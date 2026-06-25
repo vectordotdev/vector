@@ -205,6 +205,11 @@ impl Application {
     ) -> Result<(Runtime, Self), ExitCode> {
         opts.root.init_global();
 
+        #[cfg(feature = "sources-utils-http-encoding")]
+        crate::sources::util::http::set_max_decompressed_size_bytes(
+            opts.root.max_decompressed_size_bytes,
+        );
+
         let color = opts.root.color.use_color();
 
         init_logging(
@@ -212,6 +217,7 @@ impl Application {
             opts.root.log_format,
             opts.log_level(),
             opts.root.internal_log_rate_limit,
+            opts.root.internal_logs_source_rate_limit,
         );
 
         #[cfg(unix)]
@@ -658,19 +664,33 @@ pub async fn load_configs(
     Ok(config)
 }
 
-pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {
+pub fn init_logging(
+    color: bool,
+    format: LogFormat,
+    log_level: &str,
+    internal_log_rate_limit_secs: u64,
+    internal_logs_source_rate_limit_secs: Option<NonZeroU64>,
+) {
     let level = get_log_levels(log_level);
     let json = match format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
 
-    trace::init(color, json, &level, rate);
+    trace::init(
+        color,
+        json,
+        &level,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs,
+    );
     debug!(
         message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs =
+            internal_logs_source_rate_limit_secs.map(NonZeroU64::get),
     );
-    info!(message = "Log level is enabled.", level = ?level);
+    info!(message = "Log level is enabled.", ?level);
 }
 
 pub fn watcher_config(

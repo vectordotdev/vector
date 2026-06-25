@@ -2,7 +2,6 @@ package metadata
 
 components: sinks: splunk_hec_logs: {
 	title: "Splunk HEC logs"
-	alias: "splunk_hec"
 
 	classes: {
 		delivery:      "at_least_once"

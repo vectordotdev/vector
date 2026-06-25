@@ -193,7 +193,8 @@ pub struct RootOpts {
     /// This controls the time window for rate limiting Vector's own internal logs.
     /// Within each time window, the first occurrence of a log is emitted, the second
     /// shows a suppression warning, and subsequent occurrences are silent until the
-    /// window expires.
+    /// window expires. When the window expires and the log fires again, a summary of
+    /// the suppressed count is emitted followed by the log itself.
     ///
     /// Logs are grouped by their location in the code and the `component_id` field, so logs
     /// from different components are rate limited independently.
@@ -209,6 +210,16 @@ pub struct RootOpts {
         default_value = "10"
     )]
     pub internal_log_rate_limit: u64,
+
+    /// Apply a rate limit (in seconds) to the broadcast channel that feeds all `internal_logs`
+    /// sources. When set, the first occurrence of a repeated log is emitted, the second shows a
+    /// suppression warning, and subsequent occurrences are silent until the window expires. When
+    /// the window expires and the log fires again, a summary of the suppressed count is emitted
+    /// followed by the log itself. Unset by default so that `internal_logs` consumers receive
+    /// every log event. This limit is independent of `--internal-log-rate-limit`, which only
+    /// applies to stdout/stderr output.
+    #[arg(long, env = "VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT")]
+    pub internal_logs_source_rate_limit: Option<NonZeroU64>,
 
     /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
     /// received. After the duration has passed, Vector will force shutdown. To never force
@@ -260,6 +271,21 @@ pub struct RootOpts {
     /// `--watch-config`.
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
+
+    /// Maximum number of bytes allowed after decompressing a payload.
+    ///
+    /// Sources that decompress incoming payloads (gzip, deflate, zstd, snappy) enforce this cap to
+    /// prevent a compressed "bomb" from exhausting memory. Payloads whose decompressed size exceeds
+    /// the limit are rejected.
+    ///
+    /// Defaults to 104857600 (100 MiB). Raise this only when sources routinely receive
+    /// legitimately large compressed payloads.
+    #[arg(
+        long,
+        env = "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES",
+        default_value = "104857600"
+    )]
+    pub max_decompressed_size_bytes: usize,
 
     /// Raise the file descriptor soft limit (RLIMIT_NOFILE) to the hard limit at startup.
     ///

@@ -466,6 +466,7 @@ mod test {
     use std::{collections::HashMap, fmt, str::FromStr};
 
     use chrono::prelude::*;
+    use indoc::indoc;
     use rand::{Rng, rng};
     use serde::Deserialize;
     use tokio::time::{Duration, Instant, sleep};
@@ -670,25 +671,25 @@ mod test {
 
     #[test]
     fn config_tcp() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            "#,
+        })
         .unwrap();
         assert!(matches!(config.mode, Mode::Tcp { .. }));
     }
 
     #[test]
     fn config_tcp_with_receive_buffer_size() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-            receive_buffer_bytes = 256
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            receive_buffer_bytes: 256
+            "#,
+        })
         .unwrap();
 
         let receive_buffer_bytes = match config.mode {
@@ -704,12 +705,12 @@ mod test {
 
     #[test]
     fn config_tcp_keepalive_empty() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            "#,
+        })
         .unwrap();
 
         let keepalive = match config.mode {
@@ -722,13 +723,14 @@ mod test {
 
     #[test]
     fn config_tcp_keepalive_full() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-            keepalive.time_secs = 7200
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            keepalive:
+              time_secs: 7200
+            "#,
+        })
         .unwrap();
 
         let keepalive = match config.mode {
@@ -743,27 +745,27 @@ mod test {
 
     #[test]
     fn config_udp() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "udp"
-            address = "127.0.0.1:1235"
-            max_length = 32187
-          "#,
-        )
+            mode: udp
+            address: "127.0.0.1:1235"
+            max_length: 32187
+            "#,
+        })
         .unwrap();
         assert!(matches!(config.mode, Mode::Udp { .. }));
     }
 
     #[test]
     fn config_udp_with_receive_buffer_size() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "udp"
-            address = "127.0.0.1:1235"
-            max_length = 32187
-            receive_buffer_bytes = 256
-          "#,
-        )
+            mode: udp
+            address: "127.0.0.1:1235"
+            max_length: 32187
+            receive_buffer_bytes: 256
+            "#,
+        })
         .unwrap();
 
         let receive_buffer_bytes = match config.mode {
@@ -780,12 +782,12 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn config_unix() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "unix"
-            path = "127.0.0.1:1235"
-          "#,
-        )
+            mode: unix
+            path: "127.0.0.1:1235"
+            "#,
+        })
         .unwrap();
         assert!(matches!(config.mode, Mode::Unix { .. }));
     }
@@ -793,13 +795,13 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn config_unix_permissions() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "unix"
-            path = "127.0.0.1:1235"
-            socket_file_mode = 0o777
-          "#,
-        )
+            mode: unix
+            path: "127.0.0.1:1235"
+            socket_file_mode: 511
+            "#,
+        })
         .unwrap();
         let socket_file_mode = match config.mode {
             Mode::Unix {
