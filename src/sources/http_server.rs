@@ -437,11 +437,15 @@ fn compile_response_source(
 
     // The runtime only knows how to turn a string (body) or an object (`status`/`body`/`headers`)
     // into a response; any other return type hits the `unexpected type` branch at request time,
-    // returns a 500, and drops the batch. Reject those statically so a config mistake fails fast
-    // instead of losing data at runtime. A program that always `abort`s has a `never` result and
-    // is allowed, since it never reaches the normal return path.
-    let result = program.final_type_info().result;
-    if !(result.is_never() || result.contains_bytes() || result.contains_object()) {
+    // returns a 500, and drops the batch. Require the result to be a subset of those supported
+    // kinds, not merely to contain one of them, so a mixed union such as `if cond { "ok" } else
+    // { 1 }` is rejected rather than dropping the batch on the unsupported branch. A program that
+    // always `abort`s has a `never` result, which is a subset of any kind and so is allowed.
+    let allowed = Kind::bytes().or_object(Collection::any());
+    if allowed
+        .is_superset(&program.final_type_info().result)
+        .is_err()
+    {
         return Err("`response_source` must return a string or object.".into());
     }
 
@@ -1107,6 +1111,28 @@ mod tests {
         assert!(
             result.is_err(),
             "a non-string/object return type should fail at build time"
+        );
+    }
+
+    /// A program whose result is a union of a supported and an unsupported kind (here string or
+    /// integer) is rejected at build time. The integer branch would otherwise reach the runtime
+    /// `unexpected type` path, return a 500, and drop the batch.
+    #[tokio::test]
+    async fn response_source_mixed_return_kinds_fails_at_build() {
+        let result = SimpleHttpConfig {
+            address: "0.0.0.0:0".parse().unwrap(),
+            response_source: Some(r#"if exists(.[0].ok) { "ok" } else { 1 }"#.to_owned()),
+            ..SimpleHttpConfig::default()
+        }
+        .build(SourceContext::new_test(
+            SourceSender::new_test_finalize(EventStatus::Delivered).0,
+            None,
+        ))
+        .await;
+
+        assert!(
+            result.is_err(),
+            "a union with an unsupported return kind should fail at build time"
         );
     }
 
