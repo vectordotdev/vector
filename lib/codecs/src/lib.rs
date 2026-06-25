@@ -37,6 +37,8 @@ pub use encoding::{
     RawMessageSerializer, RawMessageSerializerConfig, SinkType, TextSerializer,
     TextSerializerConfig, TimestampFormat, Transformer,
 };
+#[cfg(feature = "syslog")]
+pub use encoding::{SyslogSerializer, SyslogSerializerConfig, SyslogSerializerOptions};
 pub use gelf::{VALID_FIELD_REGEX, gelf_fields};
 pub use ready_frames::ReadyFrames;
 use vector_config_macros::configurable_component;
