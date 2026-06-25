@@ -10,8 +10,12 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     Client,
-    proto::{Component, ComponentType, MetricName, stream_component_metrics_response::Value},
+    proto::{
+        Component, ComponentType, InternalMetricKind, MetricName,
+        stream_component_metrics_response::Value,
+    },
 };
+use vector_common::internal_event::all_metrics;
 
 use crate::state::{self, OutputMetrics, SentEventsMetric};
 use vector_common::config::ComponentKey;
@@ -569,22 +573,52 @@ pub async fn init_components(
         })
         .collect::<BTreeMap<_, _>>();
 
+    // GetCapabilities is a one-shot call made once per connection to learn allocation
+    // tracing status and the full set of registered metric names. Re-evaluated on every
+    // reconnect via the retry loop in `subscription()`.
+    // On older servers that don't implement GetCapabilities, fall back to the legacy
+    // GetAllocationTracingStatus RPC for the allocation tracing flag and use the
+    // compiled-in metric names as the available metrics list.
+    let (allocation_tracing_enabled, available_metrics) = match client.get_capabilities().await {
+        Ok(caps) => {
+            let metrics = caps
+                .available_metrics
+                .into_iter()
+                .filter_map(|m| {
+                    let kind = match InternalMetricKind::try_from(m.kind) {
+                        Ok(InternalMetricKind::Counter) => state::InternalMetricKind::Counter,
+                        Ok(InternalMetricKind::Gauge) => state::InternalMetricKind::Gauge,
+                        Ok(InternalMetricKind::Histogram) => state::InternalMetricKind::Histogram,
+                        _ => return None,
+                    };
+                    Some(state::MetricInfo { name: m.name, kind })
+                })
+                .collect();
+            (caps.allocation_tracing_enabled, metrics)
+        }
+        Err(_) => {
+            let enabled = client
+                .get_allocation_tracing_status()
+                .await
+                .map(|r| r.enabled)
+                .unwrap_or(false);
+            let metrics = all_metrics()
+                .map(|(name, kind)| state::MetricInfo {
+                    name: name.to_string(),
+                    kind,
+                })
+                .collect();
+            (enabled, metrics)
+        }
+    };
+
+    let mut state = state::State::new(rows);
+    state.available_metrics = available_metrics;
+
     #[cfg(feature = "allocation-tracing")]
     {
-        // Allocation tracing is a compile-time + startup-time setting on the
-        // server, so querying once per connection is sufficient. On error
-        // (e.g. older server without this RPC) we default to false, matching
-        // pre-existing behavior. This is re-evaluated on every reconnect via
-        // the retry loop in `subscription()`.
-        let mut state = state::State::new(rows);
-        state.allocation_tracing_active = client
-            .get_allocation_tracing_status()
-            .await
-            .map(|r| r.enabled)
-            .unwrap_or(false);
-        Ok(state)
+        state.allocation_tracing_active = allocation_tracing_enabled;
     }
 
-    #[cfg(not(feature = "allocation-tracing"))]
-    Ok(state::State::new(rows))
+    Ok(state)
 }
