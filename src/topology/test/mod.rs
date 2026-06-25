@@ -32,6 +32,7 @@ use crate::{
     topology::{ReloadError::*, RunningTopology, builder::TopologyPiecesBuilder},
 };
 
+mod authoritative_acks;
 mod backpressure;
 mod compliance;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]

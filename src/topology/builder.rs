@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::ready,
     num::NonZeroUsize,
     sync::{Arc, LazyLock, Mutex},
@@ -138,6 +138,10 @@ impl<'a> Builder<'a> {
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
         let enrichment_tables = self.load_enrichment_tables().await;
+
+        // Compute which components are on authoritative paths (for fanout-level stripping).
+        let authoritative_components = self.config.compute_authoritative_components();
+
         let source_tasks = self.build_sources(enrichment_tables).await;
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
@@ -159,6 +163,7 @@ impl<'a> Builder<'a> {
                 utilization: self
                     .utilization_emitter
                     .map(|e| (e, self.utilization_registry)),
+                authoritative_components,
             })
         } else {
             Err(self.errors)
@@ -1062,6 +1067,9 @@ pub struct TopologyPieces {
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
+    /// Components on authoritative acknowledgement paths. None means the feature
+    /// is inactive (no sink has authoritative: true), so all sinks participate.
+    pub(crate) authoritative_components: Option<HashSet<ComponentKey>>,
 }
 
 /// Builder for constructing TopologyPieces with a fluent API.

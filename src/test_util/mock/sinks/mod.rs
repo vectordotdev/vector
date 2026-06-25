@@ -10,6 +10,9 @@ pub use self::completion::CompletionSinkConfig;
 mod error;
 pub use self::error::ErrorSinkConfig;
 
+mod no_ack;
+pub use self::no_ack::NoAckSinkConfig;
+
 mod oneshot;
 pub use self::oneshot::OneshotSinkConfig;
 
