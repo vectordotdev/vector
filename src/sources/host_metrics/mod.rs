@@ -913,7 +913,12 @@ mod tests {
         let keys = collect_tag_values(&all_metrics, tag);
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
-            let key_prefix = &key[..key.len() - 1].to_string();
+            #[expect(
+                clippy::string_slice,
+                reason = "index from char_indices, always a char boundary"
+            )]
+            let key_prefix =
+                &key[..key.char_indices().next_back().map_or(0, |(i, _)| i)].to_string();
             let key_prefix_pattern = PatternWrapper::try_from(format!("{key_prefix}*")).unwrap();
             let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 

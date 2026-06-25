@@ -3,6 +3,7 @@
 
 #![deny(missing_docs)]
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 
 mod common;
 mod decoder_framed_read;

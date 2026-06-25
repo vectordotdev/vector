@@ -125,8 +125,9 @@ impl SinkConfig for DatabendConfig {
         let mut endpoint = url::Url::parse(&endpoint)?;
         match auth {
             Some(Auth::Basic { user, password }) => {
-                let _ = endpoint.set_username(&user);
-                let _ = endpoint.set_password(Some(password.inner()));
+                // Only fails for host-less URLs, which cannot happen given the scheme validation above.
+                endpoint.set_username(&user).ok();
+                endpoint.set_password(Some(password.inner())).ok();
             }
             Some(Auth::Bearer { .. }) => {
                 return Err("Bearer authentication is not supported currently".into());

@@ -301,11 +301,17 @@ impl StringCollector {
         result.push_str(key);
         result.push_str("=\"");
         while let Some(i) = value.find(['\\', '"']) {
-            result.push_str(&value[..i]);
-            result.push('\\');
-            // Ugly but works because we know the character at `i` is ASCII
-            result.push(value.as_bytes()[i] as char);
-            value = &value[i + 1..];
+            #[expect(
+                clippy::string_slice,
+                reason = "i comes from find() on ASCII chars, i and i+1 are char boundaries"
+            )]
+            {
+                result.push_str(&value[..i]);
+                result.push('\\');
+                // Ugly but works because we know the character at `i` is ASCII
+                result.push(value.as_bytes()[i] as char);
+                value = &value[i + 1..];
+            }
         }
         result.push_str(value);
         result.push('"');

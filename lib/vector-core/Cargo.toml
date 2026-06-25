@@ -5,8 +5,8 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ddsketch_extended)'] }
+[lints]
+workspace = true
 
 [dependencies]
 async-trait.workspace = true
