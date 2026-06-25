@@ -737,6 +737,13 @@ generated: components: sources: http_server: configuration: {
 			- A string, used directly as the response body with the configured `response_code`.
 			- An object with optional fields: `status` (integer), `body` (string), `headers` (object).
 
+			## Event types
+
+			The program only sees log events. When a decoder that emits metric or trace events is
+			configured (for example `native`, `native_json`, or `otlp`), those events are still
+			forwarded to the sink but are not included in `.`. Programs that count or inspect events
+			(for example `length(.)`) therefore account only for log events.
+
 			## Aborting and early rejection
 
 			Call `abort` in the program to suppress event forwarding entirely and respond immediately,
