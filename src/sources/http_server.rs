@@ -427,6 +427,17 @@ fn compile_response_source(
             warnings = %warnings_str
         );
     }
+
+    // The runtime only knows how to turn a string (body) or an object (`status`/`body`/`headers`)
+    // into a response; any other return type hits the `unexpected type` branch at request time,
+    // returns a 500, and drops the batch. Reject those statically so a config mistake fails fast
+    // instead of losing data at runtime. A program that always `abort`s has a `never` result and
+    // is allowed, since it never reaches the normal return path.
+    let result = program.final_type_info().result;
+    if !(result.is_never() || result.contains_bytes() || result.contains_object()) {
+        return Err("`response_source` must return a string or object.".into());
+    }
+
     Ok(Arc::new(program))
 }
 
@@ -1069,6 +1080,45 @@ mod tests {
         .await;
 
         assert!(result.is_err(), "invalid VRL should fail at build time");
+    }
+
+    /// A program that compiles but returns a type the runtime cannot turn into a response (here an
+    /// integer) is rejected at build time rather than producing a 500 and dropping events.
+    #[tokio::test]
+    async fn response_source_non_string_object_return_fails_at_build() {
+        let result = SimpleHttpConfig {
+            address: "0.0.0.0:0".parse().unwrap(),
+            response_source: Some("1".to_owned()),
+            ..SimpleHttpConfig::default()
+        }
+        .build(SourceContext::new_test(
+            SourceSender::new_test_finalize(EventStatus::Delivered).0,
+            None,
+        ))
+        .await;
+
+        assert!(
+            result.is_err(),
+            "a non-string/object return type should fail at build time"
+        );
+    }
+
+    /// A program that unconditionally `abort`s has a `never` return type and must still build,
+    /// so the return-type check does not reject valid reject-only programs.
+    #[tokio::test]
+    async fn response_source_abort_only_program_builds() {
+        let result = SimpleHttpConfig {
+            address: "0.0.0.0:0".parse().unwrap(),
+            response_source: Some(r#"abort "rejected""#.to_owned()),
+            ..SimpleHttpConfig::default()
+        }
+        .build(SourceContext::new_test(
+            SourceSender::new_test_finalize(EventStatus::Delivered).0,
+            None,
+        ))
+        .await;
+
+        assert!(result.is_ok(), "an abort-only program should build");
     }
 
     /// Spawn an `http_server` source with a `response_source`, a specific `EventStatus` finalizer,
