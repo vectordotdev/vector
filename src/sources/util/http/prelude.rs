@@ -29,7 +29,7 @@ use warp::{
         BoxedFilter,
         path::{FullPath, Tail},
     },
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
     reject::Rejection,
     reply::Reply,
 };
@@ -512,7 +512,7 @@ fn build_response_from_vrl_obj(
     if let Some(Value::Object(headers)) = obj.get("headers") {
         for (k, v) in headers {
             if let Value::Bytes(v) = v {
-                builder = builder.header(k.as_str(), v.as_ref());
+                insert_validated_header(&mut builder, k.as_str(), v.as_ref());
             }
         }
     }
@@ -523,6 +523,32 @@ fn build_response_from_vrl_obj(
             format!("Failed to build response: {err}"),
         ))
     })
+}
+
+/// Inserts a single response header after validating its name and value.
+///
+/// Header data can be built from arbitrary event content, so an invalid name or value (for
+/// example a value containing CR/LF) is skipped with a warning rather than failing the whole
+/// response. Validating up front and inserting via `headers_mut` avoids latching an error on the
+/// builder, which would otherwise make `body()` fail and drop the already-accepted events.
+fn insert_validated_header(builder: &mut warp::http::response::Builder, name: &str, value: &[u8]) {
+    let header_name = match HeaderName::from_bytes(name.as_bytes()) {
+        Ok(name) => name,
+        Err(error) => {
+            warn!(message = "Skipping invalid response header name.", header = %name, %error);
+            return;
+        }
+    };
+    let header_value = match HeaderValue::from_bytes(value) {
+        Ok(value) => value,
+        Err(error) => {
+            warn!(message = "Skipping invalid response header value.", header = %name, %error);
+            return;
+        }
+    };
+    if let Some(headers) = builder.headers_mut() {
+        headers.insert(header_name, header_value);
+    }
 }
 
 /// Builds an HTTP response from a JSON object encoded in an `abort` message string.
@@ -553,7 +579,7 @@ fn build_response_from_json_obj(
     if let Some(JsonValue::Object(headers)) = obj.get("headers") {
         for (k, v) in headers {
             if let Some(v) = v.as_str() {
-                builder = builder.header(k.as_str(), v);
+                insert_validated_header(&mut builder, k.as_str(), v.as_bytes());
             }
         }
     }

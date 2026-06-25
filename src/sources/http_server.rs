@@ -998,6 +998,63 @@ mod tests {
         .await;
     }
 
+    /// An invalid header name (spaces are not allowed) is skipped rather than failing the whole
+    /// response, so the valid header and body are returned and the events are still forwarded.
+    #[tokio::test]
+    async fn response_source_invalid_header_name_skipped_and_events_forwarded() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let program = r#"
+                {
+                    "body": "ok",
+                    "headers": { "Bad Header Name": "v", "X-Good": "yes" }
+                }
+            "#;
+            let (rx, addr) = source_with_program(program, None).await;
+
+            spawn_collect_n(
+                async move {
+                    let resp = post_raw(addr, "hello\n").await;
+                    assert_eq!(resp.status().as_u16(), 200);
+                    assert!(resp.headers().get("bad header name").is_none());
+                    assert_eq!(resp.headers()["x-good"], "yes");
+                    assert_eq!(resp.text().await.unwrap(), "ok");
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    /// An invalid header value (CR/LF is not allowed) is skipped rather than failing the whole
+    /// response, so the body is still returned and the events are still forwarded.
+    #[tokio::test]
+    async fn response_source_invalid_header_value_skipped_and_events_forwarded() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let program = r#"
+                {
+                    "body": "ok",
+                    "headers": { "X-Test": "line1\nline2" }
+                }
+            "#;
+            let (rx, addr) = source_with_program(program, None).await;
+
+            spawn_collect_n(
+                async move {
+                    let resp = post_raw(addr, "hello\n").await;
+                    assert_eq!(resp.status().as_u16(), 200);
+                    assert!(resp.headers().get("x-test").is_none());
+                    assert_eq!(resp.text().await.unwrap(), "ok");
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
     #[tokio::test]
     async fn response_source_invalid_vrl_fails_at_build() {
         let result = SimpleHttpConfig {
