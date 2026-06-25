@@ -43,7 +43,7 @@ The actual comparison tool. Runs 3 replicates of each variant with 270 samples a
 All images use the same Vector source; they differ only in VRL version and the `VRL_OBJECT_MAP` env var.
 
 | Image | VRL version | Map type | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `vector:btree` | baseline (no opts) | btree | **The baseline for all comparisons** |
 | `vector:flat` | baseline | flat | Flat map only |
 | `vector:btree-ks` | + EcoString | btree | Old keystring on btree |
@@ -56,6 +56,7 @@ All images use the same Vector source; they differ only in VRL version and the `
 | `vector:flat-co-ksc` | + copy elim + CompactString | flat | Copy elim + CompactString |
 
 To rebuild: the VRL repo (`../vrl`) has copy elimination committed on `main`. KeyString variants are managed via `git stash`:
+
 - **EcoString**: `git stash pop` the older stash
 - **CompactString**: dirty working tree state (or stash pop the newer stash)
 - **No keystring**: `git stash` everything
@@ -67,7 +68,7 @@ To rebuild: the VRL repo (`../vrl`) has copy elimination committed on `main`. Ke
 Throughput vs btree baseline, from `bench-results/full/`:
 
 | Tier | Cases | Flat map Δ |
-|---|---|---|
+| --- | --- | --- |
 | High (heavy VRL) | datadog_agent_remap_blackhole | +35.5% |
 | | datadog_agent_remap_blackhole_acks | +30.1% |
 | | syslog_humio_logs | +25.8% |
@@ -90,7 +91,7 @@ Memory (RSS) is 3–8% lower with flat map on VRL-heavy workloads.
 All measurements vs old btree baseline:
 
 | Configuration | Throughput Δ |
-|---|---|
+| --- | --- |
 | flat map only | +29.2% |
 | btree + copy elim | -0.8% |
 | btree + copy elim + EcoString | +7.4% |
@@ -99,6 +100,7 @@ All measurements vs old btree baseline:
 | flat + copy elim + CompactString | +29.2% |
 
 Key findings:
+
 - **EcoString helps btree (+7.4%) but hurts flat (-9.6% vs flat alone)**. The reference-counting indirection undermines flat map cache locality.
 - **CompactString is neutral on flat**. Inline small-string storage preserves cache behavior. Full +29.2% recovered.
 - **Copy elimination is near-zero on its own** but is a prerequisite for the KeyString changes.

@@ -13481,7 +13481,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.33.1"
-source = "git+https://github.com/lukesteensen/vrl.git?branch=experiment%2Fobjectmap-backends#d243198bc134ab19ea6293322d36055fd54c2fe2"
+source = "git+https://github.com/lukesteensen/vrl.git?branch=experiment%2Fobjectmap-backends#90933efb3b4e9e27f95697ef9adc129fba508e44"
 dependencies = [
  "aes",
  "aes-siv",

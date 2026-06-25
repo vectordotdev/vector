@@ -66,7 +66,13 @@ for variant in "${VARIANTS[@]}"; do
     fi
 
     echo "[$n/$total] Running: ${case_name} -- btree vs ${variant}"
-    docker rm -f $(docker ps -aq) 2>/dev/null || true
+    containers=()
+    while IFS= read -r container; do
+      containers+=("$container")
+    done < <(docker ps -aq)
+    if (( ${#containers[@]} > 0 )); then
+      docker rm -f "${containers[@]}" 2>/dev/null || true
+    fi
     if ! "${BENCH}" run "${case_name}" btree "${variant}" 2>&1 | tee "${outfile}"; then
       echo "[$n/$total] FAILED: ${case_name} -- btree vs ${variant}"
     fi
