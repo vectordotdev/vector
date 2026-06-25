@@ -10,7 +10,7 @@ use glob::{Pattern, PatternError};
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use serde_with::serde_as;
-use sysinfo::System;
+use sysinfo::{Components, System};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
@@ -358,6 +358,10 @@ impl HostMetricsConfig {
 pub struct HostMetrics {
     config: HostMetricsConfig,
     system: System,
+    // Kept across scrapes so that sysinfo-derived values such as
+    // `Component::max()` retain their refresh history instead of resetting on
+    // every collection (see `temperature_metrics`).
+    components: Components,
     #[cfg(target_os = "linux")]
     root_cgroup: Option<cgroups::CGroupRoot>,
     events_received: Registered<EventsReceived>,
@@ -369,6 +373,7 @@ impl HostMetrics {
         Self {
             config,
             system: System::new(),
+            components: Components::new_with_refreshed_list(),
             events_received: register!(EventsReceived),
         }
     }
@@ -380,6 +385,7 @@ impl HostMetrics {
         Self {
             config,
             system: System::new(),
+            components: Components::new_with_refreshed_list(),
             root_cgroup,
             events_received: register!(EventsReceived),
         }

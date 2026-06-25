@@ -1,4 +1,3 @@
-use sysinfo::Components;
 use vector_lib::metric_tags;
 
 use super::HostMetrics;
@@ -9,19 +8,33 @@ const TEMPERATURE_MAX_CELSIUS: &str = "temperature_max_celsius";
 const TEMPERATURE_CRITICAL_CELSIUS: &str = "temperature_critical_celsius";
 
 impl HostMetrics {
-    pub async fn temperature_metrics(&self, output: &mut super::MetricsBuffer) {
+    pub async fn temperature_metrics(&mut self, output: &mut super::MetricsBuffer) {
         output.name = "temperature";
-        let components = Components::new_with_refreshed_list();
-        for component in &components {
-            let label = component.label();
+        // Refresh the long-lived component list in place. `Component::max()` is
+        // derived by sysinfo from successive refreshes when the sensor does not
+        // expose a hardware maximum, so recreating the list every scrape (as a
+        // fresh `Components::new_with_refreshed_list()` would) resets that
+        // history and makes the reported max equal the latest sample.
+        self.components.refresh(true);
+        for component in &self.components {
+            // Some sensors expose an empty label (for example when sysinfo falls
+            // back to `/sys/class/thermal`); use the component id as a fallback
+            // so distinct sensors are not collapsed into a single series.
+            let label = if component.label().is_empty() {
+                component.id().unwrap_or_default()
+            } else {
+                component.label()
+            };
             let tags = || metric_tags!(COMPONENT => label);
-            if let Some(temperature) = component.temperature() {
+            // Skip non-finite readings: sysinfo can return `NaN` when a sensor
+            // file exists but the read fails, and downstream sinks reject NaN.
+            if let Some(temperature) = component.temperature().filter(|t| t.is_finite()) {
                 output.gauge(TEMPERATURE_CELSIUS, temperature as f64, tags());
             }
-            if let Some(max) = component.max() {
+            if let Some(max) = component.max().filter(|m| m.is_finite()) {
                 output.gauge(TEMPERATURE_MAX_CELSIUS, max as f64, tags());
             }
-            if let Some(critical) = component.critical() {
+            if let Some(critical) = component.critical().filter(|c| c.is_finite()) {
                 output.gauge(TEMPERATURE_CRITICAL_CELSIUS, critical as f64, tags());
             }
         }

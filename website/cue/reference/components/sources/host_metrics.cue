@@ -57,7 +57,7 @@ components: sources: host_metrics: {
 		}
 
 		SYSFS_ROOT: {
-			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container. Unset and uses system `/sys` by default."
+			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container. Unset and uses system `/sys` by default. Note: the `temperature` collector reads sensors through the `sysinfo` library, which always uses the process' real `/sys` and does not honor this setting."
 			type: string: {
 				default: null
 				examples: ["/mnt/host/sys"]
@@ -318,7 +318,7 @@ components: sources: host_metrics: {
 			tags: _host_metrics_tags & {
 				collector: examples: ["temperature"]
 				component: {
-					description: "The label of the hardware component the temperature was read from."
+					description: "The label of the hardware component the temperature was read from. Falls back to the component id when the sensor exposes no label (for example when sysinfo reads `/sys/class/thermal`)."
 					required:    true
 					examples: ["Core 0", "coretemp Package id 0", "nvme Composite"]
 				}
