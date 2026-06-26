@@ -10764,6 +10764,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "smol_str"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4aaa7368fcf4852a4c2dd92df0cace6a71f2091ca0a23391ce7f3a31833f1523"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "smpl_jwt"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13475,7 +13484,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.33.1"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#74e3e74582aa6b4445c1a94004bb3f14276d07df"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=perf%2Fsmol-str-keystring#46f61ee8232d1ca9f8455788959f123e0c439b2b"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13566,6 +13575,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "simdutf8",
+ "smol_str",
  "snafu 0.8.9",
  "snap",
  "strip-ansi-escapes",
