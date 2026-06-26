@@ -45,22 +45,25 @@ pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLa
 static MAX_CONNECTION_AGE_CONNECTION_OBSERVATIONS: std::sync::Mutex<Vec<SocketAddr>> =
     std::sync::Mutex::new(Vec::new());
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(crate) fn reset_max_connection_age_connection_observations() {
-    MAX_CONNECTION_AGE_CONNECTION_OBSERVATIONS
-        .lock()
-        .unwrap()
-        .clear();
-}
+#[cfg(all(test, feature = "sources-vector", feature = "sinks-vector"))]
+pub(crate) mod test_support {
+    use std::net::SocketAddr;
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(crate) fn max_connection_age_connection_observations() -> Vec<SocketAddr> {
-    MAX_CONNECTION_AGE_CONNECTION_OBSERVATIONS
-        .lock()
-        .unwrap()
-        .clone()
+    use super::MAX_CONNECTION_AGE_CONNECTION_OBSERVATIONS;
+
+    pub(crate) fn reset_max_connection_age_connection_observations() {
+        MAX_CONNECTION_AGE_CONNECTION_OBSERVATIONS
+            .lock()
+            .unwrap()
+            .clear();
+    }
+
+    pub(crate) fn max_connection_age_connection_observations() -> Vec<SocketAddr> {
+        MAX_CONNECTION_AGE_CONNECTION_OBSERVATIONS
+            .lock()
+            .unwrap()
+            .clone()
+    }
 }
 
 /// Configuration of gRPC server keepalive parameters.

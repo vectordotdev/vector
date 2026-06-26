@@ -483,7 +483,7 @@ mod tests {
         use tokio::time::{Duration, sleep};
         use tonic::transport::Channel;
 
-        use crate::sources::util::grpc::{
+        use crate::sources::util::grpc::test_support::{
             max_connection_age_connection_observations,
             reset_max_connection_age_connection_observations,
         };
