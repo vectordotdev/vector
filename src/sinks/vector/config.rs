@@ -202,9 +202,20 @@ impl SinkConfig for VectorConfig {
             }
             EndpointStrategy::Failover | EndpointStrategy::FailoverPrimary => {
                 let endpoint_timeout = request_settings.timeout;
+                let max_endpoint_attempts = match self.endpoint_strategy {
+                    EndpointStrategy::Failover => services.len(),
+                    EndpointStrategy::FailoverPrimary => services.len() + 1,
+                    EndpointStrategy::LoadBalance => {
+                        unreachable!("load balancing uses a different service")
+                    }
+                };
                 let mut failover_request_settings = request_settings;
+                // The outer Tower timeout wraps the whole failover loop. Add one
+                // endpoint timeout of slack so the final endpoint attempt is not
+                // aborted by scheduling overhead after earlier attempts consume
+                // their per-endpoint timeouts.
                 failover_request_settings.timeout = endpoint_timeout
-                    .checked_mul((services.len() + 1) as u32)
+                    .checked_mul((max_endpoint_attempts + 1) as u32)
                     .unwrap_or(endpoint_timeout);
 
                 let service = ServiceBuilder::new()
