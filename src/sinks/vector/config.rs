@@ -301,22 +301,19 @@ impl Service<VectorRequest> for FailoverVectorService {
         let endpoint_strategy = self.endpoint_strategy;
 
         Box::pin(async move {
-            let start_state = state.load(Ordering::Acquire);
-            let start = failover_state_index(start_state, services.len());
-            let mut expected_state = start_state;
+            let mut expected_state = state.load(Ordering::Acquire);
+            let start = failover_state_index(expected_state, services.len());
             let mut last_error = None;
-            let attempts = match endpoint_strategy {
-                EndpointStrategy::Failover => failover_ring_attempt_indices(start, services.len()),
-                EndpointStrategy::FailoverPrimary => {
-                    failover_primary_attempt_indices(start, services.len())
-                }
-                EndpointStrategy::LoadBalance => {
-                    unreachable!("load balancing uses a different service")
-                }
-            };
+            let mut attempts = failover_attempt_indices(endpoint_strategy, start, services.len());
+            let mut attempt = 0;
+            let mut remaining_attempts = attempts.len();
+            let mut tried = Vec::new();
 
-            for (attempt, index) in attempts.iter().copied().enumerate() {
+            while remaining_attempts > 0 && attempt < attempts.len() {
+                let index = attempts[attempt];
                 let mut service = services[index].clone();
+                tried.push(index);
+                remaining_attempts -= 1;
 
                 match tokio::time::timeout(endpoint_timeout, service.call(request.clone())).await {
                     Ok(Ok(response)) => {
@@ -327,22 +324,40 @@ impl Service<VectorRequest> for FailoverVectorService {
                             return Err(error);
                         }
 
-                        expected_state = failover_advance_if_current(
+                        let advance = failover_advance_if_current(
                             &state,
                             expected_state,
                             index,
                             attempts.get(attempt + 1).copied(),
                             services.len(),
                         );
+                        expected_state = failover_next_attempts(
+                            endpoint_strategy,
+                            services.len(),
+                            attempts.as_mut(),
+                            &mut attempt,
+                            expected_state,
+                            advance,
+                            &tried,
+                        );
                         last_error = Some(error);
                     }
                     Err(_elapsed) => {
-                        expected_state = failover_advance_if_current(
+                        let advance = failover_advance_if_current(
                             &state,
                             expected_state,
                             index,
                             attempts.get(attempt + 1).copied(),
                             services.len(),
+                        );
+                        expected_state = failover_next_attempts(
+                            endpoint_strategy,
+                            services.len(),
+                            attempts.as_mut(),
+                            &mut attempt,
+                            expected_state,
+                            advance,
+                            &tried,
                         );
                         last_error = Some(Box::new(VectorSinkError::Request {
                             source: tonic::Status::deadline_exceeded(
@@ -355,6 +370,18 @@ impl Service<VectorRequest> for FailoverVectorService {
 
             Err(last_error.expect("failover service should have at least one endpoint"))
         })
+    }
+}
+
+fn failover_attempt_indices(
+    endpoint_strategy: EndpointStrategy,
+    start: usize,
+    endpoints: usize,
+) -> Vec<usize> {
+    match endpoint_strategy {
+        EndpointStrategy::Failover => failover_ring_attempt_indices(start, endpoints),
+        EndpointStrategy::FailoverPrimary => failover_primary_attempt_indices(start, endpoints),
+        EndpointStrategy::LoadBalance => unreachable!("load balancing uses a different service"),
     }
 }
 
@@ -377,41 +404,78 @@ fn failover_ring_attempt_indices(start: usize, endpoints: usize) -> Vec<usize> {
         .collect()
 }
 
+#[derive(Debug, Eq, PartialEq)]
+struct FailoverAdvance {
+    state: usize,
+    advanced: bool,
+}
+
+fn failover_next_attempts(
+    endpoint_strategy: EndpointStrategy,
+    endpoints: usize,
+    attempts: &mut Vec<usize>,
+    attempt: &mut usize,
+    expected_state: usize,
+    advance: FailoverAdvance,
+    tried: &[usize],
+) -> usize {
+    if advance.advanced
+        || advance.state == expected_state
+        || failover_state_index(advance.state, endpoints)
+            == failover_state_index(expected_state, endpoints)
+    {
+        *attempt += 1;
+    } else {
+        *attempts = failover_attempt_indices(
+            endpoint_strategy,
+            failover_state_index(advance.state, endpoints),
+            endpoints,
+        )
+        .into_iter()
+        .filter(|index| !tried.contains(index))
+        .collect();
+        *attempt = 0;
+    }
+
+    advance.state
+}
+
 fn failover_advance_if_current(
     state: &AtomicUsize,
     expected_state: usize,
     index: usize,
     next_index: Option<usize>,
     endpoints: usize,
-) -> usize {
+) -> FailoverAdvance {
     let Some(next_index) = next_index else {
-        return state.load(Ordering::Acquire);
+        return FailoverAdvance {
+            state: state.load(Ordering::Acquire),
+            advanced: false,
+        };
     };
 
-    let mut current_state = expected_state;
+    if failover_state_index(expected_state, endpoints) != index {
+        return FailoverAdvance {
+            state: state.load(Ordering::Acquire),
+            advanced: false,
+        };
+    }
 
-    loop {
-        if failover_state_index(current_state, endpoints) != index {
-            let actual_state = state.load(Ordering::Acquire);
-            if actual_state == current_state
-                || failover_state_index(actual_state, endpoints) != index
-            {
-                return actual_state;
-            }
-            current_state = actual_state;
-            continue;
-        }
-
-        let next_state = failover_next_state(current_state, next_index, endpoints);
-        match state.compare_exchange(
-            current_state,
-            next_state,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            Ok(_) => return next_state,
-            Err(actual) => current_state = actual,
-        }
+    let next_state = failover_next_state(expected_state, next_index, endpoints);
+    match state.compare_exchange(
+        expected_state,
+        next_state,
+        Ordering::AcqRel,
+        Ordering::Acquire,
+    ) {
+        Ok(_) => FailoverAdvance {
+            state: next_state,
+            advanced: true,
+        },
+        Err(actual) => FailoverAdvance {
+            state: actual,
+            advanced: false,
+        },
     }
 }
 
@@ -610,7 +674,7 @@ mod tests {
     }
 
     #[test]
-    fn failover_advance_reloads_stale_generation() {
+    fn failover_advance_ignores_stale_generation() {
         let endpoints = 2;
         let state = AtomicUsize::new(failover_next_state(
             failover_next_state(0, 1, endpoints),
@@ -620,12 +684,18 @@ mod tests {
 
         let observed = failover_advance_if_current(&state, 0, 0, Some(1), endpoints);
 
-        assert_eq!(observed, 7);
-        assert_eq!(state.load(Ordering::Acquire), 7);
+        assert_eq!(
+            observed,
+            FailoverAdvance {
+                state: 4,
+                advanced: false,
+            }
+        );
+        assert_eq!(state.load(Ordering::Acquire), 4);
     }
 
     #[test]
-    fn failover_advance_reloads_stale_mismatched_state() {
+    fn failover_advance_ignores_stale_mismatched_state() {
         let endpoints = 3;
         let shared_state = failover_next_state(failover_next_state(0, 1, endpoints), 0, endpoints);
         let stale_state = 1;
@@ -633,8 +703,14 @@ mod tests {
 
         let observed = failover_advance_if_current(&state, stale_state, 0, Some(1), endpoints);
 
-        assert_eq!(observed, 10);
-        assert_eq!(state.load(Ordering::Acquire), 10);
+        assert_eq!(
+            observed,
+            FailoverAdvance {
+                state: shared_state,
+                advanced: false,
+            }
+        );
+        assert_eq!(state.load(Ordering::Acquire), shared_state);
     }
 
     #[test]
@@ -654,7 +730,13 @@ mod tests {
 
         let observed = failover_advance_if_current(&state, 0, 0, Some(1), endpoints);
 
-        assert_eq!(observed, 5);
+        assert_eq!(
+            observed,
+            FailoverAdvance {
+                state: 5,
+                advanced: false,
+            }
+        );
         assert_eq!(state.load(Ordering::Acquire), 5);
     }
 
@@ -664,7 +746,82 @@ mod tests {
 
         let observed = failover_advance_if_current(&state, 0, 0, None, 2);
 
-        assert_eq!(observed, 0);
+        assert_eq!(
+            observed,
+            FailoverAdvance {
+                state: 0,
+                advanced: false,
+            }
+        );
         assert_eq!(state.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn failover_next_attempts_recomputes_after_concurrent_advance() {
+        let mut attempts = failover_ring_attempt_indices(0, 3);
+        let mut attempt = 0;
+
+        let observed_state = failover_next_attempts(
+            EndpointStrategy::Failover,
+            3,
+            &mut attempts,
+            &mut attempt,
+            0,
+            FailoverAdvance {
+                state: 5,
+                advanced: false,
+            },
+            &[0],
+        );
+
+        assert_eq!(observed_state, 5);
+        assert_eq!(attempt, 0);
+        assert_eq!(attempts, vec![2, 1]);
+    }
+
+    #[test]
+    fn failover_next_attempts_continues_after_stale_same_endpoint_generation() {
+        let mut attempts = failover_ring_attempt_indices(0, 2);
+        let mut attempt = 0;
+
+        let observed_state = failover_next_attempts(
+            EndpointStrategy::Failover,
+            2,
+            &mut attempts,
+            &mut attempt,
+            0,
+            FailoverAdvance {
+                state: 4,
+                advanced: false,
+            },
+            &[0],
+        );
+
+        assert_eq!(observed_state, 4);
+        assert_eq!(attempt, 1);
+        assert_eq!(attempts, vec![0, 1]);
+    }
+
+    #[test]
+    fn failover_next_attempts_continues_after_local_advance() {
+        let mut attempts = failover_primary_attempt_indices(1, 3);
+        let mut attempt = 0;
+
+        let observed_state = failover_next_attempts(
+            EndpointStrategy::FailoverPrimary,
+            3,
+            &mut attempts,
+            &mut attempt,
+            1,
+            FailoverAdvance {
+                state: 3,
+                advanced: true,
+            },
+            &[1],
+        );
+
+        assert_eq!(observed_state, 3);
+        assert_eq!(attempt, 1);
+        assert_eq!(attempts, vec![1, 0, 1, 2]);
     }
 }
