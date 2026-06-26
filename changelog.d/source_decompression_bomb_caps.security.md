@@ -1,0 +1,13 @@
+Sources that can decompress potentially untrusted input now cap compressed and decompressed payloads size. The size of the decompressed output is now 100MiB by default and can be configured by `--max-decompressed-size-bytes` or `VECTOR_MAX_DECOMPRESSED_SIZE_BYTES`. This prevents a small compressed payload (e.g. a gzip/zlib/zstd bomb) from allocating unbounded memory and OOM-killing the Vector process. Affected sources: `http_server`, `heroku_logs`, `prometheus_pushgateway`, `prometheus_remote_write`, `datadog_agent`, `splunk_hec`, `aws_kinesis_firehose`, `fluent`, `logstash`, `vector`, and `opentelemetry` (both its HTTP and gRPC modes).
+
+Additionally, the `datadog_agent`, `splunk_hec`, and `aws_kinesis_firehose` sources now cap the size of the raw (compressed) request body they buffer in memory, matching the `http_server` and `opentelemetry` sources. Previously these sources read the entire request body into memory unbounded before decompression, so a large compressed upload could drive memory allocation independently of the decompressed-size cap. The compressed body is now bounded by the same limit and oversized requests are rejected with `413 Payload Too Large`.
+
+The `fluent` source now caps how large a single msgpack frame may grow while being buffered, using the same limit. Previously, a peer could declare an oversized msgpack array, map, or string and stream the bytes without ever completing a message, driving unbounded memory growth independently of decompression. Frames that exceed the limit before a complete message is decoded are now rejected and the connection is closed.
+
+The `vector` source and the `opentelemetry` source's gRPC mode now bound gRPC message size at the header read and cap `gzip`/`zstd` decompression mid-stream, matching the decompressed-size limit enforced elsewhere. Previously a compressed gRPC message could expand past the cap during decompression before being rejected.
+
+zstd decoders across these sources now also bound the decoder's internal window allocation, derived from the decompressed-size cap (and for HTTP-based sources, additionally clamped to the 8 MB ceiling suggested by RFC 9659). Previously a crafted frame could declare a large `Window_Size` and drive a big allocation for the decoder's window buffer before the decompressed-size cap had a chance to trip.
+
+The `aws_kinesis_firehose` source no longer falls back to forwarding raw, undecoded bytes for a record that hits the decompressed-size cap under `Compression::Auto`. Previously, a gzip record that failed only because it exceeded the cap was treated the same as a record that failed to decode for other reasons and was forwarded as-is, bypassing the cap; such records are now rejected.
+
+authors: thomasqueirozb

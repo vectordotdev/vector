@@ -601,14 +601,12 @@ impl StreamSink<Event> for PrometheusExporter {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
-
     use chrono::{Duration, Utc};
-    use flate2::read::GzDecoder;
     use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
+    use vector_common::decompression::CappedDecoder;
     use vector_lib::{
         event::{MetricTags, StatisticKind},
         finalization::{BatchNotifier, BatchStatus},
@@ -809,9 +807,8 @@ mod tests {
             name = name1,
         );
 
-        let mut gz = GzDecoder::new(&body_raw[..]);
-        let mut body_decoded = String::new();
-        gz.read_to_string(&mut body_decoded).unwrap();
+        let body_decoded =
+            String::from_utf8(CappedDecoder::gzip(&body_raw[..]).decompress().unwrap()).unwrap();
 
         assert!(body_raw.len() < expected.len());
         assert_eq!(body_decoded, expected);

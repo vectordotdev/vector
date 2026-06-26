@@ -1,14 +1,13 @@
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
-    io::{self, Read},
+    io,
     net::SocketAddr,
     num::NonZeroUsize,
     time::Duration,
 };
 
 use bytes::{Buf, Bytes, BytesMut};
-use flate2::read::ZlibDecoder;
 use smallvec::{SmallVec, smallvec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
@@ -23,7 +22,7 @@ use vector_lib::{
 use vrl::value::{KeyString, Kind, kind::Collection};
 
 use super::util::decompression::{
-    max_decompressed_size_bytes, max_zlib_compressed_frame_size_bytes,
+    CappedDecoder, max_decompressed_size_bytes, max_zlib_compressed_frame_size_bytes,
 };
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -785,24 +784,10 @@ fn decode_compressed_frame(
     let (slice, right) = rest.split_at(payload_size);
     rest = right;
 
-    let mut buf = Vec::new();
-
-    // Read one byte beyond the cap to detect overflow without ambiguity.
-    let res = ZlibDecoder::new(io::Cursor::new(slice))
-        .take((limit as u64).saturating_add(1))
-        .read_to_end(&mut buf)
-        .context(DecompressionFailedSnafu)
-        .and_then(|_| {
-            if buf.len() > limit {
-                Err(DecodeError::DecompressionFailed {
-                    source: io::Error::other(format!(
-                        "decompressed size exceeds limit of {limit} bytes"
-                    )),
-                })
-            } else {
-                Ok(BytesMut::from(&buf[..]))
-            }
-        });
+    let res = CappedDecoder::zlib_with_limit(io::Cursor::new(slice), limit)
+        .decompress()
+        .map(|v| BytesMut::from(v.as_slice()))
+        .context(DecompressionFailedSnafu);
 
     let byte_size = bytes_remaining(src, rest);
     src.advance(byte_size);

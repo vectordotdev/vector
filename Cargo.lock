@@ -13228,6 +13228,7 @@ dependencies = [
  "chrono",
  "crossbeam-utils",
  "derivative",
+ "flate2",
  "futures",
  "indexmap 2.12.0",
  "itertools 0.14.0",
@@ -13244,6 +13245,7 @@ dependencies = [
  "vector-common-macros",
  "vector-config",
  "vrl",
+ "zstd 0.13.2",
 ]
 
 [[package]]

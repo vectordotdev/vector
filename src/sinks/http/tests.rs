@@ -6,11 +6,11 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{Deserialize, de};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
         JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
@@ -991,9 +991,10 @@ where
     T: de::DeserializeOwned,
 {
     match compression {
-        "gzip" => serde_json::from_reader(MultiGzDecoder::new(buf.reader())).unwrap(),
-        "zstd" => serde_json::from_reader(zstd::Decoder::new(buf.reader()).unwrap()).unwrap(),
-        "zlib" => serde_json::from_reader(ZlibDecoder::new(buf.reader())).unwrap(),
+        "gzip" => serde_json::from_reader(CappedDecoder::gzip(buf.reader()).into_reader()).unwrap(),
+        "zstd" => serde_json::from_reader(CappedDecoder::zstd(buf.reader()).unwrap().into_reader())
+            .unwrap(),
+        "zlib" => serde_json::from_reader(CappedDecoder::zlib(buf.reader()).into_reader()).unwrap(),
         _ => panic!("undefined compression: {compression}"),
     }
 }

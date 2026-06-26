@@ -7,8 +7,8 @@ use azure_core::http::StatusCode;
 use azure_storage_blob::BlobContainerClient;
 
 use bytes::{Buf, BytesMut};
-use flate2::read::GzDecoder;
 use futures::{Stream, StreamExt, stream};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     ByteSizeOf,
     codecs::{
@@ -396,7 +396,7 @@ impl AzureBlobSinkConfig {
         if self.compression == Compression::None {
             BufReader::new(body).lines().map(|l| l.unwrap()).collect()
         } else {
-            BufReader::new(GzDecoder::new(body))
+            BufReader::new(CappedDecoder::gzip(body).into_reader())
                 .lines()
                 .map(|l| l.unwrap())
                 .collect()
