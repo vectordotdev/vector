@@ -80,6 +80,7 @@ jobs:
           datadog-ci: ${{ !inputs.coverage }}
           protoc: true
           libsasl2: true
+          librdkafka: true
 
       - name: Run tests
         run: |
@@ -97,7 +98,7 @@ jobs:
           if [[ "${RUNNER_OS}" == "Windows" ]]; then
             DEFAULT_FEATURES="default-msvc"
           else
-            DEFAULT_FEATURES="default"
+            DEFAULT_FEATURES="default,rdkafka-dynamic"
           fi
 
           if [[ "${{ inputs.default }}" == "true" ]]; then

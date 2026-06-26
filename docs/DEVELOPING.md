@@ -46,7 +46,26 @@ To build Vector on your own host will require a fairly complete development envi
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
-  - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no extra system prerequisites beyond the C build tools above.
+  - By default, `rdkafka-sys` compiles librdkafka from its bundled C source (slow on clean builds). Enable the `rdkafka-dynamic` feature to link against a system-installed librdkafka instead — this skips the C compile and speeds up Kafka-related rebuilds significantly:
+
+    ```bash
+    FEATURES="default,rdkafka-dynamic" make build
+    ```
+
+    Prerequisites for `rdkafka-dynamic` (`pkg-config` + `librdkafka >= 2.x`):
+    - macOS: `brew install pkg-config librdkafka`
+    - Ubuntu: the distro `librdkafka-dev` is too old. Use the Confluent apt repo (signing key fingerprint: `CBBB821E 8FAF364F 79835C43 8B1DA612 0C2BF624`):
+
+      ```bash
+      curl -fsSL https://packages.confluent.io/clients/deb/archive.key -o /tmp/confluent.key
+      gpg --show-keys --with-fingerprint /tmp/confluent.key  # verify fingerprint matches
+      sudo gpg --yes --dearmor -o /usr/share/keyrings/confluent-archive-keyring.gpg /tmp/confluent.key
+      echo "deb [signed-by=/usr/share/keyrings/confluent-archive-keyring.gpg] https://packages.confluent.io/clients/deb $(lsb_release -cs) main" \
+        | sudo tee /etc/apt/sources.list.d/confluent-clients.list
+      sudo apt-get update && sudo apt-get install -y pkg-config librdkafka-dev
+      ```
+
+  - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so plain `cargo build` / `make build` has no extra system prerequisites beyond the C build tools above.
   - To enable GSSAPI for kafka, choose one of:
     - `gssapi`: dynamically links against system `libsasl2`. Requires `libsasl2-dev` (Ubuntu: `sudo apt-get install -y libsasl2-dev`) or `cyrus-sasl` (macOS: `brew install cyrus-sasl`) installed.
     - `gssapi-vendored` (or `vendored`, which includes it): builds `libsasl2` and `krb5` from bundled source. No system install needed. Linux only; the bundled path does not currently link on macOS arm64.
