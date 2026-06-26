@@ -15,7 +15,13 @@ impl HostMetrics {
         // expose a hardware maximum, so recreating the list every scrape (as a
         // fresh `Components::new_with_refreshed_list()` would) resets that
         // history and makes the reported max equal the latest sample.
-        self.components.refresh(true);
+        //
+        // Pass `false` so components that are not re-listed on a refresh are
+        // kept rather than dropped: sysinfo only sets its internal "updated"
+        // flag for `/sys/class/hwmon` sensors, so `refresh(true)` would prune
+        // the `/sys/class/thermal` fallback sensors (used e.g. on Raspberry Pi)
+        // on every scrape and drop their series entirely.
+        self.components.refresh(false);
         for component in &self.components {
             // Some sensors expose an empty label (for example when sysinfo falls
             // back to `/sys/class/thermal`); use the component id as a fallback
