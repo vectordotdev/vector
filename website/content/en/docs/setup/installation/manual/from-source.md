@@ -32,6 +32,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential cmake curl git
 ```
 
+
 Clone Vector's source:
 
 ```shell

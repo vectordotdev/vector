@@ -28,6 +28,10 @@ inputs:
     required: false
     default: false
     description: "Install libsasl2." # Required to fully build Vector
+  librdkafka:
+    required: false
+    default: false
+    description: "Install librdkafka. Required when building with `rdkafka?/dynamic_linking` (e.g. the `default` feature)."
 
   # prepare.sh - rust
   rust: # rustup module
@@ -238,6 +242,45 @@ runs:
       if: ${{ inputs.libsasl2 == 'true' }}
       shell: bash
       run: timeout 30m sudo apt-get update && timeout 30m sudo apt-get install -y libsasl2-dev
+
+    # Ubuntu's apt librdkafka-dev is older than rdkafka-sys requires, so we
+    # pull it from Confluent's apt repo (upstream maintainers of librdkafka).
+    # Both Linux and macOS install the latest 2.x from their respective package
+    # managers (Confluent apt repo and Homebrew); intentional — rdkafka-sys bindings
+    # are compatible across 2.x minor/patch releases, and release artifacts always
+    # rebuild from the vendored sources rather than linking dynamically.
+    # `pkg-config` is required for `rdkafka-sys`'s dynamic discovery.
+    - name: Install librdkafka (Confluent apt repo)
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'Linux' }}
+      shell: bash
+      env:
+        CONFLUENT_GPG_FINGERPRINT: "CBBB821E8FAF364F79835C438B1DA6120C2BF624"
+      run: |
+        set -euo pipefail
+        tmpkey="$(mktemp)"
+        curl -fsSL https://packages.confluent.io/clients/deb/archive.key -o "${tmpkey}"
+        fpr=$(gpg --show-keys --with-fingerprint --with-colons "${tmpkey}" \
+          | awk -F: '$1 == "fpr" { print $10; exit }')
+        if [ "${fpr}" != "${CONFLUENT_GPG_FINGERPRINT}" ]; then
+          echo "Confluent GPG fingerprint mismatch: got ${fpr}, expected ${CONFLUENT_GPG_FINGERPRINT}" >&2
+          exit 1
+        fi
+        sudo gpg --yes --dearmor -o /usr/share/keyrings/confluent-archive-keyring.gpg "${tmpkey}"
+        rm -f "${tmpkey}"
+        echo "deb [signed-by=/usr/share/keyrings/confluent-archive-keyring.gpg] https://packages.confluent.io/clients/deb $(lsb_release -cs) main" \
+          | sudo tee /etc/apt/sources.list.d/confluent-clients.list
+        sudo apt-get update
+        sudo apt-get install -y pkg-config librdkafka-dev
+        pkg-config --modversion rdkafka
+
+    - name: Install librdkafka (Homebrew)
+      if: ${{ inputs.librdkafka == 'true' && runner.os == 'macOS' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        brew update
+        brew install pkg-config librdkafka
+        pkg-config --modversion rdkafka
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries

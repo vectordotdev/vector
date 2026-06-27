@@ -52,9 +52,12 @@ jobs:
           rust: true
           protoc: true
           libsasl2: true
+          librdkafka: true
           cargo-nextest: ${{ inputs.cargo_nextest }}
           datadog-ci: ${{ inputs.upload_test_results }}
       - run: make ${{ inputs.command }}
+        env:
+          FEATURES: "default,rdkafka-dynamic"
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: ${{ always() && inputs.upload_test_results }}
