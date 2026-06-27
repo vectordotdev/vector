@@ -16,7 +16,6 @@ components: transforms: tag_cardinality_limit: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      true
@@ -125,6 +124,10 @@ components: transforms: tag_cardinality_limit: {
 				your metrics * `value_limit` * average length of the values of tags for your
 				metrics)
 				```
+
+				Mode `exact_fingerprint` behaves like `exact` but stores an 8-byte hash of each
+				value instead of the value itself, so use the same formula with `8` in place of
+				the average tag value length.
 
 				In mode `probabilistic`, rather than storing all values seen for each key, each
 				distinct key has a bloom filter which can probabilistically determine whether

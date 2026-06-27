@@ -68,7 +68,7 @@ impl Cli {
             alpine_version: self.alpine_version,
             debian_version: self.debian_version,
             repo_root,
-            latest_vector_version: generate_cue::find_latest_release_tag()?,
+            latest_vector_version: git::latest_release_version()?,
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
             // Websites containing `website` will also generate website previews.
             // Caveat is these branches can only contain alphanumeric chars and dashes.
@@ -119,9 +119,26 @@ impl Prepare {
     /// Steps 1 & 2
     fn create_release_branches(&self) -> Result<()> {
         debug!("create_release_branches");
-        // Step 1: Create a new release branch
-        git::run_and_check_output(&["fetch"])?;
-        git::checkout_main_branch()?;
+
+        if self.dry_run {
+            // In dry-run mode the branches (and the commit range fed to
+            // generate_cue) are based on whatever is currently checked out.
+            // Surface that explicitly so a stale or feature branch doesn't
+            // silently land unrelated commits in the generated release CUE.
+            let head = git::run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])
+                .unwrap_or_else(|_| "<unknown>".to_string());
+            let last = &self.latest_vector_version;
+            warn!(
+                "dry-run: using HEAD ({}) as the release base; \
+                 commits in the generated CUE will be `git log v{last}...HEAD`. \
+                 Verify this matches what you'd expect from master.",
+                head.trim()
+            );
+        } else {
+            // Step 1: Sync with remote and start from master.
+            git::run_and_check_output(&["fetch"])?;
+            git::checkout_main_branch()?;
+        }
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
         if !self.dry_run {
@@ -433,8 +450,8 @@ fn format_vrl_changelog_block(changelog: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let opening = "\tvrl_changelog: \"\"\"";
-    let closing = format!("{double_tab}\"\"\"");
+    let opening = "\tvrl_changelog: #\"\"\"";
+    let closing = format!("{double_tab}\"\"\"#");
 
     format!("{opening}\n{body}\n{closing}")
 }
@@ -442,12 +459,17 @@ fn format_vrl_changelog_block(changelog: &str) -> String {
 fn insert_block_after_changelog(original: &str, block: &str) -> String {
     let mut result = Vec::new();
     let mut inserted = false;
+    let mut in_changelog = false;
 
     for line in original.lines() {
         result.push(line.to_string());
 
-        // Insert *after* the line containing only the closing `]` (end of changelog array)
-        if !inserted && line.trim() == "]" {
+        if line.trim_start().starts_with("changelog:") {
+            in_changelog = true;
+        }
+
+        // Insert after the closing `]` of the changelog array specifically.
+        if !inserted && in_changelog && line.trim() == "]" {
             result.push(String::new()); // empty line before
             result.push(block.to_string());
             inserted = true;
@@ -547,11 +569,11 @@ mod tests {
         let vrl_changelog_block = format_vrl_changelog_block(vrl_changelog);
 
         let expected = concat!(
-            "\tvrl_changelog: \"\"\"\n",
+            "\tvrl_changelog: #\"\"\"\n",
             "\t\t#### [0.2.0]\n",
             "\t\t- Feature\n",
             "\t\t- Fix\n",
-            "\t\t\"\"\""
+            "\t\t\"\"\"#"
         );
 
         assert_eq!(vrl_changelog_block, expected);

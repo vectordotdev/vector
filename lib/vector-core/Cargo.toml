@@ -5,8 +5,8 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ddsketch_extended)'] }
+[lints]
+workspace = true
 
 [dependencies]
 async-trait.workspace = true
@@ -31,7 +31,7 @@ lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics.workspace = true
 metrics-tracing-context.workspace = true
 metrics-util.workspace = true
-mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { workspace = true, optional = true }
 no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float.workspace = true
 openssl = { version = "0.10.80", default-features = false, features = ["vendored"] }

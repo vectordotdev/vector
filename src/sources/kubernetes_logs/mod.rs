@@ -738,7 +738,7 @@ impl Source {
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
 
-        reflectors.push(tokio::spawn(custom_reflector(
+        reflectors.push(crate::spawn_in_current_span(custom_reflector(
             pod_store_w,
             pod_cacher,
             pod_watcher,
@@ -762,7 +762,7 @@ impl Source {
             )
             .backoff(watcher::DefaultBackoff::default());
 
-            reflectors.push(tokio::spawn(custom_reflector(
+            reflectors.push(crate::spawn_in_current_span(custom_reflector(
                 ns_store_w,
                 MetaCache::new(),
                 ns_watcher,
@@ -787,7 +787,7 @@ impl Source {
         let node_state = node_store_w.as_reader();
         let node_cacher = MetaCache::new();
 
-        reflectors.push(tokio::spawn(custom_reflector(
+        reflectors.push(crate::spawn_in_current_span(custom_reflector(
             node_store_w,
             node_cacher,
             node_watcher,
@@ -1169,6 +1169,7 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use similar_asserts::assert_eq;
     use vector_lib::{
         config::LogNamespace,
@@ -1202,15 +1203,15 @@ mod tests {
 
     #[test]
     fn test_config_serialization_insert_namespace_fields() {
-        // Test that the flag serializes/deserializes correctly from TOML
-        let toml_config = r#"
-            insert_namespace_fields = false
-        "#;
-        let config: Config = toml::from_str(toml_config).unwrap();
+        // Test that the flag serializes/deserializes correctly from YAML
+        let yaml_config = indoc! {r#"
+            insert_namespace_fields: false
+        "#};
+        let config: Config = serde_yaml::from_str(yaml_config).unwrap();
         assert_eq!(config.insert_namespace_fields, false);
 
-        let default_toml = "";
-        let default_config: Config = toml::from_str(default_toml).unwrap();
+        let default_yaml = "";
+        let default_config: Config = serde_yaml::from_str(default_yaml).unwrap();
         assert_eq!(default_config.insert_namespace_fields, true);
     }
 
@@ -1369,7 +1370,7 @@ mod tests {
 
     #[test]
     fn test_output_schema_definition_vector_namespace() {
-        let definitions = toml::from_str::<Config>("")
+        let definitions = serde_yaml::from_str::<Config>("")
             .unwrap()
             .outputs(LogNamespace::Vector)
             .remove(0)
@@ -1485,7 +1486,7 @@ mod tests {
 
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
-        let definitions = toml::from_str::<Config>("")
+        let definitions = serde_yaml::from_str::<Config>("")
             .unwrap()
             .outputs(LogNamespace::Legacy)
             .remove(0)

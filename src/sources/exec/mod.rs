@@ -724,7 +724,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    drop(tokio::spawn(async move {
+    drop(crate::spawn_in_current_span(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = DecoderFramedRead::new(reader, decoder);

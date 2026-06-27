@@ -4,15 +4,13 @@ use bytes::Bytes;
 use chrono::Utc;
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use uuid::Uuid;
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, request_metadata::RequestMetadata,
-};
+use vector_lib::{codecs::encoding::Framer, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, Finalizable},
     sinks::{
-        azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
+        azure_blob::config::{AzureBlobMetadata, AzureBlobRequest},
         util::{
             Compression, RequestBuilder, metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
@@ -56,7 +54,6 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         let azure_metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 

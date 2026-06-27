@@ -183,7 +183,7 @@ use snafu::{ResultExt, Snafu};
 use vector_common::finalization::Finalizable;
 
 mod backed_archive;
-mod common;
+pub(crate) mod common;
 mod io;
 mod ledger;
 mod reader;
@@ -356,9 +356,22 @@ where
     usage_handle.set_buffer_limits(Some(max_size.get()), None);
 
     let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
-    let config = DiskBufferConfigBuilder::from_path(buffer_path)
-        .max_buffer_size(max_size.get())
-        .build()?;
+    let builder = DiskBufferConfigBuilder::from_path(buffer_path).max_buffer_size(max_size.get());
+    // Shrink the data-file size (and the matching record size) so files fill and
+    // rotate constantly. That is what reaches the rare recovery paths the bug hides
+    // in: reopening a file whose last write was cut short, and reusing a file number
+    // after the counter wraps. Read from the environment, not the public YAML config.
+    #[cfg(feature = "antithesis-disk-asserts")]
+    let builder = match std::env::var("VECTOR_DISK_V2_MAX_DATA_FILE_SIZE")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+    {
+        Some(bytes) => builder
+            .max_data_file_size(bytes)
+            .max_record_size(usize::try_from(bytes).unwrap_or(usize::MAX)),
+        None => builder,
+    };
+    let config = builder.build()?;
     Buffer::from_config(config, usage_handle)
         .await
         .map_err(Into::into)

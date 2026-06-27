@@ -73,7 +73,7 @@ inputs:
   vdev:
     required: false
     default: true
-    description: "Install vdev CLI tool via cargo binstall (uses VDEV_VERSION pinned in prepare.sh)."
+    description: "Install vdev CLI tool via cargo binstall (version from vdev/Cargo.toml)."
 
   # prepare.sh - npm
   markdownlint-cli2:
@@ -134,9 +134,24 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
+    # Two steps so that the actions/cache post-step (which saves the cache) runs
+    # directly from this composite, not a nested one — nested composites break
+    # post-step input resolution (actions/runner#3514, #2030).
     - name: Cache Cargo registry, index, and git DB
-      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
+      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref == 'refs/heads/master' }}
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Restore Cargo registry, index, and git DB
+      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref != 'refs/heads/master' }}
+      uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
           ~/.cargo/registry/index/
@@ -222,7 +237,7 @@ runs:
     - name: Install libsasl2
       if: ${{ inputs.libsasl2 == 'true' }}
       shell: bash
-      run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      run: timeout 30m sudo apt-get update && timeout 30m sudo apt-get install -y libsasl2-dev
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries
@@ -239,7 +254,7 @@ runs:
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
           ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh', 'vdev/Cargo.toml') }}
         restore-keys: |
           ${{ runner.os }}-cargo-binaries-
 

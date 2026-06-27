@@ -153,6 +153,9 @@ make check-scripts
 
 ./scripts/check_changelog_fragments.sh
 
+# Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
+typos
+
 # The following check is very slow.
 # make check-component-features
 ```
@@ -175,8 +178,7 @@ branches, this means that only the pull request title must conform to this
 format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
-A list of allowed sub-categories is defined in the
-[semantic.yml workflow](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
+A scope is optional but appreciated. Use it to identify the component or subsystem affected, for example `feat(kafka source): ...` or `fix(loki sink): ...`.
 
 The following are all good examples of pull request titles:
 
@@ -311,7 +313,7 @@ git push
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md).
 
 ### Dependencies
 
@@ -327,7 +329,7 @@ documents:
 
 1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
 2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
+3. **[DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md)** - Deprecating functionality in Vector
 
 ## Legal
 

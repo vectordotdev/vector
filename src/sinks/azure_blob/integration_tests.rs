@@ -20,7 +20,7 @@ use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        VectorSink, azure_common,
+        VectorSink, azure_blob, azure_common,
         util::{Compression, TowerRequestConfig},
     },
     test_util::{
@@ -35,7 +35,7 @@ async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let client = config.build_test_client().await;
 
-    azure_common::config::build_healthcheck(config.container_name, client)
+    azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
@@ -46,7 +46,7 @@ async fn azure_blob_healthcheck_passed_with_oauth() {
     let config = AzureBlobSinkConfig::new_emulator_with_oauth().await;
     let client = config.build_test_client().await;
 
-    azure_common::config::build_healthcheck(config.container_name, client)
+    azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
@@ -62,7 +62,7 @@ async fn azure_blob_healthcheck_unknown_container() {
     let client = config.build_test_client().await;
 
     assert_eq!(
-        azure_common::config::build_healthcheck(config.container_name, client)
+        azure_blob::config::build_healthcheck(config.container_name, client)
             .unwrap()
             .await
             .unwrap_err()
@@ -346,7 +346,7 @@ impl AzureBlobSinkConfig {
     }
 
     async fn build_test_client(&self) -> Arc<BlobContainerClient> {
-        azure_common::config::build_client(
+        azure_blob::config::build_client(
             self.auth.clone(),
             self.connection_string
                 .clone()
