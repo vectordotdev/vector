@@ -34,6 +34,8 @@ use crate::{
 
 mod backpressure;
 mod compliance;
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+mod cpu_metrics;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
 mod doesnt_reload;
