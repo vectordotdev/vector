@@ -9,9 +9,8 @@ components: sources: kubernetes_events: {
 		"""
 
 	classes: {
-		commonly_used: true
-		delivery:      "best_effort"
-		deployment_roles: ["deployment"]
+		delivery: "best_effort"
+		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      false

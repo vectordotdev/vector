@@ -550,7 +550,7 @@ impl KubernetesEventsSource {
             return true;
         }
 
-        if timestamp >= cutoff || deduper.contains(&identity.uid) {
+        if timestamp >= cutoff {
             return false;
         }
 
@@ -940,6 +940,7 @@ impl Deduper {
         }
     }
 
+    #[cfg(test)]
     fn contains(&mut self, uid: &str) -> bool {
         self.prune();
         self.entries.contains_key(uid)
@@ -1068,9 +1069,10 @@ fn prepare_lease_update(
         .renew_time
         .as_ref()
         .and_then(|renew_time| kube_timestamp_to_chrono(renew_time.0));
-    // After taking over an expired lease, only suppress events older than the previous
-    // holder's last renewal. Later events may have been created while no leader was running.
-    let suppress_bootstrap_before = (!held_by_self && previous_holder.is_some())
+    // On restart or takeover, only suppress events older than the last known
+    // leader renewal. Later events may have been created while no leader was running.
+    let suppress_bootstrap_before = previous_holder
+        .is_some()
         .then_some(previous_renewed_at)
         .flatten();
 
@@ -1592,6 +1594,44 @@ mod tests {
             processed.is_some(),
             "events created after the previous renewal should be preserved during failover"
         );
+
+        deduper.commit(PendingDedupeRecord {
+            uid: "cached-uid".to_string(),
+            resource_version: "rv-cached-old".to_string(),
+            event: make_event(
+                "cached-uid",
+                "rv-cached-old",
+                previous_renewed_at - ChronoDuration::seconds(20),
+            ),
+        });
+
+        let cached_event = make_event(
+            "cached-uid",
+            "rv-cached-new",
+            previous_renewed_at - ChronoDuration::seconds(10),
+        );
+        let processed = source
+            .handle_event(
+                None,
+                watcher::Event::InitApply(cached_event),
+                LogNamespace::Legacy,
+                &mut deduper,
+                Some(previous_renewed_at),
+            )
+            .unwrap();
+
+        assert!(
+            processed.is_none(),
+            "preexisting bootstrap events should be suppressed even when the UID is cached"
+        );
+        assert_eq!(
+            deduper.entries.get("cached-uid").and_then(|entry| entry
+                .event
+                .metadata
+                .resource_version
+                .as_deref()),
+            Some("rv-cached-new")
+        );
     }
 
     #[tokio::test]
@@ -1779,7 +1819,10 @@ mod tests {
                 .and_then(|time| kube_timestamp_to_chrono(time.0)),
             Some(now)
         );
-        assert_eq!(prepared.suppress_bootstrap_before, None);
+        assert_eq!(
+            prepared.suppress_bootstrap_before,
+            Some(now - ChronoDuration::seconds(5))
+        );
     }
 
     #[test]
