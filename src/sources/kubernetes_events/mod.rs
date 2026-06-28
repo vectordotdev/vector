@@ -55,6 +55,11 @@ use crate::{
 type WatchItem = (Option<String>, watcher::Result<watcher::Event<KubeEvent>>);
 type WatchStream = Pin<Box<dyn Stream<Item = WatchItem> + Send>>;
 
+struct EventIdentity {
+    uid: String,
+    resource_version: String,
+}
+
 struct KubernetesEventsSource {
     client: Client,
     namespaces: Vec<String>,
@@ -221,7 +226,13 @@ impl KubernetesEventsSource {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
                             if let Some(processed) =
-                                self.handle_event(namespace.as_deref(), event, log_namespace, deduper)?
+                                self.handle_event(
+                                    namespace.as_deref(),
+                                    event,
+                                    log_namespace,
+                                    deduper,
+                                    None,
+                                )?
                             {
                                 let dedupe_record = processed.dedupe_record;
                                 if send_event(out, processed.event).await.is_err() {
@@ -262,9 +273,17 @@ impl KubernetesEventsSource {
                 lease_namespace: coordinator.settings.lease_namespace.clone(),
                 lease_name: coordinator.settings.lease_name.clone(),
             });
+            let leadership_acquired_at = Utc::now();
 
             match self
-                .run_leadership_epoch(out, shutdown, log_namespace, deduper, &coordinator)
+                .run_leadership_epoch(
+                    out,
+                    shutdown,
+                    log_namespace,
+                    deduper,
+                    &coordinator,
+                    leadership_acquired_at,
+                )
                 .await?
             {
                 LeadershipEnd::Shutdown => break,
@@ -286,11 +305,13 @@ impl KubernetesEventsSource {
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
         coordinator: &LeaseCoordinator,
+        leadership_acquired_at: DateTime<Utc>,
     ) -> Result<LeadershipEnd, ()> {
         let mut streams = self.build_streams();
         let mut renew_interval = interval(coordinator.settings.retry_period);
         renew_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut last_renewal = Instant::now();
+        let mut suppress_bootstrap_before = self.bootstrap_cutoffs(leadership_acquired_at);
 
         loop {
             select! {
@@ -303,8 +324,16 @@ impl KubernetesEventsSource {
                 maybe_event = streams.next() => {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
+                            let init_done = matches!(&event, watcher::Event::InitDone);
+                            let bootstrap_cutoff = suppress_bootstrap_before.get(&namespace).copied();
                             if let Some(processed) =
-                                self.handle_event(namespace.as_deref(), event, log_namespace, deduper)?
+                                self.handle_event(
+                                    namespace.as_deref(),
+                                    event,
+                                    log_namespace,
+                                    deduper,
+                                    bootstrap_cutoff,
+                                )?
                             {
                                 let dedupe_record = processed.dedupe_record;
                                 if let Some(end) = send_event_with_leadership(
@@ -321,6 +350,9 @@ impl KubernetesEventsSource {
                                 }
                                 deduper.commit(dedupe_record);
                             }
+                            if init_done {
+                                suppress_bootstrap_before.remove(&namespace);
+                            }
                         }
                         Some((_, Err(error))) => {
                             emit!(KubernetesEventsWatchError { error });
@@ -332,15 +364,36 @@ impl KubernetesEventsSource {
         }
     }
 
+    fn bootstrap_cutoffs(&self, cutoff: DateTime<Utc>) -> HashMap<Option<String>, DateTime<Utc>> {
+        if self.namespaces.is_empty() {
+            return HashMap::from([(None, cutoff)]);
+        }
+
+        self.namespaces
+            .iter()
+            .map(|namespace| (Some(namespace.clone()), cutoff))
+            .collect()
+    }
+
     fn handle_event(
         &mut self,
         namespace: Option<&str>,
         event: watcher::Event<KubeEvent>,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
+        suppress_bootstrap_before: Option<DateTime<Utc>>,
     ) -> Result<Option<ProcessedEvent>, ()> {
         match event {
-            watcher::Event::Apply(ev) | watcher::Event::InitApply(ev) => {
+            watcher::Event::Apply(ev) => {
+                self.process_apply_event(namespace, ev, log_namespace, deduper)
+            }
+            watcher::Event::InitApply(ev) => {
+                if let Some(cutoff) = suppress_bootstrap_before
+                    && self.seed_preexisting_init_apply(&ev, cutoff, deduper)
+                {
+                    return Ok(None);
+                }
+
                 self.process_apply_event(namespace, ev, log_namespace, deduper)
             }
             watcher::Event::Delete(ev) => {
@@ -364,27 +417,11 @@ impl KubernetesEventsSource {
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
     ) -> Result<Option<ProcessedEvent>, ()> {
-        let uid = match event.metadata.uid.clone() {
-            Some(uid) => uid,
-            None => {
-                emit!(ComponentEventsDropped::<INTENTIONAL> {
-                    count: 1,
-                    reason: "missing_uid"
-                });
-                return Ok(None);
-            }
+        let Some(identity) = event_identity(&event) else {
+            return Ok(None);
         };
-
-        let resource_version = match event.metadata.resource_version.clone() {
-            Some(rv) => rv,
-            None => {
-                emit!(ComponentEventsDropped::<INTENTIONAL> {
-                    count: 1,
-                    reason: "missing_resource_version"
-                });
-                return Ok(None);
-            }
-        };
+        let uid = identity.uid;
+        let resource_version = identity.resource_version;
 
         if !self.type_allowed(&event) || !self.reason_allowed(&event) || !self.kind_allowed(&event)
         {
@@ -478,6 +515,51 @@ impl KubernetesEventsSource {
             event: Event::from(log),
             dedupe_record,
         }))
+    }
+
+    fn seed_preexisting_init_apply(
+        &self,
+        event: &KubeEvent,
+        cutoff: DateTime<Utc>,
+        deduper: &mut Deduper,
+    ) -> bool {
+        let Some(identity) = event_identity(event) else {
+            return true;
+        };
+
+        if !self.type_allowed(event) || !self.reason_allowed(event) || !self.kind_allowed(event) {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "filtered"
+            });
+            return true;
+        }
+
+        let timestamp = event_timestamp(event);
+        if self.is_older_than(timestamp) {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "expired"
+            });
+            return true;
+        }
+
+        if timestamp >= cutoff || deduper.contains(&identity.uid) {
+            return false;
+        }
+
+        deduper.prune();
+        deduper.commit(PendingDedupeRecord {
+            uid: identity.uid,
+            resource_version: identity.resource_version,
+            event: event.clone(),
+        });
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "initial_replay"
+        });
+
+        true
     }
 
     fn type_allowed(&self, event: &KubeEvent) -> bool {
@@ -829,20 +911,20 @@ impl Deduper {
     ) -> DedupResult {
         match self.entries.get_mut(uid) {
             Some(entry) => {
-                match compare_resource_versions(resource_version, &entry.resource_version) {
-                    std::cmp::Ordering::Less => DedupResult::Duplicate,
-                    std::cmp::Ordering::Equal => {
-                        entry.last_seen = Instant::now();
-                        DedupResult::Duplicate
-                    }
-                    std::cmp::Ordering::Greater => {
-                        let previous = include_previous.then(|| Box::new(entry.event.clone()));
-                        DedupResult::Updated { previous }
-                    }
+                if resource_version == entry.resource_version {
+                    entry.last_seen = Instant::now();
+                    DedupResult::Duplicate
+                } else {
+                    let previous = include_previous.then(|| Box::new(entry.event.clone()));
+                    DedupResult::Updated { previous }
                 }
             }
             None => DedupResult::Added,
         }
+    }
+
+    fn contains(&self, uid: &str) -> bool {
+        self.entries.contains_key(uid)
     }
 
     fn commit(&mut self, record: PendingDedupeRecord) {
@@ -887,13 +969,6 @@ impl Deduper {
 
     fn remove(&mut self, uid: &str) {
         self.entries.remove(uid);
-    }
-}
-
-fn compare_resource_versions(lhs: &str, rhs: &str) -> std::cmp::Ordering {
-    match (lhs.parse::<u64>(), rhs.parse::<u64>()) {
-        (Ok(a), Ok(b)) => a.cmp(&b),
-        _ => lhs.cmp(rhs),
     }
 }
 
@@ -1016,6 +1091,35 @@ fn event_timestamp(event: &KubeEvent) -> DateTime<Utc> {
         .unwrap_or_else(Utc::now)
 }
 
+fn event_identity(event: &KubeEvent) -> Option<EventIdentity> {
+    let uid = match event.metadata.uid.clone() {
+        Some(uid) => uid,
+        None => {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "missing_uid"
+            });
+            return None;
+        }
+    };
+
+    let resource_version = match event.metadata.resource_version.clone() {
+        Some(resource_version) => resource_version,
+        None => {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "missing_resource_version"
+            });
+            return None;
+        }
+    };
+
+    Some(EventIdentity {
+        uid,
+        resource_version,
+    })
+}
+
 fn kube_timestamp_to_chrono(timestamp: KubeTimestamp) -> Option<DateTime<Utc>> {
     DateTime::from_timestamp_micros(timestamp.as_microsecond())
 }
@@ -1044,6 +1148,16 @@ mod tests {
             note: Some("test".to_string()),
             ..KubeEvent::default()
         }
+    }
+
+    fn make_source() -> KubernetesEventsSource {
+        make_source_with_config(KubernetesEventsConfig::default())
+    }
+
+    fn make_source_with_config(config: KubernetesEventsConfig) -> KubernetesEventsSource {
+        let client_config = ClientConfig::new("http://127.0.0.1:8080".parse().unwrap());
+        let client = Client::try_from(client_config).unwrap();
+        KubernetesEventsSource::new(client, config).unwrap()
     }
 
     fn leader_settings(identity: &str) -> LeaderElectionSettings {
@@ -1226,6 +1340,40 @@ mod tests {
     }
 
     #[test]
+    fn deduper_treats_resource_versions_as_opaque_values() {
+        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let first_ts = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let later_ts = first_ts + ChronoDuration::seconds(10);
+        let event_added = make_event("uid", "z", first_ts);
+
+        assert!(matches!(
+            deduper.record(
+                "uid".to_string(),
+                "z".to_string(),
+                &event_added,
+                first_ts,
+                false
+            ),
+            DedupResult::Added
+        ));
+
+        let updated_event = make_event("uid", "a", later_ts);
+        match deduper.record(
+            "uid".to_string(),
+            "a".to_string(),
+            &updated_event,
+            later_ts,
+            true,
+        ) {
+            DedupResult::Updated { previous } => {
+                let previous = previous.expect("previous event expected");
+                assert_eq!(previous.metadata.resource_version.as_deref(), Some("z"));
+            }
+            other => panic!("expected DedupResult::Updated, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn deduper_defers_new_resource_version_until_commit() {
         let mut deduper = Deduper::new(Duration::from_secs(60));
         let first_ts = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
@@ -1327,6 +1475,110 @@ mod tests {
             deduper.entries.contains_key("uid"),
             "same resourceVersion replay should refresh the dedupe retention"
         );
+    }
+
+    #[tokio::test]
+    async fn leader_bootstrap_seeds_preexisting_init_apply_without_emitting() {
+        let mut source = make_source();
+        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let acquired_at = Utc::now();
+        let old_event = make_event(
+            "old-uid",
+            "rv-old",
+            acquired_at - ChronoDuration::seconds(10),
+        );
+
+        let processed = source
+            .handle_event(
+                None,
+                watcher::Event::InitApply(old_event),
+                LogNamespace::Legacy,
+                &mut deduper,
+                Some(acquired_at),
+            )
+            .unwrap();
+
+        assert!(
+            processed.is_none(),
+            "preexisting bootstrap events should seed dedupe without being emitted"
+        );
+        assert_eq!(
+            deduper.entries.get("old-uid").and_then(|entry| entry
+                .event
+                .metadata
+                .resource_version
+                .as_deref()),
+            Some("rv-old")
+        );
+
+        let new_event = make_event(
+            "new-uid",
+            "rv-new",
+            acquired_at + ChronoDuration::seconds(1),
+        );
+        let processed = source
+            .handle_event(
+                None,
+                watcher::Event::InitApply(new_event),
+                LogNamespace::Legacy,
+                &mut deduper,
+                Some(acquired_at),
+            )
+            .unwrap();
+
+        assert!(
+            processed.is_some(),
+            "bootstrap events observed after leadership acquisition should still be emitted"
+        );
+    }
+
+    #[tokio::test]
+    async fn leader_bootstrap_suppression_is_tracked_per_namespace() {
+        let mut config = KubernetesEventsConfig::default();
+        config.namespaces = vec!["first".to_string(), "second".to_string()];
+        let mut source = make_source_with_config(config);
+        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let acquired_at = Utc::now();
+        let mut cutoffs = source.bootstrap_cutoffs(acquired_at);
+
+        let first_event = make_event(
+            "first-uid",
+            "rv-first",
+            acquired_at - ChronoDuration::seconds(10),
+        );
+        let processed = source
+            .handle_event(
+                Some("first"),
+                watcher::Event::InitApply(first_event),
+                LogNamespace::Legacy,
+                &mut deduper,
+                cutoffs.get(&Some("first".to_string())).copied(),
+            )
+            .unwrap();
+        assert!(processed.is_none());
+        cutoffs.remove(&Some("first".to_string()));
+
+        let second_event = make_event(
+            "second-uid",
+            "rv-second",
+            acquired_at - ChronoDuration::seconds(10),
+        );
+        let processed = source
+            .handle_event(
+                Some("second"),
+                watcher::Event::InitApply(second_event),
+                LogNamespace::Legacy,
+                &mut deduper,
+                cutoffs.get(&Some("second".to_string())).copied(),
+            )
+            .unwrap();
+
+        assert!(
+            processed.is_none(),
+            "one namespace completing bootstrap must not disable suppression for others"
+        );
+        assert!(deduper.entries.contains_key("first-uid"));
+        assert!(deduper.entries.contains_key("second-uid"));
     }
 
     #[test]

@@ -40,6 +40,10 @@ components: sources: kubernetes_events: {
 				The service account running Vector must be allowed to `list` and `watch` the `events.k8s.io/v1`
 				API. Granting the built-in `view` ClusterRole is typically sufficient.
 				""",
+			"""
+				When `leader_election.enabled` is `true`, the service account must also be allowed to `get`,
+				`create`, and `update` `coordination.k8s.io/v1` Lease objects in the configured lease namespace.
+				""",
 		]
 		warnings: []
 		notices: []
