@@ -390,8 +390,8 @@ mod tests {
     async fn run_test(compression: Option<&str>) {
         let (_guard, addr) = test_util::addr::next_addr();
 
-        let source_config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&source_config).unwrap();
+        let source_config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&source_config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
         let server = source
@@ -405,15 +405,13 @@ mod tests {
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
         let sink_config = match compression {
-            Some(c) => format!(
-                r#"
-                    address = "{addr}"
-                    compression = "{c}"
-                "#
-            ),
-            None => format!(r#"address = "{addr}""#),
+            Some(c) => indoc::formatdoc! {r#"
+                address: "{addr}"
+                compression: "{c}"
+            "#},
+            None => format!("address: \"{addr}\"\n"),
         };
-        let sink: SinkConfig = toml::from_str(&sink_config).unwrap();
+        let sink: SinkConfig = serde_yaml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
@@ -452,8 +450,8 @@ mod tests {
 
         let (_guard, addr) = test_util::addr::next_addr();
 
-        let config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        let config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&config).unwrap();
 
         let (tx, _rx) = SourceSender::new_test();
         let server = source
@@ -611,8 +609,8 @@ mod tests {
 
         let (_guard, addr) = test_util::addr::next_addr();
 
-        let config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        let config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&config).unwrap();
 
         let (tx, _rx) = SourceSender::new_test();
         let server = source

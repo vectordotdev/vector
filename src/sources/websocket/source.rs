@@ -649,7 +649,7 @@ mod tests {
                     code: CloseCode::Error,
                     reason: Cow::from("Simulated Internal Server Error"),
                 };
-                let _ = websocket.close(Some(close_frame)).await;
+                websocket.close(Some(close_frame)).await.ok(); // connection may already be gone
             }
         });
 
