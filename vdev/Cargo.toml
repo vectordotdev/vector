@@ -16,6 +16,9 @@ include = [
   "src/**",
 ]
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true

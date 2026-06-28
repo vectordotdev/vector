@@ -389,8 +389,8 @@ macro_rules! define_stat_struct {
                 for line in text.lines(){
                     if false {}
                     $(
-                        else if line.starts_with(concat!(stringify!($field), ' ')) {
-                            result.$field = line[stringify!($field).len()+1..].parse()?;
+                        else if let Some(rest) = line.strip_prefix(concat!(stringify!($field), ' ')) {
+                            result.$field = rest.parse()?;
                         }
                     )*
                 }

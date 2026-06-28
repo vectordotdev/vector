@@ -134,7 +134,7 @@ pub(crate) async fn healthcheck(
 
     tokio::task::spawn_blocking(move || {
         let producer: BaseProducer = client_config.create().unwrap();
-        let topic = topic.as_ref().map(|topic| &topic[..]);
+        let topic = topic.as_deref();
 
         producer
             .client()

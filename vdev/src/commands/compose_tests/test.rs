@@ -51,14 +51,14 @@ pub fn exec(
         let merged_path = coverage_dir.join(coverage_filename(None));
         // Remove any stale lcov.info from a previous run so callers never pick
         // up outdated data if the merge below fails to read a per-env file.
-        let _ = std::fs::remove_file(&merged_path);
+        std::fs::remove_file(&merged_path).ok();
         let mut merged = String::new();
         for env_name in &ran_environments {
             let env_file = coverage_dir.join(coverage_filename(Some(env_name)));
             match std::fs::read_to_string(&env_file) {
                 Ok(contents) => {
                     merged.push_str(&contents);
-                    let _ = std::fs::remove_file(&env_file);
+                    std::fs::remove_file(&env_file).ok();
                 }
                 Err(e) => {
                     warn!("Could not read coverage file {}: {e}", env_file.display());

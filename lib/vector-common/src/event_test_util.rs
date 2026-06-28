@@ -73,9 +73,9 @@ pub fn record_internal_event(event: &str) {
     // Remove leading '&'
     let event = event.strip_prefix('&').unwrap_or(event);
     // Remove trailing '{fields…}'
-    let event = event.find('{').map_or(event, |par| &event[..par]);
+    let event = event.split_once('{').map_or(event, |(before, _)| before);
     // Remove trailing '::from…'
-    let event = event.find(':').map_or(event, |colon| &event[..colon]);
+    let event = event.split_once(':').map_or(event, |(before, _)| before);
 
     EVENTS_RECORDED.with(|er| er.borrow_mut().insert(event.trim().into()));
 }
