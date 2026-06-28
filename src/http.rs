@@ -372,6 +372,76 @@ impl Auth {
     }
 }
 
+/// Configuration of the authentication strategy for gRPC requests between Vector instances.
+///
+/// This mirrors the header based strategies of [`Auth`] but leaves out `aws`, which signs each
+/// request rather than sending a fixed header and so does not apply here.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+pub enum VectorAuthConfig {
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded using [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    Basic {
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
+        user: String,
+
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
+        password: SensitiveString,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
+    Bearer {
+        /// The bearer authentication token.
+        token: SensitiveString,
+    },
+
+    /// Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`
+    Custom {
+        /// Custom string value of the Authorization header
+        #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
+        #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
+        value: String,
+    },
+}
+
+impl VectorAuthConfig {
+    fn as_auth(&self) -> Auth {
+        match self {
+            Self::Basic { user, password } => Auth::Basic {
+                user: user.clone(),
+                password: password.clone(),
+            },
+            Self::Bearer { token } => Auth::Bearer {
+                token: token.clone(),
+            },
+            Self::Custom { value } => Auth::Custom {
+                value: value.clone(),
+            },
+        }
+    }
+
+    /// Returns the `Authorization` header value for this strategy.
+    ///
+    /// Returns `None` only if the configured credentials cannot be encoded into a valid header
+    /// value, in which case the underlying error is logged by [`Auth::apply_headers_map`].
+    pub fn authorization_header(&self) -> Option<HeaderValue> {
+        let mut map = HeaderMap::new();
+        self.as_auth().apply_headers_map(&mut map);
+        map.get(http::header::AUTHORIZATION).cloned()
+    }
+}
+
 pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
     // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
     // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
@@ -719,6 +789,34 @@ mod tests {
             Some(&HeaderValue::from_static("identity")),
         );
         assert_eq!(request.headers().get("User-Agent"), Some(&user_agent));
+    }
+
+    #[test]
+    fn authorization_header_for_each_strategy() {
+        let bearer = VectorAuthConfig::Bearer {
+            token: "token123".to_owned().into(),
+        };
+        assert_eq!(
+            bearer.authorization_header(),
+            Some(HeaderValue::from_static("Bearer token123"))
+        );
+
+        let basic = VectorAuthConfig::Basic {
+            user: "user".to_owned(),
+            password: "pass".to_owned().into(),
+        };
+        assert_eq!(
+            basic.authorization_header(),
+            Some(HeaderValue::from_static("Basic dXNlcjpwYXNz"))
+        );
+
+        let custom = VectorAuthConfig::Custom {
+            value: "SSWS token123".to_owned(),
+        };
+        assert_eq!(
+            custom.authorization_header(),
+            Some(HeaderValue::from_static("SSWS token123"))
+        );
     }
 
     #[test]

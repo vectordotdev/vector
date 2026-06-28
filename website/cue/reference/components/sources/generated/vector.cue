@@ -31,6 +31,59 @@ generated: components: sources: vector: configuration: {
 		required: true
 		type: string: {}
 	}
+	auth: {
+		description: """
+			Authentication required on incoming requests.
+
+			Use TLS to keep credentials from being received in plaintext.
+			"""
+		required: false
+		type: object: options: {
+			password: {
+				description:   "The basic authentication password."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${PASSWORD}", "password"]
+			}
+			strategy: {
+				description: "The authentication strategy to use."
+				required:    true
+				type: string: enum: {
+					basic: """
+						Basic authentication.
+
+						The username and password are concatenated and encoded using [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
+						"""
+					bearer: """
+						Bearer authentication.
+
+						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
+						"""
+					custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
+				}
+			}
+			token: {
+				description:   "The bearer authentication token."
+				relevant_when: "strategy = \"bearer\""
+				required:      true
+				type: string: {}
+			}
+			user: {
+				description:   "The basic authentication username."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${USERNAME}", "username"]
+			}
+			value: {
+				description:   "Custom string value of the Authorization header"
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
+			}
+		}
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false

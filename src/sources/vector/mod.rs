@@ -3,7 +3,11 @@ use std::net::SocketAddr;
 
 use chrono::Utc;
 use futures::TryFutureExt;
-use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
+use http::{HeaderValue, header::AUTHORIZATION};
+use tonic::{
+    Request, Response, Status, service::interceptor::InterceptedService,
+    transport::server::RoutesBuilder,
+};
 use tonic_health::server::health_reporter;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -20,6 +24,7 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
+    http::VectorAuthConfig,
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
@@ -101,6 +106,40 @@ impl proto::Service for Service {
     }
 }
 
+/// Rejects requests whose `authorization` metadata does not match the configured value.
+#[derive(Clone)]
+struct AuthInterceptor {
+    expected: Option<HeaderValue>,
+}
+
+impl tonic::service::Interceptor for AuthInterceptor {
+    fn call(&mut self, request: Request<()>) -> Result<Request<()>, Status> {
+        let Some(expected) = &self.expected else {
+            return Ok(request);
+        };
+
+        match request.metadata().get(AUTHORIZATION.as_str()) {
+            Some(value) if constant_time_eq(value.as_bytes(), expected.as_bytes()) => Ok(request),
+            _ => Err(Status::unauthenticated(
+                "Valid authorization token required.",
+            )),
+        }
+    }
+}
+
+// Compare in constant time so the token can't be recovered by measuring how long a
+// comparison takes.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<(), Status> {
     let status = match receiver {
         Some(receiver) => receiver.await,
@@ -131,6 +170,13 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
+    /// Authentication required on incoming requests.
+    ///
+    /// Use TLS to keep credentials from being received in plaintext.
+    #[configurable(derived)]
+    #[serde(default)]
+    auth: Option<VectorAuthConfig>,
+
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
@@ -157,6 +203,7 @@ impl Default for VectorConfig {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
+            auth: None,
             acknowledgements: Default::default(),
             log_namespace: None,
         }
@@ -177,6 +224,21 @@ impl SourceConfig for VectorConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
+        let auth_header = match self.auth.as_ref() {
+            Some(auth) => {
+                let header = auth.authorization_header().ok_or(
+                    "The configured `auth` credentials could not be encoded into a valid authorization header.",
+                )?;
+                if !tls_settings.is_tls() {
+                    warn!(
+                        "Authentication is enabled but TLS is not, so credentials will be received in plaintext."
+                    );
+                }
+                Some(header)
+            }
+            None => None,
+        };
+
         // Create the custom Vector service (existing).
         //
         // Compression negotiation (gzip, zstd) is handled centrally by
@@ -189,6 +251,15 @@ impl SourceConfig for VectorConfig {
         })
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
+
+        // Require auth on the Vector service when it is configured. The standard gRPC
+        // health service is left open so liveness probes don't need credentials.
+        let vector_service = InterceptedService::new(
+            vector_service,
+            AuthInterceptor {
+                expected: auth_header,
+            },
+        );
 
         // Create the standard gRPC health service
         let (mut health_reporter, health_service) = health_reporter();
@@ -246,6 +317,16 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::VectorConfig>();
+    }
+
+    #[test]
+    fn constant_time_eq_matches() {
+        use super::constant_time_eq;
+
+        assert!(constant_time_eq(b"token", b"token"));
+        assert!(!constant_time_eq(b"token", b"tokeN"));
+        assert!(!constant_time_eq(b"token", b"token-longer"));
+        assert!(!constant_time_eq(b"", b"token"));
     }
 
     #[test]
@@ -398,6 +479,127 @@ mod tests {
             response.into_inner().status,
             proto::ServingStatus::Serving as i32
         );
+    }
+
+    #[tokio::test]
+    async fn auth_roundtrip() {
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let auth = r#"
+            [auth]
+            strategy = "bearer"
+            token = "test-token"
+        "#;
+
+        let source_config = format!(r#"address = "{addr}"{auth}"#);
+        let source: VectorConfig = toml::from_str(&source_config).unwrap();
+
+        let (tx, rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        let sink_config = format!(r#"address = "{addr}"{auth}"#);
+        let sink: SinkConfig = toml::from_str(&sink_config).unwrap();
+        let (sink, _) = sink.build(SinkContext::default()).await.unwrap();
+
+        let (mut events, stream) = test_util::random_events_with_stream(100, 100, None);
+        sink.run(stream).await.unwrap();
+
+        for event in &mut events {
+            event.as_mut_log().insert(
+                log_schema().source_type_key_target_path().unwrap(),
+                "vector",
+            );
+        }
+
+        let output = test_util::collect_ready(rx).await;
+        assert_event_data_eq!(events, output);
+    }
+
+    #[tokio::test]
+    async fn auth_rejects_missing_token() {
+        use tonic::transport::Channel;
+
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!(
+            r#"
+                address = "{addr}"
+                [auth]
+                strategy = "bearer"
+                token = "test-token"
+            "#
+        );
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        let channel = Channel::from_shared(format!("http://{addr}"))
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        let mut client = proto::Client::new(channel);
+
+        let status = client
+            .push_events(proto::PushEventsRequest { events: vec![] })
+            .await
+            .unwrap_err();
+
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[tokio::test]
+    async fn auth_rejects_wrong_token() {
+        use tonic::{metadata::MetadataValue, transport::Channel};
+
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!(
+            r#"
+                address = "{addr}"
+                [auth]
+                strategy = "bearer"
+                token = "right-token"
+            "#
+        );
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        let channel = Channel::from_shared(format!("http://{addr}"))
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        let token: MetadataValue<_> = "Bearer wrong-token".parse().unwrap();
+        let mut client = proto::Client::with_interceptor(channel, move |mut req: Request<()>| {
+            req.metadata_mut().insert("authorization", token.clone());
+            Ok(req)
+        });
+
+        let status = client
+            .push_events(proto::PushEventsRequest { events: vec![] })
+            .await
+            .unwrap_err();
+
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
     }
 
     #[tokio::test]

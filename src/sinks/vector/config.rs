@@ -17,7 +17,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions,
     },
-    http::build_proxy_connector,
+    http::{VectorAuthConfig, build_proxy_connector},
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
@@ -76,6 +76,13 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
+    /// Authentication sent with every request to the downstream Vector instance.
+    ///
+    /// Use TLS to keep the credentials from being sent in plaintext.
+    #[configurable(derived)]
+    #[serde(default)]
+    auth: Option<VectorAuthConfig>,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -107,6 +114,7 @@ fn default_config(address: &str) -> VectorConfig {
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
+        auth: None,
         acknowledgements: Default::default(),
     }
 }
@@ -118,6 +126,21 @@ impl SinkConfig for VectorConfig {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
+        let auth_header = match self.auth.as_ref() {
+            Some(auth) => {
+                let header = auth.authorization_header().ok_or(
+                    "The configured `auth` credentials could not be encoded into a valid authorization header.",
+                )?;
+                if !tls.is_tls() {
+                    warn!(
+                        "Authentication is enabled but TLS is not, so credentials will be sent in plaintext."
+                    );
+                }
+                Some(header)
+            }
+            None => None,
+        };
+
         let client = new_client(&tls, cx.proxy())?;
 
         let healthcheck_uri = cx
@@ -126,10 +149,14 @@ impl SinkConfig for VectorConfig {
             .clone()
             .map(|uri| uri.uri)
             .unwrap_or_else(|| uri.clone());
-        let healthcheck_client =
-            VectorService::new(client.clone(), healthcheck_uri, VectorCompression::None);
+        let healthcheck_client = VectorService::new(
+            client.clone(),
+            healthcheck_uri,
+            VectorCompression::None,
+            auth_header.clone(),
+        );
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
-        let service = VectorService::new(client, uri, self.compression);
+        let service = VectorService::new(client, uri, self.compression, auth_header);
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
