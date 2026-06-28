@@ -231,7 +231,6 @@ impl KubernetesEventsSource {
                                     event,
                                     log_namespace,
                                     deduper,
-                                    None,
                                 )?
                             {
                                 let dedupe_record = processed.dedupe_record;
@@ -264,9 +263,9 @@ impl KubernetesEventsSource {
         let coordinator = LeaseCoordinator::new(self.client.clone(), settings);
 
         loop {
-            let Some(leadership_start) = coordinator.wait_for_leadership(shutdown).await else {
+            if !coordinator.wait_for_leadership(shutdown).await {
                 break;
-            };
+            }
 
             emit!(KubernetesEventsLeaderAcquired {
                 identity: coordinator.settings.identity.clone(),
@@ -275,14 +274,7 @@ impl KubernetesEventsSource {
             });
 
             match self
-                .run_leadership_epoch(
-                    out,
-                    shutdown,
-                    log_namespace,
-                    deduper,
-                    &coordinator,
-                    leadership_start.suppress_bootstrap_before,
-                )
+                .run_leadership_epoch(out, shutdown, log_namespace, deduper, &coordinator)
                 .await?
             {
                 LeadershipEnd::Shutdown => break,
@@ -304,13 +296,11 @@ impl KubernetesEventsSource {
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
         coordinator: &LeaseCoordinator,
-        suppress_bootstrap_before: Option<DateTime<Utc>>,
     ) -> Result<LeadershipEnd, ()> {
         let mut streams = self.build_streams();
         let mut renew_interval = interval(coordinator.settings.retry_period);
         renew_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut last_renewal = Instant::now();
-        let mut suppress_bootstrap_before = self.bootstrap_cutoffs(suppress_bootstrap_before);
 
         loop {
             select! {
@@ -323,15 +313,12 @@ impl KubernetesEventsSource {
                 maybe_event = streams.next() => {
                     match maybe_event {
                         Some((namespace, Ok(event))) => {
-                            let init_done = matches!(&event, watcher::Event::InitDone);
-                            let bootstrap_cutoff = suppress_bootstrap_before.get(&namespace).copied();
                             if let Some(processed) =
                                 self.handle_event(
                                     namespace.as_deref(),
                                     event,
                                     log_namespace,
                                     deduper,
-                                    bootstrap_cutoff,
                                 )?
                             {
                                 let dedupe_record = processed.dedupe_record;
@@ -349,9 +336,6 @@ impl KubernetesEventsSource {
                                 }
                                 deduper.commit(dedupe_record);
                             }
-                            if init_done {
-                                suppress_bootstrap_before.remove(&namespace);
-                            }
                         }
                         Some((_, Err(error))) => {
                             emit!(KubernetesEventsWatchError { error });
@@ -363,43 +347,18 @@ impl KubernetesEventsSource {
         }
     }
 
-    fn bootstrap_cutoffs(
-        &self,
-        cutoff: Option<DateTime<Utc>>,
-    ) -> HashMap<Option<String>, DateTime<Utc>> {
-        let Some(cutoff) = cutoff else {
-            return HashMap::new();
-        };
-
-        if self.namespaces.is_empty() {
-            return HashMap::from([(None, cutoff)]);
-        }
-
-        self.namespaces
-            .iter()
-            .map(|namespace| (Some(namespace.clone()), cutoff))
-            .collect()
-    }
-
     fn handle_event(
         &mut self,
         namespace: Option<&str>,
         event: watcher::Event<KubeEvent>,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-        suppress_bootstrap_before: Option<DateTime<Utc>>,
     ) -> Result<Option<ProcessedEvent>, ()> {
         match event {
             watcher::Event::Apply(ev) => {
                 self.process_apply_event(namespace, ev, log_namespace, deduper)
             }
             watcher::Event::InitApply(ev) => {
-                if let Some(cutoff) = suppress_bootstrap_before
-                    && self.seed_preexisting_init_apply(&ev, cutoff, deduper)
-                {
-                    return Ok(None);
-                }
-
                 self.process_apply_event(namespace, ev, log_namespace, deduper)
             }
             watcher::Event::Delete(ev) => {
@@ -521,51 +480,6 @@ impl KubernetesEventsSource {
             event: Event::from(log),
             dedupe_record,
         }))
-    }
-
-    fn seed_preexisting_init_apply(
-        &self,
-        event: &KubeEvent,
-        cutoff: DateTime<Utc>,
-        deduper: &mut Deduper,
-    ) -> bool {
-        let Some(identity) = event_identity(event) else {
-            return true;
-        };
-
-        if !self.type_allowed(event) || !self.reason_allowed(event) || !self.kind_allowed(event) {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "filtered"
-            });
-            return true;
-        }
-
-        let timestamp = event_timestamp(event);
-        if self.is_older_than(timestamp) {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "expired"
-            });
-            return true;
-        }
-
-        if timestamp >= cutoff {
-            return false;
-        }
-
-        deduper.prune();
-        deduper.commit(PendingDedupeRecord {
-            uid: identity.uid,
-            resource_version: identity.resource_version,
-            event: event.clone(),
-        });
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
-            count: 1,
-            reason: "initial_replay"
-        });
-
-        true
     }
 
     fn type_allowed(&self, event: &KubeEvent) -> bool {
@@ -727,16 +641,16 @@ impl LeaseCoordinator {
         Self { api, settings }
     }
 
-    async fn wait_for_leadership(&self, shutdown: &mut ShutdownSignal) -> Option<LeadershipStart> {
+    async fn wait_for_leadership(&self, shutdown: &mut ShutdownSignal) -> bool {
         loop {
             match self.try_acquire_or_renew().await {
-                Ok(LeaseUpdate::Held(start)) => return Some(start),
+                Ok(LeaseUpdate::Held) => return true,
                 Ok(LeaseUpdate::HeldByOther) => {}
                 Err(error) => emit!(KubernetesEventsLeaderElectionError { error }),
             }
 
             select! {
-                _ = &mut *shutdown => return None,
+                _ = &mut *shutdown => return false,
                 _ = sleep(self.settings.retry_period) => {}
             }
         }
@@ -748,7 +662,7 @@ impl LeaseCoordinator {
             Ok(lease) => self.update_existing_lease(lease, now).await,
             Err(KubeError::Api(status)) if status.is_not_found() => {
                 match self.create_lease(now).await {
-                    Ok(_) => Ok(LeaseUpdate::Held(LeadershipStart::default())),
+                    Ok(_) => Ok(LeaseUpdate::Held),
                     Err(KubeError::Api(status))
                         if status.is_already_exists() || status.is_conflict() =>
                     {
@@ -787,22 +701,16 @@ impl LeaseCoordinator {
         lease: Lease,
         now: DateTime<Utc>,
     ) -> Result<LeaseUpdate, KubeError> {
-        let Some(prepared) = prepare_lease_update(lease, &self.settings, now) else {
+        let Some(updated) = prepare_lease_update(lease, &self.settings, now) else {
             return Ok(LeaseUpdate::HeldByOther);
         };
 
         match self
             .api
-            .replace(
-                &self.settings.lease_name,
-                &PostParams::default(),
-                &prepared.lease,
-            )
+            .replace(&self.settings.lease_name, &PostParams::default(), &updated)
             .await
         {
-            Ok(_) => Ok(LeaseUpdate::Held(LeadershipStart {
-                suppress_bootstrap_before: prepared.suppress_bootstrap_before,
-            })),
+            Ok(_) => Ok(LeaseUpdate::Held),
             Err(KubeError::Api(status)) if status.is_conflict() => Ok(LeaseUpdate::HeldByOther),
             Err(error) => Err(error),
         }
@@ -811,13 +719,8 @@ impl LeaseCoordinator {
 
 #[derive(Debug, PartialEq, Eq)]
 enum LeaseUpdate {
-    Held(LeadershipStart),
+    Held,
     HeldByOther,
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-struct LeadershipStart {
-    suppress_bootstrap_before: Option<DateTime<Utc>>,
 }
 
 enum LeadershipEnd {
@@ -881,7 +784,7 @@ async fn renew_leadership(
     last_renewal: &mut Instant,
 ) -> Option<LeadershipEnd> {
     match coordinator.try_acquire_or_renew().await {
-        Ok(LeaseUpdate::Held(_)) => {
+        Ok(LeaseUpdate::Held) => {
             *last_renewal = Instant::now();
             None
         }
@@ -1039,16 +942,11 @@ fn non_empty_trimmed(value: impl AsRef<str>) -> Option<String> {
     (!value.is_empty()).then(|| value.to_string())
 }
 
-struct PreparedLeaseUpdate {
-    lease: Lease,
-    suppress_bootstrap_before: Option<DateTime<Utc>>,
-}
-
 fn prepare_lease_update(
     mut lease: Lease,
     settings: &LeaderElectionSettings,
     now: DateTime<Utc>,
-) -> Option<PreparedLeaseUpdate> {
+) -> Option<Lease> {
     let spec = lease.spec.get_or_insert_with(LeaseSpec::default);
     let held_by_self = spec
         .holder_identity
@@ -1064,25 +962,10 @@ fn prepare_lease_update(
         spec.lease_transitions = Some(spec.lease_transitions.unwrap_or(0) + 1);
     }
 
-    let previous_holder = spec.holder_identity.clone();
-    let previous_renewed_at = spec
-        .renew_time
-        .as_ref()
-        .and_then(|renew_time| kube_timestamp_to_chrono(renew_time.0));
-    // On restart or takeover, only suppress events older than the last known
-    // leader renewal. Later events may have been created while no leader was running.
-    let suppress_bootstrap_before = previous_holder
-        .is_some()
-        .then_some(previous_renewed_at)
-        .flatten();
-
     spec.holder_identity = Some(settings.identity.clone());
     spec.lease_duration_seconds = Some(duration_as_i32(settings.lease_duration));
     spec.renew_time = Some(kube_micro_time(now));
-    Some(PreparedLeaseUpdate {
-        lease,
-        suppress_bootstrap_before,
-    })
+    Some(lease)
 }
 
 fn lease_is_expired(spec: &LeaseSpec, now: DateTime<Utc>, fallback_duration: Duration) -> bool {
@@ -1122,8 +1005,8 @@ fn event_timestamp(event: &KubeEvent) -> DateTime<Utc> {
         .series
         .as_ref()
         .map(|series| series.last_observed_time.0)
-        .or_else(|| event.deprecated_last_timestamp.as_ref().map(|t| t.0))
         .or_else(|| event.event_time.as_ref().map(|t| t.0))
+        .or_else(|| event.deprecated_last_timestamp.as_ref().map(|t| t.0))
         .or_else(|| event.deprecated_first_timestamp.as_ref().map(|t| t.0))
         .or_else(|| event.metadata.creation_timestamp.as_ref().map(|t| t.0))
         .and_then(kube_timestamp_to_chrono)
@@ -1541,150 +1424,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn leader_bootstrap_seeds_preexisting_init_apply_without_emitting() {
-        let mut source = make_source();
-        let mut deduper = Deduper::new(Duration::from_secs(60));
-        let previous_renewed_at = Utc::now();
-        let acquired_at = previous_renewed_at + ChronoDuration::seconds(8);
-        let old_event = make_event(
-            "old-uid",
-            "rv-old",
-            previous_renewed_at - ChronoDuration::seconds(10),
-        );
-
-        let processed = source
-            .handle_event(
-                None,
-                watcher::Event::InitApply(old_event),
-                LogNamespace::Legacy,
-                &mut deduper,
-                Some(previous_renewed_at),
-            )
-            .unwrap();
-
-        assert!(
-            processed.is_none(),
-            "preexisting bootstrap events should seed dedupe without being emitted"
-        );
-        assert_eq!(
-            deduper.entries.get("old-uid").and_then(|entry| entry
-                .event
-                .metadata
-                .resource_version
-                .as_deref()),
-            Some("rv-old")
-        );
-
-        let gap_event = make_event(
-            "gap-uid",
-            "rv-gap",
-            acquired_at - ChronoDuration::seconds(1),
-        );
-        let processed = source
-            .handle_event(
-                None,
-                watcher::Event::InitApply(gap_event),
-                LogNamespace::Legacy,
-                &mut deduper,
-                Some(previous_renewed_at),
-            )
-            .unwrap();
-
-        assert!(
-            processed.is_some(),
-            "events created after the previous renewal should be preserved during failover"
-        );
-
-        deduper.commit(PendingDedupeRecord {
-            uid: "cached-uid".to_string(),
-            resource_version: "rv-cached-old".to_string(),
-            event: make_event(
-                "cached-uid",
-                "rv-cached-old",
-                previous_renewed_at - ChronoDuration::seconds(20),
-            ),
-        });
-
-        let cached_event = make_event(
-            "cached-uid",
-            "rv-cached-new",
-            previous_renewed_at - ChronoDuration::seconds(10),
-        );
-        let processed = source
-            .handle_event(
-                None,
-                watcher::Event::InitApply(cached_event),
-                LogNamespace::Legacy,
-                &mut deduper,
-                Some(previous_renewed_at),
-            )
-            .unwrap();
-
-        assert!(
-            processed.is_none(),
-            "preexisting bootstrap events should be suppressed even when the UID is cached"
-        );
-        assert_eq!(
-            deduper.entries.get("cached-uid").and_then(|entry| entry
-                .event
-                .metadata
-                .resource_version
-                .as_deref()),
-            Some("rv-cached-new")
-        );
-    }
-
-    #[tokio::test]
-    async fn leader_bootstrap_suppression_is_tracked_per_namespace() {
-        let mut config = KubernetesEventsConfig::default();
-        config.namespaces = vec!["first".to_string(), "second".to_string()];
-        let mut source = make_source_with_config(config);
-        let mut deduper = Deduper::new(Duration::from_secs(60));
-        let previous_renewed_at = Utc::now();
-        let mut cutoffs = source.bootstrap_cutoffs(Some(previous_renewed_at));
-
-        let first_event = make_event(
-            "first-uid",
-            "rv-first",
-            previous_renewed_at - ChronoDuration::seconds(10),
-        );
-        let processed = source
-            .handle_event(
-                Some("first"),
-                watcher::Event::InitApply(first_event),
-                LogNamespace::Legacy,
-                &mut deduper,
-                cutoffs.get(&Some("first".to_string())).copied(),
-            )
-            .unwrap();
-        assert!(processed.is_none());
-        cutoffs.remove(&Some("first".to_string()));
-
-        let second_event = make_event(
-            "second-uid",
-            "rv-second",
-            previous_renewed_at - ChronoDuration::seconds(10),
-        );
-        let processed = source
-            .handle_event(
-                Some("second"),
-                watcher::Event::InitApply(second_event),
-                LogNamespace::Legacy,
-                &mut deduper,
-                cutoffs.get(&Some("second".to_string())).copied(),
-            )
-            .unwrap();
-
-        assert!(
-            processed.is_none(),
-            "one namespace completing bootstrap must not disable suppression for others"
-        );
-        assert!(deduper.entries.contains_key("first-uid"));
-        assert!(deduper.entries.contains_key("second-uid"));
-    }
-
-    #[tokio::test]
-    async fn leader_bootstrap_without_cutoff_emits_init_apply() {
+    async fn leader_bootstrap_init_apply_uses_normal_dedupe() {
         let mut source = make_source();
         let mut deduper = Deduper::new(Duration::from_secs(60));
         let event = make_event("uid", "rv", Utc::now() - ChronoDuration::seconds(10));
@@ -1695,13 +1435,29 @@ mod tests {
                 watcher::Event::InitApply(event),
                 LogNamespace::Legacy,
                 &mut deduper,
-                None,
             )
             .unwrap();
 
         assert!(
             processed.is_some(),
-            "initial bootstrap without a previous holder should emit current events"
+            "bootstrap events should be emitted rather than suppressed by lease timing"
+        );
+        let dedupe_record = processed.unwrap().dedupe_record;
+        deduper.commit(dedupe_record);
+
+        let replayed_event = make_event("uid", "rv", Utc::now() - ChronoDuration::seconds(10));
+        let processed = source
+            .handle_event(
+                None,
+                watcher::Event::InitApply(replayed_event),
+                LogNamespace::Legacy,
+                &mut deduper,
+            )
+            .unwrap();
+
+        assert!(
+            processed.is_none(),
+            "already delivered bootstrap events should still be suppressed by dedupe"
         );
     }
 
@@ -1737,6 +1493,16 @@ mod tests {
         event.deprecated_last_timestamp = Some(Time(kube_timestamp(deprecated_ts)));
 
         assert_eq!(event_timestamp(&event), deprecated_ts);
+    }
+
+    #[test]
+    fn event_timestamp_prefers_event_time_over_deprecated_last_timestamp() {
+        let event_ts = Utc.timestamp_opt(1_700_000_300, 0).unwrap();
+        let deprecated_ts = event_ts - ChronoDuration::seconds(30);
+        let mut event = make_event("uid", "1", event_ts);
+        event.deprecated_last_timestamp = Some(Time(kube_timestamp(deprecated_ts)));
+
+        assert_eq!(event_timestamp(&event), event_ts);
     }
 
     #[test]
@@ -1810,7 +1576,7 @@ mod tests {
         );
         let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now)
             .expect("self-held lease should renew");
-        let spec = prepared.lease.spec.expect("lease spec should be set");
+        let spec = prepared.spec.expect("lease spec should be set");
 
         assert_eq!(spec.holder_identity.as_deref(), Some("vector-0"));
         assert_eq!(spec.lease_transitions, Some(2));
@@ -1818,10 +1584,6 @@ mod tests {
             spec.renew_time
                 .and_then(|time| kube_timestamp_to_chrono(time.0)),
             Some(now)
-        );
-        assert_eq!(
-            prepared.suppress_bootstrap_before,
-            Some(now - ChronoDuration::seconds(5))
         );
     }
 
@@ -1847,7 +1609,7 @@ mod tests {
         );
         let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now)
             .expect("expired lease should be acquired");
-        let spec = prepared.lease.spec.expect("lease spec should be set");
+        let spec = prepared.spec.expect("lease spec should be set");
 
         assert_eq!(spec.holder_identity.as_deref(), Some("vector-0"));
         assert_eq!(spec.lease_transitions, Some(3));
@@ -1855,10 +1617,6 @@ mod tests {
             spec.acquire_time
                 .and_then(|time| kube_timestamp_to_chrono(time.0)),
             Some(now)
-        );
-        assert_eq!(
-            prepared.suppress_bootstrap_before,
-            Some(now - ChronoDuration::seconds(16))
         );
     }
 
@@ -1868,10 +1626,9 @@ mod tests {
         let lease = make_lease(None, None, None);
         let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now)
             .expect("empty lease should be acquired");
-        let spec = prepared.lease.spec.expect("lease spec should be set");
+        let spec = prepared.spec.expect("lease spec should be set");
 
         assert_eq!(spec.holder_identity.as_deref(), Some("vector-0"));
         assert_eq!(spec.lease_transitions, Some(1));
-        assert_eq!(prepared.suppress_bootstrap_before, None);
     }
 }
