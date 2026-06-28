@@ -19,7 +19,7 @@ use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        VectorSink, azure_common,
+        VectorSink, azure_blob, azure_common,
         util::{Compression, TowerRequestConfig},
     },
     test_util::{
@@ -34,7 +34,7 @@ async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let client = config.build_test_client().await;
 
-    azure_common::config::build_healthcheck(config.container_name, client)
+    azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
@@ -45,7 +45,7 @@ async fn azure_blob_healthcheck_passed_with_oauth() {
     let config = AzureBlobSinkConfig::new_emulator_with_oauth().await;
     let client = config.build_test_client().await;
 
-    azure_common::config::build_healthcheck(config.container_name, client)
+    azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
@@ -61,7 +61,7 @@ async fn azure_blob_healthcheck_unknown_container() {
     let client = config.build_test_client().await;
 
     assert_eq!(
-        azure_common::config::build_healthcheck(config.container_name, client)
+        azure_blob::config::build_healthcheck(config.container_name, client)
             .unwrap()
             .await
             .unwrap_err()
@@ -295,7 +295,7 @@ impl AzureBlobSinkConfig {
     }
 
     async fn build_test_client(&self) -> Arc<BlobContainerClient> {
-        azure_common::config::build_client(
+        azure_blob::config::build_client(
             self.auth.clone(),
             self.connection_string
                 .clone()
@@ -335,7 +335,7 @@ impl AzureBlobSinkConfig {
         let mut names = Vec::new();
         while let Some(result) = pager.next().await {
             let item = result.expect("Failed to fetch blobs");
-            if let Some(name) = item.name.and_then(|bn| bn.content)
+            if let Some(name) = item.name
                 && name.starts_with(&prefix)
             {
                 names.push(name);
@@ -379,7 +379,7 @@ impl AzureBlobSinkConfig {
             .await
             .expect("Failed to download blob");
         let body_bytes = downloaded
-            .into_body()
+            .body
             .collect()
             .await
             .expect("Failed to read blob body");
@@ -403,7 +403,7 @@ impl AzureBlobSinkConfig {
 
     async fn ensure_container(&self) {
         let client = self.build_test_client().await;
-        let result = client.create_container(None).await;
+        let result = client.create(None).await;
 
         let response = match result {
             Ok(_) => Ok(()),

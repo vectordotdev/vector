@@ -49,6 +49,19 @@ pub struct Config {
     )]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
+
+    /// Global per-tag-key overrides, applied to every metric that does not match a
+    /// `per_metric_limits` entry. Each entry sets `mode: limit_override` (with a
+    /// per-tag `value_limit`) or `mode: excluded` (bypass tracking for that tag).
+    ///
+    /// See the "Per-tag overrides" section under "How it works" for a worked example
+    /// and the precedence rules.
+    #[configurable(
+        derived,
+        metadata(docs::additional_props_description = "An individual tag configuration.")
+    )]
+    #[serde(default)]
+    pub per_tag_limits: HashMap<String, PerTagConfig>,
 }
 
 /// Controls how tag tracking state is partitioned across metrics.
@@ -100,6 +113,13 @@ pub enum Mode {
     /// This mode has higher memory requirements than `probabilistic`, but never falsely outputs
     /// metrics with new tags after the limit has been hit.
     Exact,
+
+    /// This mode operates similarly to `exact` mode except it tracks cardinality using 64-bit hash fingerprints
+    /// of tag values instead of the original strings. This leads to lower memory requirements in most
+    /// scenarios (assuming average tag value size is greater than 8 bytes) at the cost of slightly
+    /// reduced throughput due to extra hashing operations and a very small chance of collisions at
+    /// very high cardinalities.
+    ExactFingerprint,
 
     /// Tracks cardinality probabilistically.
     ///
@@ -170,6 +190,9 @@ pub enum OverrideMode {
     /// Tracks cardinality exactly. See `Mode::Exact` for details.
     Exact,
 
+    /// Tracks cardinality using 64-bit hash fingerprints. See `Mode::ExactFingerprint` for details.
+    ExactFingerprint,
+
     /// Tracks cardinality probabilistically. See `Mode::Probabilistic` for details.
     Probabilistic(BloomFilterConfig),
 
@@ -183,6 +206,7 @@ impl OverrideMode {
     pub const fn as_mode(&self) -> Option<Mode> {
         match self {
             OverrideMode::Exact => Some(Mode::Exact),
+            OverrideMode::ExactFingerprint => Some(Mode::ExactFingerprint),
             OverrideMode::Probabilistic(b) => Some(Mode::Probabilistic(*b)),
             OverrideMode::Excluded => None,
         }
@@ -311,6 +335,7 @@ impl GenerateConfig for Config {
             tracking_scope: TrackingScope::default(),
             max_tracked_keys: None,
             per_metric_limits: HashMap::default(),
+            per_tag_limits: HashMap::default(),
         })
         .unwrap()
     }

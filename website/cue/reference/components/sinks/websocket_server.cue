@@ -5,7 +5,6 @@ components: sinks: websocket_server: {
 	title: "WebSocket server"
 
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
 		egress_method: "stream"

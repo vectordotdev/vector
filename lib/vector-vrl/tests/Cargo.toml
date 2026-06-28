@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints]
+workspace = true
+
 [dependencies]
 chrono-tz.workspace = true
 vector-vrl-functions = { workspace = true, features = ["dnstap", "vrl-metrics"] }
@@ -20,7 +23,7 @@ serde_json.workspace = true
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = { version = "0.6.1" }
+tikv-jemallocator = { version = "0.7.0" }
 
 [features]
 default = []
