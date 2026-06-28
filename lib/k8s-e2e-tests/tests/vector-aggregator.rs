@@ -123,7 +123,7 @@ async fn kubernetes_events_leader_election() -> Result<(), Box<dyn std::error::E
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![&helm_values],
                 custom_resource: &rbac,
