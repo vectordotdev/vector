@@ -122,27 +122,31 @@ fn http_encode_event_ndjson() {
 
 #[test]
 fn http_validates_normal_headers() {
-    let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        encoding.codec = "text"
-        [request.headers]
-        Auth = "token:thing_and-stuff"
-        X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
-        "#;
-    let config: HttpSinkConfig = toml::from_str(config).unwrap();
+    let config = indoc::indoc! {r#"
+        uri: "http://$IN_ADDR/frames"
+        encoding:
+          codec: text
+        request:
+          headers:
+            Auth: "token:thing_and-stuff"
+            X-Custom-Nonsense: "_%_{}_-_&_._`_|_~_!_#_&_$_"
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
 
     assert!(validate_headers(&config.request.headers, false).is_ok());
 }
 
 #[test]
 fn http_catches_bad_header_names() {
-    let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        encoding.codec = "text"
-        [request.headers]
-        "\u0001" = "bad"
-        "#;
-    let config: HttpSinkConfig = toml::from_str(config).unwrap();
+    let config = indoc::indoc! {r#"
+        uri: "http://$IN_ADDR/frames"
+        encoding:
+          codec: text
+        request:
+          headers:
+            "\x01": "bad"
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
 
     assert_downcast_matches!(
         validate_headers(&config.request.headers, false).unwrap_err(),
@@ -153,13 +157,14 @@ fn http_catches_bad_header_names() {
 
 #[test]
 fn http_validates_payload_prefix_and_suffix() {
-    let config = r#"
-        uri = "http://$IN_ADDR/"
-        encoding.codec = "json"
-        payload_prefix = '{"data":'
-        payload_suffix = "}"
-        "#;
-    let config: HttpSinkConfig = toml::from_str(config).unwrap();
+    let config = indoc::indoc! {r#"
+        uri: "http://$IN_ADDR/"
+        encoding:
+          codec: json
+        payload_prefix: '{"data":'
+        payload_suffix: "}"
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
     let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
     let encoder = Encoder::<Framer>::new(framer, serializer);
     assert!(
@@ -169,13 +174,14 @@ fn http_validates_payload_prefix_and_suffix() {
 
 #[test]
 fn http_validates_payload_prefix_and_suffix_fails_on_invalid_json() {
-    let config = r#"
-        uri = "http://$IN_ADDR/"
-        encoding.codec = "json"
-        payload_prefix = '{"data":'
-        payload_suffix = ""
-        "#;
-    let config: HttpSinkConfig = toml::from_str(config).unwrap();
+    let config = indoc::indoc! {r#"
+        uri: "http://$IN_ADDR/"
+        encoding:
+          codec: json
+        payload_prefix: '{"data":'
+        payload_suffix: ""
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
     let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
     let encoder = Encoder::<Framer>::new(framer, serializer);
     assert!(
@@ -188,17 +194,19 @@ fn http_validates_payload_prefix_and_suffix_fails_on_invalid_json() {
 #[tokio::test]
 #[should_panic(expected = "Authorization header can not be used with defined auth options")]
 async fn http_headers_auth_conflict() {
-    let config = r#"
-        uri = "http://$IN_ADDR/"
-        encoding.codec = "text"
-        [request.headers]
-        Authorization = "Basic base64encodedstring"
-        [auth]
-        strategy = "basic"
-        user = "user"
-        password = "password"
-        "#;
-    let config: HttpSinkConfig = toml::from_str(config).unwrap();
+    let config = indoc::indoc! {r#"
+        uri: "http://$IN_ADDR/"
+        encoding:
+          codec: text
+        request:
+          headers:
+            Authorization: "Basic base64encodedstring"
+        auth:
+          strategy: basic
+          user: user
+          password: password
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
 
     let cx = SinkContext::default();
 
@@ -208,12 +216,12 @@ async fn http_headers_auth_conflict() {
 #[tokio::test]
 async fn http_happy_path_post() {
     run_sink(
-        r#"
-        [auth]
-        strategy = "basic"
-        user = "waldo"
-        password = "hunter2"
-    "#,
+        indoc::indoc! {r#"
+        auth:
+          strategy: basic
+          user: waldo
+          password: hunter2
+        "#},
         |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -229,13 +237,13 @@ async fn http_happy_path_post() {
 #[tokio::test]
 async fn http_happy_path_put() {
     run_sink(
-        r#"
-        method = "put"
-        [auth]
-        strategy = "basic"
-        user = "waldo"
-        password = "hunter2"
-    "#,
+        indoc::indoc! {r#"
+        method: put
+        auth:
+          strategy: basic
+          user: waldo
+          password: hunter2
+        "#},
         |parts| {
             assert_eq!(Method::PUT, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -251,11 +259,12 @@ async fn http_happy_path_put() {
 #[tokio::test]
 async fn http_passes_custom_headers() {
     run_sink(
-        r#"
-        [request.headers]
-        foo = "bar"
-        baz = "quux"
-    "#,
+        indoc::indoc! {r#"
+        request:
+          headers:
+            foo: bar
+            baz: quux
+        "#},
         |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -275,14 +284,15 @@ async fn http_passes_custom_headers() {
 #[tokio::test]
 async fn http_passes_template_headers() {
     run_sink_with_events(
-        r#"
-        [request.headers]
-        Static-Header = "static-value"
-        Accept = "application/vnd.api+json"
-        X-Event-Level = "{{level}}"
-        X-Event-Message = "{{message}}"
-        X-Static-Template = "constant-value"
-    "#,
+        indoc::indoc! {r#"
+        request:
+          headers:
+            Static-Header: static-value
+            Accept: "application/vnd.api+json"
+            X-Event-Level: "{{level}}"
+            X-Event-Message: "{{message}}"
+            X-Static-Template: constant-value
+        "#},
         || {
             let mut event = Event::Log(LogEvent::from("test message"));
             event.as_mut_log().insert("level", "info");
@@ -334,11 +344,12 @@ async fn http_passes_template_headers() {
 #[tokio::test]
 async fn http_template_headers_missing_fields() {
     run_sink_with_events(
-        r#"
-        [request.headers]
-        X-Required-Field = "{{required_field}}"
-        X-Static = "static-value"
-    "#,
+        indoc::indoc! {r#"
+        request:
+          headers:
+            X-Required-Field: "{{required_field}}"
+            X-Static: static-value
+        "#},
         || {
             let mut event = Event::Log(LogEvent::from("good event"));
             event.as_mut_log().insert("required_field", "present");
@@ -451,13 +462,15 @@ async fn custom_retry_retries_only_configured_status_code() {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         const NUM_LINES: usize = 1;
         const NUM_FAILURES: usize = 2;
-        const CUSTOM_RETRY_CONFIG: &str = r#"
-            request.retry_attempts = 2
-            request.retry_initial_backoff_secs = 1
-            request.retry_max_duration_secs = 1
-            retry_strategy.type = "custom"
-            retry_strategy.status_codes = [408, 425, 429, 503]
-        "#;
+        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r#"
+            request:
+              retry_attempts: 2
+              retry_initial_backoff_secs: 1
+              retry_max_duration_secs: 1
+            retry_strategy:
+              type: custom
+              status_codes: [408, 425, 429, 503]
+        "#};
 
         let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
 
@@ -504,13 +517,15 @@ async fn custom_retry_retries_only_configured_status_code() {
 async fn custom_retry_does_not_retry_unconfigured_status_code() {
     components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
         const NUM_LINES: usize = 1;
-        const CUSTOM_RETRY_CONFIG: &str = r#"
-            request.retry_attempts = 2
-            request.retry_initial_backoff_secs = 1
-            request.retry_max_duration_secs = 1
-            retry_strategy.type = "custom"
-            retry_strategy.status_codes = [408, 425, 429, 503]
-        "#;
+        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r#"
+            request:
+              retry_attempts: 2
+              retry_initial_backoff_secs: 1
+              retry_max_duration_secs: 1
+            retry_strategy:
+              type: custom
+              status_codes: [408, 425, 429, 503]
+        "#};
 
         let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
 
@@ -609,20 +624,20 @@ async fn json_compression(compression: &str) {
         let (_guard, in_addr) = next_addr();
 
         let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        compression = "$COMPRESSION"
-        encoding.codec = "json"
-        method = "post"
-
-        [auth]
-        strategy = "basic"
-        user = "waldo"
-        password = "hunter2"
+        uri: "http://$IN_ADDR/frames"
+        compression: "$COMPRESSION"
+        encoding:
+          codec: json
+        method: post
+        auth:
+          strategy: basic
+          user: waldo
+          password: hunter2
     "#
         .replace("$IN_ADDR", &in_addr.to_string())
         .replace("$COMPRESSION", compression);
 
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
 
@@ -668,22 +683,22 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
         let (_guard, in_addr) = next_addr();
 
         let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        compression = "$COMPRESSION"
-        encoding.codec = "json"
-        payload_prefix = '{"data":'
-        payload_suffix = "}"
-        method = "post"
-
-        [auth]
-        strategy = "basic"
-        user = "waldo"
-        password = "hunter2"
+        uri: "http://$IN_ADDR/frames"
+        compression: "$COMPRESSION"
+        encoding:
+          codec: json
+        payload_prefix: '{"data":'
+        payload_suffix: "}"
+        method: post
+        auth:
+          strategy: basic
+          user: waldo
+          password: hunter2
     "#
         .replace("$IN_ADDR", &in_addr.to_string())
         .replace("$COMPRESSION", compression);
 
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
 
@@ -739,12 +754,13 @@ async fn templateable_uri_path() {
 
     let config = format!(
         r#"
-        uri = "http://{in_addr}/id/{{{{id}}}}"
-        encoding.codec = "json"
+        uri: "http://{in_addr}/id/{{{{id}}}}"
+        encoding:
+          codec: json
         "#
     );
 
-    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+    let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
     let cx = SinkContext::default();
 
@@ -809,12 +825,13 @@ async fn templateable_uri_auth() {
     let (_guard, in_addr) = next_addr();
     let config = format!(
         r#"
-        uri = "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
-        encoding.codec = "json"
+        uri: "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
+        encoding:
+          codec: json
         "#
     );
 
-    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+    let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
     let cx = SinkContext::default();
 
@@ -877,11 +894,12 @@ async fn missing_field_in_uri_template() {
     let (_guard, in_addr) = next_addr();
     let config = format!(
         r#"
-        uri = "http://{in_addr}/{{{{missing_field}}}}"
-        encoding.codec = "json"
+        uri: "http://{in_addr}/{{{{missing_field}}}}"
+        encoding:
+          codec: json
         "#
     );
-    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+    let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
     let cx = SinkContext::default();
 
@@ -922,14 +940,16 @@ async fn http_uri_auth_conflict() {
     let (_guard, in_addr) = next_addr();
     let config = format!(
         r#"
-        uri = "http://user:pass@{in_addr}/"
-        encoding.codec = "json"
-        auth.strategy = "basic"
-        auth.user = "user"
-        auth.password = "pass"
+        uri: "http://user:pass@{in_addr}/"
+        encoding:
+          codec: json
+        auth:
+          strategy: basic
+          user: user
+          password: pass
         "#
     );
-    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+    let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
     let cx = SinkContext::default();
 
@@ -1016,16 +1036,16 @@ async fn run_sink_with_events(
 async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
     let (_guard, in_addr) = next_addr();
 
-    let config = format!(
-        r#"
-                uri = "http://{in_addr}/frames"
-                compression = "gzip"
-                framing.method = "newline_delimited"
-                encoding.codec = "json"
-                {extra_config}
-            "#,
-    );
-    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+    let config = indoc::formatdoc! {r#"
+        uri: "http://{in_addr}/frames"
+        compression: gzip
+        framing:
+          method: newline_delimited
+        encoding:
+          codec: json
+        {extra_config}
+    "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
     let cx = SinkContext::default();
 

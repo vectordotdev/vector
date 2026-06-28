@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use vector_lib::{

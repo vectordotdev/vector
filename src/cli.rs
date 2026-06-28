@@ -272,6 +272,21 @@ pub struct RootOpts {
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
 
+    /// Maximum number of bytes allowed after decompressing a payload.
+    ///
+    /// Sources that decompress incoming payloads (gzip, deflate, zstd, snappy) enforce this cap to
+    /// prevent a compressed "bomb" from exhausting memory. Payloads whose decompressed size exceeds
+    /// the limit are rejected.
+    ///
+    /// Defaults to 104857600 (100 MiB). Raise this only when sources routinely receive
+    /// legitimately large compressed payloads.
+    #[arg(
+        long,
+        env = "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES",
+        default_value = "104857600"
+    )]
+    pub max_decompressed_size_bytes: usize,
+
     /// Raise the file descriptor soft limit (RLIMIT_NOFILE) to the hard limit at startup.
     ///
     /// Many systems default the soft limit to 1024 (Linux) or 256 (macOS), which is too low
@@ -589,7 +604,7 @@ mod tests {
         if setrlimit(Resource::RLIMIT_NOFILE, hard, hard).is_err() {
             #[cfg(target_os = "macos")]
             if let Some(maxfiles) = super::macos_maxfilesperproc() {
-                let _ = setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard);
+                setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard).ok();
             }
         }
 

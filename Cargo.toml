@@ -12,7 +12,7 @@ default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
-rust-version = "1.92"
+rust-version = "1.95"
 
 [[bin]]
 name = "vector"
@@ -47,8 +47,8 @@ lto = "fat"
 [profile.bench]
 debug = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+[lints]
+workspace = true
 
 [package.metadata.deb]
 name = "vector"
@@ -135,6 +135,15 @@ members = [
   "tests/antithesis/harness",
   "vdev",
 ]
+
+[workspace.lints.rust]
+# 'cfg(tokio_unstable)' used in vector; 'cfg(ddsketch_extended)' used in vector-core
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(ddsketch_extended)'] }
+
+[workspace.lints.clippy]
+string_slice = "warn"
+await_holding_lock = "warn"
+let_underscore_must_use = "warn"
 
 [workspace.dependencies]
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
@@ -994,7 +1003,6 @@ all-integration-tests = [
   "aws-integration-tests",
   "axiom-integration-tests",
   "azure-integration-tests",
-  "chronicle-integration-tests",
   "clickhouse-integration-tests",
   "databend-integration-tests",
   "datadog-agent-integration-tests",
@@ -1065,7 +1073,6 @@ aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 azure-logs-ingestion-integration-tests = ["sinks-azure_logs_ingestion"]
-chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]

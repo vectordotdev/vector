@@ -139,13 +139,14 @@ impl Parser {
 }
 
 fn parse_sampling(input: &str) -> Result<f64, ParseError> {
-    if !input.starts_with('@') || input.len() < 2 {
-        return Err(ParseError::Malformed(
+    let rest = input
+        .strip_prefix('@')
+        .filter(|s| !s.is_empty())
+        .ok_or(ParseError::Malformed(
             "expected non empty '@'-prefixed sampling component",
-        ));
-    }
+        ))?;
 
-    let num: f64 = input[1..].parse()?;
+    let num: f64 = rest.parse()?;
     if num.is_sign_positive() {
         Ok(num)
     } else {
@@ -155,16 +156,14 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
 
 /// Statsd (and dogstatsd) support bare, single and multi-value tags.
 fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
-    if !input.starts_with('#') || input.len() < 2 {
-        return Err(ParseError::Malformed(
+    let rest = input
+        .strip_prefix('#')
+        .filter(|s| !s.is_empty())
+        .ok_or(ParseError::Malformed(
             "expected non empty '#'-prefixed tags component",
-        ));
-    }
+        ))?;
 
-    Ok(input[1..]
-        .split(',')
-        .map(extract_tag_key_and_value)
-        .collect())
+    Ok(rest.split(',').map(extract_tag_key_and_value).collect())
 }
 
 fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {

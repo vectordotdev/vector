@@ -173,10 +173,10 @@ mod tests {
     #[test]
     fn test_config_with_username() {
         let config = indoc! {r#"
-            endpoint = "foo-bar.ap-southeast-1.aws.greptime.cloud:4001"
-            dbname = "foo-bar"
+            endpoint: "foo-bar.ap-southeast-1.aws.greptime.cloud:4001"
+            dbname: "foo-bar"
         "#};
 
-        toml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+        serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
     }
 }

@@ -4,7 +4,6 @@ use lookup::lookup_v2::ConfigTargetPath;
 use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::fmt::Write;
 use std::str::FromStr;
 use strum::{EnumString, FromRepr, VariantNames};
 use tokio_util::codec::Encoder;
@@ -235,8 +234,9 @@ where
         None => Cow::Borrowed(s), // All valid, zero allocation
         Some((first_invalid_idx, _)) => {
             let mut result = String::with_capacity(s.len());
-            result.push_str(&s[..first_invalid_idx]); // Copy valid prefix
-            for c in s[first_invalid_idx..].chars() {
+            let (valid_prefix, remainder) = s.split_at(first_invalid_idx);
+            result.push_str(valid_prefix);
+            for c in remainder.chars() {
                 result.push(if is_valid(c) { c } else { '_' });
             }
 
@@ -320,7 +320,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        let _ = write!(result, "{}", self.pri.encode());
+        result.push_str(&self.pri.encode().to_string());
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -329,7 +329,7 @@ impl SyslogMessage {
 
         match rfc {
             SyslogRFC::Rfc3164 => {
-                let _ = write!(result, "{} ", self.timestamp.format("%b %e %H:%M:%S"));
+                result.push_str(&format!("{} ", self.timestamp.format("%b %e %H:%M:%S")));
             }
             SyslogRFC::Rfc5424 => {
                 result.push_str(
@@ -435,12 +435,12 @@ impl StructuredData {
             self.elements
                 .iter()
                 .fold(String::new(), |mut acc, (sd_id, sd_params)| {
-                    let _ = write!(acc, "[{sd_id}");
+                    acc.push_str(&format!("[{sd_id}"));
                     for (key, value) in sd_params {
                         let esc_val = escape_sd_value(value);
-                        let _ = write!(acc, " {key}=\"{esc_val}\"");
+                        acc.push_str(&format!(" {key}=\"{esc_val}\""));
                     }
-                    let _ = write!(acc, "]");
+                    acc.push(']');
                     acc
                 })
         }
