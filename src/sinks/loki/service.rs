@@ -3,6 +3,7 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use http::StatusCode;
 use snafu::Snafu;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use tracing::Instrument;
 
@@ -84,12 +85,12 @@ impl MetaDescriptive for LokiRequest {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LokiService {
     endpoint: UriSerde,
     client: HttpClient,
     keep_alive_requests: i64,
-    request_count: AtomicI64,
+    request_count: Arc<AtomicI64>,
 }
 
 impl LokiService {
@@ -101,7 +102,7 @@ impl LokiService {
         keep_alive_requests: Option<i64>,
     ) -> crate::Result<Self> {
         let endpoint = endpoint.append_path(&path)?.with_auth(auth);
-        let request_count = AtomicI64::new(0);
+        let request_count = Arc::new(AtomicI64::new(0));
         Ok(Self {
             client,
             endpoint,
@@ -110,17 +111,6 @@ impl LokiService {
         })
     }
 }
-
-impl Clone for LokiService {
-    fn clone(&self) -> Self {
-        Self {
-            endpoint: self.endpoint.clone(),
-            client: self.client.clone(),
-            keep_alive_requests: self.keep_alive_requests,
-            request_count: AtomicI64::new(self.request_count.load(Ordering::SeqCst)),
-        }
-     }
- }
 
 impl Service<LokiRequest> for LokiService {
     type Response = LokiResponse;
