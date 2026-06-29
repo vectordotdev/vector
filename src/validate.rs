@@ -118,12 +118,12 @@ impl Opts {
 }
 
 /// Performs topology, component, and health checks.
-pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
+pub async fn validate(opts: &Opts, color: bool, allow_interpolation: bool) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
 
-    let mut config = match validate_config(opts, &mut fmt) {
+    let mut config = match validate_config(opts, &mut fmt, allow_interpolation) {
         Some(config) => config,
         None => return exitcode::CONFIG,
     };
@@ -145,7 +145,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
+pub fn validate_config(opts: &Opts, fmt: &mut Formatter, allow_interpolation: bool) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
     let paths = if let Some(paths) = config::process_paths(&paths) {
@@ -166,7 +166,7 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.sub_error(errors);
     };
     let builder = ConfigBuilderLoader::default()
-        .interpolate_env(opts.dangerously_allow_env_var_interpolation)
+        .interpolate_env(allow_interpolation)
         .load_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;

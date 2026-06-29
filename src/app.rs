@@ -246,7 +246,11 @@ impl Application {
         let mut signals = SignalPair::new(&runtime);
 
         if let Some(sub_command) = &opts.sub_command {
-            return Err(runtime.block_on(sub_command.execute(signals, color)));
+            return Err(runtime.block_on(sub_command.execute(
+                signals,
+                color,
+                opts.root.dangerously_allow_env_var_interpolation,
+            )));
         }
 
         let config = runtime.block_on(ApplicationConfig::from_opts(

@@ -486,23 +486,42 @@ impl SubCommand {
         &self,
         mut signals: signal::SignalPair,
         color: bool,
+        allow_interpolation: bool,
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
-            Self::Config(c) => config::cmd(c),
+            Self::Config(c) => {
+                config::cmd(c, allow_interpolation || c.dangerously_allow_env_var_interpolation)
+            }
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema(opts) => generate_schema::cmd(opts),
-            Self::Graph(g) => graph::cmd(g),
+            Self::Graph(g) => {
+                graph::cmd(g, allow_interpolation || g.dangerously_allow_env_var_interpolation)
+            }
             Self::List(l) => list::cmd(l),
             #[cfg(windows)]
-            Self::Service(s) => service::cmd(s),
+            Self::Service(s) => service::cmd(s, allow_interpolation),
             #[cfg(feature = "api-client")]
             Self::Tap(t) => tap::cmd(t, signals.receiver).await,
-            Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
+            Self::Test(t) => {
+                unit_test::cmd(
+                    t,
+                    &mut signals.handler,
+                    allow_interpolation || t.dangerously_allow_env_var_interpolation,
+                )
+                .await
+            }
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, color).await,
+            Self::Validate(v) => {
+                validate::validate(
+                    v,
+                    color,
+                    allow_interpolation || v.dangerously_allow_env_var_interpolation,
+                )
+                .await
+            }
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }

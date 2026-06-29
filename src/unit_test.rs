@@ -155,7 +155,7 @@ impl<'a> JUnitReporter<'a> {
     }
 }
 
-pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
+pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler, allow_interpolation: bool) -> exitcode::ExitCode {
     if opts.disable_env_var_interpolation {
         warn!(
             "--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
@@ -178,7 +178,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
     match config::build_unit_tests_main(
         &paths,
         signal_handler,
-        opts.dangerously_allow_env_var_interpolation,
+        allow_interpolation,
     )
     .await
     {

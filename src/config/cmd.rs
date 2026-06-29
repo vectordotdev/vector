@@ -180,7 +180,7 @@ fn serialize_to_json(
 /// The purpose of this func is to combine user configuration after processing all paths,
 /// Pipelines expansions, etc. The JSON result of this serialization can itself be used as a config,
 /// which also makes it useful for version control or treating as a singular unit of configuration.
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub fn cmd(opts: &Opts, allow_interpolation: bool) -> exitcode::ExitCode {
     if opts.disable_env_var_interpolation {
         #[allow(clippy::print_stderr)]
         {
@@ -195,7 +195,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let (paths, builder) = match process_paths(&paths) {
         Some(paths) => {
             match ConfigBuilderLoader::default()
-                .interpolate_env(opts.dangerously_allow_env_var_interpolation)
+                .interpolate_env(allow_interpolation)
                 .load_from_paths(&paths)
             {
                 Ok(builder) => (paths, builder),
