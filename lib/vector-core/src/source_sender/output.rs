@@ -214,11 +214,13 @@ impl Output {
             .for_each(|event| self.emit_lag_time(event, reference));
 
         events.iter_events_mut().for_each(|mut event| {
+            let metadata = event.metadata_mut();
             // attach runtime schema definitions from the source
             if let Some(log_definition) = &self.log_definition {
-                event.metadata_mut().set_schema_definition(log_definition);
+                metadata.set_schema_definition(log_definition);
             }
-            event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
+            metadata.set_upstream_id(Arc::clone(&self.id));
+            metadata.set_reference_timestamp(reference);
         });
 
         let byte_size = events.estimated_json_encoded_size_of();
