@@ -216,6 +216,7 @@ where
     let connector = AwsHttpClient {
         http: connector,
         region: region.clone(),
+        emit_bytes_sent: true,
     };
 
     // Build the configuration first.
@@ -330,6 +331,10 @@ pub async fn sign_request(
 struct AwsHttpClient<T> {
     http: T,
     region: Region,
+    /// When `false`, the connector skips `AwsBytesSent` so that control-plane
+    /// traffic (STS AssumeRole, IMDS, SSO token exchange) does not inflate
+    /// `component_sent_bytes_total`.
+    emit_bytes_sent: bool,
 }
 
 impl<T> HttpClient for AwsHttpClient<T>
@@ -346,6 +351,7 @@ where
         SharedHttpConnector::new(AwsConnector {
             region: self.region.clone(),
             http: http_connector,
+            emit_bytes_sent: self.emit_bytes_sent,
         })
     }
 }
@@ -354,6 +360,7 @@ where
 struct AwsConnector<T> {
     http: T,
     region: Region,
+    emit_bytes_sent: bool,
 }
 
 // ── Telemetry trait implementations for the AWS SDK HTTP types ────────────────
@@ -418,40 +425,24 @@ fn smithy_headers_to_map(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-impl<T> HttpConnector for AwsConnector<T>
+impl<T> AwsConnector<T>
 where
     T: HttpConnector,
 {
-    fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
-        let bytes_sent = Arc::new(AtomicUsize::new(0));
-
+    /// Calls the inner HTTP connector and emits common telemetry.
+    /// Does not emit `AwsBytesSent` telemetry.
+    fn call_inner(&self, req: HttpRequest) -> HttpConnectorFuture {
         emit!(AboutToSendHttpRequest { request: &req });
 
-        let req = req.map(|body| {
-            let bytes_sent = Arc::clone(&bytes_sent);
-            body.map_preserve_contents(move |body| {
-                let body = MeasuredBody::new(body, Arc::clone(&bytes_sent));
-                SdkBody::from_body_0_4(BoxBody::new(body))
-            })
-        });
-
-        let fut = self.http.call(req);
-        let region = self.region.clone();
+        let fut: HttpConnectorFuture = self.http.call(req);
 
         HttpConnectorFuture::new(async move {
             let before = Instant::now();
             let result = fut.await;
             let roundtrip = before.elapsed();
-            let byte_size = bytes_sent.load(Ordering::Relaxed);
 
             match &result {
                 Ok(response) => {
-                    if response.status().is_success() {
-                        emit!(AwsBytesSent {
-                            byte_size,
-                            region: Some(region),
-                        });
-                    }
                     emit!(GotHttpResponse {
                         response,
                         roundtrip
@@ -461,6 +452,47 @@ where
                     emit!(GotHttpWarning { error, roundtrip });
                 }
             }
+
+            result
+        })
+    }
+}
+
+impl<T> HttpConnector for AwsConnector<T>
+where
+    T: HttpConnector,
+{
+    fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
+        if !self.emit_bytes_sent {
+            return HttpConnectorFuture::new(self.call_inner(req));
+        }
+
+        let bytes_sent = Arc::new(AtomicUsize::new(0));
+
+        let req = req.map(|body| {
+            let bytes_sent = Arc::clone(&bytes_sent);
+            body.map_preserve_contents(move |body| {
+                let body = MeasuredBody::new(body, Arc::clone(&bytes_sent));
+                SdkBody::from_body_0_4(BoxBody::new(body))
+            })
+        });
+
+        let fut = self.call_inner(req);
+        let region = self.region.clone();
+
+        HttpConnectorFuture::new(async move {
+            let result = fut.await;
+
+            if let Ok(response) = &result
+                && response.status().is_success()
+            {
+                let byte_size = bytes_sent.load(Ordering::Relaxed);
+
+                emit!(AwsBytesSent {
+                    byte_size,
+                    region: Some(region),
+                });
+            };
 
             result
         })

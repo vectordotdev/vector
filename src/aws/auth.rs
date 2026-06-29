@@ -248,6 +248,7 @@ impl AwsAuthentication {
         let connector = super::AwsHttpClient {
             http: super::connector(proxy, tls_options)?,
             region: region.clone(),
+            emit_bytes_sent: false,
         };
         let config = SdkConfig::builder()
             .http_client(connector)
@@ -324,6 +325,7 @@ impl AwsAuthentication {
                 let connector = super::AwsHttpClient {
                     http: super::connector(proxy, tls_options)?,
                     region: auth_region.clone(),
+                    emit_bytes_sent: false,
                 };
                 let provider_config = ProviderConfig::empty()
                     .with_region(Option::from(auth_region))
@@ -399,6 +401,7 @@ async fn default_credentials_provider(
     let connector = super::AwsHttpClient {
         http: super::connector(proxy, tls_options)?,
         region: region.clone(),
+        emit_bytes_sent: false,
     };
 
     let provider_config = ProviderConfig::empty()

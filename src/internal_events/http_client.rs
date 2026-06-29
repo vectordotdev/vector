@@ -190,6 +190,8 @@ fn remove_sensitive(mut headers: HeaderMap<HeaderValue>) -> HeaderMap<HeaderValu
         HeaderName::from_static("x-api-key"),
         HeaderName::from_static("api-key"),
         HeaderName::from_static("x-amz-security-token"),
+        HeaderName::from_static("x-amz-sso_bearer_token"),
+        HeaderName::from_static("x-aws-ec2-metadata-token"),
     ];
     for (name, value) in headers.iter_mut() {
         if sensitive.contains(name) {
@@ -294,6 +296,36 @@ mod tests {
         assert!(
             is_sensitive(&result, &token_header).iter().all(|&s| s),
             "x-amz-security-token must be marked sensitive to avoid leaking AWS STS credentials"
+        );
+    }
+
+    #[test]
+    fn marks_aws_sso_bearer_token_as_sensitive() {
+        let token_header = HeaderName::from_static("x-amz-sso_bearer_token");
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            token_header.clone(),
+            HeaderValue::from_static("eyJhbGciOiJSUzI1NiJ9.fake"),
+        );
+        let result = remove_sensitive(headers);
+        assert!(
+            is_sensitive(&result, &token_header).iter().all(|&s| s),
+            "x-amz-sso_bearer_token must be marked sensitive: it can be exchanged for AWS role credentials via the IAM Identity Center Portal API"
+        );
+    }
+
+    #[test]
+    fn marks_imdsv2_session_token_as_sensitive() {
+        let token_header = HeaderName::from_static("x-aws-ec2-metadata-token");
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            token_header.clone(),
+            HeaderValue::from_static("AQAEAAAABBBBB=="),
+        );
+        let result = remove_sensitive(headers);
+        assert!(
+            is_sensitive(&result, &token_header).iter().all(|&s| s),
+            "x-aws-ec2-metadata-token must be marked sensitive: a valid IMDSv2 session token can be used to query EC2 metadata (including IAM role credentials) for the duration of its TTL"
         );
     }
 
