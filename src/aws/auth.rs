@@ -245,7 +245,10 @@ impl AwsAuthentication {
         external_id: Option<&str>,
         session_name: Option<&str>,
     ) -> crate::Result<AssumeRoleProviderBuilder> {
-        let connector = super::connector(proxy, tls_options)?;
+        let connector = super::AwsHttpClient {
+            http: super::connector(proxy, tls_options)?,
+            region: region.clone(),
+        };
         let config = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
@@ -311,8 +314,6 @@ impl AwsAuthentication {
                 profile,
                 region,
             } => {
-                let connector = super::connector(proxy, tls_options)?;
-
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = EnvConfigFiles::builder()
@@ -320,6 +321,10 @@ impl AwsAuthentication {
                     .build();
 
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                let connector = super::AwsHttpClient {
+                    http: super::connector(proxy, tls_options)?,
+                    region: auth_region.clone(),
+                };
                 let provider_config = ProviderConfig::empty()
                     .with_region(Option::from(auth_region))
                     .with_http_client(connector);
@@ -391,7 +396,10 @@ async fn default_credentials_provider(
     tls_options: Option<&TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let connector = super::connector(proxy, tls_options)?;
+    let connector = super::AwsHttpClient {
+        http: super::connector(proxy, tls_options)?,
+        region: region.clone(),
+    };
 
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))

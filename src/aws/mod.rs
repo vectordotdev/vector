@@ -139,6 +139,7 @@ pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
 ) -> crate::Result<impl ProvideRegion + use<>> {
+    // Region is not yet known here, so we cannot wrap with AwsHttpClient for observability.
     let config = aws_config::provider_config::ProviderConfig::default()
         .with_http_client(connector(proxy, tls_options)?);
 
