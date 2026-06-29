@@ -37,23 +37,23 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let mut args = vec!["--workspace".to_string()];
-
-        if let Some(mut extra_args) = self.args {
-            args.append(&mut extra_args);
-        }
-
         let features: Vec<String> = self
             .features
             .into_iter()
             .filter(|f| !f.is_empty())
             .collect();
 
+        let mut args = vec!["--workspace".to_string()];
+
         if self.no_default_features {
             args.push("--no-default-features".to_string());
         }
         if !features.is_empty() {
             args.extend(["--features".to_string(), features.join(",")]);
+        }
+
+        if let Some(mut extra_args) = self.args {
+            args.append(&mut extra_args);
         }
 
         LocalTestRunner.test(
