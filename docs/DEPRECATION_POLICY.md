@@ -16,8 +16,13 @@ we will typically aim to support deprecations for a longer time period depending
 burden. For example, a deprecation announced in `v0.16.0` would be eligible to be removed in `v0.17.0` but may be
 removed later in `v0.20.0`.
 
-Exceptions can be made for deprecations related to security issues or critical bugs. These may result in removals being
-introduced in a release without being announced in a prior release.
+### Security changes and critical bugs
+
+Security fixes and critical bug fixes may change or remove existing behavior without prior notice, regardless of the
+normal deprecation process. This includes changes that alter default configurations, disable insecure options, tighten
+input validation, or otherwise restrict previously-allowed behavior in order to address a vulnerability or critical
+bug, as well as removals introduced without a prior deprecation announcement. Such changes will be noted in the release
+notes and we will do our best to provide an upgrade guide, but will not necessarily follow the standard migration window.
 
 ### Examples
 
@@ -94,9 +99,9 @@ normally have been announced in an earlier release via a `deprecation.d/` fragme
 to land the announcement first, then come back to ship the removal after the migration window has passed (see the
 [Policy](#policy) section for the minimum window).
 
-The exception is the one already listed in [Policy](#policy): a security issue or critical bug may justify shipping a
-breaking change without a prior announcement. Call that out explicitly in the PR description so reviewers can apply
-the exception consciously rather than by oversight.
+The exception is the one described in [Security changes and critical bugs](#security-changes-and-critical-bugs): a
+security issue or critical bug may justify shipping a breaking change without a prior announcement. Call that out
+explicitly in the PR description so reviewers can apply the exception consciously rather than by oversight.
 
 When removing a deprecation in a subsequent release, the pull request should:
 
