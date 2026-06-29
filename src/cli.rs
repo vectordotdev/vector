@@ -244,12 +244,12 @@ pub struct RootOpts {
     pub no_graceful_shutdown_limit: bool,
 
     /// Set runtime allocation tracing
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
     pub allocation_tracing: bool,
 
     /// Set allocation tracing reporting rate in milliseconds.
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(
         long,
         env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
