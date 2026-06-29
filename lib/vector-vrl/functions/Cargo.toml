@@ -16,7 +16,6 @@ enrichment = { path = "../enrichment" }
 vector-vrl-metrics = { path = "../metrics", optional = true }
 vector-vrl-category.workspace = true
 
-[target.'cfg(unix)'.dependencies]
 dnstap-parser = { path = "../dnstap-parser", optional = true }
 
 [features]
