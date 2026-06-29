@@ -14,6 +14,13 @@ pub struct Cli {
     /// Environment variables in the form KEY[=VALUE]
     #[arg(short, long)]
     env: Option<Vec<String>>,
+
+    /// Features to activate (comma-separated, or set FEATURES env var)
+    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
+    features: Vec<String>,
+
+    #[arg(long)]
+    no_default_features: bool,
 }
 
 fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
@@ -36,8 +43,17 @@ impl Cli {
             args.append(&mut extra_args);
         }
 
-        if !args.contains(&"--features".to_string()) {
-            args.extend(["--features".to_string(), "default".to_string()]);
+        let features: Vec<String> = self
+            .features
+            .into_iter()
+            .filter(|f| !f.is_empty())
+            .collect();
+
+        if self.no_default_features {
+            args.push("--no-default-features".to_string());
+        }
+        if !features.is_empty() {
+            args.extend(["--features".to_string(), features.join(",")]);
         }
 
         LocalTestRunner.test(
