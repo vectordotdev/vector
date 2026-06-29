@@ -184,7 +184,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     if opts.disable_env_var_interpolation {
         #[allow(clippy::print_stderr)]
         {
-            eprintln!("Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+            eprintln!(
+                "Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
+            );
         }
     }
     let paths = opts.paths_with_formats();

@@ -80,7 +80,9 @@ impl InstallOpts {
         if self.disable_env_var_interpolation {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+                eprintln!(
+                    "Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
+                );
             }
         }
         let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
@@ -90,7 +92,8 @@ impl InstallOpts {
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
         let arguments =
-            create_service_arguments(&config_paths, self.dangerously_allow_env_var_interpolation).unwrap();
+            create_service_arguments(&config_paths, self.dangerously_allow_env_var_interpolation)
+                .unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),

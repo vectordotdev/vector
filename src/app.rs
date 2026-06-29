@@ -82,7 +82,9 @@ impl ApplicationConfig {
         };
 
         if opts.disable_env_var_interpolation {
-            warn!("--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+            warn!(
+                "--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
+            );
         }
         let config = load_configs(
             &config_paths,
