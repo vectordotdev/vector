@@ -171,7 +171,7 @@ impl Output {
         events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
     ) -> Result<(), SendError> {
-        let reference = Utc::now().timestamp_millis();
+        let reference = Utc::now();
         self.send_inner(events, unsent_event_count, reference).await
     }
 
@@ -179,7 +179,7 @@ impl Output {
         &mut self,
         mut events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
-        reference: i64,
+        reference: chrono::DateTime<Utc>,
     ) -> Result<(), SendError> {
         // Apply post-processor with typed dispatch. Each method receives a reference to the
         // concrete event type, making it impossible at the type level to change the variant.
@@ -209,9 +209,10 @@ impl Output {
 
         // Emit lag time after the post-processor so that any timestamp mutations made by the
         // processor are reflected in the metric.
+        let reference_millis = reference.timestamp_millis();
         events
             .iter_events()
-            .for_each(|event| self.emit_lag_time(event, reference));
+            .for_each(|event| self.emit_lag_time(event, reference_millis));
 
         events.iter_events_mut().for_each(|mut event| {
             let metadata = event.metadata_mut();
@@ -298,7 +299,7 @@ impl Output {
     {
         // Capture a single reference timestamp for the entire batch so that lag time
         // measurements are not inflated by channel-send latency for later chunks.
-        let reference = Utc::now().timestamp_millis();
+        let reference = Utc::now();
 
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit

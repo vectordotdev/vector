@@ -2,6 +2,8 @@
 
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
 
+use chrono::{DateTime, Utc};
+
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
@@ -88,11 +90,11 @@ pub(super) struct Inner {
     #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Option<Uuid>,
 
-    /// The wall-clock timestamp (milliseconds since Unix epoch) captured when the event batch
-    /// first entered the source output channel. Invariant across all fan-out copies of an event;
-    /// set once at source send time before any fan-out occurs.
+    /// The wall-clock timestamp captured when the event batch first entered the source output
+    /// channel. Invariant across all fan-out copies of an event; set once at source send time
+    /// before any fan-out occurs.
     #[serde(default, skip)]
-    pub(crate) reference_timestamp: Option<i64>,
+    pub(crate) reference_timestamp: Option<DateTime<Utc>>,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -269,16 +271,16 @@ impl EventMetadata {
         self.last_transform_timestamp = Some(timestamp);
     }
 
-    /// Returns the reference timestamp (ms since Unix epoch) set when this event's batch
-    /// entered the source output channel, if available.
+    /// Returns the UTC timestamp captured when this event's batch entered the source output
+    /// channel, if available.
     #[must_use]
-    pub fn reference_timestamp(&self) -> Option<i64> {
+    pub fn reference_timestamp(&self) -> Option<DateTime<Utc>> {
         self.inner.reference_timestamp
     }
 
     /// Sets the reference timestamp. Should be called once per event at source send time,
     /// before fan-out. All fan-out copies will share this value via the shared `Arc<Inner>`.
-    pub fn set_reference_timestamp(&mut self, timestamp: i64) {
+    pub fn set_reference_timestamp(&mut self, timestamp: DateTime<Utc>) {
         self.get_mut().reference_timestamp = Some(timestamp);
     }
 }
