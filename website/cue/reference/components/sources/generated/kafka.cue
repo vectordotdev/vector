@@ -61,7 +61,7 @@ generated: components: sources: kafka: configuration: {
 
 			When set to `false`, Vector suppresses both librdkafka's background auto-commit and its own
 			explicit synchronous commits at shutdown and rebalance. This is useful when reading from a
-			compacted topic where each consumer should always replay from offset 0 on restart (set
+			compacted topic where each consumer should always replay from offset `0` on restart (set
 			`auto_offset_reset: "earliest"` and a unique `group_id` alongside this option).
 			"""
 		required: false
