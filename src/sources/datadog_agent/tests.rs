@@ -3,6 +3,7 @@ use std::{
     iter::FromIterator,
     net::SocketAddr,
     str,
+    sync::Arc,
     time::Duration,
 };
 
@@ -58,6 +59,8 @@ use crate::{
     },
 };
 
+use crate::sources::datadog_agent::llmobs::decode_llmobs_body;
+
 const DD_API_KEY: &str = "12345678abcdefgh12345678abcdefgh";
 const DD_API_LOGS_V1_PATH: &str = "/v1/input/";
 const DD_API_LOGS_V2_PATH: &str = "/api/v2/logs";
@@ -66,6 +69,22 @@ const DD_API_SERIES_V2_PATH: &str = "/api/v2/series";
 const DD_API_SKETCHES_PATH: &str = "/api/beta/sketches";
 const DD_API_TRACES_PATH: &str = "/api/v0.2/traces";
 const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn make_llmobs_source() -> DatadogAgentSource {
+    let decoder = vector_lib::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+    DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        None,
+        LogNamespace::Legacy,
+        false,
+        true,
+    )
+}
 
 fn test_logs_schema_definition() -> schema::Definition {
     schema::Definition::empty_legacy_namespace().with_event_field(
@@ -1554,6 +1573,7 @@ fn test_config_outputs_with_disabled_data_types() {
         disable_logs: bool,
         disable_metrics: bool,
         disable_traces: bool,
+        disable_llmobs: bool,
     }
 
     for TestCase {
@@ -1561,48 +1581,56 @@ fn test_config_outputs_with_disabled_data_types() {
         disable_logs,
         disable_metrics,
         disable_traces,
+        disable_llmobs,
     } in [
         TestCase {
             multiple_outputs: true,
             disable_logs: true,
             disable_metrics: true,
             disable_traces: true,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: true,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: false,
             disable_metrics: true,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: false,
             disable_metrics: false,
             disable_traces: true,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: true,
             disable_metrics: true,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: false,
             disable_logs: true,
             disable_metrics: true,
             disable_traces: true,
+            disable_llmobs: false,
         },
     ] {
         let config = DatadogAgentConfig {
@@ -1616,6 +1644,7 @@ fn test_config_outputs_with_disabled_data_types() {
             disable_logs,
             disable_metrics,
             disable_traces,
+            disable_llmobs,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
@@ -1629,7 +1658,10 @@ fn test_config_outputs_with_disabled_data_types() {
             .map(|output| output.ty)
             .collect();
         if multiple_outputs {
-            assert_eq!(outputs.contains(&DataType::Log), !disable_logs);
+            assert_eq!(
+                outputs.contains(&DataType::Log),
+                !disable_logs || !disable_llmobs
+            );
             assert_eq!(outputs.contains(&DataType::Trace), !disable_traces);
             assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
         } else {
@@ -2060,6 +2092,7 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
@@ -2797,6 +2830,7 @@ impl ValidatableComponent for DatadogAgentConfig {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
@@ -2836,3 +2870,74 @@ impl ValidatableComponent for DatadogAgentConfig {
 }
 
 register_validatable_component!(DatadogAgentConfig);
+
+#[test]
+fn test_decode_llmobs_body() {
+    let body = Bytes::from(
+        r#"[
+        {
+            "event_type": "span",
+            "_dd.tracer_version": "2.17.0",
+            "spans": [{
+                "span_id": "abc123",
+                "trace_id": "xyz789",
+                "name": "my.workflow",
+                "start_ns": 1707763310981223236,
+                "duration": 12345678900,
+                "status": "ok",
+                "meta": { "span": { "kind": "llm" }, "model_name": "gpt-4" },
+                "metrics": { "input_tokens": 64, "output_tokens": 128 },
+                "tags": ["env:prod", "service:myapp"],
+                "_dd": { "ml_app": "my-llm-app" }
+            }]
+        }
+    ]"#,
+    );
+
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
+    assert_eq!(events.len(), 1);
+
+    let log = events[0].as_log();
+    assert_eq!(log["span_id"], "abc123".into());
+    assert_eq!(log["trace_id"], "xyz789".into());
+    assert_eq!(log["name"], "my.workflow".into());
+    assert_eq!(log["status"], "ok".into());
+    assert_eq!(log["ml_app"], "my-llm-app".into());
+    assert_eq!(
+        log["_dd"].as_object().unwrap()["tracer_version"],
+        "2.17.0".into()
+    );
+}
+
+#[test]
+fn test_decode_llmobs_body_empty_spans() {
+    let body = Bytes::from(r#"[{"event_type": "span", "spans": []}]"#);
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
+    assert_eq!(events.len(), 0);
+}
+
+#[test]
+fn test_decode_llmobs_body_invalid_json() {
+    let body = Bytes::from("not json");
+    let source = make_llmobs_source();
+    assert!(decode_llmobs_body(body, None, &source).is_err());
+}
+
+#[test]
+fn test_decode_llmobs_body_api_key() {
+    let body = Bytes::from(r#"[{"event_type":"span","spans":[{"span_id":"a","trace_id":"b"}]}]"#);
+    let api_key: Option<Arc<str>> = Some(Arc::from("test1234test1234test1234test1234"));
+    let source = make_llmobs_source();
+
+    let events = decode_llmobs_body(body, api_key, &source).unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events[0]
+            .metadata()
+            .datadog_api_key()
+            .map(|k| k.as_ref().to_owned()),
+        Some("test1234test1234test1234test1234".to_owned())
+    );
+}
