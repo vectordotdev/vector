@@ -13,9 +13,10 @@ workspace = true
 indoc.workspace = true
 vrl.workspace = true
 enrichment = { path = "../enrichment" }
-dnstap-parser = { path = "../dnstap-parser", optional = true }
 vector-vrl-metrics = { path = "../metrics", optional = true }
 vector-vrl-category.workspace = true
+
+dnstap-parser = { path = "../dnstap-parser", optional = true }
 
 [features]
 default = ["dnstap", "vrl-metrics"]
