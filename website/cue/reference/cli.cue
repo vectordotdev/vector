@@ -210,6 +210,10 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES"
 		}
+		"dangerously-allow-env-var-interpolation": {
+			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
+			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
+		}
 	}
 
 	options: _core_options
@@ -755,6 +759,21 @@ cli: {
 				warnings.
 				"""
 			type: bool: default: true
+		}
+		VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION: {
+			description: """
+				Allow interpolation of environment variables in configuration files. Environment variable
+				interpolation is disabled by default. Enabling this may expose environment secrets into your
+				Vector configuration.
+				"""
+			type: bool: default: false
+		}
+		VECTOR_DISABLE_ENV_VAR_INTERPOLATION: {
+			description: """
+				Deprecated. Environment variable interpolation is now disabled by default, making this a no-op.
+				Use `VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION` to opt in to interpolation.
+				"""
+			type: bool: default: false
 		}
 	}
 
