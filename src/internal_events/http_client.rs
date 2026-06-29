@@ -31,11 +31,19 @@ pub trait HttpRequestTelemetry {
         None
     }
 
-    /// Returns the headers with sensitive values redacted.
+    /// Transport-specific headers that carry credential material.
     ///
-    /// Provided by default; implementors only need to implement [`headers`].
+    /// The names returned here are marked sensitive in addition to the
+    /// generic list (Authorization, cookies, API keys, …) that
+    /// [`sanitized_headers`] always applies. Override this — rather than
+    /// [`sanitized_headers`] — when a transport adds its own credential headers.
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &[]
+    }
+
+    /// Returns the headers with sensitive values redacted.
     fn sanitized_headers(&self) -> HeaderMap<HeaderValue> {
-        remove_sensitive(self.headers())
+        remove_sensitive(self.headers(), self.extra_sensitive_headers())
     }
 }
 
@@ -52,11 +60,16 @@ pub trait HttpResponseTelemetry {
         None
     }
 
-    /// Returns the headers with sensitive values redacted.
+    /// Transport-specific headers that carry credential material.
     ///
-    /// Provided by default; implementors only need to implement [`headers`].
+    /// See [`HttpRequestTelemetry::extra_sensitive_headers`] for details.
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &[]
+    }
+
+    /// Returns the headers with sensitive values redacted.
     fn sanitized_headers(&self) -> HeaderMap<HeaderValue> {
-        remove_sensitive(self.headers())
+        remove_sensitive(self.headers(), self.extra_sensitive_headers())
     }
 }
 
@@ -176,7 +189,10 @@ impl InternalEvent for GotHttpWarning<'_> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn remove_sensitive(mut headers: HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> {
+fn remove_sensitive(
+    mut headers: HeaderMap<HeaderValue>,
+    extra: &'static [HeaderName],
+) -> HeaderMap<HeaderValue> {
     let sensitive: &[HeaderName] = &[
         header::AUTHORIZATION,
         header::PROXY_AUTHORIZATION,
@@ -189,12 +205,9 @@ fn remove_sensitive(mut headers: HeaderMap<HeaderValue>) -> HeaderMap<HeaderValu
         HeaderName::from_static("x-honeycomb-team"),
         HeaderName::from_static("x-api-key"),
         HeaderName::from_static("api-key"),
-        HeaderName::from_static("x-amz-security-token"),
-        HeaderName::from_static("x-amz-sso_bearer_token"),
-        HeaderName::from_static("x-aws-ec2-metadata-token"),
     ];
     for (name, value) in headers.iter_mut() {
-        if sensitive.contains(name) {
+        if sensitive.contains(name) || extra.contains(name) {
             value.set_sensitive(true);
         }
     }
@@ -245,7 +258,7 @@ mod tests {
             header::AUTHORIZATION,
             HeaderValue::from_static("Bearer token"),
         );
-        let result = remove_sensitive(headers);
+        let result = remove_sensitive(headers, &[]);
         assert!(
             is_sensitive(&result, &header::AUTHORIZATION)
                 .iter()
@@ -261,7 +274,7 @@ mod tests {
         headers.append(x_api_key.clone(), HeaderValue::from_static("key-two"));
         headers.append(x_api_key.clone(), HeaderValue::from_static("key-three"));
 
-        let result = remove_sensitive(headers);
+        let result = remove_sensitive(headers, &[]);
         let sensitive_flags = is_sensitive(&result, &x_api_key);
         assert_eq!(sensitive_flags.len(), 3);
         assert!(
@@ -278,55 +291,20 @@ mod tests {
             HeaderName::from_static("x-api-key"),
             HeaderValue::from_static("secret"),
         );
-        let result = remove_sensitive(headers);
+        let result = remove_sensitive(headers, &[]);
         // Lookup with the mixed-case form resolves to the same normalized name.
         let mixed_case = HeaderName::from_bytes(b"X-Api-Key").unwrap();
         assert!(is_sensitive(&result, &mixed_case).iter().all(|&s| s));
     }
 
     #[test]
-    fn marks_aws_session_token_as_sensitive() {
-        let token_header = HeaderName::from_static("x-amz-security-token");
+    fn extra_headers_are_marked_sensitive() {
+        static EXTRA: [HeaderName; 1] = [HeaderName::from_static("x-custom-secret")];
+        let custom = HeaderName::from_static("x-custom-secret");
         let mut headers = HeaderMap::new();
-        headers.insert(
-            token_header.clone(),
-            HeaderValue::from_static("AQoXnyc4lcK4w=="),
-        );
-        let result = remove_sensitive(headers);
-        assert!(
-            is_sensitive(&result, &token_header).iter().all(|&s| s),
-            "x-amz-security-token must be marked sensitive to avoid leaking AWS STS credentials"
-        );
-    }
-
-    #[test]
-    fn marks_aws_sso_bearer_token_as_sensitive() {
-        let token_header = HeaderName::from_static("x-amz-sso_bearer_token");
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            token_header.clone(),
-            HeaderValue::from_static("eyJhbGciOiJSUzI1NiJ9.fake"),
-        );
-        let result = remove_sensitive(headers);
-        assert!(
-            is_sensitive(&result, &token_header).iter().all(|&s| s),
-            "x-amz-sso_bearer_token must be marked sensitive: it can be exchanged for AWS role credentials via the IAM Identity Center Portal API"
-        );
-    }
-
-    #[test]
-    fn marks_imdsv2_session_token_as_sensitive() {
-        let token_header = HeaderName::from_static("x-aws-ec2-metadata-token");
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            token_header.clone(),
-            HeaderValue::from_static("AQAEAAAABBBBB=="),
-        );
-        let result = remove_sensitive(headers);
-        assert!(
-            is_sensitive(&result, &token_header).iter().all(|&s| s),
-            "x-aws-ec2-metadata-token must be marked sensitive: a valid IMDSv2 session token can be used to query EC2 metadata (including IAM role credentials) for the duration of its TTL"
-        );
+        headers.insert(custom.clone(), HeaderValue::from_static("s3cr3t"));
+        let result = remove_sensitive(headers, &EXTRA);
+        assert!(is_sensitive(&result, &custom).iter().all(|&s| s));
     }
 
     #[test]
@@ -336,7 +314,7 @@ mod tests {
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/json"),
         );
-        let result = remove_sensitive(headers);
+        let result = remove_sensitive(headers, &[]);
         assert!(
             is_sensitive(&result, &header::CONTENT_TYPE)
                 .iter()

@@ -37,7 +37,7 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
-use http::{HeaderMap, header::HeaderValue};
+use http::{HeaderMap, HeaderName, header::HeaderValue};
 use http_body::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
@@ -387,6 +387,10 @@ impl HttpRequestTelemetry for HttpRequest {
         let hint = Body::size_hint(self.body());
         (hint.lower(), hint.upper())
     }
+
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &AWS_EXTRA_SENSITIVE_HEADERS
+    }
 }
 
 impl HttpResponseTelemetry for HttpResponse {
@@ -402,7 +406,23 @@ impl HttpResponseTelemetry for HttpResponse {
         let hint = Body::size_hint(self.body());
         (hint.lower(), hint.upper())
     }
+
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &AWS_EXTRA_SENSITIVE_HEADERS
+    }
 }
+
+/// AWS-specific headers that carry credential material and must never appear in
+/// logs.
+///
+/// - `x-amz-security-token`    — STS temporary session token
+/// - `x-amz-sso_bearer_token`  — IAM Identity Center access token (exchangeable for role credentials)
+/// - `x-aws-ec2-metadata-token` — IMDSv2 session token (valid for up to 6 h)
+static AWS_EXTRA_SENSITIVE_HEADERS: [HeaderName; 3] = [
+    HeaderName::from_static("x-amz-security-token"),
+    HeaderName::from_static("x-amz-sso_bearer_token"),
+    HeaderName::from_static("x-aws-ec2-metadata-token"),
+];
 
 /// Converts the AWS SDK's string-pair header iterator into an `http::HeaderMap`.
 /// Sanitization (marking sensitive headers) is handled by the trait's default
