@@ -121,6 +121,10 @@ cli: {
 			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
 			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
 		}
+		"dangerously-allow-env-var-interpolation": {
+			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
+			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
+		}
 	}
 
 	_core_config_options: {
@@ -209,10 +213,6 @@ cli: {
 			default:     env_vars.VECTOR_MAX_DECOMPRESSED_SIZE_BYTES.type.uint.default
 			type:        "integer"
 			env_var:     "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES"
-		}
-		"dangerously-allow-env-var-interpolation": {
-			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
-			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
 		}
 	}
 
