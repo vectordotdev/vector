@@ -154,7 +154,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						- `mode: excluded` — opt this tag out of tracking entirely.
 
 						All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
-						are inherited from the enclosing per-metric configuration.
+						are inherited from the enclosing per-metric configuration, except
+						`cache_size_per_key`, which can be overridden per tag in probabilistic mode.
 						Tags not listed here use the per-metric configuration.
 						"""
 					required: false

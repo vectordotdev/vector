@@ -143,8 +143,9 @@ pub struct PerMetricConfig {
     /// - `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
     /// - `mode: excluded` — opt this tag out of tracking entirely.
     ///
-    ///  All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
-    /// are inherited from the enclosing per-metric configuration.
+    /// All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
+    /// are inherited from the enclosing per-metric configuration, except
+    /// `cache_size_per_key`, which can be overridden per tag in probabilistic mode.
     /// Tags not listed here use the per-metric configuration.
     #[configurable(
         derived,
@@ -379,7 +380,7 @@ impl Config {
         }
 
         // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
-        // mode is probabilistic (not exact, and not excluded).
+        // mode is probabilistic.
         for per_metric in self.per_metric_limits.values() {
             if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
                 for (tag_key, tag_cfg) in &per_metric.per_tag_limits {

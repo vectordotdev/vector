@@ -96,10 +96,10 @@ impl TagCardinalityLimit {
     /// Resolve the configuration that applies to a specific (metric, tag) pair.
     ///
     /// Per-tag entries support two modes:
-    /// - `mode: limit_override` — uses the per-tag `value_limit`; all other settings
-    ///   (`mode`, `cache_size_per_key`, `limit_exceeded_action`, `internal_metrics`)
-    ///   are inherited from the enclosing per-metric (or, for global overrides, the
-    ///   global) config.
+    /// - `mode: limit_override` — uses the per-tag `value_limit` and an optional per-tag
+    ///   `cache_size_per_key`; all other settings (`mode`, `limit_exceeded_action`,
+    ///   `internal_metrics`) are inherited from the enclosing per-metric (or, for global
+    ///   overrides, the global) config.
     /// - `mode: excluded` — opts the tag out entirely; all values pass through.
     ///
     /// Per-metric exclusion is blanket: `mode: excluded` on a per-metric entry opts out
@@ -132,8 +132,9 @@ impl TagCardinalityLimit {
         let metric_value_limit = per_metric.config.value_limit;
         let internal_metrics = per_metric.config.internal_metrics;
 
-        // Per-tag entry: LimitOverride uses an explicit value_limit; Excluded opts
-        // the tag out. All other settings are always inherited from per-metric.
+        // Per-tag entry: LimitOverride uses an explicit value_limit (and optional
+        // cache_size_per_key override); Excluded opts the tag out. All other settings
+        // are always inherited from per-metric.
         if let Some(per_tag) = per_metric.per_tag_limits.get(tag_key) {
             match per_tag.mode {
                 PerTagMode::Excluded => return TagSettings::Excluded,
