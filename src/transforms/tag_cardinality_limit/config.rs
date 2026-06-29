@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
@@ -142,8 +143,9 @@ pub struct PerMetricConfig {
     /// - `mode: limit_override` + `value_limit: N` — track with a per-tag cap.
     /// - `mode: excluded` — opt this tag out of tracking entirely.
     ///
-    ///  All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
-    /// are inherited from the enclosing per-metric configuration.
+    /// All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
+    /// are inherited from the enclosing per-metric configuration, except
+    /// `cache_size_per_key`, which can be overridden per tag in probabilistic mode.
     /// Tags not listed here use the per-metric configuration.
     #[configurable(
         derived,
@@ -223,6 +225,10 @@ impl OverrideMode {
 ///   environment:
 ///     mode: limit_override  # track with a per-tag cap
 ///     value_limit: 3
+///   high_cardinality_tag:
+///     mode: limit_override
+///     value_limit: 1000
+///     cache_size_per_key: 102400  # larger bloom filter for this tag
 ///   trace_id:
 ///     mode: excluded        # opt out of tracking entirely
 /// ```
@@ -236,19 +242,25 @@ pub struct PerTagConfig {
 
 /// Mode applied to a specific tag key within a per-metric override.
 ///
-/// The tracking algorithm (`exact`/`probabilistic`), `cache_size_per_key`,
-/// `limit_exceeded_action`, and `internal_metrics` are always inherited from the
-/// enclosing per-metric configuration.
+/// The tracking algorithm (`exact`/`probabilistic`), `limit_exceeded_action`, and
+/// `internal_metrics` are inherited from the enclosing per-metric (or global) configuration.
+/// `cache_size_per_key` may optionally be overridden per tag when probabilistic mode is in use.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 #[configurable(metadata(docs::enum_tag_description = "Controls how this tag key is handled."))]
 pub enum PerTagMode {
-    /// Track this tag with a per-tag value limit. The enclosing per-metric tracking
-    /// algorithm and all other settings still apply.
+    /// Track this tag with a per-tag value limit. All other settings are inherited from
+    /// the enclosing config.
     LimitOverride {
         /// Maximum number of distinct values to accept for this tag key.
         value_limit: usize,
+
+        /// Override the bloom filter cache size for this specific tag key.
+        /// Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+        /// Inherits from the enclosing config when unset.
+        #[serde(default)]
+        cache_size_per_key: Option<usize>,
     },
     /// Opt this tag out of cardinality tracking entirely. All values pass through
     /// without being recorded or checked against any `value_limit`.
@@ -341,10 +353,59 @@ impl GenerateConfig for Config {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display(
+        "cache_size_per_key set on per-tag entry `{tag_key}` but the inherited mode is not \
+         `probabilistic`, where it has no effect. Remove the field or switch to `probabilistic` mode."
+    ))]
+    CacheSizeRequiresProbabilistic { tag_key: String },
+}
+
+impl Config {
+    fn validate(&self) -> crate::Result<()> {
+        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
+        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
+            for (tag_key, tag_cfg) in &self.per_tag_limits {
+                if let PerTagMode::LimitOverride {
+                    cache_size_per_key: Some(_),
+                    ..
+                } = tag_cfg.mode
+                {
+                    return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
+                        tag_key: tag_key.clone(),
+                    }));
+                }
+            }
+        }
+
+        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
+        // mode is probabilistic.
+        for per_metric in self.per_metric_limits.values() {
+            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
+                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
+                    if let PerTagMode::LimitOverride {
+                        cache_size_per_key: Some(_),
+                        ..
+                    } = tag_cfg.mode
+                    {
+                        return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
+                            tag_key: tag_key.clone(),
+                        }));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for Config {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+        self.validate()?;
         Ok(Transform::event_task(TagCardinalityLimit::new(
             self.clone(),
         )))

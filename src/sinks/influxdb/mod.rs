@@ -553,6 +553,10 @@ pub mod test_util {
 
     // InfluxDB strips off trailing zeros in timestamps in metrics
     fn strip_timestamp(timestamp: String) -> String {
+        #[expect(
+            clippy::string_slice,
+            reason = "last two bytes are always ASCII ('0Z' or '.Z'), guaranteed char boundaries"
+        )]
         let strip_one = || format!("{}Z", &timestamp[..timestamp.len() - 2]);
         match timestamp {
             _ if timestamp.ends_with("0Z") => strip_timestamp(strip_one()),

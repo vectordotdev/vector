@@ -10,7 +10,7 @@ use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
 
-use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
+use crate::sinks::azure_blob::config::{AzureBlobRequest, AzureBlobResponse};
 
 #[derive(Clone)]
 pub struct AzureBlobService {

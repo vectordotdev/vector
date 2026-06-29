@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
@@ -321,7 +324,7 @@ impl TransformConfig for RemapConfig {
                         // Attempt to copy over the meanings from the input definition.
                         // The function will fail if the meaning that now points to a field that no longer exists,
                         // this is fine since we will no longer want that meaning in the output definition.
-                        let _ = new_type_def.try_with_meaning(path.clone(), id);
+                        new_type_def.try_with_meaning(path.clone(), id).ok();
                     }
 
                     // Apply any semantic meanings set in the VRL program
