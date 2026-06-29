@@ -487,7 +487,7 @@ rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
-tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"] }
+tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
 hickory-proto = { workspace = true, optional = true }
@@ -543,13 +543,13 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # macOS releases pick it up through the `target-aarch64-apple-darwin` feature (see target
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
-default = ["enable-api-client", "sources-dnstap"]
+default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
 antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-api-client", "sources-dnstap"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["enable-api-client", "sources-dnstap", "vendored", "rdkafka?/cmake_build"]
+default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 
 # Enables Kerberos / GSSAPI SASL support for kafka via dynamic linkage to a
 # system-provided libsasl2 (and the host's GSS implementation). Requires
@@ -572,7 +572,7 @@ vendored = ["gssapi-vendored"]
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
-default-musl = ["enable-api-client", "sources-dnstap", "vendored", "rdkafka?/cmake_build"]
+default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 default-no-api-client = ["base", "sources-dnstap", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
@@ -593,18 +593,18 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
 target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
-target-aarch64-unknown-linux-gnu =      ["target-base"]
-target-aarch64-unknown-linux-musl =     ["target-base"]
-target-armv7-unknown-linux-gnueabihf =  ["target-base"]
+target-aarch64-unknown-linux-gnu =      ["target-base", "tikv-jemallocator"]
+target-aarch64-unknown-linux-musl =     ["target-base", "tikv-jemallocator"]
+target-armv7-unknown-linux-gnueabihf =  ["target-base", "tikv-jemallocator"]
 target-armv7-unknown-linux-musleabihf = ["target-base"]
-target-arm-unknown-linux-gnueabi =      ["target-base"]
+target-arm-unknown-linux-gnueabi =      ["target-base", "tikv-jemallocator"]
 target-arm-unknown-linux-musleabi =     ["target-base"]
-target-x86_64-unknown-linux-gnu =       ["target-base", "vendored"]
-target-x86_64-unknown-linux-musl =      ["target-base"]
+target-x86_64-unknown-linux-gnu =       ["target-base", "tikv-jemallocator", "vendored"]
+target-x86_64-unknown-linux-musl =      ["target-base", "tikv-jemallocator"]
 # Apple targets opt into `gssapi` (dynamic linkage to system libsasl2 + Apple's
 # GSS framework). The `gssapi-vendored` path does not currently link on
 # macOS arm64 (unresolved gss_* symbols).
-target-aarch64-apple-darwin =           ["enable-api-client", "sources-dnstap", "gssapi"]
+target-aarch64-apple-darwin =           ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "gssapi"]
 
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
