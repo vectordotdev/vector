@@ -55,6 +55,18 @@ generated: components: sources: kafka: configuration: {
 			unit: "milliseconds"
 		}
 	}
+	commit_offsets: {
+		description: """
+			Whether to commit read offsets to Kafka.
+
+			When set to `false`, Vector suppresses both librdkafka's background auto-commit and its own
+			explicit synchronous commits at shutdown and rebalance. This is useful when reading from a
+			compacted topic where each consumer should always replay from offset 0 on restart (set
+			`auto_offset_reset: "earliest"` and a unique `group_id` alongside this option).
+			"""
+		required: false
+		type: bool: default: true
+	}
 	decoding: {
 		description: """
 			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
