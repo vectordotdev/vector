@@ -355,39 +355,40 @@ impl GenerateConfig for Config {
 #[derive(Debug, Snafu)]
 pub enum BuildError {
     #[snafu(display(
-        "cache_size_per_key set on per-tag entry `{tag_key}` but the inherited mode is \
-         `exact`, where it has no effect. Remove the field or switch to `probabilistic` mode."
+        "cache_size_per_key set on per-tag entry `{tag_key}` but the inherited mode is not \
+         `probabilistic`, where it has no effect. Remove the field or switch to `probabilistic` mode."
     ))]
-    CacheSizeInExactMode { tag_key: String },
+    CacheSizeRequiresProbabilistic { tag_key: String },
 }
 
 impl Config {
     fn validate(&self) -> crate::Result<()> {
-        // Global per_tag_limits: validate against the global mode.
-        if self.global.mode == Mode::Exact {
+        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
+        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
             for (tag_key, tag_cfg) in &self.per_tag_limits {
                 if let PerTagMode::LimitOverride {
                     cache_size_per_key: Some(_),
                     ..
                 } = tag_cfg.mode
                 {
-                    return Err(Box::new(BuildError::CacheSizeInExactMode {
+                    return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
                         tag_key: tag_key.clone(),
                     }));
                 }
             }
         }
 
-        // Per-metric per_tag_limits: validate against each per-metric mode.
+        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
+        // mode is probabilistic (not exact, and not excluded).
         for per_metric in self.per_metric_limits.values() {
-            if per_metric.config.mode == OverrideMode::Exact {
+            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
                 for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
                     if let PerTagMode::LimitOverride {
                         cache_size_per_key: Some(_),
                         ..
                     } = tag_cfg.mode
                     {
-                        return Err(Box::new(BuildError::CacheSizeInExactMode {
+                        return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
                             tag_key: tag_key.clone(),
                         }));
                     }

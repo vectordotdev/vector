@@ -1756,6 +1756,28 @@ async fn validation_rejects_cache_size_in_per_metric_exact_mode() {
     assert!(config.build(&TransformContext::default()).await.is_err());
 }
 
+/// cache_size_per_key on a per-metric per-tag entry in excluded mode is a build error.
+#[tokio::test]
+async fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric_excluded(HashMap::from([(
+                "tag1".to_string(),
+                PerTagConfig {
+                    mode: PerTagMode::LimitOverride {
+                        value_limit: 5,
+                        cache_size_per_key: Some(1024),
+                    },
+                },
+            )])),
+        )]),
+    );
+    assert!(config.build(&TransformContext::default()).await.is_err());
+}
+
 /// cache_size_per_key in probabilistic mode is valid.
 #[tokio::test]
 async fn validation_allows_cache_size_in_probabilistic_mode() {
