@@ -256,8 +256,6 @@ uuid.workspace = true
 vrl.workspace = true
 
 # Internal libs
-dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
-dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-common = { path = "lib/vector-common", default-features = false }
@@ -460,7 +458,6 @@ syslog = { version = "6.1.1", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.18", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
-hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
 tonic-health = { workspace = true, optional = true }
 tonic-reflection = { workspace = true, optional = true }
@@ -490,7 +487,10 @@ rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
-tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
+tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"] }
+dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
+dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
+hickory-proto = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
@@ -543,13 +543,13 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # macOS releases pick it up through the `target-aarch64-apple-darwin` feature (see target
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
-default = ["enable-unix"]
+default = ["enable-api-client", "sources-dnstap"]
 antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
-docs = ["enable-unix"]
+docs = ["enable-api-client", "sources-dnstap"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
+default-cmake = ["enable-api-client", "sources-dnstap", "vendored", "rdkafka?/cmake_build"]
 
 # Enables Kerberos / GSSAPI SASL support for kafka via dynamic linkage to a
 # system-provided libsasl2 (and the host's GSS implementation). Requires
@@ -572,11 +572,8 @@ vendored = ["gssapi-vendored"]
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
-enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
-
-default-msvc = ["enable-api-client", "rdkafka?/cmake_build"]
-default-musl = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
-default-no-api-client = ["base", "sources-dnstap", "unix", "vendored"]
+default-musl = ["enable-api-client", "sources-dnstap", "vendored", "rdkafka?/cmake_build"]
+default-no-api-client = ["base", "sources-dnstap", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -596,7 +593,7 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
 target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
-target-unix = ["target-base", "unix"]
+target-unix = ["target-base"]
 target-aarch64-unknown-linux-gnu =      ["target-unix"]
 target-aarch64-unknown-linux-musl =     ["target-unix"]
 target-armv7-unknown-linux-gnueabihf =  ["target-unix"]
@@ -608,11 +605,8 @@ target-x86_64-unknown-linux-musl =      ["target-unix"]
 # Apple targets opt into `gssapi` (dynamic linkage to system libsasl2 + Apple's
 # GSS framework). The `gssapi-vendored` path does not currently link on
 # macOS arm64 (unresolved gss_* symbols).
-target-aarch64-apple-darwin =           ["enable-unix", "gssapi"]
+target-aarch64-apple-darwin =           ["enable-api-client", "sources-dnstap", "gssapi"]
 
-# Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator", "allocation-tracing"]
-allocation-tracing = ["vector-lib/allocation-tracing"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -1079,7 +1073,7 @@ datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics", "dep:prost"]
 datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
-docker-logs-integration-tests = ["sources-docker_logs", "unix"]
+docker-logs-integration-tests = ["sources-docker_logs"]
 doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
@@ -1109,7 +1103,7 @@ dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 windows-event-log-integration-tests = ["sources-windows_event_log-integration-tests"]
 disable-resolv-conf = []
-shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
+shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap"]
 test-utils = ["vector-lib/test"]
 

@@ -13,14 +13,13 @@ export PATH := $(mkfile_dir)scripts/environment/npm-tools/node_modules/.bin:$(PA
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
     export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
-    export FEATURES ?= default-msvc
     undefine DNSTAP_BENCHES
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
     export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
-    export FEATURES ?= default
     export DNSTAP_BENCHES := dnstap-benches
 endif
+export FEATURES ?= default
 
 # When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
 # coverage data. Run `make coverage-report` afterwards to emit the lcov file.

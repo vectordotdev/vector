@@ -93,7 +93,7 @@ Build Vector in release mode:
 
 ```shell
 set RUSTFLAGS=-Ctarget-feature=+crt-static
-cargo build --no-default-features --features default-msvc --release
+cargo build --no-default-features --features default --release
 ```
 
 Start Vector. After these steps, a binary `vector.exe` in `target\release` would be created. It can be started by running:

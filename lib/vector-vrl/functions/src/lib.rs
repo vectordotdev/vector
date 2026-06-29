@@ -53,7 +53,7 @@ fn iter_all_without_vrl_stdlib() -> impl Iterator<Item = Box<dyn Function>> {
         .into_iter()
         .chain(enrichment::vrl_functions());
 
-    #[cfg(feature = "dnstap")]
+    #[cfg(all(unix, feature = "dnstap"))]
     let functions = functions.chain(dnstap_parser::vrl_functions());
 
     #[cfg(feature = "vrl-metrics")]
