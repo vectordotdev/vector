@@ -22,7 +22,7 @@ Security fixes and critical bug fixes may change or remove existing behavior wit
 normal deprecation process. This includes changes that alter default configurations, disable insecure options, tighten
 input validation, or otherwise restrict previously-allowed behavior in order to address a vulnerability or critical
 bug, as well as removals introduced without a prior deprecation announcement. Such changes will be noted in the release
-notes and we will do our best to provide an upgrade guide, but will not necessarily follow the standard migration window.
+notes and we will do our best to provide an upgrade guide, but may not necessarily follow the standard migration window.
 
 ### Examples
 
