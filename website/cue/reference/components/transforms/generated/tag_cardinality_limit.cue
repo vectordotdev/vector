@@ -154,7 +154,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						- `mode: excluded` — opt this tag out of tracking entirely.
 
 						All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
-						are inherited from the enclosing per-metric configuration.
+						are inherited from the enclosing per-metric configuration, except
+						`cache_size_per_key`, which can be overridden per tag in probabilistic mode.
 						Tags not listed here use the per-metric configuration.
 						"""
 					required: false
@@ -162,6 +163,16 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						description: "An individual tag configuration."
 						required:    true
 						type: object: options: {
+							cache_size_per_key: {
+								description: """
+																								Override the bloom filter cache size for this specific tag key.
+																								Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+																								Inherits from the enclosing config when unset.
+																								"""
+								relevant_when: "mode = \"limit_override\""
+								required:      false
+								type: uint: {}
+							}
 							mode: {
 								description: "Controls how this tag key is handled."
 								required:    true
@@ -171,8 +182,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 																											without being recorded or checked against any `value_limit`.
 																											"""
 									limit_override: """
-																											Track this tag with a per-tag value limit. The enclosing per-metric tracking
-																											algorithm and all other settings still apply.
+																											Track this tag with a per-tag value limit. All other settings are inherited from
+																											the enclosing config.
 																											"""
 								}
 							}
@@ -207,6 +218,16 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			description: "An individual tag configuration."
 			required:    true
 			type: object: options: {
+				cache_size_per_key: {
+					description: """
+						Override the bloom filter cache size for this specific tag key.
+						Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+						Inherits from the enclosing config when unset.
+						"""
+					relevant_when: "mode = \"limit_override\""
+					required:      false
+					type: uint: {}
+				}
 				mode: {
 					description: "Controls how this tag key is handled."
 					required:    true
@@ -216,8 +237,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 																			without being recorded or checked against any `value_limit`.
 																			"""
 						limit_override: """
-																			Track this tag with a per-tag value limit. The enclosing per-metric tracking
-																			algorithm and all other settings still apply.
+																			Track this tag with a per-tag value limit. All other settings are inherited from
+																			the enclosing config.
 																			"""
 					}
 				}
