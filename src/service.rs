@@ -55,17 +55,34 @@ struct InstallOpts {
     )]
     config_dirs: Vec<PathBuf>,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
+    #[arg(
+        long,
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub dangerously_allow_env_var_interpolation: bool,
+
+    /// Deprecated: environment variable interpolation is now disabled by default. Use
+    /// `--dangerously-allow-env-var-interpolation` to enable it.
     #[arg(
         long,
         env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false"
+        default_value = "false",
+        hide = true
     )]
     pub disable_env_var_interpolation: bool,
 }
 
 impl InstallOpts {
     fn service_info(&self) -> ServiceInfo {
+        if self.disable_env_var_interpolation {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+            }
+        }
         let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
         let display_name = self.display_name.as_deref().unwrap_or("Vector Service");
         let description = crate::built_info::PKG_DESCRIPTION;
@@ -73,7 +90,7 @@ impl InstallOpts {
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
         let arguments =
-            create_service_arguments(&config_paths, self.disable_env_var_interpolation).unwrap();
+            create_service_arguments(&config_paths, self.dangerously_allow_env_var_interpolation).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -313,10 +330,10 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
 
 fn create_service_arguments(
     config_paths: &[config::ConfigPath],
-    disable_env_var_interpolation: bool,
+    dangerously_allow_env_var_interpolation: bool,
 ) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(config_paths)?;
-    match config::load_from_paths(&config_paths, !disable_env_var_interpolation) {
+    match config::load_from_paths(&config_paths, dangerously_allow_env_var_interpolation) {
         Ok(_) => Some(
             config_paths
                 .iter()

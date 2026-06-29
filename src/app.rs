@@ -81,12 +81,15 @@ impl ApplicationConfig {
             None
         };
 
+        if opts.disable_env_var_interpolation {
+            warn!("--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+        }
         let config = load_configs(
             &config_paths,
             watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
-            !opts.disable_env_var_interpolation,
+            opts.dangerously_allow_env_var_interpolation,
             graceful_shutdown_duration,
             signal_handler,
         )
@@ -293,7 +296,7 @@ impl Application {
             signals,
             topology_controller,
             allow_empty_config: root_opts.allow_empty_config,
-            interpolate_env: !root_opts.disable_env_var_interpolation,
+            interpolate_env: root_opts.dangerously_allow_env_var_interpolation,
         })
     }
 }

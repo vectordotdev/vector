@@ -137,11 +137,22 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
+    #[arg(
+        long,
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub dangerously_allow_env_var_interpolation: bool,
+
+    /// Deprecated: environment variable interpolation is now disabled by default. Use
+    /// `--dangerously-allow-env-var-interpolation` to enable it.
     #[arg(
         long,
         env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false"
+        default_value = "false",
+        hide = true
     )]
     pub disable_env_var_interpolation: bool,
 

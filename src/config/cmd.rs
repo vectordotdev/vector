@@ -55,11 +55,22 @@ pub struct Opts {
     )]
     pub config_dirs: Vec<PathBuf>,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
+    #[arg(
+        long,
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub dangerously_allow_env_var_interpolation: bool,
+
+    /// Deprecated: environment variable interpolation is now disabled by default. Use
+    /// `--dangerously-allow-env-var-interpolation` to enable it.
     #[arg(
         long,
         env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false"
+        default_value = "false",
+        hide = true
     )]
     pub disable_env_var_interpolation: bool,
 }
@@ -170,13 +181,19 @@ fn serialize_to_json(
 /// Pipelines expansions, etc. The JSON result of this serialization can itself be used as a config,
 /// which also makes it useful for version control or treating as a singular unit of configuration.
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+    if opts.disable_env_var_interpolation {
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!("Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+        }
+    }
     let paths = opts.paths_with_formats();
     // Start by serializing to a `ConfigBuilder`. This will leverage validation in config
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
         Some(paths) => {
             match ConfigBuilderLoader::default()
-                .interpolate_env(!opts.disable_env_var_interpolation)
+                .interpolate_env(opts.dangerously_allow_env_var_interpolation)
                 .load_from_paths(&paths)
             {
                 Ok(builder) => (paths, builder),

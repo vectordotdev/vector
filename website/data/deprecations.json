@@ -21,6 +21,11 @@
       "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
     },
     {
+      "what": "`--disable-env-var-interpolation` flag and `VECTOR_DISABLE_ENV_VAR_INTERPOLATION` environment variable",
+      "deprecated_since": "0.57.0",
+      "description": "Environment variable interpolation is now disabled by default, making `--disable-env-var-interpolation` a no-op.\n\nUse `--dangerously-allow-env-var-interpolation` (or `VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true`) to explicitly opt in to interpolation."
+    },
+    {
       "what": "`encoding` field on HTTP server sources",
       "deprecated_since": "0.50.0",
       "description": "The `encoding` field will be removed. Use `decoding` and `framing` instead."

@@ -61,11 +61,22 @@ pub struct Opts {
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
+    #[arg(
+        long,
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub dangerously_allow_env_var_interpolation: bool,
+
+    /// Deprecated: environment variable interpolation is now disabled by default. Use
+    /// `--dangerously-allow-env-var-interpolation` to enable it.
     #[arg(
         long,
         env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false"
+        default_value = "false",
+        hide = true
     )]
     pub disable_env_var_interpolation: bool,
 }
@@ -119,7 +130,13 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths, !opts.disable_env_var_interpolation) {
+    if opts.disable_env_var_interpolation {
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!("Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+        }
+    }
+    let config = match config::load_from_paths(&paths, opts.dangerously_allow_env_var_interpolation) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]

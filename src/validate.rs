@@ -79,11 +79,22 @@ pub struct Opts {
     )]
     pub config_dirs: Vec<PathBuf>,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
+    #[arg(
+        long,
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub dangerously_allow_env_var_interpolation: bool,
+
+    /// Deprecated: environment variable interpolation is now disabled by default. Use
+    /// `--dangerously-allow-env-var-interpolation` to enable it.
     #[arg(
         long,
         env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false"
+        default_value = "false",
+        hide = true
     )]
     pub disable_env_var_interpolation: bool,
 }
@@ -147,12 +158,15 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Load
     let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
 
+    if opts.disable_env_var_interpolation {
+        fmt.warning("--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
+    }
     let mut report_error = |errors| {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
     let builder = ConfigBuilderLoader::default()
-        .interpolate_env(!opts.disable_env_var_interpolation)
+        .interpolate_env(opts.dangerously_allow_env_var_interpolation)
         .load_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
