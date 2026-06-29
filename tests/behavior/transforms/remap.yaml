@@ -370,1016 +370,1016 @@ transforms:
     type: remap
     source: "      set_secret(\"datadog_api_key\", \"iamanapikey\")\n      .key = get_secret(\"datadog_api_key\")\n      remove_secret(\"datadog_api_key\")\n      .empty_key = get_secret(\"datadog_api_key\")\n\n      set_secret(\"splunk_hec_token\", \"iamasplunkhectoken\")\n      .splunk_hec_token = get_secret(\"splunk_hec_token\")\n      remove_secret(\"splunk_hec_token\")\n      .empty_splunk_hec_token = get_secret(\"splunk_hec_token\")\n  "
 tests:
-- name: remap_source
-  input:
-    insert_at: remap_source
-    type: log
-    log_fields:
-      foo: true
-  outputs:
-  - extract_from: remap_source
-    conditions:
-    - type: vrl
-      source: .message == "foo"
-- name: remap_file
-  input:
-    insert_at: remap_file
-    type: log
-    log_fields:
-      foo: true
-  outputs:
-  - extract_from: remap_file
-    conditions:
-    - type: vrl
-      source: .message == "foo"
-- name: remap_emit_multiple
-  input:
-    insert_at: remap_emit_multiple
-    type: log
-    log_fields:
-      foo: true
-  outputs:
-  - extract_from: remap_emit_multiple
-    conditions:
-    - type: vrl
-      source: .message == "hello"
-- name: remap_mapped_scalars
-  input:
-    insert_at: remap_mapped_scalars
-    type: log
-    log_fields:
-      foo: true
-  outputs:
-  - extract_from: remap_mapped_scalars
-    conditions:
-    - type: vrl
-      source: .message == 5
-- name: remap_abort
-  input:
-    insert_at: remap_abort
-    type: log
-    log_fields:
-      foo: true
-      bar: true
-  outputs:
-  - extract_from: remap_abort
-    conditions:
-    - type: vrl
-      source: .foo == true && .bar == true
-- name: remap_abort_drop_on_abort
-  no_outputs_from:
-  - remap_abort_drop_on_abort
-  input:
-    insert_at: remap_abort_drop_on_abort
-    type: log
-    log_fields:
-      foo: true
-      bar: true
-- name: remap_nested
-  input:
-    insert_at: remap_nested
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_nested
-    conditions:
-    - type: vrl
-      source: "        .a.b == 123 &&\n        .x.y == 456 &&\n        .x.z == 789\n      "
-- name: remap_array
-  input:
-    insert_at: remap_array
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_array
-    conditions:
-    - type: vrl
-      source: "        .a == [0, \"1\", 2.0] &&\n        .b == [0, null, \"two\"]\n      "
-- name: remap_arithmetic
-  input:
-    insert_at: remap_arithmetic
-    type: log
-    log_fields:
-      a: 3
-      b: 7
-      c: 12
-      d: 6
-      e: 9
-  outputs:
-  - extract_from: remap_arithmetic
-    conditions:
-    - type: vrl
-      source: "        .result_a == 27 &&\n        .result_b == 51 &&\n        .result_c == 17 &&\n        .result_d == 20 &&\n        .result_e == 0.75\n     "
-- name: remap_arithmetic_error
-  input:
-    insert_at: remap_arithmetic_error
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_arithmetic_error
-    conditions:
-    - type: vrl
-      source: .a == 0.0
-- name: remap_boolean_arithmetic
-  input:
-    insert_at: remap_boolean_arithmetic
-    type: log
-    log_fields:
-      a: 3
-      b: 7
-      c: 12
-      d: 6
-  outputs:
-  - extract_from: remap_boolean_arithmetic
-    conditions:
-    - type: vrl
-      source: "        .result_a == true &&\n        .result_b == false &&\n        .result_c == true &&\n        .result_d == false\n      "
-- name: remap_coercion
-  input:
-    insert_at: remap_coercion
-    type: log
-    log_fields:
-      foo: 10
-      bar: '20'
-      baz: '30.3'
-      bev: 'true'
-      quix: 19/06/2019:17:20:49 -0400
-      a: '2020-09-14T12:53:44+03:00'
-  outputs:
-  - extract_from: remap_coercion
-    conditions:
-    - type: vrl
-      source: "        .foo == \"10\" &&\n        .bar == 20 &&\n        .baz == 30.3 &&\n        .bev == true &&\n        .a == \"2020-09-14T09:53:44Z\"\n      "
-- name: remap_quoted_path
-  input:
-    insert_at: remap_quoted_path
-    type: log
-    log_fields:
-      a."b.c": bar
-      '"d.e"': baz
-  outputs:
-  - extract_from: remap_quoted_path
-    conditions:
-    - type: vrl
-      source: "        .a.\"b.c\" == \"baz\"\n      "
-- name: remap_infallible_assignment
-  input:
-    insert_at: remap_infallible_assignment
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_infallible_assignment
-    conditions:
-    - type: vrl
-      source: "        .nope == null &&\n        .err1 == \"function call error for \\\"parse_json\\\" at (19:44): unable to parse json: key must be a string at line 1 column 3\" &&\n        .ok.foo == true &&\n        .err2 == null\n      "
-- name: remap_error_coalesce_operator
-  input:
-    insert_at: remap_error_coalesce_operator
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_error_coalesce_operator
-    conditions:
-    - type: vrl
-      source: "        .val1 == \"nope\"\n        .val2 == true\n      "
-- name: remap_bang_function
-  input:
-    insert_at: remap_bang_function
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_bang_function
-    conditions:
-    - type: vrl
-      source: '!exists(.val)'
-- name: remap_function_arguments
-  input:
-    insert_at: remap_function_arguments
-    type: log
-    log_fields:
-      in: 10
-      other: 30
-  outputs:
-  - extract_from: remap_function_arguments
-    conditions:
-    - type: vrl
-      source: "        .a == \"10\" &&\n        .b == \"10\" &&\n        .c == \"\" &&\n        .d == \"\" &&\n        .e == \"30\" &&\n        .f == \"30\"\n      "
-- name: remap_function_upcase
-  input:
-    insert_at: remap_function_upcase
-    type: log
-    log_fields:
-      a: a
-      b: bbb bb
-      c.c: c.c
-      f: f
-  outputs:
-  - extract_from: remap_function_upcase
-    conditions:
-    - type: vrl
-      source: "        .a == \"A\" &&\n        .b == \"BBB BB\" &&\n        .c == {\"c\": \"C.C\"} &&\n        .f == \"ff\"\n      "
-- name: remap_function_upcase_error
-  no_outputs_from:
-  - remap_function_upcase_error
-  input:
-    insert_at: remap_function_upcase_error
-    type: log
-    log_fields:
-      a: a
-      b: true
-- name: remap_function_downcase
-  input:
-    insert_at: remap_function_downcase
-    type: log
-    log_fields:
-      a: A
-      b: BBB BB
-      c.c: C.C
-      f: F
-  outputs:
-  - extract_from: remap_function_downcase
-    conditions:
-    - type: vrl
-      source: "        .a == \"a\" &&\n        .b == \"bbb bb\" &&\n        .c == {\"c\": \"c.c\"} &&\n        .f == \"FF\"\n      "
-- name: remap_function_downcase_error
-  no_outputs_from:
-  - remap_function_downcase_error
-  input:
-    insert_at: remap_function_downcase_error
-    type: log
-    log_fields:
-      a: A
-      b: 10
-- name: remap_function_uuid_v4
-  input:
-    insert_at: remap_function_uuid_v4
-    type: log
-    log_fields:
-      b: foo
-  outputs:
-  - extract_from: remap_function_uuid_v4
-    conditions:
-    - type: vrl
-      source: "        match(string!(.a), r'(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') &&\n        .b == \"bar\"\n      "
-- name: remap_function_uuid_v7
-  input:
-    insert_at: remap_function_uuid_v7
-    type: log
-    log_fields:
-      b: foo
-  outputs:
-  - extract_from: remap_function_uuid_v7
-    conditions:
-    - type: vrl
-      source: "        match(string!(.a), r'(?i)^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$') &&\n        .b == \"bar\"\n      "
-- name: remap_function_sha1
-  input:
-    insert_at: remap_function_sha1
-    type: log
-    log_fields:
-      a: foo
-      b: bar
-  outputs:
-  - extract_from: remap_function_sha1
-    conditions:
-    - type: vrl
-      source: "        .a == \"0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\" &&\n        .b == \"6f74c252bb7f19f553115af5e49a733b9ff17138\"\n      "
-- name: remap_function_sha1_error
-  no_outputs_from:
-  - remap_function_sha1_error
-  input:
-    insert_at: remap_function_sha1_error
-    type: log
-    log_fields:
-      a: foo
-      b: true
-- name: remap_function_md5
-  input:
-    insert_at: remap_function_md5
-    type: log
-    log_fields:
-      a: foo
-      b: bar
-  outputs:
-  - extract_from: remap_function_md5
-    conditions:
-    - type: vrl
-      source: "        .a == \"acbd18db4cc2f85cedef654fccc4a4d8\" &&\n        .b == \"223cfa6567e4c0599c9a23628bf7a234\"\n      "
-- name: remap_function_md5_error
-  no_outputs_from:
-  - remap_function_md5_error
-  input:
-    insert_at: remap_function_md5_error
-    type: log
-    log_fields:
-      a: foo
-      b: true
-- name: remap_function_now
-  input:
-    insert_at: remap_function_now
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_function_now
-    conditions:
-    - type: vrl
-      source: "        ends_with(to_string!(.a), \"Z\")\n      "
-- name: remap_function_format_timestamp
-  input:
-    insert_at: remap_function_format_timestamp
-    type: log
-    log_fields:
-      foo: 10
-  outputs:
-  - extract_from: remap_function_format_timestamp
-    conditions:
-    - type: vrl
-      source: "        .a == \"1970-01-01T00:00:10+00:00\"\n      "
-- name: remap_function_contains
-  input:
-    insert_at: remap_function_contains
-    type: log
-    log_fields:
-      foo: foo
-      bar: bar
-      foobar: foobar
-  outputs:
-  - extract_from: remap_function_contains
-    conditions:
-    - type: vrl
-      source: "        .a == false &&\n        .b == true &&\n        .c == false &&\n        .d == true &&\n        .e == true &&\n        .f == false &&\n        .g == true\n      "
-- name: remap_function_starts_with
-  input:
-    insert_at: remap_function_starts_with
-    type: log
-    log_fields:
-      foo: foo
-      foobar: foobar
-  outputs:
-  - extract_from: remap_function_starts_with
-    conditions:
-    - type: vrl
-      source: "        .a == true &&\n        .b == true &&\n        .c == false &&\n        .d == false &&\n        .e == true\n      "
-- name: remap_function_ends_with
-  input:
-    insert_at: remap_function_ends_with
-    type: log
-    log_fields:
-      bar: bar
-      foobar: foobar
-  outputs:
-  - extract_from: remap_function_ends_with
-    conditions:
-    - type: vrl
-      source: "         .a == true &&\n         .b == true &&\n         .c == false &&\n         .d == false &&\n         .e == true\n       "
-- name: remap_function_slice
-  input:
-    insert_at: remap_function_slice
-    type: log
-    log_fields:
-      foo: foo
-      bar: bar
-  outputs:
-  - extract_from: remap_function_slice
-    conditions:
-    - type: vrl
-      source: "         .a == \"oobar\" &&\n         .b == \"f\" &&\n         .c == \"ar\" &&\n         .d == \"ooba\"\n       "
-- name: remap_function_parse_tokens
-  input:
-    insert_at: remap_function_parse_tokens
-    type: log
-    log_fields:
-      a: 217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] "DELETE /deliverables/next-generation/user-centric HTTP/1.1" 205 11881
-      b: bar
-  outputs:
-  - extract_from: remap_function_parse_tokens
-    conditions:
-    - type: vrl
-      source: "         .a == [\"217.250.207.207\",\n                null,\n                null,\n                \"07/Sep/2020:16:38:00 -0400\",\n                \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\",\n                \"205\", \"11881\" ] &&\n         .b == [\"bar\"]\n       "
-- name: remap_function_sha2
-  input:
-    insert_at: remap_function_sha2
-    type: log
-    log_fields:
-      a: foo
-      b: bar
-  outputs:
-  - extract_from: remap_function_sha2
-    conditions:
-    - type: vrl
-      source: "         .a == \"d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d\" &&\n         .b == \"211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f\"\n       "
-- name: remap_function_sha3
-  input:
-    insert_at: remap_function_sha3
-    type: log
-    log_fields:
-      a: foo
-      b: bar
-  outputs:
-  - extract_from: remap_function_sha3
-    conditions:
-    - type: vrl
-      source: "         .a == \"4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7\" &&\n         .b == \"dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351\"\n       "
-- name: remap_function_parse_duration
-  input:
-    insert_at: remap_function_parse_duration
-    type: log
-    log_fields:
-      a: 2s
-      b: s
-  outputs:
-  - extract_from: remap_function_parse_duration
-    conditions:
-    - type: vrl
-      source: "         .a == 2000 &&\n         .b == 0.1\n       "
-- name: remap_function_parse_glog
-  input:
-    insert_at: remap_function_parse_glog
-    type: log
-    log_fields:
-      message: I20210131 14:48:54.411655 15520 main.c++:9] Hello world!
-  outputs:
-  - extract_from: remap_function_parse_glog
-    conditions:
-    - type: vrl
-      source: "         .glog.level == \"info\" &&\n         .glog.timestamp == parse_timestamp!(\"2021-01-31T14:48:54.411655Z\", \"%+\") &&\n         .glog.id == 15520 &&\n         .glog.file == \"main.c++\" &&\n         .glog.line == 9 &&\n         .glog.message == \"Hello world!\"\n       "
-- name: remap_function_format_number
-  input:
-    insert_at: remap_function_format_number
-    type: log
-    log_fields:
-      a: 1234.567
-  outputs:
-  - extract_from: remap_function_format_number
-    conditions:
-    - type: vrl
-      source: "         .a == \"1.234,56\"\n       "
-- name: remap_function_parse_url
-  input:
-    insert_at: remap_function_parse_url
-    type: log
-    log_fields:
-      url: https://master.vector.dev/docs/reference/transforms/merge/?hello=world#configuration
-  outputs:
-  - extract_from: remap_function_parse_url
-    conditions:
-    - type: vrl
-      source: "         .parts == { \"scheme\": \"https\",\n                     \"username\": \"\",\n                     \"password\": \"\",\n                     \"host\": \"master.vector.dev\",\n                     \"port\": null,\n                     \"path\": \"/docs/reference/transforms/merge/\",\n                     \"query\": {\"hello\": \"world\"},\n                     \"fragment\": \"configuration\"\n            }\n       "
-- name: remap_function_ceil
-  input:
-    insert_at: remap_function_ceil
-    type: log
-    log_fields:
-      num: 92.489
-  outputs:
-  - extract_from: remap_function_ceil
-    conditions:
-    - type: vrl
-      source: "         .a == 93 &&\n         .b == 92.5 &&\n         .c == 92.49\n       "
-- name: remap_function_floor
-  input:
-    insert_at: remap_function_floor
-    type: log
-    log_fields:
-      num: 92.489
-  outputs:
-  - extract_from: remap_function_floor
-    conditions:
-    - type: vrl
-      source: "         .a == 92 &&\n         .b == 92.4 &&\n         .c == 92.48\n       "
-- name: remap_function_round
-  input:
-    insert_at: remap_function_round
-    type: log
-    log_fields:
-      num: 92.489
-  outputs:
-  - extract_from: remap_function_round
-    conditions:
-    - type: vrl
-      source: "         .a == 92 &&\n         .b == 92.5 &&\n         .c == 92.49\n       "
-- name: remap_function_parse_syslog
-  input:
-    insert_at: remap_function_parse_syslog
-    type: log
-    log_fields:
-      a: '<28>1 2020-05-22T14:59:09.250-03:00 OX-XXX-MX204 OX-XXX-CONTEUDO:rpd 6589 - - bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284'
-  outputs:
-  - extract_from: remap_function_parse_syslog
-    conditions:
-    - type: vrl
-      source: "       .a.facility == \"daemon\" &&\n       .a.severity == \"warning\" &&\n       .a.timestamp == parse_timestamp!(\"2020-05-22T17:59:09.250Z\", \"%+\") &&\n       .a.hostname == \"OX-XXX-MX204\" &&\n       .a.appname == \"OX-XXX-CONTEUDO:rpd\" &&\n       .a.procid == 6589 &&\n       .a.message == \"bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284\"\n     "
-- name: remap_function_split_regex
-  input:
-    insert_at: remap_function_split_regex
-    type: log
-    log_fields:
-      foo: barAbBbataabfizzaxbbuzz
-  outputs:
-  - extract_from: remap_function_split_regex
-    conditions:
-    - type: vrl
-      source: "         .foo[0] == \"bar\" &&\n         .foo[1] == \"bat\" &&\n         .foo[2] == \"fizzaxbbuzz\"\n       "
-- name: remap_function_split_string
-  input:
-    insert_at: remap_function_split_string
-    type: log
-    log_fields:
-      foo: bar bat fizz buzz
-  outputs:
-  - extract_from: remap_function_split_string
-    conditions:
-    - type: vrl
-      source: "         .foo[0] == \"bar\" &&\n         .foo[1] == \"bat\" &&\n         .foo[2] == \"fizz buzz\"\n       "
-- name: remap_function_parse_timestamp
-  input:
-    insert_at: remap_function_parse_timestamp
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_function_parse_timestamp
-    conditions:
-    - type: vrl
-      source: "         .foo == parse_timestamp!(\"1970-01-01T00:00:10Z\", \"%+\")\n       "
-- name: remap_function_truncate
-  input:
-    insert_at: remap_function_truncate
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_function_truncate
-    conditions:
-    - type: vrl
-      source: "         .foo == \"foo\" &&\n         .bar == \"foob...\"\n       "
-- name: remap_function_tag_types_externally
-  input:
-    insert_at: remap_function_tag_types_externally
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_function_tag_types_externally
-    conditions:
-    - type: vrl
-      source: "        .string == { \"string\": \"foo\" } &&\n        .integer == { \"integer\": 123 } &&\n        .float == { \"float\": 123.45 } &&\n        .boolean == { \"boolean\": true } &&\n        .map == { \"foo\": { \"string\": \"bar\" } } &&\n        .array == [{ \"string\": \"foo\" }] &&\n        .timestamp == { \"timestamp\": parse_timestamp!(\"2021-01-01T00:00:00.00Z\", \"%+\") } &&\n        .regex == { \"regex\": r'.*' } &&\n        .null == null\n      "
-- name: remap_function_strip_whitespace
-  input:
-    insert_at: remap_function_strip_whitespace
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_function_strip_whitespace
-    conditions:
-    - type: vrl
-      source: "         .foo == \"foobar\"\n       "
-- name: remap_function_parse_grok
-  input:
-    insert_at: remap_function_parse_grok
-    type: log
-    log_fields:
-      message: 2020-10-02T23:22:12.223222Z info Hello world
-  outputs:
-  - extract_from: remap_function_parse_grok
-    conditions:
-    - type: vrl
-      source: "         .grokked.timestamp == \"2020-10-02T23:22:12.223222Z\" &&\n         .grokked.level == \"info\" &&\n         .grokked.message == \"Hello world\" &&\n         !exists(.grokked.email)\n       "
-- name: remap_function_parse_common_log
-  input:
-    insert_at: remap_function_parse_common_log
-    type: log
-    log_fields:
-      message: 127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
-  outputs:
-  - extract_from: remap_function_parse_common_log
-    conditions:
-    - type: vrl
-      source: "         .common_log.host == \"127.0.0.1\" &&\n         .common_log.identity == \"bob\" &&\n         .common_log.user == \"frank\" &&\n         .common_log.timestamp == parse_timestamp!(\"2000-10-10T20:55:36Z\", \"%+\") &&\n         .common_log.message == \"GET /apache_pb.gif HTTP/1.0\" &&\n         .common_log.method == \"GET\" &&\n         .common_log.path == \"/apache_pb.gif\" &&\n         .common_log.protocol == \"HTTP/1.0\" &&\n         .common_log.status == 200 &&\n         .common_log.size == 2326 &&\n         .common_log_timestamp_format.host == \"127.0.0.1\" &&\n         .common_log_timestamp_format.identity == \"bob\" &&\n         .common_log_timestamp_format.user == \"frank\" &&\n         .common_log_timestamp_format.timestamp == parse_timestamp!(\"2000-10-10T20:55:36Z\", \"%+\") &&\n         .common_log_timestamp_format.message == \"GET /apache_pb.gif HTTP/1.0\" &&\n         .common_log_timestamp_format.method == \"GET\" &&\n         .common_log_timestamp_format.path == \"/apache_pb.gif\" &&\n         .common_log_timestamp_format.protocol == \"HTTP/1.0\" &&\n         .common_log_timestamp_format.status == 200 &&\n         .common_log_timestamp_format.size == 2326\n       "
-- name: remap_function_ip_subnet
-  input:
-    insert_at: remap_function_ip_subnet
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_function_ip_subnet
-    conditions:
-    - type: vrl
-      source: "         .a == \"192.168.0.0\" &&\n         .b == \"192.0.0.0\" &&\n         .c == \"2404:6800::\" &&\n         .d == \"2404::\"\n       "
-- name: remap_function_ip_cidr_contains
-  input:
-    insert_at: remap_function_ip_cidr_contains
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_function_ip_cidr_contains
-    conditions:
-    - type: vrl
-      source: "         .a == true &&\n         .b == false &&\n         .c == true &&\n         .d == false\n       "
-- name: remap_function_ip_to_ipv6
-  input:
-    insert_at: remap_function_ip_to_ipv6
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_function_ip_to_ipv6
-    conditions:
-    - type: vrl
-      source: "         .a == \"::ffff:192.168.10.2\"\n       "
-- name: remap_function_ipv6_to_ipv4
-  input:
-    insert_at: remap_function_ipv6_to_ipv4
-    type: raw
-    value: ''
-  outputs:
-  - extract_from: remap_function_ipv6_to_ipv4
-    conditions:
-    - type: vrl
-      source: "         .a == \"192.168.10.2\"\n       "
-- name: remap_function_exists
-  input:
-    insert_at: remap_function_exists
-    type: log
-    log_fields:
-      data: "         { \"child\": 42, \"arr\": [1,3,3] }\n       "
-      foo: 42
-  outputs:
-  - extract_from: remap_function_exists
-    conditions:
-    - type: vrl
-      source: "         bool!(.a)  && !bool!(.b)  && bool!(.c) && !bool!(.d)  && bool!(.e) && !bool!(.f)\n       "
-- name: remap_function_compact
-  input:
-    insert_at: remap_function_compact
-    type: log
-    log_fields:
-      arr: "         [null, \"\", [], 1]\n       "
-      map: "         {\"field1\": null,\n          \"field2\": 32,\n          \"field3\": \"\",\n          \"field4\": { \"nested1\": 3,\n                      \"nested2\": null } }\n       "
-  outputs:
-  - extract_from: remap_function_compact
-    conditions:
-    - type: vrl
-      source: "         .a == false &&\n         .b == true &&\n         .c == false &&\n         .d == true &&\n         .e == false &&\n         .compactarr[0] == 1\n       "
-- name: remap_function_assert_pass
-  input:
-    insert_at: remap_function_assert_pass
-    type: log
-    log_fields:
-      foo: true
-  outputs:
-  - extract_from: remap_function_assert_pass
-    conditions:
-    - type: vrl
-      source: "       .check == \"checked\"\n     "
-- name: remap_function_assert_fail
-  no_outputs_from:
-  - remap_function_assert_fail
-  input:
-    insert_at: remap_function_assert_fail
-    type: log
-    log_fields:
-      foo: false
-- name: remap_function_log
-  input:
-    insert_at: remap_function_log
-    type: log
-    log_fields:
-      foo: this should be unchanged
-  outputs:
-  - extract_from: remap_function_log
-    conditions:
-    - type: vrl
-      source: "         .foo == \"this should be unchanged\"\n       "
-- name: remap_function_merge
-  input:
-    insert_at: remap_function_merge
-    type: log
-    log_fields:
-      bar: "         {\"field1\": \"ook\"}\n       "
-      foo: "         {\"field2\": \"ook ook\"}\n       "
-  outputs:
-  - extract_from: remap_function_merge
-    conditions:
-    - type: vrl
-      source: "         .bar.field1 == \"ook\" &&\n         .bar.field2 == \"ook ook\"\n       "
-- name: remap_function_flatten
-  input:
-    insert_at: remap_function_flatten
-    type: log
-    log_fields:
-      arr: '[1, 2, [3, 4, [5, 6]]]'
-      map: "         {\"field1\": {\"field2\": 1, \"field3\": 2} }\n         "
-  outputs:
-  - extract_from: remap_function_flatten
-    conditions:
-    - type: vrl
-      source: "         .arr[0] == 1 &&\n         .arr[1] == 2 &&\n         .arr[2] == 3 &&\n         .arr[3] == 4 &&\n         .arr[4] == 5 &&\n         .arr[5] == 6 &&\n         .a == 1 &&\n         .b == 2\n       "
-- name: remap_function_redact
-  input:
-    insert_at: remap_function_redact
-    type: log
-    log_fields:
-      input: hello world, hello universe
-  outputs:
-  - extract_from: remap_function_redact
-    conditions:
-    - type: vrl
-      source: "         .a == \"[REDACTED] world, [REDACTED] universe\" &&\n         .b == \"[REDACTED] [REDACTED]ld, [REDACTED] universe\" &&\n         .c == \"hello [REDACTED], hello [REDACTED]\" &&\n         .d == \"hello world, hello universe\" &&\n         .e == \"[REDACTED] w[REDACTED]rld, [REDACTED] [REDACTED]n[REDACTED]v[REDACTED]rs[REDACTED]\"\n       "
-- name: remap_function_replace
-  input:
-    insert_at: remap_function_replace
-    type: log
-    log_fields:
-      input: hello world, hello universe
-  outputs:
-  - extract_from: remap_function_replace
-    conditions:
-    - type: vrl
-      source: "         .a == \"fbaro\" &&\n         .b == \"fbarbar\"\n       "
-- name: remap_function_parse_aws_alb_log
-  input:
-    insert_at: remap_function_parse_aws_alb_log
-    type: log
-    log_fields:
-      log: http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-"
-  outputs:
-  - extract_from: remap_function_parse_aws_alb_log
-    conditions:
-    - type: vrl
-      source: "         .parts.type == \"http\" &&\n         .parts.timestamp == \"2018-11-30T22:23:00.186641Z\" &&\n         .parts.elb == \"app/my-loadbalancer/50dc6c495c0c9188\" &&\n         .parts.client_host == \"192.168.131.39:2817\" &&\n         .parts.target_host == null &&\n         .parts.request_processing_time == 0.0 &&\n         .parts.target_processing_time == 0.001 &&\n         .parts.response_processing_time == 0.0 &&\n         .parts.elb_status_code == \"200\" &&\n         .parts.target_status_code == \"200\" &&\n         .parts.received_bytes == 34 &&\n         .parts.sent_bytes == 366 &&\n         .parts.request_method == \"GET\" &&\n         .parts.request_url == \"http://www.example.com:80/\" &&\n         .parts.request_protocol == \"HTTP/1.1\" &&\n         .parts.user_agent == \"curl/7.46.0\" &&\n         .parts.ssl_cipher == null &&\n         .parts.ssl_protocol == null &&\n         .parts.target_group_arn == \"arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067\" &&\n         .parts.trace_id == \"Root=1-58337364-23a8c76965a2ef7629b185e3\" &&\n         .parts.domain_name == null &&\n         .parts.chosen_cert_arn == null &&\n         .parts.matched_rule_priority == \"0\" &&\n         .parts.request_creation_time == \"2018-11-30T22:22:48.364000Z\" &&\n         .parts.actions_executed == \"forward\" &&\n         .parts.redirect_url == null &&\n         .parts.error_reason == null &&\n         .parts.classification == null &&\n         .parts.classification_reason == null\n       "
-- name: remap_function_parse_aws_vpc_flow_log
-  input:
-    insert_at: remap_function_parse_aws_vpc_flow_log
-    type: log
-    log_fields:
-      a: 2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA
-      b: '- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5'
-  outputs:
-  - extract_from: remap_function_parse_aws_vpc_flow_log
-    conditions:
-    - type: vrl
-      source: "         .a.version == 2 &&\n         .a.account_id == \"123456789010\" &&\n         .a.interface_id == \"eni-1235b8ca123456789\" &&\n         .a.srcaddr == null &&\n         .a.dstaddr == null &&\n         .a.srcport == null &&\n         .a.dstport == null &&\n         .a.protocol == null &&\n         .a.packets == null &&\n         .a.bytes == null &&\n         .a.start == 1431280876 &&\n         .a.end == 1431280934 &&\n         .a.action == null &&\n         .a.log_status == \"NODATA\" &&\n         .b.instance_id == null &&\n         .b.interface_id == \"eni-1235b8ca123456789\" &&\n         .b.srcaddr == \"10.0.1.5\" &&\n         .b.dstaddr == \"10.0.0.220\" &&\n         .b.pkt_srcaddr == \"10.0.1.5\" &&\n         .b.pkt_dstaddr == \"203.0.113.5\"\n       "
-- name: remap_metrics
-  input:
-    insert_at: remap_metrics
-    type: metric
-    metric:
-      name: example counter
-      namespace: zork
-      kind: absolute
-      counter:
-        value: 1.0
-  outputs:
-  - extract_from: remap_metrics
-    conditions:
-    - type: vrl
-      source: "         .tags.name == \"example counter\" &&\n         .tags.namespace == \"zork\" &&\n         .tags.host == \"ook\" &&\n         .tags.type == \"counter\"\n       "
-- name: remap_function_encode_json
-  input:
-    insert_at: remap_function_encode_json
-    type: log
-    log_fields:
-      a: '[1, 2, 3]'
-      b: '{"field1": {"field2": 1, "field3": null}}'
-  outputs:
-  - extract_from: remap_function_encode_json
-    conditions:
-    - type: vrl
-      source: "         .a == \"[1,2,3]\" &&\n         .b == \"{\\\"field1\\\":{\\\"field2\\\":1,\\\"field3\\\":null}}\"\n       "
-- name: remap_function_parse_regex
-  input:
-    insert_at: remap_function_parse_regex
-    type: log
-    log_fields:
-      message: 5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] "GET /embrace/supply-chains/dynamic/vertical" 201 20574
-  outputs:
-  - extract_from: remap_function_parse_regex
-    conditions:
-    - type: vrl
-      source: "         .bytes_in == 5667 &&\n         .host == \"5.86.210.12\" &&\n         .user == \"zieme4647\" &&\n         .timestamp == \"19/06/2019:17:20:49 -0400\" &&\n         .method == \"GET\" &&\n         .path == \"/embrace/supply-chains/dynamic/vertical\" &&\n         .status == 201 &&\n         .bytes_out == 20574 &&\n         .\"0\" == \"5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \\\"GET /embrace/supply-chains/dynamic/vertical\\\" 201 20574\"\n       "
-- name: remap_function_parse_regex_all
-  input:
-    insert_at: remap_function_parse_regex_all
-    type: log
-    log_fields:
-      message: apples and carrots, peaches and peas
-  outputs:
-  - extract_from: remap_function_parse_regex_all
-    conditions:
-    - type: vrl
-      source: "         .result[0].fruit == \"apples\" &&\n         .result[0].veg == \"carrots\" &&\n         .result[0].\"0\" == \"apples and carrots\" &&\n         .result[1].fruit == \"peaches\" &&\n         .result[1].veg == \"peas\" &&\n         .result[1].\"0\" == \"peaches and peas\"\n       "
-- name: remap_function_parse_aws_cloudwatch_log_subscription_message
-  input:
-    insert_at: remap_function_parse_aws_cloudwatch_log_subscription_message
-    type: log
-    log_fields:
-      message: '{"messageType":"CONTROL_MESSAGE","owner":"CloudwatchLogs","logGroup":"","logStream":"","subscriptionFilters":[],"logEvents":[{"id":"","timestamp":1600110003794,"message":"CWL CONTROL MESSAGE: Checking health of destination Firehose."}]}'
-  outputs:
-  - extract_from: remap_function_parse_aws_cloudwatch_log_subscription_message
-    conditions:
-    - type: vrl
-      source: "         .result.owner == \"CloudwatchLogs\" &&\n         .result.message_type == \"CONTROL_MESSAGE\" &&\n         .result.subscription_filters == [] &&\n         .result.log_group == \"\" &&\n         .result.log_stream == \"\" &&\n         .result.log_events == [{ \"id\": \"\",\n                                  \"timestamp\": parse_timestamp!(\"2020-09-14T19:00:03.794Z\", \"%+\"),\n                                  \"message\": \"CWL CONTROL MESSAGE: Checking health of destination Firehose.\" }]\n       "
-- name: remap_function_parse_key_value
-  input:
-    insert_at: remap_function_parse_key_value
-    type: log
-    log_fields:
-      message: "         path=\"/cart_link\" host=lumberjack-store.herokuapp.com request_id=6ad70ccd-40db-477c-afce-f7e3719a886b fwd=\"108.30.189.26\" dyno=web.1 connect=0ms service=73ms status=304 bytes=656 protocol=https\n         "
-  outputs:
-  - extract_from: remap_function_parse_key_value
-    conditions:
-    - type: vrl
-      source: "         .path == \"/cart_link\" &&\n         .host == \"lumberjack-store.herokuapp.com\" &&\n         .request_id == \"6ad70ccd-40db-477c-afce-f7e3719a886b\" &&\n         .fwd == \"108.30.189.26\" &&\n         .dyno == \"web.1\" &&\n         .connect == \"0ms\" &&\n         .service == \"73ms\" &&\n         .status == \"304\" &&\n         .bytes == \"656\" &&\n         .protocol == \"https\"\n       "
-- name: remap_function_is_nullish
-  input:
-    insert_at: remap_function_is_nullish
-    type: log
-    log_fields:
-      a: ''
-      b: ' '
-      c: '     '
-      d: '-'
-      e: '
+  - name: remap_source
+    input:
+      insert_at: remap_source
+      type: log
+      log_fields:
+        foo: true
+    outputs:
+      - extract_from: remap_source
+        conditions:
+          - type: vrl
+            source: .message == "foo"
+  - name: remap_file
+    input:
+      insert_at: remap_file
+      type: log
+      log_fields:
+        foo: true
+    outputs:
+      - extract_from: remap_file
+        conditions:
+          - type: vrl
+            source: .message == "foo"
+  - name: remap_emit_multiple
+    input:
+      insert_at: remap_emit_multiple
+      type: log
+      log_fields:
+        foo: true
+    outputs:
+      - extract_from: remap_emit_multiple
+        conditions:
+          - type: vrl
+            source: .message == "hello"
+  - name: remap_mapped_scalars
+    input:
+      insert_at: remap_mapped_scalars
+      type: log
+      log_fields:
+        foo: true
+    outputs:
+      - extract_from: remap_mapped_scalars
+        conditions:
+          - type: vrl
+            source: .message == 5
+  - name: remap_abort
+    input:
+      insert_at: remap_abort
+      type: log
+      log_fields:
+        foo: true
+        bar: true
+    outputs:
+      - extract_from: remap_abort
+        conditions:
+          - type: vrl
+            source: .foo == true && .bar == true
+  - name: remap_abort_drop_on_abort
+    no_outputs_from:
+      - remap_abort_drop_on_abort
+    input:
+      insert_at: remap_abort_drop_on_abort
+      type: log
+      log_fields:
+        foo: true
+        bar: true
+  - name: remap_nested
+    input:
+      insert_at: remap_nested
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_nested
+        conditions:
+          - type: vrl
+            source: "        .a.b == 123 &&\n        .x.y == 456 &&\n        .x.z == 789\n      "
+  - name: remap_array
+    input:
+      insert_at: remap_array
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_array
+        conditions:
+          - type: vrl
+            source: "        .a == [0, \"1\", 2.0] &&\n        .b == [0, null, \"two\"]\n      "
+  - name: remap_arithmetic
+    input:
+      insert_at: remap_arithmetic
+      type: log
+      log_fields:
+        a: 3
+        b: 7
+        c: 12
+        d: 6
+        e: 9
+    outputs:
+      - extract_from: remap_arithmetic
+        conditions:
+          - type: vrl
+            source: "        .result_a == 27 &&\n        .result_b == 51 &&\n        .result_c == 17 &&\n        .result_d == 20 &&\n        .result_e == 0.75\n     "
+  - name: remap_arithmetic_error
+    input:
+      insert_at: remap_arithmetic_error
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_arithmetic_error
+        conditions:
+          - type: vrl
+            source: .a == 0.0
+  - name: remap_boolean_arithmetic
+    input:
+      insert_at: remap_boolean_arithmetic
+      type: log
+      log_fields:
+        a: 3
+        b: 7
+        c: 12
+        d: 6
+    outputs:
+      - extract_from: remap_boolean_arithmetic
+        conditions:
+          - type: vrl
+            source: "        .result_a == true &&\n        .result_b == false &&\n        .result_c == true &&\n        .result_d == false\n      "
+  - name: remap_coercion
+    input:
+      insert_at: remap_coercion
+      type: log
+      log_fields:
+        foo: 10
+        bar: "20"
+        baz: "30.3"
+        bev: "true"
+        quix: 19/06/2019:17:20:49 -0400
+        a: "2020-09-14T12:53:44+03:00"
+    outputs:
+      - extract_from: remap_coercion
+        conditions:
+          - type: vrl
+            source: "        .foo == \"10\" &&\n        .bar == 20 &&\n        .baz == 30.3 &&\n        .bev == true &&\n        .a == \"2020-09-14T09:53:44Z\"\n      "
+  - name: remap_quoted_path
+    input:
+      insert_at: remap_quoted_path
+      type: log
+      log_fields:
+        a."b.c": bar
+        '"d.e"': baz
+    outputs:
+      - extract_from: remap_quoted_path
+        conditions:
+          - type: vrl
+            source: "        .a.\"b.c\" == \"baz\"\n      "
+  - name: remap_infallible_assignment
+    input:
+      insert_at: remap_infallible_assignment
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_infallible_assignment
+        conditions:
+          - type: vrl
+            source: "        .nope == null &&\n        .err1 == \"function call error for \\\"parse_json\\\" at (19:44): unable to parse json: key must be a string at line 1 column 3\" &&\n        .ok.foo == true &&\n        .err2 == null\n      "
+  - name: remap_error_coalesce_operator
+    input:
+      insert_at: remap_error_coalesce_operator
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_error_coalesce_operator
+        conditions:
+          - type: vrl
+            source: "        .val1 == \"nope\"\n        .val2 == true\n      "
+  - name: remap_bang_function
+    input:
+      insert_at: remap_bang_function
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_bang_function
+        conditions:
+          - type: vrl
+            source: "!exists(.val)"
+  - name: remap_function_arguments
+    input:
+      insert_at: remap_function_arguments
+      type: log
+      log_fields:
+        in: 10
+        other: 30
+    outputs:
+      - extract_from: remap_function_arguments
+        conditions:
+          - type: vrl
+            source: "        .a == \"10\" &&\n        .b == \"10\" &&\n        .c == \"\" &&\n        .d == \"\" &&\n        .e == \"30\" &&\n        .f == \"30\"\n      "
+  - name: remap_function_upcase
+    input:
+      insert_at: remap_function_upcase
+      type: log
+      log_fields:
+        a: a
+        b: bbb bb
+        c.c: c.c
+        f: f
+    outputs:
+      - extract_from: remap_function_upcase
+        conditions:
+          - type: vrl
+            source: "        .a == \"A\" &&\n        .b == \"BBB BB\" &&\n        .c == {\"c\": \"C.C\"} &&\n        .f == \"ff\"\n      "
+  - name: remap_function_upcase_error
+    no_outputs_from:
+      - remap_function_upcase_error
+    input:
+      insert_at: remap_function_upcase_error
+      type: log
+      log_fields:
+        a: a
+        b: true
+  - name: remap_function_downcase
+    input:
+      insert_at: remap_function_downcase
+      type: log
+      log_fields:
+        a: A
+        b: BBB BB
+        c.c: C.C
+        f: F
+    outputs:
+      - extract_from: remap_function_downcase
+        conditions:
+          - type: vrl
+            source: "        .a == \"a\" &&\n        .b == \"bbb bb\" &&\n        .c == {\"c\": \"c.c\"} &&\n        .f == \"FF\"\n      "
+  - name: remap_function_downcase_error
+    no_outputs_from:
+      - remap_function_downcase_error
+    input:
+      insert_at: remap_function_downcase_error
+      type: log
+      log_fields:
+        a: A
+        b: 10
+  - name: remap_function_uuid_v4
+    input:
+      insert_at: remap_function_uuid_v4
+      type: log
+      log_fields:
+        b: foo
+    outputs:
+      - extract_from: remap_function_uuid_v4
+        conditions:
+          - type: vrl
+            source: "        match(string!(.a), r'(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') &&\n        .b == \"bar\"\n      "
+  - name: remap_function_uuid_v7
+    input:
+      insert_at: remap_function_uuid_v7
+      type: log
+      log_fields:
+        b: foo
+    outputs:
+      - extract_from: remap_function_uuid_v7
+        conditions:
+          - type: vrl
+            source: "        match(string!(.a), r'(?i)^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$') &&\n        .b == \"bar\"\n      "
+  - name: remap_function_sha1
+    input:
+      insert_at: remap_function_sha1
+      type: log
+      log_fields:
+        a: foo
+        b: bar
+    outputs:
+      - extract_from: remap_function_sha1
+        conditions:
+          - type: vrl
+            source: "        .a == \"0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33\" &&\n        .b == \"6f74c252bb7f19f553115af5e49a733b9ff17138\"\n      "
+  - name: remap_function_sha1_error
+    no_outputs_from:
+      - remap_function_sha1_error
+    input:
+      insert_at: remap_function_sha1_error
+      type: log
+      log_fields:
+        a: foo
+        b: true
+  - name: remap_function_md5
+    input:
+      insert_at: remap_function_md5
+      type: log
+      log_fields:
+        a: foo
+        b: bar
+    outputs:
+      - extract_from: remap_function_md5
+        conditions:
+          - type: vrl
+            source: "        .a == \"acbd18db4cc2f85cedef654fccc4a4d8\" &&\n        .b == \"223cfa6567e4c0599c9a23628bf7a234\"\n      "
+  - name: remap_function_md5_error
+    no_outputs_from:
+      - remap_function_md5_error
+    input:
+      insert_at: remap_function_md5_error
+      type: log
+      log_fields:
+        a: foo
+        b: true
+  - name: remap_function_now
+    input:
+      insert_at: remap_function_now
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_function_now
+        conditions:
+          - type: vrl
+            source: "        ends_with(to_string!(.a), \"Z\")\n      "
+  - name: remap_function_format_timestamp
+    input:
+      insert_at: remap_function_format_timestamp
+      type: log
+      log_fields:
+        foo: 10
+    outputs:
+      - extract_from: remap_function_format_timestamp
+        conditions:
+          - type: vrl
+            source: "        .a == \"1970-01-01T00:00:10+00:00\"\n      "
+  - name: remap_function_contains
+    input:
+      insert_at: remap_function_contains
+      type: log
+      log_fields:
+        foo: foo
+        bar: bar
+        foobar: foobar
+    outputs:
+      - extract_from: remap_function_contains
+        conditions:
+          - type: vrl
+            source: "        .a == false &&\n        .b == true &&\n        .c == false &&\n        .d == true &&\n        .e == true &&\n        .f == false &&\n        .g == true\n      "
+  - name: remap_function_starts_with
+    input:
+      insert_at: remap_function_starts_with
+      type: log
+      log_fields:
+        foo: foo
+        foobar: foobar
+    outputs:
+      - extract_from: remap_function_starts_with
+        conditions:
+          - type: vrl
+            source: "        .a == true &&\n        .b == true &&\n        .c == false &&\n        .d == false &&\n        .e == true\n      "
+  - name: remap_function_ends_with
+    input:
+      insert_at: remap_function_ends_with
+      type: log
+      log_fields:
+        bar: bar
+        foobar: foobar
+    outputs:
+      - extract_from: remap_function_ends_with
+        conditions:
+          - type: vrl
+            source: "         .a == true &&\n         .b == true &&\n         .c == false &&\n         .d == false &&\n         .e == true\n       "
+  - name: remap_function_slice
+    input:
+      insert_at: remap_function_slice
+      type: log
+      log_fields:
+        foo: foo
+        bar: bar
+    outputs:
+      - extract_from: remap_function_slice
+        conditions:
+          - type: vrl
+            source: "         .a == \"oobar\" &&\n         .b == \"f\" &&\n         .c == \"ar\" &&\n         .d == \"ooba\"\n       "
+  - name: remap_function_parse_tokens
+    input:
+      insert_at: remap_function_parse_tokens
+      type: log
+      log_fields:
+        a: 217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] "DELETE /deliverables/next-generation/user-centric HTTP/1.1" 205 11881
+        b: bar
+    outputs:
+      - extract_from: remap_function_parse_tokens
+        conditions:
+          - type: vrl
+            source: "         .a == [\"217.250.207.207\",\n                null,\n                null,\n                \"07/Sep/2020:16:38:00 -0400\",\n                \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\",\n                \"205\", \"11881\" ] &&\n         .b == [\"bar\"]\n       "
+  - name: remap_function_sha2
+    input:
+      insert_at: remap_function_sha2
+      type: log
+      log_fields:
+        a: foo
+        b: bar
+    outputs:
+      - extract_from: remap_function_sha2
+        conditions:
+          - type: vrl
+            source: "         .a == \"d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d\" &&\n         .b == \"211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f\"\n       "
+  - name: remap_function_sha3
+    input:
+      insert_at: remap_function_sha3
+      type: log
+      log_fields:
+        a: foo
+        b: bar
+    outputs:
+      - extract_from: remap_function_sha3
+        conditions:
+          - type: vrl
+            source: "         .a == \"4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7\" &&\n         .b == \"dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351\"\n       "
+  - name: remap_function_parse_duration
+    input:
+      insert_at: remap_function_parse_duration
+      type: log
+      log_fields:
+        a: 2s
+        b: s
+    outputs:
+      - extract_from: remap_function_parse_duration
+        conditions:
+          - type: vrl
+            source: "         .a == 2000 &&\n         .b == 0.1\n       "
+  - name: remap_function_parse_glog
+    input:
+      insert_at: remap_function_parse_glog
+      type: log
+      log_fields:
+        message: I20210131 14:48:54.411655 15520 main.c++:9] Hello world!
+    outputs:
+      - extract_from: remap_function_parse_glog
+        conditions:
+          - type: vrl
+            source: "         .glog.level == \"info\" &&\n         .glog.timestamp == parse_timestamp!(\"2021-01-31T14:48:54.411655Z\", \"%+\") &&\n         .glog.id == 15520 &&\n         .glog.file == \"main.c++\" &&\n         .glog.line == 9 &&\n         .glog.message == \"Hello world!\"\n       "
+  - name: remap_function_format_number
+    input:
+      insert_at: remap_function_format_number
+      type: log
+      log_fields:
+        a: 1234.567
+    outputs:
+      - extract_from: remap_function_format_number
+        conditions:
+          - type: vrl
+            source: "         .a == \"1.234,56\"\n       "
+  - name: remap_function_parse_url
+    input:
+      insert_at: remap_function_parse_url
+      type: log
+      log_fields:
+        url: https://master.vector.dev/docs/reference/transforms/merge/?hello=world#configuration
+    outputs:
+      - extract_from: remap_function_parse_url
+        conditions:
+          - type: vrl
+            source: "         .parts == { \"scheme\": \"https\",\n                     \"username\": \"\",\n                     \"password\": \"\",\n                     \"host\": \"master.vector.dev\",\n                     \"port\": null,\n                     \"path\": \"/docs/reference/transforms/merge/\",\n                     \"query\": {\"hello\": \"world\"},\n                     \"fragment\": \"configuration\"\n            }\n       "
+  - name: remap_function_ceil
+    input:
+      insert_at: remap_function_ceil
+      type: log
+      log_fields:
+        num: 92.489
+    outputs:
+      - extract_from: remap_function_ceil
+        conditions:
+          - type: vrl
+            source: "         .a == 93 &&\n         .b == 92.5 &&\n         .c == 92.49\n       "
+  - name: remap_function_floor
+    input:
+      insert_at: remap_function_floor
+      type: log
+      log_fields:
+        num: 92.489
+    outputs:
+      - extract_from: remap_function_floor
+        conditions:
+          - type: vrl
+            source: "         .a == 92 &&\n         .b == 92.4 &&\n         .c == 92.48\n       "
+  - name: remap_function_round
+    input:
+      insert_at: remap_function_round
+      type: log
+      log_fields:
+        num: 92.489
+    outputs:
+      - extract_from: remap_function_round
+        conditions:
+          - type: vrl
+            source: "         .a == 92 &&\n         .b == 92.5 &&\n         .c == 92.49\n       "
+  - name: remap_function_parse_syslog
+    input:
+      insert_at: remap_function_parse_syslog
+      type: log
+      log_fields:
+        a: "<28>1 2020-05-22T14:59:09.250-03:00 OX-XXX-MX204 OX-XXX-CONTEUDO:rpd 6589 - - bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+    outputs:
+      - extract_from: remap_function_parse_syslog
+        conditions:
+          - type: vrl
+            source: "       .a.facility == \"daemon\" &&\n       .a.severity == \"warning\" &&\n       .a.timestamp == parse_timestamp!(\"2020-05-22T17:59:09.250Z\", \"%+\") &&\n       .a.hostname == \"OX-XXX-MX204\" &&\n       .a.appname == \"OX-XXX-CONTEUDO:rpd\" &&\n       .a.procid == 6589 &&\n       .a.message == \"bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284\"\n     "
+  - name: remap_function_split_regex
+    input:
+      insert_at: remap_function_split_regex
+      type: log
+      log_fields:
+        foo: barAbBbataabfizzaxbbuzz
+    outputs:
+      - extract_from: remap_function_split_regex
+        conditions:
+          - type: vrl
+            source: "         .foo[0] == \"bar\" &&\n         .foo[1] == \"bat\" &&\n         .foo[2] == \"fizzaxbbuzz\"\n       "
+  - name: remap_function_split_string
+    input:
+      insert_at: remap_function_split_string
+      type: log
+      log_fields:
+        foo: bar bat fizz buzz
+    outputs:
+      - extract_from: remap_function_split_string
+        conditions:
+          - type: vrl
+            source: "         .foo[0] == \"bar\" &&\n         .foo[1] == \"bat\" &&\n         .foo[2] == \"fizz buzz\"\n       "
+  - name: remap_function_parse_timestamp
+    input:
+      insert_at: remap_function_parse_timestamp
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_function_parse_timestamp
+        conditions:
+          - type: vrl
+            source: "         .foo == parse_timestamp!(\"1970-01-01T00:00:10Z\", \"%+\")\n       "
+  - name: remap_function_truncate
+    input:
+      insert_at: remap_function_truncate
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_function_truncate
+        conditions:
+          - type: vrl
+            source: "         .foo == \"foo\" &&\n         .bar == \"foob...\"\n       "
+  - name: remap_function_tag_types_externally
+    input:
+      insert_at: remap_function_tag_types_externally
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_function_tag_types_externally
+        conditions:
+          - type: vrl
+            source: "        .string == { \"string\": \"foo\" } &&\n        .integer == { \"integer\": 123 } &&\n        .float == { \"float\": 123.45 } &&\n        .boolean == { \"boolean\": true } &&\n        .map == { \"foo\": { \"string\": \"bar\" } } &&\n        .array == [{ \"string\": \"foo\" }] &&\n        .timestamp == { \"timestamp\": parse_timestamp!(\"2021-01-01T00:00:00.00Z\", \"%+\") } &&\n        .regex == { \"regex\": r'.*' } &&\n        .null == null\n      "
+  - name: remap_function_strip_whitespace
+    input:
+      insert_at: remap_function_strip_whitespace
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_function_strip_whitespace
+        conditions:
+          - type: vrl
+            source: "         .foo == \"foobar\"\n       "
+  - name: remap_function_parse_grok
+    input:
+      insert_at: remap_function_parse_grok
+      type: log
+      log_fields:
+        message: 2020-10-02T23:22:12.223222Z info Hello world
+    outputs:
+      - extract_from: remap_function_parse_grok
+        conditions:
+          - type: vrl
+            source: "         .grokked.timestamp == \"2020-10-02T23:22:12.223222Z\" &&\n         .grokked.level == \"info\" &&\n         .grokked.message == \"Hello world\" &&\n         !exists(.grokked.email)\n       "
+  - name: remap_function_parse_common_log
+    input:
+      insert_at: remap_function_parse_common_log
+      type: log
+      log_fields:
+        message: 127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
+    outputs:
+      - extract_from: remap_function_parse_common_log
+        conditions:
+          - type: vrl
+            source: "         .common_log.host == \"127.0.0.1\" &&\n         .common_log.identity == \"bob\" &&\n         .common_log.user == \"frank\" &&\n         .common_log.timestamp == parse_timestamp!(\"2000-10-10T20:55:36Z\", \"%+\") &&\n         .common_log.message == \"GET /apache_pb.gif HTTP/1.0\" &&\n         .common_log.method == \"GET\" &&\n         .common_log.path == \"/apache_pb.gif\" &&\n         .common_log.protocol == \"HTTP/1.0\" &&\n         .common_log.status == 200 &&\n         .common_log.size == 2326 &&\n         .common_log_timestamp_format.host == \"127.0.0.1\" &&\n         .common_log_timestamp_format.identity == \"bob\" &&\n         .common_log_timestamp_format.user == \"frank\" &&\n         .common_log_timestamp_format.timestamp == parse_timestamp!(\"2000-10-10T20:55:36Z\", \"%+\") &&\n         .common_log_timestamp_format.message == \"GET /apache_pb.gif HTTP/1.0\" &&\n         .common_log_timestamp_format.method == \"GET\" &&\n         .common_log_timestamp_format.path == \"/apache_pb.gif\" &&\n         .common_log_timestamp_format.protocol == \"HTTP/1.0\" &&\n         .common_log_timestamp_format.status == 200 &&\n         .common_log_timestamp_format.size == 2326\n       "
+  - name: remap_function_ip_subnet
+    input:
+      insert_at: remap_function_ip_subnet
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_function_ip_subnet
+        conditions:
+          - type: vrl
+            source: "         .a == \"192.168.0.0\" &&\n         .b == \"192.0.0.0\" &&\n         .c == \"2404:6800::\" &&\n         .d == \"2404::\"\n       "
+  - name: remap_function_ip_cidr_contains
+    input:
+      insert_at: remap_function_ip_cidr_contains
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_function_ip_cidr_contains
+        conditions:
+          - type: vrl
+            source: "         .a == true &&\n         .b == false &&\n         .c == true &&\n         .d == false\n       "
+  - name: remap_function_ip_to_ipv6
+    input:
+      insert_at: remap_function_ip_to_ipv6
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_function_ip_to_ipv6
+        conditions:
+          - type: vrl
+            source: "         .a == \"::ffff:192.168.10.2\"\n       "
+  - name: remap_function_ipv6_to_ipv4
+    input:
+      insert_at: remap_function_ipv6_to_ipv4
+      type: raw
+      value: ""
+    outputs:
+      - extract_from: remap_function_ipv6_to_ipv4
+        conditions:
+          - type: vrl
+            source: "         .a == \"192.168.10.2\"\n       "
+  - name: remap_function_exists
+    input:
+      insert_at: remap_function_exists
+      type: log
+      log_fields:
+        data: "         { \"child\": 42, \"arr\": [1,3,3] }\n       "
+        foo: 42
+    outputs:
+      - extract_from: remap_function_exists
+        conditions:
+          - type: vrl
+            source: "         bool!(.a)  && !bool!(.b)  && bool!(.c) && !bool!(.d)  && bool!(.e) && !bool!(.f)\n       "
+  - name: remap_function_compact
+    input:
+      insert_at: remap_function_compact
+      type: log
+      log_fields:
+        arr: "         [null, \"\", [], 1]\n       "
+        map: "         {\"field1\": null,\n          \"field2\": 32,\n          \"field3\": \"\",\n          \"field4\": { \"nested1\": 3,\n                      \"nested2\": null } }\n       "
+    outputs:
+      - extract_from: remap_function_compact
+        conditions:
+          - type: vrl
+            source: "         .a == false &&\n         .b == true &&\n         .c == false &&\n         .d == true &&\n         .e == false &&\n         .compactarr[0] == 1\n       "
+  - name: remap_function_assert_pass
+    input:
+      insert_at: remap_function_assert_pass
+      type: log
+      log_fields:
+        foo: true
+    outputs:
+      - extract_from: remap_function_assert_pass
+        conditions:
+          - type: vrl
+            source: "       .check == \"checked\"\n     "
+  - name: remap_function_assert_fail
+    no_outputs_from:
+      - remap_function_assert_fail
+    input:
+      insert_at: remap_function_assert_fail
+      type: log
+      log_fields:
+        foo: false
+  - name: remap_function_log
+    input:
+      insert_at: remap_function_log
+      type: log
+      log_fields:
+        foo: this should be unchanged
+    outputs:
+      - extract_from: remap_function_log
+        conditions:
+          - type: vrl
+            source: "         .foo == \"this should be unchanged\"\n       "
+  - name: remap_function_merge
+    input:
+      insert_at: remap_function_merge
+      type: log
+      log_fields:
+        bar: "         {\"field1\": \"ook\"}\n       "
+        foo: "         {\"field2\": \"ook ook\"}\n       "
+    outputs:
+      - extract_from: remap_function_merge
+        conditions:
+          - type: vrl
+            source: "         .bar.field1 == \"ook\" &&\n         .bar.field2 == \"ook ook\"\n       "
+  - name: remap_function_flatten
+    input:
+      insert_at: remap_function_flatten
+      type: log
+      log_fields:
+        arr: "[1, 2, [3, 4, [5, 6]]]"
+        map: "         {\"field1\": {\"field2\": 1, \"field3\": 2} }\n         "
+    outputs:
+      - extract_from: remap_function_flatten
+        conditions:
+          - type: vrl
+            source: "         .arr[0] == 1 &&\n         .arr[1] == 2 &&\n         .arr[2] == 3 &&\n         .arr[3] == 4 &&\n         .arr[4] == 5 &&\n         .arr[5] == 6 &&\n         .a == 1 &&\n         .b == 2\n       "
+  - name: remap_function_redact
+    input:
+      insert_at: remap_function_redact
+      type: log
+      log_fields:
+        input: hello world, hello universe
+    outputs:
+      - extract_from: remap_function_redact
+        conditions:
+          - type: vrl
+            source: "         .a == \"[REDACTED] world, [REDACTED] universe\" &&\n         .b == \"[REDACTED] [REDACTED]ld, [REDACTED] universe\" &&\n         .c == \"hello [REDACTED], hello [REDACTED]\" &&\n         .d == \"hello world, hello universe\" &&\n         .e == \"[REDACTED] w[REDACTED]rld, [REDACTED] [REDACTED]n[REDACTED]v[REDACTED]rs[REDACTED]\"\n       "
+  - name: remap_function_replace
+    input:
+      insert_at: remap_function_replace
+      type: log
+      log_fields:
+        input: hello world, hello universe
+    outputs:
+      - extract_from: remap_function_replace
+        conditions:
+          - type: vrl
+            source: "         .a == \"fbaro\" &&\n         .b == \"fbarbar\"\n       "
+  - name: remap_function_parse_aws_alb_log
+    input:
+      insert_at: remap_function_parse_aws_alb_log
+      type: log
+      log_fields:
+        log: http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-"
+    outputs:
+      - extract_from: remap_function_parse_aws_alb_log
+        conditions:
+          - type: vrl
+            source: "         .parts.type == \"http\" &&\n         .parts.timestamp == \"2018-11-30T22:23:00.186641Z\" &&\n         .parts.elb == \"app/my-loadbalancer/50dc6c495c0c9188\" &&\n         .parts.client_host == \"192.168.131.39:2817\" &&\n         .parts.target_host == null &&\n         .parts.request_processing_time == 0.0 &&\n         .parts.target_processing_time == 0.001 &&\n         .parts.response_processing_time == 0.0 &&\n         .parts.elb_status_code == \"200\" &&\n         .parts.target_status_code == \"200\" &&\n         .parts.received_bytes == 34 &&\n         .parts.sent_bytes == 366 &&\n         .parts.request_method == \"GET\" &&\n         .parts.request_url == \"http://www.example.com:80/\" &&\n         .parts.request_protocol == \"HTTP/1.1\" &&\n         .parts.user_agent == \"curl/7.46.0\" &&\n         .parts.ssl_cipher == null &&\n         .parts.ssl_protocol == null &&\n         .parts.target_group_arn == \"arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067\" &&\n         .parts.trace_id == \"Root=1-58337364-23a8c76965a2ef7629b185e3\" &&\n         .parts.domain_name == null &&\n         .parts.chosen_cert_arn == null &&\n         .parts.matched_rule_priority == \"0\" &&\n         .parts.request_creation_time == \"2018-11-30T22:22:48.364000Z\" &&\n         .parts.actions_executed == \"forward\" &&\n         .parts.redirect_url == null &&\n         .parts.error_reason == null &&\n         .parts.classification == null &&\n         .parts.classification_reason == null\n       "
+  - name: remap_function_parse_aws_vpc_flow_log
+    input:
+      insert_at: remap_function_parse_aws_vpc_flow_log
+      type: log
+      log_fields:
+        a: 2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA
+        b: "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"
+    outputs:
+      - extract_from: remap_function_parse_aws_vpc_flow_log
+        conditions:
+          - type: vrl
+            source: "         .a.version == 2 &&\n         .a.account_id == \"123456789010\" &&\n         .a.interface_id == \"eni-1235b8ca123456789\" &&\n         .a.srcaddr == null &&\n         .a.dstaddr == null &&\n         .a.srcport == null &&\n         .a.dstport == null &&\n         .a.protocol == null &&\n         .a.packets == null &&\n         .a.bytes == null &&\n         .a.start == 1431280876 &&\n         .a.end == 1431280934 &&\n         .a.action == null &&\n         .a.log_status == \"NODATA\" &&\n         .b.instance_id == null &&\n         .b.interface_id == \"eni-1235b8ca123456789\" &&\n         .b.srcaddr == \"10.0.1.5\" &&\n         .b.dstaddr == \"10.0.0.220\" &&\n         .b.pkt_srcaddr == \"10.0.1.5\" &&\n         .b.pkt_dstaddr == \"203.0.113.5\"\n       "
+  - name: remap_metrics
+    input:
+      insert_at: remap_metrics
+      type: metric
+      metric:
+        name: example counter
+        namespace: zork
+        kind: absolute
+        counter:
+          value: 1.0
+    outputs:
+      - extract_from: remap_metrics
+        conditions:
+          - type: vrl
+            source: "         .tags.name == \"example counter\" &&\n         .tags.namespace == \"zork\" &&\n         .tags.host == \"ook\" &&\n         .tags.type == \"counter\"\n       "
+  - name: remap_function_encode_json
+    input:
+      insert_at: remap_function_encode_json
+      type: log
+      log_fields:
+        a: "[1, 2, 3]"
+        b: '{"field1": {"field2": 1, "field3": null}}'
+    outputs:
+      - extract_from: remap_function_encode_json
+        conditions:
+          - type: vrl
+            source: "         .a == \"[1,2,3]\" &&\n         .b == \"{\\\"field1\\\":{\\\"field2\\\":1,\\\"field3\\\":null}}\"\n       "
+  - name: remap_function_parse_regex
+    input:
+      insert_at: remap_function_parse_regex
+      type: log
+      log_fields:
+        message: 5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] "GET /embrace/supply-chains/dynamic/vertical" 201 20574
+    outputs:
+      - extract_from: remap_function_parse_regex
+        conditions:
+          - type: vrl
+            source: "         .bytes_in == 5667 &&\n         .host == \"5.86.210.12\" &&\n         .user == \"zieme4647\" &&\n         .timestamp == \"19/06/2019:17:20:49 -0400\" &&\n         .method == \"GET\" &&\n         .path == \"/embrace/supply-chains/dynamic/vertical\" &&\n         .status == 201 &&\n         .bytes_out == 20574 &&\n         .\"0\" == \"5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \\\"GET /embrace/supply-chains/dynamic/vertical\\\" 201 20574\"\n       "
+  - name: remap_function_parse_regex_all
+    input:
+      insert_at: remap_function_parse_regex_all
+      type: log
+      log_fields:
+        message: apples and carrots, peaches and peas
+    outputs:
+      - extract_from: remap_function_parse_regex_all
+        conditions:
+          - type: vrl
+            source: "         .result[0].fruit == \"apples\" &&\n         .result[0].veg == \"carrots\" &&\n         .result[0].\"0\" == \"apples and carrots\" &&\n         .result[1].fruit == \"peaches\" &&\n         .result[1].veg == \"peas\" &&\n         .result[1].\"0\" == \"peaches and peas\"\n       "
+  - name: remap_function_parse_aws_cloudwatch_log_subscription_message
+    input:
+      insert_at: remap_function_parse_aws_cloudwatch_log_subscription_message
+      type: log
+      log_fields:
+        message: '{"messageType":"CONTROL_MESSAGE","owner":"CloudwatchLogs","logGroup":"","logStream":"","subscriptionFilters":[],"logEvents":[{"id":"","timestamp":1600110003794,"message":"CWL CONTROL MESSAGE: Checking health of destination Firehose."}]}'
+    outputs:
+      - extract_from: remap_function_parse_aws_cloudwatch_log_subscription_message
+        conditions:
+          - type: vrl
+            source: "         .result.owner == \"CloudwatchLogs\" &&\n         .result.message_type == \"CONTROL_MESSAGE\" &&\n         .result.subscription_filters == [] &&\n         .result.log_group == \"\" &&\n         .result.log_stream == \"\" &&\n         .result.log_events == [{ \"id\": \"\",\n                                  \"timestamp\": parse_timestamp!(\"2020-09-14T19:00:03.794Z\", \"%+\"),\n                                  \"message\": \"CWL CONTROL MESSAGE: Checking health of destination Firehose.\" }]\n       "
+  - name: remap_function_parse_key_value
+    input:
+      insert_at: remap_function_parse_key_value
+      type: log
+      log_fields:
+        message: "         path=\"/cart_link\" host=lumberjack-store.herokuapp.com request_id=6ad70ccd-40db-477c-afce-f7e3719a886b fwd=\"108.30.189.26\" dyno=web.1 connect=0ms service=73ms status=304 bytes=656 protocol=https\n         "
+    outputs:
+      - extract_from: remap_function_parse_key_value
+        conditions:
+          - type: vrl
+            source: "         .path == \"/cart_link\" &&\n         .host == \"lumberjack-store.herokuapp.com\" &&\n         .request_id == \"6ad70ccd-40db-477c-afce-f7e3719a886b\" &&\n         .fwd == \"108.30.189.26\" &&\n         .dyno == \"web.1\" &&\n         .connect == \"0ms\" &&\n         .service == \"73ms\" &&\n         .status == \"304\" &&\n         .bytes == \"656\" &&\n         .protocol == \"https\"\n       "
+  - name: remap_function_is_nullish
+    input:
+      insert_at: remap_function_is_nullish
+      type: log
+      log_fields:
+        a: ""
+        b: " "
+        c: "     "
+        d: "-"
+        e: "
 
-        '
-      f: "\r"
-      g: i am a teapot
-  outputs:
-  - extract_from: remap_function_is_nullish
-    conditions:
-    - type: vrl
-      source: "         .a == true &&\n         .b == true &&\n         .c == true &&\n         .d == true &&\n         .e == true &&\n         .f == true &&\n         .g == false\n       "
-- name: remap_function_to_syslog_facility
-  input:
-    insert_at: remap_function_to_syslog_facility
-    type: log
-    log_fields:
-      a: 3
-      b: 11
-      c: 23
-  outputs:
-  - extract_from: remap_function_to_syslog_facility
-    conditions:
-    - type: vrl
-      source: "         .a == \"daemon\" &&\n         .b == \"ftp\" &&\n         .c == \"local7\"\n       "
-- name: remap_function_to_unix_timestamp
-  input:
-    insert_at: remap_function_to_unix_timestamp
-    type: log
-    log_fields:
-      time: '2020-09-14T12:53:44+03:00'
-  outputs:
-  - extract_from: remap_function_to_unix_timestamp
-    conditions:
-    - type: vrl
-      source: "         .secs == 1600077224 &&\n         .millis == 1600077224000 &&\n         .nanos == 1600077224000000000\n       "
-- name: remap_function_push_to_array
-  input:
-    insert_at: remap_function_push_to_array
-    type: log
-    log_fields:
-      fruits: '["apple", "orange", "banana"]'
-      fruit: mango
-  outputs:
-  - extract_from: remap_function_push_to_array
-    conditions:
-    - type: vrl
-      source: "         .result[0] == \"apple\" &&\n         .result[1] == \"orange\" &&\n         .result[2] == \"banana\" &&\n         .result[3] == \"mango\"\n       "
-- name: remap_function_append_to_array
-  input:
-    insert_at: remap_function_append_to_array
-    type: log
-    log_fields:
-      fruits: '["apple", "orange"]'
-      other_fruits: '["banana", "mango"]'
-  outputs:
-  - extract_from: remap_function_append_to_array
-    conditions:
-    - type: vrl
-      source: "         .result[0] == \"apple\" &&\n         .result[1] == \"orange\" &&\n         .result[2] == \"banana\" &&\n         .result[3] == \"mango\"\n       "
-- name: remap_function_encode_base64
-  input:
-    insert_at: remap_function_encode_base64
-    type: raw
-    value: Bron-Y-Aur Stomp
-  outputs:
-  - extract_from: remap_function_encode_base64
-    conditions:
-    - type: vrl
-      source: "         .result == \"QnJvbi1ZLUF1ciBTdG9tcA==\"\n       "
-- name: remap_function_decode_base64
-  input:
-    insert_at: remap_function_decode_base64
-    type: raw
-    value: QnJvbi1ZLUF1ciBTdG9tcA==
-  outputs:
-  - extract_from: remap_function_decode_base64
-    conditions:
-    - type: vrl
-      source: "         .result == \"Bron-Y-Aur Stomp\"\n       "
-- name: remap_comments
-  input:
-    insert_at: remap_comments
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_comments
-    conditions:
-    - type: vrl
-      source: "         .a == 1\n         .b == true\n       "
-- name: remap_multiline
-  input:
-    insert_at: remap_multiline
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_multiline
-    conditions:
-    - type: vrl
-      source: .a == "A long multiline string"
-- name: remap_function_length
-  input:
-    insert_at: remap_function_length
-    type: log
-    log_fields:
-      a: '[1, 2, 3]'
-      b: '{"foo":"bar","lorem":{"ipsum": "sicut dolor"}}'
-      c: '[[1, 2, 3], [4, 5, 6], []]'
-  outputs:
-  - extract_from: remap_function_length
-    conditions:
-    - type: vrl
-      source: '[.a, .b, .c] == [3, 2, 3]'
-- name: remap_function_get_hostname
-  input:
-    insert_at: remap_function_get_hostname
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_function_get_hostname
-    conditions:
-    - type: vrl
-      source: "         .a != \"\"\n       "
-- name: remap_function_get_timezone_name
-  input:
-    insert_at: remap_function_get_timezone_name
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_function_get_timezone_name
-    conditions:
-    - type: vrl
-      source: "         .a != \"\"\n       "
-- name: remap_function_join
-  input:
-    insert_at: remap_function_join
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_function_join
-    conditions:
-    - type: vrl
-      source: "         .comma == \"foo, bar, baz\" &&\n         .space == \"foo bar baz\" &&\n         .none == \"foobarbaz\" &&\n         .from_split == \"big__bad__booper\"\n       "
-- name: remap_function_reverse_dns
-  input:
-    insert_at: remap_function_reverse_dns
-    type: log
-    log_fields:
-      ip: 127.0.0.1
-  outputs:
-  - extract_from: remap_function_reverse_dns
-    conditions:
-    - type: vrl
-      source: "        .host == \"localhost\"\n      "
-- name: remap_function_get_enrichment_table_row
-  input:
-    insert_at: remap_function_get_enrichment_table_row
-    type: log
-    log_fields:
-      id: 3
-  outputs:
-  - extract_from: remap_function_get_enrichment_table_row
-    conditions:
-    - type: vrl
-      source: "        .tree == \"yew\"\n      "
-- name: remap_function_find_enrichment_table_rows
-  input:
-    insert_at: remap_function_find_enrichment_table_rows
-    type: log
-    log_fields:
-      tree: yew
-  outputs:
-  - extract_from: remap_function_find_enrichment_table_rows
-    conditions:
-    - type: vrl
-      source: "        .trees == [{\"id\": 3, \"tree\": \"yew\"},\n                   {\"id\": 5, \"tree\": \"yew\"},\n                   {\"id\": 7, \"tree\": \"yew\"}]\n      "
-- name: remap_metadata
-  input:
-    insert_at: remap_metadata
-    type: log
-    log_fields: {}
-  outputs:
-  - extract_from: remap_metadata
-    conditions:
-    - type: vrl
-      source: "        .key == \"iamanapikey\" && .empty_key == null &&\n        .splunk_hec_token == \"iamasplunkhectoken\" && .empty_splunk_hec_token == null\n      "
+          "
+        f: "\r"
+        g: i am a teapot
+    outputs:
+      - extract_from: remap_function_is_nullish
+        conditions:
+          - type: vrl
+            source: "         .a == true &&\n         .b == true &&\n         .c == true &&\n         .d == true &&\n         .e == true &&\n         .f == true &&\n         .g == false\n       "
+  - name: remap_function_to_syslog_facility
+    input:
+      insert_at: remap_function_to_syslog_facility
+      type: log
+      log_fields:
+        a: 3
+        b: 11
+        c: 23
+    outputs:
+      - extract_from: remap_function_to_syslog_facility
+        conditions:
+          - type: vrl
+            source: "         .a == \"daemon\" &&\n         .b == \"ftp\" &&\n         .c == \"local7\"\n       "
+  - name: remap_function_to_unix_timestamp
+    input:
+      insert_at: remap_function_to_unix_timestamp
+      type: log
+      log_fields:
+        time: "2020-09-14T12:53:44+03:00"
+    outputs:
+      - extract_from: remap_function_to_unix_timestamp
+        conditions:
+          - type: vrl
+            source: "         .secs == 1600077224 &&\n         .millis == 1600077224000 &&\n         .nanos == 1600077224000000000\n       "
+  - name: remap_function_push_to_array
+    input:
+      insert_at: remap_function_push_to_array
+      type: log
+      log_fields:
+        fruits: '["apple", "orange", "banana"]'
+        fruit: mango
+    outputs:
+      - extract_from: remap_function_push_to_array
+        conditions:
+          - type: vrl
+            source: "         .result[0] == \"apple\" &&\n         .result[1] == \"orange\" &&\n         .result[2] == \"banana\" &&\n         .result[3] == \"mango\"\n       "
+  - name: remap_function_append_to_array
+    input:
+      insert_at: remap_function_append_to_array
+      type: log
+      log_fields:
+        fruits: '["apple", "orange"]'
+        other_fruits: '["banana", "mango"]'
+    outputs:
+      - extract_from: remap_function_append_to_array
+        conditions:
+          - type: vrl
+            source: "         .result[0] == \"apple\" &&\n         .result[1] == \"orange\" &&\n         .result[2] == \"banana\" &&\n         .result[3] == \"mango\"\n       "
+  - name: remap_function_encode_base64
+    input:
+      insert_at: remap_function_encode_base64
+      type: raw
+      value: Bron-Y-Aur Stomp
+    outputs:
+      - extract_from: remap_function_encode_base64
+        conditions:
+          - type: vrl
+            source: "         .result == \"QnJvbi1ZLUF1ciBTdG9tcA==\"\n       "
+  - name: remap_function_decode_base64
+    input:
+      insert_at: remap_function_decode_base64
+      type: raw
+      value: QnJvbi1ZLUF1ciBTdG9tcA==
+    outputs:
+      - extract_from: remap_function_decode_base64
+        conditions:
+          - type: vrl
+            source: "         .result == \"Bron-Y-Aur Stomp\"\n       "
+  - name: remap_comments
+    input:
+      insert_at: remap_comments
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_comments
+        conditions:
+          - type: vrl
+            source: "         .a == 1\n         .b == true\n       "
+  - name: remap_multiline
+    input:
+      insert_at: remap_multiline
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_multiline
+        conditions:
+          - type: vrl
+            source: .a == "A long multiline string"
+  - name: remap_function_length
+    input:
+      insert_at: remap_function_length
+      type: log
+      log_fields:
+        a: "[1, 2, 3]"
+        b: '{"foo":"bar","lorem":{"ipsum": "sicut dolor"}}'
+        c: "[[1, 2, 3], [4, 5, 6], []]"
+    outputs:
+      - extract_from: remap_function_length
+        conditions:
+          - type: vrl
+            source: "[.a, .b, .c] == [3, 2, 3]"
+  - name: remap_function_get_hostname
+    input:
+      insert_at: remap_function_get_hostname
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_function_get_hostname
+        conditions:
+          - type: vrl
+            source: "         .a != \"\"\n       "
+  - name: remap_function_get_timezone_name
+    input:
+      insert_at: remap_function_get_timezone_name
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_function_get_timezone_name
+        conditions:
+          - type: vrl
+            source: "         .a != \"\"\n       "
+  - name: remap_function_join
+    input:
+      insert_at: remap_function_join
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_function_join
+        conditions:
+          - type: vrl
+            source: "         .comma == \"foo, bar, baz\" &&\n         .space == \"foo bar baz\" &&\n         .none == \"foobarbaz\" &&\n         .from_split == \"big__bad__booper\"\n       "
+  - name: remap_function_reverse_dns
+    input:
+      insert_at: remap_function_reverse_dns
+      type: log
+      log_fields:
+        ip: 127.0.0.1
+    outputs:
+      - extract_from: remap_function_reverse_dns
+        conditions:
+          - type: vrl
+            source: "        .host == \"localhost\"\n      "
+  - name: remap_function_get_enrichment_table_row
+    input:
+      insert_at: remap_function_get_enrichment_table_row
+      type: log
+      log_fields:
+        id: 3
+    outputs:
+      - extract_from: remap_function_get_enrichment_table_row
+        conditions:
+          - type: vrl
+            source: "        .tree == \"yew\"\n      "
+  - name: remap_function_find_enrichment_table_rows
+    input:
+      insert_at: remap_function_find_enrichment_table_rows
+      type: log
+      log_fields:
+        tree: yew
+    outputs:
+      - extract_from: remap_function_find_enrichment_table_rows
+        conditions:
+          - type: vrl
+            source: "        .trees == [{\"id\": 3, \"tree\": \"yew\"},\n                   {\"id\": 5, \"tree\": \"yew\"},\n                   {\"id\": 7, \"tree\": \"yew\"}]\n      "
+  - name: remap_metadata
+    input:
+      insert_at: remap_metadata
+      type: log
+      log_fields: {}
+    outputs:
+      - extract_from: remap_metadata
+        conditions:
+          - type: vrl
+            source: "        .key == \"iamanapikey\" && .empty_key == null &&\n        .splunk_hec_token == \"iamasplunkhectoken\" && .empty_splunk_hec_token == null\n      "
 enrichment_tables:
   test:
     type: file

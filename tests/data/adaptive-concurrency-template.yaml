@@ -10,14 +10,14 @@ params:
     knee_start: 0
     knee_exp: 0.0
     limit: 0
-    action: "defer"  # "defer" or "drop"
+    action: "defer" # "defer" or "drop"
 
   rate:
     scale: 0
     knee_start: 0
     knee_exp: 0.0
     limit: 0
-    action: "defer"  # "defer" or "drop"
+    action: "defer" # "defer" or "drop"
 
   concurrency: "auto"
 
@@ -31,28 +31,28 @@ params:
 
 stats:
   in_flight:
-    max: [,]
-    mean: [,]
-    mode: [,]
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
   rate:
-    max: [,]
-    mean: [,]
-    mode: [,]
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
 
 controller:
   concurrency_limit:
-    max: [,]
-    mean: [,]
-    mode: [,]
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
   in_flight:
-    max: [,]
-    mean: [,]
-    mode: [,]
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
   observed_rtt:
-    min: [,]
-    max: [,]
-    mean: [,]
+    min: [0, 0]
+    max: [0, 0]
+    mean: [0, 0]
   averaged_rtt:
-    min: [,]
-    max: [,]
-    mean: [,]
+    min: [0, 0]
+    max: [0, 0]
+    mean: [0, 0]

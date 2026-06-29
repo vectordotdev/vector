@@ -67,7 +67,7 @@ transforms:
       message: "concat"
     ends_when:
       type: "vrl"
-      source: "ends_with(strip_whitespace(string!(.message)), \";\")"
+      source: 'ends_with(strip_whitespace(string!(.message)), ";")'
 
   log_stream:
     inputs: []
@@ -346,7 +346,7 @@ tests:
       - insert_at: "ruby_exception"
         type: "log"
         log_fields:
-          message: "Started GET \"/\" for 127.0.0.1 at 2012-03-10 14:28:14 +0100"
+          message: 'Started GET "/" for 127.0.0.1 at 2012-03-10 14:28:14 +0100'
       - insert_at: "ruby_exception"
         type: "log"
         log_fields:
@@ -366,7 +366,7 @@ tests:
       - insert_at: "ruby_exception"
         type: "log"
         log_fields:
-          message: "Started GET \"/\" for 127.0.0.1 at 2012-03-11 14:28:14 +0100"
+          message: 'Started GET "/" for 127.0.0.1 at 2012-03-11 14:28:14 +0100'
     outputs:
       - extract_from: "ruby_exception"
         conditions:
