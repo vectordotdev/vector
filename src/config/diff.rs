@@ -29,6 +29,7 @@ impl ConfigDiff {
             enrichment_tables: Difference::from_enrichment_tables(
                 &old.enrichment_tables,
                 &new.enrichment_tables,
+                &components_to_reload,
             ),
             components_to_reload,
         }
@@ -56,7 +57,7 @@ impl ConfigDiff {
         self.sources.is_changed(key)
             || self.transforms.is_changed(key)
             || self.sinks.is_changed(key)
-            || self.enrichment_tables.contains(key)
+            || self.enrichment_tables.is_changed(key)
     }
 
     /// Checks whether the given component is removed.
@@ -64,7 +65,7 @@ impl ConfigDiff {
         self.sources.is_removed(key)
             || self.transforms.is_removed(key)
             || self.sinks.is_removed(key)
-            || self.enrichment_tables.contains(key)
+            || self.enrichment_tables.is_removed(key)
     }
 }
 
@@ -116,6 +117,7 @@ impl Difference {
     fn from_enrichment_tables(
         old: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
         new: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+        need_change: &HashSet<ComponentKey>,
     ) -> Self {
         let old_table_keys = extract_table_component_keys(old);
         let new_table_keys = extract_table_component_keys(new);
@@ -131,7 +133,7 @@ impl Difference {
                 // which can iterate in varied orders.
                 let old_value = serde_json::to_value(&old[*table_key]).unwrap();
                 let new_value = serde_json::to_value(&new[*table_key]).unwrap();
-                old_value != new_value
+                old_value != new_value || need_change.contains(*table_key)
             })
             .cloned()
             .map(|(_table_key, derived_component_key)| derived_component_key)
@@ -305,6 +307,7 @@ mod tests {
         let diff = Difference::from_enrichment_tables(
             &old_config.enrichment_tables,
             &new_config.enrichment_tables,
+            &Default::default(),
         );
 
         assert_eq!(diff.to_add, HashSet::from_iter(["memory_table_new".into()]));
