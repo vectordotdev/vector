@@ -31,7 +31,7 @@ use vector_lib::{
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
-    source_sender::{SourceSenderItem, chunk_size},
+    source_sender::{SourceSenderItem, chunk_size_events},
     transform::update_runtime_schema_definition,
 };
 use vector_lib::{gauge, internal_event::GaugeName};
@@ -72,7 +72,7 @@ static ENRICHMENT_TABLES_LOAD_LOCK: LazyLock<AsyncMutex<()>> = LazyLock::new(Asy
 static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
-    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * chunk_size());
+    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * chunk_size_events());
 
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
@@ -1299,7 +1299,7 @@ impl Runner {
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let ready_array_capacity =
-            NonZeroUsize::new(chunk_size() * 4).expect("chunk size is non-zero");
+            NonZeroUsize::new(chunk_size_events() * 4).expect("chunk size is non-zero");
         let mut input_rx =
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, ready_array_capacity);
 

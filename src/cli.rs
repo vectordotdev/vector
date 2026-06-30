@@ -134,8 +134,8 @@ pub struct RootOpts {
 
     /// Number of events batched per source send and used as the base for source output buffer sizing
     /// (source output buffer capacity is this value multiplied by the number of worker threads)
-    #[arg(long, env = "VECTOR_CHUNK_SIZE")]
-    pub chunk_size: Option<NonZeroUsize>,
+    #[arg(long, env = "VECTOR_CHUNK_SIZE_EVENTS")]
+    pub chunk_size_events: Option<NonZeroUsize>,
 
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
     #[arg(short, long, action = ArgAction::Count)]
