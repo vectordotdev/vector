@@ -554,7 +554,7 @@ where
             );
     }
 
-    fn set_observed_occupancy(&self) {
+    pub(super) fn set_observed_occupancy(&self) {
         if self.occupancy_enabled {
             self.usage_handle
                 .set_occupancy(self.get_total_records(), self.get_total_buffer_size());

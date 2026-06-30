@@ -5,7 +5,9 @@ use tracing::Instrument;
 
 use crate::{
     test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::tests::{create_default_buffer_v2, set_file_length},
+    variants::disk_v2::tests::{
+        create_default_buffer_v2, create_default_buffer_v2_observed, set_file_length,
+    },
 };
 
 #[tokio::test]
@@ -85,6 +87,71 @@ async fn reader_doesnt_block_from_partial_write_on_last_record() {
     });
 
     let parent = trace_span!("reader_doesnt_block_from_partial_write_on_last_record");
+    fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn reopen_refreshes_observed_occupancy_after_seek() {
+    // On restart, `update_buffer_size` publishes the full on-disk size to the observer, then
+    // `seek_to_next_record` draws the tracked size back down to the unread tail by skipping
+    // already-acknowledged records. The observed occupancy must reflect that post-seek size, not
+    // the stale whole-file value, otherwise drain shaping treats a nearly drained buffer as
+    // saturated and throttles recovery unnecessarily.
+    let _a = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Write two records, acknowledge the first, and leave the second unacknowledged so the
+            // reopened buffer seeks back to it as an unread tail.
+            let (mut writer, mut reader, ledger, _usage) =
+                create_default_buffer_v2_observed::<_, SizedRecord>(data_dir.clone()).await;
+            writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("should not fail to write");
+            writer
+                .write_record(SizedRecord::new(68))
+                .await
+                .expect("should not fail to write");
+            writer.flush().await.expect("flush should not fail");
+            writer.close();
+
+            // Reading the second record pumps the first record's acknowledgement into the ledger.
+            // It is intentionally neither bound nor acknowledged: dropping it immediately keeps it
+            // from pinning the buffer past the reopen, while leaving it unacknowledged means the
+            // reopened reader must seek back to it as an unread tail on disk.
+            let first_read = reader
+                .next()
+                .await
+                .expect("should not fail to read record")
+                .expect("should contain first record");
+            acknowledge(first_read).await;
+            reader
+                .next()
+                .await
+                .expect("should not fail to read record")
+                .expect("should contain second record");
+            ledger.flush().expect("should not fail to flush ledger");
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            // Reopen: load publishes the full on-disk size, then the seek draws it back down to
+            // the unread tail and must refresh the observed occupancy to match.
+            let (_writer, _reader, ledger, usage) =
+                create_default_buffer_v2_observed::<_, SizedRecord>(data_dir).await;
+
+            assert_eq!(
+                usage.occupancy(),
+                (ledger.get_total_records(), ledger.get_total_buffer_size()),
+                "observed occupancy must match the post-seek buffer size, not the stale whole-file size"
+            );
+        }
+    });
+
+    let parent = trace_span!("reopen_refreshes_observed_occupancy_after_seek");
     fut.instrument(parent.or_current()).await;
 }
 
