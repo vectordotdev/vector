@@ -442,4 +442,83 @@ mod tests {
             HashSet::from_iter(["memory_table".into()])
         );
     }
+
+    #[test]
+    fn diff_enrichment_tables_tracks_source_key_renames() {
+        let old_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 10
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source_old"
+                  export_interval: 50
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let new_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 10
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source_new"
+                  export_interval: 50
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = EnrichmentTableDiff::new(
+            &old_config.enrichment_tables,
+            &new_config.enrichment_tables,
+            &Default::default(),
+        );
+
+        assert_eq!(
+            diff.tables.to_change,
+            HashSet::from_iter(["memory_table".into()])
+        );
+        assert!(diff.tables.to_add.is_empty());
+        assert!(diff.tables.to_remove.is_empty());
+
+        assert_eq!(
+            diff.sources.to_add,
+            HashSet::from_iter(["memory_table_source_new".into()])
+        );
+        assert_eq!(
+            diff.sources.to_remove,
+            HashSet::from_iter(["memory_table_source_old".into()])
+        );
+        assert!(diff.sources.to_change.is_empty());
+
+        assert_eq!(
+            diff.sinks.to_change,
+            HashSet::from_iter(["memory_table".into()])
+        );
+        assert!(diff.sinks.to_add.is_empty());
+        assert!(diff.sinks.to_remove.is_empty());
+    }
 }
