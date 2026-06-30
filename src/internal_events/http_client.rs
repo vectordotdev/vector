@@ -1,52 +1,138 @@
 use std::time::Duration;
 
 use http::{
-    Request, Response,
-    header::{self, HeaderMap, HeaderName, HeaderValue},
+    HeaderMap, Request, Response, Version,
+    header::{self, HeaderName, HeaderValue},
 };
-use hyper::{Error, body::HttpBody};
+use hyper::body::HttpBody;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
 };
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct AboutToSendHttpRequest<'a, T> {
-    pub request: &'a Request<T>,
-}
+// ── Telemetry traits ──────────────────────────────────────────────────────────
 
-fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> {
-    let mut headers = headers.clone();
-    let sensitive: &[HeaderName] = &[
-        header::AUTHORIZATION,
-        header::PROXY_AUTHORIZATION,
-        header::PROXY_AUTHENTICATE,
-        header::WWW_AUTHENTICATE,
-        header::COOKIE,
-        header::SET_COOKIE,
-        HeaderName::from_static("cookie2"),
-        HeaderName::from_static("dd-api-key"),
-        HeaderName::from_static("x-honeycomb-team"),
-        HeaderName::from_static("x-api-key"),
-        HeaderName::from_static("api-key"),
-    ];
-    for (name, value) in headers.iter_mut() {
-        if sensitive.contains(name) {
-            value.set_sensitive(true);
-        }
+/// Provides the data required to emit HTTP request telemetry.
+///
+/// `method`, `uri`, `sanitized_headers`, and `body_debug` are required; every
+/// transport must implement them.
+///
+/// `version` is optional (default: `None`) because some transports — notably
+/// the AWS SDK connector layer — do not expose HTTP version in their request
+/// type.
+pub trait HttpRequestTelemetry {
+    fn method(&self) -> &str;
+    fn uri(&self) -> String;
+    fn headers(&self) -> HeaderMap<HeaderValue>;
+    /// Returns the body size bounds as `(lower, upper)`.
+    fn body_size_hint(&self) -> (u64, Option<u64>);
+    /// Returns the HTTP version when the transport exposes it.
+    fn version(&self) -> Option<Version> {
+        None
     }
-    headers
+
+    /// Transport-specific headers that carry credential material.
+    ///
+    /// The names returned here are marked sensitive in addition to the
+    /// generic list (Authorization, cookies, API keys, …) that
+    /// [`HttpRequestTelemetry::sanitized_headers`] always applies. Override this — rather than
+    /// [`HttpRequestTelemetry::sanitized_headers`] — when a transport adds its own credential headers.
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &[]
+    }
+
+    /// Returns the headers with sensitive values redacted.
+    fn sanitized_headers(&self) -> HeaderMap<HeaderValue> {
+        remove_sensitive(self.headers(), self.extra_sensitive_headers())
+    }
 }
 
-impl<T: HttpBody> InternalEvent for AboutToSendHttpRequest<'_, T> {
+/// Provides the data required to emit HTTP response telemetry.
+///
+/// Same rationale as [`HttpRequestTelemetry`]: `version` is optional.
+pub trait HttpResponseTelemetry {
+    fn status_u16(&self) -> u16;
+    fn headers(&self) -> HeaderMap<HeaderValue>;
+    /// Returns the body size bounds as `(lower, upper)`.
+    fn body_size_hint(&self) -> (u64, Option<u64>);
+    /// Returns the HTTP version when the transport exposes it.
+    fn version(&self) -> Option<Version> {
+        None
+    }
+
+    /// Transport-specific headers that carry credential material.
+    ///
+    /// See [`HttpRequestTelemetry::extra_sensitive_headers`] for details.
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &[]
+    }
+
+    /// Returns the headers with sensitive values redacted.
+    fn sanitized_headers(&self) -> HeaderMap<HeaderValue> {
+        remove_sensitive(self.headers(), self.extra_sensitive_headers())
+    }
+}
+
+// ── Implementations for the hyper HTTP types (full data) ──────────────────────
+
+impl<T: HttpBody> HttpRequestTelemetry for Request<T> {
+    fn method(&self) -> &str {
+        self.method().as_str()
+    }
+
+    fn uri(&self) -> String {
+        self.uri().to_string()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        self.headers().clone()
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = self.body().size_hint();
+        (hint.lower(), hint.upper())
+    }
+
+    fn version(&self) -> Option<Version> {
+        Some(self.version())
+    }
+}
+
+impl<T: HttpBody> HttpResponseTelemetry for Response<T> {
+    fn status_u16(&self) -> u16 {
+        self.status().as_u16()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        self.headers().clone()
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = self.body().size_hint();
+        (hint.lower(), hint.upper())
+    }
+
+    fn version(&self) -> Option<Version> {
+        Some(self.version())
+    }
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct AboutToSendHttpRequest<'a, T: HttpRequestTelemetry> {
+    pub request: &'a T,
+}
+
+impl<T: HttpRequestTelemetry> InternalEvent for AboutToSendHttpRequest<'_, T> {
     fn emit(self) {
         debug!(
             message = "Sending HTTP request.",
             uri = %self.request.uri(),
             method = %self.request.method(),
             version = ?self.request.version(),
-            headers = ?remove_sensitive(self.request.headers()),
-            body = %FormatBody(self.request.body()),
+            headers = ?self.request.sanitized_headers(),
+            body = %FormatBodySizeHint::from(self.request.body_size_hint()),
         );
         counter!(CounterName::HttpClientRequestsSentTotal, "method" => self.request.method().to_string())
             .increment(1);
@@ -54,37 +140,34 @@ impl<T: HttpBody> InternalEvent for AboutToSendHttpRequest<'_, T> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct GotHttpResponse<'a, T> {
-    pub response: &'a Response<T>,
+pub struct GotHttpResponse<'a, T: HttpResponseTelemetry> {
+    pub response: &'a T,
     pub roundtrip: Duration,
 }
 
-impl<T: HttpBody> InternalEvent for GotHttpResponse<'_, T> {
+impl<T: HttpResponseTelemetry> InternalEvent for GotHttpResponse<'_, T> {
     fn emit(self) {
+        let status = self.response.status_u16();
+        let status_str = status.to_string();
         debug!(
             message = "HTTP response.",
-            status = %self.response.status(),
+            status = %status,
             version = ?self.response.version(),
-            headers = ?remove_sensitive(self.response.headers()),
-            body = %FormatBody(self.response.body()),
+            headers = ?self.response.sanitized_headers(),
+            body = %FormatBodySizeHint::from(self.response.body_size_hint()),
+
         );
-        counter!(
-            CounterName::HttpClientResponsesTotal,
-            "status" => self.response.status().as_u16().to_string(),
-        )
-        .increment(1);
+        counter!(CounterName::HttpClientResponsesTotal, "status" => status_str.clone())
+            .increment(1);
         histogram!(HistogramName::HttpClientRttSeconds).record(self.roundtrip);
-        histogram!(
-            HistogramName::HttpClientResponseRttSeconds,
-            "status" => self.response.status().as_u16().to_string(),
-        )
-        .record(self.roundtrip);
+        histogram!(HistogramName::HttpClientResponseRttSeconds, "status" => status_str)
+            .record(self.roundtrip);
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct GotHttpWarning<'a> {
-    pub error: &'a Error,
+    pub error: &'a dyn std::error::Error,
     pub roundtrip: Duration,
 }
 
@@ -104,13 +187,45 @@ impl InternalEvent for GotHttpWarning<'_> {
     }
 }
 
-/// Newtype placeholder to provide a formatter for the request and response body.
-struct FormatBody<'a, B>(&'a B);
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-impl<B: HttpBody> std::fmt::Display for FormatBody<'_, B> {
+fn remove_sensitive(
+    mut headers: HeaderMap<HeaderValue>,
+    extra: &'static [HeaderName],
+) -> HeaderMap<HeaderValue> {
+    let sensitive: &[HeaderName] = &[
+        header::AUTHORIZATION,
+        header::PROXY_AUTHORIZATION,
+        header::PROXY_AUTHENTICATE,
+        header::WWW_AUTHENTICATE,
+        header::COOKIE,
+        header::SET_COOKIE,
+        HeaderName::from_static("cookie2"),
+        HeaderName::from_static("dd-api-key"),
+        HeaderName::from_static("x-honeycomb-team"),
+        HeaderName::from_static("x-api-key"),
+        HeaderName::from_static("api-key"),
+    ];
+    for (name, value) in headers.iter_mut() {
+        if sensitive.contains(name) || extra.contains(name) {
+            value.set_sensitive(true);
+        }
+    }
+    headers
+}
+
+/// Formats a body size hint `(lower, upper)` for debug logging.
+struct FormatBodySizeHint(u64, Option<u64>);
+
+impl From<(u64, Option<u64>)> for FormatBodySizeHint {
+    fn from((lower, upper): (u64, Option<u64>)) -> Self {
+        FormatBodySizeHint(lower, upper)
+    }
+}
+
+impl std::fmt::Display for FormatBodySizeHint {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let size = self.0.size_hint();
-        match (size.lower(), size.upper()) {
+        match (self.0, self.1) {
             (0, None) => write!(fmt, "[unknown]"),
             (lower, None) => write!(fmt, "[>={lower} bytes]"),
 
@@ -143,7 +258,7 @@ mod tests {
             header::AUTHORIZATION,
             HeaderValue::from_static("Bearer token"),
         );
-        let result = remove_sensitive(&headers);
+        let result = remove_sensitive(headers, &[]);
         assert!(
             is_sensitive(&result, &header::AUTHORIZATION)
                 .iter()
@@ -159,7 +274,7 @@ mod tests {
         headers.append(x_api_key.clone(), HeaderValue::from_static("key-two"));
         headers.append(x_api_key.clone(), HeaderValue::from_static("key-three"));
 
-        let result = remove_sensitive(&headers);
+        let result = remove_sensitive(headers, &[]);
         let sensitive_flags = is_sensitive(&result, &x_api_key);
         assert_eq!(sensitive_flags.len(), 3);
         assert!(
@@ -176,10 +291,20 @@ mod tests {
             HeaderName::from_static("x-api-key"),
             HeaderValue::from_static("secret"),
         );
-        let result = remove_sensitive(&headers);
+        let result = remove_sensitive(headers, &[]);
         // Lookup with the mixed-case form resolves to the same normalized name.
         let mixed_case = HeaderName::from_bytes(b"X-Api-Key").unwrap();
         assert!(is_sensitive(&result, &mixed_case).iter().all(|&s| s));
+    }
+
+    #[test]
+    fn extra_headers_are_marked_sensitive() {
+        static EXTRA: [HeaderName; 1] = [HeaderName::from_static("x-custom-secret")];
+        let custom = HeaderName::from_static("x-custom-secret");
+        let mut headers = HeaderMap::new();
+        headers.insert(custom.clone(), HeaderValue::from_static("s3cr3t"));
+        let result = remove_sensitive(headers, &EXTRA);
+        assert!(is_sensitive(&result, &custom).iter().all(|&s| s));
     }
 
     #[test]
@@ -189,7 +314,7 @@ mod tests {
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/json"),
         );
-        let result = remove_sensitive(&headers);
+        let result = remove_sensitive(headers, &[]);
         assert!(
             is_sensitive(&result, &header::CONTENT_TYPE)
                 .iter()
