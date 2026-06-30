@@ -13,7 +13,7 @@ use anyhow::{Context as _, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 
-use crate::utils::{self, platform};
+use crate::utils;
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -83,7 +83,6 @@ pub trait CommandExt {
     fn run(&mut self) -> Result<ExitStatus>;
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()>;
     fn pre_exec(&self);
-    fn features(&mut self, features: &[String]) -> &mut Self;
 }
 
 impl CommandExt for Command {
@@ -176,17 +175,6 @@ impl CommandExt for Command {
             }
         }
     }
-
-    fn features(&mut self, features: &[String]) -> &mut Self {
-        self.arg("--no-default-features");
-        self.arg("--features");
-        if features.is_empty() {
-            self.arg(platform::default_features());
-        } else {
-            self.arg(features.join(","));
-        }
-        self
-    }
 }
 
 /// Helper function to build an error message from command output
@@ -207,14 +195,15 @@ fn format_command_error(
     }
 
     if let Some(description) = command_description {
-        let _ = writeln!(error_msg, "{description}");
+        writeln!(error_msg, "{description}").ok();
     }
 
-    let _ = write!(
+    write!(
         error_msg,
         "failed with exit code: {}",
         output.status.code().unwrap()
-    );
+    )
+    .ok();
 
     error_msg
 }

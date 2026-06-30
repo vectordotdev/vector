@@ -1,0 +1,91 @@
+{{ define "title" }}
+{{ .Title }} | Vector documentation
+{{ end }}
+
+{{ define "main" }}
+{{ $pending := sort site.Data.deprecations.deprecations_pending "deprecated_since" "desc" }}
+{{ $enacted := sort site.Data.deprecations.deprecations_enacted "deprecated_since" "desc" }}
+{{ $latest := index site.Data.docs.versions 0 }}
+
+<div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
+  <main aria-label="Deprecations" class="lg:col-span-4 md:px-0 pb-32">
+    <div class="mb-4 md:mb-6">
+      {{ partial "breadcrumb.html" . }}
+    </div>
+
+    <div class="pb-1 md:pb-2 lg:pb-3">
+      {{ partial "hero.html" . }}
+    </div>
+
+    <div id="page-content" class="mt-10">
+      {{ if gt (len $pending) 0 }}
+      <div>
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "Active Deprecations" "level" 2) }}
+          <p>The current Vector release is <strong>v{{ $latest }}</strong>. Deprecated configuration and features are retained for at least one minor release before they are eligible for removal.</p>
+        </div>
+
+        <div class="mt-6 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+          {{ range $pending }}
+          <div class="py-6 first:pt-0">
+            <span class="text-xl font-semibold text-dark dark:text-gray-300">
+              {{ .what | markdownify }}
+            </span>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Deprecated since {{ .deprecated_since }}
+            </div>
+            {{ with .description }}
+            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+              {{ . | markdownify }}
+            </div>
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ if gt (len $enacted) 0 }}
+      <div class="mt-12">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "Past Deprecations" "level" 2) }}
+          <p>These features have been removed from Vector since version 0.57.0, when the new deprecation system was introduced.</p>
+        </div>
+
+        <div class="mt-6 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+          {{ range $enacted }}
+          <div class="py-6 first:pt-0 opacity-75">
+            <span class="text-xl font-semibold text-dark dark:text-gray-300">
+              {{ .what | markdownify }}
+            </span>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
+            </div>
+            {{ with .description }}
+            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+              {{ . | markdownify }}
+            </div>
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ if and (eq (len $pending) 0) (eq (len $enacted) 0) }}
+      <p class="text-gray-500 dark:text-gray-400">No deprecations at this time.</p>
+      {{ end }}
+    </div>
+  </main>
+
+  <div class="hidden lg:block xl:col-span-1">
+    <aside aria-label="Table of contents" class="sticky top-6">
+      {{ partial "toc.html" . }}
+    </aside>
+  </div>
+</div>
+{{ end }}
+
+{{ define "subfooter" }}
+{{ partial "docs/mobile-nav.html" . }}
+{{ end }}

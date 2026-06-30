@@ -97,6 +97,12 @@ in the running system may also use this file and unintentionally switch to the l
 
 ### FIPS provider example
 
+{{< warning >}}
+Using the OpenSSL FIPS provider restricts TLS to FIPS-approved algorithms, but **does not make Vector
+fully FIPS-compliant**. See [issue #8435](https://github.com/vectordotdev/vector/issues/8435)
+for the current status of FIPS support in Vector.
+{{< /warning >}}
+
 To use the _FIPS_ provider in Vector, the [OpenSSL FIPS module][openssl-fips-module] must be installed
 and [configured][openssl-fips-module]. This is beyond the scope of this document, however
 [instructions][openssl-fips] can be found in the OpenSSL repository.

@@ -169,15 +169,13 @@ mod tests {
         let (_guard, in_addr) = next_addr();
 
         let config = match compression {
-            Some(c) => format!(
-                r#"
-                    address = "http://{in_addr}/"
-                    compression = "{c}"
-                "#
-            ),
-            None => format!(r#"address = "http://{in_addr}/""#),
+            Some(c) => indoc::formatdoc! {r#"
+                address: "http://{in_addr}/"
+                compression: "{c}"
+            "#},
+            None => format!("address: \"http://{in_addr}/\"\n"),
         };
-        let config: VectorConfig = toml::from_str(&config).unwrap();
+        let config: VectorConfig = serde_yaml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
 
@@ -835,8 +833,8 @@ mod tests {
 
         let (_guard, in_addr) = next_addr();
 
-        let config = format!(r#"address = "http://{in_addr}/""#);
-        let config: VectorConfig = toml::from_str(&config).unwrap();
+        let config = format!("address: \"http://{in_addr}/\"");
+        let config: VectorConfig = serde_yaml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
 

@@ -165,10 +165,10 @@ jobs:
           protoc: true
           libsasl2: true
       - name: Install cross-compilation tools
-        run: sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
+        run: timeout 30m sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
       - name: Install rpm
         if: endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf'
-        run: sudo apt-get install -y rpm
+        run: timeout 30m sudo apt-get install -y rpm
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
@@ -253,7 +253,7 @@ jobs:
       - name: Build Vector
         shell: bash
         run: |
-          export FEATURES="default-msvc"
+          export FEATURES="default"
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
           export RUST_LTO=""
@@ -298,8 +298,8 @@ jobs:
       image: ${{ matrix.container }}
     steps:
       - run: |
-          apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
-          apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y \
+          timeout 30m apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+          timeout 30m apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y \
           ca-certificates \
           curl \
           git \
