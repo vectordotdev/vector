@@ -120,6 +120,23 @@ impl Default for LedgerState {
     }
 }
 
+/// Compute a reader file ID that is `offset` files ahead of `current`,
+/// wrapping around at `MAX_FILE_ID`.
+fn offset_file_id(current: u16, offset: u16) -> u16 {
+    offset_file_id_with_max(current, offset, MAX_FILE_ID)
+}
+
+/// Wrapping file-id arithmetic, parameterized by the wrap-around value.
+///
+/// Uses `u32` arithmetic so the addition doesn't wrap in `u16` before the
+/// modulo is applied. With `max == u16::MAX`, an expression like
+/// `65534u16.wrapping_add(2) % max` would wrap to `0` and yield `0` instead of
+/// the correct `1`. See issue #25440.
+fn offset_file_id_with_max(current: u16, offset: u16, max: u16) -> u16 {
+    let next = (u32::from(current) + u32::from(offset)) % u32::from(max);
+    u16::try_from(next).expect("value modulo max always fits in u16")
+}
+
 impl ArchivedLedgerState {
     fn get_current_writer_file_id(&self) -> u16 {
         self.writer_current_data_file.load(Ordering::Acquire)
@@ -152,7 +169,7 @@ impl ArchivedLedgerState {
     }
 
     fn get_offset_reader_file_id(&self, offset: u16) -> u16 {
-        self.get_current_reader_file_id().wrapping_add(offset) % MAX_FILE_ID
+        offset_file_id(self.get_current_reader_file_id(), offset)
     }
 
     fn increment_reader_file_id(&self) -> u16 {
@@ -770,5 +787,43 @@ where
             .field("writer_done", &self.writer_done.load(Ordering::Acquire))
             .field("last_flush", &self.last_flush.load())
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{offset_file_id, offset_file_id_with_max};
+    use crate::variants::disk_v2::common::MAX_FILE_ID;
+
+    #[test]
+    fn offset_file_id_wraps_at_max() {
+        // No wrap.
+        assert_eq!(offset_file_id(0, 0), 0);
+        assert_eq!(offset_file_id(0, 1), 1);
+        assert_eq!(offset_file_id(1, 2), 3);
+
+        // Wrap around `MAX_FILE_ID`.
+        let max = MAX_FILE_ID;
+        assert_eq!(offset_file_id(max - 1, 1), 0);
+        assert_eq!(offset_file_id(max - 1, 2), 1);
+        assert_eq!(offset_file_id(max - 2, 3), 1);
+    }
+
+    #[test]
+    fn offset_file_id_does_not_wrap_u16_before_modulo() {
+        // Regression for #25440: the previous implementation computed
+        // `current.wrapping_add(offset) % max` in `u16`, so when
+        // `current + offset` exceeded `u16::MAX` the value wrapped *before* the
+        // modulo, collapsing distinct offsets to the same id. This is only
+        // reachable when `max == u16::MAX` (the production value), so exercise
+        // that here regardless of the test-only `MAX_FILE_ID`.
+        let max = u16::MAX;
+
+        // With the old code: 65534.wrapping_add(1) % 65535 == 0 (correct), but
+        // 65534.wrapping_add(2) % 65535 == 0 (wrong, should be 1).
+        assert_eq!(offset_file_id_with_max(65534, 1, max), 0);
+        assert_eq!(offset_file_id_with_max(65534, 2, max), 1);
+        assert_eq!(offset_file_id_with_max(65534, 3, max), 2);
+        assert_eq!(offset_file_id_with_max(65533, 5, max), 3);
     }
 }
