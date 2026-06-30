@@ -19,7 +19,7 @@ else
     export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DNSTAP_BENCHES := dnstap-benches
 endif
-export FEATURES ?= default
+export FEATURES ?=
 
 # When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
 # coverage data. Run `make coverage-report` afterwards to emit the lcov file.
@@ -89,7 +89,7 @@ help:
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode
-	cargo build --release --no-default-features --features ${FEATURES}
+	cargo build --release $(if $(FEATURES),--no-default-features --features "$(FEATURES)")
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -245,11 +245,11 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${TEST_RUNNER} --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	${TEST_RUNNER} --workspace --no-fail-fast $(if $(FEATURES),--no-default-features --features "$(FEATURES)") ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
-	cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	cargo test --doc --workspace --no-fail-fast $(if $(FEATURES),--no-default-features --features "$(FEATURES)") ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.
