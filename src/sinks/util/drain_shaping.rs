@@ -373,7 +373,19 @@ fn update_estimator(
         }
     } else if fill_ratio >= config.saturation_high_mark {
         *state.frozen = true;
-        *state.freeze_anchor = recent_window_max(state.recent, *state.input_ewma);
+        // With no pre-saturation history (e.g. restart on top of an already-full
+        // buffer) `recent` is empty and `input_ewma` is still 0, so anchoring on those
+        // alone collapses the cap to `min_drain_bytes_per_sec` and discards the rate we
+        // just measured. Seed with that rate only in this case. During a normal
+        // saturation `recent` already holds pre-saturation samples and deliberately
+        // excludes the inflated, drain-coupled current sample, which we keep doing to
+        // avoid runaway.
+        let seed = if state.recent.is_empty() {
+            (*state.input_ewma).max(rate)
+        } else {
+            *state.input_ewma
+        };
+        *state.freeze_anchor = recent_window_max(state.recent, seed);
     }
 
     if *state.frozen {
@@ -482,6 +494,7 @@ fn time_until_emittable(
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::VecDeque,
         sync::{
             Arc,
             atomic::{AtomicU64, Ordering::Relaxed},
@@ -494,7 +507,10 @@ mod tests {
     use tokio::time::{self, Instant};
     use vector_lib::buffers::BufferUsageObserver;
 
-    use super::{BufferUsageSource, DrainShapingConfig, DrainShapingExt};
+    use super::{
+        BufferUsageSource, DrainShapingConfig, DrainShapingExt, EstimatorState, effective_rate,
+        update_estimator,
+    };
 
     #[derive(Debug)]
     struct TestBufferUsageSource {
@@ -832,5 +848,53 @@ mod tests {
         assert_eq!(futures::poll!(&mut eighth), Poll::Pending);
         time::advance(Duration::from_millis(1)).await;
         assert_eq!(futures::poll!(&mut eighth), Poll::Ready(Some(100)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn freeze_anchor_uses_measured_rate_when_history_empty() {
+        // Restart with an already-saturated disk buffer: no pre-saturation recent
+        // history and `input_ewma` still 0. The first sample both measures the input
+        // rate and trips the freeze on the same call. The frozen anchor must reflect
+        // that just-measured rate; collapsing to 0 would throttle recovery down to
+        // `min_drain_bytes_per_sec` until the buffer fell below the low mark.
+        let source = TestBufferUsageSource::new(1_000);
+        source.set_occupancy_bytes(950); // >= saturation_high_mark from the start
+        source.set_received_bytes(10_000);
+
+        let config = DrainShapingConfig {
+            factor: 2.0,
+            ..stream_enabled_config()
+        };
+
+        let start = Instant::now();
+        let mut last_received_bytes = 0;
+        let mut last_sample = start;
+        let mut input_ewma = 0.0;
+        let mut frozen = false;
+        let mut freeze_anchor = 0.0;
+        let mut recent = VecDeque::new();
+
+        time::advance(Duration::from_secs(1)).await;
+        let source_dyn = shaped_source(&source);
+        update_estimator(
+            config,
+            &*source_dyn,
+            EstimatorState {
+                last_received_bytes: &mut last_received_bytes,
+                last_sample: &mut last_sample,
+                input_ewma: &mut input_ewma,
+                frozen: &mut frozen,
+                freeze_anchor: &mut freeze_anchor,
+                recent: &mut recent,
+            },
+            Instant::now(),
+        );
+
+        assert!(frozen);
+        assert_eq!(freeze_anchor, 10_000.0);
+        assert_eq!(
+            effective_rate(config, input_ewma, frozen, freeze_anchor),
+            20_000.0,
+        );
     }
 }
