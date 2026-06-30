@@ -35,8 +35,8 @@ pub trait HttpRequestTelemetry {
     ///
     /// The names returned here are marked sensitive in addition to the
     /// generic list (Authorization, cookies, API keys, …) that
-    /// [`sanitized_headers`] always applies. Override this — rather than
-    /// [`sanitized_headers`] — when a transport adds its own credential headers.
+    /// [`HttpRequestTelemetry::sanitized_headers`] always applies. Override this — rather than
+    /// [`HttpRequestTelemetry::sanitized_headers`] — when a transport adds its own credential headers.
     fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
         &[]
     }
