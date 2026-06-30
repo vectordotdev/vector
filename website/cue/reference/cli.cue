@@ -127,6 +127,13 @@ cli: {
 		}
 	}
 
+	_core_flags: {
+		"dangerously-allow-env-var-interpolation": {
+			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
+			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
+		}
+	}
+
 	_core_config_options: {
 		"config": {
 			_short:      "c"
@@ -229,6 +236,7 @@ cli: {
 
 			example: "vector graph --config /etc/vector/vector.yaml | dot -Tsvg > graph.svg"
 
+			flags:   _default_flags & _core_flags
 			options: _core_options
 		}
 		"generate": {
@@ -286,6 +294,7 @@ cli: {
 				out the [unit testing documentation](\(urls.vector_unit_tests)).
 				"""
 
+			flags: _default_flags & _core_flags
 			options: {
 				"config-toml": {
 					description: env_vars.VECTOR_CONFIG_TOML.description
@@ -456,7 +465,7 @@ cli: {
 					_short:      "d"
 					description: "Fail validation on warnings"
 				}
-			}
+			} & _core_flags
 
 			options: {
 				"config-yaml": {
