@@ -279,7 +279,20 @@ where
                 now,
             );
 
-            if source.occupancy().1 < this.config.engage_min_bytes {
+            // Base the engagement decision on the backlog when the batch was formed, not after
+            // `inner.poll_next` already pulled it out of the buffer. A single large or final batch
+            // can drop the observed occupancy below `engage_min_bytes` as it is read, and that
+            // batch must still be paced rather than bypassed, so add the pending batch back.
+            let pending_bytes = this
+                .pending
+                .as_ref()
+                .map_or(0, |item| (this.size_of)(item) as u64);
+            if source
+                .occupancy()
+                .1
+                .saturating_add(pending_bytes)
+                < this.config.engage_min_bytes
+            {
                 return Poll::Ready(this.pending.take());
             }
 
@@ -778,7 +791,9 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn engage_passthrough_below_threshold() {
         let source = TestBufferUsageSource::new(10_000);
-        source.set_occupancy_bytes(999);
+        // Occupancy plus the pending batch (400 + 500) stays below engage_min_bytes, so pacing
+        // does not engage and both items pass through without delay.
+        source.set_occupancy_bytes(400);
         let config = DrainShapingConfig {
             engage_min_bytes: 1_000,
             ..stream_enabled_config()
@@ -896,5 +911,30 @@ mod tests {
             effective_rate(config, input_ewma, frozen, freeze_anchor),
             20_000.0,
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn engages_when_drained_batch_was_backlogged() {
+        // `inner.poll_next` pulls the batch out of the buffer before the engagement check runs, so
+        // a large or final batch can leave the observed occupancy at 0 even though the backlog was
+        // present when the request was formed. Adding the pending batch back keeps it paced.
+        let source = TestBufferUsageSource::new(10_000);
+        source.set_occupancy_bytes(0);
+        let config = DrainShapingConfig {
+            engage_min_bytes: 1_000,
+            ..stream_enabled_config()
+        };
+        let mut shaped = Box::pin(stream::iter([5_000, 5_000]).drain_shaping(
+            Some(shaped_source(&source)),
+            config,
+            |item| *item as usize,
+        ));
+
+        // First batch: occupancy(0) + pending(5_000) >= engage_min_bytes, so pacing engages. With
+        // burst 0 it still emits once on debt but exhausts the byte budget.
+        assert_eq!(shaped.next().await, Some(5_000));
+        // The second batch must wait rather than bypass, since the backlog was paced.
+        let mut second = shaped.next();
+        assert_eq!(futures::poll!(&mut second), Poll::Pending);
     }
 }
