@@ -13,8 +13,11 @@ pub struct Cli {
     #[arg(long, default_value_t = true)]
     clippy: bool,
 
-    #[arg(value_name = "FEATURE")]
+    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
     features: Vec<String>,
+
+    #[arg(long)]
+    no_default_features: bool,
 
     #[arg(long)]
     fix: bool,
@@ -36,14 +39,25 @@ impl Cli {
             Vec::default()
         };
 
-        let feature_args = if self.features.is_empty() {
-            vec!["--all-features".to_string()]
+        let features: Vec<&str> = self
+            .features
+            .iter()
+            .map(String::as_str)
+            .filter(|f| !f.is_empty())
+            .collect();
+
+        let feature_args: Vec<String> = if self.no_default_features || !features.is_empty() {
+            let mut args = Vec::new();
+            if self.no_default_features {
+                args.push("--no-default-features".to_string());
+            }
+            if !features.is_empty() {
+                args.push("--features".to_string());
+                args.push(features.join(","));
+            }
+            args
         } else {
-            vec![
-                "--no-default-features".to_string(),
-                "--features".to_string(),
-                self.features.join(",").clone(),
-            ]
+            vec!["--all-features".to_string()]
         };
 
         [tool.as_ref(), "--workspace", "--all-targets"]
