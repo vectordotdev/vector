@@ -5,10 +5,15 @@ use serde_json::{Map, Value, json};
 
 fn enum_variant_value(ctx: &SchemaContext, schema: &Value) -> Value {
     let desc = ctx.get_rendered_description_from_schema(schema);
+    // Check both the top-level `deprecated` flag (#[configurable(deprecated)]) and the
+    // metadata form (#[configurable(metadata(deprecated))]).
     let deprecated = schema
         .get("deprecated")
         .and_then(Value::as_bool)
-        .unwrap_or(false);
+        .unwrap_or(false)
+        || get_schema_metadata(schema, "deprecated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
 
     if deprecated {
         let mut obj = Map::new();
