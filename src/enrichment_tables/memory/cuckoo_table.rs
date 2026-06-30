@@ -224,13 +224,13 @@ impl CuckooMemoryTable {
                         }
                     };
 
-                if persisted_config != built_config {
+                if !built_config.compatible_layout(persisted_config) {
                     return Err(
-                        format!("Stored cuckoo filter configuration doesn't match with new configuration. If this is intended, remove the persisted state file ({}).", path.to_str().unwrap_or("")).into(),
+                        format!("Stored cuckoo filter configuration is not compatible with new configuration. Only changes to values that don't affect layout or size are allowed. If this is intended, remove the persisted state file ({}).", path.to_str().unwrap_or("")).into(),
                     );
                 }
 
-                match CuckooFilter::import_state(hasher, persisted_config, &mut reader) {
+                match CuckooFilter::import_state(hasher, built_config, &mut reader) {
                     Ok(filter) => filter,
                     Err(error) => {
                         return Err(
