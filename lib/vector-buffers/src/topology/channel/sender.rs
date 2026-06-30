@@ -138,6 +138,7 @@ pub struct BufferSender<T: Bufferable> {
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     usage_instrumentation: Option<BufferUsageHandle>,
+    observer: Option<BufferUsageHandle>,
     #[derivative(Debug = "ignore")]
     send_duration: Option<Registered<BufferSendDuration>>,
     #[derivative(Debug = "ignore")]
@@ -152,6 +153,7 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: None,
             when_full,
             usage_instrumentation: None,
+            observer: None,
             send_duration: None,
             custom_instrumentation: None,
         }
@@ -164,6 +166,7 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: Some(Box::new(overflow)),
             when_full: WhenFull::Overflow,
             usage_instrumentation: None,
+            observer: None,
             send_duration: None,
             custom_instrumentation: None,
         }
@@ -182,6 +185,11 @@ impl<T: Bufferable> BufferSender<T> {
     /// Configures this sender to instrument the items passing through it.
     pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.usage_instrumentation = Some(handle);
+    }
+
+    /// Configures this sender to update the read-only usage observer.
+    pub fn with_observer(&mut self, handle: BufferUsageHandle) {
+        self.observer = Some(handle);
     }
 
     /// Configures this sender to instrument the send duration.
@@ -219,6 +227,7 @@ impl<T: Bufferable> BufferSender<T> {
         let item_sizing = self
             .usage_instrumentation
             .as_ref()
+            .or(self.observer.as_ref())
             .map(|_| (item.event_count(), item.size_of()));
 
         let mut was_dropped = false;
@@ -228,6 +237,11 @@ impl<T: Bufferable> BufferSender<T> {
         {
             instrumentation
                 .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64);
+        }
+        if let Some(observer) = self.observer.as_ref()
+            && let Some((item_count, item_size)) = item_sizing
+        {
+            observer.increment_observer_received(item_count as u64, item_size as u64);
         }
         match self.when_full {
             WhenFull::Block => self.base.send(item).await?,

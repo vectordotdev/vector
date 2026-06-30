@@ -970,6 +970,12 @@ where
 
         self.ready_to_read = true;
 
+        // `update_buffer_size` published the full on-disk size to the observer before
+        // this seek ran; the seek above drew the tracked buffer size back down to the
+        // unread tail by deleting or reading already-acknowledged records, so refresh
+        // the observed occupancy to match instead of leaving the stale startup value.
+        self.ledger.set_observed_occupancy();
+
         Ok(())
     }
 

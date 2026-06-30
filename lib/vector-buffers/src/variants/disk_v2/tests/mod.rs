@@ -206,7 +206,7 @@ where
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
-    Buffer::from_config_inner(config, usage_handle)
+    Buffer::from_config_inner(config, usage_handle, false)
         .await
         .expect("should not fail to create buffer")
 }
@@ -228,7 +228,31 @@ where
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
-    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone(), false)
+        .await
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger, usage_handle)
+}
+
+/// Creates a disk v2 buffer in observe mode, returning the buffer usage handle so tests can read
+/// the occupancy published to observer consumers (drain shaping).
+pub(crate) async fn create_default_buffer_v2_observed<P, R>(
+    data_dir: P,
+) -> (
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
+    Arc<Ledger<FilesystemUnderTest>>,
+    BufferUsageHandle,
+)
+where
+    P: AsRef<Path>,
+    R: Bufferable,
+{
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .build()
+        .expect("creating buffer should not fail");
+    let usage_handle = BufferUsageHandle::noop();
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone(), true)
         .await
         .expect("should not fail to create buffer");
     (writer, reader, ledger, usage_handle)
@@ -278,7 +302,7 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    Buffer::from_config_inner(config, usage_handle, false)
         .await
         .expect("should not fail to create buffer")
 }
@@ -302,7 +326,7 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    Buffer::from_config_inner(config, usage_handle, false)
         .await
         .expect("should not fail to create buffer")
 }
@@ -331,7 +355,7 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    Buffer::from_config_inner(config, usage_handle, false)
         .await
         .expect("should not fail to create buffer")
 }
@@ -355,7 +379,7 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    Buffer::from_config_inner(config, usage_handle, false)
         .await
         .expect("should not fail to create buffer")
 }

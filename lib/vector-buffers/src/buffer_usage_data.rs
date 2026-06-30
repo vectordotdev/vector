@@ -180,6 +180,28 @@ impl BufferUsageHandle {
         }
     }
 
+    /// Increments the number of externally received events for observer consumers.
+    pub fn increment_observer_received(&self, count: u64, byte_size: u64) {
+        self.state.observer_received.increment(count, byte_size);
+    }
+
+    /// Gets the cumulative number of externally received events for observer consumers.
+    pub fn observer_received(&self) -> (u64, u64) {
+        let snapshot = self.state.observer_received.get();
+        (snapshot.event_count, snapshot.event_byte_size)
+    }
+
+    /// Sets the current occupancy for observer consumers.
+    pub fn set_occupancy(&self, count: u64, byte_size: u64) {
+        self.state.occupancy.set(count, byte_size);
+    }
+
+    /// Gets the current occupancy for observer consumers.
+    pub fn occupancy(&self) -> (u64, u64) {
+        let snapshot = self.state.occupancy.get();
+        (snapshot.event_count, snapshot.event_byte_size)
+    }
+
     /// Increments the number of events (and their total size) sent by this buffer component.
     ///
     /// This represents the events being read out of the buffer.
@@ -214,6 +236,8 @@ struct BufferUsageData {
     dropped: CategoryMetrics,
     dropped_intentional: CategoryMetrics,
     max_size: CategoryMetrics,
+    observer_received: CategoryMetrics,
+    occupancy: CategoryMetrics,
 }
 
 impl BufferUsageData {
@@ -343,6 +367,50 @@ pub struct BufferUsageSnapshot {
     pub max_size_events: usize,
 }
 
+/// Read-only buffer usage view for rate-shaping consumers.
+#[derive(Clone, Debug)]
+pub struct BufferUsageObserver {
+    stages: Vec<Arc<BufferUsageData>>,
+}
+
+impl BufferUsageObserver {
+    fn sum<F>(&self, snapshot: F) -> (u64, u64)
+    where
+        F: Fn(&BufferUsageData) -> CategorySnapshot,
+    {
+        self.stages
+            .iter()
+            .fold((0, 0), |(event_count, byte_size), stage| {
+                let snapshot = snapshot(stage);
+                (
+                    event_count.saturating_add(snapshot.event_count),
+                    byte_size.saturating_add(snapshot.event_byte_size),
+                )
+            })
+    }
+
+    /// Gets the cumulative external ingress volume from the outermost stage.
+    pub fn received(&self) -> (u64, u64) {
+        self.stages
+            .iter()
+            .find(|stage| stage.idx == 0)
+            .map_or((0, 0), |stage| {
+                let snapshot = stage.observer_received.get();
+                (snapshot.event_count, snapshot.event_byte_size)
+            })
+    }
+
+    /// Gets the current occupancy across all stages.
+    pub fn occupancy(&self) -> (u64, u64) {
+        self.sum(|stage| stage.occupancy.get())
+    }
+
+    /// Gets the maximum configured size across all stages.
+    pub fn max_size(&self) -> (u64, u64) {
+        self.sum(|stage| stage.max_size.get())
+    }
+}
+
 /// Builder for tracking buffer usage metrics.
 ///
 /// While building a buffer topology, `BufferUsage` can be utilized to create metrics storage for each individual buffer
@@ -376,6 +444,13 @@ impl BufferUsage {
 
         self.stages.push(data);
         handle
+    }
+
+    /// Creates a read-only observer over the configured buffer stages.
+    pub fn observer(&self) -> BufferUsageObserver {
+        BufferUsageObserver {
+            stages: self.stages.clone(),
+        }
     }
 
     /// Installs a reporter for the configured stages which periodically reports buffer usage metrics.
@@ -415,6 +490,8 @@ impl BufferUsage {
 
 #[cfg(test)]
 mod tests {
+    use metrics_util::debugging::{DebugValue, DebuggingRecorder};
+
     use super::*;
 
     #[test]
@@ -504,5 +581,67 @@ mod tests {
         let current = metrics.current();
         assert_eq!(current.event_count, 10);
         assert_eq!(current.event_byte_size, 1000);
+    }
+
+    #[test]
+    fn report_emits_existing_received_metrics_without_observer_accounting() {
+        let data = BufferUsageData::new(0);
+        let mut metrics = ReporterCurrentMetrics::default();
+        let recorder = DebuggingRecorder::new();
+        let snapshotter = recorder.snapshotter();
+
+        data.received.increment(3, 300);
+        metrics::with_local_recorder(&recorder, || {
+            data.report(&mut metrics, "test");
+        });
+
+        let snapshot = snapshotter.snapshot().into_vec();
+        let received_events = snapshot.iter().find_map(|(key, _, _, value)| {
+            (key.key().name() == "buffer_received_events_total").then_some(value)
+        });
+        let received_bytes = snapshot.iter().find_map(|(key, _, _, value)| {
+            (key.key().name() == "buffer_received_bytes_total").then_some(value)
+        });
+
+        assert_eq!(received_events, Some(&DebugValue::Counter(3)));
+        assert_eq!(received_bytes, Some(&DebugValue::Counter(300)));
+        assert_eq!(data.observer_received.get().event_count, 0);
+        assert_eq!(data.observer_received.get().event_byte_size, 0);
+    }
+
+    #[test]
+    fn observer_received_accumulates_and_does_not_consume() {
+        let mut usage = BufferUsage::from_span(tracing::Span::none());
+        let handle = usage.add_stage(0);
+        handle.increment_observer_received(3, 300);
+        handle.increment_observer_received(2, 250);
+        assert_eq!(handle.observer_received(), (5, 550));
+        assert_eq!(handle.observer_received(), (5, 550));
+    }
+
+    #[test]
+    fn occupancy_reflects_last_set_value() {
+        let mut usage = BufferUsage::from_span(tracing::Span::none());
+        let handle = usage.add_stage(0);
+        handle.set_occupancy(10, 1000);
+        assert_eq!(handle.occupancy(), (10, 1000));
+        handle.set_occupancy(4, 400);
+        assert_eq!(handle.occupancy(), (4, 400));
+    }
+
+    #[test]
+    fn observer_received_is_ingress_only_occupancy_is_summed() {
+        let mut usage = BufferUsage::from_span(tracing::Span::none());
+        let ingress = usage.add_stage(0);
+        let overflow = usage.add_stage(1);
+        let observer = usage.observer();
+
+        ingress.increment_observer_received(2, 200);
+        overflow.increment_observer_received(9, 900);
+        ingress.set_occupancy(1, 100);
+        overflow.set_occupancy(2, 250);
+
+        assert_eq!(observer.received(), (2, 200));
+        assert_eq!(observer.occupancy(), (3, 350));
     }
 }

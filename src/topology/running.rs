@@ -12,7 +12,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_lib::{
-    buffers::topology::channel::BufferSender,
+    buffers::{BufferConfig, topology::channel::BufferSender},
     shutdown::ShutdownSignal,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
     trigger::DisabledTrigger,
@@ -567,17 +567,7 @@ impl RunningTopology {
                 if diff.components_to_reload.contains(key) {
                     return false;
                 }
-                self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
-                    self.config
-                        .enrichment_table(key)
-                        .and_then(|t| t.as_sink(key))
-                        .map(|(_, s)| s.buffer)
-                }) == new_config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
-                    self.config
-                        .enrichment_table(key)
-                        .and_then(|t| t.as_sink(key))
-                        .map(|(_, s)| s.buffer)
-                })
+                can_reuse_sink_buffer(&self.config, new_config, key)
             })
             .cloned()
             .collect::<HashSet<_>>();
@@ -700,12 +690,15 @@ impl RunningTopology {
                     // buffer) than it is to pass around info about which sinks are having their
                     // buffers reused and treat them differently at other stages.
                     let tx = buffer_tx.remove(key).unwrap();
-                    let rx = match buffer {
-                        TaskOutput::Sink(rx) => rx.into_inner(),
+                    let (rx, observer) = match buffer {
+                        TaskOutput::Sink(rx, observer) => (rx.into_inner(), observer),
                         _ => unreachable!(),
                     };
 
-                    buffers.insert((*key).clone(), (tx, Arc::new(Mutex::new(Some(rx)))));
+                    buffers.insert(
+                        (*key).clone(),
+                        (tx, Arc::new(Mutex::new(Some(rx))), observer),
+                    );
                 }
             }
         }
@@ -1412,6 +1405,27 @@ impl RunningTopology {
     }
 }
 
+fn sink_reuse_state(config: &Config, key: &ComponentKey) -> Option<(BufferConfig, bool)> {
+    config
+        .sink(key)
+        .map(|sink| {
+            (
+                sink.buffer.clone(),
+                sink.inner.requires_buffer_observation(),
+            )
+        })
+        .or_else(|| {
+            config
+                .enrichment_table(key)
+                .and_then(|table| table.as_sink(key))
+                .map(|(_, sink)| (sink.buffer, sink.inner.requires_buffer_observation()))
+        })
+}
+
+fn can_reuse_sink_buffer(old_config: &Config, new_config: &Config, key: &ComponentKey) -> bool {
+    sink_reuse_state(old_config, key) == sink_reuse_state(new_config, key)
+}
+
 fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
     let mut changed_outputs = Vec::new();
 
@@ -1434,4 +1448,46 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<O
     }
 
     changed_outputs
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroU64;
+
+    use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
+
+    use super::can_reuse_sink_buffer;
+    use crate::{
+        config::{ComponentKey, Config},
+        test_util::mock::{basic_sink, basic_source},
+    };
+
+    fn config_with_observation_mode(requires_buffer_observation: bool) -> Config {
+        let sink_key = ComponentKey::from("out");
+        let (_output, sink) = basic_sink(1);
+        let mut config_builder = Config::builder();
+        config_builder.add_source("in", basic_source().1);
+        config_builder.add_sink(
+            "out",
+            &["in"],
+            sink.with_buffer_observation(requires_buffer_observation),
+        );
+        config_builder.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+            max_size: NonZeroU64::new(300_000_000).unwrap(),
+            when_full: WhenFull::Block,
+        });
+        config_builder.build().unwrap()
+    }
+
+    #[test]
+    fn buffer_reuse_requires_same_observation_mode() {
+        let disabled = config_with_observation_mode(false);
+        let enabled = config_with_observation_mode(true);
+        let still_enabled = config_with_observation_mode(true);
+        let sink_key = ComponentKey::from("out");
+
+        assert!(!can_reuse_sink_buffer(&disabled, &enabled, &sink_key));
+        assert!(!can_reuse_sink_buffer(&enabled, &disabled, &sink_key));
+        assert!(can_reuse_sink_buffer(&enabled, &still_enabled, &sink_key));
+    }
 }

@@ -1,7 +1,15 @@
 //! Implementation of the `clickhouse` sink.
 
+use std::sync::Arc;
+
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::sinks::{
+    prelude::*,
+    util::{
+        drain_shaping::{BufferUsageSource, DrainShapingConfig, DrainShapingExt},
+        http::HttpRequest,
+    },
+};
 
 pub struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
@@ -10,6 +18,22 @@ pub struct ClickhouseSink<S> {
     table: Template,
     format: Format,
     request_builder: ClickhouseRequestBuilder,
+    source: Option<Arc<dyn BufferUsageSource>>,
+    drain_shaping: DrainShapingConfig,
+}
+
+pub(super) struct DrainShapingInputs {
+    source: Option<Arc<dyn BufferUsageSource>>,
+    config: DrainShapingConfig,
+}
+
+impl DrainShapingInputs {
+    pub(super) fn new(
+        source: Option<Arc<dyn BufferUsageSource>>,
+        config: DrainShapingConfig,
+    ) -> Self {
+        Self { source, config }
+    }
 }
 
 impl<S> ClickhouseSink<S>
@@ -19,13 +43,14 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub const fn new(
+    pub fn new(
         batch_settings: BatcherSettings,
         service: S,
         database: Template,
         table: Template,
         format: Format,
         request_builder: ClickhouseRequestBuilder,
+        drain_shaping: DrainShapingInputs,
     ) -> Self {
         Self {
             batch_settings,
@@ -34,11 +59,15 @@ where
             table,
             format,
             request_builder,
+            source: drain_shaping.source,
+            drain_shaping: drain_shaping.config,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let batch_settings = self.batch_settings;
+        let source = self.source;
+        let drain_shaping = self.drain_shaping;
 
         input
             .batched_partitioned(
@@ -47,6 +76,11 @@ where
                 |_| batch_settings.as_byte_size_config(),
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .drain_shaping(
+                source,
+                drain_shaping,
+                |(_, events): &(PartitionKey, Vec<Event>)| events.size_of(),
+            )
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -132,5 +166,67 @@ impl Partitioner for KeyPartitioner {
             table,
             format: self.format,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{num::NonZeroUsize, sync::Arc, time::Duration};
+
+    use super::*;
+    use crate::sinks::util::drain_shaping::{BufferUsageSource, DrainShapingConfig};
+
+    struct TestBufferUsageSource;
+
+    impl BufferUsageSource for TestBufferUsageSource {
+        fn received(&self) -> (u64, u64) {
+            (0, 0)
+        }
+
+        fn occupancy(&self) -> (u64, u64) {
+            (0, 0)
+        }
+
+        fn max_size(&self) -> (u64, u64) {
+            (0, 0)
+        }
+    }
+
+    #[test]
+    fn sink_stores_drain_shaping_source_and_config() {
+        let source: Arc<dyn BufferUsageSource> = Arc::new(TestBufferUsageSource);
+        let drain_shaping = DrainShapingConfig {
+            enabled: true,
+            min_drain_bytes_per_sec: 1,
+            ..Default::default()
+        };
+        let service = tower::service_fn(|_request: HttpRequest<PartitionKey>| async {
+            unreachable!("service is not called by this construction test")
+        });
+        let request_builder = ClickhouseRequestBuilder {
+            compression: Compression::None,
+            encoder: (
+                Transformer::default(),
+                vector_lib::codecs::EncoderKind::Framed(Box::default()),
+            ),
+        };
+
+        let sink = ClickhouseSink {
+            batch_settings: BatcherSettings::new(
+                Duration::from_secs(1),
+                NonZeroUsize::new(1).unwrap(),
+                NonZeroUsize::new(1).unwrap(),
+            ),
+            service,
+            database: "default".try_into().unwrap(),
+            table: "events".try_into().unwrap(),
+            format: Format::JsonEachRow,
+            request_builder,
+            source: Some(source),
+            drain_shaping,
+        };
+
+        assert!(sink.source.is_some());
+        assert!(sink.drain_shaping.enabled);
     }
 }

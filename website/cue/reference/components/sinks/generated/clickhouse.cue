@@ -334,6 +334,103 @@ generated: components: sinks: clickhouse: configuration: {
 		required:    false
 		type: bool: default: false
 	}
+	drain_shaping: {
+		description: """
+			Backlog-aware pacing for ClickHouse insert requests.
+
+			When enabled, Vector caps original request submission from a backed-up disk buffer to
+			reduce recovery floods. This requires static `database` and `table` values, and a disk
+			buffer with `when_full` set to `block`; memory buffers are unsupported. Retries are not
+			debited by this cap, so use `request.adaptive_concurrency` and
+			`request.retry_max_duration_secs` to bound retry behavior.
+			"""
+		required: false
+		type: object: options: {
+			burst_bytes: {
+				description: "Additional byte burst budget allowed above steady-state pacing."
+				required:    false
+				type: uint: {
+					default: 0
+					unit:    "bytes"
+				}
+			}
+			enabled: {
+				description: "Enables backlog-aware output pacing."
+				required:    false
+				type: bool: default: false
+			}
+			engage_min_bytes: {
+				description: """
+					Minimum buffered bytes before pacing engages.
+
+					Below this absolute backlog threshold, the sink submits requests without delay.
+					"""
+				required: false
+				type: uint: {
+					default: 1048576
+					unit:    "bytes"
+				}
+			}
+			ewma_alpha: {
+				description: "Exponential moving average alpha used for input byte-rate estimation."
+				required:    false
+				type: float: default: 0.1
+			}
+			factor: {
+				description: "Multiplier applied to the estimated input byte rate while the buffer has a backlog."
+				required:    false
+				type: float: default: 1.1
+			}
+			freeze_window_secs: {
+				description: "Recent input-rate window, in seconds, used to seed the frozen estimate."
+				required:    false
+				type: float: default: 30.0
+			}
+			max_requests_per_sec: {
+				description: """
+					Optional maximum number of original requests submitted per second.
+
+					This caps submissions before request retries. It does not debit retry attempts made by
+					the request service.
+					"""
+				required: false
+				type: float: {}
+			}
+			min_drain_bytes_per_sec: {
+				description: """
+					Minimum drain budget in bytes per second while pacing is active.
+
+					Set this above the expected sustained input rate to ensure a full disk buffer can drain
+					after restart, when no recent input-rate history exists.
+					"""
+				required: false
+				type: uint: {
+					default: 0
+					unit:    "bytes"
+				}
+			}
+			sample_interval_secs: {
+				description: "Buffer usage sample interval in seconds."
+				required:    false
+				type: float: default: 0.5
+			}
+			saturation_high_mark: {
+				description: """
+					Buffer fill ratio above which input-rate estimation freezes.
+
+					Freezing prevents a full `when_full = "block"` buffer from coupling the observed input
+					rate to the shaped output rate.
+					"""
+				required: false
+				type: float: default: 0.9
+			}
+			saturation_low_mark: {
+				description: "Buffer fill ratio below which frozen input-rate estimation resumes."
+				required:    false
+				type: float: default: 0.75
+			}
+		}
+	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false

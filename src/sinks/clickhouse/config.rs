@@ -1,6 +1,6 @@
 //! Configuration for the `Clickhouse` sink.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -10,13 +10,17 @@ use vector_lib::codecs::encoding::format::SchemaProvider;
 use super::{
     request_builder::ClickhouseRequestBuilder,
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
-    sink::{ClickhouseSink, PartitionKey},
+    sink::{ClickhouseSink, DrainShapingInputs, PartitionKey},
 };
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
+        util::{
+            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            drain_shaping::{BufferUsageSource, DrainShapingConfig},
+            http::HttpService,
+        },
     },
 };
 
@@ -136,6 +140,17 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    /// Backlog-aware pacing for ClickHouse insert requests.
+    ///
+    /// When enabled, Vector caps original request submission from a backed-up disk buffer to
+    /// reduce recovery floods. This requires static `database` and `table` values, and a disk
+    /// buffer with `when_full` set to `block`; memory buffers are unsupported. Retries are not
+    /// debited by this cap, so use `request.adaptive_concurrency` and
+    /// `request.retry_max_duration_secs` to bound retry behavior.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub drain_shaping: DrainShapingConfig,
+
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
@@ -239,11 +254,9 @@ impl SinkConfig for ClickhouseConfig {
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let database = self.database.clone().unwrap_or_else(|| {
-            "default"
-                .try_into()
-                .expect("'default' should be a valid template")
-        });
+        let database = self.database.clone().unwrap_or_else(default_database);
+        let static_partition_key = !database.is_dynamic() && !self.table.is_dynamic();
+        self.drain_shaping.validate(static_partition_key)?;
 
         // Resolve the encoding strategy (format + encoder) based on configuration
         let (format, encoder_kind) = self
@@ -254,6 +267,10 @@ impl SinkConfig for ClickhouseConfig {
             compression: self.compression,
             encoder: (self.encoding.clone(), encoder_kind),
         };
+        let source = cx
+            .buffer_usage_observer
+            .clone()
+            .map(|observer| Arc::new(observer) as Arc<dyn BufferUsageSource>);
 
         let sink = ClickhouseSink::new(
             batch_settings,
@@ -262,6 +279,7 @@ impl SinkConfig for ClickhouseConfig {
             self.table.clone(),
             format,
             request_builder,
+            DrainShapingInputs::new(source, self.drain_shaping),
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
@@ -275,6 +293,10 @@ impl SinkConfig for ClickhouseConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+
+    fn requires_buffer_observation(&self) -> bool {
+        self.drain_shaping.enabled
     }
 }
 
@@ -388,6 +410,12 @@ impl ClickhouseConfig {
 
         Ok(())
     }
+}
+
+fn default_database() -> Template {
+    "default"
+        .try_into()
+        .expect("'default' should be a valid template")
 }
 
 fn get_healthcheck_uri(endpoint: &Uri) -> String {
@@ -538,5 +566,42 @@ mod tests {
                 "format should match configured value"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn drain_shaping_rejects_dynamic_table() {
+        let mut config = create_test_config(Format::JsonEachRow, None);
+        config.table = "{{ .table }}".try_into().unwrap();
+        config.drain_shaping.enabled = true;
+        config.drain_shaping.min_drain_bytes_per_sec = 1;
+
+        let error = match config.build(SinkContext::default()).await {
+            Ok(_) => panic!("build unexpectedly succeeded"),
+            Err(error) => error.to_string(),
+        };
+
+        assert!(
+            error.contains("static partition key"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn drain_shaping_accepts_static_table_with_default_database() {
+        let mut config = create_test_config(Format::JsonEachRow, None);
+        config.database = None;
+        config.drain_shaping.enabled = true;
+        config.drain_shaping.min_drain_bytes_per_sec = 1;
+
+        let (_sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+    }
+
+    #[test]
+    fn drain_shaping_controls_buffer_observation_requirement() {
+        let mut config = create_test_config(Format::JsonEachRow, None);
+        assert!(!config.requires_buffer_observation());
+
+        config.drain_shaping.enabled = true;
+        assert!(config.requires_buffer_observation());
     }
 }

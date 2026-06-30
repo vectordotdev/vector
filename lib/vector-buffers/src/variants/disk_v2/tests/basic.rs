@@ -166,7 +166,7 @@ async fn initial_size_correct_with_multievents() {
                 .build()
                 .expect("creating buffer config should not fail");
             let usage_handle = BufferUsageHandle::noop();
-            let ledger = Ledger::load_or_create(config, usage_handle)
+            let ledger = Ledger::load_or_create(config, usage_handle, false)
                 .await
                 .expect("ledger should not fail to load/create");
             let ledger = Arc::new(ledger);

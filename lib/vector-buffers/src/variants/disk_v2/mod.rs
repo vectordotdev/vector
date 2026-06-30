@@ -243,12 +243,13 @@ where
     pub(crate) async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
+        observe: bool,
     ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
-        let ledger = Ledger::load_or_create(config, usage_handle)
+        let ledger = Ledger::load_or_create(config, usage_handle, observe)
             .await
             .context(LedgerSnafu)?;
         let ledger = Arc::new(ledger);
@@ -286,12 +287,13 @@ where
     pub async fn from_config<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
+        observe: bool,
     ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>), BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
-        let (writer, reader, _) = Self::from_config_inner(config, usage_handle).await?;
+        let (writer, reader, _) = Self::from_config_inner(config, usage_handle, observe).await?;
 
         Ok((writer, reader))
     }
@@ -325,12 +327,14 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
+        observe: bool,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         let (writer, reader) = build_disk_v2_buffer(
             usage_handle,
             &self.data_dir,
             self.id.as_str(),
             self.max_size,
+            observe,
         )
         .await?;
 
@@ -343,6 +347,7 @@ async fn build_disk_v2_buffer<T>(
     data_dir: &Path,
     id: &str,
     max_size: NonZeroU64,
+    observe: bool,
 ) -> Result<
     (
         BufferWriter<T, ProductionFilesystem>,
@@ -372,7 +377,7 @@ where
         None => builder,
     };
     let config = builder.build()?;
-    Buffer::from_config(config, usage_handle)
+    Buffer::from_config(config, usage_handle, observe)
         .await
         .map_err(Into::into)
 }

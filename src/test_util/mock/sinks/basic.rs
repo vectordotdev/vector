@@ -1,8 +1,11 @@
+use std::sync::{Arc, Mutex};
+
 use async_trait::async_trait;
 use futures_util::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::Snafu;
 use tokio::sync::oneshot;
 use vector_lib::{
+    buffers::BufferUsageObserver,
     config::{AcknowledgementsConfig, Input},
     configurable::configurable_component,
     event::Event,
@@ -28,6 +31,12 @@ pub struct BasicSinkConfig {
 
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
+
+    #[serde(skip)]
+    requires_buffer_observation: bool,
+
+    #[serde(skip)]
+    captured_buffer_usage_observers: Option<Arc<Mutex<Vec<Option<BufferUsageObserver>>>>>,
 }
 
 impl_generate_config_from_default!(BasicSinkConfig);
@@ -41,11 +50,13 @@ enum Mode {
 }
 
 impl BasicSinkConfig {
-    pub const fn new(sink: SourceSender, healthy: bool) -> Self {
+    pub fn new(sink: SourceSender, healthy: bool) -> Self {
         Self {
             sink: Mode::Normal(sink),
             healthy,
             data: None,
+            requires_buffer_observation: false,
+            captured_buffer_usage_observers: None,
         }
     }
 
@@ -54,7 +65,22 @@ impl BasicSinkConfig {
             sink: Mode::Normal(sink),
             healthy,
             data: Some(data.into()),
+            requires_buffer_observation: false,
+            captured_buffer_usage_observers: None,
         }
+    }
+
+    pub fn with_buffer_observation(mut self, requires_buffer_observation: bool) -> Self {
+        self.requires_buffer_observation = requires_buffer_observation;
+        self
+    }
+
+    pub fn with_captured_buffer_usage_observers(
+        mut self,
+        captured_buffer_usage_observers: Arc<Mutex<Vec<Option<BufferUsageObserver>>>>,
+    ) -> Self {
+        self.captured_buffer_usage_observers = Some(captured_buffer_usage_observers);
+        self
     }
 }
 
@@ -67,7 +93,14 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        if let Some(captured_buffer_usage_observers) = &self.captured_buffer_usage_observers {
+            captured_buffer_usage_observers
+                .lock()
+                .unwrap()
+                .push(cx.buffer_usage_observer.clone());
+        }
+
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
         // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
         // started running, so that tests can request the topology be healthy before proceeding.
@@ -92,6 +125,10 @@ impl SinkConfig for BasicSinkConfig {
 
     fn input(&self) -> Input {
         Input::all()
+    }
+
+    fn requires_buffer_observation(&self) -> bool {
+        self.requires_buffer_observation
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

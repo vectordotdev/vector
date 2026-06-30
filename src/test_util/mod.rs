@@ -36,7 +36,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 use vector_lib::{
-    buffers::topology::channel::LimitedReceiver,
+    buffers::{InMemoryBufferable, topology::channel::LimitedReceiver},
     event::{
         BatchNotifier, BatchStatusReceiver, Event, EventArray, LogEvent, Metric, MetricKind,
         MetricTags, MetricValue,
@@ -439,7 +439,7 @@ where
     }
 }
 
-pub async fn collect_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>) -> Vec<T> {
+pub async fn collect_limited<T: InMemoryBufferable>(mut rx: LimitedReceiver<T>) -> Vec<T> {
     let mut items = Vec::new();
     while let Some(item) = rx.next().await {
         items.push(item);
@@ -447,7 +447,10 @@ pub async fn collect_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>) -> V
     items
 }
 
-pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n: usize) -> Vec<T> {
+pub async fn collect_n_limited<T: InMemoryBufferable>(
+    mut rx: LimitedReceiver<T>,
+    n: usize,
+) -> Vec<T> {
     let mut items = Vec::new();
     while items.len() < n {
         match rx.next().await {

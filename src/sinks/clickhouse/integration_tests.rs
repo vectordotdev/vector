@@ -1,10 +1,12 @@
 use std::{
     convert::Infallible,
     net::SocketAddr,
+    num::NonZeroU64,
     sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
+    time::Instant as StdInstant,
 };
 
 use chrono::{TimeZone, Utc};
@@ -12,12 +14,13 @@ use futures::{
     future::{ok, ready},
     stream,
 };
-use http::StatusCode;
+use http::{Method, StatusCode};
 use ordered_float::NotNan;
 use serde::Deserialize;
 use serde_json::Value;
-use tokio::time::{Duration, timeout};
+use tokio::time::{Duration, sleep, timeout};
 use vector_lib::{
+    buffers::{BufferConfig, BufferType, WhenFull},
     codecs::encoding::ArrowStreamSerializerConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
     lookup::PathPrefix,
@@ -26,14 +29,17 @@ use warp::Filter;
 
 use crate::{
     codecs::{TimestampFormat, Transformer},
-    config::{SinkConfig, SinkContext, log_schema},
+    config::{SinkConfig, SinkContext, SinkOuter, log_schema, unit_test::UnitTestSourceConfig},
     sinks::{
         clickhouse::config::{ClickhouseBatchEncoding, ClickhouseConfig},
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{
+            BatchConfig, Compression, Concurrency, TowerRequestConfig,
+            drain_shaping::DrainShapingConfig, retries::JitterMode,
+        },
     },
     test_util::{
         components::{SINK_TAGS, init_test, run_and_assert_sink_compliance},
-        random_table_name, trace_init,
+        random_table_name, start_topology, trace_init,
     },
 };
 use vector_lib::metrics::Controller;
@@ -397,6 +403,235 @@ async fn templated_table() {
             "table \"{table}\"'s event should have been delivered"
         );
     }
+}
+
+#[tokio::test]
+async fn drain_shaping_bounds_recovery_request_rate() {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+    let client = ClickhouseClient::new(host.clone());
+    client
+        .create_table(&table, "host String, timestamp String, message String")
+        .await;
+
+    let proxy = start_clickhouse_recovery_proxy(host).await;
+    let event_count = 8;
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let clickhouse = ClickhouseConfig {
+        endpoint: proxy.endpoint.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        batch,
+        request: TowerRequestConfig {
+            concurrency: Concurrency::None,
+            retry_attempts: 10,
+            retry_initial_backoff_secs: NonZeroU64::new(1).unwrap(),
+            retry_jitter_mode: JitterMode::None,
+            ..Default::default()
+        },
+        drain_shaping: DrainShapingConfig {
+            enabled: true,
+            factor: 1.1,
+            min_drain_bytes_per_sec: 1_000_000,
+            max_requests_per_sec: Some(2.0),
+            ewma_alpha: 1.0,
+            sample_interval_secs: 0.1,
+            engage_min_bytes: 1,
+            burst_bytes: 0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let data_dir = tempfile::tempdir().unwrap();
+    let mut topology_config = crate::config::Config::builder();
+    topology_config.set_data_dir(data_dir.path());
+    topology_config.add_source(
+        "in",
+        UnitTestSourceConfig {
+            events: (0..event_count).map(make_numbered_event).collect(),
+        },
+    );
+
+    let mut sink = SinkOuter::new(vec!["in".to_string()], clickhouse);
+    sink.buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
+        when_full: WhenFull::Block,
+    });
+    topology_config.add_sink_outer("out", sink);
+
+    let (topology, _) = start_topology(topology_config.build().unwrap(), false).await;
+    proxy.wait_for_failed_insert().await;
+    sleep(Duration::from_millis(500)).await;
+
+    proxy.available();
+    wait_for_clickhouse_rows(&client, &table, event_count).await;
+    topology.stop().await;
+
+    let successful_inserts = proxy.successful_inserts();
+    assert_eq!(event_count, successful_inserts.len());
+    let insert_gaps = successful_inserts
+        .windows(2)
+        .map(|window| window[1].duration_since(window[0]))
+        .collect::<Vec<_>>();
+    let minimum_shaped_gap = Duration::from_millis(350);
+    let first_shaped_gap = insert_gaps
+        .iter()
+        .position(|gap| *gap >= minimum_shaped_gap)
+        .expect("expected recovery to eventually enter shaped drain mode");
+    let shaped_gaps = &insert_gaps[first_shaped_gap..];
+    assert!(
+        shaped_gaps.len() >= 3 && shaped_gaps.iter().all(|gap| *gap >= minimum_shaped_gap),
+        "expected recovered INSERTs to stay under the configured request cap after the initial retry/startup burst; gaps: {insert_gaps:?}; timestamps: {successful_inserts:?}"
+    );
+}
+
+struct ClickhouseRecoveryProxy {
+    endpoint: String,
+    unavailable: Arc<AtomicBool>,
+    failed_inserts: Arc<AtomicUsize>,
+    successful_inserts: Arc<Mutex<Vec<StdInstant>>>,
+    _port_guard: crate::test_util::addr::PortGuard,
+}
+
+impl ClickhouseRecoveryProxy {
+    fn available(&self) {
+        self.unavailable.store(false, Ordering::SeqCst);
+    }
+
+    async fn wait_for_failed_insert(&self) {
+        timeout(Duration::from_secs(10), async {
+            loop {
+                if self.failed_inserts.load(Ordering::SeqCst) > 0 {
+                    return;
+                }
+
+                sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("timed out waiting for the sink to build a disk-buffered backlog");
+    }
+
+    fn successful_inserts(&self) -> Vec<StdInstant> {
+        self.successful_inserts.lock().unwrap().clone()
+    }
+}
+
+async fn start_clickhouse_recovery_proxy(upstream: String) -> ClickhouseRecoveryProxy {
+    let (port_guard, address) = crate::test_util::addr::next_addr();
+    let endpoint = format!("http://{address}");
+    let upstream = upstream.trim_end_matches('/').to_string();
+    let unavailable = Arc::new(AtomicBool::new(true));
+    let failed_inserts = Arc::new(AtomicUsize::new(0));
+    let successful_inserts = Arc::new(Mutex::new(Vec::new()));
+    let client = reqwest::Client::new();
+
+    let routes = warp::method()
+        .and(warp::path::full())
+        .and(warp::query::raw().or(warp::any().map(String::new)).unify())
+        .and(warp::body::bytes())
+        .and_then({
+            let unavailable = Arc::clone(&unavailable);
+            let failed_inserts = Arc::clone(&failed_inserts);
+            let successful_inserts = Arc::clone(&successful_inserts);
+            move |method: Method, path: warp::path::FullPath, query: String, body: bytes::Bytes| {
+                let client = client.clone();
+                let upstream = upstream.clone();
+                let unavailable = Arc::clone(&unavailable);
+                let failed_inserts = Arc::clone(&failed_inserts);
+                let successful_inserts = Arc::clone(&successful_inserts);
+                async move {
+                    let is_insert = query.contains("INSERT");
+                    if unavailable.load(Ordering::SeqCst) {
+                        if is_insert {
+                            failed_inserts.fetch_add(1, Ordering::SeqCst);
+                        }
+
+                        return Ok::<_, Infallible>(clickhouse_proxy_response(
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            bytes::Bytes::from_static(b"unavailable"),
+                        ));
+                    }
+
+                    let mut target = format!("{}{}", upstream, path.as_str());
+                    if !query.is_empty() {
+                        target.push('?');
+                        target.push_str(&query);
+                    }
+
+                    let method = reqwest::Method::from_bytes(method.as_str().as_bytes()).unwrap();
+                    match client.request(method, target).body(body).send().await {
+                        Ok(response) => {
+                            let status = StatusCode::from_u16(response.status().as_u16())
+                                .expect("reqwest status code should be valid http status");
+                            let body = response
+                                .bytes()
+                                .await
+                                .unwrap_or_else(|_| bytes::Bytes::new());
+                            if is_insert && status.is_success() {
+                                successful_inserts.lock().unwrap().push(StdInstant::now());
+                            }
+
+                            Ok(clickhouse_proxy_response(status, body))
+                        }
+                        Err(error) => Ok(clickhouse_proxy_response(
+                            StatusCode::BAD_GATEWAY,
+                            bytes::Bytes::from(error.to_string()),
+                        )),
+                    }
+                }
+            }
+        });
+
+    tokio::spawn(warp::serve(routes).bind(address));
+    crate::test_util::wait_for_tcp(address).await;
+
+    ClickhouseRecoveryProxy {
+        endpoint,
+        unavailable,
+        failed_inserts,
+        successful_inserts,
+        _port_guard: port_guard,
+    }
+}
+
+fn clickhouse_proxy_response(
+    status: StatusCode,
+    body: impl Into<bytes::Bytes>,
+) -> warp::reply::Response {
+    let mut response = warp::reply::Response::new(hyper::Body::from(body.into()));
+    *response.status_mut() = status;
+    response
+}
+
+fn make_numbered_event(index: usize) -> Event {
+    let mut event = LogEvent::from(format!("raw log line {index}"));
+    event.insert("host", format!("example-{index}.com"));
+    event.into()
+}
+
+async fn wait_for_clickhouse_rows(client: &ClickhouseClient, table: &str, expected_rows: usize) {
+    timeout(Duration::from_secs(20), async {
+        loop {
+            let output = client.select_all(table).await;
+            assert!(
+                output.rows <= expected_rows,
+                "ClickHouse received more rows than Vector sent"
+            );
+            if output.rows == expected_rows {
+                return;
+            }
+
+            sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .expect("timed out waiting for ClickHouse rows to reconcile");
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {
