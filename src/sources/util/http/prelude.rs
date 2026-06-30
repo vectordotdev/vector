@@ -422,16 +422,13 @@ fn build_vrl_response(
             };
             let response = match message {
                 Some(msg) => match serde_json::from_str::<JsonValue>(&msg) {
-                    Ok(JsonValue::Object(obj))
-                        if obj.contains_key("status")
-                            || obj.contains_key("body")
-                            || obj.contains_key("headers") =>
-                    {
+                    Ok(JsonValue::Object(obj)) if is_control_object(&obj) => {
                         build_response_from_json_obj(&obj, reject_code)?
                     }
-                    // Not a JSON object, or a JSON object with no recognised control keys
-                    // (e.g. `abort encode_json({"error": "bad"})`), treat the whole message
-                    // string as the response body so the content is not silently dropped.
+                    // Not a JSON object, or a JSON object that has no control field with the type
+                    // the builder consumes (e.g. `abort encode_json({"error": "bad"})` or
+                    // `abort encode_json({"status": "error"})`), treat the whole message string as
+                    // the response body so the content is not silently dropped.
                     _ => build_plain_reject_response(reject_code, msg)?,
                 },
                 None => warp::http::Response::builder()
@@ -551,6 +548,16 @@ fn insert_validated_header(builder: &mut warp::http::response::Builder, name: &s
     if let Some(headers) = builder.headers_mut() {
         headers.insert(header_name, header_value);
     }
+}
+
+/// Returns true when a JSON object from an `abort` message is a structured control payload, i.e.
+/// it has at least one control field with the type the builder consumes (`status` integer, `body`
+/// string, `headers` object). Objects whose control keys carry other types (e.g.
+/// `{"status": "error"}`) are returned verbatim by the plain-body path instead of being dropped.
+fn is_control_object(obj: &serde_json::Map<String, JsonValue>) -> bool {
+    obj.get("status").is_some_and(JsonValue::is_u64)
+        || obj.get("body").is_some_and(JsonValue::is_string)
+        || obj.get("headers").is_some_and(JsonValue::is_object)
 }
 
 /// Builds an HTTP response from a JSON object encoded in an `abort` message string.

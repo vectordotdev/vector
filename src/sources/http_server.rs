@@ -231,12 +231,15 @@ pub struct SimpleHttpConfig {
     /// on inspecting this context should use the default `legacy` log namespace, where all
     /// metadata is written directly into the event fields before the program runs.
     ///
+    /// The remote IP is only present when [`host_key`][Self::host_key] is set, under that field
+    /// name (for example `.hostname` when `host_key = "hostname"`).
+    ///
     /// [acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
     /// [VRL]: https://vector.dev/docs/reference/vrl
     #[configurable(metadata(
         docs::examples = "encode_json({ \"ids\": map_values(.) -> |e| { e.id } })",
         docs::examples = "parsed, err = parse_json(.[0].body)\nif err != null {\n  { \"status\": 400, \"body\": \"invalid JSON\" }\n} else {\n  { \"status\": 202, \"body\": encode_json(parsed), \"headers\": { \"x-request-id\": .[0].request_id } }\n}",
-        docs::examples = "row, err = get_enrichment_table_record(\"ip_allowlist\", { \"ip\": .source_ip })\nif err != null {\n  abort encode_json({ \"status\": 403, \"body\": \"source address not permitted\" })\n} else {\n  { \"status\": 202, \"body\": encode_json({ \"accepted\": true }) }\n}",
+        docs::examples = "row, err = get_enrichment_table_record(\"ip_allowlist\", { \"ip\": .[0].hostname })\nif err != null {\n  abort encode_json({ \"status\": 403, \"body\": \"source address not permitted\" })\n} else {\n  { \"status\": 202, \"body\": encode_json({ \"accepted\": true }) }\n}",
         docs::syntax_override = "remap_program"
     ))]
     #[serde(default)]
@@ -1310,6 +1313,31 @@ mod tests {
         assert_eq!(resp.status().as_u16(), 400);
         // The full JSON string must be the body, content must not be silently dropped.
         assert_eq!(resp.text().await.unwrap(), r#"{"error":"bad request"}"#);
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let events = collect_ready(rx).await;
+        assert!(events.is_empty(), "abort must not forward events to sink");
+    }
+
+    /// When `abort` is called with a JSON object that has a control *key* but a value of the wrong
+    /// type (here `status` is a string, not an integer), it is not a control payload. The entire
+    /// message string must be used as the response body rather than silently dropping its content.
+    #[tokio::test]
+    async fn response_source_abort_json_with_non_control_value_used_as_plain_body() {
+        // `status` is a string, so no control field is consumable; the JSON is a plain error body.
+        let program = r#"abort encode_json({ "status": "error", "message": "bad" })"#;
+
+        let (rx, addr) =
+            source_with_program_and_reject_code(program, StatusCode::BAD_REQUEST).await;
+
+        let resp = post_raw(addr, "hello\n").await;
+
+        assert_eq!(resp.status().as_u16(), 400);
+        // The full JSON string must be the body, content must not be silently dropped.
+        assert_eq!(
+            resp.text().await.unwrap(),
+            r#"{"message":"bad","status":"error"}"#
+        );
 
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let events = collect_ready(rx).await;

@@ -774,6 +774,9 @@ generated: components: sources: http: configuration: {
 			on inspecting this context should use the default `legacy` log namespace, where all
 			metadata is written directly into the event fields before the program runs.
 
+			The remote IP is only present when [`host_key`][Self::host_key] is set, under that field
+			name (for example `.hostname` when `host_key = "hostname"`).
+
 			[acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
 			[VRL]: https://vector.dev/docs/reference/vrl
 			"""
@@ -787,7 +790,7 @@ generated: components: sources: http: configuration: {
 				  { "status": 202, "body": encode_json(parsed), "headers": { "x-request-id": .[0].request_id } }
 				}
 				""", """
-				row, err = get_enrichment_table_record("ip_allowlist", { "ip": .source_ip })
+				row, err = get_enrichment_table_record("ip_allowlist", { "ip": .[0].hostname })
 				if err != null {
 				  abort encode_json({ "status": 403, "body": "source address not permitted" })
 				} else {
