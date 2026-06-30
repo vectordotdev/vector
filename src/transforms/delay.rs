@@ -261,8 +261,8 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events() {
-        let config = toml::from_str::<DelayConfig>(indoc! {"
-            delay_ms = 200
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
         "})
         .unwrap();
 
@@ -289,11 +289,11 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events_at_capacity_drop_newest() {
-        let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_ms = 200
-            queue_capacity = 1
-            overflow_strategy = "drop_newest"
-        "#})
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
+            queue_capacity: 1
+            overflow_strategy: drop_newest
+        "})
         .unwrap();
 
         let delay =
@@ -324,11 +324,11 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events_at_capacity_pass() {
-        let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_ms = 200
-            queue_capacity = 1
-            overflow_strategy = "forward"
-        "#})
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
+            queue_capacity: 1
+            overflow_strategy: forward
+        "})
         .unwrap();
 
         let delay =

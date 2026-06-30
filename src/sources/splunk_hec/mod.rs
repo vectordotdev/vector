@@ -2714,7 +2714,7 @@ mod tests {
                 message.into()
             );
             assert_eq!(
-                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                event.metadata().splunk_hec_token().as_deref().unwrap(),
                 TOKEN
             );
         })
@@ -2741,7 +2741,7 @@ mod tests {
                 "splunk_hec".into()
             );
             assert_eq!(
-                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                event.metadata().splunk_hec_token().as_deref().unwrap(),
                 TOKEN
             );
         })
@@ -2792,7 +2792,7 @@ mod tests {
                 message.into()
             );
             assert_eq!(
-                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                event.metadata().splunk_hec_token().as_deref().unwrap(),
                 TOKEN
             );
         })

@@ -2,6 +2,31 @@ use super::{SchemaContext, get_schema_metadata, schema_aware_nested_merge};
 use anyhow::{Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Map, Value, json};
+
+fn enum_variant_value(ctx: &SchemaContext, schema: &Value) -> Value {
+    let desc = ctx.get_rendered_description_from_schema(schema);
+    // Check both the top-level `deprecated` flag (#[configurable(deprecated)]) and the
+    // metadata form (#[configurable(metadata(deprecated))]).
+    let deprecated = schema
+        .get("deprecated")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || get_schema_metadata(schema, "deprecated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+    if deprecated {
+        let mut obj = Map::new();
+        obj.insert("description".to_string(), Value::String(desc));
+        obj.insert("deprecated".to_string(), Value::Bool(true));
+        if let Some(msg) = get_schema_metadata(schema, "deprecated_message") {
+            obj.insert("deprecated_message".to_string(), msg.clone());
+        }
+        Value::Object(obj)
+    } else {
+        Value::String(desc)
+    }
+}
 use std::collections::HashSet;
 
 impl SchemaContext {
@@ -215,8 +240,7 @@ impl SchemaContext {
 
                 let mut enum_vals = Map::new();
                 for (k, v) in unique_tag_values {
-                    let desc = self.get_rendered_description_from_schema(&v);
-                    enum_vals.insert(k, Value::String(desc));
+                    enum_vals.insert(k, enum_variant_value(self, &v));
                 }
 
                 let mut resolved_tag_property_obj = Map::new();
@@ -268,8 +292,7 @@ impl SchemaContext {
                 debug!("Resolved as 'externally-tagged with only unit variants' enum schema.");
                 let mut enum_vals = Map::new();
                 for (k, v) in tag_values {
-                    let desc = self.get_rendered_description_from_schema(&v);
-                    enum_vals.insert(k, Value::String(desc));
+                    enum_vals.insert(k, enum_variant_value(self, &v));
                 }
                 return Ok(json!({ "_resolved": { "type": { "string": { "enum": enum_vals } } } }));
             }
@@ -397,8 +420,7 @@ impl SchemaContext {
                     let mut enum_map = Map::new();
                     for const_obj in &const_arr {
                         if let Some(value) = const_obj.get("value").and_then(|v| v.as_str()) {
-                            let desc = self.get_rendered_description_from_schema(const_obj);
-                            enum_map.insert(value.to_string(), Value::String(desc));
+                            enum_map.insert(value.to_string(), enum_variant_value(self, const_obj));
                         }
                     }
                     if !enum_map.is_empty() {

@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints]
+workspace = true
+
 [build-dependencies]
 prost-build.workspace = true
 tonic-build.workspace = true

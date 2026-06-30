@@ -426,6 +426,10 @@ fn normalize_value(s: &str) -> String {
 /// fragment a `registered_event!` field. `>` only decrements when there is a
 /// matching `<`, so the `>` in `key => value` tag pairs (used by `counter!`
 /// args) doesn't underflow.
+#[expect(
+    clippy::string_slice,
+    reason = "indices from byte-iterator over ASCII delimiters, always char boundaries"
+)]
 fn split_comma_args(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut depth: i32 = 0;
@@ -786,6 +790,10 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
 impl Scanner<'_> {
     /// Parse a `registered_event!` invocation's tokens to extract the event
     /// name, members, handle metrics, and emit-block log calls.
+    #[expect(
+        clippy::string_slice,
+        reason = "indices from find() on ASCII patterns or match_paren_end(), always char boundaries"
+    )]
     fn handle_registered_event(&mut self, mac: &syn::Macro) {
         let raw = mac.tokens.to_string();
         // Event name: first ident.
@@ -911,6 +919,10 @@ impl Scanner<'_> {
 /// Operates on the raw source rather than via the AST so that log calls
 /// nested inside opaque outer macros (`tokio::select!`, `cfg_if!`, …) are
 /// also covered — those bodies are not visited by `syn`.
+#[expect(
+    clippy::string_slice,
+    reason = "indices from regex .end() and match_paren_end(), always char boundaries"
+)]
 fn format_check_log_messages(text: &str, path_str: &str) -> Vec<String> {
     let mut reports = Vec::new();
     for caps in RE_LOG_CALL_OPEN.captures_iter(text) {
@@ -1017,6 +1029,10 @@ fn match_paren_end(s: &str) -> Option<usize> {
 }
 
 /// Split a `{ ... }` block off the front of `s`, returning `(inside, rest)`.
+#[expect(
+    clippy::string_slice,
+    reason = "indices from byte-iterator over ASCII '{' '}', always char boundaries"
+)]
 fn split_brace_block(s: &str) -> (&str, &str) {
     if !s.starts_with('{') {
         return ("", s);

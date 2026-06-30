@@ -16,7 +16,7 @@ use crate::{
         mock::{backpressure_sink, backpressure_source},
         start_topology,
     },
-    topology::builder::SOURCE_SENDER_BUFFER_SIZE,
+    topology::builder::source_sender_buffer_size,
 };
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
@@ -35,7 +35,7 @@ async fn serial_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + *SOURCE_SENDER_BUFFER_SIZE
+        + source_sender_buffer_size()
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -64,7 +64,7 @@ async fn default_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + *SOURCE_SENDER_BUFFER_SIZE
+        + source_sender_buffer_size()
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -96,7 +96,7 @@ async fn buffer_drop_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + *SOURCE_SENDER_BUFFER_SIZE
+        + source_sender_buffer_size()
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -149,7 +149,7 @@ async fn multiple_inputs_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + *SOURCE_SENDER_BUFFER_SIZE * 2
+        + source_sender_buffer_size() * 2
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
