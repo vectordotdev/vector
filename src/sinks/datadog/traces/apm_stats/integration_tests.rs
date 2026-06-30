@@ -329,10 +329,10 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
 async fn start_vector() -> (RunningTopology, ShutdownErrorReceiver) {
     let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());
 
-    let source_config = toml::from_str::<DatadogAgentConfig>(&format!(
+    let source_config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
-            address = "{}"
-            multiple_outputs = true
+            address: "{}"
+            multiple_outputs: true
         "#},
         dd_agent_address,
     ))
@@ -344,9 +344,10 @@ async fn start_vector() -> (RunningTopology, ShutdownErrorReceiver) {
     let dd_traces_endpoint = format!("http://127.0.0.1:{}", server_port_for_vector());
     let cfg = format!(
         indoc! { r#"
-            default_api_key = "atoken"
-            endpoint = "{}"
-            batch.max_events = 1
+            default_api_key: "atoken"
+            endpoint: "{}"
+            batch:
+              max_events: 1
         "#},
         dd_traces_endpoint
     );
@@ -356,7 +357,7 @@ async fn start_vector() -> (RunningTopology, ShutdownErrorReceiver) {
     assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
     let cfg = cfg.replace("atoken", &api_key);
 
-    let sink_config = toml::from_str::<DatadogTracesConfig>(&cfg).unwrap();
+    let sink_config = serde_yaml::from_str::<DatadogTracesConfig>(&cfg).unwrap();
 
     builder.add_sink("out", &["in.traces"], sink_config);
 

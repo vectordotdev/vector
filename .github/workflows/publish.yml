@@ -253,7 +253,7 @@ jobs:
       - name: Build Vector
         shell: bash
         run: |
-          export FEATURES="default-msvc"
+          export FEATURES="default"
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
           export RUST_LTO=""

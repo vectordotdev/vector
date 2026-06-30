@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{
+        Arc, LazyLock, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Instant,
 };
 
@@ -28,10 +31,11 @@ use vector_lib::{
             },
         },
     },
+    enrichment::Table,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
-    source_sender::{CHUNK_SIZE, SourceSenderItem},
+    source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
 use vector_lib::{gauge, internal_event::GaugeName};
@@ -71,10 +75,49 @@ static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
 static ENRICHMENT_TABLES_LOAD_LOCK: LazyLock<AsyncMutex<()>> = LazyLock::new(AsyncMutex::default);
 static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
-pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
-    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
+// Resolved once at startup in `crate::app::build_runtime`, together with `chunk_size_events`. `0`
+// means startup didn't run (e.g. tests that bypass it), in which case the getters fall back to the
+// `DEFAULT_CHUNK_SIZE_EVENTS`-based values.
+static SOURCE_SENDER_BUFFER_SIZE: AtomicUsize = AtomicUsize::new(0);
+static READY_ARRAY_CAPACITY: AtomicUsize = AtomicUsize::new(0);
 
-const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
+/// How many `chunk_size_events`-sized batches the concurrent transform runner's `ReadyArrays`
+/// buffers before applying backpressure: `ready_array_capacity = chunk_size_events * this`.
+pub(crate) const READY_ARRAY_CAPACITY_CHUNKS: usize = 4;
+
+/// Returns the source sender output buffer base size.
+pub(crate) fn source_sender_buffer_size() -> usize {
+    match SOURCE_SENDER_BUFFER_SIZE.load(Ordering::Relaxed) {
+        0 => *TRANSFORM_CONCURRENCY_LIMIT * DEFAULT_CHUNK_SIZE_EVENTS,
+        size => size,
+    }
+}
+
+/// Sets the process-wide source sender buffer size. Must be called at most once, before the
+/// topology is built. Panics if called more than once.
+pub(crate) fn set_source_sender_buffer_size(size: usize) {
+    SOURCE_SENDER_BUFFER_SIZE
+        .compare_exchange(0, size, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double source_sender_buffer_size initialization"));
+}
+
+/// Returns the `ReadyArrays` capacity used by concurrent transform runners.
+pub(crate) fn ready_array_capacity() -> NonZeroUsize {
+    let size = match READY_ARRAY_CAPACITY.load(Ordering::Relaxed) {
+        0 => DEFAULT_CHUNK_SIZE_EVENTS * READY_ARRAY_CAPACITY_CHUNKS,
+        size => size,
+    };
+    NonZeroUsize::new(size).expect("ready array capacity is non-zero")
+}
+
+/// Sets the process-wide concurrent transform runner `ReadyArrays` capacity. Must be called at most
+/// once, before the topology is built. Panics if called more than once.
+pub(crate) fn set_ready_array_capacity(size: usize) {
+    READY_ARRAY_CAPACITY
+        .compare_exchange(0, size, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double ready_array_capacity initialization"));
+}
+
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
@@ -142,11 +185,11 @@ impl<'a> Builder<'a> {
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
 
-        // We should have all the data for the enrichment tables loaded now, so switch them over to
-        // readonly.
-        enrichment_tables.finish_load();
-
         if self.errors.is_empty() {
+            // We should have all the data for the enrichment tables loaded now, so switch them over to
+            // readonly.
+            enrichment_tables.finish_load();
+
             Ok(TopologyPieces {
                 inputs: self.inputs,
                 outputs: Self::finalize_outputs(self.outputs),
@@ -183,12 +226,15 @@ impl<'a> Builder<'a> {
     /// Loads, or reloads the enrichment tables.
     /// The tables are stored in the `ENRICHMENT_TABLES` global variable.
     async fn load_enrichment_tables(&mut self) -> &'static vector_lib::enrichment::TableRegistry {
-        let mut enrichment_tables = HashMap::new();
+        let mut enrichment_tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
         // Build enrichment tables
         'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
             let table_name = name.to_string();
-            if ENRICHMENT_TABLES.needs_reload(&table_name) {
+            if ENRICHMENT_TABLES.needs_reload(&table_name)
+                || self.diff.enrichment_tables.is_changed(name)
+                || self.diff.enrichment_tables.is_added(name)
+            {
                 let indexes = if !self.diff.enrichment_tables.is_added(name) {
                     // If this is an existing enrichment table, we need to store the indexes to reapply
                     // them again post load.
@@ -197,7 +243,18 @@ impl<'a> Builder<'a> {
                     None
                 };
 
-                let mut table = match table_outer.inner.build(&self.config.global).await {
+                let mut prev_state = None;
+                if !self.diff.enrichment_tables.is_added(name)
+                    && table_outer.inner.wants_previous_state()
+                {
+                    prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
+                }
+
+                let mut table = match table_outer
+                    .inner
+                    .build(&self.config.global, prev_state)
+                    .await
+                {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
@@ -294,7 +351,7 @@ impl<'a> Builder<'a> {
         );
 
         let mut builder = SourceSender::builder()
-            .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+            .with_buffer(source_sender_buffer_size())
             .with_timeout(source.inner.send_timeout())
             .with_ewma_half_life_seconds(
                 self.config.global.buffer_utilization_ewma_half_life_seconds,
@@ -1006,16 +1063,20 @@ async fn run_source_output_pump(
     Ok(TaskOutput::Source)
 }
 
+/// Reloads file based enrichment tables - not stateful ones
 pub async fn reload_enrichment_tables(config: &Config) {
     let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
     let mut enrichment_tables = HashMap::new();
     // Build enrichment tables
     'tables: for (name, table_outer) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
-        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+        if ENRICHMENT_TABLES.needs_reload(&table_name)
+            // Tables that can act as sinks are reloaded through topology
+            && table_outer.as_sink(name).is_none()
+        {
             let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
 
-            let mut table = match table_outer.inner.build(&config.global).await {
+            let mut table = match table_outer.inner.build(&config.global, None).await {
                 Ok(table) => table,
                 Err(error) => {
                     error!("Enrichment table \"{name}\" reload failed: {error}");
@@ -1300,7 +1361,7 @@ impl Runner {
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut input_rx =
-            super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
+            super::ready_arrays::ReadyArrays::with_capacity(input_rx, ready_array_capacity());
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;

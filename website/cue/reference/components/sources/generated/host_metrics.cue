@@ -80,17 +80,18 @@ generated: components: sources: host_metrics: configuration: {
 
 						Only available on Linux.
 						"""
-					cpu:        "Metrics related to CPU utilization."
-					disk:       "Metrics related to disk I/O utilization."
-					filesystem: "Metrics related to filesystem space utilization."
-					host:       "Metrics related to the host."
-					load:       "Metrics related to the system load average."
-					memory:     "Metrics related to memory utilization."
-					network:    "Metrics related to network utilization."
-					process:    "Metrics related to Process utilization."
-					tcp:        "Metrics related to TCP connections."
+					cpu:         "Metrics related to CPU utilization."
+					disk:        "Metrics related to disk I/O utilization."
+					filesystem:  "Metrics related to filesystem space utilization."
+					host:        "Metrics related to the host."
+					load:        "Metrics related to the system load average."
+					memory:      "Metrics related to memory utilization."
+					network:     "Metrics related to network utilization."
+					process:     "Metrics related to Process utilization."
+					tcp:         "Metrics related to TCP connections."
+					temperature: "Metrics related to component temperatures."
 				}
-				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network", "tcp"]
+				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network", "tcp", "temperature"]
 			}
 		}
 	}
