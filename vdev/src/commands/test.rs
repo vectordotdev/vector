@@ -2,10 +2,7 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::{
-    testing::runner::{LocalTestRunner, TestRunner as _},
-    utils::platform,
-};
+use crate::testing::runner::{LocalTestRunner, TestRunner as _};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -40,8 +37,7 @@ impl Cli {
         }
 
         if !args.contains(&"--features".to_string()) {
-            let features = platform::default_features();
-            args.extend(["--features".to_string(), features.to_string()]);
+            args.extend(["--features".to_string(), "default".to_string()]);
         }
 
         LocalTestRunner.test(

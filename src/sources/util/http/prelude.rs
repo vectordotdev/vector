@@ -22,7 +22,7 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::decompress_body;
+use super::encoding::{decompress_body, limited_body, max_decompressed_size_bytes};
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
@@ -112,6 +112,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
+            let body_filter = limited_body(max_decompressed_size_bytes());
+
             let svc = filter
                 .and(warp::path::tail())
                 .and_then(move |tail: Tail| async move {
@@ -131,7 +133,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(warp::path::full())
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
-                .and(warp::body::bytes())
+                .and(body_filter)
                 .and(warp::query::<HashMap<String, String>>())
                 .and(warp::filters::ext::optional())
                 .and_then(

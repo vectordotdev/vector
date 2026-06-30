@@ -46,7 +46,7 @@ pub enum EventType {
     /// Throughput values already normalized to per-second by the server
     SentEventsThroughputs(Vec<SentEventsMetric>),
     ErrorsTotals(Vec<IdentifiedMetric>),
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     AllocatedBytes(Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(ComponentKey),
@@ -123,7 +123,7 @@ pub struct State {
     pub ui: UiState,
     /// Set to `true` once we receive the first `AllocatedBytes` event,
     /// indicating the connected Vector instance has allocation tracing active.
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     pub allocation_tracing_active: bool,
 }
 
@@ -141,7 +141,7 @@ pub enum SortColumn {
     BytesOut = 9,
     BytesOutTotal = 10,
     Errors = 11,
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     MemoryUsed = 12,
 }
 
@@ -164,7 +164,7 @@ impl SortColumn {
             SortColumn::EventsOut | SortColumn::EventsOutTotal => header == columns::EVENTS_OUT,
             SortColumn::BytesOut | SortColumn::BytesOutTotal => header == columns::BYTES_OUT,
             SortColumn::Errors => header == columns::ERRORS,
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             SortColumn::MemoryUsed => header == columns::MEMORY_USED,
         }
     }
@@ -183,7 +183,7 @@ impl SortColumn {
             columns::BYTES_OUT,
             columns::BYTES_OUT_TOTAL,
             columns::ERRORS,
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             columns::MEMORY_USED,
         ]
     }
@@ -217,7 +217,7 @@ impl From<usize> for SortColumn {
             9 => SortColumn::BytesOut,
             10 => SortColumn::BytesOutTotal,
             11 => SortColumn::Errors,
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             12 => SortColumn::MemoryUsed,
             _ => SortColumn::Id,
         }
@@ -346,7 +346,7 @@ impl State {
             ui: UiState::default(),
             sort_state: SortState::default(),
             filter_state: FilterState::default(),
-            #[cfg(feature = "allocation-tracing")]
+            #[cfg(unix)]
             allocation_tracing_active: false,
         }
     }
@@ -406,7 +406,7 @@ pub struct ComponentRow {
     pub sent_bytes_throughput_sec: i64,
     pub sent_events_total: i64,
     pub sent_events_throughput_sec: i64,
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     pub allocated_bytes: i64,
     pub errors: i64,
 }
@@ -527,7 +527,7 @@ pub async fn updater(
                                     }
                                 }
                             }
-                            #[cfg(feature = "allocation-tracing")]
+                            #[cfg(unix)]
                             EventType::AllocatedBytes(rows) => {
                                 for (key, v) in rows {
                                     if let Some(r) = state.components.get_mut(&key) {
