@@ -85,7 +85,7 @@ generated: components: sources: amqp: configuration: {
 					default: "bytes"
 					enum: {
 						avro: """
-															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+															Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 															[apache_avro]: https://avro.apache.org/
 															"""

@@ -100,13 +100,12 @@ impl MetricsStorage {
 
 /// Checks if the tag matches - also considers wildcards
 fn tag_matches(metric: &Metric, (tag_key, tag_value): (&String, &String)) -> bool {
-    if let Some(wildcard_index) = tag_value.find('*') {
+    if let Some((prefix, suffix)) = tag_value.split_once('*') {
         let Some(metric_tag_value) = metric.tag_value(tag_key) else {
             return false;
         };
 
-        metric_tag_value.starts_with(&tag_value[0..wildcard_index])
-            && metric_tag_value.ends_with(&tag_value[(wildcard_index + 1)..])
+        metric_tag_value.starts_with(prefix) && metric_tag_value.ends_with(suffix)
     } else {
         metric.tag_matches(tag_key, tag_value)
     }

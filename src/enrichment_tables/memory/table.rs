@@ -146,6 +146,25 @@ impl Memory {
         }
     }
 
+    /// Creates a new [Memory] based on the provided config and previous state.
+    pub fn from_previous_state(
+        config: MemoryConfig,
+        prev_state: Box<dyn std::any::Any + Send + Sync>,
+    ) -> Self {
+        if let Ok(prev_memory) = prev_state.downcast::<Memory>() {
+            Self {
+                config,
+                read_handle_factory: prev_memory.read_handle_factory,
+                read_handle: prev_memory.read_handle,
+                write_handle: prev_memory.write_handle,
+                expired_items_sender: prev_memory.expired_items_sender,
+                expired_items_receiver: prev_memory.expired_items_receiver,
+            }
+        } else {
+            Self::new(config)
+        }
+    }
+
     pub(super) fn get_read_handle(&self) -> &evmap::ReadHandle<String, MemoryEntry> {
         self.read_handle
             .get_or(|| self.read_handle_factory.handle())
@@ -390,6 +409,12 @@ impl Table for Memory {
     fn needs_reload(&self) -> bool {
         false
     }
+
+    fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        let writer = self.write_handle.lock().expect("mutex poisoned");
+        self.flush(writer);
+        Some(Box::new(self.clone()))
+    }
 }
 
 impl std::fmt::Debug for Memory {
@@ -471,6 +496,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::EnrichmentTableConfig,
         enrichment_tables::memory::{
             config::MemorySourceConfig, internal_events::InternalMetricsConfig,
         },
@@ -504,6 +530,43 @@ mod tests {
                 ("value".into(), Value::from(5)),
             ])),
             memory.find_table_row(Case::Sensitive, &[condition], None, None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn extract_state_preserves_data() {
+        let memory = Memory::new(Default::default());
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        let expected = ObjectMap::from([
+            ("key".into(), Value::from("test_key")),
+            ("ttl".into(), Value::from(memory.config.ttl)),
+            ("value".into(), Value::from(5)),
+        ]);
+        assert_eq!(
+            Ok(expected.clone()),
+            memory.find_table_row(
+                Case::Sensitive,
+                std::slice::from_ref(&condition),
+                None,
+                None,
+                None
+            )
+        );
+
+        // Now build a new table using old state
+        let new_memory = MemoryConfig::default()
+            .build(&Default::default(), memory.extract_state())
+            .await
+            .unwrap();
+        assert_eq!(
+            Ok(expected),
+            new_memory.find_table_row(Case::Sensitive, &[condition], None, None, None)
         );
     }
 
@@ -1029,7 +1092,7 @@ mod tests {
             export_expired_items: false,
             source_key: "test".to_string(),
         });
-        let memory = memory_config.get_or_build_memory().await;
+        let memory = memory_config.get_or_build_memory(None).await;
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let mut events: Vec<Event> = run_and_assert_source_compliance(

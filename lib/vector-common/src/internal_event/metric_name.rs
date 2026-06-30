@@ -101,6 +101,7 @@ pub enum CounterName {
     MemoryEnrichmentTableRemovedTotal,
     MemoryEnrichmentTableTtlExpirations,
     ComponentCpuUsageNsTotal,
+    DatadogLogsReservedAttributeConflictsTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -368,6 +369,9 @@ impl CounterName {
             Self::MemoryEnrichmentTableRemovedTotal => "memory_enrichment_table_removed_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
+            Self::DatadogLogsReservedAttributeConflictsTotal => {
+                "datadog_logs_reserved_attribute_conflicts_total"
+            }
         }
     }
 }
