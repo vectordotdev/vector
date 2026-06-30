@@ -78,6 +78,9 @@ pub struct CuckooMemoryConfig {
     /// Can be set to true to use LRU strategy for kicking.
     #[serde(default = "crate::serde::default_false")]
     pub lru_enabled: bool,
+    /// Can be set to true to delete unused items on scan when LRU is used.
+    #[serde(default = "crate::serde::default_false")]
+    pub lru_deletion_enabled: bool,
     /// Can be set to true to also track TTL for entries.
     #[serde(default = "crate::serde::default_true")]
     pub ttl_enabled: bool,
@@ -151,7 +154,10 @@ impl CuckooMemoryTable {
             .max_kicks(cuckoo_config.max_kicks);
 
         if cuckoo_config.lru_enabled {
-            builder = builder.with_lru(LruConfig::default());
+            builder = builder.with_lru(LruConfig {
+                remove_on_zero: cuckoo_config.lru_deletion_enabled,
+                ..Default::default()
+            });
         }
 
         if cuckoo_config.ttl_enabled {
@@ -573,6 +579,7 @@ mod tests {
             max_entries: 1000,
             max_kicks: default_cuckoo_max_kicks(),
             lru_enabled: false,
+            lru_deletion_enabled: false,
             ttl_enabled: false,
             ttl_bits: default_cuckoo_ttl_bits(),
             counter_enabled: false,
