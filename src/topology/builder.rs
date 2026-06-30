@@ -190,10 +190,10 @@ impl<'a> Builder<'a> {
         'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
             let table_name = name.to_string();
             if ENRICHMENT_TABLES.needs_reload(&table_name)
-                || self.diff.enrichment_tables.is_changed(name)
-                || self.diff.enrichment_tables.is_added(name)
+                || self.diff.enrichment_tables.tables.is_changed(name)
+                || self.diff.enrichment_tables.tables.is_added(name)
             {
-                let indexes = if !self.diff.enrichment_tables.is_added(name) {
+                let indexes = if !self.diff.enrichment_tables.tables.is_added(name) {
                     // If this is an existing enrichment table, we need to store the indexes to reapply
                     // them again post load.
                     Some(ENRICHMENT_TABLES.index_fields(&table_name))
@@ -202,7 +202,7 @@ impl<'a> Builder<'a> {
                 };
 
                 let mut prev_state = None;
-                if !self.diff.enrichment_tables.is_added(name)
+                if !self.diff.enrichment_tables.tables.is_added(name)
                     && table_outer.inner.wants_previous_state()
                 {
                     prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
@@ -269,7 +269,7 @@ impl<'a> Builder<'a> {
                 table_sources
                     .iter()
                     .map(|(key, source)| (key, source))
-                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+                    .filter(|(key, _)| self.diff.enrichment_tables.sources.contains_new(key)),
             )
         {
             debug!(component_id = %key, "Building new source.");
@@ -605,7 +605,7 @@ impl<'a> Builder<'a> {
                 table_sinks
                     .iter()
                     .map(|(key, sink)| (key, sink))
-                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+                    .filter(|(key, _)| self.diff.enrichment_tables.sinks.contains_new(key)),
             )
         {
             debug!(component_id = %key, "Building new sink.");
