@@ -329,8 +329,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces, Some(&new_config))
-                    .await;
+                self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
 
@@ -356,7 +355,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
         {
-            self.connect_diff(&diff, &mut new_pieces, None).await;
+            self.connect_diff(&diff, &mut new_pieces).await;
             self.spawn_diff(&diff, new_pieces);
 
             info!("Old configuration restored successfully.");
@@ -723,7 +722,6 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_pieces: &mut TopologyPieces,
-        _new_config: Option<&Config>,
     ) {
         debug!("Connecting changed/added component(s).");
 
@@ -1382,9 +1380,7 @@ impl RunningTopology {
         {
             return None;
         }
-        running_topology
-            .connect_diff(&diff, &mut pieces, None)
-            .await;
+        running_topology.connect_diff(&diff, &mut pieces).await;
         running_topology.spawn_diff(&diff, pieces);
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
