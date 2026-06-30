@@ -1163,7 +1163,7 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(unix)]
+        #[cfg(all(unix, feature = "allocation-tracing"))]
         if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
@@ -1204,7 +1204,7 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(unix)]
+        #[cfg(all(unix, feature = "allocation-tracing"))]
         if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
@@ -1245,7 +1245,7 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(unix)]
+        #[cfg(all(unix, feature = "allocation-tracing"))]
         if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
