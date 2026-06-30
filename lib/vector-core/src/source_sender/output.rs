@@ -76,7 +76,7 @@ impl Drop for UnsentEventCount {
             let _enter = self.span.enter();
             internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,
-                reason: "Source send cancelled.",
+                reason: "Source send interrupted mid-flight; pipeline may be overloaded or shutting down.",
             });
         }
     }
