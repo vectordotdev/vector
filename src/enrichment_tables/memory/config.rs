@@ -195,19 +195,27 @@ impl MemoryConfig {
             .clone()
     }
 
-    pub(super) async fn get_or_build_cuckoo(&self) -> crate::Result<CuckooMemoryTable> {
-        let mut boxed_cuckoo = self.cuckoo.lock().await;
+    pub(super) async fn get_or_build_cuckoo(
+        &self,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
+    ) -> crate::Result<CuckooMemoryTable> {
         let Some(TableFilter::Cuckoo(cuckoo)) = &self.filter else {
             panic!("No cuckoo");
         };
+        let mut boxed_cuckoo = self.cuckoo.lock().await;
         if let Some(boxed_cuckoo) = boxed_cuckoo.as_ref() {
             Ok(*boxed_cuckoo.clone())
         } else {
             Ok(*boxed_cuckoo
-                .insert(Box::new(CuckooMemoryTable::new(
-                    self.clone(),
-                    cuckoo.clone(),
-                )?))
+                .insert(if let Some(prev) = prev_state {
+                    Box::new(CuckooMemoryTable::from_previous_state(
+                        self.clone(),
+                        cuckoo.clone(),
+                        prev,
+                    )?)
+                } else {
+                    Box::new(CuckooMemoryTable::new(self.clone(), cuckoo.clone())?)
+                })
                 .clone())
         }
     }
@@ -224,9 +232,9 @@ impl EnrichmentTableConfig for MemoryConfig {
                 if self.source_config.is_some() {
                     return Err("Source functionality is not supported for cuckoo filter".into());
                 }
-                Ok(Box::new(self.get_or_build_cuckoo().await?))
+                Ok(Box::new(self.get_or_build_cuckoo(prev_state).await?))
             }
-            None => Ok(Box::new(self.get_or_build_memory().await)),
+            None => Ok(Box::new(self.get_or_build_memory(prev_state).await)),
         }
     }
 
@@ -265,7 +273,7 @@ impl SinkConfig for MemoryConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = match &self.filter {
             Some(TableFilter::Cuckoo(_)) => {
-                VectorSink::from_event_streamsink(self.get_or_build_cuckoo().await?)
+                VectorSink::from_event_streamsink(self.get_or_build_cuckoo(None).await?)
             }
             None => VectorSink::from_event_streamsink(self.get_or_build_memory(None).await),
         };

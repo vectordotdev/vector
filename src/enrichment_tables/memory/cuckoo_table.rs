@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     fs::File,
     io::{BufReader, BufWriter, Write},
     num::{NonZeroU64, NonZeroUsize},
@@ -147,53 +148,7 @@ impl CuckooMemoryTable {
         config: MemoryConfig,
         cuckoo_config: CuckooMemoryConfig,
     ) -> crate::Result<Self> {
-        let ttl_val = (config.ttl.div_ceil(config.scan_interval.get())).max(1);
-        let mut builder = CuckooConfiguration::builder(cuckoo_config.max_entries)
-            .fingerprint_bits(cuckoo_config.fingerprint_bits.get().try_into()?)
-            .bucket_size(cuckoo_config.bucket_size)
-            .max_kicks(cuckoo_config.max_kicks);
-
-        if cuckoo_config.lru_enabled {
-            builder = builder.with_lru(LruConfig {
-                remove_on_zero: cuckoo_config.lru_deletion_enabled,
-                ..Default::default()
-            });
-        }
-
-        if cuckoo_config.ttl_enabled {
-            let ttl_val: u32 = u32::try_from(ttl_val)?;
-            let needed_bits = ttl_val.ilog2() + 1;
-            if needed_bits as usize > cuckoo_config.ttl_bits.get() {
-                return Err(
-                    format!(
-                    "`ttl_bits` ({}) must be set to at least {} to support the default `ttl` value ({}) at the configured scan interval ({}).",
-                    cuckoo_config.ttl_bits.get(),
-                        needed_bits,
-                    config.ttl,
-                    config.scan_interval.get()).into(),
-                );
-            }
-            builder = builder.with_ttl(TtlConfig {
-                ttl: ttl_val.try_into()?,
-                ttl_bits: cuckoo_config.ttl_bits.get().try_into()?,
-            });
-        }
-
-        if cuckoo_config.counter_enabled {
-            builder = builder.with_counter(CounterConfig {
-                counter_bits: cuckoo_config.counter_bits.get().try_into()?,
-                ..Default::default()
-            });
-        }
-
-        let built_config = builder.build()?;
-
-        let filter_size = built_config.get_configured_memory_usage();
-        if let Some(max_byte_size) = config.max_byte_size
-            && filter_size as u64 > max_byte_size
-        {
-            return Err(format!("Configured cuckoo filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of cuckoo filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
-        }
+        let built_config = Self::build_config(&config, &cuckoo_config)?;
 
         let filter = 'import: {
             if let Some(path) = &cuckoo_config.persistence_path {
@@ -248,6 +203,87 @@ impl CuckooMemoryTable {
             filter,
             cuckoo_config,
         })
+    }
+
+    /// Creates a new [CuckooMemoryTable] based on the provided config and previous state.
+    pub(super) fn from_previous_state(
+        config: MemoryConfig,
+        cuckoo_config: CuckooMemoryConfig,
+        prev_state: Box<dyn std::any::Any + Send + Sync>,
+    ) -> crate::Result<Self> {
+        if let Ok(prev_memory) = prev_state.downcast::<CuckooMemoryTable>() {
+            let built_config = Self::build_config(&config, &cuckoo_config)?;
+            if built_config.compatible_layout(prev_memory.filter.get_configuration())
+                && let Ok(mut old_filter) =
+                    prev_memory.filter.exporter().snapshot().map(VecDeque::from)
+                && let Ok((hasher, _old_conf)) = CuckooFilter::import_config(&mut old_filter)
+                && let Ok(filter) =
+                    CuckooFilter::import_state(hasher, built_config, &mut old_filter)
+            {
+                return Ok(Self {
+                    filter,
+                    config,
+                    cuckoo_config,
+                });
+            }
+        }
+
+        Self::new(config, cuckoo_config)
+    }
+
+    fn build_config(
+        config: &MemoryConfig,
+        cuckoo_config: &CuckooMemoryConfig,
+    ) -> crate::Result<CuckooConfiguration> {
+        let ttl_val = (config.ttl.div_ceil(config.scan_interval.get())).max(1);
+        let mut builder = CuckooConfiguration::builder(cuckoo_config.max_entries)
+            .fingerprint_bits(cuckoo_config.fingerprint_bits.get().try_into()?)
+            .bucket_size(cuckoo_config.bucket_size)
+            .max_kicks(cuckoo_config.max_kicks);
+
+        if cuckoo_config.lru_enabled {
+            builder = builder.with_lru(LruConfig {
+                remove_on_zero: cuckoo_config.lru_deletion_enabled,
+                ..Default::default()
+            });
+        }
+
+        if cuckoo_config.ttl_enabled {
+            let ttl_val: u32 = u32::try_from(ttl_val)?;
+            let needed_bits = ttl_val.ilog2() + 1;
+            if needed_bits as usize > cuckoo_config.ttl_bits.get() {
+                return Err(
+                    format!(
+                    "`ttl_bits` ({}) must be set to at least {} to support the default `ttl` value ({}) at the configured scan interval ({}).",
+                    cuckoo_config.ttl_bits.get(),
+                        needed_bits,
+                    config.ttl,
+                    config.scan_interval.get()).into(),
+                );
+            }
+            builder = builder.with_ttl(TtlConfig {
+                ttl: ttl_val.try_into()?,
+                ttl_bits: cuckoo_config.ttl_bits.get().try_into()?,
+            });
+        }
+
+        if cuckoo_config.counter_enabled {
+            builder = builder.with_counter(CounterConfig {
+                counter_bits: cuckoo_config.counter_bits.get().try_into()?,
+                ..Default::default()
+            });
+        }
+
+        let built_config = builder.build()?;
+
+        let filter_size = built_config.get_configured_memory_usage();
+        if let Some(max_byte_size) = config.max_byte_size
+            && filter_size as u64 > max_byte_size
+        {
+            return Err(format!("Configured cuckoo filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of cuckoo filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+        }
+
+        Ok(built_config)
     }
 
     fn export(&self) {
