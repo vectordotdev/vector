@@ -27,7 +27,7 @@ async fn ack_updates_ledger_correctly() {
             let config = DiskBufferConfigBuilder::from_path(data_dir)
                 .build()
                 .expect("creating buffer should not fail");
-            let ledger = Ledger::load_or_create(config, usage_handle)
+            let ledger = Ledger::load_or_create(config, usage_handle, false)
                 .await
                 .expect("ledger should not fail to load/create");
             assert_eq!(ledger.consume_pending_acks(), 0);
@@ -59,7 +59,7 @@ async fn ack_wakes_reader() {
             let config = DiskBufferConfigBuilder::from_path(data_dir)
                 .build()
                 .expect("creating buffer should not fail");
-            let ledger = Ledger::load_or_create(config, usage_handle)
+            let ledger = Ledger::load_or_create(config, usage_handle, false)
                 .await
                 .expect("ledger should not fail to load/create");
 

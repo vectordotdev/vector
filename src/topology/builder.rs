@@ -631,7 +631,13 @@ impl<'a> Builder<'a> {
             self.errors.append(&mut err);
         };
 
-        let (tx, rx) = match self.buffers.remove(key) {
+        let observe = sink.inner.requires_buffer_observation();
+        if observe && let Err(error) = sink.buffer.validate_for_drain_shaping() {
+            self.errors.push(format!("Sink \"{key}\": {error}"));
+            return;
+        }
+
+        let (tx, rx, buffer_usage_observer) = match self.buffers.remove(key) {
             Some(buffer) => buffer,
             _ => {
                 let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
@@ -641,10 +647,11 @@ impl<'a> Builder<'a> {
                 let buffer_span = error_span!("sink", buffer_type);
                 let buffer = sink
                     .buffer
-                    .build(
+                    .build_with_observer(
                         self.config.global.data_dir.clone(),
                         key.to_string(),
                         buffer_span,
+                        observe,
                     )
                     .await;
                 match buffer {
@@ -652,7 +659,11 @@ impl<'a> Builder<'a> {
                         self.errors.push(format!("Sink \"{key}\": {error}"));
                         return;
                     }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
+                    Ok((tx, rx, observer)) => (
+                        tx,
+                        Arc::new(Mutex::new(Some(rx.into_stream()))),
+                        Some(observer),
+                    ),
                 }
             }
         };
@@ -662,6 +673,7 @@ impl<'a> Builder<'a> {
             globals: self.config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
             metrics_storage: METRICS_STORAGE.clone(),
+            buffer_usage_observer: buffer_usage_observer.clone(),
             proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
             schema: self.config.schema,
             app_name: crate::get_app_name().to_string(),
@@ -683,6 +695,7 @@ impl<'a> Builder<'a> {
             .utilization_registry
             .add_component(key.clone(), gauge!(GaugeName::Utilization));
         let component_key = key.clone();
+        let task_buffer_usage_observer = buffer_usage_observer.clone();
         let sink = async move {
             debug!("Sink starting.");
 
@@ -715,7 +728,7 @@ impl<'a> Builder<'a> {
             .await
             .map(|_| {
                 debug!("Sink finished normally.");
-                TaskOutput::Sink(rx)
+                TaskOutput::Sink(rx, task_buffer_usage_observer)
             })
             .map_err(|_| {
                 debug!("Sink finished with an error.");

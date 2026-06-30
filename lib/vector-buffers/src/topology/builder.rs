@@ -7,7 +7,7 @@ use tracing::Span;
 use super::channel::{ChannelMetricMetadata, ReceiverAdapter, SenderAdapter};
 use crate::{
     Bufferable, WhenFull,
-    buffer_usage_data::{BufferUsage, BufferUsageHandle},
+    buffer_usage_data::{BufferUsage, BufferUsageHandle, BufferUsageObserver},
     config::MemoryBufferSize,
     topology::channel::{BufferReceiver, BufferSender, limited},
 };
@@ -32,6 +32,7 @@ pub trait IntoBuffer<T: Bufferable>: Send {
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
+        observe: bool,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>>;
 }
 
@@ -109,6 +110,23 @@ impl<T: Bufferable> TopologyBuilder<T> {
         buffer_id: String,
         span: Span,
     ) -> Result<(BufferSender<T>, BufferReceiver<T>), TopologyError> {
+        let (sender, receiver, _observer) =
+            self.build_with_observer(buffer_id, span, false).await?;
+        Ok((sender, receiver))
+    }
+
+    /// Consumes this builder, returning the sender, receiver, and read-only usage observer.
+    ///
+    /// # Errors
+    ///
+    /// If there was a configuration error with one of the stages, an error variant will be returned
+    /// explaining the issue.
+    pub async fn build_with_observer(
+        self,
+        buffer_id: String,
+        span: Span,
+        observe: bool,
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>, BufferUsageObserver), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
         let mut buffer_usage = BufferUsage::from_span(span.clone());
         let mut current_stage = None;
@@ -139,7 +157,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
             let provides_instrumentation = stage.untransformed.provides_instrumentation();
             let (sender, receiver) = stage
                 .untransformed
-                .into_buffer_parts(usage_handle.clone())
+                .into_buffer_parts(usage_handle.clone(), observe)
                 .await
                 .context(FailedToBuildStageSnafu { stage_idx })?;
 
@@ -155,6 +173,9 @@ impl<T: Bufferable> TopologyBuilder<T> {
             };
 
             sender.with_send_duration_instrumentation(stage_idx, &span);
+            if observe && stage_idx == 0 {
+                sender.with_observer(usage_handle.clone());
+            }
             if !provides_instrumentation {
                 sender.with_usage_instrumentation(usage_handle.clone());
                 receiver.with_usage_instrumentation(usage_handle);
@@ -168,9 +189,10 @@ impl<T: Bufferable> TopologyBuilder<T> {
         // Install the buffer usage handler since we successfully created the buffer topology.  This
         // spawns it in the background and periodically emits aggregated metrics about each of the
         // buffer stages.
+        let observer = buffer_usage.observer();
         buffer_usage.install(buffer_id.as_str());
 
-        Ok((sender, receiver))
+        Ok((sender, receiver, observer))
     }
 }
 

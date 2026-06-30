@@ -5,7 +5,7 @@ use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
 use vector_lib::{
-    buffers::{BufferConfig, BufferType},
+    buffers::{BufferConfig, BufferType, BufferUsageObserver},
     config::{AcknowledgementsConfig, GlobalOptions, Input},
     configurable::{
         Configurable, GenerateError, Metadata, NamedComponent,
@@ -266,6 +266,11 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
         Vec::new()
     }
 
+    /// Returns whether the sink needs live buffer usage observation.
+    fn requires_buffer_observation(&self) -> bool {
+        false
+    }
+
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
 }
@@ -278,6 +283,7 @@ pub struct SinkContext {
     pub globals: GlobalOptions,
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
     pub metrics_storage: MetricsStorage,
+    pub buffer_usage_observer: Option<BufferUsageObserver>,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
     pub app_name: String,
@@ -295,6 +301,7 @@ impl Default for SinkContext {
             globals: Default::default(),
             enrichment_tables: Default::default(),
             metrics_storage: Default::default(),
+            buffer_usage_observer: None,
             proxy: Default::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
@@ -311,5 +318,49 @@ impl SinkContext {
 
     pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SinkConfig, SinkContext};
+
+    #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+    struct DefaultObservationSink;
+
+    impl vector_lib::configurable::NamedComponent for DefaultObservationSink {
+        fn get_component_name(&self) -> &'static str {
+            "default_observation_sink"
+        }
+    }
+
+    #[typetag::serde(name = "default_observation_sink")]
+    #[async_trait::async_trait]
+    impl SinkConfig for DefaultObservationSink {
+        async fn build(
+            &self,
+            _cx: SinkContext,
+        ) -> crate::Result<(vector_lib::sink::VectorSink, crate::sinks::Healthcheck)> {
+            unreachable!("default observation test does not build the sink")
+        }
+
+        fn input(&self) -> vector_lib::config::Input {
+            vector_lib::config::Input::all()
+        }
+
+        fn acknowledgements(&self) -> &vector_lib::config::AcknowledgementsConfig {
+            &vector_lib::config::AcknowledgementsConfig::DEFAULT
+        }
+    }
+
+    #[test]
+    fn sink_context_default_has_no_buffer_usage_observer() {
+        assert!(SinkContext::default().buffer_usage_observer.is_none());
+    }
+
+    #[test]
+    fn default_sink_config_does_not_require_buffer_observation() {
+        let config = DefaultObservationSink;
+        assert!(!config.requires_buffer_observation());
     }
 }

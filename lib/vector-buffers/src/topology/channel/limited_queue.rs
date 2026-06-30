@@ -5,7 +5,7 @@ use std::{
     pin::Pin,
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
     time::Instant,
 };
@@ -22,7 +22,7 @@ use vector_common::internal_event::{GaugeName, HistogramName};
 use vector_common::stats::TimeEwmaGauge;
 use vector_common::{gauge, histogram};
 
-use crate::{InMemoryBufferable, config::MemoryBufferSize};
+use crate::{InMemoryBufferable, buffer_usage_data::BufferUsageHandle, config::MemoryBufferSize};
 
 pub const DEFAULT_EWMA_HALF_LIFE_SECONDS: f64 = 5.0;
 
@@ -237,6 +237,9 @@ struct Inner<T> {
     read_waker: Arc<Notify>,
     metrics: Option<Metrics>,
     capacity: NonZeroUsize,
+    usage_handle: Option<BufferUsageHandle>,
+    queued_events: Arc<AtomicU64>,
+    queued_native: Arc<AtomicU64>,
 }
 
 impl<T> Clone for Inner<T> {
@@ -248,19 +251,25 @@ impl<T> Clone for Inner<T> {
             read_waker: self.read_waker.clone(),
             metrics: self.metrics.clone(),
             capacity: self.capacity,
+            usage_handle: self.usage_handle.clone(),
+            queued_events: self.queued_events.clone(),
+            queued_native: self.queued_native.clone(),
         }
     }
 }
 
-impl<T: Send + Sync + Debug + 'static> Inner<T> {
+impl<T: InMemoryBufferable + Send + Sync + Debug + 'static> Inner<T> {
     fn new(
         limit: MemoryBufferSize,
         metric_metadata: Option<ChannelMetricMetadata>,
         ewma_half_life_seconds: Option<f64>,
+        usage_handle: Option<BufferUsageHandle>,
     ) -> Self {
         let read_waker = Arc::new(Notify::new());
         let metrics =
             metric_metadata.map(|metadata| Metrics::new(limit, metadata, ewma_half_life_seconds));
+        let queued_events = Arc::new(AtomicU64::new(0));
+        let queued_native = Arc::new(AtomicU64::new(0));
         match limit {
             MemoryBufferSize::MaxEvents(max_events) => Inner {
                 data: Arc::new(ArrayQueue::new(max_events.get())),
@@ -269,6 +278,9 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
                 read_waker,
                 metrics,
                 capacity: max_events,
+                usage_handle,
+                queued_events,
+                queued_native,
             },
             MemoryBufferSize::MaxSize(max_bytes) => Inner {
                 data: Arc::new(SegQueue::new()),
@@ -277,6 +289,9 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
                 read_waker,
                 metrics,
                 capacity: max_bytes,
+                usage_handle,
+                queued_events,
+                queued_native,
             },
         }
     }
@@ -286,6 +301,7 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
     /// The `size` value is the true utilization contribution of `item`, which may exceed the number
     /// of permits acquired for oversized payloads.
     fn send_with_permits(&mut self, size: usize, permits: OwnedSemaphorePermit, item: T) {
+        let event_count = item.event_count() as u64;
         if let Some(metrics) = &self.metrics {
             // For normal items, capacity - available_permits() exactly represents the total queued
             // utilization (including this item's just-acquired permits). For oversized items that
@@ -295,13 +311,31 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
             metrics.record(utilization, Instant::now());
         }
         self.data.push((permits, item));
+        if let Some(handle) = &self.usage_handle {
+            let ordering = Ordering::Relaxed;
+            let events = self
+                .queued_events
+                .fetch_add(event_count, ordering)
+                .saturating_add(event_count);
+            let native_size = size as u64;
+            let native = self
+                .queued_native
+                .fetch_add(native_size, ordering)
+                .saturating_add(native_size);
+            handle.set_occupancy(events, native);
+        }
         self.read_waker.notify_one();
     }
-}
 
-impl<T> Inner<T> {
     fn used_capacity(&self) -> usize {
         self.capacity.get() - self.limiter.available_permits()
+    }
+
+    fn native_size(&self, item: &T) -> usize {
+        match self.limit {
+            MemoryBufferSize::MaxSize(_) => item.allocated_bytes(),
+            MemoryBufferSize::MaxEvents(_) => item.event_count(),
+        }
     }
 
     fn pop_and_record(&self) -> Option<T> {
@@ -312,6 +346,20 @@ impl<T> Inner<T> {
                 // permits.
                 let utilization = self.used_capacity().saturating_sub(permit.num_permits());
                 metrics.record(utilization, Instant::now());
+            }
+            if let Some(handle) = &self.usage_handle {
+                let ordering = Ordering::Relaxed;
+                let event_count = item.event_count() as u64;
+                let events = self
+                    .queued_events
+                    .fetch_sub(event_count, ordering)
+                    .saturating_sub(event_count);
+                let native_size = self.native_size(&item) as u64;
+                let native = self
+                    .queued_native
+                    .fetch_sub(native_size, ordering)
+                    .saturating_sub(native_size);
+                handle.set_occupancy(events, native);
             }
             // Release permits after recording so a waiting sender cannot enqueue a new item
             // before this pop's utilization measurement is taken.
@@ -429,7 +477,7 @@ pub struct LimitedReceiver<T> {
     inner: Inner<T>,
 }
 
-impl<T: Send + 'static> LimitedReceiver<T> {
+impl<T: InMemoryBufferable + Send + 'static> LimitedReceiver<T> {
     /// Gets the number of items that this channel could accept.
     pub fn available_capacity(&self) -> usize {
         self.inner.limiter.available_permits()
@@ -484,7 +532,16 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     metric_metadata: Option<ChannelMetricMetadata>,
     ewma_half_life_seconds: Option<f64>,
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = Inner::new(limit, metric_metadata, ewma_half_life_seconds);
+    limited_with_usage_handle(limit, metric_metadata, ewma_half_life_seconds, None)
+}
+
+pub fn limited_with_usage_handle<T: InMemoryBufferable + fmt::Debug>(
+    limit: MemoryBufferSize,
+    metric_metadata: Option<ChannelMetricMetadata>,
+    ewma_half_life_seconds: Option<f64>,
+    usage_handle: Option<BufferUsageHandle>,
+) -> (LimitedSender<T>, LimitedReceiver<T>) {
+    let inner = Inner::new(limit, metric_metadata, ewma_half_life_seconds, usage_handle);
 
     let sender = LimitedSender {
         inner: inner.clone(),

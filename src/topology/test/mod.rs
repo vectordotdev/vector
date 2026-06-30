@@ -1,7 +1,9 @@
 use std::{
+    collections::HashMap,
     iter,
+    num::NonZeroU64,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
@@ -11,6 +13,7 @@ use tokio::{
     task::yield_now,
     time::{Duration, sleep},
 };
+use tracing::Span;
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     config::{ComponentKey, OutputId},
@@ -149,6 +152,67 @@ async fn topology_shutdown_while_active() {
     // We expect the pump to fail with an error since we shut down the source it was sending to
     // while it was running.
     assert!(pump_handle.await.unwrap().is_err());
+}
+
+#[tokio::test]
+async fn reused_buffer_observer_is_forwarded_to_sink_context() {
+    trace_init();
+
+    let data_dir = tempfile::tempdir().unwrap();
+    let sink_key = ComponentKey::from("out");
+    let buffer_config = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(300_000_000).unwrap(),
+        when_full: WhenFull::Block,
+    });
+    let (sender, receiver, observer) = buffer_config
+        .build_with_observer(
+            Some(data_dir.path().to_path_buf()),
+            sink_key.to_string(),
+            Span::none(),
+            true,
+        )
+        .await
+        .unwrap();
+    let mut reusable_sender = sender.clone();
+
+    let captured_buffer_usage_observers = Arc::new(Mutex::new(Vec::new()));
+    let (_output, sink) = basic_sink(1);
+    let sink = sink
+        .with_buffer_observation(true)
+        .with_captured_buffer_usage_observers(Arc::clone(&captured_buffer_usage_observers));
+
+    let mut config_builder = Config::builder();
+    config_builder.global.data_dir = Some(data_dir.path().to_path_buf());
+    config_builder.add_source("in", basic_source().1);
+    config_builder.add_sink("out", &["in"], sink);
+    config_builder.sinks[&sink_key].buffer = buffer_config;
+    let config = config_builder.build().unwrap();
+    let diff = ConfigDiff::initial(&config);
+    let mut buffers = HashMap::new();
+    buffers.insert(
+        sink_key,
+        (
+            sender,
+            Arc::new(Mutex::new(Some(receiver.into_stream()))),
+            Some(observer),
+        ),
+    );
+
+    let _pieces = TopologyPiecesBuilder::new(&config, &diff)
+        .with_buffers(buffers)
+        .build()
+        .await
+        .unwrap();
+
+    let captured_observer = captured_buffer_usage_observers.lock().unwrap()[0]
+        .clone()
+        .expect("reused observer should be available to the sink");
+
+    reusable_sender
+        .send(EventArray::from(LogEvent::from("observed")), None)
+        .await
+        .unwrap();
+    assert_eq!(captured_observer.received().0, 1);
 }
 
 #[tokio::test]

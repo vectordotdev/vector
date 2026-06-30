@@ -231,6 +231,8 @@ where
     last_flush: AtomicCell<Instant>,
     // Tracks usage data about the buffer.
     usage_handle: BufferUsageHandle,
+    // Enables the drain-shaping observer's current occupancy mirror.
+    occupancy_enabled: bool,
 }
 
 impl<FS> Ledger<FS>
@@ -412,6 +414,7 @@ where
     /// Tracks the statistics of a successful write.
     pub fn track_write(&self, event_count: u64, record_size: u64) {
         self.increment_total_buffer_size(record_size);
+        self.set_observed_occupancy();
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
     }
@@ -419,6 +422,7 @@ where
     /// Tracks the statistics of multiple successful reads.
     pub fn track_reads(&self, event_count: u64, total_record_size: u64) {
         self.decrement_total_buffer_size(total_record_size);
+        self.set_observed_occupancy();
         self.usage_handle
             .increment_sent_event_count_and_byte_size(event_count, total_record_size);
     }
@@ -550,6 +554,13 @@ where
             );
     }
 
+    fn set_observed_occupancy(&self) {
+        if self.occupancy_enabled {
+            self.usage_handle
+                .set_occupancy(self.get_total_records(), self.get_total_buffer_size());
+        }
+    }
+
     pub fn track_dropped_events(&self, count: u64) {
         // We don't know how many bytes are represented by dropped events because we never actually had a chance to read
         // them, so we have to use a byte size of 0 here.
@@ -583,6 +594,7 @@ where
     pub(super) async fn load_or_create(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
+        observe: bool,
     ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
         // Create our containing directory if it doesn't already exist.
         fs::create_dir_all(&config.data_dir)
@@ -671,6 +683,7 @@ where
             unacked_reader_file_id_offset: AtomicU16::new(0),
             last_flush: AtomicCell::new(Instant::now()),
             usage_handle,
+            occupancy_enabled: observe,
         };
         ledger.update_buffer_size().await?;
 
@@ -733,6 +746,7 @@ where
         }
 
         self.increment_total_buffer_size(total_buffer_size);
+        self.set_observed_occupancy();
 
         Ok(())
     }

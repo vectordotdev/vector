@@ -7,6 +7,7 @@ pub mod buffer;
 pub mod builder;
 pub mod compressor;
 pub mod datagram;
+pub mod drain_shaping;
 pub mod encoding;
 pub mod http;
 pub mod metadata;

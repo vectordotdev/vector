@@ -26,7 +26,10 @@ use std::{
 
 use futures::{Future, FutureExt};
 use tokio::sync::mpsc;
-use vector_lib::buffers::topology::channel::{BufferReceiverStream, BufferSender};
+use vector_lib::buffers::{
+    BufferUsageObserver,
+    topology::channel::{BufferReceiverStream, BufferSender},
+};
 
 use self::task::{Task, TaskError, TaskResult};
 pub use self::{
@@ -45,6 +48,7 @@ type TaskHandle = tokio::task::JoinHandle<TaskResult>;
 type BuiltBuffer = (
     BufferSender<EventArray>,
     Arc<Mutex<Option<BufferReceiverStream<EventArray>>>>,
+    Option<BufferUsageObserver>,
 );
 
 pub(super) fn take_healthchecks(

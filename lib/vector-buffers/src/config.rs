@@ -12,7 +12,7 @@ use vector_common::{config::ComponentKey, finalization::Finalizable};
 use vector_config::configurable_component;
 
 use crate::{
-    Bufferable, WhenFull,
+    BufferUsageObserver, Bufferable, WhenFull,
     topology::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
@@ -378,6 +378,33 @@ impl BufferConfig {
             .any(|stage| matches!(stage, BufferType::DiskV2 { .. }))
     }
 
+    /// Validates that this buffer can support drain shaping.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any stage is not a blocking disk buffer.
+    pub fn validate_for_drain_shaping(&self) -> Result<(), String> {
+        for stage in self.stages() {
+            match stage {
+                BufferType::Memory { .. } => {
+                    return Err(
+                        "drain_shaping requires disk buffers; memory buffers are unsupported"
+                            .to_string(),
+                    );
+                }
+                BufferType::DiskV2 { when_full, .. } if *when_full != WhenFull::Block => {
+                    return Err(
+                        "drain_shaping requires when_full = \"block\" on every buffer stage"
+                            .to_string(),
+                    );
+                }
+                BufferType::DiskV2 { .. } => {}
+            }
+        }
+
+        Ok(())
+    }
+
     /// Gets all of the configured stages for this buffer.
     pub fn stages(&self) -> &[BufferType] {
         match self {
@@ -408,6 +435,32 @@ impl BufferConfig {
     where
         T: Bufferable + Clone + Finalizable,
     {
+        let (sender, receiver, _observer) = self
+            .build_with_observer(data_dir, buffer_id, span, false)
+            .await?;
+        Ok((sender, receiver))
+    }
+
+    /// Builds the buffer components and read-only usage observer represented by this configuration.
+    ///
+    /// The observer is always returned, but its hot-path accounting is only enabled when `observe`
+    /// is true.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any configured stage is invalid, a required data directory is missing,
+    /// or the underlying topology cannot be built.
+    #[allow(clippy::needless_pass_by_value)]
+    pub async fn build_with_observer<T>(
+        &self,
+        data_dir: Option<PathBuf>,
+        buffer_id: String,
+        span: Span,
+        observe: bool,
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>, BufferUsageObserver), BufferBuildError>
+    where
+        T: Bufferable + Clone + Finalizable,
+    {
         let mut builder = TopologyBuilder::default();
 
         for stage in self.stages() {
@@ -415,7 +468,7 @@ impl BufferConfig {
         }
 
         builder
-            .build(buffer_id, span)
+            .build_with_observer(buffer_id, span, observe)
             .await
             .context(FailedToBuildTopologySnafu)
     }
@@ -466,6 +519,33 @@ max_events: 42
 ";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
+    }
+
+    #[test]
+    fn drain_shaping_validation_requires_disk_block_stages() {
+        let memory = BufferConfig::Single(BufferType::Memory {
+            size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(10).unwrap()),
+            when_full: WhenFull::Block,
+        });
+        assert_eq!(
+            memory.validate_for_drain_shaping().unwrap_err(),
+            "drain_shaping requires disk buffers; memory buffers are unsupported"
+        );
+
+        let disk_drop_newest = BufferConfig::Single(BufferType::DiskV2 {
+            max_size: NonZeroU64::new(300_000_000).unwrap(),
+            when_full: WhenFull::DropNewest,
+        });
+        assert_eq!(
+            disk_drop_newest.validate_for_drain_shaping().unwrap_err(),
+            "drain_shaping requires when_full = \"block\" on every buffer stage"
+        );
+
+        let disk_block = BufferConfig::Single(BufferType::DiskV2 {
+            max_size: NonZeroU64::new(300_000_000).unwrap(),
+            when_full: WhenFull::Block,
+        });
+        disk_block.validate_for_drain_shaping().unwrap();
     }
 
     #[test]
