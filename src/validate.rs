@@ -145,7 +145,11 @@ pub async fn validate(opts: &Opts, color: bool, allow_interpolation: bool) -> Ex
     }
 }
 
-pub fn validate_config(opts: &Opts, fmt: &mut Formatter, allow_interpolation: bool) -> Option<Config> {
+pub fn validate_config(
+    opts: &Opts,
+    fmt: &mut Formatter,
+    allow_interpolation: bool,
+) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
     let paths = if let Some(paths) = config::process_paths(&paths) {

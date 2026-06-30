@@ -275,7 +275,10 @@ fn log_schema_multiple_config_files() {
     if std::env::var("CI").as_deref() == Ok("true") {
         assert_eq!(event["test_host"], json!("runner"));
     } else {
-        assert!(event["test_host"].is_string(), "expected test_host to be a string");
+        assert!(
+            event["test_host"].is_string(),
+            "expected test_host to be a string"
+        );
     }
 }
 

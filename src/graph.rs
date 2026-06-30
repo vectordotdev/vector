@@ -138,8 +138,7 @@ pub(crate) fn cmd(opts: &Opts, allow_interpolation: bool) -> exitcode::ExitCode 
             );
         }
     }
-    let config = match config::load_from_paths(&paths, allow_interpolation)
-    {
+    let config = match config::load_from_paths(&paths, allow_interpolation) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]

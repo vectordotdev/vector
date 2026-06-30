@@ -91,9 +91,7 @@ impl InstallOpts {
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments =
-            create_service_arguments(&config_paths, allow_interpolation)
-                .unwrap();
+        let arguments = create_service_arguments(&config_paths, allow_interpolation).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -256,15 +254,18 @@ pub fn cmd(opts: &Opts, allow_interpolation: bool) -> exitcode::ExitCode {
     let sub_command = &opts.sub_command;
     match sub_command {
         Some(s) => match s {
-            SubCommand::Install(opts) => {
-                control_service(
-                    &opts.service_info(allow_interpolation || opts.dangerously_allow_env_var_interpolation),
-                    ControlAction::Install,
-                )
-            }
+            SubCommand::Install(opts) => control_service(
+                &opts.service_info(
+                    allow_interpolation || opts.dangerously_allow_env_var_interpolation,
+                ),
+                ControlAction::Install,
+            ),
             SubCommand::Uninstall(opts) => {
                 let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
-                control_service(&opts.service_info(), ControlAction::Uninstall { stop_timeout })
+                control_service(
+                    &opts.service_info(),
+                    ControlAction::Uninstall { stop_timeout },
+                )
             }
             SubCommand::Start(opts) => control_service(&opts.service_info(), ControlAction::Start),
             SubCommand::Stop(opts) => {

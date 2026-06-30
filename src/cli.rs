@@ -490,15 +490,17 @@ impl SubCommand {
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
-            Self::Config(c) => {
-                config::cmd(c, allow_interpolation || c.dangerously_allow_env_var_interpolation)
-            }
+            Self::Config(c) => config::cmd(
+                c,
+                allow_interpolation || c.dangerously_allow_env_var_interpolation,
+            ),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema(opts) => generate_schema::cmd(opts),
-            Self::Graph(g) => {
-                graph::cmd(g, allow_interpolation || g.dangerously_allow_env_var_interpolation)
-            }
+            Self::Graph(g) => graph::cmd(
+                g,
+                allow_interpolation || g.dangerously_allow_env_var_interpolation,
+            ),
             Self::List(l) => list::cmd(l),
             #[cfg(windows)]
             Self::Service(s) => service::cmd(s, allow_interpolation),
