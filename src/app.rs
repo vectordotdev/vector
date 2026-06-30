@@ -246,6 +246,11 @@ impl Application {
         let mut signals = SignalPair::new(&runtime);
 
         if let Some(sub_command) = &opts.sub_command {
+            if opts.root.disable_env_var_interpolation {
+                warn!(
+                    "--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
+                );
+            }
             return Err(runtime.block_on(sub_command.execute(
                 signals,
                 color,
