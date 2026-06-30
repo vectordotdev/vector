@@ -295,11 +295,14 @@ generated: components: sinks: datadog_metrics: configuration: {
 		type: string: {
 			default: "v2"
 			enum: {
-				v1: """
-					Use the v1 series endpoint (`/api/v1/series`).
+				v1: {
+					deprecated: true
+					description: """
+						Use the v1 series endpoint (`/api/v1/series`).
 
-					This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
-					"""
+						This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
+						"""
+				}
 				v2: """
 					Use the v2 series endpoint (`/api/v2/series`).
 
