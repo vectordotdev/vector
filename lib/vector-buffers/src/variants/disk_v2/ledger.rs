@@ -363,6 +363,11 @@ where
         self.get_data_file_path(self.get_current_reader_file_id())
     }
 
+    /// Gets the buffer's data directory.
+    pub(super) fn data_dir(&self) -> &std::path::Path {
+        &self.config.data_dir
+    }
+
     /// Gets the current writer data file path.
     pub fn get_current_writer_data_file_path(&self) -> PathBuf {
         self.get_data_file_path(self.get_current_writer_file_id())

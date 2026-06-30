@@ -1,0 +1,3 @@
+Fixed a durability gap in the `disk_v2` buffer that could permanently lose end-to-end acknowledged records across a crash. When the buffer created a new data file it synced the file's contents to disk, but never synced the parent data directory, so the file's directory entry was not made durable. After a crash (for example a `SIGKILL` or power loss) the newly created file could disappear entirely on reopen even though its contents had been fsynced — taking with it records the buffer had already acknowledged to its upstream source, which the source therefore would not retransmit. The buffer now fsyncs the data directory immediately after creating a new data file, so the file is durably present before any records written into it can be acknowledged.
+
+authors: graphcareful

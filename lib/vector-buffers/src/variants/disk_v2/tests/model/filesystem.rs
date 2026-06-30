@@ -352,4 +352,10 @@ impl Filesystem for TestFilesystem {
             Err(io_err_not_found())
         }
     }
+
+    async fn sync_directory(&self, _path: &Path) -> io::Result<()> {
+        // The in-memory test filesystem does not model directory-entry durability separately, so
+        // there is nothing to synchronize here.
+        Ok(())
+    }
 }

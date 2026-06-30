@@ -85,6 +85,19 @@ pub trait Filesystem: Send + Sync {
     /// If an I/O error occurred when attempting to delete the file, an error variant will be
     /// returned describing the underlying error.
     async fn delete_file(&self, path: &Path) -> io::Result<()>;
+
+    /// Durably persists the directory entries (file creations and deletions) of `path`.
+    ///
+    /// Synchronizing a file's contents with [`AsyncFile::sync_all`] does not make that file's
+    /// *directory entry* durable; the parent directory must itself be synchronized. Without this,
+    /// a newly created data file can disappear after a crash even though its contents were synced,
+    /// losing records the buffer may have already acknowledged to its upstream source.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error occurred while synchronizing the directory, an error variant will be
+    /// returned describing the underlying error.
+    async fn sync_directory(&self, path: &Path) -> io::Result<()>;
 }
 
 pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
@@ -163,6 +176,38 @@ impl Filesystem for ProductionFilesystem {
 
     async fn delete_file(&self, path: &Path) -> io::Result<()> {
         tokio::fs::remove_file(path).await
+    }
+
+    async fn sync_directory(&self, path: &Path) -> io::Result<()> {
+        // On Unix, a directory's entries are made durable by opening the directory and issuing an
+        // `fsync` against its descriptor.
+        #[cfg(unix)]
+        {
+            let directory = tokio::fs::File::open(path).await?;
+            directory.sync_all().await
+        }
+        // On non-Unix platforms there is no portable way to durably persist a directory's entries
+        // (e.g. on Windows a directory cannot simply be opened and flushed like a regular file), so
+        // we cannot make a newly created data file's directory entry durable here. The buffer
+        // therefore remains exposed to losing a freshly created data file -- and the records it has
+        // acknowledged from it -- across a crash on these platforms. Warn once so the gap is
+        // observable rather than silent.
+        #[cfg(not(unix))]
+        {
+            use std::sync::Once;
+
+            static WARN_ONCE: Once = Once::new();
+            WARN_ONCE.call_once(|| {
+                tracing::warn!(
+                    "The disk buffer cannot durably synchronize its data directory on this \
+                     platform; a crash may lose a newly created data file and any records already \
+                     acknowledged from it."
+                );
+            });
+
+            let _ = path;
+            Ok(())
+        }
     }
 }
 

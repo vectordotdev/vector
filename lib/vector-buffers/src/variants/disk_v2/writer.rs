@@ -1160,6 +1160,16 @@ where
                 // Make sure the file is flushed to disk, especially if we just created it.
                 data_file.sync_all().await?;
 
+                // Syncing the file's contents above does not make its directory entry durable.
+                // Sync the data directory so a newly created file is present on disk before
+                // acknowledging anything written into it.
+                if data_file_size == 0 {
+                    self.ledger
+                        .filesystem()
+                        .sync_directory(self.ledger.data_dir())
+                        .await?;
+                }
+
                 self.writer = Some(RecordWriter::new(
                     data_file,
                     data_file_size,
