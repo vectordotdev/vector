@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 //! Parquet batch format codec for batched event encoding
 //!
 //! Provides Apache Parquet format encoding with schema file support and auto-inference.

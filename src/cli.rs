@@ -244,12 +244,12 @@ pub struct RootOpts {
     pub no_graceful_shutdown_limit: bool,
 
     /// Set runtime allocation tracing
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
     pub allocation_tracing: bool,
 
     /// Set allocation tracing reporting rate in milliseconds.
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(
         long,
         env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
@@ -271,6 +271,21 @@ pub struct RootOpts {
     /// `--watch-config`.
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
+
+    /// Maximum number of bytes allowed after decompressing a payload.
+    ///
+    /// Sources that decompress incoming payloads (gzip, deflate, zstd, snappy) enforce this cap to
+    /// prevent a compressed "bomb" from exhausting memory. Payloads whose decompressed size exceeds
+    /// the limit are rejected.
+    ///
+    /// Defaults to 104857600 (100 MiB). Raise this only when sources routinely receive
+    /// legitimately large compressed payloads.
+    #[arg(
+        long,
+        env = "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES",
+        default_value = "104857600"
+    )]
+    pub max_decompressed_size_bytes: usize,
 
     /// Raise the file descriptor soft limit (RLIMIT_NOFILE) to the hard limit at startup.
     ///
@@ -589,7 +604,7 @@ mod tests {
         if setrlimit(Resource::RLIMIT_NOFILE, hard, hard).is_err() {
             #[cfg(target_os = "macos")]
             if let Some(maxfiles) = super::macos_maxfilesperproc() {
-                let _ = setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard);
+                setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard).ok();
             }
         }
 

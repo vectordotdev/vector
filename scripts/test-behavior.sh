@@ -7,4 +7,4 @@ set -euo pipefail
 #
 #   Run behavioral tests
 
-$(find target -type f -executable -name vector | head -n1) test tests/behavior/**/*.toml
+$(find target -type f -executable -name vector | head -n1) test tests/behavior/**/*.yaml
