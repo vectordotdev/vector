@@ -123,7 +123,7 @@ fn edge_attributes_to_string(attributes: &EdgeAttributes, default_label: Option<
     attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
-pub(crate) fn cmd(opts: &Opts, allow_interpolation: bool) -> exitcode::ExitCode {
+pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
         Some(paths) => paths,
@@ -138,7 +138,7 @@ pub(crate) fn cmd(opts: &Opts, allow_interpolation: bool) -> exitcode::ExitCode 
             );
         }
     }
-    let config = match config::load_from_paths(&paths, allow_interpolation) {
+    let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]

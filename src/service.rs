@@ -14,6 +14,15 @@ pub struct Opts {
     sub_command: Option<SubCommand>,
 }
 
+impl Opts {
+    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+        matches!(
+            &self.sub_command,
+            Some(SubCommand::Install(opts)) if opts.dangerously_allow_env_var_interpolation
+        )
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
 struct InstallOpts {
@@ -76,7 +85,7 @@ struct InstallOpts {
 }
 
 impl InstallOpts {
-    fn service_info(&self, allow_interpolation: bool) -> ServiceInfo {
+    fn service_info(&self) -> ServiceInfo {
         if self.disable_env_var_interpolation {
             #[allow(clippy::print_stderr)]
             {
@@ -91,7 +100,7 @@ impl InstallOpts {
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments = create_service_arguments(&config_paths, allow_interpolation).unwrap();
+        let arguments = create_service_arguments(&config_paths).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -250,16 +259,13 @@ enum ControlAction {
     Restart { stop_timeout: Duration },
 }
 
-pub fn cmd(opts: &Opts, allow_interpolation: bool) -> exitcode::ExitCode {
+pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let sub_command = &opts.sub_command;
     match sub_command {
         Some(s) => match s {
-            SubCommand::Install(opts) => control_service(
-                &opts.service_info(
-                    allow_interpolation || opts.dangerously_allow_env_var_interpolation,
-                ),
-                ControlAction::Install,
-            ),
+            SubCommand::Install(opts) => {
+                control_service(&opts.service_info(), ControlAction::Install)
+            }
             SubCommand::Uninstall(opts) => {
                 let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
                 control_service(
@@ -332,12 +338,9 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     }
 }
 
-fn create_service_arguments(
-    config_paths: &[config::ConfigPath],
-    dangerously_allow_env_var_interpolation: bool,
-) -> Option<Vec<OsString>> {
+fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(config_paths)?;
-    match config::load_from_paths(&config_paths, dangerously_allow_env_var_interpolation) {
+    match config::load_from_paths(&config_paths) {
         Ok(_) => {
             let mut args: Vec<OsString> = config_paths
                 .iter()
@@ -356,7 +359,7 @@ fn create_service_arguments(
                     }
                 })
                 .collect();
-            if dangerously_allow_env_var_interpolation {
+            if config::env_var_interpolation_enabled() {
                 args.push(OsString::from("--dangerously-allow-env-var-interpolation"));
             }
             Some(args)

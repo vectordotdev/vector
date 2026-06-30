@@ -54,13 +54,11 @@ impl ConfigBuilderLoader {
 }
 
 impl Default for ConfigBuilderLoader {
-    /// Creates a new builder with default settings.
-    /// By default, environment variable interpolation is disabled.
     fn default() -> Self {
         Self {
             builder: ConfigBuilder::default(),
             secrets: HashMap::new(),
-            interpolate_env: false,
+            interpolate_env: super::env_var_interpolation_enabled(),
         }
     }
 }

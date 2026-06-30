@@ -92,11 +92,8 @@ impl UnitTest {
 fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
-    interpolate_env: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(interpolate_env)
-        .load_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
@@ -104,20 +101,16 @@ fn init_log_schema_from_paths(
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
-    interpolate_env: bool,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    init_log_schema_from_paths(paths, false, interpolate_env)?;
-    let secrets_backends_loader = loading::loader_from_paths(
-        loading::SecretBackendLoader::default().interpolate_env(interpolate_env),
-        paths,
-    )?;
+    init_log_schema_from_paths(paths, false)?;
+    let secrets_backends_loader =
+        loading::loader_from_paths(loading::SecretBackendLoader::default(), paths)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
     let config_builder = ConfigBuilderLoader::default()
-        .interpolate_env(interpolate_env)
         .secrets(secrets)
         .load_from_paths(paths)?;
 
