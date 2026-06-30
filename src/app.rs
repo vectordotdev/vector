@@ -573,7 +573,23 @@ pub fn build_runtime(
     let chunk_size_events = chunk_size_events
         .map(NonZeroUsize::get)
         .unwrap_or(vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS);
+
+    let Some(source_sender_buffer_size) = threads.checked_mul(chunk_size_events) else {
+        error!(
+            "The `chunk_size_events` argument is too large for the configured number of threads."
+        );
+        return Err(exitcode::CONFIG);
+    };
+    let Some(ready_array_capacity) =
+        chunk_size_events.checked_mul(crate::topology::builder::READY_ARRAY_CAPACITY_CHUNKS)
+    else {
+        error!("The `chunk_size_events` argument is too large.");
+        return Err(exitcode::CONFIG);
+    };
+
     vector_lib::source_sender::set_chunk_size_events(chunk_size_events);
+    crate::topology::builder::set_source_sender_buffer_size(source_sender_buffer_size);
+    crate::topology::builder::set_ready_array_capacity(ready_array_capacity);
 
     debug!(
         message = "Building runtime.",
