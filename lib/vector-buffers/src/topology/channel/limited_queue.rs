@@ -310,8 +310,11 @@ impl<T: InMemoryBufferable + Send + Sync + Debug + 'static> Inner<T> {
             let utilization = size.max(self.used_capacity());
             metrics.record(utilization, Instant::now());
         }
-        self.data.push((permits, item));
         if let Some(handle) = &self.usage_handle {
+            // Increment the observed counters before the item becomes visible to poppers. If the
+            // push happened first, a receiver already polling could pop the item and run the
+            // `fetch_sub` path before this `fetch_add`, underflowing the atomics toward `u64::MAX`
+            // and making the observer report a near-full buffer.
             let ordering = Ordering::Relaxed;
             let events = self
                 .queued_events
@@ -324,6 +327,7 @@ impl<T: InMemoryBufferable + Send + Sync + Debug + 'static> Inner<T> {
                 .saturating_add(native_size);
             handle.set_occupancy(events, native);
         }
+        self.data.push((permits, item));
         self.read_waker.notify_one();
     }
 
