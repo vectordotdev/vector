@@ -416,7 +416,7 @@ mod tests {
         // A length prefix of 26 exceeds the max length of 16, so the decoder
         // enters the discarding state with 26 bytes to discard, leaving "abc".
         buffer.put(&b"26 abc"[..]);
-        let _ = decoder.decode(&mut buffer);
+        let _result = decoder.decode(&mut buffer);
         assert_eq!(decoder.octet_decoding, Some(State::Discarding(26)));
 
         // Only three more bytes arrive, so the buffer holds fewer bytes than
