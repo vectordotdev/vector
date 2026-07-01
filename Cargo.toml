@@ -166,7 +166,7 @@ const-str = { version = "1.1.0", default-features = false }
 convert_case = { version = "0.8", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
-darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
+darling = { version = "0.23.0", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
