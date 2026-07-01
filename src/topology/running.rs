@@ -154,7 +154,7 @@ impl RunningTopology {
 
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
-        for (key, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
+        for (key, task) in self.tasks.into_iter().chain(self.source_tasks) {
             let task = task.map(map_closure).shared();
 
             wait_handles.push(task.clone());
@@ -329,7 +329,8 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces).await;
+                self.connect_diff(&diff, &mut new_pieces, Some(&new_config))
+                    .await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
 
@@ -355,7 +356,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
         {
-            self.connect_diff(&diff, &mut new_pieces).await;
+            self.connect_diff(&diff, &mut new_pieces, None).await;
             self.spawn_diff(&diff, new_pieces);
 
             info!("Old configuration restored successfully.");
@@ -421,12 +422,29 @@ impl RunningTopology {
     ) -> HashMap<ComponentKey, BuiltBuffer> {
         // First, we shutdown any changed/removed sources. This ensures that we can allow downstream
         // components to terminate naturally by virtue of the flow of events stopping.
-        if diff.sources.any_changed_or_removed() {
+        if diff.sources.any_changed_or_removed() || diff.enrichment_tables.any_changed_or_removed()
+        {
             let timeout = Duration::from_secs(30);
             let mut source_shutdown_handles = Vec::new();
 
+            let to_remove_table_sources = diff
+                .enrichment_tables
+                .to_remove
+                .iter()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key))
+                        .map(|(key, _)| key.clone())
+                })
+                .collect::<Vec<_>>();
             let deadline = Instant::now() + timeout;
-            for key in &diff.sources.to_remove {
+            for key in diff
+                .sources
+                .to_remove
+                .iter()
+                .chain(to_remove_table_sources.iter())
+            {
                 debug!(component_id = %key, "Removing source.");
 
                 let previous = self.tasks.remove(key).unwrap();
@@ -437,7 +455,23 @@ impl RunningTopology {
                     .push(self.shutdown_coordinator.shutdown_source(key, deadline));
             }
 
-            for key in &diff.sources.to_change {
+            let to_change_table_sources = diff
+                .enrichment_tables
+                .to_change
+                .iter()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key))
+                        .map(|(key, _)| key.clone())
+                })
+                .collect::<Vec<_>>();
+            for key in diff
+                .sources
+                .to_change
+                .iter()
+                .chain(to_change_table_sources.iter())
+            {
                 debug!(component_id = %key, "Changing source.");
 
                 self.remove_outputs(key);
@@ -549,8 +583,8 @@ impl RunningTopology {
                     .map(|(key, value)| ((false, key), value)),
             ),
         )
-        .into_iter()
-        .flat_map(|(_, components)| components)
+        .into_values()
+        .flatten()
         .collect::<HashSet<_>>();
         // Existing conflicting sinks
         let conflicting_sinks = conflicts
@@ -563,6 +597,12 @@ impl RunningTopology {
             .sinks
             .to_change
             .iter()
+            .chain(diff.enrichment_tables.to_change.iter().filter(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_sink(key))
+                    .is_some()
+            }))
             .filter(|&key| {
                 if diff.components_to_reload.contains(key) {
                     return false;
@@ -583,10 +623,31 @@ impl RunningTopology {
             .collect::<HashSet<_>>();
 
         // For any existing sink that has a conflicting resource dependency with a changed/added
-        // sink, or for any sink that we want to reuse their buffer, we need to explicit wait for
-        // them to finish processing so we can reclaim ownership of those resources/buffers.
+        // sink, for any sink that we want to reuse their buffer, or for any changed sink with
+        // a disk buffer that is not being reused, we need to explicitly wait for them to finish
+        // processing so we can reclaim ownership of those resources/buffers.
+        let changed_disk_buffer_sinks = diff
+            .sinks
+            .to_change
+            .iter()
+            .filter(|key| {
+                !reuse_buffers.contains(*key)
+                    && (self
+                        .config
+                        .sink(key)
+                        .is_some_and(|s| s.buffer.has_disk_stage())
+                        || self
+                            .config
+                            .enrichment_table(key)
+                            .and_then(|t| t.as_sink(key))
+                            .is_some_and(|(_, s)| s.buffer.has_disk_stage()))
+            })
+            .cloned()
+            .collect::<HashSet<_>>();
+
         let wait_for_sinks = conflicting_sinks
             .chain(reuse_buffers.iter().cloned())
+            .chain(changed_disk_buffer_sinks.iter().cloned())
             .collect::<HashSet<_>>();
 
         // First, we remove any inputs to removed sinks so they can naturally shut down.
@@ -628,24 +689,26 @@ impl RunningTopology {
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
-            if reuse_buffers.contains(key) {
+            if reuse_buffers.contains(key) || changed_disk_buffer_sinks.contains(key) {
                 self.detach_triggers
                     .remove(key)
                     .unwrap()
                     .into_inner()
                     .cancel();
 
-                // We explicitly clone the input side of the buffer and store it so we don't lose
-                // it when we remove the inputs below.
-                //
-                // We clone instead of removing here because otherwise the input will be missing for
-                // the rest of the reload process, which violates the assumption that all previous
-                // inputs for components not being removed are still available. It's simpler to
-                // allow the "old" input to stick around and be replaced (even though that's
-                // basically a no-op since we're reusing the same buffer) than it is to pass around
-                // info about which sinks are having their buffers reused and treat them differently
-                // at other stages.
-                buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
+                if reuse_buffers.contains(key) {
+                    // We explicitly clone the input side of the buffer and store it so we don't lose
+                    // it when we remove the inputs below.
+                    //
+                    // We clone instead of removing here because otherwise the input will be missing for
+                    // the rest of the reload process, which violates the assumption that all previous
+                    // inputs for components not being removed are still available. It's simpler to
+                    // allow the "old" input to stick around and be replaced (even though that's
+                    // basically a no-op since we're reusing the same buffer) than it is to pass around
+                    // info about which sinks are having their buffers reused and treat them differently
+                    // at other stages.
+                    buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
+                }
             }
             self.remove_inputs(key, diff, new_config).await;
         }
@@ -700,6 +763,7 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_pieces: &mut TopologyPieces,
+        new_config: Option<&Config>,
     ) {
         debug!("Connecting changed/added component(s).");
 
@@ -733,6 +797,7 @@ impl RunningTopology {
             for key in removed_sinks {
                 // Sinks only have inputs
                 self.inputs_tap_metadata.remove(key);
+                self.component_type_names.remove(key);
             }
 
             let removed_sources = diff.enrichment_tables.to_remove.iter().filter_map(|key| {
@@ -743,6 +808,7 @@ impl RunningTopology {
             for key in removed_sources {
                 // Sources only have outputs
                 self.outputs_tap_metadata.remove(&key);
+                self.component_type_names.remove(&key);
             }
 
             for key in diff.sources.changed_and_added() {
@@ -758,7 +824,8 @@ impl RunningTopology {
                 .enrichment_tables
                 .changed_and_added()
                 .filter_map(|key| {
-                    self.config
+                    new_config
+                        .unwrap_or(&self.config)
                         .enrichment_table(key)
                         .and_then(|t| t.as_source(key).map(|(key, _)| key))
                 })
@@ -766,6 +833,8 @@ impl RunningTopology {
                 if let Some(task) = new_pieces.tasks.get(&key) {
                     self.outputs_tap_metadata
                         .insert(key.clone(), ("source", task.typetag().to_string()));
+                    self.component_type_names
+                        .insert(key.clone(), task.typetag().to_string());
                 }
             }
 
@@ -785,6 +854,22 @@ impl RunningTopology {
                 }
             }
 
+            for key in diff
+                .enrichment_tables
+                .changed_and_added()
+                .filter_map(|key| {
+                    new_config
+                        .unwrap_or(&self.config)
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_sink(key).map(|(key, _)| key))
+                })
+            {
+                if let Some(task) = new_pieces.tasks.get(&key) {
+                    self.component_type_names
+                        .insert(key.clone(), task.typetag().to_string());
+                }
+            }
+
             for (key, input) in &new_pieces.inputs {
                 self.inputs_tap_metadata
                     .insert(key.clone(), input.1.clone());
@@ -798,12 +883,17 @@ impl RunningTopology {
             self.setup_outputs(key, new_pieces).await;
         }
 
-        let added_changed_table_sources: Vec<&ComponentKey> = diff
+        let added_changed_table_sources: Vec<ComponentKey> = diff
             .enrichment_tables
             .changed_and_added()
-            .filter(|k| new_pieces.source_tasks.contains_key(k))
+            .filter_map(|key| {
+                new_config
+                    .unwrap_or(&self.config)
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_source(key).map(|(key, _)| key))
+            })
             .collect();
-        for key in added_changed_table_sources.iter() {
+        for key in &added_changed_table_sources {
             debug!(component_id = %key, "Connecting outputs for enrichment table source.");
             self.setup_outputs(key, new_pieces).await;
         }
@@ -827,12 +917,17 @@ impl RunningTopology {
             debug!(component_id = %key, "Connecting inputs for sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
-        let added_changed_tables: Vec<&ComponentKey> = diff
+        let added_changed_tables: Vec<ComponentKey> = diff
             .enrichment_tables
             .changed_and_added()
-            .filter(|k| new_pieces.inputs.contains_key(k))
+            .filter_map(|key| {
+                new_config
+                    .unwrap_or(&self.config)
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_sink(key).map(|(key, _)| key))
+            })
             .collect();
-        for key in added_changed_tables.iter() {
+        for key in &added_changed_tables {
             debug!(component_id = %key, "Connecting inputs for enrichment table sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
@@ -1024,7 +1119,7 @@ impl RunningTopology {
             .transforms()
             .filter(|(key, _)| !diff.transforms.contains(key));
         for (transform_key, transform) in unchanged_transforms {
-            let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
+            let changed_outputs = get_changed_outputs(&self.config, diff, transform.inputs.clone());
             for output_id in changed_outputs {
                 debug!(component_id = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
@@ -1034,12 +1129,20 @@ impl RunningTopology {
             }
         }
 
+        let unchanged_table_sinks = self
+            .config
+            .enrichment_tables()
+            .filter(|(key, _)| !diff.enrichment_tables.contains(key))
+            .filter_map(|(key, table)| table.as_sink(key))
+            .collect::<Vec<_>>();
         let unchanged_sinks = self
             .config
             .sinks()
             .filter(|(key, _)| !diff.sinks.contains(key));
-        for (sink_key, sink) in unchanged_sinks {
-            let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());
+        for (sink_key, sink) in
+            unchanged_sinks.chain(unchanged_table_sinks.iter().map(|(k, v)| (k, v)))
+        {
+            let changed_outputs = get_changed_outputs(&self.config, diff, sink.inputs.clone());
             for output_id in changed_outputs {
                 debug!(component_id = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
@@ -1145,7 +1248,7 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(feature = "allocation-tracing")]
+        #[cfg(unix)]
         if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
@@ -1186,7 +1289,7 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(feature = "allocation-tracing")]
+        #[cfg(unix)]
         if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
@@ -1227,7 +1330,7 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(feature = "allocation-tracing")]
+        #[cfg(unix)]
         if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
@@ -1356,7 +1459,9 @@ impl RunningTopology {
         {
             return None;
         }
-        running_topology.connect_diff(&diff, &mut pieces).await;
+        running_topology
+            .connect_diff(&diff, &mut pieces, None)
+            .await;
         running_topology.spawn_diff(&diff, pieces);
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
@@ -1394,10 +1499,30 @@ impl RunningTopology {
     }
 }
 
-fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
+fn get_changed_outputs(
+    config: &Config,
+    diff: &ConfigDiff,
+    output_ids: Inputs<OutputId>,
+) -> Vec<OutputId> {
     let mut changed_outputs = Vec::new();
 
-    for source_key in &diff.sources.to_change {
+    let to_change_table_sources = diff
+        .enrichment_tables
+        .to_change
+        .iter()
+        .filter_map(|key| {
+            config
+                .enrichment_table(key)
+                .and_then(|t| t.as_source(key))
+                .map(|(key, _)| key.clone())
+        })
+        .collect::<Vec<_>>();
+    for source_key in diff
+        .sources
+        .to_change
+        .iter()
+        .chain(to_change_table_sources.iter())
+    {
         changed_outputs.extend(
             output_ids
                 .iter()

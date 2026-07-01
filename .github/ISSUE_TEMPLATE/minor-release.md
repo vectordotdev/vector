@@ -45,7 +45,7 @@ Automated steps include:
 - Pin VRL to latest released version rather than `main`
 - Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
       `distribution/docker/`. Update if so.
-- Run `cargo vdev build release-cue` to generate a new cue file for the release
+- Generate a new cue file for the release in `website/cue/reference/releases/`
   - Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
         ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
 - Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
@@ -65,13 +65,14 @@ Automated steps include:
   - [ ] Ensure any deprecations are highlighted in the release upgrade guide.
   - [ ] Review generated changelog entries to ensure they are understandable to end-users.
   - [ ] Ensure the date matches the scheduled release date.
-  - [ ] Add a link to pending deprecation items from [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md).
+  - [ ] Run `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"` to review new deprecation announcements in this release.
 - [ ] PR review & approval.
 
 # On the day of release
 
 - [ ] Make sure the release branch is in sync with origin/master and has only one squashed commit with all commits from the prepare branch. If you made a PR from the prepare branch into the release branch this should already be the case.
-  - [ ] `git checkout "${RELEASE_BRANCH}"`
+  - [ ] `git fetch origin`
+  - [ ] `git checkout "${RELEASE_BRANCH}" && git pull --ff-only origin "${RELEASE_BRANCH}"`
   - [ ] `git show --stat HEAD` - This should show the squashed prepare commit.
   - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
     - If this needs to be updated commit and squash it in the release branch.
@@ -88,7 +89,7 @@ Automated steps include:
 - [ ] Wait for release workflow to complete.
   - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
+  - [ ] `git fetch origin && git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push --force-with-lease`
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.

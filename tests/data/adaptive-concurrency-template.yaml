@@ -1,0 +1,58 @@
+params:
+  requests: 000
+  delay: 0.050
+  # Delete any of these that are not needed
+  interval:
+  jitter: 0
+
+  concurrency_limit_params:
+    scale: 0
+    knee_start: 0
+    knee_exp: 0.0
+    limit: 0
+    action: "defer" # "defer" or "drop"
+
+  rate:
+    scale: 0
+    knee_start: 0
+    knee_exp: 0.0
+    limit: 0
+    action: "defer" # "defer" or "drop"
+
+  concurrency: "auto"
+
+  # Delete any of these that are not needed
+  adaptive_concurrency:
+    initial_concurrency: 1
+    decrease_ratio: 0.9
+    ewma_alpha: 0.4
+    rtt_deviation_scale: 2.5
+    max_concurrency_limit: 200
+
+stats:
+  in_flight:
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
+  rate:
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
+
+controller:
+  concurrency_limit:
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
+  in_flight:
+    max: [0, 0]
+    mean: [0, 0]
+    mode: [0, 0]
+  observed_rtt:
+    min: [0, 0]
+    max: [0, 0]
+    mean: [0, 0]
+  averaged_rtt:
+    min: [0, 0]
+    max: [0, 0]
+    mean: [0, 0]

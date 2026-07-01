@@ -5,8 +5,8 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
-[lints.clippy]
-unwrap-used = "deny"
+[lints]
+workspace = true
 
 [[bin]]
 name = "generate-avro-fixtures"
@@ -14,8 +14,8 @@ path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
 apache-avro = { version = "0.20.0", default-features = false }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc", "json"], optional = true }
-parquet = { version = "56.2.0", default-features = false, features = [
+arrow = { version = "58.2.0", default-features = false, features = ["ipc", "json"], optional = true }
+parquet = { version = "58.2.0", default-features = false, features = [
     "arrow",
     "snap",
     "zstd",
@@ -45,7 +45,7 @@ prost-reflect.workspace = true
 rand.workspace = true
 regex.workspace = true
 serde.workspace = true
-serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
+serde_with.workspace = true
 serde_json.workspace = true
 serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }

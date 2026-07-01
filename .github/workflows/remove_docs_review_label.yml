@@ -1,0 +1,101 @@
+# Docs review hold — workflow 3/3
+#
+# Triggered by check_docs_review.yml (2/3) completing successfully. Runs in the
+# base-repo context so it has a write token, which is required to modify labels
+# on fork PRs. Re-checks review state immediately before removal to reduce (but
+# not eliminate) the chance of removing the label while a CHANGES_REQUESTED was
+# submitted in the small window between check and removal. Best-effort is fine.
+name: Remove Docs Review Label
+
+on:
+  workflow_run:
+    workflows: ["Check Docs Review"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+env:
+  LABEL_NAME: "docs review on hold"
+
+jobs:
+  download:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      pr_number: ${{ steps.read.outputs.pr_number }}
+    steps:
+      - name: Download PR number
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: docs-review-pr
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Read PR number
+        id: read
+        if: steps.download.outcome == 'success'
+        run: |
+          pr_number=$(cat pr-number | tr -d '[:space:]')
+          echo "pr_number=${pr_number}" >> $GITHUB_OUTPUT
+
+  remove_label:
+    needs: download
+    if: needs.download.outputs.pr_number != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: pr-labels-${{ needs.download.outputs.pr_number }}
+      cancel-in-progress: false
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Remove label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ needs.download.outputs.pr_number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            if (isNaN(prNumber)) {
+              core.setFailed('Invalid PR number');
+              return;
+            }
+
+            const allowed = ['MEMBER', 'OWNER'];
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+            const approved = reviews.some(r => allowed.includes(r.author_association) && r.state === 'APPROVED');
+            core.info(`Member approval found: ${approved}`);
+            if (!approved) {
+              core.info('No member approval, skipping removal');
+              return;
+            }
+
+            const labelName = process.env.LABEL_NAME;
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: labelName,
+              });
+              core.info(`Removed "${labelName}" label from PR #${prNumber}`);
+            } catch (err) {
+              if (err.status === 404) {
+                core.info(`Label "${labelName}" already absent from PR #${prNumber}, skipping`);
+              } else {
+                throw err;
+              }
+            }

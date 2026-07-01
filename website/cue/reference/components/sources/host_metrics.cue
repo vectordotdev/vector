@@ -10,8 +10,7 @@ components: sources: host_metrics: {
 		"""
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "batch"
@@ -58,7 +57,7 @@ components: sources: host_metrics: {
 		}
 
 		SYSFS_ROOT: {
-			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container. Unset and uses system `/sys` by default."
+			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container. Unset and uses system `/sys` by default. Note: the `temperature` collector reads sensors through the `sysinfo` library, which always uses the process' real `/sys` and does not honor this setting."
 			type: string: {
 				default: null
 				examples: ["/mnt/host/sys"]
@@ -194,6 +193,11 @@ components: sources: host_metrics: {
 			}
 		}
 
+		// Host temperature
+		temperature_celsius: _host & _temperature_gauge & {description: "The current temperature reported by a hardware component, in degrees Celsius."}
+		temperature_max_celsius: _host & _temperature_gauge & {description: "The highest temperature recorded for a hardware component, in degrees Celsius."}
+		temperature_critical_celsius: _host & _temperature_gauge & {description: "The temperature at which a hardware component is considered critical, in degrees Celsius."}
+
 		// Helpers
 		_host: {
 			default_namespace: "host"
@@ -305,6 +309,18 @@ components: sources: host_metrics: {
 					description: "The connection state."
 					required:    true
 					examples: ["established", "time_wait"]
+				}
+			}
+		}
+
+		_temperature_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["temperature"]
+				component: {
+					description: "The label of the hardware component the temperature was read from. Falls back to the component id when the sensor exposes no label (for example when sysinfo reads `/sys/class/thermal`)."
+					required:    true
+					examples: ["Core 0", "coretemp Package id 0", "nvme Composite"]
 				}
 			}
 		}

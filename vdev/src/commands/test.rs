@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::{testing::runner::get_agent_test_runner, utils::platform};
+use crate::testing::runner::{LocalTestRunner, TestRunner as _};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -11,13 +11,16 @@ pub struct Cli {
     /// Extra test command arguments
     args: Option<Vec<String>>,
 
-    /// Whether to run tests in a container
-    #[arg(short = 'C', long)]
-    container: bool,
-
     /// Environment variables in the form KEY[=VALUE]
     #[arg(short, long)]
     env: Option<Vec<String>>,
+
+    /// Features to activate (comma-separated, or set FEATURES env var)
+    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
+    features: Vec<String>,
+
+    #[arg(long)]
+    no_default_features: bool,
 }
 
 fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
@@ -34,25 +37,33 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let runner = get_agent_test_runner(self.container)?;
+        let features: Vec<String> = self
+            .features
+            .into_iter()
+            .filter(|f| !f.is_empty())
+            .collect();
 
         let mut args = vec!["--workspace".to_string()];
+
+        if self.no_default_features {
+            args.push("--no-default-features".to_string());
+        }
+        if !features.is_empty() {
+            args.extend(["--features".to_string(), features.join(",")]);
+        }
 
         if let Some(mut extra_args) = self.args {
             args.append(&mut extra_args);
         }
 
-        if !args.contains(&"--features".to_string()) {
-            let features = platform::default_features();
-            args.extend(["--features".to_string(), features.to_string()]);
-        }
-
-        runner.test(
+        LocalTestRunner.test(
             &parse_env(self.env.unwrap_or_default()),
             &BTreeMap::default(),
             None,
             &args,
             false, // Don't pre-build Vector for direct test runs
+            false,
+            None,
         )
     }
 }

@@ -4,8 +4,7 @@ components: sources: websocket: {
 	title: "WebSocket"
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"

@@ -236,10 +236,9 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let common_attributes_path = (!self.common_attributes.is_empty()).then_some(
             LegacyKey::InsertIfEmpty(owned_value_path!("common_attributes")),
         );
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self
             .decoding
-            .schema_definition(log_namespace)
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
@@ -315,7 +314,6 @@ mod tests {
     use flate2::read::GzEncoder;
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use tokio::time::{Duration, sleep};
     use vector_lib::{assert_event_data_eq, lookup::path};
     use vrl::{value, value::KeyString, value::ObjectMap, value::Value};
 
@@ -326,7 +324,7 @@ mod tests {
         log_event,
         test_util::{
             addr::{PortGuard, next_addr},
-            collect_ready,
+            collect_n,
             components::{SOURCE_TAGS, assert_source_compliance},
             wait_for_tcp,
         },
@@ -486,20 +484,9 @@ mod tests {
         record_compression: Compression,
         common_attributes: Option<&'static str>,
     ) -> tokio::task::JoinHandle<reqwest::Result<reqwest::Response>> {
-        let handle = tokio::spawn(async move {
-            send(
-                address,
-                timestamp,
-                records,
-                key,
-                gzip,
-                record_compression,
-                common_attributes,
-            )
-            .await
-        });
-        sleep(Duration::from_millis(500)).await;
-        handle
+        tokio::spawn(async move {
+            send(address, timestamp, records, key, gzip, record_compression, common_attributes).await
+        })
     }
 
     /// Encodes record data to mach AWS's representation: base64 encoded with an additional
@@ -606,7 +593,7 @@ mod tests {
             .await;
 
             if success {
-                let events = collect_ready(rx).await;
+                let events = collect_n(rx, 1).await;
 
                 let res = res.await.unwrap().unwrap();
                 assert_eq!(200, res.status().as_u16());
@@ -716,7 +703,7 @@ mod tests {
             .await;
 
             if success {
-                let events = collect_ready(rx).await;
+                let events = collect_n(rx, 1).await;
 
                 let res = res.await.unwrap().unwrap();
                 assert_eq!(200, res.status().as_u16());
@@ -794,7 +781,7 @@ mod tests {
             )
             .await;
 
-            let events = collect_ready(rx).await;
+            let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
             assert_eq!(200, res.status().as_u16());
 
@@ -842,7 +829,7 @@ mod tests {
             )
             .await;
 
-            let events = collect_ready(rx).await;
+            let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
             assert_eq!(200, res.status().as_u16());
 
@@ -891,7 +878,7 @@ mod tests {
             )
             .await;
 
-            let mut events = collect_ready(rx).await;
+            let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
             assert_eq!(200, res.status().as_u16());
 
@@ -980,7 +967,7 @@ mod tests {
             )
             .await;
 
-            let events = collect_ready(rx).await;
+            let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
             assert_eq!(200, res.status().as_u16());
 
@@ -1036,7 +1023,7 @@ mod tests {
             )
             .await;
 
-            let mut events = collect_ready(rx).await;
+            let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
             assert_eq!(200, res.status().as_u16());
 
@@ -1113,7 +1100,7 @@ mod tests {
             )
             .await;
 
-            let mut events = collect_ready(rx).await;
+            let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
             assert_eq!(200, res.status().as_u16());
 
@@ -1316,7 +1303,7 @@ mod tests {
         )
         .await;
 
-        let events = collect_ready(rx).await;
+        let events = collect_n(rx, 1).await;
 
         let res = res.await.unwrap().unwrap();
         assert_eq!(406, res.status().as_u16());
@@ -1362,7 +1349,7 @@ mod tests {
         )
         .await;
 
-        let events = collect_ready(rx).await;
+        let events = collect_n(rx, 1).await;
         let access_key = events[0]
             .metadata()
             .secrets()
@@ -1373,8 +1360,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_authorization_access_key_passthrough_enabled() {
-        let (rx, address, _guard) =
-            source(None, None, true, Default::default(), true, true, vec![]).await;
+        let (rx, address, _guard) = source(None, None, true, Default::default(), true, true, vec![]).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
@@ -1389,7 +1375,7 @@ mod tests {
         )
         .await;
 
-        let events = collect_ready(rx).await;
+        let events = collect_n(rx, 1).await;
 
         assert!(
             events[0]

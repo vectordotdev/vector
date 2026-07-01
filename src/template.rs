@@ -551,6 +551,10 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     for cap in RE.captures_iter(src) {
         let all = cap.get(0).expect("Capture 0 is always defined");
         if all.start() > last_end {
+            #[expect(
+                clippy::string_slice,
+                reason = "indices come from regex match positions, always char boundaries"
+            )]
             parts.push(parse_literal(&src[last_end..all.start()])?);
         }
 
@@ -566,6 +570,10 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
         last_end = all.end();
     }
     if src.len() > last_end {
+        #[expect(
+            clippy::string_slice,
+            reason = "last_end comes from a regex match end position, always a char boundary"
+        )]
         parts.push(parse_literal(&src[last_end..])?);
     }
 
@@ -576,7 +584,9 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
         "name" => Some(metric.name()),
         "namespace" => metric.namespace(),
-        _ if key.starts_with("tags.") => metric.tags().and_then(|tags| tags.get(&key[5..])),
+        _ if let Some(tag_key) = key.strip_prefix("tags.") => {
+            metric.tags().and_then(|tags| tags.get(tag_key))
+        }
         _ => None,
     }
 }

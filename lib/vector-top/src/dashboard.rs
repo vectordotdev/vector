@@ -34,7 +34,7 @@ use super::{
 };
 
 pub const fn is_allocation_tracing_enabled() -> bool {
-    cfg!(feature = "allocation-tracing")
+    cfg!(unix)
 }
 
 macro_rules! row_comparator {
@@ -157,7 +157,7 @@ pub mod columns {
     pub const BYTES_OUT: &str = "Bytes Out";
     pub const BYTES_OUT_TOTAL: &str = "Bytes Out Total";
     pub const ERRORS: &str = "Errors";
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     pub const MEMORY_USED: &str = "Memory Used";
 }
 
@@ -170,7 +170,7 @@ static HEADER: [&str; NUM_COLUMNS] = [
     columns::BYTES_IN,
     columns::EVENTS_OUT,
     columns::BYTES_OUT,
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     columns::MEMORY_USED,
     columns::ERRORS,
 ];
@@ -286,7 +286,7 @@ impl<'a> Widgets<'a> {
                 SortColumn::BytesOut => row_comparator!(sent_bytes_throughput_sec),
                 SortColumn::BytesOutTotal => row_comparator!(sent_bytes_total),
                 SortColumn::Errors => row_comparator!(errors),
-                #[cfg(feature = "allocation-tracing")]
+                #[cfg(unix)]
                 SortColumn::MemoryUsed => row_comparator!(allocated_bytes),
             };
             if state.sort_state.reverse {
@@ -348,7 +348,7 @@ impl<'a> Widgets<'a> {
                     r.sent_bytes_throughput_sec,
                     self.human_metrics,
                 ),
-                #[cfg(feature = "allocation-tracing")]
+                #[cfg(unix)]
                 if state.allocation_tracing_active {
                     r.allocated_bytes.human_format_bytes()
                 } else {
@@ -633,7 +633,7 @@ pub async fn init_dashboard<'a>(
     url: &'a str,
     interval: u32,
     human_metrics: bool,
-    event_tx: state::EventTx,
+    ui_event_tx: state::UiEventTx,
     mut state_rx: state::StateRx,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -661,7 +661,8 @@ pub async fn init_dashboard<'a>(
 
     loop {
         tokio::select! {
-            Some(state) = state_rx.recv() => {
+            Ok(()) = state_rx.changed() => {
+                let state = state_rx.borrow_and_update().clone();
                 if state.ui.filter_visible {
                     input_mode = InputMode::FilterInput;
                 } else if state.ui.sort_visible {
@@ -675,7 +676,7 @@ pub async fn init_dashboard<'a>(
             },
             k = key_press_rx.recv() => {
                 let k = k.unwrap();
-                if handle_input(input_mode, k, &event_tx, &terminal).await {
+                if handle_input(input_mode, k, &ui_event_tx, &terminal).await {
                     _ = key_press_kill_tx.send(());
                     break;
                 }

@@ -1,0 +1,49 @@
+name: Auto-tag vdev on version bump
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "vdev/Cargo.toml"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Generate token via GitHub App
+        id: generate_token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private-key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Create tag if version changed
+        run: |
+          set -euo pipefail
+
+          current=$(grep '^version = ' vdev/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          previous=$(git show "${{ github.event.before }}":vdev/Cargo.toml 2>/dev/null | grep '^version = ' | head -1 | sed 's/version = "\(.*\)"/\1/' || true)
+
+          if [ -z "$current" ]; then
+            echo "Could not parse current version from vdev/Cargo.toml" >&2
+            exit 1
+          fi
+
+          if [ "$current" = "$previous" ]; then
+            echo "vdev version unchanged ($current), skipping tag"
+            exit 0
+          fi
+
+          tag="vdev-v${current}"
+          echo "Version changed ${previous:-<none>} -> $current, creating tag $tag"
+          git tag "$tag"
+          git push origin "$tag"

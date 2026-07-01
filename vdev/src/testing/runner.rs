@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{collections::HashSet, env, process::Command};
+use std::{collections::HashSet, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
@@ -29,8 +29,19 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
-// The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
+const LOCAL_TEST_COMMAND: &[&str] = &["cargo", "nextest", "run", "--no-fail-fast"];
+const COVERAGE_COMMAND: &[&str] = &[
+    "cargo",
+    "llvm-cov",
+    "nextest",
+    "--workspace",
+    "--no-fail-fast",
+    "--no-default-features",
+];
+/// Coverage output path inside the test runner container.
+const COVERAGE_OUTPUT_DIR: &str = "/coverage";
+/// Coverage output path on the host (relative to project root).
+pub(crate) const LOCAL_COVERAGE_OUTPUT_DIR: &str = "target/coverage";
 
 pub enum RunnerState {
     Running,
@@ -43,15 +54,8 @@ pub enum RunnerState {
     Unknown,
 }
 
-pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
-    if container {
-        Ok(Box::new(DockerTestRunner))
-    } else {
-        Ok(Box::new(LocalTestRunner))
-    }
-}
-
 pub trait TestRunner {
+    #[allow(clippy::too_many_arguments)]
     fn test(
         &self,
         outer_env: &Environment,
@@ -59,7 +63,17 @@ pub trait TestRunner {
         features: Option<&[String]>,
         args: &[String],
         build: bool,
+        coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()>;
+}
+
+/// Return the coverage output filename, optionally scoped to an environment.
+pub(crate) fn coverage_filename(coverage_env: Option<&str>) -> String {
+    match coverage_env {
+        Some(env) => format!("lcov-{env}.info"),
+        None => "lcov.info".to_string(),
+    }
 }
 
 pub trait ContainerTestRunner: TestRunner {
@@ -237,6 +251,8 @@ where
         features: Option<&[String]>,
         args: &[String],
         build: bool,
+        coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()> {
         self.ensure_running(features, config_environment_variables, build)?;
 
@@ -256,8 +272,20 @@ where
         append_environment_variables(&mut command, config_environment_variables);
 
         command.arg(self.container_name());
-        command.args(TEST_COMMAND);
+        command.args(if coverage {
+            COVERAGE_COMMAND
+        } else {
+            TEST_COMMAND
+        });
         command.args(args);
+        if coverage {
+            let filename = coverage_filename(coverage_env);
+            command.args([
+                "--lcov",
+                "--output-path",
+                &format!("{COVERAGE_OUTPUT_DIR}/{filename}"),
+            ]);
+        }
 
         command.check_run()
     }
@@ -285,6 +313,12 @@ impl IntegrationTestRunner {
             .collect();
 
         volumes.push(format!("{VOLUME_TARGET}:/output"));
+
+        // Always mount the coverage directory so the container can be reused
+        // for coverage runs without needing to be recreated.
+        let coverage_dir = std::path::Path::new(app::path()).join(LOCAL_COVERAGE_OUTPUT_DIR);
+        std::fs::create_dir_all(&coverage_dir)?;
+        volumes.push(format!("{}:{COVERAGE_OUTPUT_DIR}", coverage_dir.display()));
 
         Ok(Self {
             integration,
@@ -368,30 +402,6 @@ impl ContainerTestRunner for IntegrationTestRunner {
     }
 }
 
-pub struct DockerTestRunner;
-
-impl ContainerTestRunner for DockerTestRunner {
-    fn network_name(&self) -> Option<&str> {
-        None
-    }
-
-    fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
-    }
-
-    fn image_name(&self) -> String {
-        env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
-    }
-
-    fn needs_docker_socket(&self) -> bool {
-        false
-    }
-
-    fn volumes(&self) -> Vec<String> {
-        Vec::default()
-    }
-}
-
 pub struct LocalTestRunner;
 
 impl TestRunner for LocalTestRunner {
@@ -402,10 +412,26 @@ impl TestRunner for LocalTestRunner {
         _features: Option<&[String]>,
         args: &[String],
         _build: bool,
+        coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()> {
-        let mut command = Command::new(TEST_COMMAND[0]);
-        command.args(&TEST_COMMAND[1..]);
+        let test_cmd = if coverage {
+            COVERAGE_COMMAND
+        } else {
+            LOCAL_TEST_COMMAND
+        };
+        let mut command = Command::new(test_cmd[0]);
+        command.args(&test_cmd[1..]);
         command.args(args);
+        if coverage {
+            std::fs::create_dir_all(LOCAL_COVERAGE_OUTPUT_DIR)?;
+            let filename = coverage_filename(coverage_env);
+            command.args([
+                "--lcov",
+                "--output-path",
+                &format!("{LOCAL_COVERAGE_OUTPUT_DIR}/{filename}"),
+            ]);
+        }
 
         for (key, value) in outer_env {
             if let Some(value) = value {

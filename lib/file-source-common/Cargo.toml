@@ -6,6 +6,9 @@ edition = "2024"
 publish = false
 license = "MIT"
 
+[lints]
+workspace = true
+
 [target.'cfg(windows)'.dependencies]
 libc.workspace = true
 winapi = { version = "0.3", features = ["winioctl"] }
@@ -16,11 +19,11 @@ chrono.workspace = true
 tracing.workspace = true
 crc = "3.3.0"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.143", default-features = false }
+serde_json.workspace = true
 bstr = { version = "1.12", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 dashmap = { version = "6.1", default-features = false }
-async-compression = { version = "0.4.41", features = ["tokio", "gzip"] }
+async-compression.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 tokio = { workspace = true, features = ["full"] }

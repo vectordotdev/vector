@@ -14,7 +14,7 @@ see which components support specific guarantees.
 
 ## Acknowledgement guarantees
 
-Vector supports end-to-end acknowledgement for the majority of its
+Vector supports [end-to-end acknowledgements][e2e_acks] for the majority of its
 sources and sinks. This is a system which tracks the delivery status of
 an event through the lifetime of that event as it travels from the
 originating source to any number of destination sinks. Support for this
@@ -92,13 +92,10 @@ The `stable` status is a _subjective_ status defined by the Vector team. It's in
 general idea of a feature's suitability for production environments. A feature is considered stable
 if it meets the following criteria:
 
-1. A meaningful number of users (generally over 50) have been using the feature in a production
-    environment for a sustained period of time without issue.
-2. The feature has had sufficient time (generally more than 4 months) to be community tested.
-
-3. The feature API is stable and unlikely to change.
-
-4. There are no major [open bugs][bugs] for the feature.
+1. The feature has had sufficient time (generally more than 4 months) to be community tested.
+2. The feature API is stable and unlikely to change.
+3. There are no major [open bugs][bugs] for the feature.
+4. There is positive community signal that the feature is being used successfully in production environments.
 
 ### Beta
 
@@ -121,11 +118,15 @@ will provide ample time to transition and, when possible, strive to retain backw
 
 One of the unique advantages of the metrics and logging use cases is that data is usually used for diagnostic purposes only. Therefore, losing the occasional event has little impact on your business. This affords you the opportunity to provision your pipeline towards performance, simplicity, and cost reduction. On the other hand, if you're using your data to perform business critical functions, then data loss is not acceptable and therefore requires "at-least-once" delivery.
 
-To clarify, even though a source or sink is marked as "best effort" it doesn't mean Vector takes delivery lightly. In fact, once data is within the boundary of Vector it won't be lost if you've configured on-disk buffers. Data loss for "best-effort" sources and sinks is almost always due to the limitations of the underlying protocol.
+To clarify, even though a source or sink is marked as "best effort" it doesn't mean Vector takes
+delivery lightly. For stronger delivery guarantees, use components that support
+[end-to-end acknowledgements][e2e_acks] and configure disk buffers where events need to survive
+restarts. Disk buffers improve durability for events that have been written to them, but they do not
+by themselves guarantee end-to-end delivery.
 
 ### Does Vector support exactly-once delivery?
 
-No, Vector does not support exactly once delivery. There are future plans to partially support this for sources and sinks that support it, for example Kafka, but it remains unclear if Vector will ever be able to achieve this. We recommend [subscribing to our mailing list](/community), which will keep you in the loop if this ever changes.
+No, Vector does not support exactly once delivery. There are future plans to partially support this for sources and sinks that support it, for example Kafka, but it remains unclear if Vector will ever be able to achieve this.
 
 ### How can I find components that meet these guarantees?
 
@@ -134,4 +135,5 @@ filters.
 
 [bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22
 [components]: /components
+[e2e_acks]: /docs/architecture/end-to-end-acknowledgements
 [event]: /docs/architecture/data-model

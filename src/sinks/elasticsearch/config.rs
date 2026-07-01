@@ -608,33 +608,30 @@ mod tests {
 
     #[test]
     fn parse_aws_auth() {
-        toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            auth.strategy = "aws"
-            auth.assume_role = "role"
-        "#,
-        )
+        serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            auth:
+              strategy: aws
+              assume_role: role
+        "#})
         .unwrap();
 
-        toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            auth.strategy = "aws"
-        "#,
-        )
+        serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            auth:
+              strategy: aws
+        "#})
         .unwrap();
     }
 
     #[test]
     fn parse_mode() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            mode = "data_stream"
-            data_stream.type = "synthetics"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            mode: data_stream
+            data_stream:
+              type: synthetics
+        "#})
         .unwrap();
         assert!(matches!(config.mode, ElasticsearchMode::DataStream));
         assert!(config.data_stream.is_some());
@@ -642,46 +639,39 @@ mod tests {
 
     #[test]
     fn parse_distribution() {
-        toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = ["", ""]
-            distribution.retry_initial_backoff_secs = 10
-        "#,
-        )
+        serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: ["", ""]
+            distribution:
+              retry_initial_backoff_secs: 10
+        "#})
         .unwrap();
     }
 
     #[test]
     fn parse_version() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            api_version = "v7"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            api_version: v7
+        "#})
         .unwrap();
         assert_eq!(config.api_version, ElasticsearchApiVersion::V7);
     }
 
     #[test]
     fn parse_version_auto() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            api_version = "auto"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            api_version: auto
+        "#})
         .unwrap();
         assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
     }
 
     #[test]
     fn parse_default_bulk() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+        "#})
         .unwrap();
         assert_eq!(config.mode, ElasticsearchMode::Bulk);
         assert_eq!(config.bulk, BulkConfig::default());
@@ -689,12 +679,10 @@ mod tests {
 
     #[test]
     fn parse_opensearch_service_type_managed() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            opensearch_service_type = "managed"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            opensearch_service_type: managed
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
@@ -704,14 +692,13 @@ mod tests {
 
     #[test]
     fn parse_opensearch_service_type_serverless() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            opensearch_service_type = "serverless"
-            auth.strategy = "aws"
-            api_version = "auto"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            api_version: auto
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
@@ -721,11 +708,9 @@ mod tests {
 
     #[test]
     fn parse_opensearch_service_type_default() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
@@ -736,14 +721,13 @@ mod tests {
     #[cfg(feature = "aws-core")]
     #[test]
     fn parse_opensearch_serverless_with_aws_auth() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            opensearch_service_type = "serverless"
-            auth.strategy = "aws"
-            api_version = "auto"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            api_version: auto
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
