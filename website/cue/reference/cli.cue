@@ -192,6 +192,12 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_THREADS"
 		}
+		"chunk-size-events": {
+			description: env_vars.VECTOR_CHUNK_SIZE_EVENTS.description
+			default:     env_vars.VECTOR_CHUNK_SIZE_EVENTS.type.uint.default
+			type:        "integer"
+			env_var:     "VECTOR_CHUNK_SIZE_EVENTS"
+		}
 		"internal-log-rate-limit": {
 			_short:      "i"
 			description: env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.description
@@ -663,6 +669,15 @@ cli: {
 			type: uint: {
 				default: null
 				unit:    null
+			}
+		}
+		VECTOR_CHUNK_SIZE_EVENTS: {
+			description: """
+				The number of events batched per source send and used as the base for source output buffer sizing.
+				"""
+			type: uint: {
+				default: 1000
+				unit:    "events"
 			}
 		}
 		VECTOR_WATCH_CONFIG: {

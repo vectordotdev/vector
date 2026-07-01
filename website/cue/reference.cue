@@ -79,7 +79,20 @@ _values: {
 //                 json: "Encodes the data via application/json"
 //                 text: "Encodes the data via text/plain"
 //                }
-#Enum: [Name=_]: string
+//
+// Deprecated variants use an object form:
+//
+//                enum: {
+//                 v1: { description: "legacy endpoint", deprecated: true }
+//                 v2: "current endpoint"
+//                }
+#EnumVariant: string | {
+	description:         string
+	deprecated?:         bool
+	deprecated_message?: string
+}
+
+#Enum: [Name=_]: #EnumVariant
 
 #EnvVars: #Schema & {[Type=string]: {
 	common:   true
