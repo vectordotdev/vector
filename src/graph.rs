@@ -61,13 +61,14 @@ pub struct Opts {
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +120,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths, !opts.disable_env_var_interpolation) {
+    let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]

@@ -14,6 +14,15 @@ pub struct Opts {
     sub_command: Option<SubCommand>,
 }
 
+impl Opts {
+    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+        matches!(
+            &self.sub_command,
+            Some(SubCommand::Install(opts)) if opts.dangerously_allow_env_var_interpolation
+        )
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
 struct InstallOpts {
@@ -55,13 +64,14 @@ struct InstallOpts {
     )]
     config_dirs: Vec<PathBuf>,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 impl InstallOpts {
@@ -72,8 +82,7 @@ impl InstallOpts {
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments =
-            create_service_arguments(&config_paths, self.disable_env_var_interpolation).unwrap();
+        let arguments = create_service_arguments(&config_paths).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -311,14 +320,11 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     }
 }
 
-fn create_service_arguments(
-    config_paths: &[config::ConfigPath],
-    disable_env_var_interpolation: bool,
-) -> Option<Vec<OsString>> {
+fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(config_paths)?;
-    match config::load_from_paths(&config_paths, !disable_env_var_interpolation) {
-        Ok(_) => Some(
-            config_paths
+    match config::load_from_paths(&config_paths) {
+        Ok(_) => {
+            let mut args: Vec<OsString> = config_paths
                 .iter()
                 .flat_map(|config_path| match config_path {
                     config::ConfigPath::File(path, format) => {
@@ -334,8 +340,12 @@ fn create_service_arguments(
                         vec![OsString::from("--config-dir"), path.as_os_str().into()]
                     }
                 })
-                .collect::<Vec<OsString>>(),
-        ),
+                .collect();
+            if config::env_var_interpolation_enabled() {
+                args.push(OsString::from("--dangerously-allow-env-var-interpolation"));
+            }
+            Some(args)
+        }
         Err(errs) => {
             handle_config_errors(errs);
             None

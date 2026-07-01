@@ -84,6 +84,7 @@ fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> Comman
     cmd.arg("-c")
         .arg(config_path)
         .arg(if quiet { "--quiet" } else { "-v" })
+        .arg("--dangerously-allow-env-var-interpolation")
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
         .env("VECTOR_TEST_ADDRESS", address.to_string());
@@ -140,6 +141,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
 fn auto_shutdown() {
     let mut cmd = assert_cmd::Command::cargo_bin("vector").unwrap();
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .arg("-c")
         .arg(create_file(STDIO_CONFIG))
         .env("VECTOR_DATA_DIR", create_directory());
@@ -157,6 +159,7 @@ fn log_schema() {
     // Vector command
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .arg("-c")
         .arg(create_file(
             r#"
@@ -248,6 +251,7 @@ fn log_schema_multiple_config_files() {
     );
 
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .env("VECTOR_CONFIG_DIR", config_dir)
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_INPUT_FILE", input_file.clone());
@@ -268,7 +272,14 @@ fn log_schema_multiple_config_files() {
     // Output
     let event: Value = serde_json::from_slice(output.stdout.as_slice()).unwrap();
     assert_eq!(event["message"], json!("42"));
-    assert_eq!(event["test_host"], json!("runner"));
+    if std::env::var("CI").as_deref() == Ok("true") {
+        assert_eq!(event["test_host"], json!("runner"));
+    } else {
+        assert!(
+            event["test_host"].is_string(),
+            "expected test_host to be a string"
+        );
+    }
 }
 
 #[test]

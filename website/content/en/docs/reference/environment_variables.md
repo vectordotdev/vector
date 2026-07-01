@@ -5,6 +5,13 @@ weight: 5
 tags: ["env", "environment variables", "interpolation"]
 ---
 
+By default, environment variable interpolation is disabled (the default changed in v0.57.0). To enable it, pass
+`--dangerously-allow-env-var-interpolation` to the `vector` CLI, or set the environment variable
+`VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true`.
+
+
+## Usage
+
 Vector interpolates environment variables within your configuration file with
 the following syntax:
 
@@ -22,6 +29,32 @@ transforms:
       # Requiring an environment variable to be present.
       .tenant = "${TENANT:?tenant must be supplied}"
 ```
+
+## How interpolation can be misused
+
+Suppose Vector is started with interpolation enabled and the following configuration template:
+
+```yaml
+sources:
+  app_logs:
+    type: file
+    include:
+      - "${LOG_PATH}"
+```
+
+If an attacker can influence the value of `LOG_PATH`, they can point Vector at any file the process can read, including sensitive
+system files. For example:
+
+```shell
+export LOG_PATH=/etc/shadow
+```
+
+
+After substitution, Vector would read `/etc/shadow` as if it were a log file and forward its contents to whatever sink is configured,
+leaking password hashes or other sensitive data.
+
+
+This is just one example of the risks that environment variable interpolation exposes, hence why it is disabled by default.
 
 ## Default values
 
@@ -59,7 +92,10 @@ environment variable example.
 
 ## Security Restrictions
 
-Vector prevents security issues related to environment variable interpolation by rejecting environment variables that contain newline
+Environment variable interpolation is disabled by default. Only enable it
+with `--dangerously-allow-env-var-interpolation` if you fully control every environment variable accessible to the Vector process.
+
+Even when enabled, Vector prevents some security issues related to environment variable interpolation by rejecting environment variables that contain newline
 characters. This also prevents injection of multi-line configuration blocks.
 
 Vector does not validate or escape other characters in interpolated values. Values containing config-structural characters such as

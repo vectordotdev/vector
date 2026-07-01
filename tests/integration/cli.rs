@@ -92,6 +92,7 @@ fn validate_cleanup() {
     // Run vector
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("validate")
+        .arg("--dangerously-allow-env-var-interpolation")
         .arg(config)
         .env("VECTOR_DATA_DIR", dir.clone());
 
@@ -190,7 +191,10 @@ fn validate(config: &str) -> i32 {
 
     // Run vector
     let mut cmd = Command::cargo_bin("vector").unwrap();
-    cmd.arg("validate").arg(config).env("VECTOR_DATA_DIR", dir);
+    cmd.arg("validate")
+        .arg("--dangerously-allow-env-var-interpolation")
+        .arg(config)
+        .env("VECTOR_DATA_DIR", dir);
 
     let output = cmd.output().unwrap();
     println!(

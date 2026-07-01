@@ -55,13 +55,14 @@ pub struct Opts {
     )]
     pub config_dirs: Vec<PathBuf>,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -174,15 +175,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     // Start by serializing to a `ConfigBuilder`. This will leverage validation in config
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
-        Some(paths) => {
-            match ConfigBuilderLoader::default()
-                .interpolate_env(!opts.disable_env_var_interpolation)
-                .load_from_paths(&paths)
-            {
-                Ok(builder) => (paths, builder),
-                Err(errs) => return handle_config_errors(errs),
-            }
-        }
+        Some(paths) => match ConfigBuilderLoader::default().load_from_paths(&paths) {
+            Ok(builder) => (paths, builder),
+            Err(errs) => return handle_config_errors(errs),
+        },
         None => return exitcode::CONFIG,
     };
 
