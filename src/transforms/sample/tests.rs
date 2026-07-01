@@ -668,3 +668,41 @@ fn random_events(n: usize) -> Vec<Event> {
         .map(|e| Event::Log(LogEvent::from(e)))
         .collect()
 }
+
+#[test]
+fn discarded_event_tags_callback_is_invoked_on_drop() {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_for_cb = Arc::clone(&counter);
+
+    // Aggressive rate — only 1 in 100 events should pass, so the vast
+    // majority of the events below will be dropped.
+    let mut sampler = Sample::new(
+        "sample".to_string(),
+        SampleMode::new_rate(100),
+        None,
+        None,
+        None,
+        default_sample_rate_key(),
+    )
+    .with_discarded_event_tags(move |_event| {
+        counter_for_cb.fetch_add(1, Ordering::SeqCst);
+        vec![("custom_tag".to_string(), "from_callback".to_string())]
+    });
+
+    let events = random_events(200);
+    for event in events {
+        let mut buf = OutputBuffer::with_capacity(1);
+        sampler.transform(&mut buf, event);
+    }
+
+    // With rate=100 and 200 events, expect close to 198 drops. Assert at
+    // least 100 to be robust to randomness without becoming a flaky test.
+    let calls = counter.load(Ordering::SeqCst);
+    assert!(
+        calls >= 100,
+        "callback was invoked {calls} times, expected at least 100"
+    );
+}
