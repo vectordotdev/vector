@@ -551,6 +551,11 @@ generated: components: sources: amqp: configuration: {
 			}
 		}
 	}
+	headers_key: {
+		description: "The key where `AMQP` message headers are added to events."
+		required:    false
+		type: string: default: "headers"
+	}
 	offset_key: {
 		description: "The `AMQP` offset key."
 		required:    false
@@ -570,6 +575,11 @@ generated: components: sources: amqp: configuration: {
 		type: uint: examples: [
 			100,
 		]
+	}
+	properties_key: {
+		description: "The key where `AMQP` message properties are added to events."
+		required:    false
+		type: string: default: "properties"
 	}
 	queue: {
 		description: "The name of the queue to consume."
