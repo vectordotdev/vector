@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use cuckoo_clock::{
     CuckooFilter, ExportableRandomState, InsertValues, LookupValues,
-    config::{CounterConfig, CuckooConfiguration, LruConfig, TtlConfig},
+    config::{CounterConfig, CuckooConfiguration, LruAgingStrategy, LruConfig, TtlConfig},
 };
 use futures::{
     Stream, StreamExt,
@@ -82,6 +82,21 @@ pub struct CuckooMemoryConfig {
     /// Can be set to true to delete unused items on scan when LRU is used.
     #[serde(default = "crate::serde::default_false")]
     pub lru_deletion_enabled: bool,
+    /// Number of bits to use to track LRU counter.
+    /// Low bit count will reduce the maximum LRU counter value, making the items expire sooner if
+    /// unused.
+    #[serde(default = "default_cuckoo_lru_bits")]
+    pub lru_bits: NonZeroUsize,
+    /// Starting value for LRU counter on item insertion.
+    /// Higher value will give newer items a higher probability to stay in the filter.
+    #[serde(default = "default_cuckoo_lru_starting_value")]
+    pub lru_starting_value: u32,
+    /// Value to increase LRU counter by on each item access.
+    #[serde(default = "default_cuckoo_lru_increment")]
+    pub lru_increment: u32,
+    /// Strategy to use when aging LRU counters at each scan.
+    #[serde(default)]
+    pub lru_aging_strategy: CuckooLruAgingStrategy,
     /// Can be set to true to also track TTL for entries.
     #[serde(default = "crate::serde::default_true")]
     pub ttl_enabled: bool,
@@ -122,6 +137,31 @@ pub struct CuckooMemoryConfig {
     pub concurrent_scanning: bool,
 }
 
+/// Aging strategy for LRU counters in cuckoo filters.
+#[configurable_component]
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+#[serde(tag = "strategy", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The LRU aging strategy to use."))]
+pub enum CuckooLruAgingStrategy {
+    /// Aging LRU counters by halving their value on each scan.
+    #[default]
+    Halving,
+    /// Aging LRU counters by decrementing by a fixed value on each scan.
+    Decrement {
+        /// Value to decrement by
+        value: u32,
+    },
+}
+
+impl From<&CuckooLruAgingStrategy> for LruAgingStrategy {
+    fn from(value: &CuckooLruAgingStrategy) -> Self {
+        match value {
+            CuckooLruAgingStrategy::Halving => LruAgingStrategy::Halving,
+            CuckooLruAgingStrategy::Decrement { value } => LruAgingStrategy::Decrement(*value),
+        }
+    }
+}
+
 const fn default_cuckoo_fingerprint_bits() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(8) }
 }
@@ -132,6 +172,18 @@ const fn default_cuckoo_bucket_size() -> NonZeroUsize {
 
 const fn default_cuckoo_ttl_bits() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(8) }
+}
+
+const fn default_cuckoo_lru_bits() -> NonZeroUsize {
+    unsafe { NonZeroUsize::new_unchecked(8) }
+}
+
+const fn default_cuckoo_lru_starting_value() -> u32 {
+    1
+}
+
+const fn default_cuckoo_lru_increment() -> u32 {
+    1
 }
 
 const fn default_cuckoo_counter_bits() -> NonZeroUsize {
@@ -179,9 +231,9 @@ impl CuckooMemoryTable {
                         }
                     };
 
-                if !built_config.compatible_layout(persisted_config) {
+                if !built_config.compatible_layout(&persisted_config) {
                     return Err(
-                        format!("Stored cuckoo filter configuration is not compatible with new configuration. Only changes to values that don't affect layout or size are allowed. If this is intended, remove the persisted state file ({}).", path.to_str().unwrap_or("")).into(),
+                        format!("Stored cuckoo filter configuration is not compatible with new configuration. Only changes to values that don't affect layout or size are allowed. If this is intended, remove the persisted state file ({}). Built: {:?}. Persisted: {:?}", path.to_str().unwrap_or(""), built_config, persisted_config).into(),
                     );
                 }
 
@@ -213,7 +265,7 @@ impl CuckooMemoryTable {
     ) -> crate::Result<Self> {
         if let Ok(prev_memory) = prev_state.downcast::<CuckooMemoryTable>() {
             let built_config = Self::build_config(&config, &cuckoo_config)?;
-            if built_config.compatible_layout(prev_memory.filter.get_configuration())
+            if built_config.compatible_layout(&prev_memory.filter.get_configuration())
                 && let Ok(mut old_filter) =
                     prev_memory.filter.exporter().snapshot().map(VecDeque::from)
                 && let Ok((hasher, _old_conf)) = CuckooFilter::import_config(&mut old_filter)
@@ -242,9 +294,30 @@ impl CuckooMemoryTable {
             .max_kicks(cuckoo_config.max_kicks);
 
         if cuckoo_config.lru_enabled {
+            let starting_value_needed_bits = cuckoo_config.lru_starting_value.ilog2() + 1;
+            if starting_value_needed_bits as usize > cuckoo_config.lru_bits.get() {
+                return Err(format!(
+                    "`lru_bits` ({}) must be set to at least {} to support the `lru_starting_value` value ({}).",
+                    cuckoo_config.lru_bits.get(),
+                    starting_value_needed_bits,
+                    cuckoo_config.lru_starting_value,
+                ).into());
+            }
+            let increment_needed_bits = cuckoo_config.lru_increment.ilog2() + 1;
+            if increment_needed_bits as usize > cuckoo_config.lru_bits.get() {
+                return Err(format!(
+                    "`lru_bits` ({}) must be set to at least {} to support the `lru_increment` value ({}).",
+                    cuckoo_config.lru_bits.get(),
+                    increment_needed_bits,
+                    cuckoo_config.lru_increment,
+                ).into());
+            }
             builder = builder.with_lru(LruConfig {
+                counter_bits: cuckoo_config.lru_bits.get().try_into()?,
                 remove_on_zero: cuckoo_config.lru_deletion_enabled,
-                ..Default::default()
+                starting_value: cuckoo_config.lru_starting_value,
+                increment: cuckoo_config.lru_increment,
+                aging_strategy: (&cuckoo_config.lru_aging_strategy).into(),
             });
         }
 
@@ -625,6 +698,10 @@ mod tests {
             export_interval: None,
             scanning_threads: None,
             concurrent_scanning: false,
+            lru_bits: default_cuckoo_ttl_bits(),
+            lru_starting_value: default_cuckoo_lru_starting_value(),
+            lru_increment: default_cuckoo_lru_increment(),
+            lru_aging_strategy: CuckooLruAgingStrategy::default(),
         };
         modfn(&mut config);
         config

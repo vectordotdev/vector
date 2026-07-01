@@ -262,10 +262,60 @@ generated: configuration: {
 								description: "Number of bits used for fingerprint."
 								required:    false
 							}
+							lru_aging_strategy: {
+								type: object: options: {
+									value: {
+										type: uint: {}
+										description:   "Value to decrement by"
+										required:      true
+										relevant_when: "strategy = \"decrement\""
+									}
+									strategy: {
+										required: false
+										type: string: {
+											enum: {
+												halving:   "Aging LRU counters by halving their value on each scan."
+												decrement: "Aging LRU counters by decrementing by a fixed value on each scan."
+											}
+											default: "halving"
+										}
+										description: "The LRU aging strategy to use."
+									}
+								}
+								description: "Strategy to use when aging LRU counters at each scan."
+								required:    false
+							}
+							lru_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track LRU counter.
+																		Low bit count will reduce the maximum LRU counter value, making the items expire sooner if
+																		unused.
+																		"""
+								required: false
+							}
+							lru_deletion_enabled: {
+								type: bool: default: false
+								description: "Can be set to true to delete unused items on scan when LRU is used."
+								required:    false
+							}
 							lru_enabled: {
 								type: bool: default: false
 								description: "Can be set to true to use LRU strategy for kicking."
 								required:    false
+							}
+							lru_increment: {
+								type: uint: default: 1
+								description: "Value to increase LRU counter by on each item access."
+								required:    false
+							}
+							lru_starting_value: {
+								type: uint: default: 1
+								description: """
+																		Starting value for LRU counter on item insertion.
+																		Higher value will give newer items a higher probability to stay in the filter.
+																		"""
+								required: false
 							}
 							max_entries: {
 								type: uint: {}
