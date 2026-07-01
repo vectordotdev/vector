@@ -160,6 +160,7 @@ async fn json_decoding_character_delimited() {
             character_delimited: CharacterDelimitedDecoderOptions {
                 delimiter: b',',
                 max_length: Some(usize::MAX),
+                oversized_action: Default::default(),
             },
         }),
         headers: HashMap::new(),
