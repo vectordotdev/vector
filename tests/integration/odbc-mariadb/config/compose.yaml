@@ -3,13 +3,20 @@ version: '3'
 services:
   mariadb:
     image: docker.io/mariadb:${CONFIG_VERSION}
+    hostname: mariadb
     ports:
       - "3306:3306"
     environment:
-      - MYSQL_USER=vector
-      - MYSQL_PASSWORD=vector
-      - MYSQL_ROOT_PASSWORD=vector
-      - MYSQL_DATABASE=vector_db
+      - MARIADB_ROOT_PASSWORD=vector
+      - MARIADB_USER=vector
+      - MARIADB_PASSWORD=vector
+      - MARIADB_DATABASE=vector_db
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 networks:
   default:

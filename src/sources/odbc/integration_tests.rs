@@ -90,7 +90,7 @@ async fn parse_odbc_config() {
 #[tokio::test]
 async fn scheduled_query_executed() {
     let conn_str = get_conn_str();
-    run_and_assert_source_compliance(
+    let events = run_and_assert_source_compliance(
         OdbcConfig {
             connection_string: SensitiveString::from(conn_str),
             schedule: "*/1 * * * * *".into(),
@@ -102,6 +102,11 @@ async fn scheduled_query_executed() {
         &SOURCE_TAGS,
     )
     .await;
+
+    assert!(
+        !events.is_empty(),
+        "expected ODBC source to emit events from SELECT 1"
+    );
 }
 
 #[tokio::test]

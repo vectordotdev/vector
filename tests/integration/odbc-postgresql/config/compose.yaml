@@ -3,12 +3,19 @@ version: '3'
 services:
   postgresql:
     image: docker.io/postgres:${CONFIG_VERSION}
+    hostname: postgresql
     ports:
       - "5432:5432"
     environment:
       - POSTGRES_USER=vector
       - POSTGRES_PASSWORD=vector
       - POSTGRES_DB=vector_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vector -d vector_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
 networks:
   default:

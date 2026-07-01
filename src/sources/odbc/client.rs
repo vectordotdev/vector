@@ -1,6 +1,6 @@
 use crate::config::{LogNamespace, SourceContext, log_schema};
 use crate::event::Event;
-use crate::internal_events::{EventsReceived, OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
+use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
 use bytes::BytesMut;
@@ -243,10 +243,6 @@ impl Context {
             let mut out = out.clone();
             out.send_batch(events).await.context(SendSnafu)?;
             events_received.emit(CountByteSize(event_count, byte_size));
-            emit!(OdbcEventsReceived {
-                count: event_count,
-                byte_size,
-            });
         }
 
         if let Some(last) = rows.last() {
