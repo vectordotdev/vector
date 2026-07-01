@@ -1,6 +1,6 @@
 use crate::config::{LogNamespace, SourceContext, log_schema};
 use crate::event::Event;
-use crate::internal_events::{OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
+use crate::internal_events::{EventsReceived, OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
 use bytes::BytesMut;
@@ -22,7 +22,9 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::select;
 use tokio_util::codec::Decoder as _;
-use vector_common::internal_event::{BytesReceived, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::Decoder;
 use vector_lib::emit;
@@ -105,7 +107,8 @@ impl Context {
         let schedule = self.cfg.schedule.clone().stream(self.cfg.schedule_timezone);
         pin_mut!(schedule);
 
-        let _ = register!(BytesReceived::from(Protocol::NONE));
+        let bytes_received = register!(BytesReceived::from(Protocol::from("odbc")));
+        let events_received = register!(EventsReceived);
 
         #[cfg(test)]
         let mut count = 0;
@@ -125,7 +128,10 @@ impl Context {
                     }
 
                     let instant = Instant::now();
-                    match self.process(prev_result.clone()).await {
+                    match self
+                        .process(prev_result.clone(), &bytes_received, &events_received)
+                        .await
+                    {
                         Ok(result) => {
                             // Update the cached result when the query returns rows.
                             if result.is_some() {
@@ -162,7 +168,12 @@ impl Context {
     }
 
     /// Executes the scheduled ODBC query, sends the result as an event, and updates tracking metadata.
-    async fn process(&self, map: Option<ObjectMap>) -> Result<Option<ObjectMap>, OdbcError> {
+    async fn process(
+        &self,
+        map: Option<ObjectMap>,
+        bytes_received: &Registered<BytesReceived>,
+        events_received: &Registered<EventsReceived>,
+    ) -> Result<Option<ObjectMap>, OdbcError> {
         let conn_str = self.cfg.connection_string_or_file().context(IoSnafu)?;
         let stmt_str = self.cfg.statement_or_file().context(IoSnafu)?;
         if stmt_str.trim().is_empty() {
@@ -220,7 +231,10 @@ impl Context {
         .await
         .context(BlockingTaskSnafu)??;
 
-        let mut events = self.decode_rows(&rows)?;
+        let (mut events, payload_byte_size) = self.decode_rows(&rows)?;
+        if payload_byte_size > 0 {
+            bytes_received.emit(ByteSize(payload_byte_size));
+        }
         self.enrich_events(&mut events);
 
         let event_count = events.len();
@@ -228,6 +242,7 @@ impl Context {
             let byte_size = events.estimated_json_encoded_size_of();
             let mut out = out.clone();
             out.send_batch(events).await.context(SendSnafu)?;
+            events_received.emit(CountByteSize(event_count, byte_size));
             emit!(OdbcEventsReceived {
                 count: event_count,
                 byte_size,
@@ -250,12 +265,13 @@ impl Context {
         Ok(None)
     }
 
-    fn decode_rows(&self, rows: &Rows) -> Result<Vec<Event>, OdbcError> {
+    fn decode_rows(&self, rows: &Rows) -> Result<(Vec<Event>, usize), OdbcError> {
         if rows.is_empty() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), 0));
         }
 
         let payload = serde_json::to_vec(rows).context(JsonSnafu)?;
+        let payload_byte_size = payload.len();
         let mut buf = BytesMut::from(payload.as_slice());
         let mut events = Vec::new();
         let mut decoder = self.decoder.clone();
@@ -271,7 +287,7 @@ impl Context {
             }
         }
 
-        Ok(events)
+        Ok((events, payload_byte_size))
     }
 
     fn enrich_events(&self, events: &mut [Event]) {
