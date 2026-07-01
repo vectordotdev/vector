@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
@@ -243,6 +244,52 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached_with_oauth() {
     .await;
 }
 
+async fn assert_insert_lines_with_blob_tags_and_metadata(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("lines-tags-meta/into/blob/{}", random_string(10));
+
+    let mut tags = BTreeMap::new();
+    tags.insert("Project".to_string(), "Blue".to_string());
+    tags.insert("Owner".to_string(), "vector".to_string());
+
+    let mut metadata = HashMap::new();
+    metadata.insert("source".to_string(), "vector".to_string());
+    metadata.insert("environment".to_string(), "test".to_string());
+
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        tags: Some(tags.clone()),
+        metadata: Some(metadata.clone()),
+        ..config
+    };
+    let (_lines, input) = random_lines_with_stream(100, 10, None);
+
+    config.run_assert(input).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(blobs.len(), 1);
+
+    let blob_metadata = config.get_blob_metadata(blobs[0].clone()).await;
+    assert_eq!(blob_metadata, metadata);
+
+    let blob_tags = config.get_blob_tags(blobs[0].clone()).await;
+    let expected: HashMap<String, String> = tags.into_iter().collect();
+    assert_eq!(blob_tags, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_insert_lines_with_blob_tags_and_metadata() {
+    assert_insert_lines_with_blob_tags_and_metadata(AzureBlobSinkConfig::new_emulator().await)
+        .await;
+}
+
+#[tokio::test]
+async fn azure_blob_insert_lines_with_blob_tags_and_metadata_with_oauth() {
+    assert_insert_lines_with_blob_tags_and_metadata(
+        AzureBlobSinkConfig::new_emulator_with_oauth().await,
+    )
+    .await;
+}
+
 impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_ADDRESS").unwrap_or_else(|_| "localhost".into());
@@ -257,6 +304,8 @@ impl AzureBlobSinkConfig {
             blob_append_uuid: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
+            tags: None,
+            metadata: None,
             batch: Default::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
@@ -281,6 +330,8 @@ impl AzureBlobSinkConfig {
             blob_append_uuid: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
+            tags: None,
+            metadata: None,
             batch: Default::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
@@ -335,10 +386,10 @@ impl AzureBlobSinkConfig {
         let mut names = Vec::new();
         while let Some(result) = pager.next().await {
             let item = result.expect("Failed to fetch blobs");
-            if let Some(name) = item.name
-                && name.starts_with(&prefix)
-            {
-                names.push(name);
+            if let Some(name) = item.name {
+                if name.starts_with(&prefix) {
+                    names.push(name);
+                }
             }
         }
 
@@ -386,6 +437,45 @@ impl AzureBlobSinkConfig {
         let data = body_bytes.to_vec();
 
         (content_type, content_encoding, self.get_blob_content(data))
+    }
+
+    pub async fn get_blob_metadata(&self, blob: String) -> HashMap<String, String> {
+        let client = self.build_test_client().await;
+        let blob_client = client.blob_client(&blob);
+        let props_resp = blob_client
+            .get_properties(None)
+            .await
+            .expect("Failed to get blob properties");
+
+        const META_PREFIX: &str = "x-ms-meta-";
+        props_resp
+            .headers()
+            .iter()
+            .filter_map(|(name, value)| {
+                let key = name.as_str();
+                if key.len() > META_PREFIX.len()
+                    && key[..META_PREFIX.len()].eq_ignore_ascii_case(META_PREFIX)
+                {
+                    Some((
+                        key[META_PREFIX.len()..].to_string(),
+                        value.as_str().to_string(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub async fn get_blob_tags(&self, blob: String) -> HashMap<String, String> {
+        let client = self.build_test_client().await;
+        let blob_client = client.blob_client(&blob);
+        let resp = blob_client
+            .get_tags(None)
+            .await
+            .expect("Failed to get blob tags");
+        let body = resp.into_model().expect("Failed to decode tags body");
+        HashMap::from(body)
     }
 
     fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
