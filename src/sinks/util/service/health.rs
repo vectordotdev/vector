@@ -48,6 +48,8 @@ pub struct HealthConfig {
 
 impl Default for HealthConfig {
     fn default() -> Self {
+        // Keep Rust defaults aligned with the serde/documented defaults. The
+        // previous derived default produced zero-valued retry durations.
         Self {
             retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
             retry_max_duration_secs: default_retry_max_duration_secs(),
