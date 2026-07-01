@@ -42,7 +42,7 @@ components: sinks: aws_sns: components._aws & {
 				enabled_by_scheme:      true
 			}
 			to: {
-				service: services.aws_sqs
+				service: services.aws_sns
 
 				interface: {
 					socket: {
@@ -65,7 +65,7 @@ components: sinks: aws_sns: components._aws & {
 		notices: []
 	}
 
-	configuration: generated.components.sinks.aws_sqs.configuration & {
+	configuration: generated.components.sinks.aws_sns.configuration & {
 		_aws_include: false
 	}
 
@@ -78,7 +78,7 @@ components: sinks: aws_sns: components._aws & {
 	permissions: iam: [
 		{
 			platform:  "aws"
-			_service:  "sqs"
+			_service:  "sns"
 			_docs_tag: "AWSSimpleNotificationService"
 
 			policies: [
