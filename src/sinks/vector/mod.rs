@@ -92,38 +92,38 @@ mod tests {
 
         assert!(
             err.to_string()
-                .contains("No Vector endpoint configured. Please set `address` or `addresses`."),
+                .contains("No Vector endpoint configured. Please set `address` or `endpoints`."),
             "{err}"
         );
     }
 
     #[tokio::test]
-    async fn build_rejects_address_and_addresses() {
+    async fn build_rejects_address_and_endpoints() {
         let config: VectorConfig = toml::from_str(
             r#"
                 address = "http://127.0.0.1:6000"
-                addresses = ["http://127.0.0.1:6001"]
+                endpoints = ["http://127.0.0.1:6001"]
             "#,
         )
         .unwrap();
 
         let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("address and addresses should be mutually exclusive"),
+            Ok(_) => panic!("address and endpoints should be mutually exclusive"),
             Err(err) => err,
         };
 
         assert!(
             err.to_string()
-                .contains("`address` and `addresses` options are mutually exclusive"),
+                .contains("`address` and `endpoints` options are mutually exclusive"),
             "{err}"
         );
     }
 
     #[test]
-    fn parse_addresses_config() {
+    fn parse_endpoints_config() {
         let config: Result<VectorConfig, _> = toml::from_str(
             r#"
-                addresses = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
+                endpoints = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
             "#,
         );
 
@@ -134,7 +134,7 @@ mod tests {
     fn parse_failover_endpoint_strategy() {
         let config: Result<VectorConfig, _> = toml::from_str(
             r#"
-                addresses = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
+                endpoints = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
                 endpoint_strategy = "failover"
             "#,
         );
@@ -146,7 +146,7 @@ mod tests {
     fn parse_failover_primary_endpoint_strategy() {
         let config: Result<VectorConfig, _> = toml::from_str(
             r#"
-                addresses = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
+                endpoints = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
                 endpoint_strategy = "failover_primary"
             "#,
         );
@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn deliver_message_to_multiple_addresses() {
+    async fn deliver_message_to_multiple_endpoints() {
         let num_lines = 10;
 
         let (_guard1, addr1) = next_addr();
@@ -250,7 +250,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/"]
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -299,7 +299,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn failover_strategy_prefers_first_address() {
+    async fn failover_strategy_prefers_first_endpoint() {
         let num_lines = 10;
 
         let (_guard1, addr1) = next_addr();
@@ -307,7 +307,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/"]
                 endpoint_strategy = "failover"
             "#
         );
@@ -351,7 +351,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn failover_strategy_uses_next_address_when_first_fails() {
+    async fn failover_strategy_uses_next_endpoint_when_first_fails() {
         let num_lines = 10;
 
         let (_guard1, addr1) = next_addr();
@@ -359,7 +359,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/"]
                 endpoint_strategy = "failover"
             "#
         );
@@ -400,7 +400,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/"]
                 endpoint_strategy = "failover_primary"
             "#
         );
@@ -476,7 +476,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
                 endpoint_strategy = "failover"
                 batch.max_events = 1
                 request.concurrency = 1
@@ -554,7 +554,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
                 endpoint_strategy = "failover_primary"
                 batch.max_events = 1
                 request.concurrency = 1
@@ -638,7 +638,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/"]
                 endpoint_strategy = "failover"
             "#
         );
@@ -679,7 +679,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn failover_strategy_uses_next_address_when_first_times_out() {
+    async fn failover_strategy_uses_next_endpoint_when_first_times_out() {
         let num_lines = 10;
 
         let (_guard1, addr1) = next_addr();
@@ -687,7 +687,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr1}/", "http://{addr2}/"]
+                endpoints = ["http://{addr1}/", "http://{addr2}/"]
                 endpoint_strategy = "failover"
 
                 [request]
@@ -745,7 +745,7 @@ mod tests {
 
         let config = format!(
             r#"
-                addresses = ["http://{addr}/"]
+                endpoints = ["http://{addr}/"]
                 endpoint_strategy = "failover"
 
                 [request]

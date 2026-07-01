@@ -56,27 +56,27 @@ pub struct VectorConfig {
     ///
     /// The address _must_ include a port.
     ///
-    /// This option is mutually exclusive with `addresses`. Set exactly one of
-    /// `address` or `addresses`.
+    /// This option is mutually exclusive with `endpoints`. Set exactly one of
+    /// `address` or `endpoints`.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
     address: Option<String>,
 
-    /// The downstream Vector addresses to which to connect.
+    /// The downstream Vector endpoints to which to connect.
     ///
     /// Both IP addresses and hostnames are accepted formats.
     ///
-    /// Each address _must_ include a port.
+    /// Each endpoint _must_ include a port.
     ///
     /// This option is mutually exclusive with `address`. Set exactly one of
-    /// `address` or `addresses`.
+    /// `address` or `endpoints`.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
-    addresses: Vec<String>,
+    endpoints: Vec<String>,
 
     /// Compression algorithm for requests.
     ///
@@ -105,9 +105,9 @@ pub struct VectorConfig {
     #[configurable(derived)]
     pub endpoint_health: Option<HealthConfig>,
 
-    /// Strategy for routing requests across multiple configured addresses.
+    /// Strategy for routing requests across multiple configured endpoints.
     ///
-    /// This option is only used when `addresses` is configured.
+    /// This option is only used when `endpoints` is configured.
     #[serde(default)]
     pub endpoint_strategy: EndpointStrategy,
 
@@ -142,7 +142,7 @@ fn default_config(address: &str) -> VectorConfig {
     VectorConfig {
         version: None,
         address: Some(address.to_owned()),
-        addresses: Vec::new(),
+        endpoints: Vec::new(),
         compression: VectorCompression::None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
@@ -253,23 +253,27 @@ impl SinkConfig for VectorConfig {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum EndpointStrategy {
-    /// Distribute requests across healthy endpoints.
+    /// Distribute requests across healthy endpoints using Vector's existing
+    /// Tower distributed service. Endpoint health is tracked using
+    /// `endpoint_health`, and unhealthy endpoints are backed off and probed
+    /// according to that configuration. This mode does not preserve a single
+    /// active endpoint or prefer the first configured endpoint.
     #[default]
     LoadBalance,
     /// Use one endpoint at a time. When the active endpoint fails, continue
-    /// through the configured addresses from the next endpoint.
+    /// through the configured endpoints from the next endpoint.
     ///
     /// This mode keeps using the last successful endpoint until it fails. Use
     /// `failover_primary` instead when retriable failures should re-check the
-    /// first configured address before trying secondary endpoints.
+    /// first configured endpoint before trying secondary endpoints.
     Failover,
     /// Use one endpoint at a time. When the active endpoint fails, retry from
-    /// the configured address order so the sink can return to its configured
+    /// the configured endpoint order so the sink can return to its configured
     /// primary endpoint.
     ///
     /// This is useful when receiver-side connection recycling, such as
     /// `max_connection_age_secs`, should converge the sink back to the first
-    /// configured address when it is available.
+    /// configured endpoint when it is available.
     FailoverPrimary,
 }
 
@@ -430,12 +434,13 @@ fn failover_next_attempts(
     advance: FailoverAdvance,
     tried: &[usize],
 ) -> usize {
-    if advance.advanced
-        || advance.state == expected_state
-        || failover_state_index(advance.state, endpoints)
-            == failover_state_index(expected_state, endpoints)
-    {
+    if advance.advanced || advance.state == expected_state {
         *attempt += 1;
+    } else if failover_state_index(advance.state, endpoints)
+        == failover_state_index(expected_state, endpoints)
+    {
+        attempts.clear();
+        *attempt = 0;
     } else {
         *attempts = failover_attempt_indices(
             endpoint_strategy,
@@ -497,18 +502,27 @@ fn is_retriable_vector_error(error: &crate::Error) -> bool {
 }
 
 impl VectorConfig {
-    fn uris(&self, tls: bool) -> crate::Result<Vec<Uri>> {
-        match (self.address.as_ref(), self.addresses.as_slice()) {
-            (Some(_), [_first, ..]) => Err(
-                "`address` and `addresses` options are mutually exclusive. Please use `addresses` for multiple Vector endpoints."
+    fn validate_endpoint_options(&self) -> crate::Result<()> {
+        match (self.address.as_ref(), self.endpoints.as_slice()) {
+            (Some(_), [_, ..]) => Err(
+                "`address` and `endpoints` options are mutually exclusive. Please use `endpoints` for multiple Vector endpoints."
                     .into(),
             ),
-            (None, []) => Err("No Vector endpoint configured. Please set `address` or `addresses`.".into()),
-            (Some(address), []) => Ok(vec![with_default_scheme(address, tls)?]),
-            (None, addresses) => addresses
+            (None, []) => Err("No Vector endpoint configured. Please set `address` or `endpoints`.".into()),
+            (Some(_), []) | (None, [_, ..]) => Ok(()),
+        }
+    }
+
+    fn uris(&self, tls: bool) -> crate::Result<Vec<Uri>> {
+        self.validate_endpoint_options()?;
+
+        if let Some(address) = self.address.as_ref() {
+            Ok(vec![with_default_scheme(address, tls)?])
+        } else {
+            self.endpoints
                 .iter()
-                .map(|address| with_default_scheme(address, tls))
-                .collect(),
+                .map(|endpoint| with_default_scheme(endpoint, tls))
+                .collect()
         }
     }
 }
@@ -791,7 +805,7 @@ mod tests {
     }
 
     #[test]
-    fn failover_next_attempts_continues_after_stale_same_endpoint_generation() {
+    fn failover_next_attempts_stops_after_stale_same_endpoint_generation() {
         let mut attempts = failover_ring_attempt_indices(0, 2);
         let mut attempt = 0;
 
@@ -809,8 +823,31 @@ mod tests {
         );
 
         assert_eq!(observed_state, 4);
-        assert_eq!(attempt, 1);
-        assert_eq!(attempts, vec![0, 1]);
+        assert_eq!(attempt, 0);
+        assert!(attempts.is_empty());
+    }
+
+    #[test]
+    fn failover_next_attempts_stops_after_stale_wrapped_generation() {
+        let mut attempts = failover_ring_attempt_indices(0, 3);
+        let mut attempt = 0;
+
+        let observed_state = failover_next_attempts(
+            EndpointStrategy::Failover,
+            3,
+            &mut attempts,
+            &mut attempt,
+            0,
+            FailoverAdvance {
+                state: 6,
+                advanced: false,
+            },
+            &[0],
+        );
+
+        assert_eq!(observed_state, 6);
+        assert_eq!(attempt, 0);
+        assert!(attempts.is_empty());
     }
 
     #[test]

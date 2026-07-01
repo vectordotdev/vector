@@ -35,28 +35,11 @@ generated: components: sinks: vector: configuration: {
 
 			The address _must_ include a port.
 
-			This option is mutually exclusive with `addresses`. Set exactly one of
-			`address` or `addresses`.
+			This option is mutually exclusive with `endpoints`. Set exactly one of
+			`address` or `endpoints`.
 			"""
 		required: false
 		type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
-	}
-	addresses: {
-		description: """
-			The downstream Vector addresses to which to connect.
-
-			Both IP addresses and hostnames are accepted formats.
-
-			Each address _must_ include a port.
-
-			This option is mutually exclusive with `address`. Set exactly one of
-			`address` or `addresses`.
-			"""
-		required: false
-		type: array: {
-			default: []
-			items: type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
-		}
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -142,9 +125,9 @@ generated: components: sinks: vector: configuration: {
 	}
 	endpoint_strategy: {
 		description: """
-			Strategy for routing requests across multiple configured addresses.
+			Strategy for routing requests across multiple configured endpoints.
 
-			This option is only used when `addresses` is configured.
+			This option is only used when `endpoints` is configured.
 			"""
 		required: false
 		type: string: {
@@ -152,23 +135,46 @@ generated: components: sinks: vector: configuration: {
 			enum: {
 				failover: """
 					Use one endpoint at a time. When the active endpoint fails, continue
-					through the configured addresses from the next endpoint.
+					through the configured endpoints from the next endpoint.
 
 					This mode keeps using the last successful endpoint until it fails. Use
 					`failover_primary` instead when retriable failures should re-check the
-					first configured address before trying secondary endpoints.
+					first configured endpoint before trying secondary endpoints.
 					"""
 				failover_primary: """
 					Use one endpoint at a time. When the active endpoint fails, retry from
-					the configured address order so the sink can return to its configured
+					the configured endpoint order so the sink can return to its configured
 					primary endpoint.
 
 					This is useful when receiver-side connection recycling, such as
 					`max_connection_age_secs`, should converge the sink back to the first
-					configured address when it is available.
+					configured endpoint when it is available.
 					"""
-				load_balance: "Distribute requests across healthy endpoints."
+				load_balance: """
+					Distribute requests across healthy endpoints using Vector's existing
+					Tower distributed service. Endpoint health is tracked using
+					`endpoint_health`, and unhealthy endpoints are backed off and probed
+					according to that configuration. This mode does not preserve a single
+					active endpoint or prefer the first configured endpoint.
+					"""
 			}
+		}
+	}
+	endpoints: {
+		description: """
+			The downstream Vector endpoints to which to connect.
+
+			Both IP addresses and hostnames are accepted formats.
+
+			Each endpoint _must_ include a port.
+
+			This option is mutually exclusive with `address`. Set exactly one of
+			`address` or `endpoints`.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
 		}
 	}
 	request: {
