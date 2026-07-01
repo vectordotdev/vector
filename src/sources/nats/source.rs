@@ -1,4 +1,4 @@
-use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
+use async_nats::jetstream::consumer::PullConsumer;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::ResultExt;
@@ -16,10 +16,14 @@ use vector_lib::{
 use crate::{
     SourceSender,
     codecs::Decoder,
+    common::backoff::ExponentialBackoff,
     event::Event,
     internal_events::StreamClosedError,
     shutdown::ShutdownSignal,
-    sources::nats::config::{BuildError, NatsSourceConfig, SubscribeSnafu},
+    sources::nats::config::{
+        BuildError, ConsumerSnafu, JetStreamConfig, MessagesSnafu, NatsSourceConfig, StreamSnafu,
+        SubscribeSnafu,
+    },
 };
 
 /// The outcome of processing a single NATS message.
@@ -103,49 +107,112 @@ pub async fn process_message(
     }
 }
 
+pub(crate) async fn create_consumer_stream(
+    connection: &async_nats::Client,
+    js_config: &JetStreamConfig,
+) -> Result<async_nats::jetstream::consumer::pull::Stream, BuildError> {
+    let js = async_nats::jetstream::new(connection.clone());
+    let stream = js
+        .get_stream(&js_config.stream)
+        .await
+        .context(StreamSnafu)?;
+    let consumer: PullConsumer = stream
+        .get_consumer(&js_config.consumer)
+        .await
+        .context(ConsumerSnafu)?;
+    consumer
+        .stream()
+        .max_messages_per_batch(js_config.batch_config.batch)
+        .max_bytes_per_batch(js_config.batch_config.max_bytes)
+        .messages()
+        .await
+        .context(MessagesSnafu)
+}
+
 pub async fn run_nats_jetstream(
     config: NatsSourceConfig,
-    _connection: async_nats::Client,
-    stream: PullConsumerStream,
+    connection: async_nats::Client,
+    initial_messages: async_nats::jetstream::consumer::pull::Stream,
     decoder: Decoder,
     log_namespace: LogNamespace,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
-    let mut message_stream = stream.take_until(shutdown);
+    let mut backoff = ExponentialBackoff::default().max_delay(std::time::Duration::from_secs(30));
 
-    while let Some(Ok(msg)) = message_stream.next().await {
-        bytes_received.emit(ByteSize(msg.payload.len()));
+    let js_config = config
+        .jetstream
+        .as_ref()
+        .expect("jetstream config must be present");
 
-        let status = process_message(
-            &msg,
-            &config,
-            &decoder,
-            log_namespace,
-            &mut out,
-            &events_received,
-        )
-        .await;
+    let mut messages = initial_messages;
 
-        match status {
-            ProcessingStatus::Success => {
-                // Message processed successfully, acknowledge it.
-                if let Err(err) = msg.ack().await {
-                    error!(message = "Failed to acknowledge JetStream message.", %err);
+    loop {
+        let mut message_stream = messages.take_until(&mut shutdown);
+
+        while let Some(result) = message_stream.next().await {
+            match result {
+                Ok(msg) => {
+                    backoff.reset();
+                    bytes_received.emit(ByteSize(msg.payload.len()));
+
+                    let status = process_message(
+                        &msg,
+                        &config,
+                        &decoder,
+                        log_namespace,
+                        &mut out,
+                        &events_received,
+                    )
+                    .await;
+
+                    match status {
+                        ProcessingStatus::Success => {
+                            if let Err(err) = msg.ack().await {
+                                error!(message = "Failed to acknowledge JetStream message.", %err);
+                            }
+                        }
+                        ProcessingStatus::ChannelClosed => return Err(()),
+                        // Do not acknowledge on failure; the message will be redelivered.
+                        ProcessingStatus::Failed => {}
+                    }
+                }
+                Err(err) => {
+                    warn!(message = "JetStream consumer stream error, recreating.", %err);
+                    break;
                 }
             }
-            ProcessingStatus::Failed => {
-                // Do not acknowledge on failure; the message will be redelivered.
+        }
+
+        if futures::poll!(&mut shutdown).is_ready() {
+            return Ok(());
+        }
+
+        // Reconnect: rebuild the consumer stream with backoff.
+        // The durable consumer on the server tracks delivery state,
+        // so we pick up where we left off.
+        warn!(message = "JetStream pull stream terminated. Recovering consumer...");
+        loop {
+            let delay = backoff.next().expect("backoff never ends");
+            tokio::select! {
+                _ = &mut shutdown => return Ok(()),
+                _ = tokio::time::sleep(delay) => {},
             }
-            ProcessingStatus::ChannelClosed => {
-                // Downstream channel is closed, shut down the source.
-                return Err(());
+
+            match create_consumer_stream(&connection, js_config).await {
+                Ok(m) => {
+                    messages = m;
+                    backoff.reset();
+                    break;
+                }
+                Err(err) => {
+                    warn!(message = "Failed to recreate JetStream consumer stream, retrying.", %err);
+                }
             }
         }
     }
-    Ok(())
 }
 
 pub async fn run_nats_core(
