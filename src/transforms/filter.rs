@@ -50,6 +50,12 @@ impl TransformConfig for FilterConfig {
         )?)))
     }
 
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        self.condition
+            .validate(&context.enrichment_tables, &context.metrics_storage)
+            .map_err(|e| vec![e.to_string()])
+    }
+
     fn input(&self) -> Input {
         Input::all()
     }
