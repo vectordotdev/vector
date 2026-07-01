@@ -7776,6 +7776,7 @@ dependencies = [
  "prost-build 0.12.6",
  "tonic 0.11.0",
  "tonic-build 0.11.0",
+ "vector-common",
  "vector-core",
  "vector-lookup",
  "vrl",
