@@ -1,6 +1,24 @@
 package metadata
 
 generated: components: transforms: reduce: configuration: {
+	data_type: {
+		description: """
+			The event data type this transform instance operates on.
+
+			`reduce` accepts and emits a single data type per instance. Defaults
+			to `log` to preserve historical behavior; set to `trace` to reduce
+			trace events instead. The selected value drives both the topology-
+			level input type filter and the type of the emitted reduced events.
+			"""
+		required: false
+		type: string: {
+			default: "log"
+			enum: {
+				log:   "Accept and emit `log` events."
+				trace: "Accept and emit `trace` events."
+			}
+		}
+	}
 	end_every_period_ms: {
 		description: """
 			If supplied, every time this interval elapses for a given grouping, the reduced value

@@ -4,7 +4,7 @@ components: transforms: reduce: {
 	title: "Reduce"
 
 	description: """
-		Reduces multiple log events into a single log event based on a set of
+		Reduces multiple log or trace events into a single event based on a set of
 		conditions and merge strategies.
 		"""
 
@@ -29,12 +29,15 @@ components: transforms: reduce: {
 	input: {
 		logs:    true
 		metrics: null
-		traces:  false
+		traces:  true
 	}
 
 	output: {
 		logs: "": {
 			description: "The modified input `log` event."
+		}
+		traces: "": {
+			description: "The modified input `trace` event."
 		}
 	}
 
