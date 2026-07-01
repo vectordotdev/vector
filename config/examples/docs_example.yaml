@@ -15,7 +15,7 @@
     "type": "remap"
     "drop_on_error": false
     "source": |
-      . = parse_apache_log!(.message)
+      . = parse_apache_log!(string!(.message), "combined")
 
   "apache_sample":
     "inputs": [ "apache_parser" ]
