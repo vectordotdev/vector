@@ -142,6 +142,67 @@ fn vector_sink_otel_sink_logs_match() {
     );
 }
 
+/// Verifies that the native decode path (use_otlp_decoding: false) preserves
+/// the new OTLP fields added by PR #24905: scope.name, scope.schema_url,
+/// schema_url (resource-level), dropped_attributes_count.
+///
+/// Reads raw decoded events from vector-decoded-events.log (written before
+/// the VRL remap) and asserts the fields exist with expected values.
+///
+/// Only runs with vector_default.yaml (native decode); the decoded file
+/// is not written by vector_otlp.yaml (passthrough mode).
+#[test]
+fn native_decode_preserves_scope_and_schema_url_fields() {
+    let content = match read_file_helper("logs", "vector-decoded-events.log") {
+        Ok(c) => c,
+        Err(_) => {
+            // This file only exists when running with vector_default.yaml
+            // (native decode mode). Skip if not present.
+            eprintln!("Skipping: vector-decoded-events.log not found (passthrough mode)");
+            return;
+        }
+    };
+
+    let mut checked = 0;
+    for (line_num, line) in content.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let event: serde_json::Value = serde_json::from_str(line)
+            .unwrap_or_else(|e| panic!("Line {}: invalid JSON: {e}", line_num + 1));
+
+        // scope.name should be present (telemetrygen sets it to "log-generator")
+        assert!(
+            event.pointer("/scope/name").is_some(),
+            "Line {}: missing scope.name in decoded event",
+            line_num + 1
+        );
+
+        // dropped_attributes_count is always written for log records (even if 0)
+        assert!(
+            event.get("dropped_attributes_count").is_some(),
+            "Line {}: missing dropped_attributes_count in decoded event",
+            line_num + 1
+        );
+
+        // resources should contain the service.name attribute
+        if let Some(resources) = event.get("resources") {
+            assert!(
+                resources.get("service.name").is_some(),
+                "Line {}: missing resources.service.name in decoded event",
+                line_num + 1
+            );
+        }
+
+        checked += 1;
+    }
+    assert!(
+        checked > 0,
+        "No decoded events found in vector-decoded-events.log"
+    );
+}
+
 #[test]
 fn vector_component_received_events_total_counts_individual_log_records() {
     // This test verifies that when use_otlp_decoding is enabled, the

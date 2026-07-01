@@ -52,6 +52,62 @@ use vector_lib::{
 };
 use vrl::value;
 
+/// Build the expected OTLP metric sidecar metadata for the standard test fixtures.
+///
+/// All metric tests use the same resource/scope/data-point attributes:
+/// - resource: service.name=vector-collector
+/// - scope: name=vector-collector-instrumentation, version=0.111.0
+/// - data points: host=localhost, service=vector-collector
+///
+/// The sidecar stores kind-wrapped typed values and a tags fingerprint.
+fn inject_standard_metric_sidecar(event: &mut Event) {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let wrap_str = |val: &str| -> Value {
+        Value::Object(ObjectMap::from([("string_value".into(), Value::from(val))]))
+    };
+
+    let mut sidecar = ObjectMap::new();
+    sidecar.insert(
+        "resource_attributes".into(),
+        Value::Object(ObjectMap::from([(
+            "service.name".into(),
+            wrap_str("vector-collector"),
+        )])),
+    );
+    sidecar.insert(
+        "scope_name".into(),
+        Value::from("vector-collector-instrumentation"),
+    );
+    sidecar.insert("scope_version".into(), Value::from("0.111.0"));
+    sidecar.insert(
+        "data_point_attributes".into(),
+        Value::Object(ObjectMap::from([
+            ("host".into(), wrap_str("localhost")),
+            ("service".into(), wrap_str("vector-collector")),
+        ])),
+    );
+
+    // Compute fingerprint from the expected tags (same as compute_tags_fingerprint)
+    let metric = event.as_metric();
+    let mut hasher: DefaultHasher = DefaultHasher::new();
+    if let Some(tags) = metric.tags() {
+        for (key, value) in tags.iter_single() {
+            key.hash(&mut hasher);
+            value.hash(&mut hasher);
+        }
+    }
+    sidecar.insert(
+        "tags_fingerprint".into(),
+        Value::Integer(hasher.finish() as i64),
+    );
+
+    event.metadata_mut().value_mut().insert(
+        path!("vector", "otlp", "metric_sidecar"),
+        Value::Object(sidecar),
+    );
+}
 fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
     Request::new(ExportLogsServiceRequest {
         resource_logs: vec![ResourceLogs {
@@ -370,8 +426,10 @@ async fn receive_grpc_logs_legacy_namespace() {
                         Value::Object(vec_into_btmap(vec![("scope_attr", "scope_val".into())])),
                     ),
                     ("dropped_attributes_count", 7.into()),
+                    ("schema_url", "v1".into()),
                 ])),
             ),
+            ("schema_url", "v1".into()),
             ("message", "log body".into()),
             ("trace_id", "4ac52aadf321c2e531db005df08792f5".into()),
             ("span_id", "0b9e4bda2a55530d".into()),
@@ -468,20 +526,23 @@ async fn receive_sum_metric() {
         tags.insert("host".to_string(), "localhost".to_string());
         tags.insert("service".to_string(), "vector-collector".to_string());
 
-        let mut expected_event = Event::from(MetricEvent::new(
-            "some.random.metric",
-            MetricKind::Absolute, // since monotonic = true
-            MetricValue::Counter { value: 42.0 },
-        )
+        let mut expected_event = Event::from(
+            MetricEvent::new(
+                "some.random.metric",
+                MetricKind::Absolute, // since monotonic = true
+                MetricValue::Counter { value: 42.0 },
+            )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
-            .with_tags(Some(tags)));
+            .with_tags(Some(tags)),
+        );
         expected_event.set_upstream_id(Arc::new(OutputId {
             component: "test".into(),
             port: Some("metrics".into()),
         }));
+        inject_standard_metric_sidecar(&mut expected_event);
         assert_eq!(actual_event, expected_event);
     })
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -560,20 +621,23 @@ async fn receive_sum_non_monotonic_metric() {
         tags.insert("host".to_string(), "localhost".to_string());
         tags.insert("service".to_string(), "vector-collector".to_string());
 
-        let mut expected_event = Event::from(MetricEvent::new(
-            "some.random.metric",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 42.0 }, // since we have monotonic = false
-        )
+        let mut expected_event = Event::from(
+            MetricEvent::new(
+                "some.random.metric",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 42.0 }, // since we have monotonic = false
+            )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
-            .with_tags(Some(tags)));
+            .with_tags(Some(tags)),
+        );
         expected_event.set_upstream_id(Arc::new(OutputId {
             component: "test".into(),
             port: Some("metrics".into()),
         }));
+        inject_standard_metric_sidecar(&mut expected_event);
         assert_eq!(actual_event, expected_event);
     })
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -649,20 +713,23 @@ async fn receive_gauge_metric() {
         tags.insert("host".to_string(), "localhost".to_string());
         tags.insert("service".to_string(), "vector-collector".to_string());
 
-        let mut expected_event = Event::from(MetricEvent::new(
-            "some.random.metric",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 42.0 },
-        )
+        let mut expected_event = Event::from(
+            MetricEvent::new(
+                "some.random.metric",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 42.0 },
+            )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
-            .with_tags(Some(tags)));
+            .with_tags(Some(tags)),
+        );
         expected_event.set_upstream_id(Arc::new(OutputId {
             component: "test".into(),
             port: Some("metrics".into()),
         }));
+        inject_standard_metric_sidecar(&mut expected_event);
         assert_eq!(actual_event, expected_event);
     })
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -787,6 +854,7 @@ async fn receive_histogram_metric() {
             component: "test".into(),
             port: Some("metrics".into()),
         }));
+        inject_standard_metric_sidecar(&mut expected_event);
         assert_eq!(actual_event, expected_event);
     })
     .await;
@@ -914,6 +982,7 @@ async fn receive_histogram_delta_metric() {
             component: "test".into(),
             port: Some("metrics".into()),
         }));
+        inject_standard_metric_sidecar(&mut expected_event);
         assert_eq!(actual_event, expected_event);
     })
     .await;
@@ -1054,6 +1123,7 @@ async fn receive_exponential_histogram_metric() {
             component: "test".into(),
             port: Some("metrics".into()),
         }));
+        inject_standard_metric_sidecar(&mut expected_event);
         assert_eq!(actual_event, expected_event);
     })
     .await;
@@ -1185,6 +1255,7 @@ async fn receive_summary_metric() {
             component: "test".into(),
             port: Some("metrics".into()),
         }));
+        inject_standard_metric_sidecar(&mut expected_event);
         assert_eq!(actual_event, expected_event);
     })
     .await;
@@ -1321,6 +1392,11 @@ async fn http_headers_logs_use_otlp_decoding_false() {
             ("severity_text", "info".into()),
             ("flags", 4.into()),
             ("dropped_attributes_count", 0.into()),
+            (
+                "scope",
+                Value::Object(vec_into_btmap(vec![("schema_url", "v1".into())])),
+            ),
+            ("schema_url", "v1".into()),
             ("timestamp", Utc.timestamp_nanos(1).into()),
             ("observed_timestamp", Utc.timestamp_nanos(2).into()),
             ("source_type", "opentelemetry".into()),
