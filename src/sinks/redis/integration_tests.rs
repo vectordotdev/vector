@@ -516,6 +516,70 @@ async fn redis_sink_channel_data_volume_tags() {
 }
 
 #[tokio::test]
+async fn redis_sink_string() {
+    trace_init();
+
+    let key = Template::try_from(format!("test-{}-{{{{num}}}}", random_string(10)))
+        .expect("should not fail to create key template");
+    debug!("Test key name: {key}.");
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10..20);
+    debug!("Test events num: {num_events}.");
+
+    let cnf = RedisSinkConfig {
+        endpoint: OneOrMany::One(redis_server()),
+        key: key.clone(),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::String,
+        list_option: None,
+        sorted_set_option: None,
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: u64::MAX,
+            ..Default::default()
+        },
+        sentinel_service: None,
+        sentinel_connect: None,
+        acknowledgements: Default::default(),
+    };
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..num_events {
+        let s: String = i.to_string();
+        let mut e = LogEvent::from(s);
+        e.insert("num", i);
+        events.push(e.into());
+    }
+    let input = stream::iter(events.clone().into_iter().map(Into::into));
+
+    // Publish events.
+    let cnf2 = cnf.clone();
+    assert_sink_compliance(&SINK_TAGS, async move {
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    let mut conn = cnf
+        .build_connection()
+        .await
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
+
+    for i in 0..num_events {
+        let e = events.get(i).unwrap().as_log();
+        let s = serde_json::to_string(e).unwrap_or_default();
+        let val: String = conn.get(key.render(e).unwrap().to_vec()).await.unwrap();
+        assert_eq!(val, s);
+    }
+}
+
+#[tokio::test]
 async fn redis_sink_metrics() {
     trace_init();
 
