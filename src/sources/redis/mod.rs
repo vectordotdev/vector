@@ -270,7 +270,7 @@ struct InputHandler {
 }
 
 impl InputHandler {
-    async fn handle_line(&mut self, line: String, channel: Option<&str>) -> Result<(), ()> {
+    async fn handle_line(&mut self, line: String, channel: Option<&[u8]>) -> Result<(), ()> {
         let now = Utc::now();
 
         self.bytes_received.emit(ByteSize(line.len()));
@@ -575,6 +575,14 @@ mod integration_test {
         let prefix = format!("test-pchannel-{}", random_string(10));
         let channel_a = format!("{prefix}-a");
         let channel_b = format!("{prefix}-b");
+        // A channel name that is not valid UTF-8. It still matches the pattern (glob matching
+        // is byte-wise) and must be preserved verbatim in the `channel` metadata rather than
+        // being lossily replaced with `?`.
+        let channel_bin = {
+            let mut name = format!("{prefix}-").into_bytes();
+            name.extend_from_slice(&[0xff, 0xfe]);
+            name
+        };
         let pattern = format!("{prefix}-*");
         let text = "test message for pchannel";
 
@@ -611,11 +619,12 @@ mod integration_test {
 
         let _: i32 = async_conn.publish(channel_a.clone(), text).await.unwrap();
         let _: i32 = async_conn.publish(channel_b.clone(), text).await.unwrap();
+        let _: i32 = async_conn.publish(channel_bin.clone(), text).await.unwrap();
 
-        let events = collect_n(rx, 2).await;
-        assert_eq!(events.len(), 2);
+        let events = collect_n(rx, 3).await;
+        assert_eq!(events.len(), 3);
 
-        let mut seen_channels = std::collections::HashSet::new();
+        let mut seen_channels: Vec<Vec<u8>> = Vec::new();
         for event in events {
             let log = event.as_log();
             assert_eq!(
@@ -626,10 +635,15 @@ mod integration_test {
                 log[log_schema().source_type_key().unwrap().to_string()],
                 RedisSourceConfig::NAME.into()
             );
-            seen_channels.insert(log["channel"].to_string_lossy().into_owned());
+            let channel = log["channel"]
+                .as_bytes()
+                .expect("channel metadata should be bytes")
+                .to_vec();
+            seen_channels.push(channel);
         }
 
-        assert!(seen_channels.contains(&channel_a));
-        assert!(seen_channels.contains(&channel_b));
+        assert!(seen_channels.contains(&channel_a.into_bytes()));
+        assert!(seen_channels.contains(&channel_b.into_bytes()));
+        assert!(seen_channels.contains(&channel_bin));
     }
 }

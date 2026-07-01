@@ -60,7 +60,10 @@ impl InputHandler {
             let mut pubsub_stream = pubsub_conn.on_message().take_until(shutdown);
             while let Some(msg) = pubsub_stream.next().await {
                 // For pattern subscriptions, record which concrete channel matched.
-                let channel = with_channel.then(|| msg.get_channel_name().to_string());
+                // Redis channel names are binary-safe, so keep the raw bytes
+                let channel: Option<Vec<u8>> = with_channel
+                    .then(|| msg.get_channel::<Vec<u8>>().ok())
+                    .flatten();
                 match msg.get_payload::<String>() {
                     Ok(line) => {
                         if let Err(()) = self.handle_line(line, channel.as_deref()).await {
