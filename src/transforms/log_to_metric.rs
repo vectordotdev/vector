@@ -22,7 +22,7 @@ use crate::{
     },
     event::{
         Event, Value,
-        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
+        metric::{Metric, MetricKind, MetricSketch, MetricTags, MetricValue, StatisticKind, TagValue},
     },
     internal_events::{
         DROP_EVENT, LogToMetricFieldNullError, LogToMetricParseFloatError,
@@ -234,6 +234,8 @@ pub enum TransformParseErrorKind {
     IntError,
     /// Errors when Parsing Arrays
     ArrayError,
+    /// Errors when Parsing Objects (e.g., sketch)
+    ObjectError,
 }
 
 impl std::fmt::Display for TransformParseErrorKind {
@@ -778,6 +780,28 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     })
 }
 
+fn get_sketch_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
+    let sketch_value = log
+        .get(event_path!("sketch"))
+        .ok_or_else(|| TransformError::PathNotFound {
+            path: "sketch".to_string(),
+        })?;
+
+    // Convert VRL Value to serde_json::Value, then deserialize as MetricSketch
+    let json_value = serde_json::to_value(sketch_value).map_err(|_| TransformError::ParseError {
+        path: "sketch".to_string(),
+        kind: TransformParseErrorKind::ObjectError,
+    })?;
+
+    let sketch: MetricSketch =
+        serde_json::from_value(json_value).map_err(|_| TransformError::ParseError {
+            path: "sketch".to_string(),
+            kind: TransformParseErrorKind::ObjectError,
+        })?;
+
+    Ok(MetricValue::Sketch { sketch })
+}
+
 fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
     let timestamp = log
@@ -834,6 +858,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
                 "aggregated_summary" => Some(get_summary_value(log)?),
                 "counter" => Some(get_counter_value(log)?),
                 "set" => Some(get_set_value(log)?),
+                "sketch" => Some(get_sketch_value(log)?),
                 _ => None,
             };
 
@@ -973,11 +998,12 @@ mod tests {
         config::log_schema,
         event::{
             Event, LogEvent,
-            metric::{Metric, MetricKind, MetricValue, StatisticKind},
+            metric::{Metric, MetricKind, MetricSketch, MetricValue, StatisticKind},
         },
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
+    use vector_lib::metrics::AgentDDSketch;
 
     const TEST_SOURCE_COMPONENT_ID: &str = "in";
     const TEST_UPSTREAM_COMPONENT_ID: &str = "transform";
@@ -2228,6 +2254,56 @@ mod tests {
                 MetricValue::Counter { value: 10.0 },
                 metric.metadata().clone(),
             )
+            .with_tags(Some(metric_tags!(
+                "env" => "test_env",
+                "host" => "localhost",
+            )))
+            .with_timestamp(Some(ts()))
+        );
+    }
+
+    #[tokio::test]
+    async fn transform_sketch() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        // Create a sketch with some data
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        sketch.insert(1.0);
+        sketch.insert(2.0);
+        sketch.insert(3.0);
+
+        // Serialize the sketch to get the JSON structure
+        let sketch_value = MetricSketch::AgentDDSketch(sketch.clone());
+        let sketch_json = serde_json::to_value(&sketch_value).unwrap();
+
+        let json_str = format!(
+            r#"{{
+              "sketch": {},
+              "kind": "absolute",
+              "name": "test.transform.sketch",
+              "tags": {{
+                "env": "test_env",
+                "host": "localhost"
+              }}
+            }}"#,
+            sketch_json
+        );
+        let log = create_log_event(&json_str);
+        let metric = do_transform(config, log.clone()).await.unwrap();
+        assert_eq!(
+            *metric.as_metric(),
+            Metric::new_with_metadata(
+                "test.transform.sketch",
+                MetricKind::Absolute,
+                MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(sketch),
+                },
+                metric.metadata().clone(),
+            )
+            .with_namespace(Some("test_namespace"))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
