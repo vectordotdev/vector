@@ -417,6 +417,8 @@ mod test {
         event::{EventContainer, metric::TagValue},
     };
 
+    #[cfg(unix)]
+    use super::unix::UnixSocketType;
     use super::*;
     use crate::{
         series,
@@ -506,6 +508,8 @@ mod test {
             let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
             let config = StatsdConfig::Unix(UnixConfig {
                 path: in_path.clone(),
+                socket_type: UnixSocketType::Stream,
+                max_length: crate::serde::default_max_length(),
                 sanitize: true,
                 convert_to: ConversionUnit::Seconds,
             });
@@ -518,6 +522,33 @@ mod test {
                         .write_all(bytes)
                         .await
                         .unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_statsd_unix_datagram() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+            let in_path = tempfile::tempdir()
+                .unwrap()
+                .keep()
+                .join("unix_datagram_test");
+            let config = StatsdConfig::Unix(UnixConfig {
+                path: in_path.clone(),
+                socket_type: UnixSocketType::Datagram,
+                max_length: crate::serde::default_max_length(),
+                sanitize: true,
+                convert_to: ConversionUnit::Seconds,
+            });
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                let socket = tokio::net::UnixDatagram::unbound().unwrap();
+                while let Some(bytes) = receiver.next().await {
+                    socket.send_to(bytes, &in_path).await.unwrap();
                 }
             });
             test_statsd(config, sender).await;
