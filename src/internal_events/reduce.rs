@@ -14,6 +14,15 @@ impl InternalEvent for ReduceStaleEventFlushed {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct ReduceByteLimitFlushed;
+
+impl InternalEvent for ReduceByteLimitFlushed {
+    fn emit(self) {
+        counter!(CounterName::ByteLimitFlushedTotal).increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct ReduceAddEventError {
     pub error: PathParseError,
     pub path: KeyString,
