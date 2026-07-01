@@ -1,6 +1,9 @@
 use futures::StreamExt;
 use itertools::Itertools;
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
+use rumqttc::{
+    AsyncClient, Event as MqttEvent, EventLoop, Incoming, Publish, QoS, SubscribeFilter,
+};
+use tokio::sync::mpsc;
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
@@ -34,27 +37,18 @@ struct FinalizerEntry {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct ProtocolState {
     connected: bool,
-    pending_resubscribe: bool,
     connection_generation: u64,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-struct LoopActions {
-    retry_pending_acks: bool,
-    retry_resubscribe: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct ConnAckActions {
     warn_session_not_resumed: bool,
-    clear_pending_acks: bool,
     flush_finalizer: bool,
     resubscribe: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct DisconnectActions {
-    clear_pending_acks: bool,
     flush_finalizer: bool,
 }
 
@@ -64,14 +58,12 @@ struct PublishAckDecision {
     warn_unsupported_qos: bool,
 }
 
-impl ProtocolState {
-    const fn loop_actions(&self) -> LoopActions {
-        LoopActions {
-            retry_pending_acks: self.connected,
-            retry_resubscribe: self.connected && self.pending_resubscribe,
-        }
-    }
+enum PolledMqttEvent {
+    Event(MqttEvent),
+    Disconnect,
+}
 
+impl ProtocolState {
     const fn on_connack(
         &mut self,
         acknowledgements: bool,
@@ -79,7 +71,6 @@ impl ProtocolState {
     ) -> ConnAckActions {
         let actions = ConnAckActions {
             warn_session_not_resumed: acknowledgements && !session_present,
-            clear_pending_acks: true,
             flush_finalizer: true,
             resubscribe: self.connection_generation > 0 && !session_present,
         };
@@ -94,17 +85,14 @@ impl ProtocolState {
         self.connected = false;
 
         DisconnectActions {
-            clear_pending_acks: true,
             flush_finalizer: true,
         }
     }
 
-    const fn on_resubscribe_result(&mut self, success: bool) {
-        self.pending_resubscribe = !success;
-    }
-
     fn should_ack_finalized_publish(&self, status: BatchStatus, entry_generation: u64) -> bool {
-        status == BatchStatus::Delivered && entry_generation == self.connection_generation
+        self.connected
+            && status == BatchStatus::Delivered
+            && entry_generation == self.connection_generation
     }
 }
 
@@ -137,50 +125,30 @@ fn warn_session_not_resumed() {
     );
 }
 
-fn warn_resubscribe_failed() {
+fn warn_subscribe_failed() {
     warn!(
-        message = "Failed to queue MQTT re-subscribe request after reconnect; will retry while connected.",
+        message = "Failed to queue MQTT subscribe request.",
         internal_log_rate_limit = true,
     );
 }
 
-#[derive(Default)]
-struct PendingAcks {
-    publishes: Vec<Publish>,
-}
+async fn poll_mqtt_connection(
+    mut connection: EventLoop,
+    events_tx: mpsc::UnboundedSender<PolledMqttEvent>,
+    shutdown: ShutdownSignal,
+) {
+    loop {
+        let event = tokio::select! {
+            _ = shutdown.clone() => break,
+            event = connection.poll() => match event {
+                Ok(event) => PolledMqttEvent::Event(event),
+                Err(_) => PolledMqttEvent::Disconnect,
+            },
+        };
 
-impl PendingAcks {
-    fn push(&mut self, publish: Publish) {
-        self.publishes.push(publish);
-    }
-
-    fn clear(&mut self) {
-        self.publishes.clear();
-    }
-
-    fn retry(&mut self, client: &rumqttc::AsyncClient) {
-        self.retry_with(|publish| client.try_ack(publish).is_ok());
-    }
-
-    fn try_ack(&mut self, connected: bool, publish: Publish, client: &rumqttc::AsyncClient) {
-        self.try_ack_with(connected, publish, |publish| {
-            client.try_ack(publish).is_ok()
-        });
-    }
-
-    fn try_ack_with(
-        &mut self,
-        connected: bool,
-        publish: Publish,
-        mut try_ack: impl FnMut(&Publish) -> bool,
-    ) {
-        if connected && !try_ack(&publish) {
-            self.push(publish);
+        if events_tx.send(event).is_err() {
+            break;
         }
-    }
-
-    fn retry_with(&mut self, mut try_ack: impl FnMut(&Publish) -> bool) {
-        self.publishes.retain(|publish| !try_ack(publish));
     }
 }
 
@@ -210,9 +178,15 @@ impl MqttSource {
     }
 
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let (client, mut connection) = self.connector.connect();
+        let (client, connection) = self.connector.connect();
+        let (mqtt_events_tx, mut mqtt_events_rx) = mpsc::unbounded_channel();
+        tokio::spawn(poll_mqtt_connection(
+            connection,
+            mqtt_events_tx,
+            shutdown.clone(),
+        ));
 
-        self.subscribe(&client)?;
+        self.subscribe(&client).await?;
 
         // Finalizer drives end-to-end acknowledgements: each in-flight publish is
         // registered with its batch-status receiver, and we send the QoS-1 PUBACK
@@ -225,49 +199,29 @@ impl MqttSource {
             Some(shutdown.clone()),
         );
 
-        // PUBACKs that rumqttc's bounded request channel was too full to accept,
-        // retained for retry rather than dropped. Dropping a PUBACK for an already
-        // delivered message would pin it in the broker's in-flight window until the
-        // next reconnect. This is bounded in practice by that in-flight window (the
-        // broker stops delivering once it fills), and the event loop below drains the
-        // request channel, so entries flush on subsequent iterations.
         let mut protocol_state = ProtocolState::default();
-        let mut pending_acks = PendingAcks::default();
 
         loop {
-            let actions = protocol_state.loop_actions();
-            if actions.retry_resubscribe {
-                protocol_state.on_resubscribe_result(self.try_subscribe(&client));
-            }
-
-            // Retry deferred PUBACKs while connected (the event loop below drains the
-            // request channel). Skipped while disconnected: a publish's packet id is
-            // only valid on the connection it arrived on, so stale PUBACKs must not be
-            // replayed across a reconnect.
-            if actions.retry_pending_acks {
-                pending_acks.retry(&client);
-            }
-
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
                 entry = ack_stream.next() => {
                     // Only PUBACK delivered events. On Errored/Rejected we skip the
                     // ack so the broker redelivers after reconnect (QoS-1 +
-                    // clean_session=false), giving at-least-once delivery. Use the
-                    // non-blocking `try_ack` — awaiting `ack` could deadlock, since
-                    // this same task polls the event loop that drains rumqttc's request
-                    // channel. If that channel is full, retain the PUBACK for retry
-                    // (above) instead of dropping it.
+                    // clean_session=false), giving at-least-once delivery. The MQTT
+                    // event loop is polled by a separate task, so awaiting `ack` here
+                    // does not block the task responsible for draining rumqttc's
+                    // request channel. Stale finalizers from prior connections are
+                    // ignored because packet IDs are only valid on their connection.
                     if let Some((status, entry)) = entry
                         && protocol_state.should_ack_finalized_publish(
                             status,
                             entry.connection_generation,
                         )
                     {
-                        pending_acks.try_ack(protocol_state.connected, entry.publish, &client);
+                        client.ack(&entry.publish).await.map_err(|_| ())?;
                     }
                 },
-                mqtt_event = connection.poll() => {
+                mqtt_event = mqtt_events_rx.recv() => {
                     // Providing at-least-once here does not require correlating a
                     // connection/poll error back to a specific in-flight publish.
                     // rumqtt#349 (no packet id for *outbound* publishes) concerns the
@@ -278,7 +232,7 @@ impl MqttSource {
                     // redelivered by the broker on reconnect (clean_session=false + QoS
                     // AtLeastOnce).
                     match mqtt_event {
-                        Ok(MqttEvent::Incoming(Incoming::Publish(publish))) => {
+                        Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::Publish(publish)))) => {
                             self.process_message(
                                 publish,
                                 &mut out,
@@ -286,7 +240,7 @@ impl MqttSource {
                                 protocol_state.connection_generation,
                             ).await;
                         }
-                        Ok(MqttEvent::Incoming(Incoming::SubAck(suback)))
+                        Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::SubAck(suback))))
                             if self.acknowledgements =>
                         {
                             for return_code in suback.return_codes {
@@ -304,7 +258,7 @@ impl MqttSource {
                         // A (re)connected session resumes here; the broker will
                         // redeliver any unacknowledged publishes, so drop deferred
                         // PUBACKs whose packet ids came from the previous connection.
-                        Ok(MqttEvent::Incoming(Incoming::ConnAck(connack))) => {
+                        Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::ConnAck(connack)))) => {
                             let actions = protocol_state.on_connack(
                                 self.acknowledgements,
                                 connack.session_present,
@@ -312,31 +266,26 @@ impl MqttSource {
                             if actions.warn_session_not_resumed {
                                 warn_session_not_resumed();
                             }
-                            if actions.clear_pending_acks {
-                                pending_acks.clear();
-                            }
                             if actions.flush_finalizer
                                 && let Some(finalizer) = &finalizer
                             {
                                 finalizer.flush();
                             }
                             if actions.resubscribe {
-                                protocol_state.on_resubscribe_result(self.try_subscribe(&client));
+                                self.subscribe(&client).await?;
                             }
                         }
                         // Connection lost: same stale-packet-id reasoning, and rumqttc
                         // drops its own queued acks while reconnecting.
-                        Err(_) => {
+                        Some(PolledMqttEvent::Disconnect) => {
                             let actions = protocol_state.on_disconnect();
-                            if actions.clear_pending_acks {
-                                pending_acks.clear();
-                            }
                             if actions.flush_finalizer
                                 && let Some(finalizer) = &finalizer
                             {
                                 finalizer.flush();
                             }
                         }
+                        None => return Ok(()),
                         _ => {}
                     }
                 }
@@ -344,30 +293,26 @@ impl MqttSource {
         }
     }
 
-    fn try_subscribe(&self, client: &rumqttc::AsyncClient) -> bool {
-        match self.subscribe(client) {
-            Ok(()) => true,
-            Err(()) => {
-                warn_resubscribe_failed();
-                false
+    async fn subscribe(&self, client: &AsyncClient) -> Result<(), ()> {
+        let result = match &self.config.topic {
+            OneOrMany::One(topic) => client.subscribe(topic, SUBSCRIPTION_QOS).await,
+            OneOrMany::Many(topics) => {
+                client
+                    .subscribe_many(
+                        topics
+                            .iter()
+                            .cloned()
+                            .map(|topic| SubscribeFilter::new(topic, SUBSCRIPTION_QOS)),
+                    )
+                    .await
             }
-        }
-    }
+        };
 
-    fn subscribe(&self, client: &rumqttc::AsyncClient) -> Result<(), ()> {
-        match &self.config.topic {
-            OneOrMany::One(topic) => client
-                .try_subscribe(topic, SUBSCRIPTION_QOS)
-                .map_err(|_| ()),
-            OneOrMany::Many(topics) => client
-                .try_subscribe_many(
-                    topics
-                        .iter()
-                        .cloned()
-                        .map(|topic| SubscribeFilter::new(topic, SUBSCRIPTION_QOS)),
-                )
-                .map_err(|_| ()),
+        if result.is_err() {
+            warn_subscribe_failed();
         }
+
+        result.map_err(|_| ())
     }
 
     async fn process_message(
@@ -453,64 +398,6 @@ impl MqttSource {
 mod tests {
     use super::*;
 
-    fn publish(pkid: u16) -> Publish {
-        let mut publish = Publish::new("topic", QoS::AtLeastOnce, vec![1, 2, 3]);
-        publish.pkid = pkid;
-        publish
-    }
-
-    #[test]
-    fn pending_acks_keeps_failed_retries() {
-        let mut pending_acks = PendingAcks::default();
-        pending_acks.push(publish(1));
-        pending_acks.push(publish(2));
-        pending_acks.push(publish(3));
-
-        let mut attempted = Vec::new();
-        pending_acks.retry_with(|publish| {
-            attempted.push(publish.pkid);
-            publish.pkid != 2
-        });
-
-        assert_eq!(attempted, vec![1, 2, 3]);
-        assert_eq!(pending_acks.publishes.len(), 1);
-        assert_eq!(pending_acks.publishes[0].pkid, 2);
-
-        pending_acks.retry_with(|_| true);
-        assert!(pending_acks.publishes.is_empty());
-    }
-
-    #[test]
-    fn pending_acks_clear_drops_stale_packet_ids() {
-        let mut pending_acks = PendingAcks::default();
-        pending_acks.push(publish(1));
-        pending_acks.push(publish(2));
-
-        pending_acks.clear();
-
-        assert!(pending_acks.publishes.is_empty());
-    }
-
-    #[test]
-    fn pending_acks_backpressure_matrix() {
-        for (connected, try_ack_succeeds, expected_attempted, expected_queued) in [
-            (false, true, false, false),
-            (true, true, true, false),
-            (true, false, true, true),
-        ] {
-            let mut pending_acks = PendingAcks::default();
-            let mut attempted = false;
-
-            pending_acks.try_ack_with(connected, publish(1), |_| {
-                attempted = true;
-                try_ack_succeeds
-            });
-
-            assert_eq!(attempted, expected_attempted);
-            assert_eq!(!pending_acks.publishes.is_empty(), expected_queued);
-        }
-    }
-
     #[test]
     fn protocol_contract_matrix_for_requested_and_granted_qos() {
         assert!(publish_supports_end_to_end_acknowledgements(
@@ -591,7 +478,6 @@ mod tests {
             let actions = state.on_connack(acknowledgements, session_present);
 
             assert_eq!(actions.warn_session_not_resumed, expected_warn);
-            assert!(actions.clear_pending_acks);
             assert!(actions.flush_finalizer);
             assert!(!actions.resubscribe);
             assert!(state.connected);
@@ -605,7 +491,6 @@ mod tests {
             actions,
             ConnAckActions {
                 warn_session_not_resumed: false,
-                clear_pending_acks: true,
                 flush_finalizer: true,
                 resubscribe: false,
             }
@@ -619,43 +504,11 @@ mod tests {
             actions,
             ConnAckActions {
                 warn_session_not_resumed: true,
-                clear_pending_acks: true,
                 flush_finalizer: true,
                 resubscribe: true,
             }
         );
         assert_eq!(fresh_session.connection_generation, 2);
-    }
-
-    #[test]
-    fn protocol_contract_matrix_for_pending_resubscribe() {
-        let mut state = ProtocolState::default();
-        state.on_resubscribe_result(false);
-        assert_eq!(
-            state.loop_actions(),
-            LoopActions {
-                retry_pending_acks: false,
-                retry_resubscribe: false,
-            }
-        );
-
-        state.on_connack(true, true);
-        assert_eq!(
-            state.loop_actions(),
-            LoopActions {
-                retry_pending_acks: true,
-                retry_resubscribe: true,
-            }
-        );
-
-        state.on_resubscribe_result(true);
-        assert_eq!(
-            state.loop_actions(),
-            LoopActions {
-                retry_pending_acks: true,
-                retry_resubscribe: false,
-            }
-        );
     }
 
     #[test]
@@ -668,19 +521,11 @@ mod tests {
         assert_eq!(
             actions,
             DisconnectActions {
-                clear_pending_acks: true,
                 flush_finalizer: true,
             }
         );
         assert!(!state.connected);
         assert_eq!(state.connection_generation, 1);
-        assert_eq!(
-            state.loop_actions(),
-            LoopActions {
-                retry_pending_acks: false,
-                retry_resubscribe: false,
-            }
-        );
     }
 
     #[test]
@@ -700,5 +545,8 @@ mod tests {
                 should_ack
             );
         }
+
+        state.on_disconnect();
+        assert!(!state.should_ack_finalized_publish(BatchStatus::Delivered, 2));
     }
 }
