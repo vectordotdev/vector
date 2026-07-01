@@ -509,6 +509,13 @@ fn mark_schema_closed(schema: &mut SchemaObject) {
     }
 
     schema.object().unevaluated_properties = Some(Box::new(Schema::Bool(false)));
+
+    // Ensure the schema has an explicit `"type": "object"` when `unevaluatedProperties` is set.
+    // Some validators (e.g. Ajv in strict mode) require that object-level keywords like
+    // `unevaluatedProperties` are accompanied by an explicit type declaration.
+    if schema.instance_type.is_none() {
+        schema.instance_type = Some(SingleOrVec::Single(Box::new(InstanceType::Object)));
+    }
 }
 
 fn schema_type_matches(
@@ -536,6 +543,37 @@ mod tests {
 
     use super::DisallowUnevaluatedPropertiesVisitor;
     use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
+
+    #[test]
+    fn adds_type_object_when_missing_and_unevaluated_properties_is_set() {
+        // When a schema uses subschema validation (e.g. allOf) with object subschemas but
+        // has no explicit `type` at the root level, setting `unevaluatedProperties` should
+        // also add `"type": "object"` for compatibility with strict validators like Ajv.
+        let mut actual_schema = as_schema(json!({
+            "allOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            }]
+        }));
+
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "allOf": [{
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string" }
+                }
+            }],
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
 
     #[test]
     fn basic_object_schema() {
@@ -855,6 +893,7 @@ mod tests {
             },
             "definitions": {
                 "custom_acks": {
+                    "type": "object",
                     "allOf": [
                         { "type": "object", "properties": { "ack_count": { "type": "number" } } },
                         { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
@@ -938,10 +977,12 @@ mod tests {
             },
             "definitions": {
                 "one": {
+                    "type": "object",
                     "allOf": [{ "$ref": "#/definitions/c" }],
                     "unevaluatedProperties": false
                 },
                 "two": {
+                    "type": "object",
                     "allOf": [
                         {
                             "type": "object",
