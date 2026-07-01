@@ -134,32 +134,30 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
-    # Two steps so that the actions/cache post-step (which saves the cache) runs
-    # directly from this composite, not a nested one — nested composites break
-    # post-step input resolution (actions/runner#3514, #2030).
-    - name: Cache Cargo registry, index, and git DB
-      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref == 'refs/heads/master' }}
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+    # Caches ~/.cargo (registry + git + cargo-installed bin) AND target/ build
+    # artifacts. Master pushes save the cache; PRs read it but don't write
+    # back. PRs only recompile what their changes invalidate (Cargo
+    # fingerprints), so unchanged deps (rdkafka-sys, openssl-sys, …) are
+    # reused as-is from master's cache.
+    #
+    # No `shared-key`: per-job partitioning (Swatinem's default). Sharing one
+    # key across jobs caused races — the lightest job (check-fmt) consistently
+    # won the save lock, persisting an almost-empty target/ and locking out
+    # heavier jobs (check-clippy, build) from saving their actual artifacts.
+    #
+    # `add-rust-environment-hash-key: false` suppresses Swatinem's rustc +
+    # Cargo.lock hash suffixes, giving one fixed entry per job that is
+    # overwritten on every master save. Without this, each Cargo.lock bump
+    # creates a new ~1-3 GB entry per job, quickly saturating the 10 GB GHA
+    # cache budget. Cargo's internal fingerprint system handles invalidation
+    # inside the cached target/ — changed crates recompile, unchanged ones hit.
+    - name: Cache Cargo + target/
+      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-
-    - name: Restore Cargo registry, index, and git DB
-      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref != 'refs/heads/master' }}
-      uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        prefix-key: "v1-vector"
+        add-rust-environment-hash-key: "false"
+        save-if: ${{ github.ref == 'refs/heads/master' }}
 
     - name: Install mold
       if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
