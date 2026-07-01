@@ -1,15 +1,18 @@
 use chrono::{TimeZone, Utc};
 use vector_core::event::{
     Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
-    metric::{Bucket, Quantile, TagValue},
+    metric::{Bucket, Quantile, TagValue, TagValueSet},
 };
 
+use super::common::str_to_key_value;
 use super::proto::{
+    collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{InstrumentationScope, KeyValue},
     metrics::v1::{
         AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
-        Histogram, HistogramDataPoint, NumberDataPoint, ResourceMetrics, Sum, Summary,
-        SummaryDataPoint, metric::Data, number_data_point::Value as NumberDataPointValue,
+        Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
+        Summary, SummaryDataPoint, metric::Data, number_data_point::Value as NumberDataPointValue,
+        summary_data_point::ValueAtQuantile,
     },
     resource::v1::Resource,
 };
@@ -438,5 +441,436 @@ impl ToF64 for Option<NumberDataPointValue> {
             Some(NumberDataPointValue::AsInt(i)) => Some(i as f64),
             None => None,
         }
+    }
+}
+
+/// The single/last value of a tag, preserving `TagValue::Bare` (unlike `MetricTags::iter_single`,
+/// which discards `Bare` tags because it goes through `TagValue::as_option`).
+fn representative_tag_value(tag_set: &TagValueSet) -> Option<TagValue> {
+    match tag_set {
+        TagValueSet::Empty => None,
+        TagValueSet::Single(tag) => Some(tag.clone()),
+        TagValueSet::Set(set) => set.iter().last().cloned(),
+    }
+}
+
+/// Splits a metric's tags back into the `Resource`, `InstrumentationScope`, and data point
+/// `attributes` they were flattened from by [`build_metric_tags`].
+pub fn split_metric_tags(tags: &MetricTags) -> (Resource, InstrumentationScope, Vec<KeyValue>) {
+    let mut resource_attributes = Vec::new();
+    let mut scope_name = String::new();
+    let mut scope_version = String::new();
+    let mut scope_attributes = Vec::new();
+    let mut attributes = Vec::new();
+
+    for (key, tag_set) in tags.iter_sets() {
+        let Some(value) = representative_tag_value(tag_set) else {
+            continue;
+        };
+
+        if let Some(rest) = key.strip_prefix("resource.") {
+            resource_attributes.push(str_to_key_value(rest, &value));
+        } else if key == "scope.name" {
+            scope_name = value.as_option().unwrap_or_default().to_string();
+        } else if key == "scope.version" {
+            scope_version = value.as_option().unwrap_or_default().to_string();
+        } else if let Some(rest) = key.strip_prefix("scope.") {
+            scope_attributes.push(str_to_key_value(rest, &value));
+        } else {
+            attributes.push(str_to_key_value(key, &value));
+        }
+    }
+
+    let resource = Resource {
+        attributes: resource_attributes,
+        dropped_attributes_count: 0,
+    };
+    let scope = InstrumentationScope {
+        name: scope_name,
+        version: scope_version,
+        attributes: scope_attributes,
+        dropped_attributes_count: 0,
+    };
+
+    (resource, scope, attributes)
+}
+
+fn metric_value_to_data(
+    value: &MetricValue,
+    kind: MetricKind,
+    timestamp_ns: u64,
+    attrs: Vec<KeyValue>,
+) -> Result<Data, vector_common::Error> {
+    let temporality = match kind {
+        MetricKind::Incremental => AggregationTemporality::Delta,
+        MetricKind::Absolute => AggregationTemporality::Cumulative,
+    } as i32;
+
+    match value {
+        MetricValue::Counter { value } => Ok(Data::Sum(Sum {
+            data_points: vec![NumberDataPoint {
+                attributes: attrs,
+                start_time_unix_nano: 0,
+                time_unix_nano: timestamp_ns,
+                value: Some(NumberDataPointValue::AsDouble(*value)),
+                exemplars: Vec::new(),
+                flags: 0,
+            }],
+            aggregation_temporality: temporality,
+            is_monotonic: true,
+        })),
+        MetricValue::Gauge { value } => Ok(Data::Gauge(Gauge {
+            data_points: vec![NumberDataPoint {
+                attributes: attrs,
+                start_time_unix_nano: 0,
+                time_unix_nano: timestamp_ns,
+                value: Some(NumberDataPointValue::AsDouble(*value)),
+                exemplars: Vec::new(),
+                flags: 0,
+            }],
+        })),
+        MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        } => {
+            // The decode path treats the last bucket's `upper_limit` as `+Inf`, folding it into
+            // `bucket_counts` without a matching `explicit_bounds` entry. Mirror that here: emit
+            // all `N` counts but only the first `N-1` bounds, or OTLP receivers reject the point.
+            let bucket_counts: Vec<u64> = buckets.iter().map(|bucket| bucket.count).collect();
+            let explicit_bounds: Vec<f64> = buckets
+                .iter()
+                .take(buckets.len().saturating_sub(1))
+                .map(|bucket| bucket.upper_limit)
+                .collect();
+
+            Ok(Data::Histogram(Histogram {
+                data_points: vec![HistogramDataPoint {
+                    attributes: attrs,
+                    start_time_unix_nano: 0,
+                    time_unix_nano: timestamp_ns,
+                    count: *count,
+                    sum: Some(*sum),
+                    bucket_counts,
+                    explicit_bounds,
+                    exemplars: Vec::new(),
+                    flags: 0,
+                    min: None,
+                    max: None,
+                }],
+                aggregation_temporality: temporality,
+            }))
+        }
+        MetricValue::AggregatedSummary {
+            quantiles,
+            count,
+            sum,
+        } => {
+            let quantile_values = quantiles
+                .iter()
+                .map(|quantile| ValueAtQuantile {
+                    quantile: quantile.quantile,
+                    value: quantile.value,
+                })
+                .collect();
+
+            Ok(Data::Summary(Summary {
+                data_points: vec![SummaryDataPoint {
+                    attributes: attrs,
+                    start_time_unix_nano: 0,
+                    time_unix_nano: timestamp_ns,
+                    count: *count,
+                    sum: *sum,
+                    quantile_values,
+                    flags: 0,
+                }],
+            }))
+        }
+        MetricValue::Set { .. } => {
+            Err("OTLP serializer does not support Set (statsd-style) metric values".into())
+        }
+        MetricValue::Distribution { .. } => Err(
+            "OTLP serializer does not support Distribution (un-aggregated) metric values".into(),
+        ),
+        MetricValue::Sketch { .. } => {
+            Err("OTLP serializer does not support Sketch (DDSketch) metric values".into())
+        }
+    }
+}
+
+/// Converts a native Vector `Metric` event into an OTLP `ExportMetricsServiceRequest`.
+///
+/// This is the inverse of `ResourceMetrics::into_event_iter`. See the module-level docs for
+/// which `MetricValue` variants are supported and why the reverse direction is not lossless.
+pub fn metric_event_to_export_request(
+    metric: MetricEvent,
+) -> Result<ExportMetricsServiceRequest, vector_common::Error> {
+    let timestamp_ns = metric
+        .timestamp()
+        .and_then(|ts| ts.timestamp_nanos_opt())
+        .unwrap_or_else(|| Utc::now().timestamp_nanos_opt().unwrap_or(0))
+        as u64;
+
+    let empty_tags = MetricTags::default();
+    let tags = metric.tags().unwrap_or(&empty_tags);
+    let (resource, scope, attributes) = split_metric_tags(tags);
+
+    let kind = metric.kind();
+    let name = metric.name().to_string();
+    let data = metric_value_to_data(metric.value(), kind, timestamp_ns, attributes)?;
+
+    Ok(ExportMetricsServiceRequest {
+        resource_metrics: vec![ResourceMetrics {
+            resource: Some(resource),
+            scope_metrics: vec![ScopeMetrics {
+                scope: Some(scope),
+                metrics: vec![Metric {
+                    name,
+                    description: String::new(),
+                    unit: String::new(),
+                    data: Some(data),
+                }],
+                schema_url: String::new(),
+            }],
+            schema_url: String::new(),
+        }],
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::proto::common::v1::any_value::Value as PBValue;
+    use super::*;
+    use vector_core::event::MetricValue;
+    use vector_core::event::metric::StatisticKind;
+
+    fn number_data_point(data: Data) -> NumberDataPoint {
+        match data {
+            Data::Sum(sum) => sum.data_points.into_iter().next().unwrap(),
+            Data::Gauge(gauge) => gauge.data_points.into_iter().next().unwrap(),
+            other => panic!("expected a number data point, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn counter_to_otlp_sum() {
+        let metric = MetricEvent::new(
+            "requests",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
+        )
+        .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
+
+        let data = metric_value_to_data(metric.value(), metric.kind(), 1_000, Vec::new())
+            .expect("counter should encode");
+
+        match data {
+            Data::Sum(sum) => {
+                assert!(sum.is_monotonic);
+                assert_eq!(
+                    sum.aggregation_temporality,
+                    AggregationTemporality::Delta as i32
+                );
+                let point = sum.data_points.into_iter().next().unwrap();
+                assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(42.0)));
+                assert_eq!(point.time_unix_nano, 1_000);
+            }
+            other => panic!("expected Data::Sum, got {other:?}"),
+        }
+
+        // Absolute kind maps to Cumulative temporality.
+        let metric = MetricEvent::new(
+            "requests",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let data = metric_value_to_data(metric.value(), metric.kind(), 1, Vec::new()).unwrap();
+        match data {
+            Data::Sum(sum) => assert_eq!(
+                sum.aggregation_temporality,
+                AggregationTemporality::Cumulative as i32
+            ),
+            other => panic!("expected Data::Sum, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gauge_to_otlp_gauge() {
+        let attrs = vec![str_to_key_value("host", &TagValue::from("localhost"))];
+        let metric = MetricEvent::new(
+            "cpu",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 12.5 },
+        );
+
+        let data = metric_value_to_data(metric.value(), metric.kind(), 5, attrs.clone()).unwrap();
+        let point = number_data_point(data);
+        assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(12.5)));
+        assert_eq!(point.attributes, attrs);
+    }
+
+    #[test]
+    fn aggregated_histogram_to_otlp_histogram() {
+        let buckets = vec![
+            Bucket {
+                upper_limit: 1.0,
+                count: 1,
+            },
+            Bucket {
+                upper_limit: 2.0,
+                count: 2,
+            },
+            Bucket {
+                upper_limit: f64::INFINITY,
+                count: 3,
+            },
+        ];
+        let metric = MetricEvent::new(
+            "latency",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count: 6,
+                sum: 10.0,
+            },
+        );
+
+        let data = metric_value_to_data(metric.value(), metric.kind(), 42, Vec::new()).unwrap();
+        match data {
+            Data::Histogram(histogram) => {
+                let point = histogram.data_points.into_iter().next().unwrap();
+                assert_eq!(point.bucket_counts, vec![1, 2, 3]);
+                // Trailing +Inf bound must be dropped: N counts, N-1 bounds.
+                assert_eq!(point.explicit_bounds, vec![1.0, 2.0]);
+                assert_eq!(point.count, 6);
+                assert_eq!(point.sum, Some(10.0));
+            }
+            other => panic!("expected Data::Histogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn aggregated_summary_to_otlp_summary() {
+        let quantiles = vec![
+            Quantile {
+                quantile: 0.5,
+                value: 10.0,
+            },
+            Quantile {
+                quantile: 0.99,
+                value: 20.0,
+            },
+        ];
+        let metric = MetricEvent::new(
+            "response_time",
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles,
+                count: 100,
+                sum: 1000.0,
+            },
+        );
+
+        let data = metric_value_to_data(metric.value(), metric.kind(), 1, Vec::new()).unwrap();
+        match data {
+            Data::Summary(summary) => {
+                let point = summary.data_points.into_iter().next().unwrap();
+                assert_eq!(point.count, 100);
+                assert_eq!(point.sum, 1000.0);
+                assert_eq!(
+                    point.quantile_values,
+                    vec![
+                        ValueAtQuantile {
+                            quantile: 0.5,
+                            value: 10.0
+                        },
+                        ValueAtQuantile {
+                            quantile: 0.99,
+                            value: 20.0
+                        },
+                    ]
+                );
+            }
+            other => panic!("expected Data::Summary, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn tag_splitting() {
+        let mut tags = MetricTags::default();
+        tags.insert("resource.service.name".to_string(), "my-service");
+        tags.insert("scope.name".to_string(), "my-scope");
+        tags.insert("scope.version".to_string(), "1.0.0");
+        tags.insert("scope.custom".to_string(), "scope-value");
+        tags.insert("env".to_string(), "prod");
+        tags.insert("bare_tag".to_string(), TagValue::Bare);
+
+        let (resource, scope, attributes) = split_metric_tags(&tags);
+
+        assert_eq!(resource.attributes.len(), 1);
+        assert_eq!(resource.attributes[0].key, "service.name");
+        assert_eq!(
+            resource.attributes[0].value.as_ref().unwrap().value,
+            Some(PBValue::StringValue("my-service".to_string()))
+        );
+
+        assert_eq!(scope.name, "my-scope");
+        assert_eq!(scope.version, "1.0.0");
+        assert_eq!(scope.attributes.len(), 1);
+        assert_eq!(scope.attributes[0].key, "custom");
+
+        assert_eq!(attributes.len(), 2);
+        let env = attributes.iter().find(|kv| kv.key == "env").unwrap();
+        assert_eq!(
+            env.value.as_ref().unwrap().value,
+            Some(PBValue::StringValue("prod".to_string()))
+        );
+        let bare = attributes.iter().find(|kv| kv.key == "bare_tag").unwrap();
+        assert_eq!(
+            bare.value.as_ref().unwrap().value,
+            Some(PBValue::StringValue(String::new()))
+        );
+    }
+
+    #[test]
+    fn unsupported_metric_returns_err() {
+        let set_metric = MetricEvent::new(
+            "unique_users",
+            MetricKind::Incremental,
+            MetricValue::Set {
+                values: std::iter::once("a".to_string()).collect(),
+            },
+        );
+        let err = metric_event_to_export_request(set_metric).unwrap_err();
+        assert!(err.to_string().contains("Set"));
+
+        let distribution_metric = MetricEvent::new(
+            "latencies",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: Vec::new(),
+                statistic: StatisticKind::Histogram,
+            },
+        );
+        let err = metric_event_to_export_request(distribution_metric).unwrap_err();
+        assert!(err.to_string().contains("Distribution"));
+    }
+
+    #[test]
+    fn timestamp_fallback() {
+        let metric = MetricEvent::new(
+            "cpu",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        );
+        assert!(metric.timestamp().is_none());
+
+        let request = metric_event_to_export_request(metric).unwrap();
+        let data = request.resource_metrics[0].scope_metrics[0].metrics[0]
+            .data
+            .clone()
+            .unwrap();
+        let point = number_data_point(data);
+        assert_ne!(point.time_unix_nano, 0);
     }
 }

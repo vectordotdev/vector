@@ -22,4 +22,5 @@ ordered-float.workspace = true
 prost.workspace = true
 tonic.workspace = true
 vrl.workspace = true
+vector-common = { path = "../vector-common", default-features = false }
 vector-core = { path = "../vector-core", default-features = false }
