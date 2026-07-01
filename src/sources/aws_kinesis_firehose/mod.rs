@@ -259,7 +259,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 Self::NAME,
                 common_attributes_path,
                 &owned_value_path!("common_attributes"),
-                Kind::object(Collection::from_unknown(Kind::bytes().or_undefined())).or_undefined(),
+                Kind::object(Collection::from_unknown(
+                    Kind::bytes().or_null().or_undefined(),
+                ))
+                .or_undefined(),
                 None,
             );
 
@@ -485,7 +488,16 @@ mod tests {
         common_attributes: Option<&'static str>,
     ) -> tokio::task::JoinHandle<reqwest::Result<reqwest::Response>> {
         tokio::spawn(async move {
-            send(address, timestamp, records, key, gzip, record_compression, common_attributes).await
+            send(
+                address,
+                timestamp,
+                records,
+                key,
+                gzip,
+                record_compression,
+                common_attributes,
+            )
+            .await
         })
     }
 
@@ -1360,7 +1372,8 @@ mod tests {
 
     #[tokio::test]
     async fn no_authorization_access_key_passthrough_enabled() {
-        let (rx, address, _guard) = source(None, None, true, Default::default(), true, true, vec![]).await;
+        let (rx, address, _guard) =
+            source(None, None, true, Default::default(), true, true, vec![]).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
