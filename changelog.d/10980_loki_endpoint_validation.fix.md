@@ -1,0 +1,1 @@
+The `loki` sink now validates the `endpoint` option at startup and returns a clear error when it is not an absolute URL (for example, a host name with a missing or mistyped scheme). Previously such values were accepted during configuration parsing but later failed with an opaque `invalid format` error.
