@@ -25,11 +25,3 @@ pub fn default_target() -> String {
         format!("{ARCH}-unknown-linux-gnu")
     }
 }
-
-pub fn default_features() -> &'static str {
-    if cfg!(windows) {
-        "default-msvc"
-    } else {
-        "default"
-    }
-}

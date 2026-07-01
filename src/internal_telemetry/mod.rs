@@ -1,4 +1,4 @@
 #![allow(missing_docs)]
 
-#[cfg(feature = "allocation-tracing")]
+#[cfg(unix)]
 pub mod allocations;

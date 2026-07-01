@@ -1,6 +1,9 @@
 #![allow(missing_docs)]
 
-use std::{num::NonZeroU64, path::PathBuf};
+use std::{
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 
@@ -129,6 +132,11 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
 
+    /// Number of events batched per source send and used as the base for source output buffer sizing
+    /// (source output buffer capacity is this value multiplied by the number of worker threads)
+    #[arg(long, env = "VECTOR_CHUNK_SIZE_EVENTS")]
+    pub chunk_size_events: Option<NonZeroUsize>,
+
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
@@ -244,12 +252,12 @@ pub struct RootOpts {
     pub no_graceful_shutdown_limit: bool,
 
     /// Set runtime allocation tracing
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
     pub allocation_tracing: bool,
 
     /// Set allocation tracing reporting rate in milliseconds.
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(
         long,
         env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
