@@ -24,9 +24,7 @@ transforms:
     inputs: ["apache_logs"]
     type: "remap"
     source: |
-      '''
       .host = get_env_var!("HOSTNAME")
-      '''
 
 # Print the data to STDOUT for inspection
 # Docs: https://vector.dev/docs/reference/configuration/sinks/console
