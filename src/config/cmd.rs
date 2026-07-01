@@ -63,16 +63,6 @@ pub struct Opts {
         default_value = "false"
     )]
     pub dangerously_allow_env_var_interpolation: bool,
-
-    /// Deprecated: environment variable interpolation is now disabled by default. Use
-    /// `--dangerously-allow-env-var-interpolation` to enable it.
-    #[arg(
-        long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false",
-        hide = true
-    )]
-    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -181,14 +171,6 @@ fn serialize_to_json(
 /// Pipelines expansions, etc. The JSON result of this serialization can itself be used as a config,
 /// which also makes it useful for version control or treating as a singular unit of configuration.
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    if opts.disable_env_var_interpolation {
-        #[allow(clippy::print_stderr)]
-        {
-            eprintln!(
-                "Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
-            );
-        }
-    }
     let paths = opts.paths_with_formats();
     // Start by serializing to a `ConfigBuilder`. This will leverage validation in config
     // builder fields which we'll use to error out if required.

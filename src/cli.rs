@@ -146,16 +146,6 @@ pub struct RootOpts {
     )]
     pub dangerously_allow_env_var_interpolation: bool,
 
-    /// Deprecated: environment variable interpolation is now disabled by default. Use
-    /// `--dangerously-allow-env-var-interpolation` to enable it.
-    #[arg(
-        long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false",
-        hide = true
-    )]
-    pub disable_env_var_interpolation: bool,
-
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
     pub log_format: LogFormat,

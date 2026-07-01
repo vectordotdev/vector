@@ -81,11 +81,6 @@ impl ApplicationConfig {
             None
         };
 
-        if opts.disable_env_var_interpolation {
-            warn!(
-                "--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
-            );
-        }
         let config = load_configs(
             &config_paths,
             watcher_conf,
@@ -250,11 +245,6 @@ impl Application {
                 opts.root.dangerously_allow_env_var_interpolation
                     || sub_command.dangerously_allow_env_var_interpolation(),
             );
-            if opts.root.disable_env_var_interpolation {
-                warn!(
-                    "--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
-                );
-            }
             return Err(runtime.block_on(sub_command.execute(signals, color)));
         }
 

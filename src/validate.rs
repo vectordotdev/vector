@@ -87,16 +87,6 @@ pub struct Opts {
         default_value = "false"
     )]
     pub dangerously_allow_env_var_interpolation: bool,
-
-    /// Deprecated: environment variable interpolation is now disabled by default. Use
-    /// `--dangerously-allow-env-var-interpolation` to enable it.
-    #[arg(
-        long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false",
-        hide = true
-    )]
-    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -158,9 +148,6 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Load
     let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
 
-    if opts.disable_env_var_interpolation {
-        fmt.warning("--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default.");
-    }
     let mut report_error = |errors| {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);

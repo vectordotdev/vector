@@ -69,16 +69,6 @@ pub struct Opts {
         default_value = "false"
     )]
     pub dangerously_allow_env_var_interpolation: bool,
-
-    /// Deprecated: environment variable interpolation is now disabled by default. Use
-    /// `--dangerously-allow-env-var-interpolation` to enable it.
-    #[arg(
-        long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false",
-        hide = true
-    )]
-    pub disable_env_var_interpolation: bool,
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,14 +120,6 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    if opts.disable_env_var_interpolation {
-        #[allow(clippy::print_stderr)]
-        {
-            eprintln!(
-                "Warning: --disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
-            );
-        }
-    }
     let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {

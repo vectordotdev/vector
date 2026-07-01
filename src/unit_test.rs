@@ -60,16 +60,6 @@ pub struct Opts {
         default_value = "false"
     )]
     pub dangerously_allow_env_var_interpolation: bool,
-
-    /// Deprecated: environment variable interpolation is now disabled by default. Use
-    /// `--dangerously-allow-env-var-interpolation` to enable it.
-    #[arg(
-        long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
-        default_value = "false",
-        hide = true
-    )]
-    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -156,11 +146,6 @@ impl<'a> JUnitReporter<'a> {
 }
 
 pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
-    if opts.disable_env_var_interpolation {
-        warn!(
-            "--disable-env-var-interpolation is deprecated and has no effect; env var interpolation is now disabled by default."
-        );
-    }
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();

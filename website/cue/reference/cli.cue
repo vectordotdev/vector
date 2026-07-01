@@ -777,13 +777,6 @@ cli: {
 				"""
 			type: bool: default: false
 		}
-		VECTOR_DISABLE_ENV_VAR_INTERPOLATION: {
-			description: """
-				Deprecated. Environment variable interpolation is now disabled by default, making this a no-op.
-				Use `VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION` to opt in to interpolation.
-				"""
-			type: bool: default: false
-		}
 	}
 
 	// Helpers

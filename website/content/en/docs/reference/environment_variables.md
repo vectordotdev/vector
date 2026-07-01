@@ -7,8 +7,7 @@ tags: ["env", "environment variables", "interpolation"]
 
 By default, environment variable interpolation is disabled (the default changed in v0.57.0). To enable it, pass
 `--dangerously-allow-env-var-interpolation` to the `vector` CLI, or set the environment variable
-`VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true`. This flag replaces the former
-`--disable-env-var-interpolation` flag, which is now a no-op.
+`VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true`.
 
 
 ## Usage
