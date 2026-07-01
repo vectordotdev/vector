@@ -13,7 +13,7 @@ use vector_lib::{
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
-    aws::{ImdsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthRegion, ImdsAuthentication},
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
@@ -304,7 +304,7 @@ async fn auto_version_aws() {
             },
         )),
         endpoints: vec![aws_server()],
-        aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
+        aws: Some(AwsAuthRegion::with_region("us-east-1")),
         api_version: ElasticsearchApiVersion::Auto,
         batch: batch_settings(),
         ..Default::default()
@@ -410,7 +410,7 @@ async fn insert_events_on_aws() {
                 },
             )),
             endpoints: vec![aws_server()],
-            aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
+            aws: Some(AwsAuthRegion::with_region("us-east-1")),
             api_version: ElasticsearchApiVersion::V6,
             batch: batch_settings(),
             ..Default::default()
@@ -436,7 +436,7 @@ async fn insert_events_on_aws_with_compression() {
                 },
             )),
             endpoints: vec![aws_server()],
-            aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
+            aws: Some(AwsAuthRegion::with_region("us-east-1")),
             compression: Compression::gzip_default(),
             api_version: ElasticsearchApiVersion::V6,
             batch: batch_settings(),
