@@ -130,7 +130,7 @@ impl From<SpanEvent> for Value {
             "dropped_attributes_count".into(),
             Value::Integer(ev.dropped_attributes_count as i64),
         );
-        Value::Object(obj)
+        Value::Object(obj.into())
     }
 }
 
@@ -145,7 +145,7 @@ impl From<Link> for Value {
             "dropped_attributes_count".into(),
             Value::Integer(link.dropped_attributes_count as i64),
         );
-        Value::Object(obj)
+        Value::Object(obj.into())
     }
 }
 
@@ -154,6 +154,6 @@ impl From<SpanStatus> for Value {
         let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
         obj.insert("message".into(), status.message.into());
         obj.insert("code".into(), status.code.into());
-        Value::Object(obj)
+        Value::Object(obj.into())
     }
 }

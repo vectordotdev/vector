@@ -110,13 +110,14 @@ mod tests {
     #[tokio::test]
     async fn transform_trace() {
         use vrl::btreemap;
+        use vrl::value::ObjectMap;
 
-        let trace = TraceEvent::from(btreemap! {
+        let trace = TraceEvent::from(ObjectMap::from(btreemap! {
             "span_id" => "abc123",
             "trace_id" => "xyz789",
             "span_name" => "test-span",
             "service" => "my-service",
-        });
+        }));
 
         let (expected_map, _) = trace.clone().into_parts();
 

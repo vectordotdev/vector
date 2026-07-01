@@ -479,13 +479,13 @@ impl DataStreamConfig {
         let namespace = self.namespace(&*log);
 
         if log.as_map().is_none() {
-            *log.value_mut() = Value::Object(BTreeMap::new());
+            *log.value_mut() = Value::Object(BTreeMap::new().into());
         }
         let existing = log
             .as_map_mut()
             .expect("must be a map")
             .entry("data_stream".into())
-            .or_insert_with(|| Value::Object(BTreeMap::new()))
+            .or_insert_with(|| Value::Object(BTreeMap::new().into()))
             .as_object_mut_unwrap();
 
         if let Some(dtype) = dtype {

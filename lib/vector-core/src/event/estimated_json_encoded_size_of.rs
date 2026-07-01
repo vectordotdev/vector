@@ -5,7 +5,7 @@ use chrono::{DateTime, Timelike, Utc};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 use vector_common::json_size::JsonSize;
-use vrl::value::{KeyString, Value};
+use vrl::value::{KeyString, ObjectMap, Value};
 
 const NULL_SIZE: JsonSize = JsonSize::new(4);
 const TRUE_SIZE: JsonSize = JsonSize::new(4);
@@ -167,6 +167,23 @@ where
     V: EstimatedJsonEncodedSizeOf,
     S: ::std::hash::BuildHasher,
 {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        let size = self.iter().fold(BRACES_SIZE, |acc, (k, v)| {
+            acc + k.as_ref().estimated_json_encoded_size_of().get()
+                + COLON_SIZE
+                + v.estimated_json_encoded_size_of().get()
+                + COMMA_SIZE
+        });
+
+        JsonSize::new(if size > BRACES_SIZE {
+            size - COMMA_SIZE
+        } else {
+            size
+        })
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for ObjectMap {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         let size = self.iter().fold(BRACES_SIZE, |acc, (k, v)| {
             acc + k.as_ref().estimated_json_encoded_size_of().get()

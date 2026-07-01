@@ -823,7 +823,7 @@ mod test {
         ];
 
         for (value, path, expect) in cases {
-            let value: ObjectMap = value;
+            let value: ObjectMap = value.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -927,7 +927,7 @@ mod test {
         ];
 
         for (object, path, value, expect, result) in cases {
-            let object: ObjectMap = object;
+            let object: ObjectMap = object.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -935,7 +935,7 @@ mod test {
                 target_assignments: vec![],
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
-            let expect = LogEvent::from(expect);
+            let expect = LogEvent::from(ObjectMap::from(expect));
             let value: Value = value;
             let path = OwnedTargetPath::event(path);
 
@@ -1027,6 +1027,7 @@ mod test {
         ];
 
         for (object, path, compact, expect) in cases {
+            let object: ObjectMap = object.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -1101,7 +1102,7 @@ mod test {
                 },
                 expect
                     .into_iter()
-                    .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
+                    .map(|v| Event::Log(LogEvent::from_map(v.into(), metadata.clone())))
                     .collect::<Vec<_>>()
             );
         }
@@ -1278,7 +1279,7 @@ mod test {
         let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
-            Value::Object(BTreeMap::from([("a".into(), "b".into())])),
+            Value::Object(ObjectMap::from([("a".into(), "b".into())])),
         );
 
         match target {
@@ -1398,7 +1399,7 @@ mod test {
 
         assert_eq!(
             vrl_tags_value,
-            &Value::Object(BTreeMap::from([(
+            &Value::Object(ObjectMap::from([(
                 "foo".into(),
                 Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()])
             )]))

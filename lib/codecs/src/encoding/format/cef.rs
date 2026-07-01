@@ -392,6 +392,7 @@ mod tests {
     use ordered_float::NotNan;
     use vector_common::btreemap;
     use vector_core::event::{Event, LogEvent, Value};
+    use vrl::value::ObjectMap;
 
     use super::*;
 
@@ -470,7 +471,7 @@ mod tests {
 
     #[test]
     fn serialize_extensions() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
             "cef" => Value::from(btreemap! {
                 "severity" => Value::from(1),
                 "name" => Value::from("Event name"),
@@ -484,7 +485,7 @@ mod tests {
             "quote" => Value::from("the \"quote\" should be escaped"),
             "bool" => Value::from(true),
             "other" => Value::from("data"),
-        }));
+        })));
 
         let extensions = HashMap::from([
             (

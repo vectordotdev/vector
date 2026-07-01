@@ -20,7 +20,7 @@ use vector_lib::{
     lookup::{OwnedValuePath, event_path, metadata_path, owned_value_path, path},
     schema::Definition,
 };
-use vrl::value::{KeyString, Kind, kind::Collection};
+use vrl::value::{KeyString, Kind, ObjectMap, kind::Collection};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -771,7 +771,7 @@ impl From<LogstashEventFrame> for Event {
                 .fields
                 .into_iter()
                 .map(|(key, value)| (key, Value::from(value)))
-                .collect::<BTreeMap<_, _>>(),
+                .collect::<ObjectMap>(),
         ))
     }
 }

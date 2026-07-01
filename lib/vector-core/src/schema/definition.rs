@@ -617,7 +617,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use lookup::{lookup_v2::parse_target_path, owned_value_path};
-    use vrl::value::Value;
+    use vrl::value::{ObjectMap, Value};
 
     use super::*;
     use crate::event::{Event, EventMetadata, LogEvent};
@@ -640,7 +640,7 @@ mod tests {
             TestCase {
                 title: "match",
                 definition: Definition::new(Kind::any(), Kind::any(), [LogNamespace::Legacy]),
-                event: Event::Log(LogEvent::from(BTreeMap::new())),
+                event: Event::Log(LogEvent::from(ObjectMap::new())),
                 valid: true,
             },
             TestCase {
@@ -650,7 +650,7 @@ mod tests {
                     Kind::any(),
                     [LogNamespace::Legacy],
                 ),
-                event: Event::Log(LogEvent::from(BTreeMap::from([("foo".into(), 4.into())]))),
+                event: Event::Log(LogEvent::from(ObjectMap::from([("foo".into(), 4.into())]))),
                 valid: false,
             },
             TestCase {
@@ -661,9 +661,9 @@ mod tests {
                     [LogNamespace::Legacy],
                 ),
                 event: Event::Log(LogEvent::from_parts(
-                    Value::Object(BTreeMap::new()),
+                    Value::Object(ObjectMap::new()),
                     EventMetadata::default_with_value(
-                        BTreeMap::from([("foo".into(), 4.into())]).into(),
+                        ObjectMap::from([("foo".into(), 4.into())]).into(),
                     ),
                 )),
                 valid: false,
@@ -671,7 +671,7 @@ mod tests {
             TestCase {
                 title: "wrong log namespace",
                 definition: Definition::new(Kind::any(), Kind::any(), []),
-                event: Event::Log(LogEvent::from(BTreeMap::new())),
+                event: Event::Log(LogEvent::from(ObjectMap::new())),
                 valid: false,
             },
             TestCase {
@@ -681,7 +681,7 @@ mod tests {
                     Kind::any(),
                     [LogNamespace::Legacy],
                 ),
-                event: Event::Log(LogEvent::from(BTreeMap::from([(
+                event: Event::Log(LogEvent::from(ObjectMap::from([(
                     "foo".into(),
                     Value::Null,
                 )]))),
