@@ -29,7 +29,7 @@ const UNHEALTHY_AMOUNT_OF_ERRORS: usize = 5;
 /// Options for determining the health of an endpoint.
 #[serde_as]
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct HealthConfig {
     /// Initial delay between attempts to reactivate endpoints once they become unhealthy.
@@ -44,6 +44,17 @@ pub struct HealthConfig {
     #[serde(default = "default_retry_max_duration_secs")]
     #[configurable(metadata(docs::human_name = "Max Retry Duration"))]
     pub retry_max_duration_secs: Duration,
+}
+
+impl Default for HealthConfig {
+    fn default() -> Self {
+        // Keep Rust defaults aligned with the serde/documented defaults. The
+        // previous derived default produced zero-valued retry durations.
+        Self {
+            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
+            retry_max_duration_secs: default_retry_max_duration_secs(),
+        }
+    }
 }
 
 const fn default_retry_initial_backoff_secs() -> u64 {
@@ -328,5 +339,13 @@ mod tests {
 
         counters.inc_healthy();
         assert!(counters.healthy(snapshot).is_ok());
+    }
+
+    #[test]
+    fn default_health_config_matches_documented_defaults() {
+        let config = HealthConfig::default();
+
+        assert_eq!(config.retry_initial_backoff_secs, 1);
+        assert_eq!(config.retry_max_duration_secs, Duration::from_secs(3_600));
     }
 }
