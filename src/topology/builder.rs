@@ -235,13 +235,10 @@ impl<'a> Builder<'a> {
                 || self.diff.enrichment_tables.tables.is_changed(name)
                 || self.diff.enrichment_tables.tables.is_added(name)
             {
-                let indexes = if !self.diff.enrichment_tables.tables.is_added(name) {
-                    // If this is an existing enrichment table, we need to store the indexes to reapply
-                    // them again post load.
-                    Some(ENRICHMENT_TABLES.index_fields(&table_name))
-                } else {
-                    None
-                };
+                // Indexes are registered dynamically by VRL lookups against the global
+                // enrichment table registry. Preserve any existing registry indexes even
+                // when this config diff sees the table as newly added.
+                let indexes = ENRICHMENT_TABLES.index_fields(&table_name);
 
                 let mut prev_state = None;
                 if !self.diff.enrichment_tables.tables.is_added(name)
@@ -263,21 +260,19 @@ impl<'a> Builder<'a> {
                     }
                 };
 
-                if let Some(indexes) = indexes {
-                    for (case, index) in indexes {
-                        match table
-                            .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
-                        {
-                            Ok(_) => (),
-                            Err(error) => {
-                                // If there is an error adding an index we do not want to use the reloaded
-                                // data, the previously loaded data will still need to be used.
-                                // Just report the error and continue.
-                                error!(message = "Unable to add index to reloaded enrichment table.",
-                                    table = ?name.to_string(),
-                                    %error);
-                                continue 'tables;
-                            }
+                for (case, index) in indexes {
+                    match table
+                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            // If there is an error adding an index we do not want to use the reloaded
+                            // data, the previously loaded data will still need to be used.
+                            // Just report the error and continue.
+                            error!(message = "Unable to add index to reloaded enrichment table.",
+                                table = ?name.to_string(),
+                                %error);
+                            continue 'tables;
                         }
                     }
                 }

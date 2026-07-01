@@ -104,43 +104,39 @@ impl EnrichmentTableDiff {
         }
     }
 
-    /// Checks whether or not any enrichment table component is being changed or added.
+    /// Checks whether or not any enrichment table-derived component is being changed or added.
     pub fn any_changed_or_added(&self) -> bool {
-        self.tables.any_changed_or_added()
-            || self.sources.any_changed_or_added()
-            || self.sinks.any_changed_or_added()
+        self.sources.any_changed_or_added() || self.sinks.any_changed_or_added()
     }
 
-    /// Checks whether or not any enrichment table component is being changed or removed.
+    /// Checks whether or not any enrichment table-derived component is being changed or removed.
     pub fn any_changed_or_removed(&self) -> bool {
-        self.tables.any_changed_or_removed()
-            || self.sources.any_changed_or_removed()
-            || self.sinks.any_changed_or_removed()
+        self.sources.any_changed_or_removed() || self.sinks.any_changed_or_removed()
     }
 
-    /// Checks whether the given enrichment table component is present at all.
+    /// Checks whether the given enrichment table-derived component is present at all.
     pub fn contains(&self, id: &ComponentKey) -> bool {
-        self.tables.contains(id) || self.sources.contains(id) || self.sinks.contains(id)
+        self.sources.contains(id) || self.sinks.contains(id)
     }
 
-    /// Checks whether the given enrichment table component is present as a change or addition.
+    /// Checks whether the given enrichment table-derived component is present as a change or addition.
     pub fn contains_new(&self, id: &ComponentKey) -> bool {
-        self.tables.contains_new(id) || self.sources.contains_new(id) || self.sinks.contains_new(id)
+        self.sources.contains_new(id) || self.sinks.contains_new(id)
     }
 
-    /// Checks whether or not the given enrichment table component is changed.
+    /// Checks whether or not the given enrichment table-derived component is changed.
     pub fn is_changed(&self, key: &ComponentKey) -> bool {
-        self.tables.is_changed(key) || self.sources.is_changed(key) || self.sinks.is_changed(key)
+        self.sources.is_changed(key) || self.sinks.is_changed(key)
     }
 
-    /// Checks whether the given enrichment table component is present as an addition.
+    /// Checks whether the given enrichment table-derived component is present as an addition.
     pub fn is_added(&self, id: &ComponentKey) -> bool {
-        self.tables.is_added(id) || self.sources.is_added(id) || self.sinks.is_added(id)
+        self.sources.is_added(id) || self.sinks.is_added(id)
     }
 
-    /// Checks whether or not the given enrichment table component is removed.
+    /// Checks whether or not the given enrichment table-derived component is removed.
     pub fn is_removed(&self, key: &ComponentKey) -> bool {
-        self.tables.is_removed(key) || self.sources.is_removed(key) || self.sinks.is_removed(key)
+        self.sources.is_removed(key) || self.sinks.is_removed(key)
     }
 
     const fn flip(&mut self) {
@@ -441,6 +437,63 @@ mod tests {
             diff.sinks.to_change,
             HashSet::from_iter(["memory_table".into()])
         );
+    }
+
+    #[test]
+    fn diff_enrichment_table_component_helpers_ignore_table_config_keys() {
+        let old_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let new_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              file_table:
+                type: "file"
+                file:
+                  path: ./tests/data/enrichment.csv
+                  encoding:
+                    type: "csv"
+                schema:
+                  id: integer
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = EnrichmentTableDiff::new(
+            &old_config.enrichment_tables,
+            &new_config.enrichment_tables,
+            &Default::default(),
+        );
+        let table_key = ComponentKey::from("file_table");
+
+        assert_eq!(diff.tables.to_add, HashSet::from_iter([table_key.clone()]));
+        assert!(diff.sources.to_add.is_empty());
+        assert!(diff.sinks.to_add.is_empty());
+
+        assert!(!diff.any_changed_or_added());
+        assert!(!diff.contains(&table_key));
+        assert!(!diff.contains_new(&table_key));
+        assert!(!diff.is_added(&table_key));
     }
 
     #[test]
