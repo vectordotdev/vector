@@ -1,0 +1,18 @@
+features:
+  - iggy-integration-tests
+
+test_filter: "::iggy::"
+
+env:
+  IGGY_ADDRESS: iggy+tcp://iggy:iggy@iggy:8090
+
+matrix:
+  version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/sinks/iggy/**"
+  - "src/sinks/util/**"
+  - "src/sources/iggy/**"
+  - "tests/integration/iggy/**"
