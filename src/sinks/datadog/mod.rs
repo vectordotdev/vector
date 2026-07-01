@@ -1,6 +1,6 @@
 use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
-use hyper::body::Body;
+use hyper::{body::Body, client::connect::Connect};
 use snafu::Snafu;
 use vector_lib::{
     config::AcknowledgementsConfig, configurable::configurable_component,
@@ -137,7 +137,10 @@ pub struct DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
-    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+    pub fn build_healthcheck<C>(&self, client: HttpClient<Body, C>) -> crate::Result<Healthcheck>
+    where
+        C: Connect + Clone + Send + Sync + 'static,
+    {
         let validate_endpoint = self.get_api_endpoint("/api/v1/validate")?;
 
         let api_key: String = self.default_api_key.clone().into();
@@ -155,11 +158,14 @@ impl DatadogCommonConfig {
 }
 
 /// Makes a GET HTTP request to `<site>/api/v1/validate` using the provided client and API key.
-async fn build_healthcheck_future(
-    client: HttpClient,
+async fn build_healthcheck_future<C>(
+    client: HttpClient<Body, C>,
     validate_endpoint: Uri,
     api_key: String,
-) -> crate::Result<()> {
+) -> crate::Result<()>
+where
+    C: Connect + Clone + Send + Sync + 'static,
+{
     let request = Request::get(validate_endpoint)
         .header("DD-API-KEY", api_key)
         .body(hyper::Body::empty())
