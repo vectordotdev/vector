@@ -57,7 +57,8 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 
 			Specifying "*" results in all common attributes included in the log event.
 
-			These attributes are included in `common_attributes` key in the root of the log event.
+			Legacy namespace: selected attributes are added under the root `common_attributes` object
+			Vector namespace: selected attributes are added under the source metadata at `aws_kinesis_firehose.common_attributes`
 			"""
 		required: false
 		type: array: {
