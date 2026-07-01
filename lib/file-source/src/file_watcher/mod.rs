@@ -230,6 +230,10 @@ impl FileWatcher {
         self.file_position
     }
 
+    pub fn get_inode(&self) -> (u64, u64) {
+        (self.devno, self.inode)
+    }
+
     /// Read a single line from the underlying file
     ///
     /// This function will attempt to read a new line from its file, blocking,
