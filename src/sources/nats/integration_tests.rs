@@ -131,6 +131,98 @@ async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
     Ok(())
 }
 
+/// Publishes a message with NATS headers and returns the resulting event's log.
+async fn publish_with_headers_and_collect(
+    conf: NatsSourceConfig,
+    headers: async_nats::HeaderMap,
+) -> Result<vector_lib::event::LogEvent, BuildError> {
+    let subject = conf.subject.clone();
+    let (nc, sub) = create_subscription(&conf).await?;
+    let nc_pub = nc.clone();
+    let msg = "my message with headers";
+
+    let events = assert_source_compliance(&SOURCE_TAGS, async move {
+        let (tx, rx) = SourceSender::new_test();
+        let decoder = DecodingConfig::new(
+            conf.framing.clone(),
+            conf.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build()
+        .unwrap();
+        tokio::spawn(run_nats_core(
+            conf.clone(),
+            nc,
+            sub,
+            decoder,
+            LogNamespace::Legacy,
+            ShutdownSignal::noop(),
+            tx,
+        ));
+        nc_pub
+            .publish_with_headers(subject, headers, Bytes::from_static(msg.as_bytes()))
+            .await
+            .unwrap();
+
+        collect_n(rx, 1).await
+    })
+    .await;
+
+    Ok(events.into_iter().next().unwrap().into_log())
+}
+
+#[tokio::test]
+async fn nats_headers_enabled() {
+    let subject = format!("test-{}", random_string(10));
+    let url =
+        std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.headers_key = vector_lib::lookup::lookup_v2::OptionalValuePath::new("headers");
+
+    let mut headers = async_nats::HeaderMap::new();
+    headers.insert("X-My-Custom-Header", "A");
+    headers.insert("X-My-Custom-Timestamp", "1771517040123456000");
+
+    let log = publish_with_headers_and_collect(conf, headers)
+        .await
+        .expect("publish_with_headers_and_collect failed");
+
+    let mut expected = vrl::value::ObjectMap::new();
+    expected.insert(
+        "X-My-Custom-Header".into(),
+        vec![vector_lib::event::Value::from("A")].into(),
+    );
+    expected.insert(
+        "X-My-Custom-Timestamp".into(),
+        vec![vector_lib::event::Value::from("1771517040123456000")].into(),
+    );
+
+    assert_eq!(log["headers"], vector_lib::event::Value::Object(expected));
+}
+
+#[tokio::test]
+async fn nats_headers_disabled_by_default() {
+    let subject = format!("test-{}", random_string(10));
+    let url =
+        std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+    // No headers_key set: headers must not be exposed.
+    let conf = generate_source_config(&url, &subject);
+
+    let mut headers = async_nats::HeaderMap::new();
+    headers.insert("X-My-Custom-Header", "A");
+
+    let log = publish_with_headers_and_collect(conf, headers)
+        .await
+        .expect("publish_with_headers_and_collect failed");
+
+    assert!(
+        log.get("headers").is_none(),
+        "headers should not be present when headers_key is unset, got: {log:?}"
+    );
+}
+
 #[tokio::test]
 async fn nats_no_auth() {
     let subject = format!("test-{}", random_string(10));

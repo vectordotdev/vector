@@ -9,7 +9,7 @@ use vector_lib::{
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, kind::Collection};
 
 use crate::{
     codecs::DecodingConfig,
@@ -156,6 +156,15 @@ pub struct NatsSourceConfig {
     #[serde(default = "default_subject_key_field")]
     pub subject_key_field: OptionalValuePath,
 
+    /// Enables exposing NATS message headers on each event under the named key.
+    ///
+    /// By default this is unset and no headers are exposed, preserving backwards
+    /// compatibility. When set, the message headers are inserted as an object
+    /// mapping each header name to an array of its string values.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "headers"))]
+    pub headers_key: OptionalValuePath,
+
     /// The buffer capacity of the underlying NATS subscriber.
     ///
     /// This value determines how many messages the NATS subscriber buffers
@@ -258,7 +267,7 @@ impl SourceConfig for NatsSourceConfig {
             .clone()
             .path
             .map(LegacyKey::InsertIfEmpty);
-        let schema_definition = self
+        let mut schema_definition = self
             .decoding
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata()
@@ -269,6 +278,19 @@ impl SourceConfig for NatsSourceConfig {
                 Kind::bytes(),
                 None,
             );
+
+        if let Some(headers_key) = self.headers_key.path.clone() {
+            schema_definition = schema_definition.with_source_metadata(
+                NatsSourceConfig::NAME,
+                Some(LegacyKey::Overwrite(headers_key)),
+                &owned_value_path!("headers"),
+                Kind::object(
+                    Collection::empty()
+                        .with_unknown(Kind::array(Collection::empty().with_unknown(Kind::bytes()))),
+                ),
+                None,
+            );
+        }
 
         vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
@@ -369,6 +391,81 @@ mod tests {
                     None,
                 )
                 .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None);
+
+        assert_eq!(definitions, Some(expected_definition));
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace_with_headers() {
+        let config = NatsSourceConfig {
+            log_namespace: Some(true),
+            subject_key_field: default_subject_key_field(),
+            headers_key: OptionalValuePath::new("headers"),
+            ..Default::default()
+        };
+
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None,
+                )
+                .with_metadata_field(&owned_value_path!("nats", "subject"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("nats", "headers"),
+                    Kind::object(Collection::empty().with_unknown(Kind::array(
+                        Collection::empty().with_unknown(Kind::bytes()),
+                    ))),
+                    None,
+                );
+
+        assert_eq!(definitions, Some(expected_definition));
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace_with_headers() {
+        let config = NatsSourceConfig {
+            subject_key_field: default_subject_key_field(),
+            headers_key: OptionalValuePath::new("headers"),
+            ..Default::default()
+        };
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("subject"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("headers"),
+            Kind::object(
+                Collection::empty()
+                    .with_unknown(Kind::array(Collection::empty().with_unknown(Kind::bytes()))),
+            ),
+            None,
+        );
 
         assert_eq!(definitions, Some(expected_definition));
     }
