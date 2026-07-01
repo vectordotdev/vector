@@ -31,6 +31,12 @@ use crate::{
     tls::{self, TlsConfig},
 };
 
+const INITIAL_ADMIN_PASSWORD: &str = "Vector2026!";
+
+fn http_username() -> String {
+    std::env::var("ELASTICSEARCH_USERNAME").unwrap_or_else(|_| "elastic".into())
+}
+
 fn aws_server() -> String {
     std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
 }
@@ -264,15 +270,14 @@ async fn auto_version_http() {
         .expect("Config error");
 }
 
-#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn auto_version_https() {
     trace_init();
 
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
-            user: "elastic".to_string(),
-            password: "vector".to_string().into(),
+            user: http_username(),
+            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
         }),
         endpoints: vec![https_server()],
         doc_type: "log_lines".to_string(),
@@ -291,6 +296,7 @@ async fn auto_version_https() {
 }
 
 #[cfg(feature = "aws-core")]
+#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn auto_version_aws() {
     trace_init();
@@ -376,8 +382,8 @@ async fn insert_events_over_https() {
     run_insert_tests(
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuthConfig::Basic {
-                user: "elastic".to_string(),
-                password: "vector".to_string().into(),
+                user: http_username(),
+                password: INITIAL_ADMIN_PASSWORD.to_string().into(),
             }),
             endpoints: vec![https_server()],
             doc_type: "log_lines".into(),
@@ -396,6 +402,7 @@ async fn insert_events_over_https() {
 }
 
 #[cfg(feature = "aws-core")]
+#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn insert_events_on_aws() {
     trace_init();
@@ -422,6 +429,7 @@ async fn insert_events_on_aws() {
 }
 
 #[cfg(feature = "aws-core")]
+#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn insert_events_on_aws_with_compression() {
     trace_init();
@@ -487,8 +495,9 @@ async fn insert_events_with_failure_and_gzip_compression() {
 #[tokio::test]
 async fn insert_events_in_data_stream() {
     trace_init();
-    let template_index = format!("my-template-{}", gen_index());
-    let stream_index = format!("my-stream-{}", gen_index());
+    let index = gen_index();
+    let template_index = format!("my-template-{}", index);
+    let stream_index = format!("my-stream-{}", index);
 
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -497,6 +506,10 @@ async fn insert_events_in_data_stream() {
             index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
             ..Default::default()
         },
+        data_stream: Some(DataStreamConfig {
+            namespace: index,
+            ..Default::default()
+        }),
         batch: batch_settings(),
         ..Default::default()
     };
@@ -522,8 +535,8 @@ async fn distributed_insert_events() {
     // Assumes that behind https_server and http_server addresses lies the same server
     let mut config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
-            user: "elastic".into(),
-            password: "vector".to_string().into(),
+            user: http_username(),
+            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
         }),
         endpoints: vec![https_server(), http_server()],
         doc_type: "log_lines".into(),
@@ -548,8 +561,8 @@ async fn distributed_insert_events_failover() {
 
     let mut config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
-            user: "elastic".into(),
-            password: "vector".to_string().into(),
+            user: http_username(),
+            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
         }),
         // Valid endpoints and some random non elasticsearch endpoint
         endpoints: vec![
@@ -627,14 +640,6 @@ async fn run_insert_tests_with_config(
     let common = ElasticsearchCommon::parse_single(config)
         .await
         .expect("Config error");
-    let index = match config.mode {
-        // Data stream mode uses an index name generated from the event.
-        ElasticsearchMode::DataStream => format!(
-            "{}",
-            Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
-        ),
-        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
-    };
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::default();
@@ -654,7 +659,10 @@ async fn run_insert_tests_with_config(
             let events = events.map(move |mut events| {
                 if doit {
                     events.iter_logs_mut().for_each(|log| {
+                        // _type: 1 is invalid for elasticsearch
                         log.insert("_type", 1);
+                        // opensearch has a 512 character limit on _id
+                        log.insert("_id", "invalid id because it is too long".repeat(16));
                     });
                 }
                 doit = true;
@@ -678,10 +686,19 @@ async fn run_insert_tests_with_config(
     // make sure writes are all visible
     flush(common).await.expect("Flushing writes failed");
 
+    let index = match config.mode {
+        ElasticsearchMode::DataStream => config
+            .data_stream
+            .as_ref()
+            .map(|ds| format!("logs-generic-{}", ds.namespace))
+            .unwrap(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
+    };
+
     let client = create_http_client();
     let mut response = client
         .get(format!("{base_url}/{index}/_search"))
-        .basic_auth("elastic", Some("vector"))
+        .basic_auth(http_username(), Some(INITIAL_ADMIN_PASSWORD))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -770,7 +787,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     for base_url in base_urls {
         if let Ok(response) = client
             .get(format!("{base_url}/{index}/_search"))
-            .basic_auth("elastic", Some("vector"))
+            .basic_auth(http_username(), Some(INITIAL_ADMIN_PASSWORD))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
