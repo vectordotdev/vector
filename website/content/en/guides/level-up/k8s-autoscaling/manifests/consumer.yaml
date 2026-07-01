@@ -1,0 +1,50 @@
+---
+# Drain all incoming TCP data as fast as possible — the consumer's only job is
+# to keep accepting connections so Vector's sink does not back up.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer
+  namespace: vector-perf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+    spec:
+      containers:
+        - name: consumer
+          image: alpine/socat:latest
+          command:
+            - socat
+            - -u
+            - TCP4-LISTEN:9000,fork,reuseaddr
+            - /dev/null
+          ports:
+            - containerPort: 9000
+              name: tcp-in
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "64Mi"
+            limits:
+              cpu: "2000m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consumer
+  namespace: vector-perf
+spec:
+  selector:
+    app: consumer
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: tcp-in

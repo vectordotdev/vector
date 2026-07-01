@@ -1,0 +1,23 @@
+{{ $path := .Get "file" }}
+{{ if not $path }}
+  {{ errorf "embed shortcode at %s: no \"file\" param given" .Page.File.Path }}
+{{ end }}
+
+{{ if not (fileExists $path) }}
+  {{ errorf "embed shortcode at %s: file %q does not exist" .Page.File.Path $path }}
+{{ end }}
+
+{{ $lang := .Get "lang" | default (path.Ext $path | strings.TrimPrefix ".") }}
+{{ $label := .Get "label" | default (path.Base $path) }}
+{{ $content := readFile $path }}
+{{ $githubUrl := printf "https://github.com/vectordotdev/vector/blob/master/website/%s" $path }}
+
+<div class="no-prose mb-4 border dark:border-gray-700 rounded-md">
+  <div class="flex justify-between items-center px-4 py-2 border-b dark:border-gray-700 text-sm">
+    <code class="text-gray-600 dark:text-gray-400">{{ $label }}</code>
+    <a href="{{ $githubUrl }}" target="_blank" rel="noopener noreferrer" class="text-secondary dark:text-primary hover:underline">
+      View on GitHub
+    </a>
+  </div>
+  {{ highlight $content $lang "" }}
+</div>

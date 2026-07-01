@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vector-http
+  namespace: vector-perf
+  annotations:
+    # Allow arbitrarily large POST bodies (100 MiB chunks from producers)
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # Stream request body directly to the upstream without buffering so
+    # backpressure propagates back to the producer curl client
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vector
+            port:
+              number: 9000

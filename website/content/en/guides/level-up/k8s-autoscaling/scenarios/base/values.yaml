@@ -1,0 +1,71 @@
+# Shared Helm values for all Vector scenarios.
+# Layer a scenario-specific overlay on top:
+#
+#   helm upgrade --install vector vectordotdev/vector \
+#     --repo https://helm.vector.dev \
+#     --namespace vector-perf --create-namespace \
+#     -f scenarios/base/values.yaml \
+#     -f scenarios/<scenario>/values.yaml
+
+role: Stateless-Aggregator
+
+resources:
+  requests:
+    cpu: "1000m"
+    memory: "1Gi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+customConfig:
+  data_dir: /vector-data-dir
+
+  api:
+    enabled: true
+    address: "0.0.0.0:8686"
+
+  sources:
+    in:
+      type: http_server
+      address: "0.0.0.0:9000"
+      framing:
+        method: newline_delimited
+      decoding:
+        codec: bytes
+
+  transforms:
+    apache_parser:
+      inputs: ["in"]
+      type: remap
+      source: |
+        . = parse_regex!(.message, r'^(?P<host>[\w\.]+) - (?P<user>[\w\-]+) \[(?P<timestamp>[^\]]*)\] "(?P<method>[\w]+) (?P<path>[^"]*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$')
+
+  sinks:
+    out:
+      inputs: ["apache_parser"]
+      type: socket
+      mode: tcp
+      address: "consumer:9000"
+      encoding:
+        codec: text
+
+containerPorts:
+  - name: http-in
+    containerPort: 9000
+    protocol: TCP
+  - name: api
+    containerPort: 8686
+    protocol: TCP
+
+service:
+  enabled: true
+  type: ClusterIP
+  ports:
+    - port: 9000
+      protocol: TCP
+      targetPort: 9000
+      name: http-in
+    - port: 8686
+      protocol: TCP
+      targetPort: 8686
+      name: api
