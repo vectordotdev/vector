@@ -76,6 +76,35 @@ pub use self::http::decompress_body;
 ))]
 pub use self::message_decoding::decode_message;
 
+/// Returns a default `max_open_files` value derived from the OS file descriptor limit.
+///
+/// On Unix, this returns 80% of the current RLIMIT_NOFILE soft limit, leaving headroom
+/// for non-file-source file descriptors (sockets, pipes, etc.). On non-Unix platforms,
+/// returns `None` (no limit).
+#[cfg(unix)]
+pub fn default_max_open_files() -> Option<usize> {
+    use nix::sys::resource::{Resource, getrlimit};
+
+    if let Ok((soft, _hard)) = getrlimit(Resource::RLIMIT_NOFILE) {
+        let limit = (soft as usize).saturating_mul(80) / 100;
+        if limit > 0 {
+            tracing::info!(
+                message = "Auto-configured max_open_files from OS file descriptor limit.",
+                rlimit_nofile = soft,
+                max_open_files = limit,
+            );
+            return Some(limit);
+        }
+    }
+    None
+}
+
+/// Returns `None` on non-Unix platforms (no default limit).
+#[cfg(not(unix))]
+pub fn default_max_open_files() -> Option<usize> {
+    None
+}
+
 /// Extract a tag and it's value from input string delimited by a colon character.
 ///
 /// Note: the behavior of StatsD if more than one colon is found (which would presumably
@@ -96,5 +125,27 @@ pub fn extract_tag_key_and_value<S: AsRef<str>>(
         // the notation `tag:` is valid for StatsD. The effect is an empty string value.
         Some((prefix, suffix)) => (prefix.to_string(), TagValue::Value(suffix.to_string())),
         None => (tag_chunk.to_string(), TagValue::Bare),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(unix)]
+    fn test_default_max_open_files_returns_some() {
+        let result = super::default_max_open_files();
+        assert!(result.is_some(), "Should return Some on Unix");
+        assert!(result.unwrap() > 0, "Limit should be positive");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_default_max_open_files_is_80_percent() {
+        use nix::sys::resource::{Resource, getrlimit};
+
+        let (soft, _hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
+        let expected = (soft as usize).saturating_mul(80) / 100;
+        let result = super::default_max_open_files();
+        assert_eq!(result, Some(expected));
     }
 }
