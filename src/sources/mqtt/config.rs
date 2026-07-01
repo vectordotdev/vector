@@ -19,8 +19,8 @@ use crate::{
         ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
         TlsSnafu,
     },
-    config::{SourceConfig, SourceContext, SourceOutput},
-    serde::{OneOrMany, default_decoding, default_framing_message_based},
+    config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
+    serde::{OneOrMany, bool_or_struct, default_decoding, default_framing_message_based},
 };
 
 /// Configuration for the `mqtt` source.
@@ -61,6 +61,10 @@ pub struct MqttSourceConfig {
     #[serde(default = "default_topic_key")]
     #[configurable(metadata(docs::examples = "topic"))]
     pub topic_key: OptionalValuePath,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 fn default_topic() -> OneOrMany<String> {
@@ -77,14 +81,22 @@ impl SourceConfig for MqttSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let connector = self.build_connector()?;
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+
+        let connector = self.build_connector(acknowledgements)?;
 
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(connector.clone(), decoder, log_namespace, self.clone())?;
-        Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
+        let source = MqttSource::new(
+            connector.clone(),
+            decoder,
+            log_namespace,
+            self.clone(),
+            acknowledgements,
+        )?;
+        Ok(Box::pin(source.run(cx.out, cx.shutdown)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -107,12 +119,22 @@ impl SourceConfig for MqttSourceConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
 impl MqttSourceConfig {
-    fn build_connector(&self) -> Result<MqttConnector, MqttError> {
+    fn build_connector(&self, acknowledgements: bool) -> Result<MqttConnector, MqttError> {
+        // End-to-end acknowledgements rely on resuming the MQTT session (and its
+        // unacknowledged in-flight messages) after a restart, which is keyed by the
+        // client ID. A generated/random client ID would start a fresh session and
+        // orphan those messages, silently breaking at-least-once — so require an
+        // explicit, stable client ID when acknowledgements are enabled.
+        if acknowledgements && self.common.client_id.is_none() {
+            return Err(ConfigurationError::AcknowledgementsRequireClientId)
+                .context(ConfigurationSnafu);
+        }
+
         let client_id = self.common.client_id.clone().unwrap_or_else(|| {
             let hash = rand::rng()
                 .sample_iter(&rand_distr::Alphanumeric)
@@ -133,6 +155,16 @@ impl MqttSourceConfig {
         options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
 
         options.set_clean_session(false);
+
+        // With end-to-end acknowledgements enabled, defer the QoS-1 PUBACK until
+        // the event has been delivered to all sinks. rumqttc then requires every
+        // incoming publish to be acked explicitly via `client.ack(&publish)`.
+        // Combined with `clean_session(false)` and QoS `AtLeastOnce`, an unacked
+        // message is redelivered by the broker after a crash/reconnect.
+        if acknowledgements {
+            options.set_manual_acks(true);
+        }
+
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
                 options.set_credentials(user, password);
@@ -170,5 +202,26 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MqttSourceConfig>();
+    }
+
+    #[test]
+    fn acknowledgements_require_a_stable_client_id() {
+        // Without acks, a client ID is auto-generated — fine.
+        let default_config = MqttSourceConfig::default();
+        assert!(default_config.build_connector(false).is_ok());
+
+        // With acks and no explicit client ID, building must fail (a generated ID
+        // would orphan the session's unacknowledged messages after a restart).
+        assert!(default_config.build_connector(true).is_err());
+
+        // With acks and an explicit client ID, building succeeds.
+        let with_client_id = MqttSourceConfig {
+            common: MqttCommonConfig {
+                client_id: Some("stable-id".to_owned()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(with_client_id.build_connector(true).is_ok());
     }
 }
