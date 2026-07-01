@@ -3,6 +3,8 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use http::StatusCode;
 use snafu::Snafu;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
 use tracing::Instrument;
 
 use crate::{
@@ -87,6 +89,8 @@ impl MetaDescriptive for LokiRequest {
 pub struct LokiService {
     endpoint: UriSerde,
     client: HttpClient,
+    keep_alive_requests: i64,
+    request_count: Arc<AtomicI64>,
 }
 
 impl LokiService {
@@ -95,10 +99,16 @@ impl LokiService {
         endpoint: UriSerde,
         path: String,
         auth: Option<Auth>,
+        keep_alive_requests: Option<i64>,
     ) -> crate::Result<Self> {
         let endpoint = endpoint.append_path(&path)?.with_auth(auth);
-
-        Ok(Self { client, endpoint })
+        let request_count = Arc::new(AtomicI64::new(0));
+        Ok(Self {
+            client,
+            endpoint,
+            keep_alive_requests: keep_alive_requests.unwrap_or(0),
+            request_count
+        })
     }
 }
 
@@ -126,6 +136,14 @@ impl Service<LokiRequest> for LokiService {
 
         if let Some(ce) = request.compression.content_encoding() {
             req = req.header("Content-Encoding", ce);
+        }
+
+        if self.keep_alive_requests > 0 {
+            let request_count = self.request_count.fetch_add(1, Ordering::Relaxed);
+            if request_count + 1 >= self.keep_alive_requests {
+                self.request_count.store(0, Ordering::Relaxed);
+                req = req.header("Connection", "close");
+            }
         }
 
         let body = hyper::Body::from(request.payload);
