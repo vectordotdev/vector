@@ -416,6 +416,20 @@ where
             .increment_received_event_count_and_byte_size(event_count, record_size);
     }
 
+    /// Tracks events that arrived at the buffer but were rejected before being
+    /// persisted (e.g. `Bufferable::filter_unencodable` dropping over-budget
+    /// sub-items). Bumps both `received` and the unintentional-`dropped` counter
+    /// on the usage handle so `buffer_size = received - sent - dropped` stays
+    /// consistent and operators can see the rejection in buffer-usage metrics.
+    /// `total_buffer_size` is intentionally left alone — these events never
+    /// reached disk.
+    pub fn track_dropped(&self, event_count: u64, byte_size: u64) {
+        self.usage_handle
+            .increment_received_event_count_and_byte_size(event_count, byte_size);
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(event_count, byte_size, false);
+    }
+
     /// Tracks the statistics of multiple successful reads.
     pub fn track_reads(&self, event_count: u64, total_record_size: u64) {
         self.decrement_total_buffer_size(total_record_size);

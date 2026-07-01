@@ -1009,10 +1009,26 @@ where
         Ok(())
     }
 
-    fn is_buffer_full(&self) -> bool {
+    /// Returns whether the buffer is currently at or above its configured size limit.
+    ///
+    /// Exposed so callers can decide what to do with an item *before* it is encoded —
+    /// notably, an over-budget `EventArray` headed for a `WhenFull::Overflow` topology
+    /// should be handed to the overflow stage unfiltered rather than have its sub-items
+    /// pruned for a write that will never happen.
+    pub(crate) fn is_buffer_full(&self) -> bool {
         let total_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes;
         let max_buffer_size = self.config.max_buffer_size;
         total_buffer_size >= max_buffer_size
+    }
+
+    /// Records sub-items that arrived at the buffer but were dropped before
+    /// reaching disk (e.g. `Bufferable::filter_unencodable` rejecting events
+    /// the protobuf decoder cannot handle). Delegates to the ledger's usage
+    /// handle so the rejection shows up under the disk-v2 stage's
+    /// `received` / `dropped` metrics in production, where the
+    /// `BufferSender` does not carry its own usage instrumentation.
+    pub(crate) fn track_dropped(&self, event_count: u64, byte_size: u64) {
+        self.ledger.track_dropped(event_count, byte_size);
     }
 
     /// Ensures this writer is ready to attempt writer the next record.

@@ -1,10 +1,19 @@
 use super::*;
 use crate::config::log_schema;
 use bytes::{Buf, BufMut, BytesMut};
+use chrono::TimeZone;
+use prost::Message;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
+
+use crate::event::event_exceeds_max_nesting_cost;
+use crate::event::ser::{
+    ARRAY_FRAME_COST, MAX_METADATA_VALUE_NESTING_FRAMES, MAX_VALUE_NESTING_FRAMES,
+    OBJECT_FRAME_COST, TIMESTAMP_FRAME_COST, check_value_nesting_cost,
+};
+use vector_buffers::Bufferable;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
     value.encode(buffer).expect("encoding should not fail");
@@ -94,4 +103,685 @@ fn type_serialization() {
     assert_eq!(map["int"], json!(4));
     assert_eq!(map["bool"], json!(true));
     assert_eq!(map["string"], json!("thisisastring"));
+}
+
+// ---------------------------------------------------------------------------
+// Nesting validation tests
+// ---------------------------------------------------------------------------
+//
+// Prost enforces a decode recursion limit of 100 (no limit on encode). Each nesting
+// level consumes a path-dependent number of prost recursion frames:
+//
+//   - `Value::Object` level: Value + ValueMap + map_entry = 3 frames
+//   - `Value::Array` level:  Value + ValueArray          = 2 frames
+//
+// Each encoding path has a fixed proto-wrapper overhead before the Value tree starts:
+//
+//   - Event data path (Log.fields, Trace.fields):  frame budget MAX_VALUE_NESTING_FRAMES (99)
+//   - Metadata path (metadata_full):               frame budget MAX_METADATA_VALUE_NESTING_FRAMES (96)
+//
+// The `per_path_boundaries` test verifies both budgets empirically via prost roundtrip.
+//
+// The saturated-event tests create events with ALL Value-carrying fields at their
+// respective max frame cost simultaneously. The proto conversion code populates every
+// field (including deprecated ones like Log.metadata), so a single roundtrip per event
+// type covers every proto path automatically.
+
+/// Maximum number of object-only nesting levels that fit the event-data frame budget.
+const MAX_OBJECT_DEPTH_VALUE: usize = MAX_VALUE_NESTING_FRAMES / OBJECT_FRAME_COST;
+
+/// Maximum number of object-only nesting levels that fit the metadata frame budget.
+const MAX_OBJECT_DEPTH_METADATA: usize = MAX_METADATA_VALUE_NESTING_FRAMES / OBJECT_FRAME_COST;
+
+/// Maximum number of array-only nesting levels that fit the event-data frame budget.
+const MAX_ARRAY_DEPTH_VALUE: usize = MAX_VALUE_NESTING_FRAMES / ARRAY_FRAME_COST;
+
+/// Maximum number of array-only nesting levels that fit the metadata frame budget.
+const MAX_ARRAY_DEPTH_METADATA: usize = MAX_METADATA_VALUE_NESTING_FRAMES / ARRAY_FRAME_COST;
+
+/// Creates a Value with the specified number of nested Object wrapping levels.
+///
+/// Returns a Value that is `wrapping_levels` nested Objects deep, with a string leaf.
+fn create_nested_value(wrapping_levels: usize) -> Value {
+    let mut value = Value::from("innermost");
+    for _ in 0..wrapping_levels {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    value
+}
+
+/// Creates a Value with the specified number of nested Array wrapping levels.
+fn create_nested_array(wrapping_levels: usize) -> Value {
+    let mut value = Value::from("innermost");
+    for _ in 0..wrapping_levels {
+        value = Value::Array(vec![value]);
+    }
+    value
+}
+
+/// Creates a Value with the specified number of nested Object wrapping levels around
+/// the supplied leaf. Used to probe leaf-specific frame costs (e.g. `Value::Timestamp`).
+fn create_nested_value_with_leaf(wrapping_levels: usize, leaf: Value) -> Value {
+    let mut value = leaf;
+    for _ in 0..wrapping_levels {
+        let mut map = ObjectMap::new();
+        map.insert("nested".into(), value);
+        value = Value::Object(map);
+    }
+    value
+}
+
+/// A fixed [`Value::Timestamp`] for use as a leaf in nesting tests.
+fn ts_leaf() -> Value {
+    Value::Timestamp(
+        chrono::Utc
+            .timestamp_opt(1_700_000_000, 0)
+            .single()
+            .unwrap(),
+    )
+}
+
+/// Create a [`LogEvent`] with event data at `value_depth` and metadata at `metadata_depth`.
+fn create_saturated_log(value_depth: usize, metadata_depth: usize) -> LogEvent {
+    let mut event = LogEvent::default();
+    event.insert("data", create_nested_value(value_depth - 1));
+    *event.metadata_mut().value_mut() = create_nested_value(metadata_depth);
+    event
+}
+
+/// Create a [`TraceEvent`] with event data at `value_depth` and metadata at `metadata_depth`.
+fn create_saturated_trace(value_depth: usize, metadata_depth: usize) -> TraceEvent {
+    let mut trace = TraceEvent::default();
+    trace.insert("data", create_nested_value(value_depth - 1));
+    *trace.metadata_mut().value_mut() = create_nested_value(metadata_depth);
+    trace
+}
+
+/// Create a Metric with metadata at `metadata_depth`.
+/// (Metric values have fixed structure — only metadata carries arbitrary Values.)
+fn create_saturated_metric(metadata_depth: usize) -> Metric {
+    let mut metric = Metric::new(
+        "test",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    );
+    *metric.metadata_mut().value_mut() = create_nested_value(metadata_depth);
+    metric
+}
+
+/// Build all three `EventArray` variants with each field at its respective max depth.
+fn saturated_event_arrays(
+    value_depth: usize,
+    metadata_depth: usize,
+) -> Vec<(&'static str, EventArray)> {
+    vec![
+        (
+            "Log",
+            EventArray::Logs(LogArray::from(vec![create_saturated_log(
+                value_depth,
+                metadata_depth,
+            )])),
+        ),
+        (
+            "Trace",
+            EventArray::Traces(TraceArray::from(vec![create_saturated_trace(
+                value_depth,
+                metadata_depth,
+            )])),
+        ),
+        (
+            "Metric",
+            EventArray::Metrics(MetricArray::from(vec![create_saturated_metric(
+                metadata_depth,
+            )])),
+        ),
+    ]
+}
+
+/// Build all three Event variants for `EventWrapper` encoding.
+fn saturated_events(value_depth: usize, metadata_depth: usize) -> Vec<(&'static str, Event)> {
+    vec![
+        (
+            "Log",
+            Event::Log(create_saturated_log(value_depth, metadata_depth)),
+        ),
+        (
+            "Trace",
+            Event::Trace(create_saturated_trace(value_depth, metadata_depth)),
+        ),
+        (
+            "Metric",
+            Event::Metric(create_saturated_metric(metadata_depth)),
+        ),
+    ]
+}
+
+/// Verify the frame budgets are exactly right: all event types roundtrip at the
+/// max object-only depth, and at least one fails prost decode when either budget
+/// is exceeded.
+#[test]
+fn max_nesting_budgets_are_correct() {
+    let max_val = MAX_OBJECT_DEPTH_VALUE;
+    let max_meta = MAX_OBJECT_DEPTH_METADATA;
+
+    // --- Both budgets at max must roundtrip for all event types ---
+
+    for (name, array) in saturated_event_arrays(max_val, max_meta) {
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        assert!(
+            proto::EventArray::decode(buf.freeze()).is_ok(),
+            "EventArray decode FAILED for {name} at value depth {max_val}, metadata depth {max_meta}.",
+        );
+    }
+
+    for (name, event) in saturated_events(max_val, max_meta) {
+        let wrapper = proto::EventWrapper::from(event);
+        let mut buf = BytesMut::with_capacity(65536);
+        wrapper.encode(&mut buf).unwrap();
+        assert!(
+            proto::EventWrapper::decode(buf.freeze()).is_ok(),
+            "EventWrapper decode FAILED for {name} at value depth {max_val}, metadata depth {max_meta}.",
+        );
+    }
+
+    // --- Exceeding either budget must fail for at least one event type ---
+
+    // Exceed value budget
+    let any_fails = saturated_event_arrays(max_val + 1, max_meta)
+        .into_iter()
+        .any(|(_, array)| {
+            let proto_array = proto::EventArray::from(array);
+            let mut buf = BytesMut::with_capacity(65536);
+            proto_array.encode(&mut buf).unwrap();
+            proto::EventArray::decode(buf.freeze()).is_err()
+        });
+    assert!(
+        any_fails,
+        "No path failed at object value depth {}. MAX_VALUE_NESTING_FRAMES could be raised.",
+        max_val + 1
+    );
+
+    // Exceed metadata budget
+    let any_fails = saturated_event_arrays(max_val, max_meta + 1)
+        .into_iter()
+        .any(|(_, array)| {
+            let proto_array = proto::EventArray::from(array);
+            let mut buf = BytesMut::with_capacity(65536);
+            proto_array.encode(&mut buf).unwrap();
+            proto::EventArray::decode(buf.freeze()).is_err()
+        });
+    assert!(
+        any_fails,
+        "No path failed at object metadata depth {}. MAX_METADATA_VALUE_NESTING_FRAMES could be raised.",
+        max_meta + 1
+    );
+}
+
+/// Verify the nesting gate accepts all event types at the max object-only depth.
+#[test]
+fn nesting_gate_accepts_all_types_at_max_depth() {
+    for (name, array) in saturated_event_arrays(MAX_OBJECT_DEPTH_VALUE, MAX_OBJECT_DEPTH_METADATA) {
+        let mut buf = BytesMut::with_capacity(65536);
+        assert!(
+            array.encode(&mut buf).is_ok(),
+            "nesting gate rejected {name} at max object depths",
+        );
+    }
+}
+
+/// Verify the nesting gate rejects when either object-only budget is exceeded.
+#[test]
+fn nesting_gate_rejects_above_max_depth() {
+    // Exceed value budget (Log and Trace have event data; Metric does not)
+    for (name, array) in
+        saturated_event_arrays(MAX_OBJECT_DEPTH_VALUE + 1, MAX_OBJECT_DEPTH_METADATA)
+    {
+        // Metric has no event data field, so it won't be rejected here
+        if name == "Metric" {
+            continue;
+        }
+        let mut buf = BytesMut::with_capacity(65536);
+        assert!(
+            matches!(
+                array.encode(&mut buf),
+                Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+            ),
+            "nesting gate should reject {name} at object value depth {}",
+            MAX_OBJECT_DEPTH_VALUE + 1,
+        );
+    }
+
+    // Exceed metadata budget
+    for (name, array) in
+        saturated_event_arrays(MAX_OBJECT_DEPTH_VALUE, MAX_OBJECT_DEPTH_METADATA + 1)
+    {
+        let mut buf = BytesMut::with_capacity(65536);
+        assert!(
+            matches!(
+                array.encode(&mut buf),
+                Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+            ),
+            "nesting gate should reject {name} at object metadata depth {}",
+            MAX_OBJECT_DEPTH_METADATA + 1,
+        );
+    }
+}
+
+/// Verify the per-path prost boundaries match the budgets for both object-only and
+/// array-only nesting.
+///
+/// Object-only `Log.fields`:     depth 33 succeeds, 34 fails.
+/// Object-only `metadata_full`:  depth 32 succeeds, 33 fails.
+/// Array-only  `Log.fields`:     depth 49 succeeds, 50 fails.
+/// Array-only  `metadata_full`:  depth 48 succeeds, 49 fails.
+#[test]
+fn per_path_boundaries() {
+    let roundtrip_value = |value: Value| -> bool {
+        let mut event = LogEvent::default();
+        event.insert("data", value);
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
+
+    let roundtrip_metadata = |value: Value| -> bool {
+        let mut event = LogEvent::from("flat");
+        *event.metadata_mut().value_mut() = value;
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
+
+    // Object-only Log.fields: the "data" key contributes one level on top of the inner
+    // nested value, so we subtract one when building the value.
+    assert!(
+        roundtrip_value(create_nested_value(MAX_OBJECT_DEPTH_VALUE - 1)),
+        "Log.fields should succeed at object depth {MAX_OBJECT_DEPTH_VALUE}"
+    );
+    assert!(
+        !roundtrip_value(create_nested_value(MAX_OBJECT_DEPTH_VALUE)),
+        "Log.fields should fail at object depth {}",
+        MAX_OBJECT_DEPTH_VALUE + 1
+    );
+
+    // Object-only metadata_full: metadata Value is the root, no key on top.
+    assert!(
+        roundtrip_metadata(create_nested_value(MAX_OBJECT_DEPTH_METADATA)),
+        "metadata_full should succeed at object depth {MAX_OBJECT_DEPTH_METADATA}"
+    );
+    assert!(
+        !roundtrip_metadata(create_nested_value(MAX_OBJECT_DEPTH_METADATA + 1)),
+        "metadata_full should fail at object depth {}",
+        MAX_OBJECT_DEPTH_METADATA + 1
+    );
+
+    // Array-only Log.fields: array contributes 2 frames per level, so it fits more levels.
+    assert!(
+        roundtrip_value(create_nested_array(MAX_ARRAY_DEPTH_VALUE - 1)),
+        "Log.fields should succeed at array depth {MAX_ARRAY_DEPTH_VALUE}"
+    );
+    assert!(
+        !roundtrip_value(create_nested_array(MAX_ARRAY_DEPTH_VALUE)),
+        "Log.fields should fail at array depth {}",
+        MAX_ARRAY_DEPTH_VALUE + 1
+    );
+
+    // Array-only metadata_full
+    assert!(
+        roundtrip_metadata(create_nested_array(MAX_ARRAY_DEPTH_METADATA)),
+        "metadata_full should succeed at array depth {MAX_ARRAY_DEPTH_METADATA}"
+    );
+    assert!(
+        !roundtrip_metadata(create_nested_array(MAX_ARRAY_DEPTH_METADATA + 1)),
+        "metadata_full should fail at array depth {}",
+        MAX_ARRAY_DEPTH_METADATA + 1
+    );
+}
+
+/// Verify that array-only nesting deeper than the object-only cap (33) is accepted by
+/// the gate — this is the regression that the frame-cost check addresses. Previously a
+/// uniform depth-33 cap dropped array-only events that prost would happily roundtrip.
+#[test]
+fn nesting_gate_accepts_deep_array_nesting() {
+    // An array depth 40 = 80 frames, comfortably under the 99-frame value budget but well
+    // over the 33-depth limit the old uniform check would have applied.
+    let mut event = LogEvent::default();
+    event.insert("data", create_nested_array(40));
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        array.encode(&mut buf).is_ok(),
+        "nesting gate should accept array-only nesting at depth 40",
+    );
+}
+
+/// Verify the gate correctly accounts for mixed array/object nesting via the per-variant
+/// frame weights. Uses the metadata path because it has no outer wrapping object, making
+/// the arithmetic match the inserted Value's cost directly.
+#[test]
+fn nesting_gate_handles_mixed_array_object_nesting() {
+    // Alternating levels (innermost-Array, then Object, then Array, ...). For N levels,
+    // cost = ceil(N/2)*ARRAY_FRAME_COST + floor(N/2)*OBJECT_FRAME_COST.
+    let build_alternating = |total_levels: usize| -> Value {
+        let mut value = Value::from("leaf");
+        for i in 0..total_levels {
+            if i.is_multiple_of(2) {
+                value = Value::Array(vec![value]);
+            } else {
+                let mut map = ObjectMap::new();
+                map.insert("k".into(), value);
+                value = Value::Object(map);
+            }
+        }
+        value
+    };
+
+    // 38 alternating levels: 19 array (cost 38) + 19 object (cost 57) = 95 frames.
+    // Under the metadata budget of 96. Fits.
+    let mut event = LogEvent::from("flat");
+    *event.metadata_mut().value_mut() = build_alternating(38);
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        array.encode(&mut buf).is_ok(),
+        "nesting gate should accept 38 alternating metadata levels (cost 95)",
+    );
+
+    // 39 alternating levels: 20 array (cost 40) + 19 object (cost 57) = 97 frames.
+    // Over the metadata budget of 96. Fails.
+    let mut event = LogEvent::from("flat");
+    *event.metadata_mut().value_mut() = build_alternating(39);
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        matches!(
+            array.encode(&mut buf),
+            Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+        ),
+        "nesting gate should reject 39 alternating metadata levels (cost 97)",
+    );
+}
+
+/// Verify the gate rejects a `Value::Timestamp` leaf sitting at the deepest object
+/// position the budget would otherwise allow, and that the underlying proto roundtrip
+/// would in fact fail there — confirming the timestamp leaf is not free.
+#[test]
+fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
+    let roundtrip_log = |value: Value| -> bool {
+        let mut event = LogEvent::default();
+        event.insert("data", value);
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
+    let roundtrip_metadata = |value: Value| -> bool {
+        let mut event = LogEvent::from("flat");
+        *event.metadata_mut().value_mut() = value;
+        let array = EventArray::Logs(LogArray::from(vec![event]));
+        let proto_array = proto::EventArray::from(array);
+        let mut buf = BytesMut::with_capacity(65536);
+        proto_array.encode(&mut buf).unwrap();
+        proto::EventArray::decode(buf.freeze()).is_ok()
+    };
+
+    // Event data: at object depth 33, a Bytes leaf decodes but a Timestamp leaf does not,
+    // because the Timestamp message consumes one more recursion frame.
+    let event_data_ts = create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf());
+    assert!(
+        !roundtrip_log(event_data_ts.clone()),
+        "depth {MAX_OBJECT_DEPTH_VALUE} with Timestamp leaf is expected to fail prost decode"
+    );
+
+    let mut event = LogEvent::default();
+    event.insert("data", event_data_ts);
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        matches!(
+            array.encode(&mut buf),
+            Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+        ),
+        "gate should reject event-data Timestamp leaf at object depth {MAX_OBJECT_DEPTH_VALUE}",
+    );
+
+    // Metadata: same boundary, one shallower.
+    let metadata_ts = create_nested_value_with_leaf(MAX_OBJECT_DEPTH_METADATA, ts_leaf());
+    assert!(
+        !roundtrip_metadata(metadata_ts.clone()),
+        "metadata depth {MAX_OBJECT_DEPTH_METADATA} with Timestamp leaf is expected to fail prost decode"
+    );
+
+    let mut event = LogEvent::from("flat");
+    *event.metadata_mut().value_mut() = metadata_ts;
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        matches!(
+            array.encode(&mut buf),
+            Err(super::super::ser::EncodeError::NestingTooDeep { .. })
+        ),
+        "gate should reject metadata Timestamp leaf at object depth {MAX_OBJECT_DEPTH_METADATA}",
+    );
+}
+
+/// Verify the gate still admits Timestamp leaves one level shallower than the boundary
+/// — they cost exactly one frame, no more — and that those payloads roundtrip cleanly
+/// through prost.
+#[test]
+fn nesting_gate_accepts_timestamp_leaf_below_max_object_depth() {
+    // Event data: depth (max-1) Object + Timestamp leaf = (max-1)*3 + 1 frames.
+    let mut event = LogEvent::default();
+    event.insert(
+        "data",
+        create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 2, ts_leaf()),
+    );
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        array.encode(&mut buf).is_ok(),
+        "gate should accept event-data Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_VALUE - 1,
+    );
+    assert!(
+        proto::EventArray::decode(buf.freeze()).is_ok(),
+        "prost should decode event-data Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_VALUE - 1,
+    );
+
+    // Metadata: one shallower.
+    let mut event = LogEvent::from("flat");
+    *event.metadata_mut().value_mut() =
+        create_nested_value_with_leaf(MAX_OBJECT_DEPTH_METADATA - 1, ts_leaf());
+    let array = EventArray::Logs(LogArray::from(vec![event]));
+    let mut buf = BytesMut::with_capacity(65536);
+    assert!(
+        array.encode(&mut buf).is_ok(),
+        "gate should accept metadata Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_METADATA - 1,
+    );
+    assert!(
+        proto::EventArray::decode(buf.freeze()).is_ok(),
+        "prost should decode metadata Timestamp leaf at object depth {}",
+        MAX_OBJECT_DEPTH_METADATA - 1,
+    );
+}
+
+/// Verify `filter_unencodable` keeps the valid events and drops only the over-budget
+/// ones, returning a smaller `EventArray` rather than failing the whole batch.
+#[test]
+fn filter_unencodable_drops_only_over_budget_events() {
+    let good = || {
+        let mut event = LogEvent::default();
+        event.insert("data", "ok");
+        event
+    };
+    let bad = || {
+        let mut event = LogEvent::default();
+        event.insert("data", create_nested_value(MAX_OBJECT_DEPTH_VALUE));
+        event
+    };
+
+    let logs = vec![good(), bad(), good(), bad(), good()];
+    let array = EventArray::Logs(LogArray::from(logs));
+
+    let filtered = array
+        .filter_unencodable()
+        .expect("3 good events should survive filtering");
+    assert_eq!(filtered.event_count(), 3, "only good events should remain");
+
+    let EventArray::Logs(surviving) = filtered else {
+        panic!("variant should be preserved");
+    };
+    for log in &surviving {
+        assert_eq!(
+            log.value().get("data").and_then(|v| v.as_bytes()),
+            Some(&bytes::Bytes::from_static(b"ok")),
+            "only good events should remain",
+        );
+    }
+}
+
+/// Verify that the public per-event entry point used by both the native codec and the
+/// vector sink charges `Value::Timestamp` for one frame, just like the buffer gate.
+/// Without this, a depth-33 object chain ending in a timestamp would pass the codec
+/// check and fail prost decode on the receiving end.
+#[test]
+fn event_exceeds_max_nesting_cost_charges_timestamp_leaf() {
+    let log_at_max_with_ts = {
+        let mut event = LogEvent::default();
+        event.insert(
+            "data",
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf()),
+        );
+        Event::Log(event)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&log_at_max_with_ts).is_some(),
+        "depth {MAX_OBJECT_DEPTH_VALUE} log with Timestamp leaf must be rejected",
+    );
+
+    let trace_at_max_with_ts = {
+        let mut trace = TraceEvent::default();
+        trace.insert(
+            "data",
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf()),
+        );
+        Event::Trace(trace)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&trace_at_max_with_ts).is_some(),
+        "depth {MAX_OBJECT_DEPTH_VALUE} trace with Timestamp leaf must be rejected",
+    );
+
+    let metric_at_max_with_ts = {
+        let mut metric = Metric::new(
+            "test",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        *metric.metadata_mut().value_mut() =
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_METADATA, ts_leaf());
+        Event::Metric(metric)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&metric_at_max_with_ts).is_some(),
+        "metric with metadata-Timestamp leaf at depth {MAX_OBJECT_DEPTH_METADATA} must be rejected",
+    );
+
+    // And one shallower stays under the budget.
+    let log_below_max_with_ts = {
+        let mut event = LogEvent::default();
+        event.insert(
+            "data",
+            create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 2, ts_leaf()),
+        );
+        Event::Log(event)
+    };
+    assert!(
+        event_exceeds_max_nesting_cost(&log_below_max_with_ts).is_none(),
+        "depth {} log with Timestamp leaf must be accepted",
+        MAX_OBJECT_DEPTH_VALUE - 1,
+    );
+}
+
+/// Unit-level check that `check_value_nesting_cost` charges `TIMESTAMP_FRAME_COST`
+/// for a `Value::Timestamp` leaf, independent of nesting.
+#[test]
+fn check_value_nesting_cost_charges_timestamp_leaf() {
+    let ts = ts_leaf();
+    assert!(check_value_nesting_cost(&ts, 0, TIMESTAMP_FRAME_COST).is_ok());
+    assert!(check_value_nesting_cost(&ts, 0, TIMESTAMP_FRAME_COST - 1).is_err());
+
+    // A single object level containing a timestamp leaf: OBJECT_FRAME_COST + TIMESTAMP_FRAME_COST.
+    let mut map = ObjectMap::new();
+    map.insert("ts".into(), ts);
+    let nested = Value::Object(map);
+    let expected = OBJECT_FRAME_COST + TIMESTAMP_FRAME_COST;
+    assert!(check_value_nesting_cost(&nested, 0, expected).is_ok());
+    assert!(check_value_nesting_cost(&nested, 0, expected - 1).is_err());
+}
+
+/// Verify flat events pass without issues.
+#[test]
+fn nesting_gate_accepts_flat_events() {
+    let mut log = LogEvent::from("hello world");
+    log.insert("foo", "bar");
+    let events = EventArray::Logs(LogArray::from(vec![log]));
+    let mut buf = BytesMut::with_capacity(1024);
+    assert!(events.encode(&mut buf).is_ok());
+
+    let mut trace = TraceEvent::default();
+    trace.insert("foo", "bar");
+    let events = EventArray::Traces(TraceArray::from(vec![trace]));
+    let mut buf = BytesMut::with_capacity(1024);
+    assert!(events.encode(&mut buf).is_ok());
+
+    let metric = Metric::new(
+        "test_counter",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    );
+    let events = EventArray::Metrics(MetricArray::from(vec![metric]));
+    let mut buf = BytesMut::with_capacity(1024);
+    assert!(events.encode(&mut buf).is_ok());
+}
+
+#[test]
+fn check_value_nesting_cost_with_configurable_budget() {
+    // Five nested objects: 5 levels × 3 frames per object = 15 frame cost.
+    let mut value = Value::from("leaf");
+    for _ in 0..5 {
+        let mut map = ObjectMap::new();
+        map.insert("n".into(), value);
+        value = Value::Object(map);
+    }
+
+    assert!(check_value_nesting_cost(&value, 0, 15).is_ok());
+    assert!(check_value_nesting_cost(&value, 0, 14).is_err());
+    assert!(check_value_nesting_cost(&value, 0, 30).is_ok());
+
+    let flat = Value::from("hello");
+    assert!(check_value_nesting_cost(&flat, 0, 0).is_ok());
+}
+
+#[test]
+fn check_value_nesting_cost_with_mixed_variants() {
+    // Outer array (2) → inner object (3) → inner array (2) → leaf = 7 frame cost.
+    let inner = Value::Array(vec![Value::from("leaf")]);
+    let mut map = ObjectMap::new();
+    map.insert("arr".into(), inner);
+    let value = Value::Array(vec![Value::Object(map)]);
+
+    assert!(check_value_nesting_cost(&value, 0, 7).is_ok());
+    assert!(check_value_nesting_cost(&value, 0, 6).is_err());
 }

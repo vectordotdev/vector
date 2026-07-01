@@ -7,10 +7,12 @@ use vector_common::{
 };
 
 use crate::{
-    EventCount,
+    Bufferable, EventCount,
     encoding::FixedEncodable,
     variants::disk_v2::{record::RECORD_HEADER_LEN, tests::align16},
 };
+
+impl Bufferable for Record {}
 
 #[derive(Debug)]
 pub struct EncodeError;

@@ -6,7 +6,7 @@ use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
-    BufferType, EventCount,
+    BufferType, Bufferable, EventCount,
     encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
@@ -54,6 +54,8 @@ impl<const N: usize> EventCount for Message<N> {
         1
     }
 }
+
+impl<const N: usize> Bufferable for Message<N> {}
 
 impl<const N: usize> Finalizable for Message<N> {
     fn take_finalizers(&mut self) -> EventFinalizers {
