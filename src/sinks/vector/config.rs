@@ -343,10 +343,10 @@ impl Service<VectorRequest> for FailoverVectorService {
                             &state,
                             expected_state,
                             index,
-                            attempts.get(attempt + 1).copied(),
+                            failover_next_index(endpoint_strategy, attempts.as_slice(), attempt),
                             services.len(),
                         );
-                        expected_state = failover_next_attempts(
+                        let next_attempts = failover_next_attempts(
                             endpoint_strategy,
                             services.len(),
                             attempts.as_mut(),
@@ -355,6 +355,10 @@ impl Service<VectorRequest> for FailoverVectorService {
                             advance,
                             &tried,
                         );
+                        expected_state = next_attempts.state;
+                        if next_attempts.rebuilt {
+                            remaining_attempts = attempts.len();
+                        }
                         last_error = Some(error);
                     }
                     Err(_elapsed) => {
@@ -362,10 +366,10 @@ impl Service<VectorRequest> for FailoverVectorService {
                             &state,
                             expected_state,
                             index,
-                            attempts.get(attempt + 1).copied(),
+                            failover_next_index(endpoint_strategy, attempts.as_slice(), attempt),
                             services.len(),
                         );
-                        expected_state = failover_next_attempts(
+                        let next_attempts = failover_next_attempts(
                             endpoint_strategy,
                             services.len(),
                             attempts.as_mut(),
@@ -374,6 +378,10 @@ impl Service<VectorRequest> for FailoverVectorService {
                             advance,
                             &tried,
                         );
+                        expected_state = next_attempts.state;
+                        if next_attempts.rebuilt {
+                            remaining_attempts = attempts.len();
+                        }
                         last_error = Some(Box::new(VectorSinkError::Request {
                             source: tonic::Status::deadline_exceeded(
                                 "vector endpoint request timed out",
@@ -419,10 +427,30 @@ fn failover_ring_attempt_indices(start: usize, endpoints: usize) -> Vec<usize> {
         .collect()
 }
 
+fn failover_next_index(
+    endpoint_strategy: EndpointStrategy,
+    attempts: &[usize],
+    attempt: usize,
+) -> Option<usize> {
+    attempts
+        .get(attempt + 1)
+        .copied()
+        .or(match endpoint_strategy {
+            EndpointStrategy::FailoverPrimary => Some(0),
+            EndpointStrategy::Failover | EndpointStrategy::LoadBalance => None,
+        })
+}
+
 #[derive(Debug, Eq, PartialEq)]
 struct FailoverAdvance {
     state: usize,
     advanced: bool,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct FailoverNextAttempts {
+    state: usize,
+    rebuilt: bool,
 }
 
 fn failover_next_attempts(
@@ -433,9 +461,13 @@ fn failover_next_attempts(
     expected_state: usize,
     advance: FailoverAdvance,
     tried: &[usize],
-) -> usize {
+) -> FailoverNextAttempts {
     if advance.advanced || advance.state == expected_state {
         *attempt += 1;
+        return FailoverNextAttempts {
+            state: advance.state,
+            rebuilt: false,
+        };
     } else {
         *attempts = stale_failover_attempt_indices(
             endpoint_strategy,
@@ -446,7 +478,10 @@ fn failover_next_attempts(
         *attempt = 0;
     }
 
-    advance.state
+    FailoverNextAttempts {
+        state: advance.state,
+        rebuilt: true,
+    }
 }
 
 fn stale_failover_attempt_indices(
@@ -791,11 +826,39 @@ mod tests {
     }
 
     #[test]
+    fn failover_primary_final_attempt_wraps_state_to_primary() {
+        let attempts = failover_primary_attempt_indices(2, 3);
+        let state = AtomicUsize::new(5);
+
+        let observed = failover_advance_if_current(
+            &state,
+            5,
+            2,
+            failover_next_index(
+                EndpointStrategy::FailoverPrimary,
+                &attempts,
+                attempts.len() - 1,
+            ),
+            3,
+        );
+
+        assert_eq!(
+            observed,
+            FailoverAdvance {
+                state: 6,
+                advanced: true,
+            }
+        );
+        assert_eq!(state.load(Ordering::Acquire), 6);
+    }
+
+    #[test]
     fn failover_next_attempts_recomputes_after_concurrent_advance() {
         let mut attempts = failover_ring_attempt_indices(0, 3);
         let mut attempt = 0;
+        let mut remaining_attempts = 2;
 
-        let observed_state = failover_next_attempts(
+        let observed = failover_next_attempts(
             EndpointStrategy::Failover,
             3,
             &mut attempts,
@@ -807,18 +870,24 @@ mod tests {
             },
             &[0],
         );
+        if observed.rebuilt {
+            remaining_attempts = attempts.len();
+        }
 
-        assert_eq!(observed_state, 5);
+        assert_eq!(observed.state, 5);
+        assert!(observed.rebuilt);
         assert_eq!(attempt, 0);
         assert_eq!(attempts, vec![2, 1]);
+        assert_eq!(remaining_attempts, attempts.len());
     }
 
     #[test]
     fn failover_next_attempts_restarts_after_stale_same_endpoint_generation() {
         let mut attempts = failover_ring_attempt_indices(0, 2);
         let mut attempt = 0;
+        let mut remaining_attempts = 1;
 
-        let observed_state = failover_next_attempts(
+        let observed = failover_next_attempts(
             EndpointStrategy::Failover,
             2,
             &mut attempts,
@@ -830,18 +899,24 @@ mod tests {
             },
             &[0],
         );
+        if observed.rebuilt {
+            remaining_attempts = attempts.len();
+        }
 
-        assert_eq!(observed_state, 4);
+        assert_eq!(observed.state, 4);
+        assert!(observed.rebuilt);
         assert_eq!(attempt, 0);
         assert_eq!(attempts, vec![0, 1]);
+        assert_eq!(remaining_attempts, attempts.len());
     }
 
     #[test]
     fn failover_next_attempts_restarts_after_stale_wrapped_generation() {
         let mut attempts = failover_ring_attempt_indices(0, 3);
         let mut attempt = 0;
+        let mut remaining_attempts = 1;
 
-        let observed_state = failover_next_attempts(
+        let observed = failover_next_attempts(
             EndpointStrategy::Failover,
             3,
             &mut attempts,
@@ -853,18 +928,24 @@ mod tests {
             },
             &[0],
         );
+        if observed.rebuilt {
+            remaining_attempts = attempts.len();
+        }
 
-        assert_eq!(observed_state, 6);
+        assert_eq!(observed.state, 6);
+        assert!(observed.rebuilt);
         assert_eq!(attempt, 0);
         assert_eq!(attempts, vec![0, 1, 2]);
+        assert_eq!(remaining_attempts, attempts.len());
     }
 
     #[test]
     fn failover_next_attempts_preserves_failover_primary_after_duplicate_primary_advance() {
         let mut attempts = failover_primary_attempt_indices(0, 3);
         let mut attempt = 0;
+        let mut remaining_attempts = 1;
 
-        let observed_state = failover_next_attempts(
+        let observed = failover_next_attempts(
             EndpointStrategy::FailoverPrimary,
             3,
             &mut attempts,
@@ -876,18 +957,24 @@ mod tests {
             },
             &[0],
         );
+        if observed.rebuilt {
+            remaining_attempts = attempts.len();
+        }
 
-        assert_eq!(observed_state, 3);
+        assert_eq!(observed.state, 3);
+        assert!(observed.rebuilt);
         assert_eq!(attempt, 0);
         assert_eq!(attempts, vec![0, 1, 2]);
+        assert_eq!(remaining_attempts, attempts.len());
     }
 
     #[test]
     fn failover_next_attempts_keeps_shared_active_endpoint_after_stale_wrap() {
         let mut attempts = failover_ring_attempt_indices(0, 3);
         let mut attempt = 1;
+        let mut remaining_attempts = 1;
 
-        let observed_state = failover_next_attempts(
+        let observed = failover_next_attempts(
             EndpointStrategy::Failover,
             3,
             &mut attempts,
@@ -899,18 +986,24 @@ mod tests {
             },
             &[0, 1],
         );
+        if observed.rebuilt {
+            remaining_attempts = attempts.len();
+        }
 
-        assert_eq!(observed_state, 6);
+        assert_eq!(observed.state, 6);
+        assert!(observed.rebuilt);
         assert_eq!(attempt, 0);
         assert_eq!(attempts, vec![0, 2]);
+        assert_eq!(remaining_attempts, attempts.len());
     }
 
     #[test]
     fn failover_next_attempts_continues_after_local_advance() {
         let mut attempts = failover_primary_attempt_indices(1, 3);
         let mut attempt = 0;
+        let remaining_attempts = 3;
 
-        let observed_state = failover_next_attempts(
+        let observed = failover_next_attempts(
             EndpointStrategy::FailoverPrimary,
             3,
             &mut attempts,
@@ -923,8 +1016,10 @@ mod tests {
             &[1],
         );
 
-        assert_eq!(observed_state, 3);
+        assert_eq!(observed.state, 3);
+        assert!(!observed.rebuilt);
         assert_eq!(attempt, 1);
         assert_eq!(attempts, vec![1, 0, 1, 2]);
+        assert_eq!(remaining_attempts, 3);
     }
 }
