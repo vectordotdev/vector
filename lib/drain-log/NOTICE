@@ -1,0 +1,24 @@
+drain-log
+Copyright 2026 Vector Contributors
+
+This product includes software derived from drain3 (Apache License 2.0):
+
+    drain3 — Fast log template extraction via fixed-depth prefix trees
+    Copyright 2026 Akshat Agarwal
+    https://github.com/akshatagarwl/drain3
+
+drain3 is itself a Rust port of logpai/Drain3:
+
+    Drain3 — Streaming log template miner with persistence and masking
+    https://github.com/logpai/Drain3
+    Released under the MIT License.
+
+Local additions on top of the upstream drain3 sources:
+  * True LRU eviction of clusters once `max_clusters` is reached, so the
+    matcher can adapt to drifting log vocabularies on long-running streams
+    without unbounded memory growth. The LRU is implemented as an intrusive
+    doubly-linked list threaded through `Cluster`, giving O(1) touch on
+    match and O(1) eviction on cap; freed cluster ids are recycled so the
+    `clusters` slot vector stays bounded.
+  * A `cluster_count` accessor on `Matcher` exposing the live tracked
+    cluster count after eviction.
