@@ -588,19 +588,24 @@ pub enum Facility {
 #[configurable_component]
 pub enum Severity {
     /// Emergency
+    #[strum(serialize = "emergency", serialize = "emerg", serialize = "panic")]
     Emergency = 0,
     /// Alert
     Alert = 1,
     /// Critical
+    #[strum(serialize = "critical", serialize = "crit")]
     Critical = 2,
     /// Error
+    #[strum(serialize = "error", serialize = "err")]
     Error = 3,
     /// Warning
+    #[strum(serialize = "warning", serialize = "warn")]
     Warning = 4,
     /// Notice
     Notice = 5,
     /// Informational
     #[default]
+    #[strum(serialize = "informational", serialize = "info")]
     Informational = 6,
     /// Debug
     Debug = 7,
@@ -743,6 +748,40 @@ mod tests {
         let severity = decanter.get_severity(&config_sev);
         assert_eq!(facility, Facility::Daemon);
         assert_eq!(severity, Severity::Critical);
+
+        //check short-form severity aliases
+        log.insert(event_path!("syslog_severity"), "crit");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Critical);
+
+        log.insert(event_path!("syslog_severity"), "emerg");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Emergency);
+
+        log.insert(event_path!("syslog_severity"), "err");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Error);
+
+        log.insert(event_path!("syslog_severity"), "info");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Informational);
+
+        log.insert(event_path!("syslog_severity"), "warn");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Warning);
+
+        log.insert(event_path!("syslog_severity"), "panic");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Emergency);
+
+        //check uppercase short-form aliases
+        log.insert(event_path!("syslog_severity"), "CRIT");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Critical);
+
+        log.insert(event_path!("syslog_severity"), "EMERG");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Emergency);
 
         //check defaults with empty config
         let empty_config =
