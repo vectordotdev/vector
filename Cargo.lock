@@ -3170,6 +3170,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cuckoo-clock"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d53c54372b29d8ba8f4878f0d6b5e8cd7d2e1ec0b73c11d7fb0624800b92cb79"
+dependencies = [
+ "rand 0.9.4",
+]
+
+[[package]]
 name = "curl-sys"
 version = "0.4.84+curl-8.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12884,6 +12893,7 @@ dependencies = [
  "console-subscriber",
  "criterion",
  "csv",
+ "cuckoo-clock",
  "databend-client",
  "databricks-zerobus-ingest-sdk",
  "deadpool 0.13.0",
