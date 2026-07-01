@@ -243,7 +243,15 @@ where
     pub(crate) async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
+    ) -> Result<
+        (
+            BufferWriter<T, FS>,
+            BufferReader<T, FS>,
+            Arc<Ledger<FS>>,
+            tokio::task::JoinHandle<()>,
+        ),
+        BufferError<T>,
+    >
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
@@ -259,7 +267,7 @@ where
             .await
             .context(WriterSeekFailedSnafu)?;
 
-        let finalizer = Arc::clone(&ledger).spawn_finalizer();
+        let (finalizer, finalizer_handle) = Arc::clone(&ledger).spawn_finalizer();
 
         let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
         reader
@@ -269,7 +277,7 @@ where
 
         ledger.synchronize_buffer_usage();
 
-        Ok((writer, reader, ledger))
+        Ok((writer, reader, ledger, finalizer_handle))
     }
 
     /// Creates a new disk buffer from the given [`DiskBufferConfig`].
@@ -291,7 +299,7 @@ where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
-        let (writer, reader, _) = Self::from_config_inner(config, usage_handle).await?;
+        let (writer, reader, _, _) = Self::from_config_inner(config, usage_handle).await?;
 
         Ok((writer, reader))
     }

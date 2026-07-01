@@ -9,7 +9,7 @@
 #[cfg(target_os = "linux")]
 extern crate antithesis_instrumentation;
 
-use antithesis_harness::payload_field;
+use antithesis_harness::{claim, post_event, report_acked};
 use antithesis_sdk::{antithesis_init, assert_reachable, assert_unreachable};
 use clap::Parser;
 use serde_json::json;
@@ -23,48 +23,6 @@ struct Args {
     source_url: String,
     #[arg(long, env = "ORACLE_URL", default_value = "http://127.0.0.1:8686")]
     oracle_url: String,
-}
-
-/// POST one event to the source. Ok(2xx) means the pipeline took end-to-end
-/// responsibility for the event (with e2e acks enabled).
-async fn post_event(
-    client: &reqwest::Client,
-    source_url: &str,
-    id: u64,
-    timeout: time::Duration,
-) -> bool {
-    // The payload is a deterministic function of the id, so every retry re-sends
-    // the exact same record and the oracle can recompute the expected bytes.
-    let event = json!([{ "id": id, "data": payload_field(id) }]);
-    matches!(
-        client.post(source_url).timeout(timeout).json(&event).send().await,
-        Ok(resp) if resp.status().is_success()
-    )
-}
-
-/// Claim one fresh id from the oracle.
-async fn claim(client: &reqwest::Client, oracle_url: &str) -> Option<u64> {
-    let resp = client
-        .post(format!("{oracle_url}/claim"))
-        .timeout(time::Duration::from_secs(10))
-        .send()
-        .await
-        .ok()?;
-    resp.text().await.ok()?.trim().parse().ok()
-}
-
-/// Tell the oracle the pipeline acked this id, so it must come back. Returns
-/// whether the oracle recorded the obligation.
-async fn report_acked(client: &reqwest::Client, oracle_url: &str, id: u64) -> bool {
-    matches!(
-        client
-            .post(format!("{oracle_url}/acked"))
-            .timeout(time::Duration::from_secs(10))
-            .body(id.to_string())
-            .send()
-            .await,
-        Ok(resp) if resp.status().is_success()
-    )
 }
 
 #[tokio::main(flavor = "current_thread")]
