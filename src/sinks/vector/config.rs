@@ -436,24 +436,33 @@ fn failover_next_attempts(
 ) -> usize {
     if advance.advanced || advance.state == expected_state {
         *attempt += 1;
-    } else if failover_state_index(advance.state, endpoints)
-        == failover_state_index(expected_state, endpoints)
-    {
-        attempts.clear();
-        *attempt = 0;
     } else {
-        *attempts = failover_attempt_indices(
+        *attempts = stale_failover_attempt_indices(
             endpoint_strategy,
             failover_state_index(advance.state, endpoints),
             endpoints,
-        )
-        .into_iter()
-        .filter(|index| !tried.contains(index))
-        .collect();
+            tried,
+        );
         *attempt = 0;
     }
 
     advance.state
+}
+
+fn stale_failover_attempt_indices(
+    endpoint_strategy: EndpointStrategy,
+    start: usize,
+    endpoints: usize,
+    tried: &[usize],
+) -> Vec<usize> {
+    let active_endpoint = start;
+    std::iter::once(active_endpoint)
+        .chain(
+            failover_attempt_indices(endpoint_strategy, start, endpoints)
+                .into_iter()
+                .filter(move |index| *index != active_endpoint && !tried.contains(index)),
+        )
+        .collect()
 }
 
 fn failover_advance_if_current(
@@ -805,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    fn failover_next_attempts_stops_after_stale_same_endpoint_generation() {
+    fn failover_next_attempts_restarts_after_stale_same_endpoint_generation() {
         let mut attempts = failover_ring_attempt_indices(0, 2);
         let mut attempt = 0;
 
@@ -824,11 +833,11 @@ mod tests {
 
         assert_eq!(observed_state, 4);
         assert_eq!(attempt, 0);
-        assert!(attempts.is_empty());
+        assert_eq!(attempts, vec![0, 1]);
     }
 
     #[test]
-    fn failover_next_attempts_stops_after_stale_wrapped_generation() {
+    fn failover_next_attempts_restarts_after_stale_wrapped_generation() {
         let mut attempts = failover_ring_attempt_indices(0, 3);
         let mut attempt = 0;
 
@@ -847,7 +856,53 @@ mod tests {
 
         assert_eq!(observed_state, 6);
         assert_eq!(attempt, 0);
-        assert!(attempts.is_empty());
+        assert_eq!(attempts, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn failover_next_attempts_preserves_failover_primary_after_duplicate_primary_advance() {
+        let mut attempts = failover_primary_attempt_indices(0, 3);
+        let mut attempt = 0;
+
+        let observed_state = failover_next_attempts(
+            EndpointStrategy::FailoverPrimary,
+            3,
+            &mut attempts,
+            &mut attempt,
+            0,
+            FailoverAdvance {
+                state: 3,
+                advanced: false,
+            },
+            &[0],
+        );
+
+        assert_eq!(observed_state, 3);
+        assert_eq!(attempt, 0);
+        assert_eq!(attempts, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn failover_next_attempts_keeps_shared_active_endpoint_after_stale_wrap() {
+        let mut attempts = failover_ring_attempt_indices(0, 3);
+        let mut attempt = 1;
+
+        let observed_state = failover_next_attempts(
+            EndpointStrategy::Failover,
+            3,
+            &mut attempts,
+            &mut attempt,
+            1,
+            FailoverAdvance {
+                state: 6,
+                advanced: false,
+            },
+            &[0, 1],
+        );
+
+        assert_eq!(observed_state, 6);
+        assert_eq!(attempt, 0);
+        assert_eq!(attempts, vec![0, 2]);
     }
 
     #[test]
