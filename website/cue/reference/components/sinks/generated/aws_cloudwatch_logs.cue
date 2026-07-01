@@ -220,7 +220,8 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 	}
 	create_missing_group: {
 		description: """
-			Dynamically create a [log group][log_group] if it does not already exist.
+			Dynamically create a [log group][log_group] if it does not already exist. Its group
+			class is determined by `group_class`.
 
 			This ignores `create_missing_stream` directly after creating the group and creates
 			the first stream.
@@ -678,6 +679,22 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 		description: "Custom endpoint for use with AWS-compatible services."
 		required:    false
 		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+	}
+	group_class: {
+		description: """
+			The [log class][log_class] used when dynamically creating a log group via
+			`create_missing_group`.
+
+			[log_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+			"""
+		required: false
+		type: string: {
+			default: "STANDARD"
+			enum: {
+				INFREQUENT_ACCESS: "For cost-effective consolidation of logs that are queried only occasionally."
+				STANDARD:          "For real-time monitoring and frequently-accessed logs."
+			}
+		}
 	}
 	group_name: {
 		description: """

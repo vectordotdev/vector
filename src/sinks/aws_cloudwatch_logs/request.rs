@@ -22,7 +22,10 @@ use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
+use crate::sinks::aws_cloudwatch_logs::{
+    config::{CloudwatchLogsGroupClass, Retention},
+    service::CloudwatchError,
+};
 
 pub struct CloudwatchFuture {
     client: Client,
@@ -42,6 +45,7 @@ struct Client {
     retention_days: u32,
     kms_key: Option<String>,
     tags: Option<HashMap<String, String>>,
+    group_class: CloudwatchLogsGroupClass,
 }
 
 type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E, HttpResponse>>>;
@@ -67,6 +71,7 @@ impl CloudwatchFuture {
         retention: Retention,
         kms_key: Option<String>,
         tags: Option<HashMap<String, String>>,
+        group_class: CloudwatchLogsGroupClass,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
@@ -80,6 +85,7 @@ impl CloudwatchFuture {
             retention_days,
             kms_key,
             tags,
+            group_class,
         };
 
         let state = if let Some(token) = token {
@@ -296,12 +302,14 @@ impl Client {
         let group_name = self.group_name.clone();
         let kms_key = self.kms_key.clone();
         let tags = self.tags.clone();
+        let log_group_class = self.group_class.into();
         Box::pin(async move {
             client
                 .create_log_group()
                 .log_group_name(group_name)
                 .set_kms_key_id(kms_key)
                 .set_tags(tags)
+                .log_group_class(log_group_class)
                 .send()
                 .await?;
             Ok(())

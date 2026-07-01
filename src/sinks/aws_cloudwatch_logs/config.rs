@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::{Client as CloudwatchLogsClient, types::LogGroupClass};
 use futures::FutureExt;
 use serde::{Deserialize, Deserializer, de};
 use tower::ServiceBuilder;
@@ -53,6 +53,30 @@ pub struct Retention {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub days: u32,
+}
+
+/// CloudWatch Logs [log class][log_class] used when creating a new log group.
+///
+/// [log_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CloudwatchLogsGroupClass {
+    /// For real-time monitoring and frequently-accessed logs.
+    #[default]
+    Standard,
+
+    /// For cost-effective consolidation of logs that are queried only occasionally.
+    InfrequentAccess,
+}
+
+impl From<CloudwatchLogsGroupClass> for LogGroupClass {
+    fn from(value: CloudwatchLogsGroupClass) -> Self {
+        match value {
+            CloudwatchLogsGroupClass::Standard => LogGroupClass::Standard,
+            CloudwatchLogsGroupClass::InfrequentAccess => LogGroupClass::InfrequentAccess,
+        }
+    }
 }
 
 fn retention_days<'de, D>(deserializer: D) -> Result<u32, D::Error>
@@ -109,7 +133,8 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
 
-    /// Dynamically create a [log group][log_group] if it does not already exist.
+    /// Dynamically create a [log group][log_group] if it does not already exist. Its group
+    /// class is determined by `group_class`.
     ///
     /// This ignores `create_missing_stream` directly after creating the group and creates
     /// the first stream.
@@ -117,6 +142,14 @@ pub struct CloudwatchLogsSinkConfig {
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     #[serde(default = "crate::serde::default_true")]
     pub create_missing_group: bool,
+
+    /// The [log class][log_class] used when dynamically creating a log group via
+    /// `create_missing_group`.
+    ///
+    /// [log_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+    #[serde(default)]
+    #[configurable(derived)]
+    pub group_class: CloudwatchLogsGroupClass,
 
     /// Dynamically create a [log stream][log_stream] if it does not already exist.
     ///
@@ -257,6 +290,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         stream_name: Default::default(),
         region: Default::default(),
         create_missing_group: true,
+        group_class: Default::default(),
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
