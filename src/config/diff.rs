@@ -10,9 +10,7 @@ pub struct ConfigDiff {
     pub sources: Difference,
     pub transforms: Difference,
     pub sinks: Difference,
-    /// This difference does not only contain the actual enrichment_tables keys, but also keys that
-    /// may be used for their source and sink components (if available).
-    pub enrichment_tables: Difference,
+    pub enrichment_tables: EnrichmentTableDiff,
     pub components_to_reload: HashSet<ComponentKey>,
 }
 
@@ -26,7 +24,7 @@ impl ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources, &components_to_reload),
             transforms: Difference::new(&old.transforms, &new.transforms, &components_to_reload),
             sinks: Difference::new(&old.sinks, &new.sinks, &components_to_reload),
-            enrichment_tables: Difference::from_enrichment_tables(
+            enrichment_tables: EnrichmentTableDiff::new(
                 &old.enrichment_tables,
                 &new.enrichment_tables,
                 &components_to_reload,
@@ -66,6 +64,85 @@ impl ConfigDiff {
             || self.transforms.is_removed(key)
             || self.sinks.is_removed(key)
             || self.enrichment_tables.is_removed(key)
+    }
+}
+
+#[derive(Debug)]
+pub struct EnrichmentTableDiff {
+    /// Difference for the enrichment table configuration keyed by table name.
+    pub tables: Difference,
+    /// Difference for source components derived from enrichment tables.
+    pub sources: Difference,
+    /// Difference for sink components derived from enrichment tables.
+    pub sinks: Difference,
+}
+
+impl EnrichmentTableDiff {
+    fn new(
+        old: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+        new: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+        need_change: &HashSet<ComponentKey>,
+    ) -> Self {
+        let tables = Difference::new(old, new, need_change);
+        let sources = Difference::from_enrichment_table_components(
+            old,
+            new,
+            need_change,
+            enrichment_table_source_key,
+        );
+        let sinks = Difference::from_enrichment_table_components(
+            old,
+            new,
+            need_change,
+            enrichment_table_sink_key,
+        );
+
+        Self {
+            tables,
+            sources,
+            sinks,
+        }
+    }
+
+    /// Checks whether or not any enrichment table-derived component is being changed or added.
+    pub fn any_changed_or_added(&self) -> bool {
+        self.sources.any_changed_or_added() || self.sinks.any_changed_or_added()
+    }
+
+    /// Checks whether or not any enrichment table-derived component is being changed or removed.
+    pub fn any_changed_or_removed(&self) -> bool {
+        self.sources.any_changed_or_removed() || self.sinks.any_changed_or_removed()
+    }
+
+    /// Checks whether the given enrichment table-derived component is present at all.
+    pub fn contains(&self, id: &ComponentKey) -> bool {
+        self.sources.contains(id) || self.sinks.contains(id)
+    }
+
+    /// Checks whether the given enrichment table-derived component is present as a change or addition.
+    pub fn contains_new(&self, id: &ComponentKey) -> bool {
+        self.sources.contains_new(id) || self.sinks.contains_new(id)
+    }
+
+    /// Checks whether or not the given enrichment table-derived component is changed.
+    pub fn is_changed(&self, key: &ComponentKey) -> bool {
+        self.sources.is_changed(key) || self.sinks.is_changed(key)
+    }
+
+    /// Checks whether the given enrichment table-derived component is present as an addition.
+    pub fn is_added(&self, id: &ComponentKey) -> bool {
+        self.sources.is_added(id) || self.sinks.is_added(id)
+    }
+
+    /// Checks whether or not the given enrichment table-derived component is removed.
+    pub fn is_removed(&self, key: &ComponentKey) -> bool {
+        self.sources.is_removed(key) || self.sinks.is_removed(key)
+    }
+
+    const fn flip(&mut self) {
+        self.tables.flip();
+        self.sources.flip();
+        self.sinks.flip();
     }
 }
 
@@ -114,13 +191,17 @@ impl Difference {
         }
     }
 
-    fn from_enrichment_tables(
+    fn from_enrichment_table_components<F>(
         old: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
         new: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
         need_change: &HashSet<ComponentKey>,
-    ) -> Self {
-        let old_table_keys = extract_table_component_keys(old);
-        let new_table_keys = extract_table_component_keys(new);
+        component_key: F,
+    ) -> Self
+    where
+        F: Fn(&ComponentKey, &EnrichmentTableOuter<OutputId>) -> Option<ComponentKey>,
+    {
+        let old_table_keys = extract_table_component_keys(old, &component_key);
+        let new_table_keys = extract_table_component_keys(new, &component_key);
 
         let to_change = old_table_keys
             .intersection(&new_table_keys)
@@ -208,23 +289,37 @@ impl Difference {
 }
 
 /// Helper function to extract component keys from enrichment tables.
-fn extract_table_component_keys(
-    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
-) -> HashSet<(&ComponentKey, ComponentKey)> {
+fn extract_table_component_keys<'a, F>(
+    tables: &'a IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+    component_key: &F,
+) -> HashSet<(&'a ComponentKey, ComponentKey)>
+where
+    F: Fn(&ComponentKey, &EnrichmentTableOuter<OutputId>) -> Option<ComponentKey>,
+{
     tables
         .iter()
-        .flat_map(|(table_key, table)| {
-            vec![
-                table
-                    .as_source(table_key)
-                    .map(|(component_key, _)| (table_key, component_key)),
-                table
-                    .as_sink(table_key)
-                    .map(|(component_key, _)| (table_key, component_key)),
-            ]
+        .filter_map(|(table_key, table)| {
+            component_key(table_key, table).map(|component_key| (table_key, component_key))
         })
-        .flatten()
         .collect()
+}
+
+fn enrichment_table_source_key(
+    table_key: &ComponentKey,
+    table: &EnrichmentTableOuter<OutputId>,
+) -> Option<ComponentKey> {
+    table
+        .as_source(table_key)
+        .map(|(component_key, _)| component_key)
+}
+
+fn enrichment_table_sink_key(
+    table_key: &ComponentKey,
+    table: &EnrichmentTableOuter<OutputId>,
+) -> Option<ComponentKey> {
+    table
+        .as_sink(table_key)
+        .map(|(component_key, _)| component_key)
 }
 
 #[cfg(all(test, feature = "enrichment-tables-memory"))]
@@ -304,20 +399,179 @@ mod tests {
         .build()
         .unwrap();
 
-        let diff = Difference::from_enrichment_tables(
+        let diff = EnrichmentTableDiff::new(
             &old_config.enrichment_tables,
             &new_config.enrichment_tables,
             &Default::default(),
         );
 
-        assert_eq!(diff.to_add, HashSet::from_iter(["memory_table_new".into()]));
         assert_eq!(
-            diff.to_remove,
+            diff.tables.to_add,
+            HashSet::from_iter(["memory_table_new".into()])
+        );
+        assert_eq!(
+            diff.tables.to_remove,
             HashSet::from_iter(["memory_table_old".into()])
         );
         assert_eq!(
-            diff.to_change,
-            HashSet::from_iter(["memory_table".into(), "memory_table_source".into()])
+            diff.tables.to_change,
+            HashSet::from_iter(["memory_table".into()])
         );
+
+        assert_eq!(
+            diff.sources.to_change,
+            HashSet::from_iter(["memory_table_source".into()])
+        );
+        assert!(diff.sources.to_add.is_empty());
+        assert!(diff.sources.to_remove.is_empty());
+
+        assert_eq!(
+            diff.sinks.to_add,
+            HashSet::from_iter(["memory_table_new".into()])
+        );
+        assert_eq!(
+            diff.sinks.to_remove,
+            HashSet::from_iter(["memory_table_old".into()])
+        );
+        assert_eq!(
+            diff.sinks.to_change,
+            HashSet::from_iter(["memory_table".into()])
+        );
+    }
+
+    #[test]
+    fn diff_enrichment_table_component_helpers_ignore_table_config_keys() {
+        let old_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let new_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              file_table:
+                type: "file"
+                file:
+                  path: ./tests/data/enrichment.csv
+                  encoding:
+                    type: "csv"
+                schema:
+                  id: integer
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = EnrichmentTableDiff::new(
+            &old_config.enrichment_tables,
+            &new_config.enrichment_tables,
+            &Default::default(),
+        );
+        let table_key = ComponentKey::from("file_table");
+
+        assert_eq!(diff.tables.to_add, HashSet::from_iter([table_key.clone()]));
+        assert!(diff.sources.to_add.is_empty());
+        assert!(diff.sinks.to_add.is_empty());
+
+        assert!(!diff.any_changed_or_added());
+        assert!(!diff.contains(&table_key));
+        assert!(!diff.contains_new(&table_key));
+        assert!(!diff.is_added(&table_key));
+    }
+
+    #[test]
+    fn diff_enrichment_tables_tracks_source_key_renames() {
+        let old_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 10
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source_old"
+                  export_interval: 50
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let new_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 10
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source_new"
+                  export_interval: 50
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = EnrichmentTableDiff::new(
+            &old_config.enrichment_tables,
+            &new_config.enrichment_tables,
+            &Default::default(),
+        );
+
+        assert_eq!(
+            diff.tables.to_change,
+            HashSet::from_iter(["memory_table".into()])
+        );
+        assert!(diff.tables.to_add.is_empty());
+        assert!(diff.tables.to_remove.is_empty());
+
+        assert_eq!(
+            diff.sources.to_add,
+            HashSet::from_iter(["memory_table_source_new".into()])
+        );
+        assert_eq!(
+            diff.sources.to_remove,
+            HashSet::from_iter(["memory_table_source_old".into()])
+        );
+        assert!(diff.sources.to_change.is_empty());
+
+        assert_eq!(
+            diff.sinks.to_change,
+            HashSet::from_iter(["memory_table".into()])
+        );
+        assert!(diff.sinks.to_add.is_empty());
+        assert!(diff.sinks.to_remove.is_empty());
     }
 }
