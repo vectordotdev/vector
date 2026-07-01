@@ -1,0 +1,71 @@
+---
+# Lading load generator — generates apache_common log lines and POSTs them via
+# HTTP to the Nginx ingress controller with high parallelism.
+#
+# Each pod opens `parallel_connections` concurrent HTTP connections to Nginx,
+# which round-robins each request to a Vector pod at the HTTP layer (L7).
+# Unlike the previous sequential-curl producer, lading keeps all connections
+# busy simultaneously, so it saturates as many Vector pods as the cluster has.
+#
+# bytes_per_second is set above what 1–3 Vector pods can handle (bottlenecked in
+# Phases 1–2) but below what 8 pods can handle, so Phase 3 has headroom and the
+# HPA can find a natural equilibrium in Phase 4 (~5 pods at 70% CPU).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lading-config
+  namespace: vector-perf
+data:
+  lading.yaml: |
+    generator:
+      - http:
+          seed: [2, 3, 5, 7, 11, 13, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59,
+                 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137]
+          target_uri: "http://ingress-nginx-controller.ingress-nginx:80/"
+          bytes_per_second: "65 MiB"
+          parallel_connections: 100
+          method:
+            post:
+              variant: "apache_common"
+              maximum_prebuild_cache_size_bytes: "256 MiB"
+          headers: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  namespace: vector-perf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+        - name: producer
+          image: ghcr.io/datadog/lading:0.32.0
+          args:
+            - "--config-path"
+            - "/config/lading.yaml"
+            - "--no-target"
+            - "--capture-path"
+            - "/tmp/captures"
+            - "--experiment-duration-infinite"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: config
+          configMap:
+            name: lading-config
