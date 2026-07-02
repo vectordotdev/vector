@@ -28,6 +28,8 @@ generated: components: sinks: vector: configuration: {
 		}
 	}
 	address: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `endpoints` instead."
 		description: """
 			The downstream Vector address to which to connect.
 
@@ -37,6 +39,8 @@ generated: components: sinks: vector: configuration: {
 
 			This option is mutually exclusive with `endpoints`. Set exactly one of
 			`address` or `endpoints`.
+
+			This option has been deprecated, use `endpoints` instead.
 			"""
 		required: false
 		type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
@@ -140,6 +144,9 @@ generated: components: sinks: vector: configuration: {
 					This mode keeps using the last successful endpoint until it fails. Use
 					`failover_primary` instead when retriable failures should re-check the
 					first configured endpoint before trying secondary endpoints.
+
+					Requests are serialized for this strategy, regardless of the configured
+					request concurrency, to preserve one active endpoint at a time.
 					"""
 				failover_primary: """
 					Use one endpoint at a time. When the active endpoint fails, retry from
@@ -149,6 +156,9 @@ generated: components: sinks: vector: configuration: {
 					This is useful when receiver-side connection recycling, such as
 					`max_connection_age_secs`, should converge the sink back to the first
 					configured endpoint when it is available.
+
+					Requests are serialized for this strategy, regardless of the configured
+					request concurrency, to preserve one active endpoint at a time.
 					"""
 				load_balance: """
 					Distribute requests across healthy endpoints using Vector's existing

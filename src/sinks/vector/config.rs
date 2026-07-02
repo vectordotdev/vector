@@ -12,6 +12,7 @@ use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
+use tokio::sync::Semaphore;
 use tonic::body::BoxBody;
 use tower::{Service, ServiceBuilder};
 use vector_lib::configurable::configurable_component;
@@ -34,7 +35,7 @@ use crate::{
         util::{
             BatchConfig, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
             retries::RetryLogic,
-            service::{HealthConfig, HealthLogic, ServiceBuilderExt},
+            service::{HealthConfig, HealthLogic, ServiceBuilderExt, TowerRequestSettings},
         },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -220,14 +221,11 @@ impl SinkConfig for VectorConfig {
                         unreachable!("load balancing uses a different service")
                     }
                 };
-                let mut failover_request_settings = request_settings;
-                // The outer Tower timeout wraps the whole failover loop. Add one
-                // endpoint timeout of slack so the final endpoint attempt is not
-                // aborted by scheduling overhead after earlier attempts consume
-                // their per-endpoint timeouts.
-                failover_request_settings.timeout = endpoint_timeout
-                    .checked_mul((max_endpoint_attempts + 1) as u32)
-                    .unwrap_or(endpoint_timeout);
+                let failover_request_settings = failover_request_settings(
+                    request_settings,
+                    endpoint_timeout,
+                    max_endpoint_attempts,
+                );
 
                 let service = ServiceBuilder::new()
                     .settings(failover_request_settings, VectorGrpcRetryLogic)
@@ -277,6 +275,9 @@ pub enum EndpointStrategy {
     /// This mode keeps using the last successful endpoint until it fails. Use
     /// `failover_primary` instead when retriable failures should re-check the
     /// first configured endpoint before trying secondary endpoints.
+    ///
+    /// Requests are serialized for this strategy, regardless of the configured
+    /// request concurrency, to preserve one active endpoint at a time.
     Failover,
     /// Use one endpoint at a time. When the active endpoint fails, retry from
     /// the configured endpoint order so the sink can return to its configured
@@ -285,6 +286,9 @@ pub enum EndpointStrategy {
     /// This is useful when receiver-side connection recycling, such as
     /// `max_connection_age_secs`, should converge the sink back to the first
     /// configured endpoint when it is available.
+    ///
+    /// Requests are serialized for this strategy, regardless of the configured
+    /// request concurrency, to preserve one active endpoint at a time.
     FailoverPrimary,
 }
 
@@ -292,6 +296,7 @@ pub enum EndpointStrategy {
 struct FailoverVectorService {
     services: Vec<VectorService>,
     state: Arc<AtomicUsize>,
+    in_flight: Arc<Semaphore>,
     endpoint_timeout: std::time::Duration,
     endpoint_strategy: EndpointStrategy,
 }
@@ -305,6 +310,7 @@ impl FailoverVectorService {
         Self {
             services,
             state: Arc::new(AtomicUsize::new(0)),
+            in_flight: Arc::new(Semaphore::new(1)),
             endpoint_timeout,
             endpoint_strategy,
         }
@@ -323,10 +329,15 @@ impl Service<VectorRequest> for FailoverVectorService {
     fn call(&mut self, request: VectorRequest) -> Self::Future {
         let services = self.services.clone();
         let state = Arc::clone(&self.state);
+        let in_flight = Arc::clone(&self.in_flight);
         let endpoint_timeout = self.endpoint_timeout;
         let endpoint_strategy = self.endpoint_strategy;
 
         Box::pin(async move {
+            let _permit = in_flight
+                .acquire_owned()
+                .await
+                .expect("failover service semaphore should not be closed");
             let mut expected_state = state.load(Ordering::Acquire);
             let start = failover_state_index(expected_state, services.len());
             let mut last_error = None;
@@ -415,6 +426,22 @@ impl Service<VectorRequest> for FailoverVectorService {
             Err(last_error.expect("failover service should have at least one endpoint"))
         })
     }
+}
+
+fn failover_request_settings(
+    mut request_settings: TowerRequestSettings,
+    endpoint_timeout: Duration,
+    max_endpoint_attempts: usize,
+) -> TowerRequestSettings {
+    request_settings.concurrency = Some(1);
+    // The outer Tower timeout wraps the whole failover loop. Add one endpoint
+    // timeout of slack so the final endpoint attempt is not aborted by
+    // scheduling overhead after earlier attempts consume their per-endpoint
+    // timeouts.
+    request_settings.timeout = endpoint_timeout
+        .checked_mul((max_endpoint_attempts + 1) as u32)
+        .unwrap_or(endpoint_timeout);
+    request_settings
 }
 
 fn failover_attempt_indices(
@@ -516,15 +543,13 @@ fn stale_failover_attempt_indices(
     tried: &[usize],
 ) -> Vec<usize> {
     let active_endpoint = start;
+    let filter_tried = endpoint_strategy != EndpointStrategy::FailoverPrimary;
     std::iter::once(active_endpoint)
         .chain(
             failover_attempt_indices(endpoint_strategy, start, endpoints)
                 .into_iter()
                 .filter(move |index| {
-                    *index != active_endpoint
-                        && (!tried.contains(index)
-                            || (endpoint_strategy == EndpointStrategy::FailoverPrimary
-                                && *index == 0))
+                    *index != active_endpoint && (!filter_tried || !tried.contains(index))
                 }),
         )
         .collect()
@@ -653,20 +678,10 @@ fn healthchecks(
         .boxed()
     });
 
-    match endpoint_strategy {
-        // Load balancing can route data to any endpoint, so all endpoints must
-        // pass the startup healthcheck. Otherwise a sink can start with a bad
-        // endpoint that later rejects non-retriable batches.
-        EndpointStrategy::LoadBalance => {
-            Box::pin(futures::future::try_join_all(healthchecks).map_ok(|_| ()))
-        }
-        EndpointStrategy::Failover | EndpointStrategy::FailoverPrimary => {
-            Box::pin(futures::future::select_ok(healthchecks).map_ok(|((), _)| ()))
-        }
-    }
+    Box::pin(futures::future::try_join_all(healthchecks).map_ok(|_| ()))
 }
 
-fn requires_all_endpoint_healthchecks(
+const fn requires_all_endpoint_healthchecks(
     endpoint_strategy: EndpointStrategy,
     endpoint_count: usize,
 ) -> bool {
@@ -694,7 +709,7 @@ fn healthcheck_uris_for_strategy(
     }
 }
 
-fn default_endpoint_health_config() -> HealthConfig {
+const fn default_endpoint_health_config() -> HealthConfig {
     HealthConfig {
         retry_initial_backoff_secs: 1,
         retry_max_duration_secs: Duration::from_secs(60 * 60),
@@ -795,6 +810,42 @@ impl HealthLogic for VectorGrpcHealthLogic {
 mod tests {
     use super::*;
     use crate::sinks::util::UriSerde;
+
+    #[test]
+    fn failover_request_settings_force_serial_concurrency() {
+        let mut settings = TowerRequestConfig::<
+            crate::sinks::util::service::GlobalTowerRequestConfigDefaults,
+        >::default()
+        .into_settings();
+        settings.concurrency = Some(8);
+        settings.timeout = Duration::from_secs(5);
+
+        let settings = failover_request_settings(settings, Duration::from_secs(5), 3);
+
+        assert_eq!(settings.concurrency, Some(1));
+        assert_eq!(settings.timeout, Duration::from_secs(20));
+    }
+
+    #[test]
+    fn failover_service_clones_share_single_in_flight_permit() {
+        let service = FailoverVectorService::new(
+            Vec::new(),
+            Duration::from_secs(1),
+            EndpointStrategy::Failover,
+        );
+        let cloned = service.clone();
+
+        let permit = Arc::clone(&service.in_flight).try_acquire_owned().unwrap();
+
+        assert!(
+            Arc::clone(&cloned.in_flight).try_acquire_owned().is_err(),
+            "cloned failover services must share one request permit"
+        );
+
+        drop(permit);
+
+        assert!(Arc::clone(&cloned.in_flight).try_acquire_owned().is_ok());
+    }
 
     #[test]
     fn health_logic_ignores_non_retriable_vector_errors() {
@@ -1080,7 +1131,7 @@ mod tests {
                 state: 5,
                 advanced: false,
             },
-            &[0],
+            &[0, 1],
         );
         if observed.rebuilt {
             remaining_attempts = attempts.len();
