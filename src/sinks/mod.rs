@@ -51,6 +51,8 @@ pub mod databricks_zerobus;
 pub mod datadog;
 #[cfg(feature = "sinks-doris")]
 pub mod doris;
+#[cfg(feature = "sinks-duckdb")]
+pub mod duckdb;
 #[cfg(feature = "sinks-elasticsearch")]
 pub mod elasticsearch;
 #[cfg(feature = "sinks-file")]

@@ -48,6 +48,8 @@ mod dnstap;
 mod docker_logs;
 #[cfg(feature = "sinks-doris")]
 mod doris;
+#[cfg(feature = "sinks-duckdb")]
+mod duckdb;
 mod encoding_transcode;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 mod eventstoredb_metrics;
@@ -204,6 +206,8 @@ pub(crate) use self::dnstap::*;
 pub(crate) use self::docker_logs::*;
 #[cfg(feature = "sinks-doris")]
 pub(crate) use self::doris::*;
+#[cfg(feature = "sinks-duckdb")]
+pub(crate) use self::duckdb::*;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
