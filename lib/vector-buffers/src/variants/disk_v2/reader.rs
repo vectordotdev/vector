@@ -134,6 +134,7 @@ where
             self,
             ReaderError::Checksum { .. }
                 | ReaderError::Deserialization { .. }
+                | ReaderError::Decode { .. }
                 | ReaderError::PartialWrite
         )
     }
