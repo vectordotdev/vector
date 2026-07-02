@@ -170,6 +170,16 @@ pub struct KafkaSourceConfig {
     #[configurable(metadata(docs::human_name = "Commit Interval"))]
     commit_interval_ms: Duration,
 
+    /// Whether to commit read offsets to Kafka.
+    ///
+    /// When set to `false`, Vector suppresses both librdkafka's background auto-commit and its own
+    /// explicit synchronous commits at shutdown and rebalance. This is useful when reading from a
+    /// compacted topic where each consumer should always replay from offset 0 on restart (set
+    /// `auto_offset_reset: "earliest"` and a unique `group_id` alongside this option).
+    #[serde(default = "default_commit_offsets")]
+    #[derivative(Default(value = "default_commit_offsets()"))]
+    commit_offsets: bool,
+
     /// Overrides the name of the log field used to add the message key to each event.
     ///
     /// The value is the message key of the Kafka message itself.
@@ -273,6 +283,10 @@ const fn default_fetch_wait_max_ms() -> Duration {
 
 const fn default_commit_interval_ms() -> Duration {
     Duration::from_millis(5000)
+}
+
+const fn default_commit_offsets() -> bool {
+    true
 }
 
 fn default_auto_offset_reset() -> String {
@@ -476,7 +490,9 @@ async fn kafka_source(
     };
 
     _ = tokio::join!(client_task, coordination_task);
-    consumer.context().commit_consumer_state();
+    if consumer.context().commit_offsets {
+        consumer.context().commit_consumer_state();
+    }
 
     Ok(())
 }
@@ -1210,7 +1226,14 @@ fn create_consumer(
             config.fetch_wait_max_ms.as_millis().to_string(),
         )
         .set("enable.partition.eof", "false")
-        .set("enable.auto.commit", "true")
+        .set(
+            "enable.auto.commit",
+            if config.commit_offsets {
+                "true"
+            } else {
+                "false"
+            },
+        )
         .set(
             "auto.commit.interval.ms",
             config.commit_interval_ms.as_millis().to_string(),
@@ -1232,6 +1255,7 @@ fn create_consumer(
         .create_with_context::<_, StreamConsumer<_>>(KafkaSourceContext::new(
             config.metrics.topic_lag_metric,
             acknowledgements,
+            config.commit_offsets,
             callbacks,
             Span::current(),
         ))
@@ -1259,6 +1283,9 @@ enum KafkaCallback {
 
 struct KafkaSourceContext {
     acknowledgements: bool,
+
+    commit_offsets: bool,
+
     stats: kafka::KafkaStatisticsContext,
 
     /// A callback channel used to coordinate between the main consumer task and the acknowledgement task
@@ -1272,6 +1299,7 @@ impl KafkaSourceContext {
     fn new(
         expose_lag_metrics: bool,
         acknowledgements: bool,
+        commit_offsets: bool,
         callbacks: UnboundedSender<KafkaCallback>,
         span: Span,
     ) -> Self {
@@ -1281,6 +1309,7 @@ impl KafkaSourceContext {
                 span,
             },
             acknowledgements,
+            commit_offsets,
             consumer: OnceLock::default(),
             callbacks,
         }
@@ -1294,7 +1323,9 @@ impl KafkaSourceContext {
             .is_ok()
         {
             while rendezvous.recv().is_ok() {
-                self.commit_consumer_state();
+                if self.commit_offsets {
+                    self.commit_consumer_state();
+                }
             }
         }
     }
@@ -1342,7 +1373,9 @@ impl KafkaSourceContext {
             .ok();
 
         while rendezvous.recv().is_ok() {
-            self.commit_consumer_state();
+            if self.commit_offsets {
+                self.commit_consumer_state();
+            }
         }
     }
 
@@ -1376,7 +1409,9 @@ impl ConsumerContext for KafkaSourceContext {
 
             Rebalance::Revoke(tpl) => {
                 self.revoke_partitions(tpl);
-                self.commit_consumer_state();
+                if self.commit_offsets {
+                    self.commit_consumer_state();
+                }
             }
 
             Rebalance::Error(message) => {
@@ -1532,6 +1567,16 @@ mod test {
             ..make_config("topic", "group", LogNamespace::Legacy, None)
         };
         assert!(create_consumer(&config, true).is_err());
+    }
+
+    #[tokio::test]
+    async fn consumer_create_commit_offsets_false() {
+        let config = KafkaSourceConfig {
+            commit_offsets: false,
+            ..make_config("topic", "group", LogNamespace::Legacy, None)
+        };
+        let (consumer, _rx) = create_consumer(&config, true).unwrap();
+        assert!(!consumer.context().commit_offsets);
     }
 }
 
@@ -2030,6 +2075,52 @@ mod integration_test {
             "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) "
         );
         assert_eq!(total, expect_count);
+    }
+
+    #[tokio::test]
+    async fn no_commits_when_commit_offsets_false() {
+        const SEND_COUNT: usize = 10;
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+
+        send_events(topic.clone(), 1, SEND_COUNT).await;
+
+        let mut opts = HashMap::new();
+        opts.insert("enable.partition.eof".into(), "true".into());
+
+        // First consumer: commit_offsets: false
+        {
+            let config = KafkaSourceConfig {
+                commit_offsets: false,
+                ..make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts.clone()))
+            };
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
+            let events = rx.collect::<Vec<Event>>().await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+            assert_eq!(events.len(), SEND_COUNT);
+        }
+
+        // No offset should have been committed
+        let offset = fetch_tpl_offset(&group_id, &topic, 0);
+        assert_eq!(offset, Offset::Invalid);
+
+        // Second consumer: same group_id, should replay all messages from the start
+        {
+            let config = KafkaSourceConfig {
+                commit_offsets: false,
+                ..make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts))
+            };
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
+            let events = rx.collect::<Vec<Event>>().await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+            assert_eq!(events.len(), SEND_COUNT);
+        }
     }
 
     async fn consume_with_rebalance(rebalance_strategy: String) {
