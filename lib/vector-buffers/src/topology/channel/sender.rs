@@ -1,7 +1,7 @@
 // Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
 #![allow(clippy::let_underscore_must_use)]
 
-use std::{io, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
 use derivative::Derivative;
@@ -13,7 +13,7 @@ use vector_common::{
     internal_event::{InternalEventHandle, Registered, register},
 };
 
-use super::limited_queue::LimitedSender;
+use super::limited_queue::{DropOldestSendError, LimitedSender};
 use crate::{
     BufferInstrumentation, Bufferable, EventCount, WhenFull,
     buffer_usage_data::BufferUsageHandle,
@@ -90,12 +90,16 @@ where
         }
     }
 
-    pub(crate) async fn send_drop_oldest(&mut self, item: T) -> crate::Result<Vec<T>> {
+    pub(crate) async fn send_drop_oldest(
+        &mut self,
+        item: T,
+    ) -> Result<Vec<T>, DropOldestSendError<T>> {
         match self {
-            Self::InMemory(tx) => tx.send_drop_oldest(item).await.map_err(Into::into),
-            Self::DiskV2(_) => {
-                Err(io::Error::other("drop_oldest is only supported for memory buffers").into())
-            }
+            Self::InMemory(tx) => tx.send_drop_oldest(item).await,
+            Self::DiskV2(_) => Err(DropOldestSendError {
+                error: super::limited_queue::TrySendError::Disconnected(item),
+                dropped: Vec::new(),
+            }),
         }
     }
 
@@ -252,16 +256,39 @@ impl<T: Bufferable> BufferSender<T> {
                 }
             }
             WhenFull::DropOldest => {
-                let mut dropped = self.base.send_drop_oldest(item).await?;
+                let mut dropped = match self.base.send_drop_oldest(item).await {
+                    Ok(dropped) => dropped,
+                    Err(mut error) => {
+                        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
+                            && !error.dropped.is_empty()
+                        {
+                            let dropped_count = error
+                                .dropped
+                                .iter()
+                                .map(EventCount::event_count)
+                                .sum::<usize>();
+                            let dropped_size =
+                                error.dropped.iter().map(ByteSizeOf::size_of).sum::<usize>();
+                            instrumentation.increment_dropped_oldest_event_count_and_byte_size(
+                                dropped_count as u64,
+                                dropped_size as u64,
+                            );
+                        }
+                        for item in &mut error.dropped {
+                            item.take_finalizers().update_status(EventStatus::Rejected);
+                        }
+
+                        return Err(error.error.into());
+                    }
+                };
                 if let Some(instrumentation) = self.usage_instrumentation.as_ref()
                     && !dropped.is_empty()
                 {
                     let dropped_count = dropped.iter().map(EventCount::event_count).sum::<usize>();
                     let dropped_size = dropped.iter().map(ByteSizeOf::size_of).sum::<usize>();
-                    instrumentation.increment_dropped_event_count_and_byte_size(
+                    instrumentation.increment_dropped_oldest_event_count_and_byte_size(
                         dropped_count as u64,
                         dropped_size as u64,
-                        true,
                     );
                 }
                 for item in &mut dropped {

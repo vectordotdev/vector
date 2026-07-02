@@ -52,6 +52,12 @@ pub enum TrySendError<T> {
     Disconnected(T),
 }
 
+#[derive(Debug)]
+pub struct DropOldestSendError<T> {
+    pub error: TrySendError<T>,
+    pub dropped: Vec<T>,
+}
+
 impl<T> TrySendError<T> {
     pub fn into_inner(self) -> T {
         match self {
@@ -408,11 +414,10 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     ///
     /// # Errors
     ///
-    /// If the receiver has disconnected (does not exist anymore), then
-    /// `Err(TrySendError::Disconnected)` will be returned with the given `item`. If the channel has
-    /// insufficient total capacity for the item, then `Err(TrySendError::InsufficientCapacity)`
-    /// will be returned with the given `item`.
-    pub async fn send_drop_oldest(&mut self, item: T) -> Result<Vec<T>, TrySendError<T>> {
+    /// If the receiver has disconnected, then an error will be returned with the given `item` and
+    /// any queued items that were already evicted. If the channel has insufficient total capacity
+    /// for the item, then an error will be returned with the given `item`.
+    pub async fn send_drop_oldest(&mut self, item: T) -> Result<Vec<T>, DropOldestSendError<T>> {
         // Calculate how many permits we need, and try to acquire them all without waiting. If there
         // is not enough space, evict queued items until we have enough room for the new item.
         let (size, permits_required) = self.calc_required_permits(&item);
@@ -432,13 +437,40 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
                 }
                 Err(TryAcquireError::NoPermits) => {
                     let notified = self.inner.read_waker.notified();
-                    if let Some(dropped_item) = self.inner.pop_and_record() {
-                        dropped.push(dropped_item);
-                    } else {
-                        notified.await;
+                    match self
+                        .inner
+                        .limiter
+                        .clone()
+                        .try_acquire_many_owned(permits_required)
+                    {
+                        Ok(permits) => {
+                            self.inner.send_with_permits(size, permits, item);
+                            trace!(
+                                "Attempt to send item after rechecking available capacity succeeded."
+                            );
+                            return Ok(dropped);
+                        }
+                        Err(TryAcquireError::NoPermits) => {
+                            if let Some(dropped_item) = self.inner.pop_and_record() {
+                                dropped.push(dropped_item);
+                            } else {
+                                notified.await;
+                            }
+                        }
+                        Err(TryAcquireError::Closed) => {
+                            return Err(DropOldestSendError {
+                                error: TrySendError::Disconnected(item),
+                                dropped,
+                            });
+                        }
                     }
                 }
-                Err(TryAcquireError::Closed) => return Err(TrySendError::Disconnected(item)),
+                Err(TryAcquireError::Closed) => {
+                    return Err(DropOldestSendError {
+                        error: TrySendError::Disconnected(item),
+                        dropped,
+                    });
+                }
             }
         }
     }
