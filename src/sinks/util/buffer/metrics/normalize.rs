@@ -691,10 +691,10 @@ impl MetricSet {
                     metric = metric.with_value(new_value);
                 }
                 // Insert the updated stored value, or as store a new reference value (if the Metric changed type)
-                self.insert(metric.clone(), timestamp);
+                self.insert_normalization_state(metric.clone(), timestamp);
             }
             None => {
-                self.insert(metric.clone(), timestamp);
+                self.insert_normalization_state(metric.clone(), timestamp);
             }
         }
         metric.into_absolute()
@@ -738,13 +738,13 @@ impl MetricSet {
                     Some(metric.into_incremental())
                 } else {
                     // Metric changed type, store this and emit nothing
-                    self.insert(metric, timestamp);
+                    self.insert_normalization_state(metric, timestamp);
                     None
                 }
             }
             None => {
                 // No reference so store this and emit nothing
-                self.insert(metric, timestamp);
+                self.insert_normalization_state(metric, timestamp);
                 None
             }
         }
@@ -753,6 +753,11 @@ impl MetricSet {
     fn insert(&mut self, metric: Metric, timestamp: Option<Instant>) {
         let (series, entry) = MetricEntry::from_metric(metric, timestamp);
         self.insert_with_tracking(series, entry);
+    }
+
+    fn insert_normalization_state(&mut self, mut metric: Metric, timestamp: Option<Instant>) {
+        metric.metadata_mut().take_finalizers();
+        self.insert(metric, timestamp);
     }
 
     pub fn insert_update(&mut self, metric: Metric) {
@@ -809,12 +814,33 @@ impl Default for MetricSet {
 
 #[cfg(test)]
 mod tests {
-    use vector_lib::event::metric::{MetricKind, MetricValue};
+    use vector_lib::event::{
+        BatchNotifier, BatchStatus, EventStatus, Finalizable,
+        metric::{MetricKind, MetricValue},
+    };
 
     use super::*;
 
     fn counter(name: &str, value: f64, kind: MetricKind) -> Metric {
         Metric::new(name, kind, MetricValue::Counter { value })
+    }
+
+    fn counter_with_receiver(
+        name: &str,
+        value: f64,
+        kind: MetricKind,
+    ) -> (Metric, vector_lib::event::BatchStatusReceiver) {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        (
+            counter(name, value, kind).with_batch_notifier(&batch),
+            receiver,
+        )
+    }
+
+    fn deliver_metric(mut metric: Metric) {
+        let mut finalizers = metric.take_finalizers();
+        finalizers.update_status(EventStatus::Delivered);
+        finalizers.update_sources();
     }
 
     // Verifies that the default (no capacity policy) path uses IndexMap and that
@@ -857,5 +883,57 @@ mod tests {
             ..Default::default()
         });
         assert!(matches!(set.inner, MetricSetInner::Bounded(_)));
+    }
+
+    #[test]
+    fn make_absolute_does_not_retain_finalizers_in_state() {
+        let mut set = MetricSet::default();
+        let (metric, mut receiver) = counter_with_receiver("hits", 1.0, MetricKind::Incremental);
+
+        let normalized = set.make_absolute(metric).unwrap();
+        deliver_metric(normalized);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert!(
+            set.into_metrics()
+                .into_iter()
+                .all(|metric| metric.metadata().finalizers().is_empty())
+        );
+    }
+
+    #[test]
+    fn make_incremental_releases_finalizers_when_metric_is_not_emitted() {
+        let mut set = MetricSet::default();
+        let (metric, mut receiver) = counter_with_receiver("hits", 1.0, MetricKind::Absolute);
+
+        assert!(set.make_incremental(metric).is_none());
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert!(
+            set.into_metrics()
+                .into_iter()
+                .all(|metric| metric.metadata().finalizers().is_empty())
+        );
+    }
+
+    #[test]
+    fn make_incremental_does_not_retain_finalizers_in_updated_state() {
+        let mut set = MetricSet::default();
+        let (first, mut first_receiver) = counter_with_receiver("hits", 1.0, MetricKind::Absolute);
+        let (second, mut second_receiver) =
+            counter_with_receiver("hits", 3.0, MetricKind::Absolute);
+
+        assert!(set.make_incremental(first).is_none());
+        assert_eq!(first_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let normalized = set.make_incremental(second).unwrap();
+        deliver_metric(normalized);
+
+        assert_eq!(second_receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert!(
+            set.into_metrics()
+                .into_iter()
+                .all(|metric| metric.metadata().finalizers().is_empty())
+        );
     }
 }
