@@ -81,7 +81,7 @@ where
         // all the timers and emits utilization value periodically
         let this = self.project();
         this.timer_tx.try_send_start_wait();
-        let _ = this.intervals.poll_next_unpin(cx);
+        _ = this.intervals.poll_next_unpin(cx);
         let result = ready!(this.inner.poll_next_unpin(cx));
         this.timer_tx.try_send_stop_wait();
         Poll::Ready(result)

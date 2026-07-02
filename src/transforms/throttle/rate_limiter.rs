@@ -1,9 +1,10 @@
-use std::{hash::Hash, sync::Arc, time::Duration};
+use std::{hash::Hash, sync::Arc};
 
-use governor::{
-    Quota, RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore,
-};
+use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore};
 use tokio;
+
+use super::transform::Throttle;
+use crate::cpu_time::spawn_timed;
 
 /// Re-usable wrapper around the structs/type from the governor crate.
 /// Spawns a background task that periodically flushes keys that haven't been accessed recently.
@@ -21,17 +22,28 @@ where
     K: Hash + Eq + Clone + Send + Sync + 'static,
     C: clock::Clock + Clone + Send + Sync + 'static,
 {
-    pub fn start(quota: Quota, clock: C, flush_keys_interval: Duration) -> Self {
-        let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(quota, clock));
+    pub fn start(throttle: &Throttle<C, C::Instant>) -> Self {
+        let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(
+            throttle.quota,
+            throttle.clock.clone(),
+        ));
+
+        let flush_keys_interval = throttle.flush_keys_interval;
+        let cpu_ns = throttle.cpu_ns.clone();
 
         let rate_limiter_clone = Arc::clone(&rate_limiter);
-        let flush_handle = crate::spawn_in_current_span(async move {
-            let mut interval = tokio::time::interval(flush_keys_interval);
-            loop {
-                interval.tick().await;
-                rate_limiter_clone.retain_recent();
-            }
-        });
+        // Hook the periodic key-flush task onto the component's CPU counter so
+        // its housekeeping work is attributed to this throttle transform.
+        let flush_handle = spawn_timed(
+            async move {
+                let mut interval = tokio::time::interval(flush_keys_interval);
+                loop {
+                    interval.tick().await;
+                    rate_limiter_clone.retain_recent();
+                }
+            },
+            cpu_ns,
+        );
 
         Self {
             rate_limiter,

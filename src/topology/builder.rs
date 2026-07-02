@@ -2,16 +2,20 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{
+        Arc, LazyLock, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Instant,
 };
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
+use metrics::Counter;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
-    sync::{mpsc::UnboundedSender, oneshot},
+    sync::{Mutex as AsyncMutex, mpsc::UnboundedSender, oneshot},
     time::timeout,
 };
 use tracing::{Instrument, Span};
@@ -27,10 +31,11 @@ use vector_lib::{
             },
         },
     },
+    enrichment::Table,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
-    source_sender::{CHUNK_SIZE, SourceSenderItem},
+    source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
 use vector_lib::{gauge, internal_event::GaugeName};
@@ -49,6 +54,7 @@ use crate::{
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
         TransformOuter, TransformOutput,
     },
+    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -64,12 +70,54 @@ use crate::{
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
     LazyLock::new(vector_lib::enrichment::TableRegistry::default);
+// `TableRegistry::load` and `finish_load` are separate operations on a process-global registry.
+// Keep topology builds and enrichment-table reloads from interleaving that transition.
+static ENRICHMENT_TABLES_LOAD_LOCK: LazyLock<AsyncMutex<()>> = LazyLock::new(AsyncMutex::default);
 static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
-pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
-    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
+// Resolved once at startup in `crate::app::build_runtime`, together with `chunk_size_events`. `0`
+// means startup didn't run (e.g. tests that bypass it), in which case the getters fall back to the
+// `DEFAULT_CHUNK_SIZE_EVENTS`-based values.
+static SOURCE_SENDER_BUFFER_SIZE: AtomicUsize = AtomicUsize::new(0);
+static READY_ARRAY_CAPACITY: AtomicUsize = AtomicUsize::new(0);
 
-const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
+/// How many `chunk_size_events`-sized batches the concurrent transform runner's `ReadyArrays`
+/// buffers before applying backpressure: `ready_array_capacity = chunk_size_events * this`.
+pub(crate) const READY_ARRAY_CAPACITY_CHUNKS: usize = 4;
+
+/// Returns the source sender output buffer base size.
+pub(crate) fn source_sender_buffer_size() -> usize {
+    match SOURCE_SENDER_BUFFER_SIZE.load(Ordering::Relaxed) {
+        0 => *TRANSFORM_CONCURRENCY_LIMIT * DEFAULT_CHUNK_SIZE_EVENTS,
+        size => size,
+    }
+}
+
+/// Sets the process-wide source sender buffer size. Must be called at most once, before the
+/// topology is built. Panics if called more than once.
+pub(crate) fn set_source_sender_buffer_size(size: usize) {
+    SOURCE_SENDER_BUFFER_SIZE
+        .compare_exchange(0, size, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double source_sender_buffer_size initialization"));
+}
+
+/// Returns the `ReadyArrays` capacity used by concurrent transform runners.
+pub(crate) fn ready_array_capacity() -> NonZeroUsize {
+    let size = match READY_ARRAY_CAPACITY.load(Ordering::Relaxed) {
+        0 => DEFAULT_CHUNK_SIZE_EVENTS * READY_ARRAY_CAPACITY_CHUNKS,
+        size => size,
+    };
+    NonZeroUsize::new(size).expect("ready array capacity is non-zero")
+}
+
+/// Sets the process-wide concurrent transform runner `ReadyArrays` capacity. Must be called at most
+/// once, before the topology is built. Panics if called more than once.
+pub(crate) fn set_ready_array_capacity(size: usize) {
+    READY_ARRAY_CAPACITY
+        .compare_exchange(0, size, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double ready_array_capacity initialization"));
+}
+
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
@@ -131,16 +179,17 @@ impl<'a> Builder<'a> {
 
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
+        let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources(enrichment_tables).await;
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
 
-        // We should have all the data for the enrichment tables loaded now, so switch them over to
-        // readonly.
-        enrichment_tables.finish_load();
-
         if self.errors.is_empty() {
+            // We should have all the data for the enrichment tables loaded now, so switch them over to
+            // readonly.
+            enrichment_tables.finish_load();
+
             Ok(TopologyPieces {
                 inputs: self.inputs,
                 outputs: Self::finalize_outputs(self.outputs),
@@ -177,21 +226,32 @@ impl<'a> Builder<'a> {
     /// Loads, or reloads the enrichment tables.
     /// The tables are stored in the `ENRICHMENT_TABLES` global variable.
     async fn load_enrichment_tables(&mut self) -> &'static vector_lib::enrichment::TableRegistry {
-        let mut enrichment_tables = HashMap::new();
+        let mut enrichment_tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
         // Build enrichment tables
         'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
             let table_name = name.to_string();
-            if ENRICHMENT_TABLES.needs_reload(&table_name) {
-                let indexes = if !self.diff.enrichment_tables.is_added(name) {
-                    // If this is an existing enrichment table, we need to store the indexes to reapply
-                    // them again post load.
-                    Some(ENRICHMENT_TABLES.index_fields(&table_name))
-                } else {
-                    None
-                };
+            if ENRICHMENT_TABLES.needs_reload(&table_name)
+                || self.diff.enrichment_tables.tables.is_changed(name)
+                || self.diff.enrichment_tables.tables.is_added(name)
+            {
+                // Indexes are registered dynamically by VRL lookups against the global
+                // enrichment table registry. Preserve any existing registry indexes even
+                // when this config diff sees the table as newly added.
+                let indexes = ENRICHMENT_TABLES.index_fields(&table_name);
 
-                let mut table = match table_outer.inner.build(&self.config.global).await {
+                let mut prev_state = None;
+                if !self.diff.enrichment_tables.tables.is_added(name)
+                    && table_outer.inner.wants_previous_state()
+                {
+                    prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
+                }
+
+                let mut table = match table_outer
+                    .inner
+                    .build(&self.config.global, prev_state)
+                    .await
+                {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
@@ -200,21 +260,19 @@ impl<'a> Builder<'a> {
                     }
                 };
 
-                if let Some(indexes) = indexes {
-                    for (case, index) in indexes {
-                        match table
-                            .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
-                        {
-                            Ok(_) => (),
-                            Err(error) => {
-                                // If there is an error adding an index we do not want to use the reloaded
-                                // data, the previously loaded data will still need to be used.
-                                // Just report the error and continue.
-                                error!(message = "Unable to add index to reloaded enrichment table.",
-                                    table = ?name.to_string(),
-                                    %error);
-                                continue 'tables;
-                            }
+                for (case, index) in indexes {
+                    match table
+                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            // If there is an error adding an index we do not want to use the reloaded
+                            // data, the previously loaded data will still need to be used.
+                            // Just report the error and continue.
+                            error!(message = "Unable to add index to reloaded enrichment table.",
+                                table = ?name.to_string(),
+                                %error);
+                            continue 'tables;
                         }
                     }
                 }
@@ -248,7 +306,7 @@ impl<'a> Builder<'a> {
                 table_sources
                     .iter()
                     .map(|(key, source)| (key, source))
-                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+                    .filter(|(key, _)| self.diff.enrichment_tables.sources.contains_new(key)),
             )
         {
             debug!(component_id = %key, "Building new source.");
@@ -288,7 +346,7 @@ impl<'a> Builder<'a> {
         );
 
         let mut builder = SourceSender::builder()
-            .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+            .with_buffer(source_sender_buffer_size())
             .with_timeout(source.inner.send_timeout())
             .with_ewma_half_life_seconds(
                 self.config.global.buffer_utilization_ewma_half_life_seconds,
@@ -520,6 +578,20 @@ impl<'a> Builder<'a> {
             merged_schema_definition: merged_definition.clone(),
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
+            // Resolve the per-component CPU counter inside the transform span so it
+            // picks up component_id/component_kind/component_type tags. The same
+            // handle is shared between the main transform task and any helper
+            // tokio tasks the transform spawns at construction time. On platforms
+            // without per-thread CPU time, `register_counter` returns a noop
+            // handle and the metric is silently omitted.
+            //
+            // `None` when `measure_cpu_usage` is false (the default): no counter
+            // is registered and no per-poll `ThreadTime` measurement takes place.
+            cpu_ns: if transform.measure_cpu_usage {
+                Some(crate::cpu_time::register_counter())
+            } else {
+                None
+            },
         };
 
         let node = TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
@@ -570,7 +642,7 @@ impl<'a> Builder<'a> {
                 table_sinks
                     .iter()
                     .map(|(key, sink)| (key, sink))
-                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+                    .filter(|(key, _)| self.diff.enrichment_tables.sinks.contains_new(key)),
             )
         {
             debug!(component_id = %key, "Building new sink.");
@@ -759,14 +831,7 @@ impl<'a> Builder<'a> {
             // TODO: avoid the double boxing for function transforms here
             Transform::Function(t) => self.build_sync_transform(Box::new(t), node, input_rx),
             Transform::Synchronous(t) => self.build_sync_transform(t, node, input_rx),
-            Transform::Task(t) => self.build_task_transform(
-                t,
-                input_rx,
-                node.input_details.data_type(),
-                node.typetag,
-                &node.key,
-                &node.outputs,
-            ),
+            Transform::Task(t) => self.build_task_transform(t, node, input_rx),
         }
     }
 
@@ -788,11 +853,31 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+            node.cpu_ns.clone(),
         );
+
+        // Attribute the runner task's per-poll CPU time (driver loop +,
+        // for the inline variant, the transform body) to the component. The
+        // concurrent variant additionally spawns transform invocations onto
+        // their own tasks with `spawn_timed`, which feed the same counter.
+        // When `cpu_ns` is `None` the futures are returned as-is — no
+        // `ThreadTime` sampling takes place.
         let transform = if node.enable_concurrency {
-            runner.run_concurrently().boxed()
+            let fut = runner.run_concurrently();
+
+            if let Some(cpu_ns) = node.cpu_ns {
+                fut.cpu_timed(cpu_ns).boxed()
+            } else {
+                fut.boxed()
+            }
         } else {
-            runner.run_inline().boxed()
+            let fut = runner.run_inline();
+
+            if let Some(cpu_ns) = node.cpu_ns {
+                fut.cpu_timed(cpu_ns).boxed()
+            } else {
+                fut.boxed()
+            }
         };
 
         let transform = async move {
@@ -826,12 +911,19 @@ impl<'a> Builder<'a> {
     fn build_task_transform(
         &self,
         t: Box<dyn TaskTransform<EventArray>>,
+        node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
-        input_type: DataType,
-        typetag: &str,
-        key: &ComponentKey,
-        outputs: &[TransformOutput],
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+        let TransformNode {
+            key,
+            typetag,
+            input_details,
+            outputs,
+            cpu_ns,
+            ..
+        } = node;
+        let input_type = input_details.data_type();
+
         let (mut fanout, control) = Fanout::new(key.clone());
 
         let sender = self
@@ -897,13 +989,18 @@ impl<'a> Builder<'a> {
                     Err(TaskError::wrapped(e))
                 }
             }
-        }
-        .boxed();
+        };
+
+        let transform = if let Some(cpu_ns) = cpu_ns {
+            transform.cpu_timed(cpu_ns).boxed()
+        } else {
+            transform.boxed()
+        };
 
         let mut outputs = HashMap::new();
-        outputs.insert(OutputId::from(key), control);
+        outputs.insert(OutputId::from(&key), control);
 
-        let task = Task::new(key.clone(), typetag, transform);
+        let task = Task::new(key, typetag, transform);
 
         (task, outputs)
     }
@@ -961,15 +1058,20 @@ async fn run_source_output_pump(
     Ok(TaskOutput::Source)
 }
 
+/// Reloads file based enrichment tables - not stateful ones
 pub async fn reload_enrichment_tables(config: &Config) {
+    let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
     let mut enrichment_tables = HashMap::new();
     // Build enrichment tables
     'tables: for (name, table_outer) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
-        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+        if ENRICHMENT_TABLES.needs_reload(&table_name)
+            // Tables that can act as sinks are reloaded through topology
+            && table_outer.as_sink(name).is_none()
+        {
             let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
 
-            let mut table = match table_outer.inner.build(&config.global).await {
+            let mut table = match table_outer.inner.build(&config.global, None).await {
                 Ok(table) => table,
                 Err(error) => {
                     error!("Enrichment table \"{name}\" reload failed: {error}");
@@ -1149,6 +1251,7 @@ struct TransformNode {
     input_details: Input,
     outputs: Vec<TransformOutput>,
     enable_concurrency: bool,
+    cpu_ns: Option<Counter>,
 }
 
 impl TransformNode {
@@ -1165,6 +1268,7 @@ impl TransformNode {
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
+            cpu_ns: context.cpu_ns.clone(),
         }
     }
 }
@@ -1177,6 +1281,7 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
+    cpu_ns: Option<Counter>,
 }
 
 impl Runner {
@@ -1187,6 +1292,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
+        cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
             transform,
@@ -1196,6 +1302,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
+            cpu_ns,
         }
     }
 
@@ -1249,7 +1356,7 @@ impl Runner {
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut input_rx =
-            super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
+            super::ready_arrays::ReadyArrays::with_capacity(input_rx, ready_array_capacity());
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -1280,12 +1387,18 @@ impl Runner {
 
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = crate::spawn_in_current_span(async move {
-                                for events in input_arrays {
-                                    t.transform_all(events, &mut outputs_buf);
-                                }
-                                outputs_buf
-                            });
+                            // Hook CPU-time accounting onto the spawned task at
+                            // the `Future::poll` boundary.
+                            // This is a separate task from the current one, so there is no double-counting.
+                            let task = spawn_timed(
+                                async move {
+                                    for events in input_arrays {
+                                        t.transform_all(events, &mut outputs_buf);
+                                    }
+                                    outputs_buf
+                                },
+                                self.cpu_ns.clone(),
+                            );
                             in_flight.push_back(task);
                         }
                         None => {

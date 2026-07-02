@@ -6,6 +6,9 @@ edition = "2024"
 publish = false
 license = "MPL-2.0"
 
+[lints]
+workspace = true
+
 [features]
 default = [
   "btreemap",
@@ -34,6 +37,7 @@ test = []
 tokenize = []
 
 [dependencies]
+async-compression.workspace = true
 async-stream = "0.3.6"
 bytes = { version = "1.11.1", default-features = false, optional = true }
 chrono.workspace = true

@@ -280,7 +280,6 @@ mod tests {
     use flate2::read::GzEncoder;
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use tokio::time::{Duration, sleep};
     use vector_lib::{assert_event_data_eq, lookup::path};
     use vrl::value;
 
@@ -291,7 +290,7 @@ mod tests {
         log_event,
         test_util::{
             addr::{PortGuard, next_addr},
-            collect_ready,
+            collect_n,
             components::{SOURCE_TAGS, assert_source_compliance},
             wait_for_tcp,
         },
@@ -428,11 +427,9 @@ mod tests {
         gzip: bool,
         record_compression: Compression,
     ) -> tokio::task::JoinHandle<reqwest::Result<reqwest::Response>> {
-        let handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             send(address, timestamp, records, key, gzip, record_compression).await
-        });
-        sleep(Duration::from_millis(500)).await;
-        handle
+        })
     }
 
     /// Encodes record data to mach AWS's representation: base64 encoded with an additional
@@ -530,7 +527,7 @@ mod tests {
             .await;
 
             if success {
-                let events = collect_ready(rx).await;
+                let events = collect_n(rx, 1).await;
 
                 let res = res.await.unwrap().unwrap();
                 assert_eq!(200, res.status().as_u16());
@@ -631,7 +628,7 @@ mod tests {
             .await;
 
             if success {
-                let events = collect_ready(rx).await;
+                let events = collect_n(rx, 1).await;
 
                 let res = res.await.unwrap().unwrap();
                 assert_eq!(200, res.status().as_u16());
@@ -703,7 +700,7 @@ mod tests {
             )
             .await;
 
-            let events = collect_ready(rx).await;
+            let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
             assert_eq!(200, res.status().as_u16());
 
@@ -863,7 +860,7 @@ mod tests {
         )
         .await;
 
-        let events = collect_ready(rx).await;
+        let events = collect_n(rx, 1).await;
 
         let res = res.await.unwrap().unwrap();
         assert_eq!(406, res.status().as_u16());
@@ -907,7 +904,7 @@ mod tests {
         )
         .await;
 
-        let events = collect_ready(rx).await;
+        let events = collect_n(rx, 1).await;
         let access_key = events[0]
             .metadata()
             .secrets()
@@ -932,7 +929,7 @@ mod tests {
         )
         .await;
 
-        let events = collect_ready(rx).await;
+        let events = collect_n(rx, 1).await;
 
         assert!(
             events[0]

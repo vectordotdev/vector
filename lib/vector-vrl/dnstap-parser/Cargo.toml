@@ -6,6 +6,9 @@ edition = "2024"
 publish = false
 license = "MIT"
 
+[lints]
+workspace = true
+
 [dependencies]
 base64 = { workspace = true, features = ["alloc"] }
 bytes = { workspace = true, features = ["serde"] }

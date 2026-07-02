@@ -210,6 +210,14 @@ impl AnyCondition {
             AnyCondition::Map(m) => m.build(enrichment_tables, metrics_storage),
         }
     }
+
+    pub fn validate(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
+    ) -> crate::Result<()> {
+        self.build(enrichment_tables, metrics_storage).map(|_| ())
+    }
 }
 
 impl From<ConditionConfig> for AnyCondition {
@@ -232,7 +240,7 @@ mod tests {
 
     #[test]
     fn deserialize_anycondition_default() {
-        let conf: Test = toml::from_str(r#"condition = ".nork == false""#).unwrap();
+        let conf: Test = serde_yaml::from_str(r#"condition: ".nork == false""#).unwrap();
         assert_eq!(
             r#"String(".nork == false")"#,
             format!("{:?}", conf.condition)
@@ -241,10 +249,11 @@ mod tests {
 
     #[test]
     fn deserialize_anycondition_vrl() {
-        let conf: Test = toml::from_str(indoc! {r#"
-            condition.type = "vrl"
-            condition.source = '.nork == true'
-        "#})
+        let conf: Test = serde_yaml::from_str(indoc! {"
+            condition:
+              type: vrl
+              source: '.nork == true'
+        "})
         .unwrap();
 
         assert_eq!(

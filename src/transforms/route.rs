@@ -131,13 +131,32 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
         if self.route.contains_key(UNMATCHED_ROUTE) {
             Err(vec![format!(
                 "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
             )])
         } else {
             Ok(())
+        }
+    }
+
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let errors: Vec<String> = self
+            .route
+            .iter()
+            .filter_map(|(name, condition)| {
+                condition
+                    .validate(&context.enrichment_tables, &context.metrics_storage)
+                    .err()
+                    .map(|e| format!("route \"{name}\": {e}"))
+            })
+            .collect();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
         }
     }
 
@@ -196,12 +215,12 @@ mod test {
     fn can_serialize_remap() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+        "})
         .unwrap();
 
         assert_eq!(
@@ -218,18 +237,18 @@ mod test {
             LogNamespace::Legacy,
         )
         .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
         let mut transform = Route::new(&config, &Default::default()).unwrap();
@@ -264,18 +283,18 @@ mod test {
             LogNamespace::Legacy,
         )
         .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
         let mut transform = Route::new(&config, &Default::default()).unwrap();
@@ -307,18 +326,18 @@ mod test {
         let event =
             Event::from_json_value(serde_json::json!({"message": "NOPE"}), LogNamespace::Legacy)
                 .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
         let mut transform = Route::new(&config, &Default::default()).unwrap();
@@ -350,20 +369,19 @@ mod test {
         let event =
             Event::from_json_value(serde_json::json!({"message": "NOPE"}), LogNamespace::Legacy)
                 .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            reroute_unmatched = false
-
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            reroute_unmatched: false
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
         let mut transform = Route::new(&config, &Default::default()).unwrap();
@@ -389,26 +407,25 @@ mod test {
     async fn route_metrics_with_output_tag() {
         init_test();
 
-        let config: ConfigBuilder = toml::from_str(indoc! {r#"
-            [transforms.foo]
-            inputs = []
-            type = "route"
-            [transforms.foo.route.first]
-                type = "is_log"
-
-            [[tests]]
-            name = "metric output"
-
-            [tests.input]
-                insert_at = "foo"
-                value = "none"
-
-            [[tests.outputs]]
-                extract_from = "foo.first"
-                [[tests.outputs.conditions]]
-                type = "vrl"
-                source = "true"
-        "#})
+        let config: ConfigBuilder = serde_yaml::from_str(indoc! {"
+            transforms:
+              foo:
+                inputs: []
+                type: route
+                route:
+                  first:
+                    type: is_log
+            tests:
+              - name: metric output
+                input:
+                  insert_at: foo
+                  value: none
+                outputs:
+                  - extract_from: foo.first
+                    conditions:
+                      - type: vrl
+                        source: \"true\"
+        "})
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();

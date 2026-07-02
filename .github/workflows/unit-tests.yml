@@ -92,16 +92,8 @@ jobs:
             fi
           }
 
-          # Mirror the Makefile's OS-based default: `default-msvc` on Windows,
-          # `default` elsewhere. Keep in sync with the FEATURES defaults in Makefile.
-          if [[ "${RUNNER_OS}" == "Windows" ]]; then
-            DEFAULT_FEATURES="default-msvc"
-          else
-            DEFAULT_FEATURES="default"
-          fi
-
           if [[ "${{ inputs.default }}" == "true" ]]; then
-            FEATURES="${DEFAULT_FEATURES}"
+            FEATURES="default"
           else
             FEATURES=""
           fi
@@ -139,7 +131,7 @@ jobs:
           # coverage from the containerized integration tests (which use SF:src/...).
           sed -i "s|SF:$(pwd)/|SF:|g" lcov.info
 
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ inputs.coverage }}
         with:
           name: coverage-unit

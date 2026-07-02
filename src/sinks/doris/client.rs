@@ -177,7 +177,7 @@ impl DorisSinkClient {
 
         // Add custom headers
         for (header, value) in self.headers.as_ref() {
-            builder = builder.header(&header[..], &value[..]);
+            builder = builder.header(header.as_str(), value.as_str());
         }
 
         let body = Body::from(payload.clone());

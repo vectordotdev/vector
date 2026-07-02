@@ -6,6 +6,7 @@ use std::{
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
+use metrics::Counter;
 use serde::Serialize;
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
@@ -67,6 +68,17 @@ where
     #[configurable(derived)]
     pub inputs: Inputs<T>,
 
+    /// Enable CPU usage metrics for this transform.
+    ///
+    /// When set to `true`, each poll of the transform task is timed using the OS thread CPU clock
+    /// and the accumulated nanoseconds are reported as the `component_cpu_usage_ns_total` counter,
+    /// tagged with `component_id`, `component_kind`, and `component_type`.
+    ///
+    /// Defaults to `false`. Enable only for transforms where CPU attribution is needed, as it
+    /// adds a `clock_gettime` call on every future poll.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub measure_cpu_usage: bool,
+
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
     pub inner: BoxedTransform,
@@ -87,6 +99,7 @@ where
             inputs,
             inner,
             graph: Default::default(),
+            measure_cpu_usage: false,
         }
     }
 
@@ -107,6 +120,7 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             graph: self.graph,
+            measure_cpu_usage: self.measure_cpu_usage,
         }
     }
 }
@@ -141,6 +155,13 @@ pub struct TransformContext {
     /// Extra context data provided by the running app and shared across all components. This can be
     /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
+
+    /// Counter handle for `component_cpu_usage_ns_total`, pre-tagged with this transform's
+    /// component identity. `Some` only when `measure_cpu_usage` is enabled on the
+    /// `TransformOuter`. Transforms that spawn helper tokio tasks at construction time
+    /// (e.g. `aws_ec2_metadata`, `throttle`) clone this and pass it to [`crate::cpu_time::spawn_timed`] so
+    /// their CPU is attributed to the component alongside the main transform task.
+    pub cpu_ns: Option<Counter>,
 }
 
 impl Default for TransformContext {
@@ -154,6 +175,7 @@ impl Default for TransformContext {
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
             extra_context: Default::default(),
+            cpu_ns: None,
         }
     }
 }
@@ -220,15 +242,29 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     ) -> Vec<TransformOutput>;
 
     /// Validates that the configuration of the transform is valid.
-    ///
-    /// This would generally be where logical conditions were checked, such as ensuring a transform
-    /// isn't using a named output that matches a reserved output name, and so on.
+    /// Validates structural constraints on the transform configuration that do not require
+    /// environment resources: reserved output names, duplicate route names, invalid sample
+    /// rates, and similar config-level checks. Called during config compilation so errors
+    /// are reported on both `vector validate` and normal startup/reload.
     ///
     /// # Errors
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
+    /// Validates the transform configuration against environment resources: compiles VRL
+    /// programs, builds conditions, and resolves enrichment table references. Only called
+    /// from `vector validate` (via `validate_transforms`), not during normal startup because
+    /// `build()` performs equivalent checks with real resources.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate_env(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
         Ok(())
     }
 
