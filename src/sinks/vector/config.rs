@@ -354,7 +354,12 @@ impl Service<VectorRequest> for FailoverVectorService {
                             &state,
                             expected_state,
                             index,
-                            failover_next_index(endpoint_strategy, attempts.as_slice(), attempt),
+                            failover_next_index(
+                                endpoint_strategy,
+                                attempts.as_slice(),
+                                attempt,
+                                services.len(),
+                            ),
                             services.len(),
                         );
                         let next_attempts = failover_next_attempts(
@@ -377,7 +382,12 @@ impl Service<VectorRequest> for FailoverVectorService {
                             &state,
                             expected_state,
                             index,
-                            failover_next_index(endpoint_strategy, attempts.as_slice(), attempt),
+                            failover_next_index(
+                                endpoint_strategy,
+                                attempts.as_slice(),
+                                attempt,
+                                services.len(),
+                            ),
                             services.len(),
                         );
                         let next_attempts = failover_next_attempts(
@@ -442,12 +452,16 @@ fn failover_next_index(
     endpoint_strategy: EndpointStrategy,
     attempts: &[usize],
     attempt: usize,
+    endpoint_count: usize,
 ) -> Option<usize> {
     attempts
         .get(attempt + 1)
         .copied()
         .or(match endpoint_strategy {
             EndpointStrategy::FailoverPrimary => Some(0),
+            EndpointStrategy::Failover if endpoint_count > 0 => attempts
+                .get(attempt)
+                .map(|index| (index + 1) % endpoint_count),
             EndpointStrategy::Failover | EndpointStrategy::LoadBalance => None,
         })
 }
@@ -886,6 +900,7 @@ mod tests {
                 EndpointStrategy::FailoverPrimary,
                 &attempts,
                 attempts.len() - 1,
+                3,
             ),
             3,
         );
@@ -898,6 +913,29 @@ mod tests {
             }
         );
         assert_eq!(state.load(Ordering::Acquire), 6);
+    }
+
+    #[test]
+    fn failover_final_attempt_wraps_state_to_next_pass_start() {
+        let attempts = failover_ring_attempt_indices(0, 3);
+        let state = AtomicUsize::new(2);
+
+        let observed = failover_advance_if_current(
+            &state,
+            2,
+            2,
+            failover_next_index(EndpointStrategy::Failover, &attempts, attempts.len() - 1, 3),
+            3,
+        );
+
+        assert_eq!(
+            observed,
+            FailoverAdvance {
+                state: 3,
+                advanced: true,
+            }
+        );
+        assert_eq!(state.load(Ordering::Acquire), 3);
     }
 
     #[test]
