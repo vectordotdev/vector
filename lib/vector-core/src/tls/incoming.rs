@@ -109,6 +109,7 @@ impl MaybeTlsListener {
             }
         }
     }
+
     pub async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
         let listener = self
             .retrying_accept()
