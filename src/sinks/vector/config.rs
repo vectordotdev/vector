@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
@@ -76,6 +78,16 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
+    /// HTTP/2 keepalive settings for the sink's gRPC connections.
+    ///
+    /// Keepalive is disabled unless this is configured. When enabled, the sink periodically sends
+    /// HTTP/2 PING frames so that a pooled connection to a downstream Vector instance that has gone
+    /// away (crashed and restarted, or cut off by a network partition) is detected and evicted
+    /// rather than reused indefinitely.
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    keepalive: Option<VectorKeepaliveConfig>,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -83,6 +95,44 @@ pub struct VectorConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
+}
+
+/// HTTP/2 keepalive configuration for the `vector` sink's gRPC connections.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct VectorKeepaliveConfig {
+    /// The interval, in seconds, between HTTP/2 keepalive PING frames sent on a connection.
+    #[serde(default = "default_keepalive_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Keepalive Interval"))]
+    pub interval_secs: u64,
+
+    /// The time, in seconds, to wait for an acknowledgement of a keepalive PING before considering
+    /// the connection dead and closing it.
+    #[serde(default = "default_keepalive_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Keepalive Timeout"))]
+    pub timeout_secs: u64,
+
+    /// Whether to send keepalive PING frames while the connection is idle (no requests in flight).
+    ///
+    /// This is required to detect a connection that dies while idle in the pool. However, some gRPC
+    /// servers and gRPC-aware proxies close a connection with a `too_many_pings` (`GOAWAY`) error
+    /// when keepalive PINGs are sent without active calls. Only enable this when the downstream
+    /// permits keepalive without active calls.
+    #[serde(default)]
+    #[configurable(metadata(docs::human_name = "Keepalive While Idle"))]
+    pub while_idle: bool,
+}
+
+const fn default_keepalive_interval_secs() -> u64 {
+    // Aligned with gRPC keepalive guidance, which recommends against client intervals much below
+    // one minute to avoid tripping server-side `too_many_pings` policies.
+    60
+}
+
+const fn default_keepalive_timeout_secs() -> u64 {
+    // Matches hyper's default keepalive timeout.
+    20
 }
 
 impl VectorConfig {
@@ -107,6 +157,7 @@ fn default_config(address: &str) -> VectorConfig {
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
+        keepalive: None,
         acknowledgements: Default::default(),
     }
 }
@@ -118,7 +169,7 @@ impl SinkConfig for VectorConfig {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
-        let client = new_client(&tls, cx.proxy())?;
+        let client = new_client(&tls, cx.proxy(), self.keepalive)?;
 
         let healthcheck_uri = cx
             .healthcheck
@@ -220,10 +271,23 @@ pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
 fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
+    keepalive: Option<VectorKeepaliveConfig>,
 ) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
     let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
 
-    Ok(hyper::Client::builder().http2_only(true).build(proxy))
+    let mut builder = hyper::Client::builder();
+    builder.http2_only(true);
+
+    // Keepalive is opt-in. When enabled, HTTP/2 PING frames let the pool detect and evict a
+    // connection to a peer that has gone away instead of reusing it indefinitely.
+    if let Some(keepalive) = keepalive {
+        builder
+            .http2_keep_alive_interval(Duration::from_secs(keepalive.interval_secs))
+            .http2_keep_alive_timeout(Duration::from_secs(keepalive.timeout_secs))
+            .http2_keep_alive_while_idle(keepalive.while_idle);
+    }
+
+    Ok(builder.build(proxy))
 }
 
 #[derive(Debug, Clone)]
