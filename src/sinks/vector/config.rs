@@ -682,11 +682,16 @@ fn healthcheck_uris_for_strategy(
         return uris.to_vec();
     }
 
-    options
-        .uri
-        .clone()
-        .map(|uri| vec![uri.uri])
-        .unwrap_or_else(|| uris.to_vec())
+    if let Some(uri) = options.uri.clone() {
+        return vec![uri.uri];
+    }
+
+    match endpoint_strategy {
+        EndpointStrategy::Failover | EndpointStrategy::FailoverPrimary => {
+            uris.first().cloned().into_iter().collect()
+        }
+        EndpointStrategy::LoadBalance => uris.to_vec(),
+    }
 }
 
 fn default_endpoint_health_config() -> HealthConfig {
@@ -1220,6 +1225,20 @@ mod tests {
     }
 
     #[test]
+    fn failover_healthchecks_active_endpoint_without_override_uri() {
+        let endpoints = vec![
+            "http://endpoint-a.example.com".parse().unwrap(),
+            "http://endpoint-b.example.com".parse().unwrap(),
+        ];
+        let options = SinkHealthcheckOptions::default();
+
+        assert_eq!(
+            healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::Failover),
+            vec![endpoints[0].clone()]
+        );
+    }
+
+    #[test]
     fn failover_primary_healthchecks_can_use_override_uri() {
         let endpoints = vec![
             "http://endpoint-a.example.com".parse().unwrap(),
@@ -1237,6 +1256,20 @@ mod tests {
         assert_eq!(
             healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::FailoverPrimary),
             vec![override_uri]
+        );
+    }
+
+    #[test]
+    fn failover_primary_healthchecks_primary_without_override_uri() {
+        let endpoints = vec![
+            "http://endpoint-a.example.com".parse().unwrap(),
+            "http://endpoint-b.example.com".parse().unwrap(),
+        ];
+        let options = SinkHealthcheckOptions::default();
+
+        assert_eq!(
+            healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::FailoverPrimary),
+            vec![endpoints[0].clone()]
         );
     }
 }
