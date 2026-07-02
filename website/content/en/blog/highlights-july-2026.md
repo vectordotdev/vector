@@ -26,6 +26,7 @@ _It has been a while since our [February 2025 highlights]({{< ref "/blog/highlig
 | [`incremental_to_absolute`]({{< ref "/docs/reference/configuration/transforms/incremental_to_absolute" >}}) | Transform | Reconstruct absolute metrics from incremental data | [@GreyLilac09](https://github.com/GreyLilac09) | [#23374](https://github.com/vectordotdev/vector/pull/23374) |
 | [`trace_to_log`]({{< ref "/docs/reference/configuration/transforms/trace_to_log" >}}) | Transform | Convert traces to logs | [@spencerho777](https://github.com/spencerho777) | [#24168](https://github.com/vectordotdev/vector/pull/24168) |
 | [`window`]({{< ref "/docs/reference/configuration/transforms/window" >}}) | Transform | Sliding-window ring-buffer for noise reduction | [@ilinas](https://github.com/ilinas) | [#22609](https://github.com/vectordotdev/vector/pull/22609) |
+| [`azure_logs_ingestion`]({{< ref "/docs/reference/configuration/sinks/azure_logs_ingestion" >}}) | Sink | Send logs to Azure Monitor via the Logs Ingestion API | [@jlaundry](https://github.com/jlaundry) | [#22912](https://github.com/vectordotdev/vector/pull/22912) |
 | [`databricks_zerobus`]({{< ref "/docs/reference/configuration/sinks/databricks_zerobus" >}}) | Sink | Stream to Databricks Unity Catalog via Zerobus | [@flaviofcruz](https://github.com/flaviofcruz) | [#24840](https://github.com/vectordotdev/vector/pull/24840) |
 | [`doris`]({{< ref "/docs/reference/configuration/sinks/doris" >}}) | Sink | Apache Doris via the Stream Load API | [@bingquanzhao](https://github.com/bingquanzhao) | [#23117](https://github.com/vectordotdev/vector/pull/23117) |
 | [`postgres`]({{< ref "/docs/reference/configuration/sinks/postgres" >}}) | Sink | Send logs, metrics, and traces to Postgres | [@jorgehermo9](https://github.com/jorgehermo9) | [#21248](https://github.com/vectordotdev/vector/pull/21248) |
@@ -57,18 +58,19 @@ _It has been a while since our [February 2025 highlights]({{< ref "/blog/highlig
 * Unit tests support an `expected_event_count` field on outputs to assert on emitted event counts.
 * Task-transform `utilization` no longer counts downstream wait time, giving a more accurate saturation view.
 * New internal metrics for capacity planning and backpressure detection:
-  * `source_buffer_max_size_bytes`, `source_buffer_size_bytes`, `source_buffer_max_size_events`, `source_buffer_size_events`
-  * `transform_buffer_max_size_bytes`, `transform_buffer_size_bytes`, `transform_buffer_max_size_events`, `transform_buffer_size_events`
+  * `source_buffer_max_size_bytes`, `source_buffer_max_size_events`
+  * `transform_buffer_max_size_bytes`, `transform_buffer_max_size_events`
   * `source_buffer_utilization_mean`, `transform_buffer_utilization_mean` (EWMA-smoothed)
   * `component_latency_seconds` (histogram), `component_latency_mean_seconds` (gauge)
   * `source_send_latency_seconds`, `source_send_batch_latency_seconds`
-  * `config_reloaded`, `config_reload_rejected`
 
 For the complete list of changes, breaking changes, and upgrade steps, see the [releases page]({{< ref "/releases" >}}).
 
 ### VRL
 
-#### New functions
+#### Features
+
+##### New functions
 
 | Function | Author | PR |
 | --- | --- | --- |
@@ -91,12 +93,40 @@ For the complete list of changes, breaking changes, and upgrade steps, see the [
 | [`to_entries`]({{< ref "/docs/reference/vrl/functions/#to_entries" >}}) | [@close2code-palm](https://github.com/close2code-palm) | [vrl#1653](https://github.com/vectordotdev/vrl/pull/1653) |
 | [`xxhash`]({{< ref "/docs/reference/vrl/functions/#xxhash" >}}) | [@stigglor](https://github.com/stigglor) | [vrl#1473](https://github.com/vectordotdev/vrl/pull/1473) |
 
-#### Syntax
+##### Syntax
 
 * `else` and `else if` can now appear on a new line after the closing `}` of an `if` block. Previously the newline terminated the expression, forcing `} else if {` on a single line.
 * String literals now support `\u{HEX}` Unicode escape sequences (`"hello\u{1F30E}world"`). Invalid sequences (empty braces, non-hex digits, surrogate codepoints, or values above U+10FFFF) fail at compile time with a specific error.
 
-#### Compiler diagnostics and error reporting
+##### Type system and function surface
+
+* `find` now returns `null` when no match is found, instead of `-1`. Audit existing programs that branch on `find(...) < 0`.
+* Vector-specific VRL functions are now available in the standalone VRL CLI (`vector vrl`) and in codec VRL transforms, closing a long-standing surface gap.
+* Enrichment functions gained bounded date range filtering (`from` / `to`) and wildcard match support.
+* `encode_proto` gained looser scalar coercion: integers and strings are accepted for `bool` fields, integers for `float` and `double` fields, and integer or boolean map keys are stringified per the protobuf JSON mapping. A new `allow_lossy_string_coercion` flag lets strict callers opt back into spec-only encoding.
+
+##### Performance
+
+* `encode_gzip` / `decode_gzip` / `encode_zlib` / `decode_zlib` switched to the [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) backend for significantly faster compression and decompression.
+* `encode_base64` / `decode_base64` / `decode_mime_q` moved to a SIMD backend.
+* `parse_regex_all` reuses the compiled regex across invocations.
+
+##### VRL in more places
+
+* HTTP client sources accept VRL expressions in query parameters and in the request body, enabling dynamic request construction (e.g. embedding `now()` or environment variables in outgoing requests).
+* Custom auth strategies expose the client address and URL path to VRL scripts, and can now write scalar values back into the auth context via `%field = value` writes.
+* Templating landed on the `http` sink's `uri` and `request.headers` fields.
+
+##### Live reload
+
+* `--watch-config` also watches external VRL files referenced by `remap` transforms.
+* Vector reloads external VRL files on `SIGHUP`.
+
+##### VRL Playground
+
+The [VRL Playground](https://playground.vrl.dev) gained a timezone selector, performance timing display, output-panel line wrap, and a series of dropdown and rendering fixes.
+
+#### Fixes
 
 * The compiler now reports **every** unhandled-error in a single compilation pass instead of stopping at the first. Fix all your fallible calls in one go rather than a compile-fix-compile loop.
 * Fallible-call error location is now correct. Previously, a missing `!` or `, err =` on an earlier call could cause the diagnostic to point at a later, unrelated assignment. Now the error is reported on the actual fallible expression, including inside `for_each` and `map_values` closures.
@@ -104,39 +134,11 @@ For the complete list of changes, breaking changes, and upgrade steps, see the [
 * Lexer errors surface specific error codes (e.g. `E209 invalid escape character`) instead of the generic `E202 syntax error`, and their spans now point at the exact character rather than the whole call.
 * `vector test` output honors `--color {auto|always|never}` and `VECTOR_COLOR`; VRL diagnostics stop emitting stray ANSI escape sequences when color is disabled or when running non-interactively.
 
-#### Type system and function surface
-
-* `find` now returns `null` when no match is found, instead of `-1`. Audit existing programs that branch on `find(...) < 0`.
-* Vector-specific VRL functions are now available in the standalone VRL CLI (`vector vrl`) and in codec VRL transforms, closing a long-standing surface gap.
-* Enrichment functions gained bounded date range filtering (`from` / `to`) and wildcard match support.
-* `encode_proto` gained looser scalar coercion: integers and strings are accepted for `bool` fields, integers for `float` and `double` fields, and integer or boolean map keys are stringified per the protobuf JSON mapping. A new `allow_lossy_string_coercion` flag lets strict callers opt back into spec-only encoding.
-
-#### Performance
-
-* `encode_gzip` / `decode_gzip` / `encode_zlib` / `decode_zlib` switched to the [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) backend for significantly faster compression and decompression.
-* `encode_base64` / `decode_base64` / `decode_mime_q` moved to a SIMD backend.
-* `parse_regex_all` reuses the compiled regex across invocations.
-
-#### VRL in more places
-
-* HTTP client sources accept VRL expressions in query parameters and in the request body, enabling dynamic requests driven by event data.
-* Custom auth strategies expose the client address and URL path to VRL scripts, and can now write scalar values back into the auth context via `%field = value` writes.
-* Templating landed on the `http` sink's `uri` and `request.headers` fields.
-
-#### Live reload
-
-* `--watch-config` also watches external VRL files referenced by `remap` transforms.
-* Vector reloads external VRL files on `SIGHUP`.
-
-#### VRL Playground
-
-The [VRL Playground](https://playground.vrl.dev) gained a timezone selector, performance timing display, output-panel line wrap, and a series of dropdown and rendering fixes.
-
 ## CI and developer ergonomics
 
 * **Simpler PR title check.** The semantic PR title action was replaced with a small inline script that only validates the type prefix (`feat`, `fix`, `chore`, and so on) and leaves scopes free-form. Contributors are no longer blocked by a 180-entry hardcoded scope allowlist that drifted every time a component was added or renamed.
 * **`typos` replaces `check-spelling`.** The old `check-spelling` workflow produced enough false positives to be a constant source of friction on PRs. It has been replaced with [`typos`](https://github.com/crate-ci/typos), a Rust-native spell checker built for source code. It understands identifiers and hex literals natively and runs on the full repo in seconds. Run it locally with `cargo binstall typos-cli && typos`.
-* **YAML linting.** A `yamllint` check was added to CI. It catches indentation issues, duplicate keys, and trailing whitespace in configuration examples and test fixtures before they reach review. Run `make check-prettier` locally and `make fix-prettier` to auto-fix.
+* **YAML/JSON/TS formatting.** Prettier formatting checks now run in CI for YAML, JSON, and TypeScript files. Run `make check-prettier` locally and `make fix-prettier` to auto-fix.
 * **Improved Markdown checks.** The `markdownlint` configuration was tightened to flag broken link syntax, inconsistent heading levels, and bare URLs. Run `make check-markdown` locally and `make fix-markdown` to auto-fix.
 * **Faster integration runner.** The integration test runner switched to a multi-stage Dockerfile that skips the source copy step, cutting per-job overhead.
 * **Reduced flake surface.** Long-standing flaky tests in the `file` source were fixed (checkpoint write race on shutdown, `test_oldest_first`, `initial_size_correct_with_multievents`). `apt-get` calls in package-verify jobs are now wrapped in `timeout 30m` to prevent silent CI hangs and are retried on transient failures.
