@@ -520,7 +520,12 @@ fn stale_failover_attempt_indices(
         .chain(
             failover_attempt_indices(endpoint_strategy, start, endpoints)
                 .into_iter()
-                .filter(move |index| *index != active_endpoint && !tried.contains(index)),
+                .filter(move |index| {
+                    *index != active_endpoint
+                        && (!tried.contains(index)
+                            || (endpoint_strategy == EndpointStrategy::FailoverPrimary
+                                && *index == 0))
+                }),
         )
         .collect()
 }
@@ -1051,6 +1056,35 @@ mod tests {
         assert!(observed.rebuilt);
         assert_eq!(attempt, 0);
         assert_eq!(attempts, vec![0, 1, 2]);
+        assert_eq!(remaining_attempts, attempts.len());
+    }
+
+    #[test]
+    fn failover_primary_stale_rebuild_rechecks_primary_before_secondaries() {
+        let mut attempts = failover_primary_attempt_indices(0, 3);
+        let mut attempt = 0;
+        let mut remaining_attempts = 2;
+
+        let observed = failover_next_attempts(
+            EndpointStrategy::FailoverPrimary,
+            3,
+            &mut attempts,
+            &mut attempt,
+            0,
+            FailoverAdvance {
+                state: 5,
+                advanced: false,
+            },
+            &[0],
+        );
+        if observed.rebuilt {
+            remaining_attempts = attempts.len();
+        }
+
+        assert_eq!(observed.state, 5);
+        assert!(observed.rebuilt);
+        assert_eq!(attempt, 0);
+        assert_eq!(attempts, vec![2, 0, 1]);
         assert_eq!(remaining_attempts, attempts.len());
     }
 
