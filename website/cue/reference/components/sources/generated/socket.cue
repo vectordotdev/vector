@@ -599,15 +599,14 @@ generated: components: sources: socket: configuration: {
 			The IPv4 interface address used when joining multicast groups.
 
 			Specifies which local network interface to use for receiving multicast traffic.
-			When not set, defaults to the socket's binding address (e.g. `0.0.0.0` lets the OS
-			pick the default multicast-capable interface).
+			When not set, defaults to the socket's binding address.
 
 			Set this explicitly when the host has multiple interfaces and you need to control
 			which one receives multicast traffic. For example, `127.0.0.1` restricts multicast
 			reception to the loopback interface.
 
 			On macOS, specifying `0.0.0.0` only joins on the default network interface (typically
-			the primary Ethernet or Wi-Fi interface), unlike Linux which joins on all interfaces.
+			the primary Ethernet or Wi-Fi interface), unlike Linux, which joins on all interfaces.
 			If multicast traffic is expected on a specific interface (including loopback), set this
 			field explicitly.
 			"""
