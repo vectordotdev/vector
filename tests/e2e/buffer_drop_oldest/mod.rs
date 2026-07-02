@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use reqwest::Client;
 use serde::Deserialize;
@@ -59,6 +59,27 @@ async fn get_collected_ids(client: &Client, collector: &str) -> Vec<usize> {
         .ids
 }
 
+async fn wait_for_vector(client: &Client, vector: &str) {
+    for _ in 0..MAX_RETRIES {
+        if client.get(vector).send().await.is_ok() {
+            return;
+        }
+        tokio::time::sleep(WAIT_INTERVAL).await;
+    }
+
+    panic!("Vector HTTP source did not become reachable at {vector}");
+}
+
+async fn reset_collector(client: &Client, collector: &str) {
+    client
+        .post(format!("{collector}/reset"))
+        .send()
+        .await
+        .expect("resetting collector should succeed")
+        .error_for_status()
+        .expect("collector reset response should be successful");
+}
+
 #[tokio::test]
 async fn retains_newest_events_when_memory_buffer_is_full() {
     trace_init();
@@ -68,6 +89,9 @@ async fn retains_newest_events_when_memory_buffer_is_full() {
     let collector = collector_endpoint();
     let event_count = event_count();
     let retained_tail = retained_tail();
+
+    wait_for_vector(&client, &vector).await;
+    reset_collector(&client, &collector).await;
 
     for id in 0..event_count {
         client
@@ -98,8 +122,9 @@ async fn retains_newest_events_when_memory_buffer_is_full() {
         expected_tail.iter().all(|id| ids.contains(id)),
         "collector should receive the newest buffered events; expected tail {expected_tail:?}, got {ids:?}"
     );
+    let unique_ids = ids.iter().copied().collect::<HashSet<_>>();
     assert!(
-        ids.len() < event_count,
-        "drop_oldest should shed some events under forced sink backpressure; got all {event_count} events: {ids:?}"
+        unique_ids.len() < event_count,
+        "drop_oldest should shed some events under forced sink backpressure; got all {event_count} unique events: {ids:?}"
     );
 }

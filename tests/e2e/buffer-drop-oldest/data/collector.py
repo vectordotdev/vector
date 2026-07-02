@@ -42,6 +42,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if self.path == "/reset":
+            with LOCK:
+                IDS.clear()
+            self.send_response(200)
+            self.end_headers()
+            return
+
         length = int(self.headers.get("content-length", "0"))
         body = self.rfile.read(length)
         try:

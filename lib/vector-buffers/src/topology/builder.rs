@@ -28,6 +28,11 @@ pub trait IntoBuffer<T: Bufferable>: Send {
         false
     }
 
+    /// Gets whether this stage supports `WhenFull::DropOldest`.
+    fn supports_drop_oldest(&self) -> bool {
+        true
+    }
+
     /// Converts this value into a sender and receiver pair suitable for use in a buffer topology.
     async fn into_buffer_parts(
         self: Box<Self>,
@@ -46,6 +51,8 @@ pub enum TopologyError {
     NextStageNotUsed { stage_idx: usize },
     #[snafu(display("last stage in buffer topology cannot be set to overflow mode"))]
     OverflowWhenLast,
+    #[snafu(display("stage {} does not support drop_oldest mode", stage_idx))]
+    DropOldestNotSupported { stage_idx: usize },
     #[snafu(display("failed to build individual stage {}: {}", stage_idx, source))]
     FailedToBuildStage {
         stage_idx: usize,
@@ -127,6 +134,11 @@ impl<T: Bufferable> TopologyBuilder<T> {
                 WhenFull::Block | WhenFull::DropNewest | WhenFull::DropOldest => {
                     if current_stage.is_some() {
                         return Err(TopologyError::NextStageNotUsed { stage_idx });
+                    }
+                    if stage.when_full == WhenFull::DropOldest
+                        && !stage.untransformed.supports_drop_oldest()
+                    {
+                        return Err(TopologyError::DropOldestNotSupported { stage_idx });
                     }
                 }
             }
@@ -257,7 +269,10 @@ impl<T: Bufferable> Default for TopologyBuilder<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroUsize;
+    use std::{
+        num::{NonZeroU64, NonZeroUsize},
+        path::PathBuf,
+    };
 
     use tracing::Span;
 
@@ -268,7 +283,7 @@ mod tests {
             builder::TopologyError,
             test_util::{Sample, assert_current_send_capacity},
         },
-        variants::MemoryBuffer,
+        variants::{DiskV2Buffer, MemoryBuffer},
     };
 
     #[tokio::test]
@@ -311,6 +326,24 @@ mod tests {
 
         let (mut sender, _) = result.unwrap();
         assert_current_send_capacity(&mut sender, Some(1), None);
+    }
+
+    #[tokio::test]
+    async fn single_stage_topology_disk_drop_oldest() {
+        let mut builder = TopologyBuilder::<Sample>::default();
+        builder.stage(
+            DiskV2Buffer::new(
+                String::from("test"),
+                PathBuf::from("/tmp/vector-drop-oldest-test"),
+                NonZeroU64::new(1).unwrap(),
+            ),
+            WhenFull::DropOldest,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
+        match result {
+            Err(TopologyError::DropOldestNotSupported { stage_idx }) => assert_eq!(stage_idx, 0),
+            r => panic!("unexpected build result: {r:?}"),
+        }
     }
 
     #[tokio::test]

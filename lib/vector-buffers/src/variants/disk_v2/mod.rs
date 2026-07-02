@@ -322,6 +322,10 @@ where
         true
     }
 
+    fn supports_drop_oldest(&self) -> bool {
+        false
+    }
+
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,

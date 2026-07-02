@@ -454,7 +454,29 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
                             if let Some(dropped_item) = self.inner.pop_and_record() {
                                 dropped.push(dropped_item);
                             } else {
-                                notified.await;
+                                match self
+                                    .inner
+                                    .limiter
+                                    .clone()
+                                    .try_acquire_many_owned(permits_required)
+                                {
+                                    Ok(permits) => {
+                                        self.inner.send_with_permits(size, permits, item);
+                                        trace!(
+                                            "Attempt to send item after queue drained succeeded."
+                                        );
+                                        return Ok(dropped);
+                                    }
+                                    Err(TryAcquireError::NoPermits) => {
+                                        notified.await;
+                                    }
+                                    Err(TryAcquireError::Closed) => {
+                                        return Err(DropOldestSendError {
+                                            error: TrySendError::Disconnected(item),
+                                            dropped,
+                                        });
+                                    }
+                                }
                             }
                         }
                         Err(TryAcquireError::Closed) => {
