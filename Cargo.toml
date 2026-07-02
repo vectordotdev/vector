@@ -805,6 +805,7 @@ sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-health", "protobuf-build"
 transforms = ["transforms-logs", "transforms-metrics"]
 transforms-logs = [
   "transforms-aws_ec2_metadata",
+  "transforms-aws_ecs_metadata",
   "transforms-dedupe",
   "transforms-delay",
   "transforms-filter",
@@ -835,6 +836,7 @@ transforms-metrics = [
 
 transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
+transforms-aws_ecs_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["transforms-impl-dedupe"]
 transforms-delay = []
 transforms-filter = []
