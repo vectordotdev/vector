@@ -3,15 +3,21 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tokio::{pin, sync::Barrier, time::sleep};
+use tokio::{
+    pin,
+    sync::Barrier,
+    time::{sleep, timeout},
+};
 
 use crate::{
     Bufferable, WhenFull,
+    test::SizedRecord,
     topology::{
         channel::{BufferReceiver, BufferSender},
-        test_util::{assert_current_send_capacity, build_buffer},
+        test_util::{assert_current_send_capacity, build_buffer, build_buffer_with_type},
     },
 };
+use vector_common::finalization::{BatchNotifier, BatchStatus, Finalizable};
 
 async fn assert_send_ok_with_capacities<T>(
     sender: &mut BufferSender<T>,
@@ -19,7 +25,7 @@ async fn assert_send_ok_with_capacities<T>(
     base_expected: Option<usize>,
     overflow_expected: Option<usize>,
 ) where
-    T: Bufferable,
+    T: Bufferable + Finalizable,
 {
     assert!(sender.send(value.into(), None).await.is_ok());
     assert_current_send_capacity(sender, base_expected, overflow_expected);
@@ -31,7 +37,7 @@ async fn blocking_send_and_drain_receiver<T, V>(
     send_value: V,
 ) -> Vec<V>
 where
-    T: Bufferable,
+    T: Bufferable + Finalizable,
     V: Into<T> + From<T> + Send + 'static,
 {
     // We can likely replace this with `tokio_test`-related helpers to avoid the sleeping.
@@ -135,6 +141,51 @@ async fn test_sender_drop_newest() {
 }
 
 #[tokio::test]
+async fn test_sender_drop_oldest() {
+    // Get a non-overflow buffer in "drop oldest" mode with a capacity of 3.
+    let (mut tx, rx, _) = build_buffer(3, WhenFull::DropOldest, None);
+
+    // We should be able to send three messages through unimpeded.
+    assert_current_send_capacity(&mut tx, Some(3), None);
+    assert_send_ok_with_capacities(&mut tx, 1, Some(2), None).await;
+    assert_send_ok_with_capacities(&mut tx, 2, Some(1), None).await;
+    assert_send_ok_with_capacities(&mut tx, 3, Some(0), None).await;
+
+    // Then, since we're in "drop oldest" mode, additional sends should evict the oldest buffered
+    // events to preserve the newest events.
+    assert_send_ok_with_capacities(&mut tx, 7, Some(0), None).await;
+    assert_send_ok_with_capacities(&mut tx, 8, Some(0), None).await;
+    assert_send_ok_with_capacities(&mut tx, 9, Some(0), None).await;
+
+    // Then, when we collect all of the messages from the receiver, we should only get back the
+    // newest three of them.
+    let results: Vec<u64> = drain_receiver(tx, rx).await;
+    assert_eq!(results, vec![7, 8, 9]);
+}
+
+#[tokio::test]
+async fn test_sender_drop_oldest_rejects_evicted_event() {
+    let (mut tx, rx, _) = build_buffer_with_type::<SizedRecord>(1, WhenFull::DropOldest, None);
+    let mut evicted = vec![SizedRecord::new(1)];
+    let batch_receiver = BatchNotifier::apply_to(&mut evicted);
+    let evicted = evicted.pop().expect("evicted record should exist");
+    let retained = SizedRecord::new(2);
+
+    assert_send_ok_with_capacities(&mut tx, evicted, Some(0), None).await;
+    assert_send_ok_with_capacities(&mut tx, retained.clone(), Some(0), None).await;
+
+    let status = timeout(Duration::from_secs(5), batch_receiver)
+        .await
+        .expect("evicted event should finalize");
+
+    assert_eq!(status, BatchStatus::Rejected);
+    assert_eq!(
+        drain_receiver::<SizedRecord, SizedRecord>(tx, rx).await,
+        vec![retained]
+    );
+}
+
+#[tokio::test]
 async fn test_sender_overflow_block() {
     // Get an overflow buffer, where the overflow buffer is in blocking mode, and both the base
     // and overflow buffers have a capacity of 2.
@@ -234,6 +285,33 @@ async fn test_buffer_metrics_drop_newest() {
     let mut results: Vec<u64> = drain_receiver(tx, rx).await;
     results.sort_unstable();
     assert_eq!(results, vec![7, 8]);
+
+    let snapshot = handle.snapshot();
+    assert_eq!(3, snapshot.received_event_count);
+    assert_eq!(2, snapshot.sent_event_count);
+    assert_eq!(1, snapshot.dropped_event_count_intentional);
+}
+
+#[tokio::test]
+async fn test_buffer_metrics_drop_oldest() {
+    // Get a buffer that drops the oldest items when full.
+    let (mut tx, rx, handle) = build_buffer(2, WhenFull::DropOldest, None);
+
+    // Send three items through, and make sure the buffer usage stats reflect the oldest drop.
+    assert_current_send_capacity(&mut tx, Some(2), None);
+    assert_send_ok_with_capacities(&mut tx, 7, Some(1), None).await;
+    assert_send_ok_with_capacities(&mut tx, 8, Some(0), None).await;
+    assert_send_ok_with_capacities(&mut tx, 2, Some(0), None).await;
+
+    let snapshot = handle.snapshot();
+    assert_eq!(3, snapshot.received_event_count);
+    assert_eq!(0, snapshot.sent_event_count);
+    assert_eq!(1, snapshot.dropped_event_count_intentional);
+
+    // Then, when we collect all of the messages from the receiver, the metrics should also reflect
+    // that the newest two events were retained.
+    let results: Vec<u64> = drain_receiver(tx, rx).await;
+    assert_eq!(results, vec![8, 2]);
 
     let snapshot = handle.snapshot();
     assert_eq!(3, snapshot.received_event_count);

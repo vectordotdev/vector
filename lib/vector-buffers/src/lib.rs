@@ -63,6 +63,13 @@ pub enum WhenFull {
     /// slowdown in the acceptance/consumption of events.
     DropNewest,
 
+    /// Drops the oldest buffered event to make room for the new event.
+    ///
+    /// The oldest buffered event will be intentionally dropped when free space is required. This
+    /// mode is typically used when preserving the most recent events is more important than
+    /// preserving older buffered events.
+    DropOldest,
+
     /// Overflows to the next stage in the buffer topology.
     ///
     /// If the current buffer stage is full, attempt to send this event to the next buffer stage.
@@ -81,10 +88,10 @@ impl Arbitrary for WhenFull {
         // TODO: We explicitly avoid generating "overflow" as a possible value because nothing yet
         // supports handling it, and will be defaulted to using "block" if they encounter
         // "overflow".  Thus, there's no reason to emit it here... yet.
-        if bool::arbitrary(g) {
-            WhenFull::Block
-        } else {
-            WhenFull::DropNewest
+        match usize::arbitrary(g) % 3 {
+            0 => WhenFull::Block,
+            1 => WhenFull::DropNewest,
+            _ => WhenFull::DropOldest,
         }
     }
 }

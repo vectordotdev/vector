@@ -1,0 +1,37 @@
+services:
+  collector:
+    image: docker.io/library/python:3.12-alpine
+    working_dir: /app
+    command:
+      - python
+      - /app/collector.py
+    environment:
+      - DELAY_SECONDS=2
+    volumes:
+      - type: bind
+        source: ../data/collector.py
+        target: /app/collector.py
+        read_only: true
+
+  vector:
+    depends_on:
+      - collector
+    image: ${CONFIG_VECTOR_IMAGE}
+    environment:
+      - FEATURES=e2e-tests-buffer-drop-oldest
+      - VECTOR_EXPERIMENTAL_REQUEST_BUILDER_CONCURRENCY=1
+    working_dir: /home/vector
+    command:
+      - /usr/bin/vector
+      - -vvv
+      - -c
+      - /home/vector/tests/e2e/buffer-drop-oldest/data/vector.yaml
+    volumes:
+      - type: bind
+        source: ../../../..
+        target: /home/vector
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

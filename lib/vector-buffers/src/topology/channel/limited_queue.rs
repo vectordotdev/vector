@@ -285,7 +285,7 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
     ///
     /// The `size` value is the true utilization contribution of `item`, which may exceed the number
     /// of permits acquired for oversized payloads.
-    fn send_with_permits(&mut self, size: usize, permits: OwnedSemaphorePermit, item: T) {
+    fn send_with_permits(&self, size: usize, permits: OwnedSemaphorePermit, item: T) {
         if let Some(metrics) = &self.metrics {
             // For normal items, capacity - available_permits() exactly represents the total queued
             // utilization (including this item's just-acquired permits). For oversized items that
@@ -401,6 +401,47 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             Err(TryAcquireError::Closed) => Err(TrySendError::Disconnected(item)),
         }
     }
+
+    /// Sends an item into the channel, evicting the oldest queued items as needed.
+    ///
+    /// Returns the queued items that were dropped to make room for `item`.
+    ///
+    /// # Errors
+    ///
+    /// If the receiver has disconnected (does not exist anymore), then
+    /// `Err(TrySendError::Disconnected)` will be returned with the given `item`. If the channel has
+    /// insufficient total capacity for the item, then `Err(TrySendError::InsufficientCapacity)`
+    /// will be returned with the given `item`.
+    pub async fn send_drop_oldest(&mut self, item: T) -> Result<Vec<T>, TrySendError<T>> {
+        // Calculate how many permits we need, and try to acquire them all without waiting. If there
+        // is not enough space, evict queued items until we have enough room for the new item.
+        let (size, permits_required) = self.calc_required_permits(&item);
+        let mut dropped = Vec::new();
+
+        loop {
+            match self
+                .inner
+                .limiter
+                .clone()
+                .try_acquire_many_owned(permits_required)
+            {
+                Ok(permits) => {
+                    self.inner.send_with_permits(size, permits, item);
+                    trace!("Attempt to send item after dropping oldest queued items succeeded.");
+                    return Ok(dropped);
+                }
+                Err(TryAcquireError::NoPermits) => {
+                    let notified = self.inner.read_waker.notified();
+                    if let Some(dropped_item) = self.inner.pop_and_record() {
+                        dropped.push(dropped_item);
+                    } else {
+                        notified.await;
+                    }
+                }
+                Err(TryAcquireError::Closed) => return Err(TrySendError::Disconnected(item)),
+            }
+        }
+    }
 }
 
 impl<T> Clone for LimitedSender<T> {
@@ -500,6 +541,7 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use rand::{Rng as _, SeedableRng as _, rngs::SmallRng};
+    use tokio::time::{Duration, timeout};
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 
@@ -653,6 +695,64 @@ mod tests {
         // Channel should have no more data
         let mut recv = spawn(async { rx.next().await });
         assert_pending!(recv.poll());
+    }
+
+    #[tokio::test]
+    async fn send_drop_oldest_by_byte_size_evicts_until_new_item_fits() {
+        let small = Sample::new_with_heap_allocated_values(10);
+        let large = Sample::new_with_heap_allocated_values(20);
+        let small_size = small.allocated_bytes();
+        let max_allowed_bytes = small_size * 3;
+
+        let limit = MemoryBufferSize::MaxSize(NonZeroUsize::new(max_allowed_bytes).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        for _ in 0..3 {
+            tx.try_send(small.clone()).expect("send should succeed");
+        }
+        assert_eq!(0, tx.available_capacity());
+
+        let dropped = tx
+            .send_drop_oldest(large.clone())
+            .await
+            .expect("drop oldest send should succeed");
+        assert_eq!(dropped.len(), 2);
+        assert!(
+            dropped
+                .iter()
+                .all(|item| item.allocated_bytes() == small_size)
+        );
+        assert_eq!(0, tx.available_capacity());
+
+        assert_eq!(Some(small), rx.next().await);
+        assert_eq!(Some(large), rx.next().await);
+        assert_eq!(max_allowed_bytes, rx.available_capacity());
+    }
+
+    #[tokio::test]
+    async fn send_drop_oldest_waits_for_in_flight_permits() {
+        let buffer_size = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (tx, mut rx) = limited(buffer_size, None, None);
+        let queued = Sample::new_with_heap_allocated_values(5);
+        let sent = Sample::new_with_heap_allocated_values(10);
+        let permit = tx.inner.limiter.clone().try_acquire_many_owned(1).unwrap();
+        let mut sending_tx = tx.clone();
+        let sent_clone = sent.clone();
+
+        let sending = tokio::spawn(async move { sending_tx.send_drop_oldest(sent_clone).await });
+        tokio::task::yield_now().await;
+        assert!(!sending.is_finished());
+
+        tx.inner.send_with_permits(1, permit, queued.clone());
+
+        let dropped = timeout(Duration::from_secs(5), sending)
+            .await
+            .expect("drop oldest send should complete")
+            .expect("join should succeed")
+            .expect("send should succeed");
+
+        assert_eq!(dropped, vec![queued]);
+        assert_eq!(Some(sent), rx.next().await);
     }
 
     #[test]

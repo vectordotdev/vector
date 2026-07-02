@@ -28,6 +28,8 @@ pub enum BufferBuildError {
     FailedToBuildTopology { source: TopologyError },
     #[snafu(display("`max_events` must be greater than zero"))]
     InvalidMaxEvents,
+    #[snafu(display("`when_full = \"drop_oldest\"` is only supported for memory buffers"))]
+    DropOldestRequiresMemory,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -316,6 +318,9 @@ impl BufferType {
                 when_full,
                 max_size,
             } => {
+                if when_full == WhenFull::DropOldest {
+                    return Err(BufferBuildError::DropOldestRequiresMemory);
+                }
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
@@ -425,7 +430,10 @@ impl BufferConfig {
 mod test {
     use std::num::{NonZeroU64, NonZeroUsize};
 
-    use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull};
+    use tracing::Span;
+
+    use super::BufferBuildError;
+    use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
 
     fn check_single_stage(source: &str, expected: BufferType) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
@@ -552,6 +560,17 @@ max_events: 42
         check_single_stage(
             r"
           type: memory
+          when_full: drop_oldest
+          ",
+            BufferType::Memory {
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(500).unwrap()),
+                when_full: WhenFull::DropOldest,
+            },
+        );
+
+        check_single_stage(
+            r"
+          type: memory
           when_full: overflow
           ",
             BufferType::Memory {
@@ -570,5 +589,20 @@ max_events: 42
                 when_full: WhenFull::Block,
             },
         );
+    }
+
+    #[tokio::test]
+    async fn build_rejects_drop_oldest_for_disk() {
+        let config = BufferConfig::Single(BufferType::DiskV2 {
+            max_size: NonZeroU64::new(1024).unwrap(),
+            when_full: WhenFull::DropOldest,
+        });
+
+        let error = config
+            .build::<SizedRecord>(None, String::from("test"), Span::none())
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, BufferBuildError::DropOldestRequiresMemory));
     }
 }

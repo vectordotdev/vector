@@ -70,6 +70,13 @@ generated: components: sinks: configuration: {
 														highest priority, and it is preferable to temporarily lose events rather than cause a
 														slowdown in the acceptance/consumption of events.
 														"""
+						drop_oldest: """
+														Drops the oldest buffered event to make room for the new event.
+
+														The oldest buffered event will be intentionally dropped when free space is required. This
+														mode is typically used when preserving the most recent events is more important than
+														preserving older buffered events.
+														"""
 					}
 				}
 			}

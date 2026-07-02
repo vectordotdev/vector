@@ -1,17 +1,21 @@
 // Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
 #![allow(clippy::let_underscore_must_use)]
 
-use std::{sync::Arc, time::Instant};
+use std::{io, sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
 use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
-use vector_common::internal_event::{InternalEventHandle, Registered, register};
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{EventStatus, Finalizable},
+    internal_event::{InternalEventHandle, Registered, register},
+};
 
 use super::limited_queue::LimitedSender;
 use crate::{
-    BufferInstrumentation, Bufferable, WhenFull,
+    BufferInstrumentation, Bufferable, EventCount, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
     variants::disk_v2::{self, ProductionFilesystem},
@@ -86,6 +90,15 @@ where
         }
     }
 
+    pub(crate) async fn send_drop_oldest(&mut self, item: T) -> crate::Result<Vec<T>> {
+        match self {
+            Self::InMemory(tx) => tx.send_drop_oldest(item).await.map_err(Into::into),
+            Self::DiskV2(_) => {
+                Err(io::Error::other("drop_oldest is only supported for memory buffers").into())
+            }
+        }
+    }
+
     pub(crate) async fn flush(&mut self) -> crate::Result<()> {
         match self {
             Self::InMemory(_) => Ok(()),
@@ -115,16 +128,19 @@ where
 /// events when the internal channel is full.
 ///
 /// When creating a buffer sender/receiver pair, callers can specify the "when full" behavior of the
-/// sender.  This controls how events are handled when the internal channel is full.  Three modes
+/// sender.  This controls how events are handled when the internal channel is full.  Four modes
 /// are possible:
 /// - block
 /// - drop newest
+/// - drop oldest
 /// - overflow
 ///
 /// In "block" mode, callers are simply forced to wait until the channel has enough capacity to
 /// accept the event.  In "drop newest" mode, any event being sent when the channel is full will be
 /// dropped and proceed no further. In "overflow" mode, events will be sent to another buffer
-/// sender.  Callers can specify the overflow sender to use when constructing their buffers initially.
+/// sender.  In "drop oldest" mode, the oldest buffered events will be dropped as needed to make room
+/// for incoming events. Callers can specify the overflow sender to use when constructing their
+/// buffers initially.
 ///
 /// TODO: We should eventually rework `BufferSender`/`BufferReceiver` so that they contain a vector
 /// of the fields we already have here, but instead of cascading via calling into `overflow`, we'd
@@ -208,11 +224,10 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(
-        &mut self,
-        mut item: T,
-        send_reference: Option<Instant>,
-    ) -> crate::Result<()> {
+    pub async fn send(&mut self, mut item: T, send_reference: Option<Instant>) -> crate::Result<()>
+    where
+        T: Finalizable,
+    {
         if let Some(instrumentation) = self.custom_instrumentation.as_ref() {
             instrumentation.on_send(&mut item);
         }
@@ -234,6 +249,23 @@ impl<T: Bufferable> BufferSender<T> {
             WhenFull::DropNewest => {
                 if self.base.try_send(item).await?.is_some() {
                     was_dropped = true;
+                }
+            }
+            WhenFull::DropOldest => {
+                let mut dropped = self.base.send_drop_oldest(item).await?;
+                if let Some(instrumentation) = self.usage_instrumentation.as_ref()
+                    && !dropped.is_empty()
+                {
+                    let dropped_count = dropped.iter().map(EventCount::event_count).sum::<usize>();
+                    let dropped_size = dropped.iter().map(ByteSizeOf::size_of).sum::<usize>();
+                    instrumentation.increment_dropped_event_count_and_byte_size(
+                        dropped_count as u64,
+                        dropped_size as u64,
+                        true,
+                    );
+                }
+                for item in &mut dropped {
+                    item.take_finalizers().update_status(EventStatus::Rejected);
                 }
             }
             WhenFull::Overflow => {
