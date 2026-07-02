@@ -15,9 +15,9 @@ use odbc_api::{
     ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata, environment,
 };
 use snafu::{ResultExt, Snafu};
-use std::fs;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::BufReader;
+use std::path::Path;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::select;
@@ -464,8 +464,29 @@ fn order_params(
     Ok(params)
 }
 
+/// Creates parent directories for the metadata path when needed.
+pub(crate) fn prepare_metadata_path(path: &str) -> Result<(), OdbcError> {
+    if path.is_empty() {
+        return Err(OdbcError::Io {
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "`last_run_metadata_path` must not be empty",
+            ),
+        });
+    }
+
+    let path = Path::new(path);
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    fs::create_dir_all(parent).context(IoSnafu)
+}
+
 /// Serializes and persists the latest tracked values for reuse as SQL parameters.
 fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
+    prepare_metadata_path(path)?;
     let json = serde_json::to_string(obj).context(JsonSnafu)?;
     fs::write(path, json).context(IoSnafu)
 }
@@ -863,5 +884,26 @@ mod tests {
             .expect_err("validation error");
 
         assert!(error.contains("name"));
+    }
+
+    #[test]
+    fn prepare_metadata_path_creates_parent_directory() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let path = temp_dir.path().join("nested").join("tracking.json");
+        let path = path.to_str().expect("utf-8 path");
+
+        prepare_metadata_path(path).expect("prepare metadata path");
+
+        assert!(temp_dir.path().join("nested").is_dir());
+    }
+
+    #[test]
+    fn prepare_metadata_path_rejects_empty_path() {
+        let error = match prepare_metadata_path("") {
+            Err(error) => error,
+            Ok(_) => panic!("expected empty path error"),
+        };
+
+        assert!(matches!(error, OdbcError::Io { .. }));
     }
 }

@@ -1,7 +1,7 @@
 use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
 use crate::serde::{default_decoding, default_framing_message_based};
 use crate::sources::Source;
-use crate::sources::odbc::client::{Context, validate_tracking_state};
+use crate::sources::odbc::client::{prepare_metadata_path, Context, validate_tracking_state};
 use crate::sources::odbc::schedule::OdbcSchedule;
 use chrono_tz::Tz;
 use futures_util::FutureExt;
@@ -158,6 +158,8 @@ pub struct OdbcConfig {
     /// This file provides parameters for the SQL query in the next scheduled run.
     /// If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
     ///
+    /// Parent directories are created automatically if they do not exist.
+    ///
     /// # Examples
     ///
     /// If `tracking_columns = ["id", "name"]`, it is saved as the following JSON data.
@@ -259,6 +261,8 @@ impl OdbcConfig {
         let tz = self.odbc_default_timezone;
 
         if let Some(path) = &self.last_run_metadata_path {
+            prepare_metadata_path(path).map_err(|error| error.to_string())?;
+
             match fs::metadata(path) {
                 Ok(_) => {
                     let file = fs::File::open(path).map_err(|source| {
