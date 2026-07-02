@@ -49,7 +49,7 @@ fn message_body(event: &Event) -> String {
         .into_owned()
 }
 
-async fn get_mqtt_client() -> AsyncClient {
+async fn get_mqtt_client_with_options(configure: impl FnOnce(&mut MqttOptions)) -> AsyncClient {
     // Unique client ID per producer: brokers that strictly enforce client-ID
     // uniqueness (e.g. RabbitMQ) otherwise kick a previous connection when tests
     // run concurrently, which manifests as spurious publish timeouts.
@@ -59,6 +59,7 @@ async fn get_mqtt_client() -> AsyncClient {
         mqtt_broker_port(),
     );
     mqtt_options.set_keep_alive(Duration::from_secs(5));
+    configure(&mut mqtt_options);
 
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
@@ -69,6 +70,10 @@ async fn get_mqtt_client() -> AsyncClient {
     });
 
     client
+}
+
+async fn get_mqtt_client() -> AsyncClient {
+    get_mqtt_client_with_options(|_| {}).await
 }
 
 #[tokio::test]
@@ -221,6 +226,103 @@ async fn mqtt_redelivers_unacknowledged_messages() {
 
     source2.abort();
     drop(source2.await);
+}
+
+/// A downstream that can't keep up must not deadlock the source or grow memory
+/// without bound. `poll_mqtt_connection` forwards polled events to the main task
+/// over a channel bounded by `EVENTS_CHANNEL_CAPACITY`; once that backlog
+/// saturates, the event is dropped rather than buffered without bound or blocking
+/// (blocking would risk deadlocking against rumqttc's own outgoing request
+/// channel, since the poller is also the only thing that drains it). This test
+/// proves that path actually recovers instead of hanging, and that every message
+/// is still eventually delivered afterward: a dropped QoS 1 publish was never
+/// acknowledged, so the broker's own retry timer redelivers it independently of
+/// the connection ever reconnecting.
+#[tokio::test]
+async fn mqtt_recovers_from_downstream_saturation() {
+    trace_init();
+
+    let topic = format!("source-saturation-test-{}", random_string(6));
+    let client_id = format!("sourceSaturationTest{}", random_string(6));
+    // Comfortably more than the poller's internal event backlog capacity, so the
+    // backlog saturates and starts dropping messages before the sink below starts
+    // draining.
+    let num_events = super::source::EVENTS_CHANNEL_CAPACITY * 3;
+    let (input, ..) = random_lines_with_stream(16, num_events, None);
+
+    let config = MqttSourceConfig {
+        common: MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(client_id),
+            ..Default::default()
+        },
+        topic: OneOrMany::One(topic.clone()),
+        acknowledgements: true.into(),
+        ..MqttSourceConfig::default()
+    };
+
+    // A small, undrained buffer stands in for a stalled/slow sink: `out.send_batch`
+    // inside the source blocks almost immediately once it fills.
+    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let source = tokio::spawn(async move {
+        config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+    });
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // rumqttc's default outgoing QoS-1 inflight window (100) would otherwise pace
+    // the producer to the broker's PUBACK round-trip time, making it too slow to
+    // ever build up a backlog at the subscriber. Raise it so publishing is only
+    // limited by the network, not by our own producer's flow control.
+    let producer = get_mqtt_client_with_options(|opts| {
+        opts.set_inflight(u16::MAX);
+    })
+    .await;
+    send_test_events(&producer, &topic, &input).await;
+
+    // Give the poller time to saturate its backlog and start dropping messages
+    // while nothing is draining the sink.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Now let the sink drain. Duplicates are expected (a dropped message is
+    // redelivered by the broker's retry timer, independently of whatever else is
+    // still flowing through), so drain until every distinct message has been seen
+    // rather than taking a fixed count. If the poller had deadlocked instead of
+    // recovering, this times out.
+    let mut expected_messages: HashSet<_> = input.into_iter().collect();
+    let mut total_received = 0usize;
+    let drain = async {
+        tokio::pin!(rx);
+        while !expected_messages.is_empty() {
+            let event = rx.next().await.expect("source stream ended unexpectedly");
+            expected_messages.remove(&message_body(&event));
+            total_received += 1;
+        }
+    };
+    timeout(Duration::from_secs(60), drain).await.expect(
+        "timed out waiting for all messages after downstream recovered: the source likely deadlocked",
+    );
+
+    // If nothing was ever actually dropped (e.g. a regression reverted the
+    // backlog channel to unbounded), every message would still eventually
+    // arrive via simple buffering and the check above would pass for the wrong
+    // reason. Requiring more received events than distinct inputs pins the
+    // pass on the drop-and-redeliver path having actually run.
+    assert!(
+        total_received > num_events,
+        "expected at least one duplicate from broker redelivery of a dropped message, \
+         got {total_received} events for {num_events} distinct inputs -- the backlog \
+         may never have actually saturated"
+    );
+
+    source.abort();
+    drop(source.await);
 }
 
 #[tokio::test]

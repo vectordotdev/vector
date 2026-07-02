@@ -1,3 +1,5 @@
+use std::ops::ControlFlow;
+
 use futures::StreamExt;
 use itertools::Itertools;
 use rumqttc::{
@@ -23,6 +25,17 @@ use crate::{
 };
 
 const SUBSCRIPTION_QOS: QoS = QoS::AtLeastOnce;
+
+/// Bound on the number of polled MQTT events buffered between the poller task and
+/// the main task, for events it's safe to drop under backlog (see
+/// `safe_to_drop_under_backlog`). Matches the capacity of rumqttc's own
+/// outgoing-request channel (see `MqttConnector::connect`) as a reasonable
+/// starting point; the two aren't required to match, but there's no reason to
+/// buffer more here than rumqttc itself buffers for outgoing acks/subscribes.
+///
+/// `pub(super)` so the integration test that exercises the saturation path can
+/// publish comfortably more than this many messages without hard-coding the value.
+pub(super) const EVENTS_CHANNEL_CAPACITY: usize = 1024;
 
 /// Identifies an in-flight publish so its QoS-1 PUBACK can be sent once the
 /// downstream sinks confirm delivery. Only the packet id (carried by `Publish`)
@@ -132,9 +145,56 @@ fn warn_subscribe_failed() {
     );
 }
 
+fn warn_event_backlog_saturated() {
+    warn!(
+        message = "MQTT event backlog is saturated because downstream is not keeping up; dropping this message. It was not yet acknowledged, so the broker's own retry timer will redeliver it independently of any reconnect.",
+        internal_log_rate_limit = true,
+    );
+}
+
+/// Whether dropping this specific polled event under a saturated backlog is
+/// protocol-safe. Only a QoS 1/2 publish that will actually be deferred-acked
+/// (acknowledgements enabled, see `publish_ack_decision`) is safe to drop here:
+/// only then does the broker still consider it unacknowledged and worth
+/// retrying on its own. Everything else must never be dropped this way:
+/// connection lifecycle events (ConnAck/SubAck/Disconnect) drive `ProtocolState`
+/// and losing one desyncs it from the real connection (e.g. permanently skipping
+/// a post-reconnect resubscribe); a publish rumqttc has already auto-acked
+/// (acknowledgements disabled) or that has no acknowledgement at all (QoS 0) has
+/// no redelivery guarantee, so dropping it would be true, unrecoverable data
+/// loss rather than a redelivered retry.
+fn safe_to_drop_under_backlog(event: &PolledMqttEvent, acknowledgements: bool) -> bool {
+    match event {
+        PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::Publish(publish))) => {
+            acknowledgements && publish_supports_end_to_end_acknowledgements(publish.qos)
+        }
+        _ => false,
+    }
+}
+
+// Polls the MQTT event loop on a dedicated task so the main task (see `run`) can
+// use the blocking `client.ack`/`client.subscribe` without risking a deadlock:
+// `EventLoop::poll` is the only thing that drains rumqttc's outgoing request
+// channel (used by those calls), so this task must never block on anything other
+// than `poll` itself.
+//
+// Polled events are split across two channels by `safe_to_drop_under_backlog`:
+// - Events safe to drop go through a bounded channel with a non-blocking
+//   `try_send`; if the main task falls behind and it fills, the event is
+//   dropped (with a warning) rather than buffered without bound or blocking.
+//   An earlier version of this forced a reconnect on saturation instead, but
+//   that reintroduces the underlying problem immediately: the broker refloods
+//   a freshly (re)connected client from the same backlog, so under sustained
+//   backpressure it degenerates into a reconnect storm instead of actually
+//   recovering.
+// - Everything else is forwarded over an unbounded channel and never dropped.
+//   `send` on an unbounded channel never blocks, so this doesn't reintroduce
+//   the deadlock this task is designed to avoid.
 async fn poll_mqtt_connection(
     mut connection: EventLoop,
-    events_tx: mpsc::UnboundedSender<PolledMqttEvent>,
+    acknowledgements: bool,
+    droppable_tx: mpsc::Sender<PolledMqttEvent>,
+    guaranteed_tx: mpsc::UnboundedSender<PolledMqttEvent>,
     shutdown: ShutdownSignal,
 ) {
     loop {
@@ -146,7 +206,13 @@ async fn poll_mqtt_connection(
             },
         };
 
-        if events_tx.send(event).is_err() {
+        if safe_to_drop_under_backlog(&event, acknowledgements) {
+            match droppable_tx.try_send(event) {
+                Ok(()) => {}
+                Err(mpsc::error::TrySendError::Full(_)) => warn_event_backlog_saturated(),
+                Err(mpsc::error::TrySendError::Closed(_)) => break,
+            }
+        } else if guaranteed_tx.send(event).is_err() {
             break;
         }
     }
@@ -179,10 +245,13 @@ impl MqttSource {
 
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (client, connection) = self.connector.connect();
-        let (mqtt_events_tx, mut mqtt_events_rx) = mpsc::unbounded_channel();
+        let (droppable_tx, mut droppable_rx) = mpsc::channel(EVENTS_CHANNEL_CAPACITY);
+        let (guaranteed_tx, mut guaranteed_rx) = mpsc::unbounded_channel();
         tokio::spawn(poll_mqtt_connection(
             connection,
-            mqtt_events_tx,
+            self.acknowledgements,
+            droppable_tx,
+            guaranteed_tx,
             shutdown.clone(),
         ));
 
@@ -221,76 +290,102 @@ impl MqttSource {
                         client.ack(&entry.publish).await.map_err(|_| ())?;
                     }
                 },
-                mqtt_event = mqtt_events_rx.recv() => {
-                    // Providing at-least-once here does not require correlating a
-                    // connection/poll error back to a specific in-flight publish.
-                    // rumqtt#349 (no packet id for *outbound* publishes) concerns the
-                    // publish/sink direction and does not apply to a subscribe-only
-                    // source: each incoming Publish already carries its packet id, and
-                    // we withhold its QoS-1 PUBACK until the event is delivered
-                    // end-to-end. Anything left unacked when the connection drops is
-                    // redelivered by the broker on reconnect (clean_session=false + QoS
-                    // AtLeastOnce).
-                    match mqtt_event {
-                        Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::Publish(publish)))) => {
-                            self.process_message(
-                                publish,
-                                &mut out,
-                                finalizer.as_ref(),
-                                protocol_state.connection_generation,
-                            ).await;
-                        }
-                        Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::SubAck(suback))))
-                            if self.acknowledgements =>
-                        {
-                            for return_code in suback.return_codes {
-                                if let rumqttc::SubscribeReasonCode::Success(qos) = return_code
-                                    && !publish_supports_end_to_end_acknowledgements(qos)
-                                {
-                                    warn!(
-                                        message = "MQTT broker granted a subscription QoS below the level required for end-to-end acknowledgements.",
-                                        ?qos,
-                                        internal_log_rate_limit = true,
-                                    );
-                                }
-                            }
-                        }
-                        // A (re)connected session resumes here; the broker will
-                        // redeliver any unacknowledged publishes, so drop deferred
-                        // PUBACKs whose packet ids came from the previous connection.
-                        Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::ConnAck(connack)))) => {
-                            let actions = protocol_state.on_connack(
-                                self.acknowledgements,
-                                connack.session_present,
-                            );
-                            if actions.warn_session_not_resumed {
-                                warn_session_not_resumed();
-                            }
-                            if actions.flush_finalizer
-                                && let Some(finalizer) = &finalizer
-                            {
-                                finalizer.flush();
-                            }
-                            if actions.resubscribe {
-                                self.subscribe(&client).await?;
-                            }
-                        }
-                        // Connection lost: same stale-packet-id reasoning, and rumqttc
-                        // drops its own queued acks while reconnecting.
-                        Some(PolledMqttEvent::Disconnect) => {
-                            let actions = protocol_state.on_disconnect();
-                            if actions.flush_finalizer
-                                && let Some(finalizer) = &finalizer
-                            {
-                                finalizer.flush();
-                            }
-                        }
-                        None => return Ok(()),
-                        _ => {}
+                mqtt_event = droppable_rx.recv() => {
+                    if let ControlFlow::Break(result) = self.handle_mqtt_event(
+                        mqtt_event, &mut out, &finalizer, &mut protocol_state, &client,
+                    ).await {
+                        return result;
+                    }
+                },
+                mqtt_event = guaranteed_rx.recv() => {
+                    if let ControlFlow::Break(result) = self.handle_mqtt_event(
+                        mqtt_event, &mut out, &finalizer, &mut protocol_state, &client,
+                    ).await {
+                        return result;
+                    }
+                },
+            }
+        }
+    }
+
+    // Providing at-least-once here does not require correlating a
+    // connection/poll error back to a specific in-flight publish. rumqtt#349 (no
+    // packet id for *outbound* publishes) concerns the publish/sink direction
+    // and does not apply to a subscribe-only source: each incoming Publish
+    // already carries its packet id, and we withhold its QoS-1 PUBACK until the
+    // event is delivered end-to-end. Anything left unacked when the connection
+    // drops is redelivered by the broker on reconnect (clean_session=false + QoS
+    // AtLeastOnce).
+    //
+    // Returns `ControlFlow::Break` with the result `run` should return, or
+    // `ControlFlow::Continue` to keep looping.
+    async fn handle_mqtt_event(
+        &self,
+        mqtt_event: Option<PolledMqttEvent>,
+        out: &mut SourceSender,
+        finalizer: &Option<UnorderedFinalizer<FinalizerEntry>>,
+        protocol_state: &mut ProtocolState,
+        client: &AsyncClient,
+    ) -> ControlFlow<Result<(), ()>> {
+        match mqtt_event {
+            Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::Publish(publish)))) => {
+                self.process_message(
+                    publish,
+                    out,
+                    finalizer.as_ref(),
+                    protocol_state.connection_generation,
+                )
+                .await;
+            }
+            Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::SubAck(suback))))
+                if self.acknowledgements =>
+            {
+                for return_code in suback.return_codes {
+                    if let rumqttc::SubscribeReasonCode::Success(qos) = return_code
+                        && !publish_supports_end_to_end_acknowledgements(qos)
+                    {
+                        warn!(
+                            message = "MQTT broker granted a subscription QoS below the level required for end-to-end acknowledgements.",
+                            ?qos,
+                            internal_log_rate_limit = true,
+                        );
                     }
                 }
             }
+            // A (re)connected session resumes here; the broker will redeliver
+            // any unacknowledged publishes, so drop deferred PUBACKs whose
+            // packet ids came from the previous connection.
+            Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::ConnAck(connack)))) => {
+                let actions =
+                    protocol_state.on_connack(self.acknowledgements, connack.session_present);
+                if actions.warn_session_not_resumed {
+                    warn_session_not_resumed();
+                }
+                if actions.flush_finalizer
+                    && let Some(finalizer) = finalizer
+                {
+                    finalizer.flush();
+                }
+                if actions.resubscribe
+                    && let Err(()) = self.subscribe(client).await
+                {
+                    return ControlFlow::Break(Err(()));
+                }
+            }
+            // Connection lost: same stale-packet-id reasoning, and rumqttc drops
+            // its own queued acks while reconnecting.
+            Some(PolledMqttEvent::Disconnect) => {
+                let actions = protocol_state.on_disconnect();
+                if actions.flush_finalizer
+                    && let Some(finalizer) = finalizer
+                {
+                    finalizer.flush();
+                }
+            }
+            None => return ControlFlow::Break(Ok(())),
+            _ => {}
         }
+        ControlFlow::Continue(())
     }
 
     async fn subscribe(&self, client: &AsyncClient) -> Result<(), ()> {
@@ -548,5 +643,36 @@ mod tests {
 
         state.on_disconnect();
         assert!(!state.should_ack_finalized_publish(BatchStatus::Delivered, 2));
+    }
+
+    #[test]
+    fn protocol_contract_matrix_for_backlog_drop_safety() {
+        fn publish_event(qos: QoS) -> PolledMqttEvent {
+            PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::Publish(Publish::new(
+                "topic",
+                qos,
+                vec![1, 2, 3],
+            ))))
+        }
+
+        for (acknowledgements, qos, safe_to_drop) in [
+            (false, QoS::AtMostOnce, false),
+            (false, QoS::AtLeastOnce, false),
+            (false, QoS::ExactlyOnce, false),
+            (true, QoS::AtMostOnce, false),
+            (true, QoS::AtLeastOnce, true),
+            (true, QoS::ExactlyOnce, true),
+        ] {
+            assert_eq!(
+                safe_to_drop_under_backlog(&publish_event(qos), acknowledgements),
+                safe_to_drop,
+                "acknowledgements={acknowledgements}, qos={qos:?}"
+            );
+        }
+
+        assert!(!safe_to_drop_under_backlog(
+            &PolledMqttEvent::Disconnect,
+            true
+        ));
     }
 }

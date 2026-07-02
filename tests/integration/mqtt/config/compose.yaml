@@ -5,6 +5,20 @@ services:
     image: docker.io/emqx:${CONFIG_VERSION}
     ports:
       - 1883:1883
+    environment:
+      # Default is 1000, too small to exercise the source's own
+      # backlog/backpressure handling (which buffers well beyond that) without the
+      # broker's own per-client queue dropping messages first.
+      - EMQX_MQTT__MAX_MQUEUE_LEN=100000
+      # Default is 32: the broker won't have more than this many QoS 1/2 messages
+      # unacknowledged in flight to a client at once, which is far too small to
+      # ever reach the source's own backlog capacity regardless of test volume.
+      - EMQX_MQTT__MAX_INFLIGHT=10000
+      # Default is 30s: how long the broker waits for a PUBACK before retrying a
+      # QoS 1/2 publish. Shortened so a test that deliberately drops messages to
+      # saturate the source's backlog doesn't have to wait 30s per retry round to
+      # observe redelivery.
+      - EMQX_MQTT__RETRY_INTERVAL=2s
 
 networks:
   default:
