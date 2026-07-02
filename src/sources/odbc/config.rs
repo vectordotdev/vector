@@ -1,13 +1,14 @@
 use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
 use crate::serde::{default_decoding, default_framing_message_based};
 use crate::sources::Source;
-use crate::sources::odbc::client::Context;
+use crate::sources::odbc::client::{Context, validate_tracking_state};
 use crate::sources::odbc::schedule::OdbcSchedule;
 use chrono_tz::Tz;
 use futures_util::FutureExt;
 use serde_with::DurationSeconds;
 use serde_with::serde_as;
 use std::fs;
+use std::io::BufReader;
 use std::time::Duration;
 use vector_config_macros::configurable_component;
 use vector_lib::codecs::{DecodingConfig, decoding::DeserializerConfig};
@@ -138,6 +139,9 @@ pub struct OdbcConfig {
     /// Specifies the columns to track from the last row of the statement result set.
     /// Their values are passed as parameters to the SQL statement in the next scheduled run.
     ///
+    /// Requires `statement_init_params` or `last_run_metadata_path` so the first scheduled
+    /// run has values to bind.
+    ///
     /// # Examples
     ///
     /// ```toml
@@ -221,16 +225,78 @@ impl OdbcConfig {
     fn validate_tracking_columns(&self) -> Result<(), String> {
         let uses_init_params_or_metadata =
             self.statement_init_params.is_some() || self.last_run_metadata_path.is_some();
+        let has_tracking_columns = self
+            .tracking_columns
+            .as_ref()
+            .is_some_and(|columns| !columns.is_empty());
 
-        if uses_init_params_or_metadata && self.tracking_columns.as_ref().is_none_or(Vec::is_empty)
-        {
+        if uses_init_params_or_metadata && !has_tracking_columns {
             return Err(
                 "`tracking_columns` must be set when using `statement_init_params` or `last_run_metadata_path`"
                     .to_owned(),
             );
         }
 
+        if has_tracking_columns && !uses_init_params_or_metadata {
+            return Err(
+                "`statement_init_params` or `last_run_metadata_path` must be set when using `tracking_columns`"
+                    .to_owned(),
+            );
+        }
+
         Ok(())
+    }
+
+    fn validate_tracking_bootstrap(&self) -> Result<(), String> {
+        let Some(tracking_columns) = self
+            .tracking_columns
+            .as_ref()
+            .filter(|columns| !columns.is_empty())
+        else {
+            return Ok(());
+        };
+
+        let tz = self.odbc_default_timezone;
+
+        if let Some(path) = &self.last_run_metadata_path {
+            match fs::metadata(path) {
+                Ok(_) => {
+                    let file = fs::File::open(path).map_err(|source| {
+                        format!("unable to read `last_run_metadata_path` `{path}`: {source}")
+                    })?;
+                    let map: ObjectMap =
+                        serde_json::from_reader(BufReader::new(file)).map_err(|source| {
+                            format!(
+                                "unable to parse `last_run_metadata_path` `{path}`: {source}"
+                            )
+                        })?;
+                    validate_tracking_state(&map, tracking_columns, tz)?;
+                    return Ok(());
+                }
+                Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+                    let Some(init_params) = &self.statement_init_params else {
+                        return Err(format!(
+                            "`last_run_metadata_path` `{path}` does not exist and `statement_init_params` is not set"
+                        ));
+                    };
+                    validate_tracking_state(init_params, tracking_columns, tz)?;
+                    return Ok(());
+                }
+                Err(source) => {
+                    return Err(format!(
+                        "unable to access `last_run_metadata_path` `{path}`: {source}"
+                    ));
+                }
+            }
+        }
+
+        let Some(init_params) = &self.statement_init_params else {
+            return Err(
+                "`statement_init_params` must be set when using `tracking_columns` without `last_run_metadata_path`"
+                    .to_owned(),
+            );
+        };
+        validate_tracking_state(init_params, tracking_columns, tz)
     }
 }
 
@@ -311,6 +377,10 @@ impl SourceConfig for OdbcConfig {
         }
 
         if let Err(error) = self.validate_tracking_columns() {
+            return Err(error.into());
+        }
+
+        if let Err(error) = self.validate_tracking_bootstrap() {
             return Err(error.into());
         }
 

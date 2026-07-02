@@ -495,6 +495,9 @@ generated: components: sources: odbc: configuration: {
 			Specifies the columns to track from the last row of the statement result set.
 			Their values are passed as parameters to the SQL statement in the next scheduled run.
 
+			Requires `statement_init_params` or `last_run_metadata_path` so the first scheduled
+			run has values to bind.
+
 			# Examples
 
 			```toml

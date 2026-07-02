@@ -73,6 +73,17 @@ pub enum OdbcError {
 
     #[snafu(display("Blocking ODBC task failed: {source}"))]
     BlockingTask { source: tokio::task::JoinError },
+
+    #[snafu(display("Missing tracking column `{column}`"))]
+    MissingTrackingColumn { column: String },
+
+    #[snafu(display(
+        "Tracking column `{column}` has a value that cannot be converted to an ODBC parameter"
+    ))]
+    InvalidTrackingValue { column: String },
+
+    #[snafu(display("Last query result row is not an object; cannot extract tracking columns"))]
+    InvalidTrackingRow,
 }
 
 pub(crate) struct Context {
@@ -167,7 +178,7 @@ impl Context {
         Ok(())
     }
 
-    /// Executes the scheduled ODBC query, sends the result as an event, and updates tracking metadata.
+    /// Executes the scheduled ODBC query, updates tracking metadata, then sends the result as events.
     async fn process(
         &self,
         map: Option<ObjectMap>,
@@ -191,23 +202,14 @@ impl Context {
         // If the file is missing, fall back to the initial parameters or the latest query result.
         // Unreadable or corrupt metadata is treated as an error to avoid replaying old rows.
         let tz = self.cfg.odbc_default_timezone;
+        let fallback_map = map.unwrap_or_default();
         let stmt_params = if let Some(path) = &self.cfg.last_run_metadata_path {
             match load_params(path, self.cfg.tracking_columns.as_ref(), tz)? {
                 Some(params) => params,
-                None => order_params(
-                    map.unwrap_or_default(),
-                    self.cfg.tracking_columns.as_ref(),
-                    tz,
-                )
-                .unwrap_or_default(),
+                None => order_params(&fallback_map, self.cfg.tracking_columns.as_ref(), tz)?,
             }
         } else {
-            order_params(
-                map.unwrap_or_default(),
-                self.cfg.tracking_columns.as_ref(),
-                tz,
-            )
-            .unwrap_or_default()
+            order_params(&fallback_map, self.cfg.tracking_columns.as_ref(), tz)?
         };
         let cfg = self.cfg.clone();
         let login_timeout = cfg.login_timeout;
@@ -232,6 +234,20 @@ impl Context {
         .context(BlockingTaskSnafu)??;
 
         let (mut events, payload_byte_size) = self.decode_rows(&rows)?;
+
+        // Advance tracking metadata before sending events so a save failure does not
+        // emit rows that would be replayed on the next scheduled run.
+        let mut latest_result = None;
+        if let (Some(last), Some(tracking_columns)) = (rows.last(), cfg.tracking_columns.clone()) {
+            latest_result = extract_and_save_tracking(
+                cfg.last_run_metadata_path.as_deref(),
+                last.clone(),
+                tracking_columns,
+                tz,
+            )
+            .await?;
+        }
+
         if payload_byte_size > 0 {
             bytes_received.emit(ByteSize(payload_byte_size));
         }
@@ -245,20 +261,7 @@ impl Context {
             events_received.emit(CountByteSize(event_count, byte_size));
         }
 
-        if let Some(last) = rows.last() {
-            let Some(tracking_columns) = cfg.tracking_columns else {
-                return Ok(None);
-            };
-            let latest_result = extract_and_save_tracking(
-                cfg.last_run_metadata_path.as_deref(),
-                last.clone(),
-                tracking_columns,
-            )
-            .await?;
-            return Ok(latest_result);
-        }
-
-        Ok(None)
+        Ok(latest_result)
     }
 
     fn decode_rows(&self, rows: &Rows) -> Result<(Vec<Event>, usize), OdbcError> {
@@ -310,26 +313,22 @@ async fn extract_and_save_tracking(
     path: Option<&str>,
     obj: Value,
     tracking_columns: Vec<String>,
+    tz: Tz,
 ) -> Result<Option<ObjectMap>, OdbcError> {
-    let tracking_columns = tracking_columns
-        .iter()
-        .map(|col| col.as_str())
-        .collect_vec();
+    let Value::Object(obj) = obj else {
+        return Err(OdbcError::InvalidTrackingRow);
+    };
 
-    if let Value::Object(obj) = obj {
-        let save_obj = obj
-            .iter()
-            .filter(|item| tracking_columns.contains(&item.0.as_str()))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-
-        if let Some(path) = path {
-            save_params(path, &save_obj)?;
-        }
-        return Ok(Some(save_obj));
+    let mut save_obj = ObjectMap::new();
+    for column in tracking_columns {
+        let (value, _) = resolve_tracking_column_parameter(&obj, column.as_str(), tz)?;
+        save_obj.insert(KeyString::from(column.as_str()), value);
     }
 
-    Ok(None)
+    if let Some(path) = path {
+        save_params(path, &save_obj)?;
+    }
+    Ok(Some(save_obj))
 }
 
 /// Executes an ODBC SQL query with optional parameters, fetches rows in batches,
@@ -432,42 +431,37 @@ fn load_params(
     let reader = BufReader::new(file);
     let map: ObjectMap = serde_json::from_reader(reader).context(JsonSnafu)?;
 
-    Ok(order_params(map, columns_order, tz))
+    order_params(&map, columns_order, tz).map(Some)
 }
 
 /// Orders the parameters of a given `ObjectMap` based on an optional column order.
+///
+/// When `columns_order` is set, every declared column must be present in `map` and
+/// convertible to an ODBC parameter. Missing or unconvertible values return an error
+/// instead of being silently dropped.
 fn order_params(
-    map: ObjectMap,
+    map: &ObjectMap,
     columns_order: Option<&Vec<String>>,
     tz: Tz,
-) -> Option<Vec<VarCharBox>> {
-    if columns_order.is_none() || columns_order.iter().len() == 0 {
+) -> Result<Vec<VarCharBox>, OdbcError> {
+    if columns_order.is_none_or(Vec::is_empty) {
         let params = map
             .values()
             .filter_map(|value| {
                 value_to_sql_parameter(value, tz).map(|param| param.into_parameter())
             })
             .collect_vec();
-        return Some(params);
+        return Ok(params);
     }
 
-    let binding = vec![];
-    let columns_order = columns_order
-        .unwrap_or(&binding)
-        .iter()
-        .map(|col| col.as_str())
-        .collect_vec();
+    let columns = columns_order.expect("non-empty tracking_columns checked above");
+    let mut params = Vec::with_capacity(columns.len());
+    for column in columns {
+        let (_, param) = resolve_tracking_column_parameter(map, column.as_str(), tz)?;
+        params.push(param.into_parameter());
+    }
 
-    // Ensure parameters follow the declared column order.
-    let params = columns_order
-        .into_iter()
-        .filter_map(|col| {
-            let value = map.get(col)?;
-            value_to_sql_parameter(value, tz).map(|param| param.into_parameter())
-        })
-        .collect_vec();
-
-    Some(params)
+    Ok(params)
 }
 
 /// Serializes and persists the latest tracked values for reuse as SQL parameters.
@@ -636,6 +630,37 @@ fn format_timestamp_for_sql_parameter(timestamp: DateTime<Utc>, tz: Tz) -> Strin
     }
 }
 
+/// Validates that `map` contains every declared tracking column with a value that can
+/// be converted to an ODBC parameter.
+pub(crate) fn validate_tracking_state(
+    map: &ObjectMap,
+    tracking_columns: &[String],
+    tz: Tz,
+) -> Result<(), String> {
+    for column in tracking_columns {
+        resolve_tracking_column_parameter(map, column.as_str(), tz)
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Resolves a single tracking column to its source value and the text used for ODBC
+/// parameter binding.
+fn resolve_tracking_column_parameter(
+    map: &ObjectMap,
+    column: &str,
+    tz: Tz,
+) -> Result<(Value, String), OdbcError> {
+    let value = map.get(column).ok_or_else(|| OdbcError::MissingTrackingColumn {
+        column: column.to_owned(),
+    })?;
+    let param = value_to_sql_parameter(value, tz).ok_or_else(|| OdbcError::InvalidTrackingValue {
+        column: column.to_owned(),
+    })?;
+    Ok((value.clone(), param))
+}
+
 /// Converts a scalar VRL value to raw text for ODBC parameter binding.
 ///
 /// Unlike `Value::to_string()`, this does not use VRL literal syntax (e.g. quoted
@@ -692,5 +717,151 @@ mod tests {
             value_to_sql_parameter(&value, chrono_tz::UTC),
             Some("18446744073709551615".to_owned())
         );
+    }
+
+    #[test]
+    fn order_params_follows_tracking_column_order() {
+        let mut map = ObjectMap::new();
+        map.insert(KeyString::from("id"), Value::Integer(1));
+        map.insert(KeyString::from("name"), Value::from("vector"));
+        let columns = vec!["id".to_owned(), "name".to_owned()];
+        let expected: Vec<String> = columns
+            .iter()
+            .map(|column| {
+                value_to_sql_parameter(map.get(column.as_str()).unwrap(), chrono_tz::UTC).unwrap()
+            })
+            .collect();
+
+        let params = order_params(&map, Some(&columns), chrono_tz::UTC).expect("params");
+
+        assert_eq!(expected, vec!["1", "vector"]);
+        assert_eq!(params.len(), expected.len());
+    }
+
+    #[test]
+    fn order_params_errors_on_missing_tracking_column() {
+        let mut map = ObjectMap::new();
+        map.insert(KeyString::from("id"), Value::Integer(1));
+
+        let error = match order_params(
+            &map,
+            Some(&vec!["id".to_owned(), "name".to_owned()]),
+            chrono_tz::UTC,
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("expected missing tracking column error"),
+        };
+
+        assert!(matches!(
+            error,
+            OdbcError::MissingTrackingColumn { column } if column == "name"
+        ));
+    }
+
+    #[test]
+    fn order_params_errors_on_unconvertible_tracking_value() {
+        let mut map = ObjectMap::new();
+        map.insert(KeyString::from("id"), Value::Null);
+
+        let error = match order_params(&map, Some(&vec!["id".to_owned()]), chrono_tz::UTC) {
+            Err(error) => error,
+            Ok(_) => panic!("expected invalid tracking value error"),
+        };
+
+        assert!(matches!(
+            error,
+            OdbcError::InvalidTrackingValue { column } if column == "id"
+        ));
+    }
+
+    #[tokio::test]
+    async fn extract_and_save_tracking_errors_on_missing_column() {
+        let mut obj = ObjectMap::new();
+        obj.insert(KeyString::from("id"), Value::Integer(1));
+
+        let error = match extract_and_save_tracking(
+            None,
+            Value::Object(obj),
+            vec!["id".to_owned(), "name".to_owned()],
+            chrono_tz::UTC,
+        )
+        .await
+        {
+            Err(error) => error,
+            Ok(_) => panic!("expected missing tracking column error"),
+        };
+
+        assert!(matches!(
+            error,
+            OdbcError::MissingTrackingColumn { column } if column == "name"
+        ));
+    }
+
+    #[tokio::test]
+    async fn extract_and_save_tracking_errors_on_invalid_tracking_row() {
+        let error = match extract_and_save_tracking(
+            None,
+            Value::Integer(1),
+            vec!["id".to_owned()],
+            chrono_tz::UTC,
+        )
+        .await
+        {
+            Err(error) => error,
+            Ok(_) => panic!("expected invalid tracking row error"),
+        };
+
+        assert!(matches!(error, OdbcError::InvalidTrackingRow));
+    }
+
+    #[tokio::test]
+    async fn extract_and_save_tracking_persists_declared_columns() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let path = temp_dir.path().join("tracking.json");
+        let path = path.to_str().expect("utf-8 path");
+        let mut obj = ObjectMap::new();
+        obj.insert(KeyString::from("id"), Value::Integer(42));
+        obj.insert(KeyString::from("name"), Value::from("vector"));
+
+        let saved = extract_and_save_tracking(
+            Some(path),
+            Value::Object(obj),
+            vec!["id".to_owned(), "name".to_owned()],
+            chrono_tz::UTC,
+        )
+        .await
+        .expect("saved tracking state")
+        .expect("tracking object");
+
+        assert_eq!(saved.len(), 2);
+        assert_eq!(saved.get("id"), Some(&Value::Integer(42)));
+        assert_eq!(saved.get("name"), Some(&Value::from("vector")));
+        assert!(std::path::Path::new(path).exists());
+    }
+
+    #[test]
+    fn load_params_reads_valid_tracking_metadata() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let path = temp_dir.path().join("tracking.json");
+        fs::write(&path, r#"{"id":1,"name":"vector"}"#).expect("write metadata");
+        let path = path.to_str().expect("utf-8 path");
+        let columns = vec!["id".to_owned(), "name".to_owned()];
+
+        let params = load_params(path, Some(&columns), chrono_tz::UTC)
+            .expect("load params")
+            .expect("metadata params");
+
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn validate_tracking_state_errors_on_missing_column() {
+        let mut map = ObjectMap::new();
+        map.insert(KeyString::from("id"), Value::Integer(1));
+
+        let error = validate_tracking_state(&map, &["id".to_owned(), "name".to_owned()], chrono_tz::UTC)
+            .expect_err("validation error");
+
+        assert!(error.contains("name"));
     }
 }

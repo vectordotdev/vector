@@ -72,6 +72,23 @@ impl InternalEvent for OdbcFailedError<'_> {
                 )
                 .increment(1);
             }
+            OdbcError::MissingTrackingColumn { .. }
+            | OdbcError::InvalidTrackingValue { .. }
+            | OdbcError::InvalidTrackingRow => {
+                error!(
+                    message = "Invalid ODBC tracking state.",
+                    statement = %self.statement,
+                    error = %self.error,
+                    error_type = error_type::CONFIGURATION_FAILED,
+                    stage = error_stage::PROCESSING,
+                );
+                counter!(
+                    CounterName::ComponentErrorsTotal,
+                    "error_type" => error_type::CONFIGURATION_FAILED,
+                    "stage" => error_stage::PROCESSING,
+                )
+                .increment(1);
+            }
         }
     }
 }
