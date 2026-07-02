@@ -51,7 +51,7 @@ impl InputHandler {
                         if retry > 0 {
                             retry = 0
                         }
-                        if let Err(()) = self.handle_line(line).await {
+                        if let Err(()) = self.handle_line(line, None).await {
                             break;
                         }
                     }
