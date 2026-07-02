@@ -1,3 +1,7 @@
+args:
+  - --test-threads
+  - "1"
+
 features:
   - odbc-integration-tests
 
