@@ -46,23 +46,21 @@ pub struct HealthConfig {
     pub retry_max_duration_secs: Duration,
 }
 
-impl Default for HealthConfig {
-    fn default() -> Self {
-        // Keep Rust defaults aligned with the serde/documented defaults. The
-        // previous derived default produced zero-valued retry durations.
-        Self {
-            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
-            retry_max_duration_secs: default_retry_max_duration_secs(),
-        }
-    }
-}
-
 const fn default_retry_initial_backoff_secs() -> u64 {
     RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT
 }
 
 const fn default_retry_max_duration_secs() -> std::time::Duration {
     Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
+}
+
+impl Default for HealthConfig {
+    fn default() -> Self {
+        Self {
+            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
+            retry_max_duration_secs: default_retry_max_duration_secs(),
+        }
+    }
 }
 
 impl HealthConfig {
@@ -341,6 +339,7 @@ mod tests {
         assert!(counters.healthy(snapshot).is_ok());
     }
 
+    #[test]
     fn health_config_default_matches_deserialize_defaults() {
         let config = HealthConfig::default();
 

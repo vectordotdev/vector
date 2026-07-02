@@ -4,6 +4,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
+    time::Duration,
 };
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
@@ -58,7 +59,10 @@ pub struct VectorConfig {
     ///
     /// This option is mutually exclusive with `endpoints`. Set exactly one of
     /// `address` or `endpoints`.
+    ///
+    /// This option has been deprecated, use `endpoints` instead.
     #[configurable(validation(format = "uri"))]
+    #[configurable(deprecated = "This option has been deprecated, use `endpoints` instead.")]
     #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
@@ -195,7 +199,9 @@ impl SinkConfig for VectorConfig {
                 let service = request_settings.distributed_service(
                     VectorGrpcRetryLogic,
                     services,
-                    self.endpoint_health.clone().unwrap_or_default(),
+                    self.endpoint_health
+                        .clone()
+                        .unwrap_or_else(default_endpoint_health_config),
                     VectorGrpcHealthLogic,
                     1,
                 );
@@ -662,6 +668,13 @@ fn healthcheck_uris_for_strategy(
         .clone()
         .map(|uri| vec![uri.uri])
         .unwrap_or_else(|| uris.to_vec())
+}
+
+fn default_endpoint_health_config() -> HealthConfig {
+    HealthConfig {
+        retry_initial_backoff_secs: 1,
+        retry_max_duration_secs: Duration::from_secs(60 * 60),
+    }
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
