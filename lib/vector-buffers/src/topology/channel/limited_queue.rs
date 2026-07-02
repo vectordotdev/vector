@@ -18,6 +18,7 @@ use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use metrics::{Gauge, Histogram};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
+use vector_common::finalization::{EventStatus, Finalizable};
 use vector_common::internal_event::{GaugeName, HistogramName};
 use vector_common::stats::TimeEwmaGauge;
 use vector_common::{gauge, histogram};
@@ -417,7 +418,10 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     /// If the receiver has disconnected, then an error will be returned with the given `item` and
     /// any queued items that were already evicted. If the channel has insufficient total capacity
     /// for the item, then an error will be returned with the given `item`.
-    pub async fn send_drop_oldest(&mut self, item: T) -> Result<Vec<T>, DropOldestSendError<T>> {
+    pub async fn send_drop_oldest(&mut self, item: T) -> Result<Vec<T>, DropOldestSendError<T>>
+    where
+        T: Finalizable,
+    {
         // Calculate how many permits we need, and try to acquire them all without waiting. If there
         // is not enough space, evict queued items until we have enough room for the new item.
         let (size, permits_required) = self.calc_required_permits(&item);
@@ -451,7 +455,10 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
                             return Ok(dropped);
                         }
                         Err(TryAcquireError::NoPermits) => {
-                            if let Some(dropped_item) = self.inner.pop_and_record() {
+                            if let Some(mut dropped_item) = self.inner.pop_and_record() {
+                                dropped_item
+                                    .take_finalizers()
+                                    .update_status(EventStatus::Rejected);
                                 dropped.push(dropped_item);
                             } else {
                                 match self
@@ -467,9 +474,10 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
                                         );
                                         return Ok(dropped);
                                     }
-                                    Err(TryAcquireError::NoPermits) => {
-                                        notified.await;
-                                    }
+                                    Err(TryAcquireError::NoPermits) => tokio::select! {
+                                        () = notified => {}
+                                        () = tokio::task::yield_now() => {}
+                                    },
                                     Err(TryAcquireError::Closed) => {
                                         return Err(DropOldestSendError {
                                             error: TrySendError::Disconnected(item),

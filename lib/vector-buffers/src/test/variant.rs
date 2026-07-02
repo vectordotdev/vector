@@ -105,11 +105,15 @@ impl Arbitrary for Variant {
         let max_size = NonZeroU16::arbitrary(g).into();
         let size = MemoryBufferSize::MaxEvents(max_events);
 
-        let when_full = WhenFull::arbitrary(g);
-
         if use_memory_buffer {
+            let when_full = WhenFull::arbitrary(g);
             Variant::Memory { size, when_full }
         } else {
+            let when_full = if bool::arbitrary(g) {
+                WhenFull::Block
+            } else {
+                WhenFull::DropNewest
+            };
             Variant::DiskV2 {
                 max_size,
                 when_full,

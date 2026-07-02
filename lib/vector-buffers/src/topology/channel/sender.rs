@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 use tracing::Span;
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{EventStatus, Finalizable},
+    finalization::Finalizable,
     internal_event::{InternalEventHandle, Registered, register},
 };
 
@@ -93,7 +93,10 @@ where
     pub(crate) async fn send_drop_oldest(
         &mut self,
         item: T,
-    ) -> Result<Vec<T>, DropOldestSendError<T>> {
+    ) -> Result<Vec<T>, DropOldestSendError<T>>
+    where
+        T: Finalizable,
+    {
         match self {
             Self::InMemory(tx) => tx.send_drop_oldest(item).await,
             Self::DiskV2(_) => Err(DropOldestSendError {
@@ -256,9 +259,9 @@ impl<T: Bufferable> BufferSender<T> {
                 }
             }
             WhenFull::DropOldest => {
-                let mut dropped = match self.base.send_drop_oldest(item).await {
+                let dropped = match self.base.send_drop_oldest(item).await {
                     Ok(dropped) => dropped,
-                    Err(mut error) => {
+                    Err(error) => {
                         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
                             && !error.dropped.is_empty()
                         {
@@ -274,10 +277,6 @@ impl<T: Bufferable> BufferSender<T> {
                                 dropped_size as u64,
                             );
                         }
-                        for item in &mut error.dropped {
-                            item.take_finalizers().update_status(EventStatus::Rejected);
-                        }
-
                         return Err(error.error.into());
                     }
                 };
@@ -290,9 +289,6 @@ impl<T: Bufferable> BufferSender<T> {
                         dropped_count as u64,
                         dropped_size as u64,
                     );
-                }
-                for item in &mut dropped {
-                    item.take_finalizers().update_status(EventStatus::Rejected);
                 }
             }
             WhenFull::Overflow => {
