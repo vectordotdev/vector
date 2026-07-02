@@ -328,13 +328,11 @@ mod test {
     #[test]
     fn test_url_or_region_deserialization_with_url() {
         // Test that url can be deserialized at the top level (flattened)
-        let config: super::AxiomConfig = toml::from_str(
-            r#"
-            token = "test-token"
-            dataset = "test-dataset"
-            url = "https://api.eu.axiom.co"
-            "#,
-        )
+        let config: super::AxiomConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            token: "test-token"
+            dataset: "test-dataset"
+            url: "https://api.eu.axiom.co"
+        "#})
         .unwrap();
 
         assert_eq!(config.endpoint.url(), Some("https://api.eu.axiom.co"));
@@ -344,13 +342,11 @@ mod test {
     #[test]
     fn test_url_or_region_deserialization_with_region() {
         // Test that region can be deserialized at the top level (flattened)
-        let config: super::AxiomConfig = toml::from_str(
-            r#"
-            token = "test-token"
-            dataset = "test-dataset"
-            region = "mumbai.axiom.co"
-            "#,
-        )
+        let config: super::AxiomConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            token: "test-token"
+            dataset: "test-dataset"
+            region: "mumbai.axiom.co"
+        "#})
         .unwrap();
 
         assert_eq!(config.endpoint.url(), None);

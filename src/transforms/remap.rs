@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
@@ -277,6 +280,16 @@ impl TransformConfig for RemapConfig {
         Ok(transform)
     }
 
+    fn validate_env(&self, context: &TransformContext) -> std::result::Result<(), Vec<String>> {
+        self.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
+            context.merged_schema_definition.clone(),
+        )
+        .map(|_| ())
+        .map_err(|e| vec![e.to_string()])
+    }
+
     fn input(&self) -> Input {
         Input::all()
     }
@@ -321,7 +334,7 @@ impl TransformConfig for RemapConfig {
                         // Attempt to copy over the meanings from the input definition.
                         // The function will fail if the meaning that now points to a field that no longer exists,
                         // this is fine since we will no longer want that meaning in the output definition.
-                        let _ = new_type_def.try_with_meaning(path.clone(), id);
+                        new_type_def.try_with_meaning(path.clone(), id).ok();
                     }
 
                     // Apply any semantic meanings set in the VRL program
@@ -1543,27 +1556,25 @@ mod tests {
     async fn check_remap_branching_metrics_with_output() {
         init_test();
 
-        let config: ConfigBuilder = toml::from_str(indoc! {r#"
-            [transforms.foo]
-            inputs = []
-            type = "remap"
-            drop_on_abort = true
-            reroute_dropped = true
-            source = "abort"
-
-            [[tests]]
-            name = "metric output"
-
-            [tests.input]
-                insert_at = "foo"
-                value = "none"
-
-            [[tests.outputs]]
-                extract_from = "foo.dropped"
-                [[tests.outputs.conditions]]
-                type = "vrl"
-                source = "true"
-        "#})
+        let config: ConfigBuilder = serde_yaml::from_str(indoc! {"
+            transforms:
+              foo:
+                inputs: []
+                type: remap
+                drop_on_abort: true
+                reroute_dropped: true
+                source: abort
+            tests:
+              - name: metric output
+                input:
+                  insert_at: foo
+                  value: none
+                outputs:
+                  - extract_from: foo.dropped
+                    conditions:
+                      - type: vrl
+                        source: \"true\"
+        "})
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();

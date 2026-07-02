@@ -66,6 +66,13 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				This mode has higher memory requirements than `probabilistic`, but never falsely outputs
 				metrics with new tags after the limit has been hit.
 				"""
+			exact_fingerprint: """
+				This mode operates similarly to `exact` mode except it tracks cardinality using 64-bit hash fingerprints
+				of tag values instead of the original strings. This leads to lower memory requirements in most
+				scenarios (assuming average tag value size is greater than 8 bytes) at the cost of slightly
+				reduced throughput due to extra hashing operations and a very small chance of collisions at
+				very high cardinalities.
+				"""
 			probabilistic: """
 				Tracks cardinality probabilistically.
 
@@ -126,7 +133,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					description: "Controls the approach taken for tracking tag cardinality."
 					required:    true
 					type: string: enum: {
-						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
+						exact:             "Tracks cardinality exactly. See `Mode::Exact` for details."
+						exact_fingerprint: "Tracks cardinality using 64-bit hash fingerprints. See `Mode::ExactFingerprint` for details."
 						excluded: """
 																			Skip cardinality tracking for this metric. All tag values pass through and nothing is
 																			limited. Other fields in this per-metric configuration are ignored when this is selected.
@@ -146,7 +154,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						- `mode: excluded` — opt this tag out of tracking entirely.
 
 						All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
-						are inherited from the enclosing per-metric configuration.
+						are inherited from the enclosing per-metric configuration, except
+						`cache_size_per_key`, which can be overridden per tag in probabilistic mode.
 						Tags not listed here use the per-metric configuration.
 						"""
 					required: false
@@ -154,6 +163,16 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						description: "An individual tag configuration."
 						required:    true
 						type: object: options: {
+							cache_size_per_key: {
+								description: """
+																								Override the bloom filter cache size for this specific tag key.
+																								Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+																								Inherits from the enclosing config when unset.
+																								"""
+								relevant_when: "mode = \"limit_override\""
+								required:      false
+								type: uint: {}
+							}
 							mode: {
 								description: "Controls how this tag key is handled."
 								required:    true
@@ -163,8 +182,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 																											without being recorded or checked against any `value_limit`.
 																											"""
 									limit_override: """
-																											Track this tag with a per-tag value limit. The enclosing per-metric tracking
-																											algorithm and all other settings still apply.
+																											Track this tag with a per-tag value limit. All other settings are inherited from
+																											the enclosing config.
 																											"""
 								}
 							}
@@ -199,6 +218,16 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			description: "An individual tag configuration."
 			required:    true
 			type: object: options: {
+				cache_size_per_key: {
+					description: """
+						Override the bloom filter cache size for this specific tag key.
+						Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
+						Inherits from the enclosing config when unset.
+						"""
+					relevant_when: "mode = \"limit_override\""
+					required:      false
+					type: uint: {}
+				}
 				mode: {
 					description: "Controls how this tag key is handled."
 					required:    true
@@ -208,8 +237,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 																			without being recorded or checked against any `value_limit`.
 																			"""
 						limit_override: """
-																			Track this tag with a per-tag value limit. The enclosing per-metric tracking
-																			algorithm and all other settings still apply.
+																			Track this tag with a per-tag value limit. All other settings are inherited from
+																			the enclosing config.
 																			"""
 					}
 				}

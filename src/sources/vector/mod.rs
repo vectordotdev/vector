@@ -23,7 +23,10 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    sources::{Source, util::grpc::run_grpc_server_with_routes},
+    sources::{
+        Source,
+        util::grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+    },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -135,6 +138,10 @@ pub struct VectorConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: GrpcKeepaliveConfig,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
@@ -158,6 +165,7 @@ impl Default for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
+            keepalive: Default::default(),
             log_namespace: None,
         }
     }
@@ -204,11 +212,16 @@ impl SourceConfig for VectorConfig {
             .add_service(health_service)
             .add_service(vector_service);
 
-        let source =
-            run_grpc_server_with_routes(self.address, tls_settings, builder.routes(), cx.shutdown)
-                .map_err(|error| {
-                    error!(message = "Source future failed.", %error);
-                });
+        let source = run_grpc_server_with_routes(
+            self.address,
+            tls_settings,
+            builder.routes(),
+            self.keepalive.clone(),
+            cx.shutdown,
+        )
+        .map_err(|error| {
+            error!(message = "Source future failed.", %error);
+        });
 
         Ok(Box::pin(source))
     }
@@ -241,11 +254,76 @@ mod test {
     use vrl::value::{Kind, kind::Collection};
 
     use super::VectorConfig;
-    use crate::config::SourceConfig;
+    use crate::{
+        SourceSender,
+        config::{SourceConfig, SourceContext},
+        test_util,
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::VectorConfig>();
+    }
+
+    #[test]
+    fn config_keepalive() {
+        let config: VectorConfig = toml::from_str(
+            r#"
+                address = "0.0.0.0:6000"
+
+                [keepalive]
+                max_connection_age_secs = 300
+                max_connection_age_grace_secs = 30
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.keepalive.max_connection_age_secs, Some(300));
+        assert_eq!(config.keepalive.max_connection_age_grace_secs, Some(30));
+    }
+
+    #[tokio::test]
+    async fn max_connection_age_closes_idle_connection() {
+        use tokio::{
+            io::AsyncReadExt,
+            net::TcpStream,
+            time::{Duration, sleep, timeout},
+        };
+
+        let (_guard, addr) = test_util::addr::next_addr();
+        let source_config = format!(
+            r#"
+                address = "{addr}"
+
+                [keepalive]
+                max_connection_age_secs = 1
+            "#
+        );
+        let source: VectorConfig = toml::from_str(&source_config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        sleep(Duration::from_millis(1500)).await;
+
+        let mut buf = [0; 32];
+        let read = timeout(Duration::from_secs(2), async {
+            loop {
+                if stream.read(&mut buf).await.unwrap() == 0 {
+                    break 0;
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(read, 0);
     }
 
     #[test]
@@ -309,8 +387,8 @@ mod tests {
     async fn run_test(compression: Option<&str>) {
         let (_guard, addr) = test_util::addr::next_addr();
 
-        let source_config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&source_config).unwrap();
+        let source_config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&source_config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
         let server = source
@@ -324,15 +402,13 @@ mod tests {
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
         let sink_config = match compression {
-            Some(c) => format!(
-                r#"
-                    address = "{addr}"
-                    compression = "{c}"
-                "#
-            ),
-            None => format!(r#"address = "{addr}""#),
+            Some(c) => indoc::formatdoc! {r#"
+                address: "{addr}"
+                compression: "{c}"
+            "#},
+            None => format!("address: \"{addr}\"\n"),
         };
-        let sink: SinkConfig = toml::from_str(&sink_config).unwrap();
+        let sink: SinkConfig = serde_yaml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
@@ -371,8 +447,8 @@ mod tests {
 
         let (_guard, addr) = test_util::addr::next_addr();
 
-        let config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        let config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&config).unwrap();
 
         let (tx, _rx) = SourceSender::new_test();
         let server = source
@@ -403,14 +479,87 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn max_connection_age_allows_client_reconnect() {
+        use tokio::time::{Duration, sleep};
+        use tonic::transport::Channel;
+
+        use crate::sources::util::grpc::test_support::{
+            max_connection_age_connection_observations,
+            reset_max_connection_age_connection_observations,
+        };
+
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!(
+            r#"
+                address = "{addr}"
+
+                [keepalive]
+                max_connection_age_secs = 1
+            "#
+        );
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        reset_max_connection_age_connection_observations();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        let endpoint = format!("http://{addr}");
+        let channel = Channel::from_shared(endpoint)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        let mut client = proto::Client::new(channel);
+
+        let response = client
+            .health_check(proto::HealthCheckRequest {})
+            .await
+            .unwrap();
+        assert_eq!(
+            response.into_inner().status,
+            proto::ServingStatus::Serving as i32
+        );
+        let observations_before_expiry = max_connection_age_connection_observations();
+        assert!(!observations_before_expiry.is_empty());
+
+        sleep(Duration::from_millis(1500)).await;
+
+        let response = client
+            .health_check(proto::HealthCheckRequest {})
+            .await
+            .unwrap();
+        assert_eq!(
+            response.into_inner().status,
+            proto::ServingStatus::Serving as i32
+        );
+        let observations = max_connection_age_connection_observations();
+        assert!(
+            observations.len() > observations_before_expiry.len(),
+            "expected second RPC to reconnect after max connection age elapsed, got observations: {observations:?}",
+        );
+        assert!(observations.iter().any(|peer_addr| {
+            !observations_before_expiry
+                .iter()
+                .any(|observed| observed == peer_addr)
+        }));
+    }
+
+    #[tokio::test]
     async fn standard_grpc_health_check_works() {
         use tonic::transport::Channel;
         use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
 
         let (_guard, addr) = test_util::addr::next_addr();
 
-        let config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        let config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&config).unwrap();
 
         let (tx, _rx) = SourceSender::new_test();
         let server = source

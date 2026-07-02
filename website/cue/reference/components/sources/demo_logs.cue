@@ -3,8 +3,6 @@ package metadata
 components: sources: demo_logs: {
 	title: "Demo Logs"
 
-	alias: "generator"
-
 	description: """
 		Generates fakes events useful for testing and demoing.
 		"""

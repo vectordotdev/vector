@@ -14,7 +14,7 @@ use crate::{
             grpc::Service,
             http::{build_warp_filter, run_http_server},
         },
-        util::grpc::run_grpc_server_with_routes,
+        util::grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
     },
 };
 use futures::FutureExt;
@@ -173,12 +173,17 @@ pub struct GrpcConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub keepalive: GrpcKeepaliveConfig,
 }
 
 fn example_grpc_config() -> GrpcConfig {
     GrpcConfig {
         address: "0.0.0.0:4317".parse().unwrap(),
         tls: None,
+        keepalive: GrpcKeepaliveConfig::default(),
     }
 }
 
@@ -325,6 +330,7 @@ impl SourceConfig for OpentelemetryConfig {
             self.grpc.address,
             grpc_tls_settings,
             builder.routes(),
+            self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
         )
         .map_err(|error| {

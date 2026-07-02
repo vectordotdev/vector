@@ -1581,23 +1581,16 @@ mod test {
 
     #[cfg(unix)]
     fn parses_unix_config(mode: &str) -> SocketConfig {
-        toml::from_str::<SocketConfig>(&format!(
-            r#"
-               mode = "{mode}"
-               path = "/does/not/exist"
-            "#
+        serde_yaml::from_str::<SocketConfig>(&format!(
+            "mode: \"{mode}\"\npath: \"/does/not/exist\""
         ))
         .unwrap()
     }
 
     #[cfg(unix)]
     fn parses_unix_config_file_mode(mode: &str) -> SocketConfig {
-        toml::from_str::<SocketConfig>(&format!(
-            r#"
-               mode = "{mode}"
-               path = "/does/not/exist"
-               socket_file_mode = 0o777
-            "#
+        serde_yaml::from_str::<SocketConfig>(&format!(
+            "mode: \"{mode}\"\npath: \"/does/not/exist\"\nsocket_file_mode: 511"
         ))
         .unwrap()
     }

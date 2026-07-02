@@ -44,7 +44,8 @@ mod latency_metrics;
     feature = "sources-prometheus",
     feature = "sinks-prometheus",
     feature = "sources-internal_metrics",
-    feature = "sources-splunk_hec"
+    feature = "sources-splunk_hec",
+    feature = "enrichment-tables-memory",
 ))]
 mod reload;
 #[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
