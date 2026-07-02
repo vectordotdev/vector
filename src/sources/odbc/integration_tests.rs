@@ -28,6 +28,37 @@ fn get_db_type() -> DbType {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn collect_query_rows(
+    env: &odbc_api::Environment,
+    conn_str: &str,
+    stmt_str: &str,
+    stmt_params: Vec<odbc_api::parameter::VarCharBox>,
+    login_timeout: Duration,
+    statement_timeout: Duration,
+    tz: Tz,
+    batch_size: usize,
+    max_str_limit: Option<usize>,
+) -> Result<Vec<Value>, crate::sources::odbc::OdbcError> {
+    let mut rows = Vec::new();
+    execute_query(
+        env,
+        conn_str,
+        stmt_str,
+        stmt_params,
+        login_timeout,
+        statement_timeout,
+        tz,
+        batch_size,
+        max_str_limit,
+        |batch| {
+            rows.extend(batch);
+            Ok(true)
+        },
+    )?;
+    Ok(rows)
+}
+
 fn get_conn_str() -> String {
     std::env::var("ODBC_CONN_STRING").expect("Required environment variable 'ODBC_CONN_STRING'")
 }
@@ -432,7 +463,7 @@ INSERT INTO number_columns (
         )
         .unwrap();
 
-    let rows = execute_query(
+    let rows = collect_query_rows(
         env,
         &conn_str,
         "SELECT * FROM number_columns;",
@@ -617,7 +648,7 @@ INSERT INTO string_columns (
         )
         .unwrap();
 
-    let rows = execute_query(
+    let rows = collect_query_rows(
         env,
         &conn_str,
         "SELECT * FROM string_columns;",
@@ -724,7 +755,7 @@ VALUES (
         )
         .unwrap();
 
-    let rows = execute_query(
+    let rows = collect_query_rows(
         env,
         &conn_str,
         "SELECT * FROM timestamp_columns;",

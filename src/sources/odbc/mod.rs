@@ -1,8 +1,9 @@
 //! ODBC Data Source
 //!
 //! This data source runs a database query through the ODBC interface on the required `schedule` (cron expression).
-//! Query results are sent to Vector as an array of key-value maps.
-//! The final row of the result set is saved to disk and used as a parameter for the next scheduled SQL query.
+//! Query results are fetched, decoded, and sent in batches bounded by `odbc_batch_size`.
+//! Each row is emitted as a log event. The final row of the result set is saved to disk and used as a
+//! parameter for the next scheduled SQL query after all batches are successfully decoded and sent.
 //!
 //! The ODBC data source offers functionality similar to the [Logstash JDBC plugin](https://www.elastic.co/docs/reference/logstash/plugins/plugins-inputs-jdbc).
 //!
@@ -38,6 +39,7 @@
 //! statement_init_params = { id = "0", name = "test" }
 //! schedule = "*/5 * * * * *"
 //! schedule_timezone = "UTC"
+//! odbc_batch_size = 100
 //! last_run_metadata_path = "/path/to/odbc_tracking.json"
 //! tracking_columns = ["id"]
 //!

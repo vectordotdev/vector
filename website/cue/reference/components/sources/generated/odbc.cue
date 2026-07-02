@@ -338,6 +338,12 @@ generated: components: sources: odbc: configuration: {
 			This file provides parameters for the SQL query in the next scheduled run.
 			If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
 
+			Tracking metadata is written only after all result batches are decoded and sent.
+			If saving fails after events were already sent, the previous tracking values are kept
+			and the next scheduled run may emit duplicate rows.
+
+			Parent directories are created automatically if they do not exist.
+
 			# Examples
 
 			If `tracking_columns = ["id", "name"]`, it is saved as the following JSON data.
@@ -368,7 +374,8 @@ generated: components: sources: odbc: configuration: {
 	}
 	odbc_batch_size: {
 		description: """
-			Number of rows to fetch per batch from the ODBC driver.
+			Number of rows to fetch, decode, and send per batch.
+			This bounds ODBC driver fetch buffers and in-memory processing for each batch.
 			Must be greater than 0.
 			The default is 100.
 			"""
@@ -494,6 +501,10 @@ generated: components: sources: odbc: configuration: {
 		description: """
 			Specifies the columns to track from the last row of the statement result set.
 			Their values are passed as parameters to the SQL statement in the next scheduled run.
+
+			Tracking metadata is saved only after all result batches are decoded and sent.
+			If a run fails partway through, the previous tracking values are kept so rows are
+			not skipped on the next scheduled run.
 
 			Requires `statement_init_params` or `last_run_metadata_path` so the first scheduled
 			run has values to bind.

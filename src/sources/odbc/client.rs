@@ -17,6 +17,7 @@ use odbc_api::{
 use snafu::{ResultExt, Snafu};
 use std::fs::{self, File};
 use std::io::BufReader;
+use std::mem;
 use std::path::Path;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -25,6 +26,7 @@ use tokio_util::codec::Decoder as _;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
+use vector_common::json_size::JsonSize;
 use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::Decoder;
 use vector_lib::emit;
@@ -178,7 +180,8 @@ impl Context {
         Ok(())
     }
 
-    /// Executes the scheduled ODBC query, updates tracking metadata, then sends the result as events.
+    /// Executes the scheduled ODBC query, sends the result as events in bounded batches,
+    /// then updates tracking metadata after all batches are successfully decoded and sent.
     async fn process(
         &self,
         map: Option<ObjectMap>,
@@ -217,8 +220,9 @@ impl Context {
         let batch_size = cfg.odbc_batch_size;
         let max_str_limit = (cfg.odbc_max_str_limit > 0).then_some(cfg.odbc_max_str_limit);
 
-        let rows = tokio::task::spawn_blocking(move || {
-            execute_query(
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let blocking = tokio::task::spawn_blocking(move || {
+            let result = execute_query(
                 env,
                 &conn_str,
                 &stmt_str,
@@ -228,37 +232,82 @@ impl Context {
                 tz,
                 batch_size,
                 max_str_limit,
-            )
-        })
-        .await
-        .context(BlockingTaskSnafu)??;
+                |batch| {
+                    if tx.blocking_send(batch).is_err() {
+                        return Ok(false);
+                    }
+                    Ok(true)
+                },
+            );
+            drop(tx);
+            result
+        });
 
-        let (mut events, payload_byte_size) = self.decode_rows(&rows)?;
+        // Last row of the most recently sent batch. Used for tracking only after every batch succeeds.
+        let mut last_successfully_sent_row = None;
+        let mut total_payload_byte_size = 0;
+        let mut total_events = CountByteSize(0, JsonSize::zero());
+        let mut stream_error = None;
 
-        // Advance tracking metadata before sending events so a save failure does not
-        // emit rows that would be replayed on the next scheduled run.
+        while let Some(batch_rows) = rx.recv().await {
+            if batch_rows.is_empty() {
+                continue;
+            }
+
+            let (mut events, payload_byte_size) = match self.decode_rows(&batch_rows) {
+                Ok(result) => result,
+                Err(error) => {
+                    stream_error = Some(error);
+                    break;
+                }
+            };
+
+            total_payload_byte_size += payload_byte_size;
+            self.enrich_events(&mut events);
+
+            let event_count = events.len();
+            if event_count > 0 {
+                let byte_size = events.estimated_json_encoded_size_of();
+                if let Err(error) = out.clone().send_batch(events).await.context(SendSnafu) {
+                    stream_error = Some(error);
+                    break;
+                }
+                total_events += CountByteSize(event_count, byte_size);
+            }
+
+            last_successfully_sent_row = batch_rows.into_iter().next_back();
+        }
+
+        drop(rx);
+        let blocking_result = blocking.await.context(BlockingTaskSnafu)?;
+
+        if total_payload_byte_size > 0 {
+            bytes_received.emit(ByteSize(total_payload_byte_size));
+        }
+        if total_events.0 > 0 {
+            events_received.emit(total_events);
+        }
+
+        if let Some(error) = stream_error {
+            let _ = blocking_result;
+            return Err(error);
+        }
+
+        blocking_result?;
+
+        // Advance tracking metadata only after all batches are decoded and sent so a
+        // partial failure does not skip rows on the next scheduled run.
         let mut latest_result = None;
-        if let (Some(last), Some(tracking_columns)) = (rows.last(), cfg.tracking_columns.clone()) {
+        if let (Some(last), Some(tracking_columns)) =
+            (last_successfully_sent_row, cfg.tracking_columns.clone())
+        {
             latest_result = extract_and_save_tracking(
                 cfg.last_run_metadata_path.as_deref(),
-                last.clone(),
+                last,
                 tracking_columns,
                 tz,
             )
             .await?;
-        }
-
-        if payload_byte_size > 0 {
-            bytes_received.emit(ByteSize(payload_byte_size));
-        }
-        self.enrich_events(&mut events);
-
-        let event_count = events.len();
-        if event_count > 0 {
-            let byte_size = events.estimated_json_encoded_size_of();
-            let mut out = out.clone();
-            out.send_batch(events).await.context(SendSnafu)?;
-            events_received.emit(CountByteSize(event_count, byte_size));
         }
 
         Ok(latest_result)
@@ -331,10 +380,12 @@ async fn extract_and_save_tracking(
     Ok(Some(save_obj))
 }
 
-/// Executes an ODBC SQL query with optional parameters, fetches rows in batches,
-/// and returns the results as a vector of objects.
+/// Executes an ODBC SQL query with optional parameters and invokes `on_batch` for each
+/// fetched batch instead of accumulating the full result set in memory.
+///
+/// The callback returns `Ok(true)` to continue fetching or `Ok(false)` to stop early.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_query(
+pub(crate) fn execute_query<F>(
     env: &Environment,
     conn_str: &str,
     stmt_str: &str,
@@ -344,7 +395,11 @@ pub fn execute_query(
     tz: Tz,
     batch_size: usize,
     max_str_limit: Option<usize>,
-) -> Result<Rows, OdbcError> {
+    mut on_batch: F,
+) -> Result<(), OdbcError>
+where
+    F: FnMut(Rows) -> Result<bool, OdbcError>,
+{
     let conn_options = ConnectionOptions {
         login_timeout_sec: Some(login_timeout.as_secs() as u32),
         packet_size: None,
@@ -365,7 +420,7 @@ pub fn execute_query(
     .context(DbSnafu)?;
 
     let Some(mut cursor) = result else {
-        return Ok(Rows::default());
+        return Ok(());
     };
 
     let names = cursor
@@ -387,7 +442,7 @@ pub fn execute_query(
 
     let buffer = TextRowSet::for_cursor(batch_size, &mut cursor, max_str_limit).context(DbSnafu)?;
     let mut row_set_cursor = cursor.bind_buffer(buffer).context(DbSnafu)?;
-    let mut rows = Rows::with_capacity(batch_size);
+    let mut batch_rows = Rows::with_capacity(batch_size);
 
     while let Some(batch) = row_set_cursor
         .fetch_with_truncation_check(true)
@@ -407,11 +462,18 @@ pub fn execute_query(
                 cols.insert(key, value);
             }
 
-            rows.push(Value::Object(cols))
+            batch_rows.push(Value::Object(cols));
+        }
+
+        if !batch_rows.is_empty() {
+            if !on_batch(mem::take(&mut batch_rows))? {
+                break;
+            }
+            batch_rows.reserve(batch_size);
         }
     }
 
-    Ok(rows)
+    Ok(())
 }
 
 /// Loads the previously saved result and returns it as SQL parameters.
