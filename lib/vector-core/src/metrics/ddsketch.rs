@@ -295,6 +295,26 @@ impl AgentDDSketch {
         self.avg = avg;
     }
 
+    /// Sets the exact sum of the samples represented by this sketch, recomputing the average
+    /// from it and the current sample count.
+    ///
+    /// Bucketed histograms carry the exact sum of all observed values alongside their bucket
+    /// counts. When such a histogram is converted to a sketch, `insert_interpolate_buckets` can
+    /// only approximate the sum/average by spreading each bucket's count across the bucket's
+    /// bounds, so the approximation error grows with bucket width. This allows callers that know
+    /// the exact sum to restore it after interpolation.
+    ///
+    /// The interpolated `min`/`max` are widened if necessary so the summary statistics stay
+    /// mutually consistent (`min <= avg <= max`).
+    fn set_exact_sum(&mut self, sum: f64) {
+        self.sum = sum;
+        if self.count > 0 {
+            self.avg = sum / f64::from(self.count);
+            self.min = self.min.min(self.avg);
+            self.max = self.max.max(self.avg);
+        }
+    }
+
     pub fn gamma(&self) -> f64 {
         self.config.gamma_v
     }
@@ -799,10 +819,16 @@ impl AgentDDSketch {
                 }
                 Some(sketch)
             }
-            MetricValue::AggregatedHistogram { buckets, .. } => {
+            MetricValue::AggregatedHistogram { buckets, sum, .. } => {
                 let delta_buckets = mem::take(buckets);
+                let exact_sum = *sum;
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
+                // The histogram carries the exact sum of all observed values, which is more
+                // accurate than the sum approximated by interpolating within bucket bounds.
+                if exact_sum.is_finite() {
+                    sketch.set_exact_sum(exact_sum);
+                }
                 Some(sketch)
             }
             // We can't convert from any other metric value.
@@ -1108,7 +1134,10 @@ fn round_to_even(v: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{AGENT_DEFAULT_EPS, AgentDDSketch, Config, MAX_KEY, round_to_even};
-    use crate::event::metric::Bucket;
+    use crate::event::{
+        Metric, MetricKind, MetricValue,
+        metric::{Bucket, MetricSketch},
+    };
 
     const FLOATING_POINT_ACCEPTABLE_ERROR: f64 = 1.0e-10;
 
@@ -1243,6 +1272,50 @@ mod tests {
 
         // Assert the sketch remains unchanged.
         assert_eq!(sketch, AgentDDSketch::with_agent_defaults());
+    }
+
+    #[test]
+    fn test_transform_aggregated_histogram_to_sketch_uses_exact_sum() {
+        // Two samples of 0.005 land in the wide (0.001, 0.1] bucket. Interpolation alone
+        // spreads them uniformly across the bucket, so the approximated sum/avg can be off
+        // by an order of magnitude; the histogram's exact `sum` must win.
+        let histogram = Metric::new(
+            "histogram",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 0.001,
+                        count: 0,
+                    },
+                    Bucket {
+                        upper_limit: 0.1,
+                        count: 2,
+                    },
+                ],
+                count: 2,
+                sum: 0.01,
+            },
+        );
+
+        let transformed =
+            AgentDDSketch::transform_to_sketch(histogram).expect("should convert to sketch");
+        let MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(sketch),
+        } = transformed.value()
+        else {
+            panic!("should be an AgentDDSketch");
+        };
+
+        assert_eq!(sketch.count(), 2);
+        assert_eq!(sketch.sum(), Some(0.01));
+        assert_eq!(sketch.avg(), Some(0.005));
+
+        // Summary statistics stay mutually consistent.
+        let min = sketch.min().expect("sketch should not be empty");
+        let max = sketch.max().expect("sketch should not be empty");
+        let avg = sketch.avg().expect("sketch should not be empty");
+        assert!(min <= avg && avg <= max);
     }
 
     #[test]
