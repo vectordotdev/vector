@@ -35,9 +35,29 @@ impl Input {
 // and the execution time.
 #[derive(Deserialize, Serialize)]
 pub struct VrlCompileResult {
+    // Full-precision JSON rendering of `target_value`, produced on the Rust side.
+    //
+    // The result is marshaled into JS via `JsValue::from_serde`, which serializes to a
+    // JSON string and then calls JS `JSON.parse`. `JSON.parse` coerces every number into
+    // an f64, so any integer beyond the safe integer range for f64 (e.g. an XXH64/seahash hash or a
+    // nanosecond timestamp) loses its low-order digits. Serializing the event here and
+    // rendering this string verbatim in the UI keeps large integers exact.
+    pub output: String,
     pub runtime_result: Value,
     pub target_value: Value,
     pub elapsed_time: Option<f64>,
+}
+
+// Serialize a `Value` to pretty JSON using tab indentation, matching the layout the
+// playground previously produced with `JSON.stringify(value, null, "\t")`.
+fn to_pretty_json(value: &Value) -> String {
+    let mut buf = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+    let mut serializer = serde_json::Serializer::with_formatter(&mut buf, formatter);
+    match value.serialize(&mut serializer) {
+        Ok(()) => String::from_utf8(buf).unwrap_or_default(),
+        Err(_) => String::new(),
+    }
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -127,7 +147,8 @@ fn compile(
 
     match result {
         Ok(runtime_result) => Ok(VrlCompileResult {
-            runtime_result,                   // This is the value of the last expression.
+            output: to_pretty_json(&target_value.value), // Full-precision JSON for display.
+            runtime_result, // This is the value of the last expression.
             target_value: target_value.value, // The value of the final event
             elapsed_time,
         }),
@@ -164,4 +185,36 @@ pub fn vrl_version() -> String {
 #[wasm_bindgen]
 pub fn vrl_link() -> String {
     built_info::VRL_LINK.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    // `compile`/`run_vrl` can't be exercised here: they call `web_sys::window()`, which
+    // panics on non-wasm targets, so they need a `wasm-bindgen-test` harness. These tests
+    // instead cover `to_pretty_json`, which is where the precision fix lives.
+    use super::*;
+    use vrl::value::ObjectMap;
+
+    // A scalar integer larger than f64's safe range must serialize to its exact digits.
+    // JS `JSON.parse` (used when marshaling the wasm result) would round these; see
+    // https://github.com/vectordotdev/vrl/issues/1535.
+    #[test]
+    fn to_pretty_json_preserves_large_integers() {
+        // An XXH64 hash (`xxhash("foo", "XXH64")`).
+        assert_eq!(
+            to_pretty_json(&Value::from(3_728_699_739_546_630_719_i64)),
+            "3728699739546630719"
+        );
+        // A seahash whose `u64 as i64` reinterpretation wrapped negative (`seahash("bar")`).
+        assert_eq!(
+            to_pretty_json(&Value::from(-2_796_170_501_982_571_315_i64)),
+            "-2796170501982571315"
+        );
+    }
+
+    // An empty event renders the same as before (`JSON.stringify({}, null, "\t")`).
+    #[test]
+    fn to_pretty_json_renders_empty_object() {
+        assert_eq!(to_pretty_json(&Value::Object(ObjectMap::new())), "{}");
+    }
 }
