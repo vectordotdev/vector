@@ -4,14 +4,11 @@ use std::{
     num::NonZeroUsize,
     pin::Pin,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
     time::Instant,
 };
-
-#[cfg(test)]
-use std::sync::Mutex;
 
 use async_stream::stream;
 use crossbeam_queue::{ArrayQueue, SegQueue};
@@ -57,6 +54,12 @@ pub enum TrySendError<T> {
 pub struct DropOldestSendError<T> {
     pub error: TrySendError<T>,
     pub dropped: Vec<T>,
+}
+
+enum DropOldestStep<T> {
+    Acquired(OwnedSemaphorePermit),
+    Dropped(T),
+    Empty,
 }
 
 impl<T> TrySendError<T> {
@@ -239,6 +242,7 @@ impl Metrics {
 #[derive(Debug)]
 struct Inner<T> {
     data: Arc<dyn QueueImpl<(OwnedSemaphorePermit, T)>>,
+    queue_lock: Arc<Mutex<()>>,
     limit: MemoryBufferSize,
     limiter: Arc<Semaphore>,
     read_waker: Arc<Notify>,
@@ -250,6 +254,7 @@ impl<T> Clone for Inner<T> {
     fn clone(&self) -> Self {
         Self {
             data: self.data.clone(),
+            queue_lock: self.queue_lock.clone(),
             limit: self.limit,
             limiter: self.limiter.clone(),
             read_waker: self.read_waker.clone(),
@@ -271,6 +276,7 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
         match limit {
             MemoryBufferSize::MaxEvents(max_events) => Inner {
                 data: Arc::new(ArrayQueue::new(max_events.get())),
+                queue_lock: Arc::new(Mutex::new(())),
                 limit,
                 limiter: Arc::new(Semaphore::new(max_events.get())),
                 read_waker,
@@ -279,6 +285,7 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
             },
             MemoryBufferSize::MaxSize(max_bytes) => Inner {
                 data: Arc::new(SegQueue::new()),
+                queue_lock: Arc::new(Mutex::new(())),
                 limit,
                 limiter: Arc::new(Semaphore::new(max_bytes.get())),
                 read_waker,
@@ -301,6 +308,7 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
             let utilization = size.max(self.used_capacity());
             metrics.record(utilization, Instant::now());
         }
+        let _guard = self.queue_lock.lock().unwrap();
         self.data.push((permits, item));
         self.read_waker.notify_one();
     }
@@ -312,6 +320,11 @@ impl<T> Inner<T> {
     }
 
     fn pop_and_record(&self) -> Option<T> {
+        let _guard = self.queue_lock.lock().unwrap();
+        self.pop_and_record_locked()
+    }
+
+    fn pop_and_record_locked(&self) -> Option<T> {
         self.data.pop().map(|(permit, item)| {
             if let Some(metrics) = &self.metrics {
                 // Compute remaining utilization from the semaphore state. Since our permits haven't
@@ -325,6 +338,24 @@ impl<T> Inner<T> {
             drop(permit);
             item
         })
+    }
+
+    fn try_acquire_or_pop_oldest(
+        &self,
+        permits_required: u32,
+    ) -> Result<DropOldestStep<T>, TryAcquireError> {
+        let _guard = self.queue_lock.lock().unwrap();
+        match self
+            .limiter
+            .clone()
+            .try_acquire_many_owned(permits_required)
+        {
+            Ok(permits) => Ok(DropOldestStep::Acquired(permits)),
+            Err(TryAcquireError::NoPermits) => Ok(self
+                .pop_and_record_locked()
+                .map_or(DropOldestStep::Empty, DropOldestStep::Dropped)),
+            Err(error @ TryAcquireError::Closed) => Err(error),
+        }
     }
 }
 
@@ -428,71 +459,23 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
         let mut dropped = Vec::new();
 
         loop {
-            match self
-                .inner
-                .limiter
-                .clone()
-                .try_acquire_many_owned(permits_required)
-            {
-                Ok(permits) => {
+            match self.inner.try_acquire_or_pop_oldest(permits_required) {
+                Ok(DropOldestStep::Acquired(permits)) => {
                     self.inner.send_with_permits(size, permits, item);
                     trace!("Attempt to send item after dropping oldest queued items succeeded.");
                     return Ok(dropped);
                 }
-                Err(TryAcquireError::NoPermits) => {
+                Ok(DropOldestStep::Dropped(mut dropped_item)) => {
+                    dropped_item
+                        .take_finalizers()
+                        .update_status(EventStatus::Rejected);
+                    dropped.push(dropped_item);
+                }
+                Ok(DropOldestStep::Empty) => {
                     let notified = self.inner.read_waker.notified();
-                    match self
-                        .inner
-                        .limiter
-                        .clone()
-                        .try_acquire_many_owned(permits_required)
-                    {
-                        Ok(permits) => {
-                            self.inner.send_with_permits(size, permits, item);
-                            trace!(
-                                "Attempt to send item after rechecking available capacity succeeded."
-                            );
-                            return Ok(dropped);
-                        }
-                        Err(TryAcquireError::NoPermits) => {
-                            if let Some(mut dropped_item) = self.inner.pop_and_record() {
-                                dropped_item
-                                    .take_finalizers()
-                                    .update_status(EventStatus::Rejected);
-                                dropped.push(dropped_item);
-                            } else {
-                                match self
-                                    .inner
-                                    .limiter
-                                    .clone()
-                                    .try_acquire_many_owned(permits_required)
-                                {
-                                    Ok(permits) => {
-                                        self.inner.send_with_permits(size, permits, item);
-                                        trace!(
-                                            "Attempt to send item after queue drained succeeded."
-                                        );
-                                        return Ok(dropped);
-                                    }
-                                    Err(TryAcquireError::NoPermits) => tokio::select! {
-                                        () = notified => {}
-                                        () = tokio::task::yield_now() => {}
-                                    },
-                                    Err(TryAcquireError::Closed) => {
-                                        return Err(DropOldestSendError {
-                                            error: TrySendError::Disconnected(item),
-                                            dropped,
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                        Err(TryAcquireError::Closed) => {
-                            return Err(DropOldestSendError {
-                                error: TrySendError::Disconnected(item),
-                                dropped,
-                            });
-                        }
+                    tokio::select! {
+                        () = notified => {}
+                        () = tokio::task::yield_now() => {}
                     }
                 }
                 Err(TryAcquireError::Closed) => {
@@ -500,6 +483,9 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
                         error: TrySendError::Disconnected(item),
                         dropped,
                     });
+                }
+                Err(TryAcquireError::NoPermits) => {
+                    unreachable!("try_acquire_or_pop_oldest handles missing permits internally")
                 }
             }
         }
