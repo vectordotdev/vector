@@ -577,6 +577,14 @@ default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendore
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
+# Per-component allocation tracking (wraps the global allocator with a tracing
+# wrapper that attributes every alloc/dealloc to a component group ID and emits
+# `component_allocated_bytes_total` / `component_deallocated_bytes_total` /
+# `component_allocated_bytes` internal metrics). Off by default because the
+# wrapper imposes a per-allocation atomic-load + branch even when the runtime
+# `--allocation-tracing` flag is disabled.
+allocation-tracing = []
+
 # VRL functions control features
 vrl-functions-env = ["vrl/enable_env_functions"]
 vrl-functions-system = ["vrl/enable_system_functions"]
