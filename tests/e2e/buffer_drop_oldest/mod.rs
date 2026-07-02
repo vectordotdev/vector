@@ -71,13 +71,16 @@ async fn wait_for_vector(client: &Client, vector: &str) {
 }
 
 async fn reset_collector(client: &Client, collector: &str) {
-    client
-        .post(format!("{collector}/reset"))
-        .send()
-        .await
-        .expect("resetting collector should succeed")
-        .error_for_status()
-        .expect("collector reset response should be successful");
+    for _ in 0..MAX_RETRIES {
+        if let Ok(response) = client.post(format!("{collector}/reset")).send().await
+            && response.error_for_status().is_ok()
+        {
+            return;
+        }
+        tokio::time::sleep(WAIT_INTERVAL).await;
+    }
+
+    panic!("collector did not become reachable at {collector}");
 }
 
 #[tokio::test]
