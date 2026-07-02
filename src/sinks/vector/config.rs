@@ -162,7 +162,12 @@ impl SinkConfig for VectorConfig {
 
         let client = new_client(&tls, cx.proxy())?;
 
-        let healthcheck = healthchecks(client.clone(), &uris, cx.healthcheck);
+        let healthcheck = healthchecks(
+            client.clone(),
+            &uris,
+            cx.healthcheck,
+            self.endpoint_strategy,
+        );
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -601,33 +606,62 @@ fn healthchecks(
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     uris: &[Uri],
     options: SinkHealthcheckOptions,
+    endpoint_strategy: EndpointStrategy,
 ) -> Healthcheck {
     if !options.enabled {
         return Box::pin(futures::future::ok(()));
     }
 
-    let healthcheck_uris = options
+    let healthcheck_uris = healthcheck_uris_for_strategy(uris, &options, endpoint_strategy);
+
+    let healthchecks = healthcheck_uris.into_iter().map(move |uri| {
+        let service = VectorService::new(client.clone(), uri, VectorCompression::None);
+        let timeout = options.timeout;
+        healthcheck(
+            service,
+            SinkHealthcheckOptions {
+                enabled: true,
+                uri: None,
+                timeout,
+            },
+        )
+        .boxed()
+    });
+
+    match endpoint_strategy {
+        // Load balancing can route data to any endpoint, so all endpoints must
+        // pass the startup healthcheck. Otherwise a sink can start with a bad
+        // endpoint that later rejects non-retriable batches.
+        EndpointStrategy::LoadBalance => {
+            Box::pin(futures::future::try_join_all(healthchecks).map_ok(|_| ()))
+        }
+        EndpointStrategy::Failover | EndpointStrategy::FailoverPrimary => {
+            Box::pin(futures::future::select_ok(healthchecks).map_ok(|((), _)| ()))
+        }
+    }
+}
+
+fn requires_all_endpoint_healthchecks(
+    endpoint_strategy: EndpointStrategy,
+    endpoint_count: usize,
+) -> bool {
+    matches!(endpoint_strategy, EndpointStrategy::LoadBalance) && endpoint_count > 1
+}
+
+fn healthcheck_uris_for_strategy(
+    uris: &[Uri],
+    options: &SinkHealthcheckOptions,
+    endpoint_strategy: EndpointStrategy,
+) -> Vec<Uri> {
+    if requires_all_endpoint_healthchecks(endpoint_strategy, uris.len()) {
+        return uris.to_vec();
+    }
+
+    options
         .uri
         .clone()
         .map(|uri| vec![uri.uri])
-        .unwrap_or_else(|| uris.to_vec());
-
-    Box::pin(
-        futures::future::select_ok(healthcheck_uris.into_iter().map(move |uri| {
-            let service = VectorService::new(client.clone(), uri, VectorCompression::None);
-            let timeout = options.timeout;
-            healthcheck(
-                service,
-                SinkHealthcheckOptions {
-                    enabled: true,
-                    uri: None,
-                    timeout,
-                },
-            )
-            .boxed()
-        }))
-        .map_ok(|((), _)| ()),
-    )
+        .unwrap_or_else(|| uris.to_vec())
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
@@ -723,6 +757,7 @@ impl HealthLogic for VectorGrpcHealthLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sinks::util::UriSerde;
 
     #[test]
     fn health_logic_ignores_non_retriable_vector_errors() {
@@ -1021,5 +1056,102 @@ mod tests {
         assert_eq!(attempt, 1);
         assert_eq!(attempts, vec![1, 0, 1, 2]);
         assert_eq!(remaining_attempts, 3);
+    }
+
+    #[test]
+    fn only_load_balancing_requires_all_endpoint_healthchecks() {
+        assert!(requires_all_endpoint_healthchecks(
+            EndpointStrategy::LoadBalance,
+            2
+        ));
+        assert!(!requires_all_endpoint_healthchecks(
+            EndpointStrategy::LoadBalance,
+            1
+        ));
+        assert!(!requires_all_endpoint_healthchecks(
+            EndpointStrategy::Failover,
+            2
+        ));
+        assert!(!requires_all_endpoint_healthchecks(
+            EndpointStrategy::FailoverPrimary,
+            2
+        ));
+    }
+
+    #[test]
+    fn load_balancing_healthchecks_all_configured_endpoints_even_with_override_uri() {
+        let endpoints = vec![
+            "http://endpoint-a.example.com".parse().unwrap(),
+            "http://endpoint-b.example.com".parse().unwrap(),
+        ];
+        let options = SinkHealthcheckOptions {
+            uri: Some("http://health.example.com".parse::<UriSerde>().unwrap()),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::LoadBalance),
+            endpoints
+        );
+    }
+
+    #[test]
+    fn single_endpoint_load_balancing_healthcheck_can_use_override_uri() {
+        let endpoints = vec!["http://endpoint-a.example.com".parse().unwrap()];
+        let override_uri = "http://health.example.com".parse::<UriSerde>().unwrap().uri;
+        let options = SinkHealthcheckOptions {
+            uri: Some(UriSerde {
+                uri: override_uri.clone(),
+                auth: None,
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::LoadBalance),
+            vec![override_uri]
+        );
+    }
+
+    #[test]
+    fn failover_healthchecks_can_use_override_uri() {
+        let endpoints = vec![
+            "http://endpoint-a.example.com".parse().unwrap(),
+            "http://endpoint-b.example.com".parse().unwrap(),
+        ];
+        let override_uri = "http://health.example.com".parse::<UriSerde>().unwrap().uri;
+        let options = SinkHealthcheckOptions {
+            uri: Some(UriSerde {
+                uri: override_uri.clone(),
+                auth: None,
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::Failover),
+            vec![override_uri]
+        );
+    }
+
+    #[test]
+    fn failover_primary_healthchecks_can_use_override_uri() {
+        let endpoints = vec![
+            "http://endpoint-a.example.com".parse().unwrap(),
+            "http://endpoint-b.example.com".parse().unwrap(),
+        ];
+        let override_uri = "http://health.example.com".parse::<UriSerde>().unwrap().uri;
+        let options = SinkHealthcheckOptions {
+            uri: Some(UriSerde {
+                uri: override_uri.clone(),
+                auth: None,
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::FailoverPrimary),
+            vec![override_uri]
+        );
     }
 }
