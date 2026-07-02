@@ -335,6 +335,13 @@ struct LogstashDecoder {
     // preserve sender window boundaries even if ReadyFrames later batches
     // multiple decoded windows together before ACKing.
     window_events_remaining: Option<NonZeroUsize>,
+    // Set for the decoder used to parse a decompressed payload. No known
+    // Lumberjack/Beats client emits a compressed frame nested inside another,
+    // so a nested `C` frame here is rejected rather than recursed into.
+    // Without this, an attacker could nest compressed frames arbitrarily deep
+    // and drive unbounded recursion in `decode_compressed_frame`, exhausting
+    // the stack (CWE-674).
+    nested: bool,
 }
 
 impl LogstashDecoder {
@@ -348,6 +355,15 @@ impl LogstashDecoder {
         Self {
             state: LogstashDecoderReadState::ReadProtocol,
             window_events_remaining,
+            nested: false,
+        }
+    }
+
+    const fn new_nested(window_events_remaining: Option<NonZeroUsize>) -> Self {
+        Self {
+            state: LogstashDecoderReadState::ReadProtocol,
+            window_events_remaining,
+            nested: true,
         }
     }
 
@@ -396,6 +412,8 @@ pub enum DecodeError {
         "Received a WindowSize frame before the current window completed ({remaining} events still expected)"
     ))]
     PrematureWindowSize { remaining: usize },
+    #[snafu(display("Compressed frame contains a nested compressed frame"))]
+    NestedCompressedFrame,
 }
 
 impl StreamDecodingError for DecodeError {
@@ -639,6 +657,10 @@ impl Decoder for LogstashDecoder {
                 // overwrite any WindowSize boundaries that were established inside the compressed
                 // payload and can also lose progress from a partially consumed outer window.
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Compressed) => {
+                    if self.nested {
+                        return Err(DecodeError::NestedCompressedFrame);
+                    }
+
                     let Some(decoded) = decode_compressed_frame(src, self.window_events_remaining)?
                     else {
                         return Ok(None);
@@ -794,7 +816,7 @@ fn decode_compressed_frame(
 
     let mut buf = res?;
 
-    let mut decoder = LogstashDecoder::new_with_window_events_remaining(window_events_remaining);
+    let mut decoder = LogstashDecoder::new_nested(window_events_remaining);
 
     let mut frames = VecDeque::new();
 
@@ -1161,6 +1183,23 @@ mod test {
             !err.can_continue(),
             "a premature WindowSize inside a compressed frame must be fatal",
         );
+    }
+
+    #[test]
+    fn nested_compressed_frame_is_a_fatal_decode_error() {
+        let mut inner = BytesMut::new();
+        push_req(&mut inner, 1, &[("message", "should never be reached")]);
+
+        let mut middle = BytesMut::new();
+        push_compressed(&mut middle, &inner);
+
+        let mut req = BytesMut::new();
+        push_compressed(&mut req, &middle);
+
+        let mut decoder = LogstashDecoder::new();
+        let err = decoder.decode(&mut req).unwrap_err();
+        assert!(matches!(err, DecodeError::NestedCompressedFrame));
+        assert!(!err.can_continue());
     }
 
     #[tokio::test]
