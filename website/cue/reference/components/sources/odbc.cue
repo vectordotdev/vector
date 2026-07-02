@@ -5,7 +5,7 @@ components: sources: odbc: {
 
 	classes: {
 		commonly_used: false
-		delivery:      "at_least_once"
+		delivery:      "best_effort"
 		deployment_roles: ["daemon", "sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "batch"
@@ -27,7 +27,14 @@ components: sources: odbc: {
 
 	support: {
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+				When `last_run_metadata_path` is set, tracking metadata is updated before events
+				are sent downstream. If Vector restarts or a downstream sink fails after the
+				checkpoint is saved, rows can be lost and will not be replayed on the next
+				scheduled run.
+				""",
+		]
 		notices: []
 	}
 
