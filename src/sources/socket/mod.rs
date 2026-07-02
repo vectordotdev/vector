@@ -142,6 +142,7 @@ impl SourceConfig for SocketConfig {
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     config.max_connection_duration_secs(),
+                    config.disconnect_mode(),
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -367,6 +368,7 @@ mod test {
     };
 
     use super::{SocketConfig, tcp::TcpConfig, udp::UdpConfig};
+    use crate::sources::util::net::DisconnectMode;
     use crate::{
         SourceSender,
         config::{ComponentKey, GlobalOptions, SourceConfig, SourceContext, log_schema},
@@ -920,6 +922,38 @@ mod test {
                     Err(e) => panic!("{e:}")
                  }
              }
+        }
+    }
+
+    #[tokio::test]
+    async fn tcp_disconnect_mode_abort_on_shutdown() {
+        let source_id = ComponentKey::from("tcp_disconnect_mode_abort_on_shutdown");
+        let (tx, _) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_disconnect_mode(DisconnectMode::Abort);
+        let source_task = SocketConfig::from(source_config).build(cx).await.unwrap();
+
+        drop(tokio::spawn(source_task));
+        wait_for_tcp_and_release(guard, addr).await;
+
+        let mut stream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let mut buffer = [0u8; 10];
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        tokio::spawn(shutdown.shutdown_source(&source_id, deadline));
+
+        let read_result = tokio::time::timeout(Duration::from_secs(5), stream.read(&mut buffer))
+            .await
+            .expect("timed out waiting for connection to close");
+
+        match read_result {
+            Err(e) => assert_eq!(e.kind(), std::io::ErrorKind::ConnectionReset),
+            Ok(n) => panic!("expected connection reset, got Ok({n})"),
         }
     }
 

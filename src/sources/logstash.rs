@@ -22,7 +22,7 @@ use vector_lib::{
 };
 use vrl::value::{KeyString, Kind, kind::Collection};
 
-use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{DisconnectMode, SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -62,6 +62,10 @@ pub struct LogstashConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     #[configurable(metadata(docs::advanced))]
     connection_limit: Option<u32>,
+
+    #[configurable(derived)]
+    #[serde(default = "default_disconnect_mode")]
+    disconnect_mode: DisconnectMode,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -116,6 +120,12 @@ impl LogstashConfig {
     }
 }
 
+// Mimic Logstash's Beats input plugin which sets SO_LINGER=0 by default:
+// https://github.com/logstash-plugins/logstash-input-beats/blob/4898d37c63255c109bea73f3c7eccdd0421f532f/src/main/java/org/logstash/beats/Server.java#L72
+const fn default_disconnect_mode() -> DisconnectMode {
+    DisconnectMode::Abort
+}
+
 impl Default for LogstashConfig {
     fn default() -> Self {
         Self {
@@ -126,6 +136,7 @@ impl Default for LogstashConfig {
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
             connection_limit: None,
+            disconnect_mode: default_disconnect_mode(),
             log_namespace: None,
         }
     }
@@ -164,6 +175,7 @@ impl SourceConfig for LogstashConfig {
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
+            self.disconnect_mode,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -834,6 +846,7 @@ mod test {
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
             connection_limit: None,
+            disconnect_mode: default_disconnect_mode(),
             log_namespace: None,
         }
         .build(SourceContext::new_test(sender, None))
@@ -1382,6 +1395,7 @@ mod integration_tests {
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                disconnect_mode: default_disconnect_mode(),
                 log_namespace: None,
             }
             .build(SourceContext::new_test(sender, None))
