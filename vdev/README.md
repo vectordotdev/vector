@@ -14,6 +14,7 @@ Table of Contents:
 - [Running Tests](#running-tests)
   - [Running Integration tests](#running-integration-tests)
 - [Developing vdev](#developing-vdev)
+- [Releasing vdev](#releasing-vdev)
 
 ## Pre-requisites
 
@@ -39,7 +40,7 @@ CI installs vdev from a published binary release via [cargo-binstall](https://gi
 ./scripts/environment/prepare.sh --modules=vdev
 ```
 
-This pins the vdev version defined in `prepare.sh` and fetches the matching pre-compiled binary.
+This installs the vdev version declared in `vdev/Cargo.toml` by fetching the matching pre-compiled binary from the GitHub release. If no matching release exists yet — e.g. you're on a branch that bumped the version but hasn't been tagged — `prepare.sh` falls back to building vdev from your working tree (`cargo install --path vdev`), which is slower but ensures the installed binary reflects your branch's vdev source.
 
 For a quick install of the latest published vdev (not pinned):
 
@@ -80,3 +81,7 @@ cargo install -f --path vdev
 The CLI uses [Clap](https://github.com/clap-rs/clap) with the `derive` construction mechanism and is stored in the [commands](src/commands) directory.
 
 Every command group/namespace has its own directory with a `cli` module, including the root `vdev` command group. All commands have an `exec` method that provides the actual implementation, which in the case of command groups will be calling sub-commands.
+
+## Releasing vdev
+
+To release a new version of vdev, open a PR that bumps the `version` field in `vdev/Cargo.toml`. When the PR merges to `master`, CI automatically creates the `vdev-vX.Y.Z` tag, which triggers the publish workflow to build the binaries and publish the crate to crates.io.

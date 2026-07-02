@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints]
+workspace = true
+
 [dependencies]
 chrono-tz.workspace = true
 vector-vrl-functions = { workspace = true, features = ["dnstap", "vrl-metrics"] }

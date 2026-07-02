@@ -2,10 +2,7 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::{
-    testing::runner::{LocalTestRunner, TestRunner as _},
-    utils::platform,
-};
+use crate::testing::runner::{LocalTestRunner, TestRunner as _};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -17,6 +14,13 @@ pub struct Cli {
     /// Environment variables in the form KEY[=VALUE]
     #[arg(short, long)]
     env: Option<Vec<String>>,
+
+    /// Features to activate (comma-separated, or set FEATURES env var)
+    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
+    features: Vec<String>,
+
+    #[arg(long)]
+    no_default_features: bool,
 }
 
 fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
@@ -33,15 +37,23 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        let features: Vec<String> = self
+            .features
+            .into_iter()
+            .filter(|f| !f.is_empty())
+            .collect();
+
         let mut args = vec!["--workspace".to_string()];
+
+        if self.no_default_features {
+            args.push("--no-default-features".to_string());
+        }
+        if !features.is_empty() {
+            args.extend(["--features".to_string(), features.join(",")]);
+        }
 
         if let Some(mut extra_args) = self.args {
             args.append(&mut extra_args);
-        }
-
-        if !args.contains(&"--features".to_string()) {
-            let features = platform::default_features();
-            args.extend(["--features".to_string(), features.to_string()]);
         }
 
         LocalTestRunner.test(

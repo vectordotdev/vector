@@ -124,8 +124,8 @@ async fn wait_for_traces() {
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
-        let config_raw = "address = \"0.0.0.0:8081\"".to_string();
-        let config = toml::from_str::<DatadogAgentConfig>(config_raw.as_str()).unwrap();
+        let config =
+            serde_yaml::from_str::<DatadogAgentConfig>("address: \"0.0.0.0:8081\"").unwrap();
         config.build(context).await.unwrap().await.unwrap()
     });
     let events = spawn_collect_n(

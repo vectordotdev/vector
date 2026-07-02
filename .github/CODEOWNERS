@@ -3,6 +3,8 @@
 .github/workflows/regression.yml @vectordotdev/vector @vectordotdev/single-machine-performance
 regression/config.yaml @vectordotdev/vector @vectordotdev/single-machine-performance
 
+tests/antithesis/ @vectordotdev/vector @vectordotdev/single-machine-performance
+
 website/ @vectordotdev/vector
 website/js @vectordotdev/vector @vectordotdev/vector-website
 website/layouts @vectordotdev/vector @vectordotdev/vector-website
@@ -13,5 +15,6 @@ website/* @vectordotdev/vector @vectordotdev/vector-website
 # Keep documentation team paths in sync with .github/workflows/add_docs_review_label.yml
 /*.md @vectordotdev/vector @vectordotdev/documentation
 docs/ @vectordotdev/vector @vectordotdev/documentation
+deprecation.d/ @vectordotdev/vector @vectordotdev/documentation
 website/content @vectordotdev/vector @vectordotdev/documentation
 website/cue/reference @vectordotdev/vector @vectordotdev/documentation

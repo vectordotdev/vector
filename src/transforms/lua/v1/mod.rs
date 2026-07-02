@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt, stream};
@@ -388,7 +391,7 @@ mod tests {
     fn lua_read_empty_field() {
         let event = transform_one(
             r#"
-              if event["non-existant"] == nil then
+              if event["non-existent"] == nil then
                 event["result"] = "empty"
               else
                 event["result"] = "found"

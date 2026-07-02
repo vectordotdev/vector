@@ -358,6 +358,10 @@ impl<'a> SendGroup<'a> {
 
     fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
         if let Some(send) = self.sends.remove(id) {
+            // Deliberately not instrumented with the current span: this drains a send to a sink
+            // that has just been detached from the topology, so it is unrelated to the upstream
+            // component that owns this fanout. Attaching the current span would mis-tag this
+            // task's logs with the upstream component's identity rather than the detached sink's.
             tokio::spawn(async move {
                 if let Err(e) = send.await {
                     warn!(
@@ -866,13 +870,14 @@ mod tests {
             .expect("should not fail");
     }
 
+    #[cfg(debug_assertions)]
     #[tokio::test]
     #[should_panic(expected = "Fanout received empty event batch from upstream component")]
     async fn fanout_panics_on_empty_event_array_in_debug_builds() {
         let (mut fanout, _, _receivers) = fanout_from_senders(&[2, 2]);
         let empty: EventArray = Vec::<LogEvent>::new().into();
 
-        let _ = fanout.send(empty, None).await;
+        _ = fanout.send(empty, None).await;
     }
 
     #[tokio::test]

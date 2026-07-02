@@ -55,7 +55,7 @@ impl ElasticsearchCommon {
         }
 
         for (header, value) in &self.request.headers {
-            builder = builder.header(&header[..], &value[..]);
+            builder = builder.header(header.as_str(), value.as_str());
         }
 
         let mut request = builder.body(Bytes::new())?;

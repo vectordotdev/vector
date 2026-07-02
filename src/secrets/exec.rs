@@ -179,7 +179,7 @@ async fn query_backend(
         .ok_or("unable to acquire stdout")?;
 
     let query = serde_json::to_vec(&query)?;
-    tokio::spawn(async move { stdin.write_all(&query).await });
+    crate::spawn_in_current_span(async move { stdin.write_all(&query).await });
 
     let timeout = time::sleep(time::Duration::from_secs(timeout));
     tokio::pin!(timeout);

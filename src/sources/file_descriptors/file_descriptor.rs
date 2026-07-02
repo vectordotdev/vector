@@ -249,7 +249,7 @@ mod tests {
             write(&write_fd, b"hello world\nhello world again\n").unwrap();
             // Consume the OwnedFd without closing it to avoid double-close
             // with the File created in build().
-            let _ = write_fd.into_raw_fd();
+            _ = write_fd.into_raw_fd();
 
             let context = SourceContext::new_test(tx, None);
             config.build(context).await.unwrap().await.unwrap();
