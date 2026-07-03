@@ -208,6 +208,15 @@ impl CuckooMemoryTable {
                     Ok(file) => file,
                     Err(err) => match err.kind() {
                         std::io::ErrorKind::NotFound => {
+                            if let Some(parent) = path.parent()
+                                && File::open(parent).is_err()
+                            {
+                                return Err(format!(
+                                    "Cuckoo filter persistence path ({}) doesn't exist. This will prevent exporting the cuckoo filter state. Fix the `persistence_path` to ensure export works.",
+                                    parent.to_str().unwrap_or(""),
+                                )
+                                .into());
+                            }
                             break 'import CuckooFilter::new_random_exportable(built_config);
                         }
                         _ => {
