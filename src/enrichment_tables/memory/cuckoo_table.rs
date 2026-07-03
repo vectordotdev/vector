@@ -110,10 +110,16 @@ pub struct CuckooMemoryConfig {
     /// Number of bits to use to track counter. This will limit the max value.
     #[serde(default = "default_cuckoo_counter_bits")]
     pub counter_bits: NonZeroUsize,
-    /// Field in the incoming value used as the counter override.
+    /// Field in the incoming value used as the counter increment override.
     #[configurable(derived)]
     #[serde(default)]
     pub counter_field: OptionalValuePath,
+    /// The amount to increment the counter by on every insertion. Negative values are allowed.
+    #[serde(default = "default_cuckoo_counter_insertion_increment")]
+    pub counter_insertion_increment: i32,
+    /// The amount to increment the counter by on every lookup. Negative values are allowed.
+    #[serde(default = "default_cuckoo_counter_lookup_increment")]
+    pub counter_lookup_increment: i32,
     /// Path to the file to export data to periodically and on exit.
     /// Data will be imported from this file on startup.
     #[configurable(derived)]
@@ -188,6 +194,14 @@ const fn default_cuckoo_lru_increment() -> u32 {
 
 const fn default_cuckoo_counter_bits() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(8) }
+}
+
+const fn default_cuckoo_counter_insertion_increment() -> i32 {
+    1
+}
+
+const fn default_cuckoo_counter_lookup_increment() -> i32 {
+    1
 }
 
 const fn default_cuckoo_max_kicks() -> usize {
@@ -358,7 +372,8 @@ impl CuckooMemoryTable {
         if cuckoo_config.counter_enabled {
             builder = builder.with_counter(CounterConfig {
                 counter_bits: cuckoo_config.counter_bits.get().try_into()?,
-                ..Default::default()
+                change_on_insert: cuckoo_config.counter_insertion_increment,
+                change_on_lookup: cuckoo_config.counter_lookup_increment,
             });
         }
 
@@ -725,6 +740,8 @@ mod tests {
             counter_enabled: false,
             counter_bits: default_cuckoo_counter_bits(),
             counter_field: OptionalValuePath::none(),
+            counter_insertion_increment: default_cuckoo_counter_insertion_increment(),
+            counter_lookup_increment: default_cuckoo_counter_lookup_increment(),
             persistence_path: None,
             export_interval: None,
             scanning_threads: None,

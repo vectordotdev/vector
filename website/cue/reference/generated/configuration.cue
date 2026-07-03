@@ -245,7 +245,17 @@ generated: configuration: {
 							}
 							counter_field: {
 								type: string: default: ""
-								description: "Field in the incoming value used as the counter override."
+								description: "Field in the incoming value used as the counter increment override."
+								required:    false
+							}
+							counter_insertion_increment: {
+								type: int: default: 1
+								description: "The amount to increment the counter by on every insertion. Negative values are allowed."
+								required:    false
+							}
+							counter_lookup_increment: {
+								type: int: default: 1
+								description: "The amount to increment the counter by on every lookup. Negative values are allowed."
 								required:    false
 							}
 							export_interval: {
