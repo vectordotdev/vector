@@ -111,13 +111,12 @@ body {
 }
 
 div#App {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   width: calc(100% - 40px);
   max-width: 1600px;
   height: calc(100vh - 240px);
-  grid-template-columns: minmax(45%, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
-  grid-gap: 1rem;
+  gap: 1rem;
   padding: 20px 20px;
   margin: 0 auto;
 }
@@ -126,10 +125,9 @@ div#toolbar-section {
   padding: 10px 0;
   display: flex;
   flex-wrap: wrap;
-  grid-row: 1;
-  grid-column: 1 / -1;
   gap: 1rem;
   align-items: center;
+  flex: 0 0 auto;
 }
 
 #toolbar-section #run-code-btn,
@@ -139,31 +137,58 @@ div#toolbar-section {
   min-width: 120px;
 }
 
+#main-split {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 div#input-section,
 div#output-section {
   border: 1px solid var(--datadog-gray-lighter);
   border-radius: 4px;
-}
-
-div#input-section {
-  display: grid;
-  grid-column: 1;
-  grid-row: 2;
-}
-
-div#output-section {
-  display: grid;
-  grid-column: 2;
-  grid-row: 2;
-  grid-template-rows: 1fr 1fr;
-  gap: 1rem;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 #input-section #cell,
 #output-section #event-cell,
 #output-section #output-cell {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#container-program,
+#container-event,
+#container-output {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.gutter {
+  background-color: var(--datadog-purple-light);
+  transition: background-color 0.2s ease;
+}
+
+.gutter:hover {
+  background-color: var(--datadog-purple);
+}
+
+.gutter.gutter-horizontal {
+  cursor: col-resize;
+}
+
+.gutter.gutter-vertical {
+  cursor: row-resize;
 }
 
 .cell-title {
@@ -282,28 +307,17 @@ div#output-section {
   }
 
   div#App {
-    grid-template-columns: 1fr;
     height: auto;
     min-height: calc(100vh - 180px);
   }
 
-  div#input-section {
-    grid-column: 1;
-    grid-row: 2;
-    height: 40vh;
-  }
-
-  div#output-section {
-    grid-column: 1;
-    grid-row: 3;
-    grid-template-rows: auto auto;
-    grid-template-columns: 1fr;
-    height: auto;
+  #main-split {
+    flex-direction: column;
   }
 
   #output-section #event-cell,
   #output-section #output-cell {
-    height: 30vh;
+    min-height: 30vh;
   }
 }
 
