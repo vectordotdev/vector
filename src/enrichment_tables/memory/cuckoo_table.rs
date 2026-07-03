@@ -674,20 +674,24 @@ impl StreamSink<Event> for CuckooMemoryTable {
                             emit!(MemoryEnrichmentTableTtlExpiredCount {
                                 count: expired as u64
                             });
+                            scans_in_progress.fetch_sub(1, Ordering::AcqRel);
+                        }.in_current_span();
+                        handles.spawn(task);
+                    }
+                    if !self.cuckoo_config.concurrent_scanning {
+                        let _ = handles.join_all().await;
+                        emit!(MemoryEnrichmentTableFlushed {
+                            new_objects_count: filter.get_item_count(),
+                            new_byte_size: filter.get_memory_usage()
+                        });
+                    } else {
+                        tokio::spawn(async move {
+                            let _ = handles.join_all().await;
                             emit!(MemoryEnrichmentTableFlushed {
                                 new_objects_count: filter.get_item_count(),
                                 new_byte_size: filter.get_memory_usage()
                             });
-                            scans_in_progress.fetch_sub(1, Ordering::AcqRel);
-                        }.in_current_span();
-                        if !self.cuckoo_config.concurrent_scanning {
-                            handles.spawn(task);
-                        } else {
-                            tokio::spawn(task);
-                        }
-                    }
-                    if !self.cuckoo_config.concurrent_scanning {
-                        let _ = handles.join_all().await;
+                        });
                     }
                 }
             }
