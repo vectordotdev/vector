@@ -647,8 +647,16 @@ impl StreamSink<Event> for CuckooMemoryTable {
                     for i in 0..count.get() {
                         let filter = filter.clone();
                         let scans_in_progress = Arc::clone(&scans_in_progress);
+                        let lru_deletion_enabled = self.cuckoo_config.lru_deletion_enabled;
                         let task = async move {
-                            let expired = filter.scan_and_update_full_partition(count, i);
+                            let expired = if lru_deletion_enabled {
+                                filter.scan_and_update_lru_partition(count, i);
+                                // Run TTL scan separately when LRU deletion is enabled, to ensure
+                                // correct TTL expired count
+                                filter.scan_and_update_ttl_partition(count, i)
+                            } else {
+                                filter.scan_and_update_full_partition(count, i)
+                            };
                             emit!(MemoryEnrichmentTableTtlExpiredCount {
                                 count: expired as u64
                             });
