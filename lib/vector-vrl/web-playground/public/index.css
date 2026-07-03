@@ -384,6 +384,18 @@ div#output-section {
     flex-direction: column;
   }
 
+  #main-split > #input-section,
+  #main-split > #output-section {
+    width: 100% !important;
+    flex-basis: auto !important;
+    height: auto !important;
+    min-height: 40vh;
+  }
+
+  #main-split > .gutter.gutter-horizontal {
+    display: none;
+  }
+
   #output-section #event-cell,
   #output-section #output-cell {
     min-height: 30vh;
