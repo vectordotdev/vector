@@ -216,12 +216,19 @@ div#output-section {
   flex-direction: column;
 }
 
-#input-section #cell,
+#input-section #cell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Split.js writes inline flex-basis for vertical sizing — don't collapse to 0 */
 #output-section #event-cell,
 #output-section #output-cell {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
 }
