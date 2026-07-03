@@ -195,11 +195,11 @@ div#output-section {
 .cell-title {
   font-weight: 600;
   font-size: 14px;
-  color: var(--datadog-gray);
+  color: var(--datadog-purple);
   margin: 0;
   padding: 8px 12px;
-  background-color: var(--datadog-gray-lighter);
-  border-bottom: 1px solid var(--datadog-gray-light);
+  background-color: var(--datadog-purple-lightest);
+  border-bottom: 1px solid var(--datadog-purple-light);
 }
 
 /* BUTTONS */
