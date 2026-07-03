@@ -55,18 +55,21 @@ fn assert_cpu_counter_positive(metrics: &[Metric], transform_id: &str) {
     }
 }
 
-/// Builds and runs a source → transform (with `measure_cpu_usage = true`) → sink
-/// topology, sends `EVENT_COUNT` events through it, and returns the captured
-/// metrics after the topology stops.
+/// Builds and runs a source → transform → sink topology, sends `EVENT_COUNT`
+/// events through it, and returns the captured metrics after the topology
+/// stops.
 ///
 /// `transform_id` is unique per call-site so that `has_transform_tags` can
 /// discriminate this topology's metrics from those of concurrently-running
 /// tests that share the same process-wide registry.
 ///
+/// `measure_cpu_usage` controls the transform's `measure_cpu_usage` flag.
+///
 /// `make_config` receives a base `NoopTransformConfig` and can apply extra
 /// options (e.g. `.with_concurrency()`) before the topology is assembled.
 async fn run_cpu_topology(
     transform_id: &str,
+    measure_cpu_usage: bool,
     make_config: impl FnOnce(NoopTransformConfig) -> NoopTransformConfig,
 ) -> Vec<Metric> {
     trace_init();
@@ -96,7 +99,7 @@ async fn run_cpu_topology(
         .transforms
         .get_mut(&ComponentKey::from(transform_id))
         .expect("transform not found in builder")
-        .measure_cpu_usage = true;
+        .measure_cpu_usage = measure_cpu_usage;
 
     config.add_sink(&sink_id, &[transform_id], sink_config);
 
@@ -129,7 +132,7 @@ async fn run_cpu_topology(
 #[tokio::test]
 async fn component_cpu_usage_emitted_function_transform() {
     let id = "cpu_transform_fn";
-    let metrics = run_cpu_topology(id, |c| c).await;
+    let metrics = run_cpu_topology(id, true, |c| c).await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
@@ -139,7 +142,10 @@ async fn component_cpu_usage_emitted_function_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_task_transform() {
     let id = "cpu_transform_task";
-    let metrics = run_cpu_topology(id, |_| NoopTransformConfig::from(TransformType::Task)).await;
+    let metrics = run_cpu_topology(id, true, |_| {
+        NoopTransformConfig::from(TransformType::Task)
+    })
+    .await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
@@ -149,7 +155,7 @@ async fn component_cpu_usage_emitted_task_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_concurrent_transform() {
     let id = "cpu_transform_concurrent";
-    let metrics = run_cpu_topology(id, |c| c.with_concurrency()).await;
+    let metrics = run_cpu_topology(id, true, |c| c.with_concurrency()).await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
@@ -157,47 +163,12 @@ async fn component_cpu_usage_emitted_concurrent_transform() {
 /// `component_cpu_usage_ns_total` counter should be emitted for the transform.
 #[tokio::test]
 async fn component_cpu_usage_not_emitted_without_measure_cpu_usage() {
-    trace_init();
+    let id = "cpu_transform_no_measure";
+    let metrics = run_cpu_topology(id, false, |c| c).await;
 
-    let transform_id = "cpu_transform_no_measure";
-    let source_id = format!("{transform_id}_source");
-    let sink_id = format!("{transform_id}_sink");
-
-    let controller = Controller::get().expect("metrics controller");
-
-    let (mut source_tx, source_config) = basic_source();
-    let (sink_done_tx, sink_done_rx) = oneshot::channel();
-    let sink_config = CompletionSinkConfig::new(EVENT_COUNT, sink_done_tx);
-
-    let mut config = Config::builder();
-    config.add_source(&source_id, source_config);
-    // Default: measure_cpu_usage = false
-    config.add_transform(
-        transform_id,
-        &[source_id.as_str()],
-        NoopTransformConfig::from(TransformType::Function),
-    );
-    config.add_sink(&sink_id, &[transform_id], sink_config);
-
-    let (topology, _) = start_topology(config.build().unwrap(), false).await;
-
-    for idx in 0..EVENT_COUNT {
-        let event = Event::Log(LogEvent::from(format!("payload-{idx}")));
-        source_tx.send_event(event).await.unwrap();
-    }
-    drop(source_tx);
-
-    timeout(Duration::from_secs(5), sink_done_rx)
-        .await
-        .expect("timed out")
-        .expect("sender dropped");
-
-    topology.stop().await;
-
-    let metrics = controller.capture_metrics();
     let found = metrics
         .iter()
-        .any(|m| m.name() == "component_cpu_usage_ns_total" && has_transform_tags(m, transform_id));
+        .any(|m| m.name() == "component_cpu_usage_ns_total" && has_transform_tags(m, id));
 
     assert!(
         !found,
