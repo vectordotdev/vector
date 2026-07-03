@@ -50,7 +50,7 @@ pub struct MemoryConfig {
     ///
     /// By default, all writes are made visible immediately.
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub flush_interval: Option<u64>,
+    pub flush_interval: Option<NonZeroU64>,
     /// Maximum size of the table in bytes. All insertions that make
     /// this table bigger than the maximum size are rejected.
     ///

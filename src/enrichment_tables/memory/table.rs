@@ -1,6 +1,7 @@
 #![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
 
 use std::{
+    num::NonZeroU64,
     pin::Pin,
     sync::{Arc, Mutex, MutexGuard},
     time::{Duration, Instant},
@@ -431,6 +432,7 @@ impl StreamSink<Event> for Memory {
         let mut flush_interval: Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>> = self
             .config
             .flush_interval
+            .map(NonZeroU64::get)
             .map(Duration::from_secs)
             .map::<Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>>, _>(|d| {
                 Box::pin(IntervalStream::new(interval(d)))
@@ -713,7 +715,7 @@ mod tests {
         let ttl = 100;
         let memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
-            c.flush_interval = Some(10);
+            c.flush_interval = NonZeroU64::new(10);
         }));
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -952,7 +954,7 @@ mod tests {
         )])));
 
         let memory = Memory::new(build_memory_config(|c| {
-            c.flush_interval = Some(1);
+            c.flush_interval = NonZeroU64::new(1);
         }));
 
         run_and_assert_sink_compliance(

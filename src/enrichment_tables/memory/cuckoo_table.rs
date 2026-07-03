@@ -582,6 +582,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
         let mut flush_interval: Pin<Box<dyn Stream<Item = Instant> + Send>> = self
             .config
             .flush_interval
+            .map(NonZeroU64::get)
             .map(Duration::from_secs)
             .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
                 Box::pin(IntervalStream::new(interval(d)))
