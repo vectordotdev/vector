@@ -30,7 +30,7 @@ _It has been a while since our [February 2025 highlights]({{< ref "/blog/highlig
 | [`databricks_zerobus`]({{< ref "/docs/reference/configuration/sinks/databricks_zerobus" >}}) | Sink | Stream to Databricks Unity Catalog via Zerobus | [@flaviofcruz](https://github.com/flaviofcruz) | [#24840](https://github.com/vectordotdev/vector/pull/24840) |
 | [`doris`]({{< ref "/docs/reference/configuration/sinks/doris" >}}) | Sink | Apache Doris via the Stream Load API | [@bingquanzhao](https://github.com/bingquanzhao) | [#23117](https://github.com/vectordotdev/vector/pull/23117) |
 | [`postgres`]({{< ref "/docs/reference/configuration/sinks/postgres" >}}) | Sink | Send logs, metrics, and traces to Postgres | [@jorgehermo9](https://github.com/jorgehermo9) | [#21248](https://github.com/vectordotdev/vector/pull/21248) |
-| `otlp` | Codec | Bidirectional Vector <-> OTLP conversion (logs, metrics, traces) | [@pront](https://github.com/pront) | [#24003](https://github.com/vectordotdev/vector/pull/24003) |
+| `otlp` | Codec | Bidirectional Vector <-> OTLP conversion (logs and traces) | [@pront](https://github.com/pront) | [#24003](https://github.com/vectordotdev/vector/pull/24003) |
 | `syslog` | Encoder | Encode Vector events as syslog (RFC5424 and RFC3164) | [@vparfonov](https://github.com/vparfonov) | [#23777](https://github.com/vectordotdev/vector/pull/23777) |
 | `varint_length_delimited` | Framer | Varint length-delimited framing for protobuf streaming (ClickHouse-compatible) | [@modev2301](https://github.com/modev2301) | [#23352](https://github.com/vectordotdev/vector/pull/23352) |
 
@@ -85,8 +85,8 @@ For the complete list of changes, breaking changes, and upgrade steps, see the [
 | [`get_vector_metric`]({{< ref "/docs/reference/vrl/functions/#get_vector_metric" >}}) | [@esensar](https://github.com/esensar), [@Quad9DNS](https://github.com/Quad9DNS) | [vector#23430](https://github.com/vectordotdev/vector/pull/23430) |
 | [`haversine`]({{< ref "/docs/reference/vrl/functions/#haversine" >}}) | [@esensar](https://github.com/esensar), [@Quad9DNS](https://github.com/Quad9DNS) | [vrl#1442](https://github.com/vectordotdev/vrl/pull/1442) |
 | [`http_request`]({{< ref "/docs/reference/vrl/functions/#http_request" >}}) | [@benjamin-awd](https://github.com/benjamin-awd) | [vrl#1360](https://github.com/vectordotdev/vrl/pull/1360) |
-| [`ipcrypt_decrypt`]({{< ref "/docs/reference/vrl/functions/#ipcrypt_decrypt" >}}) | [@alterstep](https://github.com/alterstep) | [vrl#1506](https://github.com/vectordotdev/vrl/pull/1506) |
-| [`ipcrypt_encrypt`]({{< ref "/docs/reference/vrl/functions/#ipcrypt_encrypt" >}}) | [@alterstep](https://github.com/alterstep) | [vrl#1506](https://github.com/vectordotdev/vrl/pull/1506) |
+| [`decrypt_ip`]({{< ref "/docs/reference/vrl/functions/#decrypt_ip" >}}) | [@alterstep](https://github.com/alterstep) | [vrl#1506](https://github.com/vectordotdev/vrl/pull/1506) |
+| [`encrypt_ip`]({{< ref "/docs/reference/vrl/functions/#encrypt_ip" >}}) | [@alterstep](https://github.com/alterstep) | [vrl#1506](https://github.com/vectordotdev/vrl/pull/1506) |
 | [`parse_yaml`]({{< ref "/docs/reference/vrl/functions/#parse_yaml" >}}) | [@juchem](https://github.com/juchem) | [vrl#1602](https://github.com/vectordotdev/vrl/pull/1602) |
 | [`pop`]({{< ref "/docs/reference/vrl/functions/#pop" >}}) | [@jlambatl](https://github.com/jlambatl) | [vrl#1501](https://github.com/vectordotdev/vrl/pull/1501) |
 | [`split_path`]({{< ref "/docs/reference/vrl/functions/#split_path" >}}) | [@titaneric](https://github.com/titaneric) | [vrl#1533](https://github.com/vectordotdev/vrl/pull/1533) |
@@ -136,10 +136,10 @@ The [VRL Playground](https://playground.vrl.dev) gained a timezone selector, per
 
 ## CI and developer ergonomics
 
-* **Simpler PR title check.** The semantic PR title action was replaced with a small inline script that only validates the type prefix (`feat`, `fix`, `chore`, and so on) and leaves scopes free-form. Contributors are no longer blocked by a 180-entry hardcoded scope allowlist that drifted every time a component was added or renamed.
+* **Simpler PR title check.** The semantic PR title action was replaced with a small inline script. Contributors are no longer blocked by a 180-entry hardcoded scope allowlist that drifted every time a component was added or renamed.
 * **`typos` replaces `check-spelling`.** The old `check-spelling` workflow produced enough false positives to be a constant source of friction on PRs. It has been replaced with [`typos`](https://github.com/crate-ci/typos), a Rust-native spell checker built for source code. It understands identifiers and hex literals natively and runs on the full repo in seconds. Run it locally with `cargo binstall typos-cli && typos`.
 * **YAML/JSON/TS formatting.** Prettier formatting checks now run in CI for YAML, JSON, and TypeScript files. Run `make check-prettier` locally and `make fix-prettier` to auto-fix.
-* **Improved Markdown checks.** The `markdownlint` configuration was tightened to flag broken link syntax, inconsistent heading levels, and bare URLs. Run `make check-markdown` locally and `make fix-markdown` to auto-fix.
+* **Improved Markdown checks.** The `markdownlint` configuration was tightened to catch more common style issues. Run `make check-markdown` locally and `make fix-markdown` to auto-fix.
 * **Faster integration runner.** The integration test runner switched to a multi-stage Dockerfile that skips the source copy step, cutting per-job overhead.
 * **Reduced flake surface.** Long-standing flaky tests in the `file` source were fixed (checkpoint write race on shutdown, `test_oldest_first`, `initial_size_correct_with_multievents`). `apt-get` calls in package-verify jobs are now wrapped in `timeout 30m` to prevent silent CI hangs and are retried on transient failures.
 
