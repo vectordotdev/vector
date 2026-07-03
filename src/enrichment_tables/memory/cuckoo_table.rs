@@ -209,6 +209,7 @@ impl CuckooMemoryTable {
                     Err(err) => match err.kind() {
                         std::io::ErrorKind::NotFound => {
                             if let Some(parent) = path.parent()
+                                && parent != ""
                                 && File::open(parent).is_err()
                             {
                                 return Err(format!(
@@ -377,6 +378,9 @@ impl CuckooMemoryTable {
         if let Some(path) = &self.cuckoo_config.persistence_path {
             let mut parent = path.clone();
             if parent.pop() {
+                if parent == *"" {
+                    parent = ".".into();
+                }
                 match NamedTempFile::new_in(parent) {
                     Ok(temp) => {
                         {
