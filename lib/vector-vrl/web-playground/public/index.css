@@ -204,7 +204,10 @@ div#output-section {
 
 /* BUTTONS */
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   outline: 0;
   border: none;
   cursor: pointer;
@@ -214,6 +217,12 @@ div#output-section {
   padding: 0 16px;
   font-weight: 500;
   transition: all 0.2s ease;
+}
+
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .btn:active {
@@ -448,10 +457,16 @@ div#output-section {
   border-radius: 4px;
   background-color: #f8f9fa;
   color: #555;
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
   box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#clear-history-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 #clear-history-btn:hover {
