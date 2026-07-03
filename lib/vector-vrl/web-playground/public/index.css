@@ -21,28 +21,30 @@ body {
 }
 
 .top-bar-wrapper {
-  border-bottom: 1px solid var(--datadog-purple-light);
-  padding: 10px 0;
+  padding: 10px 15px;
 }
 
 .headers-grid {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 20px;
-  padding: 0 15px;
   max-width: 1600px;
   margin: 0 auto;
   align-items: stretch;
+  background-color: var(--datadog-purple-lightest);
+  border: 1px solid var(--datadog-purple-light);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .headers-grid-item {
-  background-color: var(--datadog-purple-lightest);
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid var(--datadog-purple-light);
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.headers-grid-item + .headers-grid-item {
+  border-left: 1px solid var(--datadog-purple-light);
 }
 
 .title-section {
@@ -148,7 +150,6 @@ div#toolbar-section {
 div#input-section,
 div#output-section {
   border: 1px solid var(--datadog-gray-lighter);
-  border-radius: 4px;
   overflow: hidden;
   height: 100%;
   min-height: 0;
