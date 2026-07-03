@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    fs::File,
+    fs::{self, File},
     io::{BufReader, BufWriter, Write},
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
@@ -210,7 +210,7 @@ impl CuckooMemoryTable {
                         std::io::ErrorKind::NotFound => {
                             if let Some(parent) = path.parent()
                                 && parent != ""
-                                && File::open(parent).is_err()
+                                && fs::metadata(parent).is_err()
                             {
                                 return Err(format!(
                                     "Cuckoo filter persistence path ({}) doesn't exist. This will prevent exporting the cuckoo filter state. Fix the `persistence_path` to ensure export works.",
