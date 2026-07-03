@@ -303,7 +303,11 @@ impl CuckooMemoryTable {
             .max_kicks(cuckoo_config.max_kicks);
 
         if cuckoo_config.lru_enabled {
-            let starting_value_needed_bits = cuckoo_config.lru_starting_value.ilog2() + 1;
+            let starting_value_needed_bits = cuckoo_config
+                .lru_starting_value
+                .checked_ilog2()
+                .unwrap_or(0)
+                + 1;
             if starting_value_needed_bits as usize > cuckoo_config.lru_bits.get() {
                 return Err(format!(
                     "`lru_bits` ({}) must be set to at least {} to support the `lru_starting_value` value ({}).",
@@ -312,7 +316,8 @@ impl CuckooMemoryTable {
                     cuckoo_config.lru_starting_value,
                 ).into());
             }
-            let increment_needed_bits = cuckoo_config.lru_increment.ilog2() + 1;
+            let increment_needed_bits =
+                cuckoo_config.lru_increment.checked_ilog2().unwrap_or(0) + 1;
             if increment_needed_bits as usize > cuckoo_config.lru_bits.get() {
                 return Err(format!(
                     "`lru_bits` ({}) must be set to at least {} to support the `lru_increment` value ({}).",
@@ -332,7 +337,7 @@ impl CuckooMemoryTable {
 
         if cuckoo_config.ttl_enabled {
             let ttl_val: u32 = u32::try_from(ttl_val)?;
-            let needed_bits = ttl_val.ilog2() + 1;
+            let needed_bits = ttl_val.checked_ilog2().unwrap_or(0) + 1;
             if needed_bits as usize > cuckoo_config.ttl_bits.get() {
                 return Err(
                     format!(
@@ -435,7 +440,7 @@ impl CuckooMemoryTable {
                     .map(|v| (v.div_ceil(self.config.scan_interval.get())).max(1))
                     .and_then(|v| u32::try_from(v).ok());
                 if let Some(ttl) = ttl {
-                    let needed_bits = ttl.ilog2() + 1;
+                    let needed_bits = ttl.checked_ilog2().unwrap_or(0) + 1;
                     if needed_bits as usize > self.cuckoo_config.ttl_bits.get() {
                         warn!(
                             "`ttl_bits` ({}) must be set to at least {} to support the provided `ttl` value ({}) at the configured scan interval ({}).",
