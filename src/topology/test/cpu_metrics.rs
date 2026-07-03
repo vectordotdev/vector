@@ -35,9 +35,8 @@ fn assert_cpu_counter_positive(metrics: &[Metric], transform_id: &str) {
         .find(|m| m.name() == "component_cpu_usage_ns_total" && has_transform_tags(m, transform_id))
         .unwrap_or_else(|| {
             panic!(
-                "component_cpu_usage_ns_total not found for transform '{}'; \
+                "component_cpu_usage_ns_total not found for transform '{transform_id}'; \
                  available metrics: {:?}",
-                transform_id,
                 metrics
                     .iter()
                     .map(|m| m.name())
