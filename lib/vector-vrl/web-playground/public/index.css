@@ -457,6 +457,31 @@ div#output-section {
     width: 100%;
     margin-bottom: 8px;
   }
+
+  #toolbar-controls {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  #toolbar-controls .toolbar-group {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  #toolbar-controls .toolbar-group + .toolbar-group {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+    margin-top: 8px;
+  }
+
+  #toolbar-controls select,
+  #toolbar-controls input[type="text"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
 }
 
 @media only screen and (max-width: 320px) {
