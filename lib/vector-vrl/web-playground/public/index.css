@@ -43,7 +43,7 @@ body {
 }
 
 .top-bar-wrapper {
-  padding: 10px 15px;
+  padding: 15px 15px 4px;
 }
 
 .theme-section {
@@ -152,6 +152,7 @@ a:hover {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 12px;
 }
 
 .version-info td {
@@ -175,14 +176,14 @@ div#App {
   flex-direction: column;
   width: calc(100% - 40px);
   max-width: 1600px;
-  height: calc(100vh - 240px);
-  gap: 1rem;
-  padding: 20px 20px;
+  height: calc(100vh - 210px);
+  gap: 0.5rem;
+  padding: 4px 20px 20px;
   margin: 0 auto;
 }
 
 div#toolbar-section {
-  padding: 10px 0;
+  padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
