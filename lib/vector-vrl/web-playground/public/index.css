@@ -378,7 +378,18 @@ div#output-section {
   margin-left: auto;
   display: flex;
   align-items: center;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+#toolbar-controls .toolbar-group + .toolbar-group {
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid var(--datadog-purple-light);
 }
 
 #toolbar-controls select,
