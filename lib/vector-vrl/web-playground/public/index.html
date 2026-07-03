@@ -52,14 +52,14 @@
       <div id="toolbar-section">
         <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()" title="Run program (Shift+Enter)">Run program</button>
         <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">Share program</button>
-        <div class="timezone-container">
-          <label for="timezone-input" id="timezone-label">Select Timezone</label>
+        <div id="toolbar-controls">
           <input
             type="text"
             id="timezone-input"
             name="timezone"
             list="timezone-list"
-            placeholder="Default"
+            placeholder="Timezone"
+            title="Select Timezone"
           >
           <datalist id="timezone-list">
             <option value="Default"></option>
@@ -74,6 +74,10 @@
             <option value="Asia/Dubai"></option>
             <option value="Australia/Sydney"></option>
           </datalist>
+          <select id="history-select" title="Run history (stored locally in your browser)">
+            <option value="" disabled selected>History</option>
+          </select>
+          <button id="clear-history-btn" type="button" title="Clear run history" onClick="vrlPlayground.handleClearHistory()">&times;</button>
         </div>
         </div>
       <div id="input-section">
