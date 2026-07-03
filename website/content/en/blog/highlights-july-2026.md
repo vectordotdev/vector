@@ -136,7 +136,7 @@ The [VRL Playground](https://playground.vrl.dev) gained a timezone selector, per
 
 ## CI and developer ergonomics
 
-A recurring source of friction for contributors was hitting CI failures that were hard to reproduce locally or caused by false positives. Several checks were replaced or improved to reduce that gap. We also fixed long-standing flaky tests and addressed silent CI hangs in package-verify jobs.
+A recurring source of friction for contributors was hitting CI failures that were hard to reproduce locally or caused by false positives. Several checks were replaced or improved to reduce that gap. We also fixed long-standing flaky tests.
 
 All of the following checks can be run locally before pushing, so there are no surprises on the PR.
 
