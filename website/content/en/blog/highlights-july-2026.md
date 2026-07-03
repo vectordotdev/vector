@@ -136,12 +136,14 @@ The [VRL Playground](https://playground.vrl.dev) gained a timezone selector, per
 
 ## CI and developer ergonomics
 
+A recurring source of friction for contributors was hitting CI failures that were hard to reproduce locally or caused by false positives. Several checks were replaced or improved to reduce that gap. We also fixed long-standing flaky tests and addressed silent CI hangs in package-verify jobs.
+
+All of the following checks can be run locally before pushing, so there are no surprises on the PR.
+
 * **Simpler PR title check.** The semantic PR title action was replaced with a small inline script. Contributors are no longer blocked by a 180-entry hardcoded scope allowlist that drifted every time a component was added or renamed.
-* **`typos` replaces `check-spelling`.** The old `check-spelling` workflow produced enough false positives to be a constant source of friction on PRs. It has been replaced with [`typos`](https://github.com/crate-ci/typos), a Rust-native spell checker built for source code. It understands identifiers and hex literals natively and runs on the full repo in seconds. Run it locally with `cargo binstall typos-cli && typos`.
+* **`typos` replaces `check-spelling`.** The old `check-spelling` workflow produced enough false positives to be a constant source of friction on PRs. It has been replaced with [`typos`](https://github.com/crate-ci/typos), a Rust-native spell checker that understands identifiers and hex literals natively. Run it locally with `cargo binstall typos-cli && typos`.
 * **YAML/JSON/TS formatting.** Prettier formatting checks now run in CI for YAML, JSON, and TypeScript files. Run `make check-prettier` locally and `make fix-prettier` to auto-fix.
 * **Improved Markdown checks.** The `markdownlint` configuration was tightened to catch more common style issues. Run `make check-markdown` locally and `make fix-markdown` to auto-fix.
-* **Faster integration runner.** The integration test runner switched to a multi-stage Dockerfile that skips the source copy step, cutting per-job overhead.
-* **Reduced flake surface.** Long-standing flaky tests in the `file` source were fixed (checkpoint write race on shutdown, `test_oldest_first`, `initial_size_correct_with_multievents`). `apt-get` calls in package-verify jobs are now wrapped in `timeout 30m` to prevent silent CI hangs and are retried on transient failures.
 
 ## Thank you
 
