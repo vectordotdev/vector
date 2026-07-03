@@ -142,10 +142,8 @@ async fn component_cpu_usage_emitted_function_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_task_transform() {
     let id = "cpu_transform_task";
-    let metrics = run_cpu_topology(id, true, |_| {
-        NoopTransformConfig::from(TransformType::Task)
-    })
-    .await;
+    let metrics =
+        run_cpu_topology(id, true, |_| NoopTransformConfig::from(TransformType::Task)).await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
