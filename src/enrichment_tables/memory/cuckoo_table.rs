@@ -227,10 +227,10 @@ impl CuckooMemoryTable {
                         std::io::ErrorKind::NotFound => {
                             if let Some(parent) = path.parent()
                                 && parent != ""
-                                && fs::metadata(parent).is_err()
+                                && !fs::metadata(parent).is_ok_and(|m| m.is_dir())
                             {
                                 return Err(format!(
-                                    "Cuckoo filter persistence path ({}) doesn't exist. This will prevent exporting the cuckoo filter state. Fix the `persistence_path` to ensure export works.",
+                                    "Cuckoo filter persistence path directory ({}) doesn't exist. This will prevent exporting the cuckoo filter state. Fix the `persistence_path` to ensure export works.",
                                     parent.to_str().unwrap_or(""),
                                 )
                                 .into());
