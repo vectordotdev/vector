@@ -264,6 +264,19 @@ impl CuckooMemoryTable {
                     );
                 }
 
+                if let Some(ttl) = built_config.ttl_config()
+                    && let Some(persisted_ttl) = persisted_config.ttl_config()
+                    && ttl.ttl != persisted_ttl.ttl
+                {
+                    warn!(
+                        "Persisted configuration had a different default TTL value ({}), comapared to the new value ({}). Previous default TTL value is effectively {} seconds, while the new one is {} seconds.",
+                        persisted_ttl.ttl,
+                        ttl.ttl,
+                        (persisted_ttl.ttl.get() as u64) * config.scan_interval.get(),
+                        config.ttl
+                    );
+                }
+
                 match CuckooFilter::import_state(hasher, built_config, &mut reader) {
                     Ok(filter) => filter,
                     Err(error) => {
@@ -292,13 +305,26 @@ impl CuckooMemoryTable {
     ) -> crate::Result<Self> {
         if let Ok(prev_memory) = prev_state.downcast::<CuckooMemoryTable>() {
             let built_config = Self::build_config(&config, &cuckoo_config)?;
+            let built_ttl = built_config.ttl_config().clone();
             if built_config.compatible_layout(&prev_memory.filter.get_configuration())
                 && let Ok(mut old_filter) =
                     prev_memory.filter.exporter().snapshot().map(VecDeque::from)
-                && let Ok((hasher, _old_conf)) = CuckooFilter::import_config(&mut old_filter)
+                && let Ok((hasher, old_conf)) = CuckooFilter::import_config(&mut old_filter)
                 && let Ok(filter) =
                     CuckooFilter::import_state(hasher, built_config, &mut old_filter)
             {
+                if let Some(ttl) = built_ttl
+                    && let Some(old_ttl) = old_conf.ttl_config()
+                    && ttl.ttl != old_ttl.ttl
+                {
+                    warn!(
+                        "Restored configuration had a different default TTL value ({}), comapared to the new value ({}). Previous default TTL value is effectively {} seconds, while the new one is {} seconds.",
+                        old_ttl.ttl,
+                        ttl.ttl,
+                        (old_ttl.ttl.get() as u64) * config.scan_interval.get(),
+                        config.ttl
+                    );
+                }
                 return Ok(Self {
                     filter,
                     config,

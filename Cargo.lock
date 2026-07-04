@@ -3171,9 +3171,9 @@ dependencies = [
 
 [[package]]
 name = "cuckoo-clock"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f78d5002849ff0144af3fd772bd4b7686137c73c1ba6d2bfed40a6edba912ca"
+checksum = "f52be29a2643acdad9588c64ed9f160643a994160a41a4a4e42e65cd097f812e"
 dependencies = [
  "rand 0.9.4",
 ]
