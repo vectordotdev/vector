@@ -1103,7 +1103,7 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 windows-event-log-integration-tests = ["sources-windows_event_log-integration-tests"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap"]
-cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap"]
+cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap", "transforms-filter", "transforms-aws_ec2_metadata"]
 test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features
