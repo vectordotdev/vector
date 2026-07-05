@@ -4,7 +4,7 @@ use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted}
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
 use bytes::BytesMut;
-use chrono::{DateTime, NaiveDateTime, NaiveTime, Timelike, Utc};
+use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
 use futures_util::StreamExt;
@@ -708,36 +708,24 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
 
         // Preserve the original time text so tracking parameters bind as `HH:MM:SS`
         // instead of a full timestamp such as `1970-01-01 15:30:00`.
+        // MariaDB TIME can represent durations outside a clock-of-day range (for example
+        // `25:00:00`), so keep the ODBC text even when chrono cannot parse it.
         odbc_api::DataType::Time { .. } => {
             let Some(value) = value else {
                 return Value::Null;
             };
-
-            let Ok(s) = std::str::from_utf8(value) else {
-                return Value::Null;
-            };
-
-            if NaiveTime::from_str(s).is_err() {
-                return Value::Null;
-            }
 
             Value::Bytes(Bytes::copy_from_slice(value))
         }
 
         // Preserve the original date text so tracking parameters bind as `YYYY-MM-DD`
         // instead of a full timestamp such as `2025-10-04 00:00:00`.
+        // MariaDB/MySQL zero dates such as `0000-00-00` are not chrono-compatible but
+        // remain valid for SQL comparison and tracking parameter binding.
         odbc_api::DataType::Date => {
             let Some(value) = value else {
                 return Value::Null;
             };
-
-            let Ok(s) = std::str::from_utf8(value) else {
-                return Value::Null;
-            };
-
-            if chrono::NaiveDate::from_str(s).is_err() {
-                return Value::Null;
-            }
 
             Value::Bytes(Bytes::copy_from_slice(value))
         }
@@ -884,6 +872,32 @@ mod tests {
         assert_eq!(
             value_to_sql_parameter(&value, chrono_tz::UTC),
             Some("2025-10-04".to_owned())
+        );
+    }
+
+    #[test]
+    fn map_value_zero_date_preserved_as_bytes_for_tracking_bind() {
+        let raw = b"0000-00-00";
+        let value = map_value(&odbc_api::DataType::Date, Some(raw), chrono_tz::UTC);
+        assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::UTC),
+            Some("0000-00-00".to_owned())
+        );
+    }
+
+    #[test]
+    fn map_value_duration_time_preserved_as_bytes_for_tracking_bind() {
+        let raw = b"25:00:00";
+        let value = map_value(
+            &odbc_api::DataType::Time { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::UTC),
+            Some("25:00:00".to_owned())
         );
     }
 
