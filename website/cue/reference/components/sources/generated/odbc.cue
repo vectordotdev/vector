@@ -21,8 +21,14 @@ generated: components: sources: odbc: configuration: {
 		type: string: examples: ["driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"]
 	}
 	decoding: {
-		description: "Decoder to use for query results."
-		required:    false
+		description: """
+			Decoder to use for query results.
+
+			Query rows are serialized to a JSON array before decoding.
+			The default is the JSON codec so each result row becomes a separate log event
+			with its columns available as top-level fields.
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -53,7 +59,7 @@ generated: components: sources: odbc: configuration: {
 				description: "The codec to use for decoding events."
 				required:    false
 				type: string: {
-					default: "bytes"
+					default: "json"
 					enum: {
 						avro: """
 															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.

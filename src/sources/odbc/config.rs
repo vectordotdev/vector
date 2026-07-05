@@ -1,5 +1,5 @@
 use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
-use crate::serde::{default_decoding, default_framing_message_based};
+use crate::serde::default_framing_message_based;
 use crate::sources::Source;
 use crate::sources::odbc::client::{Context, prepare_metadata_path, validate_tracking_state};
 use crate::sources::odbc::schedule::OdbcSchedule;
@@ -11,7 +11,10 @@ use std::fs;
 use std::io::BufReader;
 use std::time::Duration;
 use vector_config_macros::configurable_component;
-use vector_lib::codecs::{DecodingConfig, decoding::DeserializerConfig};
+use vector_lib::codecs::{
+    DecodingConfig,
+    decoding::{DeserializerConfig, JsonDeserializerConfig},
+};
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::prelude::{Kind, ObjectMap};
 
@@ -180,8 +183,12 @@ pub struct OdbcConfig {
     pub last_run_metadata_path: Option<String>,
 
     /// Decoder to use for query results.
+    ///
+    /// Query rows are serialized to a JSON array before decoding.
+    /// The default is the JSON codec so each result row becomes a separate log event
+    /// with its columns available as top-level fields.
     #[configurable(derived)]
-    #[serde(default = "default_decoding")]
+    #[serde(default = "default_odbc_decoding")]
     pub decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -341,6 +348,10 @@ fn default_schedule() -> OdbcSchedule {
     "0 * * * * *".into()
 }
 
+fn default_odbc_decoding() -> DeserializerConfig {
+    JsonDeserializerConfig::default().into()
+}
+
 impl Default for OdbcConfig {
     fn default() -> Self {
         Self {
@@ -357,7 +368,7 @@ impl Default for OdbcConfig {
             odbc_default_timezone: Tz::UTC,
             tracking_columns: None,
             last_run_metadata_path: None,
-            decoding: default_decoding(),
+            decoding: default_odbc_decoding(),
             log_namespace: None,
             statement_filepath: None,
             #[cfg(test)]
