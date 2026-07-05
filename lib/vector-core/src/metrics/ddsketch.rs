@@ -580,10 +580,10 @@ impl AgentDDSketch {
                 remainder += fkn - fkn.trunc();
             }
 
-            // SAFETY: 
+            // SAFETY:
             // [TRUNCATION] This integer cast is intentional: we want to get the non-fractional part, as
-            // we've captured the fractional part in the above conditional. 
-            // [SIGN LOSS] fkn is always non-negative because it is computed from sketch bounds and a count, 
+            // we've captured the fractional part in the above conditional.
+            // [SIGN LOSS] fkn is always non-negative because it is computed from sketch bounds and a count,
             // which are both non-negative
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let mut kn = fkn as u32;
