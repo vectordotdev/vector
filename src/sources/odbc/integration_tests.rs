@@ -466,7 +466,7 @@ INSERT INTO number_columns (
     let rows = collect_query_rows(
         env,
         &conn_str,
-        "SELECT * FROM number_columns;",
+        "SELECT * FROM number_columns ORDER BY int_col ASC;",
         vec![],
         Duration::from_secs(3),
         Duration::from_secs(3),
