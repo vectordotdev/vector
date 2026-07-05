@@ -611,6 +611,52 @@ fn naive_local_to_timestamp_value(ndt: NaiveDateTime, tz: Tz, fallback_text: &st
     }
 }
 
+/// Returns true for SQL-style timestamps with a space date/time separator and offset suffix,
+/// such as `YYYY-MM-DD HH:MM:SS+00`. RFC3339 forms (`T` separator or `Z` suffix) return false
+/// so they can be parsed to `Value::Timestamp` first.
+fn sql_timestamp_text_has_offset(text: &str) -> bool {
+    if text.len() <= 10 {
+        return false;
+    }
+
+    // SQL form uses a space between date and time; RFC3339 uses `T`.
+    if text.as_bytes().get(10) != Some(&b' ') {
+        return false;
+    }
+
+    let Some(sign_idx) = text[10..].rfind(['+', '-']) else {
+        return false;
+    };
+
+    let offset = &text[10 + sign_idx..];
+    offset.len() >= 2 && offset[1..].chars().all(|c| c.is_ascii_digit() || c == ':')
+}
+
+/// Maps ODBC timestamp bytes to a Vector value.
+///
+/// RFC3339/ISO8601 values are parsed to `Value::Timestamp`. SQL offset-bearing forms such as
+/// `YYYY-MM-DD HH:MM:SS+00` are preserved as bytes so tracking parameters round-trip the exact
+/// ODBC text. Naive timestamps are parsed to `Value::Timestamp` using `tz`.
+fn map_timestamp_value(value: &[u8], tz: Tz) -> Value {
+    let Ok(text) = std::str::from_utf8(value) else {
+        return Value::Bytes(Bytes::copy_from_slice(value));
+    };
+
+    if let Ok(datetime) = DateTime::parse_from_rfc3339(text) {
+        return Value::Timestamp(datetime.into());
+    }
+
+    if sql_timestamp_text_has_offset(text) {
+        return Value::Bytes(Bytes::copy_from_slice(value));
+    }
+
+    TIMESTAMP_FORMATS
+        .iter()
+        .find_map(|fmt| NaiveDateTime::parse_from_str(text, fmt).ok())
+        .map(|ndt| naive_local_to_timestamp_value(ndt, tz, text))
+        .unwrap_or_else(|| Value::Bytes(Bytes::copy_from_slice(value)))
+}
+
 /// Converts ODBC data types to Vector values.
 ///
 /// # Arguments
@@ -689,21 +735,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            let Ok(str) = std::str::from_utf8(value) else {
-                return Value::Null;
-            };
-
-            // Try RFC3339/ISO8601 first and convert to UTC
-            if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(str) {
-                return Value::Timestamp(datetime.into());
-            }
-
-            let datetime = TIMESTAMP_FORMATS
-                .iter()
-                .find_map(|fmt| NaiveDateTime::parse_from_str(str, fmt).ok())
-                .map(|ndt| naive_local_to_timestamp_value(ndt, tz, str));
-
-            datetime.unwrap_or(Value::Null)
+            map_timestamp_value(value, tz)
         }
 
         // Preserve the original time text so tracking parameters bind as `HH:MM:SS`
@@ -827,6 +859,7 @@ fn boolean_to_sql_parameter(value: bool) -> String {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use chrono::TimeZone;
 
     #[test]
     fn map_value_integer_in_range() {
@@ -898,6 +931,126 @@ mod tests {
         assert_eq!(
             value_to_sql_parameter(&value, chrono_tz::UTC),
             Some("25:00:00".to_owned())
+        );
+    }
+
+    #[test]
+    fn map_value_timestamp_with_offset_preserved_as_bytes_for_tracking_bind() {
+        let raw = b"2025-04-28 01:20:04+00";
+        let value = map_value(
+            &odbc_api::DataType::Timestamp { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::UTC),
+            Some("2025-04-28 01:20:04+00".to_owned())
+        );
+    }
+
+    #[test]
+    fn map_value_timestamp_with_offset_and_colon_parsed_to_timestamp() {
+        let raw = b"2025-04-28 01:20:04+00:00";
+        let value = map_value(
+            &odbc_api::DataType::Timestamp { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(
+            value,
+            Value::Timestamp(
+                chrono::Utc
+                    .with_ymd_and_hms(2025, 4, 28, 1, 20, 4)
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn map_value_timestamp_with_negative_offset_parsed_to_timestamp() {
+        let raw = b"2025-04-28 01:20:04-05:00";
+        let value = map_value(
+            &odbc_api::DataType::Timestamp { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(
+            value,
+            Value::Timestamp(
+                chrono::Utc
+                    .with_ymd_and_hms(2025, 4, 28, 6, 20, 4)
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn map_value_timestamp_rfc3339_z_parsed_to_timestamp() {
+        let raw = b"2025-04-28T01:20:04Z";
+        let value = map_value(
+            &odbc_api::DataType::Timestamp { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(
+            value,
+            Value::Timestamp(
+                chrono::Utc
+                    .with_ymd_and_hms(2025, 4, 28, 1, 20, 4)
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn map_value_timestamp_rfc3339_t_offset_parsed_to_timestamp() {
+        let raw = b"2025-04-28T01:20:04+00:00";
+        let value = map_value(
+            &odbc_api::DataType::Timestamp { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(
+            value,
+            Value::Timestamp(
+                chrono::Utc
+                    .with_ymd_and_hms(2025, 4, 28, 1, 20, 4)
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn map_value_timestamp_unparseable_preserved_as_bytes() {
+        let raw = b"not-a-timestamp";
+        let value = map_value(
+            &odbc_api::DataType::Timestamp { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::UTC),
+            Some("not-a-timestamp".to_owned())
+        );
+    }
+
+    #[test]
+    fn map_value_timestamp_naive_parsed_to_timestamp() {
+        let raw = b"2025-10-04 12:34:56";
+        let value = map_value(
+            &odbc_api::DataType::Timestamp { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
+        assert_eq!(
+            value,
+            Value::Timestamp(
+                chrono::Utc
+                    .with_ymd_and_hms(2025, 10, 4, 12, 34, 56)
+                    .unwrap()
+            )
         );
     }
 
