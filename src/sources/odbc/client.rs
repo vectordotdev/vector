@@ -17,7 +17,7 @@ use odbc_api::{
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 use std::mem;
 use std::path::Path;
 use std::str::FromStr;
@@ -578,10 +578,21 @@ pub(crate) fn prepare_metadata_path(path: &str) -> Result<(), OdbcError> {
 }
 
 /// Serializes and persists the latest tracked values for reuse as SQL parameters.
+///
+/// Writes to a `.tmp` file and atomically replaces the checkpoint on success.
 fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
     prepare_metadata_path(path)?;
+    let path = Path::new(path);
+    let tmp_path = path.with_extension("tmp");
     let json = serde_json::to_string(obj).context(JsonSnafu)?;
-    fs::write(path, json).context(IoSnafu)
+
+    {
+        let mut file = fs::File::create(&tmp_path).context(IoSnafu)?;
+        file.write_all(json.as_bytes()).context(IoSnafu)?;
+        file.sync_all().context(IoSnafu)?;
+    }
+
+    fs::rename(&tmp_path, path).context(IoSnafu)
 }
 
 /// Localizes a naive datetime with `tz`, using `.latest()` for DST ambiguity and
