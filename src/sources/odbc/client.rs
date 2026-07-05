@@ -364,6 +364,9 @@ impl Context {
 
 /// Extracts specified tracking columns from the given object,
 /// saves them to a file if a path is provided.
+///
+/// Checkpoint values are stored as the exact SQL parameter text used for ODBC binding
+/// so JSON roundtrips do not lose timestamp timezone formatting.
 async fn extract_and_save_tracking(
     path: Option<&str>,
     obj: Value,
@@ -376,8 +379,11 @@ async fn extract_and_save_tracking(
 
     let mut save_obj = ObjectMap::new();
     for column in tracking_columns {
-        let (value, _) = resolve_tracking_column_parameter(&obj, column.as_str(), tz)?;
-        save_obj.insert(KeyString::from(column.as_str()), value);
+        let (_, param) = resolve_tracking_column_parameter(&obj, column.as_str(), tz)?;
+        save_obj.insert(
+            KeyString::from(column.as_str()),
+            Value::Bytes(Bytes::from(param)),
+        );
     }
 
     if let Some(path) = path {
@@ -807,7 +813,13 @@ fn value_to_sql_parameter(value: &Value, tz: Tz) -> Option<String> {
         Value::Timestamp(t) => Some(format_timestamp_for_sql_parameter(*t, tz)),
         Value::Null => None,
         other => serde_json::to_value(other).ok().and_then(|v| match v {
-            serde_json::Value::String(s) => Some(s),
+            serde_json::Value::String(s) => {
+                if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(&s) {
+                    Some(format_timestamp_for_sql_parameter(datetime.into(), tz))
+                } else {
+                    Some(s)
+                }
+            }
             serde_json::Value::Number(n) => Some(n.to_string()),
             serde_json::Value::Bool(b) => Some(boolean_to_sql_parameter(b)),
             _ => None,
@@ -990,8 +1002,14 @@ mod tests {
         .expect("tracking object");
 
         assert_eq!(saved.len(), 2);
-        assert_eq!(saved.get("id"), Some(&Value::Integer(42)));
-        assert_eq!(saved.get("name"), Some(&Value::from("vector")));
+        assert_eq!(
+            saved.get("id"),
+            Some(&Value::Bytes(Bytes::from_static(b"42")))
+        );
+        assert_eq!(
+            saved.get("name"),
+            Some(&Value::Bytes(Bytes::from_static(b"vector")))
+        );
         assert!(std::path::Path::new(path).exists());
     }
 
