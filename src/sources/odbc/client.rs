@@ -15,6 +15,7 @@ use odbc_api::{
     ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata, environment,
 };
 use snafu::{ResultExt, Snafu};
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::mem;
@@ -86,6 +87,11 @@ pub enum OdbcError {
 
     #[snafu(display("Last query result row is not an object; cannot extract tracking columns"))]
     InvalidTrackingRow,
+
+    #[snafu(display(
+        "Query returned duplicate column names: {columns:?}; alias columns in the SQL statement"
+    ))]
+    DuplicateColumnNames { columns: Vec<String> },
 }
 
 pub(crate) struct Context {
@@ -380,6 +386,28 @@ async fn extract_and_save_tracking(
     Ok(Some(save_obj))
 }
 
+/// Returns an error when the query result contains duplicate column labels.
+fn ensure_unique_column_names(names: &[String]) -> Result<(), OdbcError> {
+    let mut seen = HashSet::with_capacity(names.len());
+    let mut duplicates = Vec::new();
+
+    for name in names {
+        if !seen.insert(name.as_str()) {
+            duplicates.push(name.clone());
+        }
+    }
+
+    if duplicates.is_empty() {
+        Ok(())
+    } else {
+        duplicates.sort_unstable();
+        duplicates.dedup();
+        Err(OdbcError::DuplicateColumnNames {
+            columns: duplicates,
+        })
+    }
+}
+
 /// Executes an ODBC SQL query with optional parameters and invokes `on_batch` for each
 /// fetched batch instead of accumulating the full result set in memory.
 ///
@@ -428,6 +456,9 @@ where
         .context(DbSnafu)?
         .collect::<Result<Vec<String>, _>>()
         .context(DbSnafu)?;
+    
+    ensure_unique_column_names(&names)?;
+
     let types = (1..=names.len())
         .map(|col_index| cursor.col_data_type(col_index as u16).unwrap_or_default())
         .collect_vec();
@@ -737,12 +768,15 @@ fn resolve_tracking_column_parameter(
     column: &str,
     tz: Tz,
 ) -> Result<(Value, String), OdbcError> {
-    let value = map.get(column).ok_or_else(|| OdbcError::MissingTrackingColumn {
-        column: column.to_owned(),
-    })?;
-    let param = value_to_sql_parameter(value, tz).ok_or_else(|| OdbcError::InvalidTrackingValue {
-        column: column.to_owned(),
-    })?;
+    let value = map
+        .get(column)
+        .ok_or_else(|| OdbcError::MissingTrackingColumn {
+            column: column.to_owned(),
+        })?;
+    let param =
+        value_to_sql_parameter(value, tz).ok_or_else(|| OdbcError::InvalidTrackingValue {
+            column: column.to_owned(),
+        })?;
     Ok((value.clone(), param))
 }
 
@@ -807,7 +841,11 @@ mod tests {
     #[test]
     fn map_value_time_preserved_as_bytes_for_tracking_bind() {
         let raw = b"15:30:00";
-        let value = map_value(&odbc_api::DataType::Time { precision: 0 }, Some(raw), chrono_tz::UTC);
+        let value = map_value(
+            &odbc_api::DataType::Time { precision: 0 },
+            Some(raw),
+            chrono_tz::UTC,
+        );
         assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
         assert_eq!(
             value_to_sql_parameter(&value, chrono_tz::UTC),
@@ -966,8 +1004,9 @@ mod tests {
         let mut map = ObjectMap::new();
         map.insert(KeyString::from("id"), Value::Integer(1));
 
-        let error = validate_tracking_state(&map, &["id".to_owned(), "name".to_owned()], chrono_tz::UTC)
-            .expect_err("validation error");
+        let error =
+            validate_tracking_state(&map, &["id".to_owned(), "name".to_owned()], chrono_tz::UTC)
+                .expect_err("validation error");
 
         assert!(error.contains("name"));
     }
@@ -991,5 +1030,47 @@ mod tests {
         };
 
         assert!(matches!(error, OdbcError::Io { .. }));
+    }
+
+    #[test]
+    fn ensure_unique_column_names_accepts_distinct_names() {
+        ensure_unique_column_names(&["id".to_owned(), "name".to_owned()])
+            .expect("distinct column names");
+    }
+
+    #[test]
+    fn ensure_unique_column_names_errors_on_duplicates() {
+        let error = match ensure_unique_column_names(&[
+            "id".to_owned(),
+            "name".to_owned(),
+            "id".to_owned(),
+        ]) {
+            Err(error) => error,
+            Ok(_) => panic!("expected duplicate column names error"),
+        };
+
+        assert!(matches!(
+            error,
+            OdbcError::DuplicateColumnNames { columns } if columns == vec!["id".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn ensure_unique_column_names_errors_on_multiple_duplicates() {
+        let error = match ensure_unique_column_names(&[
+            "id".to_owned(),
+            "name".to_owned(),
+            "id".to_owned(),
+            "name".to_owned(),
+        ]) {
+            Err(error) => error,
+            Ok(_) => panic!("expected duplicate column names error"),
+        };
+
+        assert!(matches!(
+            error,
+            OdbcError::DuplicateColumnNames { columns }
+                if columns == vec!["id".to_owned(), "name".to_owned()]
+        ));
     }
 }

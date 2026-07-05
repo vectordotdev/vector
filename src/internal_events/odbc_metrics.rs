@@ -89,6 +89,21 @@ impl InternalEvent for OdbcFailedError<'_> {
                 )
                 .increment(1);
             }
+            OdbcError::DuplicateColumnNames { .. } => {
+                error!(
+                    message = "Query returned duplicate column names.",
+                    statement = %self.statement,
+                    error = %self.error,
+                    error_type = error_type::CONFIGURATION_FAILED,
+                    stage = error_stage::PROCESSING,
+                );
+                counter!(
+                    CounterName::ComponentErrorsTotal,
+                    "error_type" => error_type::CONFIGURATION_FAILED,
+                    "stage" => error_stage::PROCESSING,
+                )
+                .increment(1);
+            }
         }
     }
 }

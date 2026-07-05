@@ -1,7 +1,7 @@
 use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
 use crate::serde::{default_decoding, default_framing_message_based};
 use crate::sources::Source;
-use crate::sources::odbc::client::{prepare_metadata_path, Context, validate_tracking_state};
+use crate::sources::odbc::client::{Context, prepare_metadata_path, validate_tracking_state};
 use crate::sources::odbc::schedule::OdbcSchedule;
 use chrono_tz::Tz;
 use futures_util::FutureExt;
@@ -279,9 +279,7 @@ impl OdbcConfig {
                     })?;
                     let map: ObjectMap =
                         serde_json::from_reader(BufReader::new(file)).map_err(|source| {
-                            format!(
-                                "unable to parse `last_run_metadata_path` `{path}`: {source}"
-                            )
+                            format!("unable to parse `last_run_metadata_path` `{path}`: {source}")
                         })?;
                     validate_tracking_state(&map, tracking_columns, tz)?;
                     return Ok(());
