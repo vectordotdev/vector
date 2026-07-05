@@ -783,7 +783,7 @@ VALUES (
 
     assert_eq!(
         *row.get("date_col").unwrap(),
-        Value::Timestamp(chrono::Utc.with_ymd_and_hms(2025, 10, 4, 0, 0, 0).unwrap())
+        Value::Bytes(bytes::Bytes::from_static(b"2025-10-04"))
     );
     assert_eq!(
         *row.get("datetime_col").unwrap(),
@@ -795,7 +795,7 @@ VALUES (
     );
     assert_eq!(
         *row.get("time_col").unwrap(),
-        Value::Timestamp(chrono::Utc.with_ymd_and_hms(1970, 1, 1, 15, 30, 0).unwrap())
+        Value::Bytes(bytes::Bytes::from_static(b"15:30:00"))
     );
     assert_eq!(
         *row.get("timestamp_col").unwrap(),

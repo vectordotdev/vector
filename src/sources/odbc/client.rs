@@ -4,7 +4,7 @@ use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted}
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
 use bytes::BytesMut;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
+use chrono::{DateTime, NaiveDateTime, NaiveTime, Timelike, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
 use futures_util::StreamExt;
@@ -658,7 +658,8 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             datetime.unwrap_or(Value::Null)
         }
 
-        // Convert to timestamp.
+        // Preserve the original time text so tracking parameters bind as `HH:MM:SS`
+        // instead of a full timestamp such as `1970-01-01 15:30:00`.
         odbc_api::DataType::Time { .. } => {
             let Some(value) = value else {
                 return Value::Null;
@@ -668,14 +669,15 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            let Ok(time) = NaiveTime::from_str(s) else {
+            if NaiveTime::from_str(s).is_err() {
                 return Value::Null;
-            };
+            }
 
-            naive_local_to_timestamp_value(NaiveDateTime::new(NaiveDate::default(), time), tz, s)
+            Value::Bytes(Bytes::copy_from_slice(value))
         }
 
-        // Convert to timestamp.
+        // Preserve the original date text so tracking parameters bind as `YYYY-MM-DD`
+        // instead of a full timestamp such as `2025-10-04 00:00:00`.
         odbc_api::DataType::Date => {
             let Some(value) = value else {
                 return Value::Null;
@@ -685,11 +687,11 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            let Ok(date) = chrono::NaiveDate::from_str(s) else {
+            if chrono::NaiveDate::from_str(s).is_err() {
                 return Value::Null;
-            };
+            }
 
-            naive_local_to_timestamp_value(NaiveDateTime::new(date, NaiveTime::default()), tz, s)
+            Value::Bytes(Bytes::copy_from_slice(value))
         }
 
         // Convert to boolean.
@@ -799,6 +801,28 @@ mod tests {
         assert_eq!(
             value_to_sql_parameter(&value, chrono_tz::UTC),
             Some("18446744073709551615".to_owned())
+        );
+    }
+
+    #[test]
+    fn map_value_time_preserved_as_bytes_for_tracking_bind() {
+        let raw = b"15:30:00";
+        let value = map_value(&odbc_api::DataType::Time { precision: 0 }, Some(raw), chrono_tz::UTC);
+        assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::UTC),
+            Some("15:30:00".to_owned())
+        );
+    }
+
+    #[test]
+    fn map_value_date_preserved_as_bytes_for_tracking_bind() {
+        let raw = b"2025-10-04";
+        let value = map_value(&odbc_api::DataType::Date, Some(raw), chrono_tz::UTC);
+        assert_eq!(value, Value::Bytes(Bytes::from_static(raw)));
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::UTC),
+            Some("2025-10-04".to_owned())
         );
     }
 
