@@ -161,25 +161,11 @@ impl KafkaAuthConfig {
             );
         }
 
-        // rust-rdkafka gates the OAUTHBEARER refresh callback on a compile-time associated const, so
-        // in `aws-core` builds it is enabled for the context whenever it exists. Vector only provides
-        // a token for it via MSK IAM. Reject a bare `OAUTHBEARER` mechanism up front with guidance,
-        // rather than letting the callback fire later with no token provider.
-        #[cfg(feature = "aws-core")]
-        if sasl_enabled
-            && !msk_iam_enabled
-            && self
-                .sasl
-                .as_ref()
-                .and_then(|s| s.mechanism.as_deref())
-                .is_some_and(|m| m.eq_ignore_ascii_case("OAUTHBEARER"))
-        {
-            return Err(
-                "`sasl.mechanism = \"OAUTHBEARER\"` is only supported via `sasl.aws_msk_iam` \
-                 (AWS MSK IAM)"
-                    .into(),
-            );
-        }
+        // NOTE: we intentionally do *not* reject a non-MSK `OAUTHBEARER` mechanism. librdkafka has a
+        // built-in OIDC flow (`sasl.oauthbearer.method=oidc`) that does not use the app refresh
+        // callback, so those configs keep working even though `ENABLE_REFRESH_OAUTH_TOKEN` is on.
+        // Only when the app callback is actually invoked without MSK IAM (i.e. `method=default` and
+        // no `aws_msk_iam`) does it error — and that surfaces clearly at connect time.
 
         let protocol = match (sasl_enabled, tls_enabled) {
             (false, false) => "plaintext",
@@ -296,14 +282,13 @@ impl KafkaAuthConfig {
         }))
     }
 
-    /// Validate `librdkafka_options` against the MSK IAM / OAUTHBEARER constraints. Both the source
-    /// and sink apply `librdkafka_options` *after* [`Self::apply`], so:
+    /// When MSK IAM is enabled, reject `librdkafka_options` that would override the security/mechanism
+    /// settings it manages. Both the source and sink apply `librdkafka_options` *after* [`Self::apply`],
+    /// so a leftover `security.protocol`/`sasl.*` override would silently drop OAUTHBEARER/SASL_SSL and
+    /// the component would load credentials but fail to authenticate.
     ///
-    /// * When MSK IAM is enabled, a leftover `security.protocol`/`sasl.*` override would silently
-    ///   drop OAUTHBEARER/SASL_SSL — the component would load credentials but fail to authenticate.
-    /// * When MSK IAM is not enabled, setting `sasl.mechanism = OAUTHBEARER` here would still reach
-    ///   the always-on refresh callback (which has no token provider) — reject it with the same
-    ///   guidance as the top-level `sasl.mechanism` guard.
+    /// This does nothing when MSK IAM is not enabled: non-MSK OAUTHBEARER (e.g. librdkafka's built-in
+    /// OIDC via `sasl.oauthbearer.method=oidc`) is a legitimate configuration and must pass through.
     #[cfg(feature = "aws-core")]
     pub(crate) fn validate_librdkafka_overrides<'a>(
         &self,
@@ -315,28 +300,24 @@ impl KafkaAuthConfig {
             .and_then(|s| s.aws_msk_iam.as_ref())
             .map(|c| c.enabled)
             .unwrap_or(false);
+        if !msk_iam_enabled {
+            return Ok(());
+        }
 
-        // Non-mechanism keys that MSK IAM owns. `security.protocol` has no alias; `sasl.username` /
-        // `sasl.password` are canonical.
-        const RESERVED: [&str; 3] = ["security.protocol", "sasl.username", "sasl.password"];
-        // librdkafka accepts both `sasl.mechanism` (singular) and `sasl.mechanisms` (plural) for the
-        // same property, so both must be caught.
-        let is_mechanism =
-            |k: &str| k.eq_ignore_ascii_case("sasl.mechanism") || k.eq_ignore_ascii_case("sasl.mechanisms");
-
-        for (key, value) in options {
-            if msk_iam_enabled {
-                if is_mechanism(key) || RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r)) {
-                    return Err(format!(
-                        "`librdkafka_options.{key}` conflicts with `sasl.aws_msk_iam`; remove it \
-                         (MSK IAM manages `security.protocol` and `sasl.*`)"
-                    )
-                    .into());
-                }
-            } else if is_mechanism(key) && value.eq_ignore_ascii_case("OAUTHBEARER") {
+        // Keys MSK IAM owns. `security.protocol` has no alias; `sasl.username`/`sasl.password` are
+        // canonical; librdkafka accepts both `sasl.mechanism` and the plural `sasl.mechanisms`.
+        const RESERVED: [&str; 5] = [
+            "security.protocol",
+            "sasl.username",
+            "sasl.password",
+            "sasl.mechanism",
+            "sasl.mechanisms",
+        ];
+        for (key, _value) in options {
+            if RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r)) {
                 return Err(format!(
-                    "`librdkafka_options.{key} = \"OAUTHBEARER\"` is only supported via \
-                     `sasl.aws_msk_iam` (AWS MSK IAM)"
+                    "`librdkafka_options.{key}` conflicts with `sasl.aws_msk_iam`; remove it \
+                     (MSK IAM manages `security.protocol` and `sasl.*`)"
                 )
                 .into());
             }
@@ -598,15 +579,16 @@ mod auth_tests {
 
     #[cfg(feature = "aws-core")]
     #[test]
-    fn bare_oauthbearer_mechanism_is_rejected() {
-        // OAUTHBEARER is only wired up for MSK IAM; a manual mechanism must fail fast with guidance.
+    fn non_msk_oauthbearer_mechanism_is_allowed() {
+        // A non-MSK OAUTHBEARER mechanism must NOT be rejected at config time: librdkafka's built-in
+        // OIDC flow doesn't use the app callback. `apply` sets it as a normal mechanism.
         let auth = KafkaAuthConfig {
             sasl: Some(sasl(Some(true), Some("OAUTHBEARER"), None)),
             tls: Some(tls(true)),
         };
-        let mut cc = ClientConfig::new();
-        let err = auth.apply(&mut cc).expect_err("bare OAUTHBEARER must be rejected");
-        assert!(err.to_string().contains("aws_msk_iam"), "got: {err}");
+        let cc = applied(&auth);
+        assert_eq!(cc.get("security.protocol"), Some("sasl_ssl"));
+        assert_eq!(cc.get("sasl.mechanism"), Some("OAUTHBEARER"));
     }
 
     #[cfg(feature = "aws-core")]
@@ -651,33 +633,25 @@ mod auth_tests {
 
     #[cfg(feature = "aws-core")]
     #[test]
-    fn librdkafka_overrides_ignored_without_msk_iam() {
-        // Without MSK IAM, non-OAUTHBEARER overrides are the user's own business.
-        use std::collections::HashMap;
-        let auth = KafkaAuthConfig {
-            sasl: Some(sasl(Some(true), Some("SCRAM-SHA-512"), Some("u"))),
-            tls: Some(tls(true)),
-        };
-        let opts = HashMap::from([("sasl.mechanism".to_string(), "PLAIN".to_string())]);
-        assert!(auth.validate_librdkafka_overrides(opts.iter()).is_ok());
-    }
-
-    #[cfg(feature = "aws-core")]
-    #[test]
-    fn librdkafka_oauthbearer_without_msk_iam_is_rejected() {
-        // Closes the gap where OAUTHBEARER set via librdkafka_options (not the mechanism field) would
-        // still reach the always-on refresh callback with no token provider.
+    fn librdkafka_overrides_pass_through_without_msk_iam() {
+        // Without MSK IAM the validator is a no-op: the user owns `librdkafka_options`, including a
+        // legitimate non-MSK OAUTHBEARER setup (e.g. librdkafka's built-in OIDC), which must not be
+        // rejected. (Verified separately that `method=oidc` never invokes the app callback.)
         use std::collections::HashMap;
         let auth = KafkaAuthConfig {
             sasl: Some(sasl(Some(true), None, None)),
             tls: Some(tls(true)),
         };
-        for key in ["sasl.mechanism", "sasl.mechanisms"] {
-            let opts = HashMap::from([(key.to_string(), "OAUTHBEARER".to_string())]);
-            let err = auth
-                .validate_librdkafka_overrides(opts.iter())
-                .expect_err("librdkafka OAUTHBEARER without MSK IAM must be rejected");
-            assert!(err.to_string().contains("aws_msk_iam"), "got: {err}");
+        for opts in [
+            HashMap::from([("sasl.mechanism".to_string(), "PLAIN".to_string())]),
+            HashMap::from([("sasl.mechanism".to_string(), "OAUTHBEARER".to_string())]),
+            HashMap::from([("sasl.mechanisms".to_string(), "OAUTHBEARER".to_string())]),
+            HashMap::from([("security.protocol".to_string(), "sasl_ssl".to_string())]),
+        ] {
+            assert!(
+                auth.validate_librdkafka_overrides(opts.iter()).is_ok(),
+                "non-MSK librdkafka_options must pass through: {opts:?}"
+            );
         }
     }
 
