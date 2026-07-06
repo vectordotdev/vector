@@ -176,6 +176,12 @@ impl KafkaSinkConfig {
 
         self.auth.apply(&mut client_config)?;
 
+        // `librdkafka_options` are applied below, after `auth.apply`; reject any that would clobber
+        // the MSK IAM security/mechanism settings.
+        #[cfg(feature = "aws-core")]
+        self.auth
+            .validate_librdkafka_overrides(self.librdkafka_options.keys())?;
+
         // All batch options are producer only.
         client_config
             .set("compression.codec", to_string(self.compression))

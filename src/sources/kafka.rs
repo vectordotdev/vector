@@ -1231,6 +1231,12 @@ fn create_consumer(
     config.auth.apply(&mut client_config)?;
 
     if let Some(librdkafka_options) = &config.librdkafka_options {
+        // `librdkafka_options` override values set by `auth.apply`; reject any that would clobber the
+        // MSK IAM security/mechanism settings.
+        #[cfg(feature = "aws-core")]
+        config
+            .auth
+            .validate_librdkafka_overrides(librdkafka_options.keys())?;
         for (key, value) in librdkafka_options {
             client_config.set(key.as_str(), value.as_str());
         }

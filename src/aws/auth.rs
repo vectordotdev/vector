@@ -212,6 +212,23 @@ fn default_profile() -> String {
 }
 
 impl AwsAuthentication {
+    /// The effective credential load timeout for this authentication mechanism (the configured
+    /// `load_timeout_secs`, or the shared 5s default). Mirrors the timeout applied by
+    /// [`AwsAuthentication::credentials_cache`] for components that resolve credentials directly.
+    pub(crate) fn load_timeout(&self) -> Duration {
+        match self {
+            AwsAuthentication::Role {
+                load_timeout_secs, ..
+            }
+            | AwsAuthentication::Default {
+                load_timeout_secs, ..
+            } => load_timeout_secs
+                .map(Duration::from_secs)
+                .unwrap_or(DEFAULT_LOAD_TIMEOUT),
+            _ => DEFAULT_LOAD_TIMEOUT,
+        }
+    }
+
     /// Creates the identity cache to store credentials based on the authentication mechanism chosen.
     pub(super) async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
         match self {

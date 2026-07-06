@@ -49,6 +49,8 @@ pub enum MskIamError {
     Credentials {
         source: aws_credential_types::provider::error::CredentialsError,
     },
+    #[snafu(display("timed out after {timeout:?} loading AWS credentials for MSK IAM auth"))]
+    CredentialsTimeout { timeout: Duration },
     #[snafu(display("failed to build SigV4 signing params: {source}"))]
     SigningParams { source: BoxError },
     #[snafu(display("failed to presign MSK IAM token: {source}"))]
@@ -72,14 +74,33 @@ pub struct MskAuthToken {
 /// component (and thus the last `CredentialsCache` clone) is dropped.
 pub(crate) async fn spawn_credentials_cache(
     provider: SharedCredentialsProvider,
+    load_timeout: Duration,
 ) -> Result<CredentialsCache, MskIamError> {
-    let initial = provider.provide_credentials().await.context(CredentialsSnafu)?;
+    let initial = load_credentials(&provider, load_timeout).await?;
     let cache: CredentialsCache = Arc::new(Mutex::new(initial));
-    tokio::spawn(refresh_loop(provider, Arc::downgrade(&cache)));
+    tokio::spawn(refresh_loop(provider, load_timeout, Arc::downgrade(&cache)));
     Ok(cache)
 }
 
-async fn refresh_loop(provider: SharedCredentialsProvider, weak: Weak<Mutex<Credentials>>) {
+/// Resolve credentials, honoring the configured load timeout so a stalled IMDS/STS/profile lookup
+/// can't hang the component build (matches `AwsAuthentication::credentials_cache` semantics).
+async fn load_credentials(
+    provider: &SharedCredentialsProvider,
+    load_timeout: Duration,
+) -> Result<Credentials, MskIamError> {
+    match tokio::time::timeout(load_timeout, provider.provide_credentials()).await {
+        Ok(res) => res.context(CredentialsSnafu),
+        Err(_) => Err(MskIamError::CredentialsTimeout {
+            timeout: load_timeout,
+        }),
+    }
+}
+
+async fn refresh_loop(
+    provider: SharedCredentialsProvider,
+    load_timeout: Duration,
+    weak: Weak<Mutex<Credentials>>,
+) {
     loop {
         let sleep_for = match weak.upgrade() {
             None => break,
@@ -88,8 +109,8 @@ async fn refresh_loop(provider: SharedCredentialsProvider, weak: Weak<Mutex<Cred
         tokio::time::sleep(sleep_for).await;
 
         let Some(cache) = weak.upgrade() else { break };
-        // On failure keep the previous credentials and retry on the next iteration.
-        if let Ok(fresh) = provider.provide_credentials().await {
+        // On failure/timeout keep the previous credentials and retry on the next iteration.
+        if let Ok(fresh) = load_credentials(&provider, load_timeout).await {
             if let Ok(mut guard) = cache.lock() {
                 *guard = fresh;
             }
@@ -303,12 +324,41 @@ mod tests {
     #[tokio::test]
     async fn credentials_cache_then_build_token() {
         let provider = SharedCredentialsProvider::new(creds(true));
-        let cache = spawn_credentials_cache(provider).await.expect("cache");
+        let cache = spawn_credentials_cache(provider, Duration::from_secs(5))
+            .await
+            .expect("cache");
         let cached = cache.lock().unwrap().clone();
         let out = build_token(&region(), &cached, fixed_time()).expect("token");
         let decoded = URL_SAFE_NO_PAD.decode(out.token.as_bytes()).unwrap();
         let url = String::from_utf8(decoded).unwrap();
         assert!(url.contains(GOLDEN_SIG_WITH_TOKEN));
+    }
+
+    /// A stalled credentials provider must surface a timeout, not hang the build.
+    #[tokio::test(start_paused = true)]
+    async fn credentials_load_times_out() {
+        use aws_credential_types::provider::{ProvideCredentials, future};
+
+        #[derive(Debug)]
+        struct StalledProvider;
+        impl ProvideCredentials for StalledProvider {
+            fn provide_credentials<'a>(&'a self) -> future::ProvideCredentials<'a>
+            where
+                Self: 'a,
+            {
+                // Never resolves within the timeout window.
+                future::ProvideCredentials::new(async {
+                    tokio::time::sleep(Duration::from_secs(3600)).await;
+                    unreachable!()
+                })
+            }
+        }
+
+        let provider = SharedCredentialsProvider::new(StalledProvider);
+        let err = spawn_credentials_cache(provider, Duration::from_secs(5))
+            .await
+            .expect_err("must time out");
+        assert!(matches!(err, MskIamError::CredentialsTimeout { .. }), "got: {err}");
     }
 
     #[test]
