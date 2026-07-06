@@ -268,6 +268,9 @@ impl KafkaAuthConfig {
         let region = cfg.region.region().ok_or(
             "`sasl.aws_msk_iam` requires a region (set `sasl.aws_msk_iam.region`)",
         )?;
+        // The signer host honors an explicit endpoint and resolves the partition suffix (e.g. China
+        // regions use `amazonaws.com.cn`).
+        let host = msk_iam::signing_host(region.as_ref(), cfg.region.endpoint().as_deref());
         let provider = cfg
             .auth
             .credentials_provider(region.clone(), proxy, None)
@@ -276,17 +279,25 @@ impl KafkaAuthConfig {
         // refreshed in the background so the token callback stays synchronous.
         let credentials =
             msk_iam::spawn_credentials_cache(provider, cfg.auth.load_timeout()).await?;
-        Ok(Some(MskIamCredentials { region, credentials }))
+        Ok(Some(MskIamCredentials {
+            region,
+            host,
+            credentials,
+        }))
     }
 
-    /// Reject `librdkafka_options` that would override the security/mechanism settings MSK IAM
-    /// depends on. Both the source and sink apply `librdkafka_options` *after* [`Self::apply`], so a
-    /// leftover `security.protocol`/`sasl.*` override would silently drop OAUTHBEARER/SASL_SSL and
-    /// the component would load credentials but fail to authenticate.
+    /// Validate `librdkafka_options` against the MSK IAM / OAUTHBEARER constraints. Both the source
+    /// and sink apply `librdkafka_options` *after* [`Self::apply`], so:
+    ///
+    /// * When MSK IAM is enabled, a leftover `security.protocol`/`sasl.*` override would silently
+    ///   drop OAUTHBEARER/SASL_SSL — the component would load credentials but fail to authenticate.
+    /// * When MSK IAM is not enabled, setting `sasl.mechanism = OAUTHBEARER` here would still reach
+    ///   the always-on refresh callback (which has no token provider) — reject it with the same
+    ///   guidance as the top-level `sasl.mechanism` guard.
     #[cfg(feature = "aws-core")]
     pub(crate) fn validate_librdkafka_overrides<'a>(
         &self,
-        option_keys: impl IntoIterator<Item = &'a String>,
+        options: impl IntoIterator<Item = (&'a String, &'a String)>,
     ) -> crate::Result<()> {
         let msk_iam_enabled = self
             .sasl
@@ -294,22 +305,30 @@ impl KafkaAuthConfig {
             .and_then(|s| s.aws_msk_iam.as_ref())
             .map(|c| c.enabled)
             .unwrap_or(false);
-        if !msk_iam_enabled {
-            return Ok(());
-        }
+
         const RESERVED: [&str; 4] = [
             "security.protocol",
             "sasl.mechanism",
             "sasl.username",
             "sasl.password",
         ];
-        for key in option_keys {
-            if RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r)) {
-                return Err(format!(
-                    "`librdkafka_options.{key}` conflicts with `sasl.aws_msk_iam`; remove it \
-                     (MSK IAM manages `security.protocol` and `sasl.*`)"
-                )
-                .into());
+        for (key, value) in options {
+            if msk_iam_enabled {
+                if RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r)) {
+                    return Err(format!(
+                        "`librdkafka_options.{key}` conflicts with `sasl.aws_msk_iam`; remove it \
+                         (MSK IAM manages `security.protocol` and `sasl.*`)"
+                    )
+                    .into());
+                }
+            } else if key.eq_ignore_ascii_case("sasl.mechanism")
+                && value.eq_ignore_ascii_case("OAUTHBEARER")
+            {
+                return Err(
+                    "`librdkafka_options.sasl.mechanism = \"OAUTHBEARER\"` is only supported via \
+                     `sasl.aws_msk_iam` (AWS MSK IAM)"
+                        .into(),
+                );
             }
         }
         Ok(())
@@ -322,6 +341,8 @@ impl KafkaAuthConfig {
 #[derive(Clone)]
 pub(crate) struct MskIamCredentials {
     pub(crate) region: Region,
+    /// The SigV4 signing host (partition-aware, honoring an explicit endpoint).
+    pub(crate) host: String,
     pub(crate) credentials: msk_iam::CredentialsCache,
 }
 
@@ -394,7 +415,8 @@ impl ClientContext for KafkaStatisticsContext {
             .lock()
             .map_err(|_| "MSK IAM credential cache mutex poisoned")?
             .clone();
-        let token = msk_iam::build_token(&creds.region, &credentials, SystemTime::now())?;
+        let token =
+            msk_iam::build_token(&creds.region, &creds.host, &credentials, SystemTime::now())?;
 
         Ok(OAuthToken {
             token: token.token,
@@ -607,26 +629,43 @@ mod auth_tests {
         ] {
             let opts = HashMap::from([(key.to_string(), "x".to_string())]);
             let err = auth
-                .validate_librdkafka_overrides(opts.keys())
+                .validate_librdkafka_overrides(opts.iter())
                 .expect_err("conflicting override must be rejected");
             assert!(err.to_string().contains(key), "got: {err}");
         }
         // Benign options are fine.
         let ok = HashMap::from([("socket.timeout.ms".to_string(), "1000".to_string())]);
-        assert!(auth.validate_librdkafka_overrides(ok.keys()).is_ok());
+        assert!(auth.validate_librdkafka_overrides(ok.iter()).is_ok());
     }
 
     #[cfg(feature = "aws-core")]
     #[test]
     fn librdkafka_overrides_ignored_without_msk_iam() {
-        // Without MSK IAM these keys are the user's own business.
+        // Without MSK IAM, non-OAUTHBEARER overrides are the user's own business.
         use std::collections::HashMap;
         let auth = KafkaAuthConfig {
             sasl: Some(sasl(Some(true), Some("SCRAM-SHA-512"), Some("u"))),
             tls: Some(tls(true)),
         };
         let opts = HashMap::from([("sasl.mechanism".to_string(), "PLAIN".to_string())]);
-        assert!(auth.validate_librdkafka_overrides(opts.keys()).is_ok());
+        assert!(auth.validate_librdkafka_overrides(opts.iter()).is_ok());
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn librdkafka_oauthbearer_without_msk_iam_is_rejected() {
+        // Closes the gap where OAUTHBEARER set via librdkafka_options (not the mechanism field) would
+        // still reach the always-on refresh callback with no token provider.
+        use std::collections::HashMap;
+        let auth = KafkaAuthConfig {
+            sasl: Some(sasl(Some(true), None, None)),
+            tls: Some(tls(true)),
+        };
+        let opts = HashMap::from([("sasl.mechanism".to_string(), "OAUTHBEARER".to_string())]);
+        let err = auth
+            .validate_librdkafka_overrides(opts.iter())
+            .expect_err("librdkafka OAUTHBEARER without MSK IAM must be rejected");
+        assert!(err.to_string().contains("aws_msk_iam"), "got: {err}");
     }
 
     #[cfg(feature = "aws-core")]

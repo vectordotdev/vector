@@ -129,35 +129,60 @@ fn next_refresh(expiry: Option<SystemTime>) -> Duration {
     }
 }
 
-/// Mint a fresh MSK IAM SASL/OAUTHBEARER token for `region` from already-resolved `credentials`.
-/// Fully synchronous — safe to call from librdkafka's refresh callback on any thread.
+/// The MSK IAM signing host for a region, honoring an explicit `endpoint` override and otherwise
+/// resolving the partition suffix (e.g. `amazonaws.com.cn` for China regions).
+pub(crate) fn signing_host(region: &str, endpoint: Option<&str>) -> String {
+    if let Some(endpoint) = endpoint {
+        // Strip scheme and any trailing slash so it can be used as a bare host.
+        return endpoint
+            .trim_start_matches("https://")
+            .trim_start_matches("http://")
+            .trim_end_matches('/')
+            .to_string();
+    }
+    let suffix = if region.starts_with("cn-") {
+        "amazonaws.com.cn"
+    } else {
+        "amazonaws.com"
+    };
+    format!("kafka.{region}.{suffix}")
+}
+
+/// Mint a fresh MSK IAM SASL/OAUTHBEARER token for `region`/`host` from already-resolved
+/// `credentials`. Fully synchronous — safe to call from librdkafka's refresh callback on any thread.
 pub(crate) fn build_token(
     region: &Region,
+    host: &str,
     credentials: &Credentials,
     signing_time: SystemTime,
 ) -> Result<MskAuthToken, MskIamError> {
-    let signed_url = presign(region, credentials, signing_time)?;
+    let signed_url = presign(region, host, credentials, signing_time)?;
     // `User-Agent` is appended *after* signing (unsigned), matching the AWS signers.
     let signed_url = format!("{signed_url}&User-Agent={USER_AGENT}");
     let token = URL_SAFE_NO_PAD.encode(signed_url.as_bytes());
 
-    let signing_ms = signing_time
+    // The token can't outlive the credentials that signed it: a presign is valid for 15 min, but
+    // temporary (STS/IMDS) credentials may expire sooner. Advertise the earlier of the two so
+    // librdkafka refreshes before the underlying AWS session dies.
+    let token_expiry = signing_time + Duration::from_secs(EXPIRY_SECONDS);
+    let effective_expiry = match credentials.expiry() {
+        Some(cred_expiry) if cred_expiry < token_expiry => cred_expiry,
+        _ => token_expiry,
+    };
+    let lifetime_ms = effective_expiry
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64;
-    Ok(MskAuthToken {
-        token,
-        lifetime_ms: signing_ms + (EXPIRY_SECONDS as i64) * 1000,
-    })
+    Ok(MskAuthToken { token, lifetime_ms })
 }
 
-/// Build the SigV4-presigned `https://kafka.{region}.amazonaws.com/?Action=...` URL.
+/// Build the SigV4-presigned `https://{host}/?Action=...` URL.
 fn presign(
     region: &Region,
+    host: &str,
     credentials: &Credentials,
     time: SystemTime,
 ) -> Result<String, MskIamError> {
-    let host = format!("kafka.{}.amazonaws.com", region.as_ref());
     let identity: Identity = credentials.clone().into();
 
     let mut settings = SigningSettings::default();
@@ -174,7 +199,7 @@ fn presign(
         .map_err(|e| MskIamError::SigningParams { source: Box::new(e) })?;
 
     let url = format!("https://{host}/?Action={}", rfc3986(ACTION));
-    let headers = [("host", host.as_str())];
+    let headers = [("host", host)];
     let signable = SignableRequest::new("GET", &url, headers.into_iter(), SignableBody::Bytes(&[]))
         .map_err(|e| MskIamError::Signing { source: Box::new(e) })?;
 
@@ -225,6 +250,9 @@ mod tests {
     const GOLDEN_SIG_NO_TOKEN: &str =
         "12f697bba1fe524b7e9f370e2c56075ea612d9d4d2c7f16c402ffc72520fce5e";
 
+    // The oracle signed `kafka.ap-southeast-1.amazonaws.com` for this region.
+    const HOST: &str = "kafka.ap-southeast-1.amazonaws.com";
+
     fn region() -> Region {
         Region::new("ap-southeast-1")
     }
@@ -271,14 +299,14 @@ mod tests {
     /// matches the independent oracle — order-independent because MSK re-canonicalizes the query.
     #[test]
     fn full_presigned_url_matches_oracle() {
-        let url = presign(&region(), &creds(true), fixed_time()).expect("presign");
+        let url = presign(&region(), HOST, &creds(true), fixed_time()).expect("presign");
         assert_eq!(normalize(&url), normalize(ORACLE_URL_WITH_TOKEN), "url={url}");
     }
 
     /// KNOWN-ANSWER: aws-sigv4 signature must equal the oracle's, with a session token present.
     #[test]
     fn signature_matches_oracle_with_session_token() {
-        let url = presign(&region(), &creds(true), fixed_time()).expect("presign");
+        let url = presign(&region(), HOST, &creds(true), fixed_time()).expect("presign");
         assert_eq!(query_param(&url, "X-Amz-Signature"), Some(GOLDEN_SIG_WITH_TOKEN));
         assert_eq!(query_param(&url, "X-Amz-Security-Token"), Some("IQoJb3Jp"));
     }
@@ -286,7 +314,7 @@ mod tests {
     /// KNOWN-ANSWER: same, without a session token (static long-term credentials).
     #[test]
     fn signature_matches_oracle_without_session_token() {
-        let url = presign(&region(), &creds(false), fixed_time()).expect("presign");
+        let url = presign(&region(), HOST, &creds(false), fixed_time()).expect("presign");
         assert_eq!(query_param(&url, "X-Amz-Signature"), Some(GOLDEN_SIG_NO_TOKEN));
         assert_eq!(query_param(&url, "X-Amz-Security-Token"), None);
     }
@@ -294,7 +322,7 @@ mod tests {
     /// Structural invariants the MSK broker requires of the presigned URL.
     #[test]
     fn presigned_url_has_required_msk_shape() {
-        let url = presign(&region(), &creds(false), fixed_time()).expect("presign");
+        let url = presign(&region(), HOST, &creds(false), fixed_time()).expect("presign");
         assert!(url.starts_with("https://kafka.ap-southeast-1.amazonaws.com/?"));
         assert_eq!(query_param(&url, "Action"), Some("kafka-cluster%3AConnect"));
         assert_eq!(query_param(&url, "X-Amz-Algorithm"), Some("AWS4-HMAC-SHA256"));
@@ -310,13 +338,59 @@ mod tests {
     /// is the absolute unix-epoch ms of signing-time + 900s.
     #[test]
     fn build_token_encodes_and_sets_lifetime() {
-        let out = build_token(&region(), &creds(false), fixed_time()).expect("token");
+        let out = build_token(&region(), HOST, &creds(false), fixed_time()).expect("token");
         assert!(!out.token.contains('='), "token must be unpadded base64url");
         let decoded = URL_SAFE_NO_PAD.decode(out.token.as_bytes()).expect("decode");
         let url = String::from_utf8(decoded).expect("utf8");
         assert!(url.starts_with("https://kafka.ap-southeast-1.amazonaws.com/?"));
         assert!(url.ends_with(&format!("&User-Agent={USER_AGENT}")));
         assert!(url.contains(GOLDEN_SIG_NO_TOKEN));
+        assert_eq!(out.lifetime_ms, (FIXED_EPOCH_SECS as i64) * 1000 + 900_000);
+    }
+
+    #[test]
+    fn signing_host_resolves_partition_and_endpoint() {
+        // Commercial partition.
+        assert_eq!(
+            signing_host("us-east-1", None),
+            "kafka.us-east-1.amazonaws.com"
+        );
+        // China partition uses the .com.cn suffix.
+        assert_eq!(
+            signing_host("cn-north-1", None),
+            "kafka.cn-north-1.amazonaws.com.cn"
+        );
+        // Explicit endpoint overrides, with scheme/trailing slash stripped.
+        assert_eq!(
+            signing_host("us-east-1", Some("https://kafka.example.internal/")),
+            "kafka.example.internal"
+        );
+    }
+
+    /// A token must never be advertised as valid past the credentials that signed it.
+    #[test]
+    fn lifetime_clamped_to_credential_expiry() {
+        // Credentials expiring 300s after signing time — earlier than the 900s presign window.
+        let cred_expiry = fixed_time() + Duration::from_secs(300);
+        let creds = Credentials::new(
+            ACCESS_KEY,
+            SECRET_KEY,
+            Some(SESSION_TOKEN.to_string()),
+            Some(cred_expiry),
+            "test",
+        );
+        let out = build_token(&region(), HOST, &creds, fixed_time()).expect("token");
+        assert_eq!(out.lifetime_ms, (FIXED_EPOCH_SECS as i64) * 1000 + 300_000);
+
+        // Credentials outliving the window -> full 900s.
+        let long = Credentials::new(
+            ACCESS_KEY,
+            SECRET_KEY,
+            Some(SESSION_TOKEN.to_string()),
+            Some(fixed_time() + Duration::from_secs(3600)),
+            "test",
+        );
+        let out = build_token(&region(), HOST, &long, fixed_time()).expect("token");
         assert_eq!(out.lifetime_ms, (FIXED_EPOCH_SECS as i64) * 1000 + 900_000);
     }
 
@@ -328,7 +402,7 @@ mod tests {
             .await
             .expect("cache");
         let cached = cache.lock().unwrap().clone();
-        let out = build_token(&region(), &cached, fixed_time()).expect("token");
+        let out = build_token(&region(), HOST, &cached, fixed_time()).expect("token");
         let decoded = URL_SAFE_NO_PAD.decode(out.token.as_bytes()).unwrap();
         let url = String::from_utf8(decoded).unwrap();
         assert!(url.contains(GOLDEN_SIG_WITH_TOKEN));

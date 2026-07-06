@@ -1236,7 +1236,7 @@ fn create_consumer(
         #[cfg(feature = "aws-core")]
         config
             .auth
-            .validate_librdkafka_overrides(librdkafka_options.keys())?;
+            .validate_librdkafka_overrides(librdkafka_options.iter())?;
         for (key, value) in librdkafka_options {
             client_config.set(key.as_str(), value.as_str());
         }

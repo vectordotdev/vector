@@ -180,7 +180,7 @@ impl KafkaSinkConfig {
         // the MSK IAM security/mechanism settings.
         #[cfg(feature = "aws-core")]
         self.auth
-            .validate_librdkafka_overrides(self.librdkafka_options.keys())?;
+            .validate_librdkafka_overrides(self.librdkafka_options.iter())?;
 
         // All batch options are producer only.
         client_config
