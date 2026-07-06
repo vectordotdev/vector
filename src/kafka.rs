@@ -306,29 +306,29 @@ impl KafkaAuthConfig {
             .map(|c| c.enabled)
             .unwrap_or(false);
 
-        const RESERVED: [&str; 4] = [
-            "security.protocol",
-            "sasl.mechanism",
-            "sasl.username",
-            "sasl.password",
-        ];
+        // Non-mechanism keys that MSK IAM owns. `security.protocol` has no alias; `sasl.username` /
+        // `sasl.password` are canonical.
+        const RESERVED: [&str; 3] = ["security.protocol", "sasl.username", "sasl.password"];
+        // librdkafka accepts both `sasl.mechanism` (singular) and `sasl.mechanisms` (plural) for the
+        // same property, so both must be caught.
+        let is_mechanism =
+            |k: &str| k.eq_ignore_ascii_case("sasl.mechanism") || k.eq_ignore_ascii_case("sasl.mechanisms");
+
         for (key, value) in options {
             if msk_iam_enabled {
-                if RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r)) {
+                if is_mechanism(key) || RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r)) {
                     return Err(format!(
                         "`librdkafka_options.{key}` conflicts with `sasl.aws_msk_iam`; remove it \
                          (MSK IAM manages `security.protocol` and `sasl.*`)"
                     )
                     .into());
                 }
-            } else if key.eq_ignore_ascii_case("sasl.mechanism")
-                && value.eq_ignore_ascii_case("OAUTHBEARER")
-            {
-                return Err(
-                    "`librdkafka_options.sasl.mechanism = \"OAUTHBEARER\"` is only supported via \
+            } else if is_mechanism(key) && value.eq_ignore_ascii_case("OAUTHBEARER") {
+                return Err(format!(
+                    "`librdkafka_options.{key} = \"OAUTHBEARER\"` is only supported via \
                      `sasl.aws_msk_iam` (AWS MSK IAM)"
-                        .into(),
-                );
+                )
+                .into());
             }
         }
         Ok(())
@@ -624,6 +624,7 @@ mod auth_tests {
         for key in [
             "security.protocol",
             "sasl.mechanism",
+            "sasl.mechanisms", // librdkafka plural alias
             "sasl.username",
             "sasl.password",
         ] {
@@ -661,11 +662,13 @@ mod auth_tests {
             sasl: Some(sasl(Some(true), None, None)),
             tls: Some(tls(true)),
         };
-        let opts = HashMap::from([("sasl.mechanism".to_string(), "OAUTHBEARER".to_string())]);
-        let err = auth
-            .validate_librdkafka_overrides(opts.iter())
-            .expect_err("librdkafka OAUTHBEARER without MSK IAM must be rejected");
-        assert!(err.to_string().contains("aws_msk_iam"), "got: {err}");
+        for key in ["sasl.mechanism", "sasl.mechanisms"] {
+            let opts = HashMap::from([(key.to_string(), "OAUTHBEARER".to_string())]);
+            let err = auth
+                .validate_librdkafka_overrides(opts.iter())
+                .expect_err("librdkafka OAUTHBEARER without MSK IAM must be rejected");
+            assert!(err.to_string().contains("aws_msk_iam"), "got: {err}");
+        }
     }
 
     #[cfg(feature = "aws-core")]
