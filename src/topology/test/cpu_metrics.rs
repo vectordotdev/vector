@@ -21,6 +21,16 @@ const EVENT_COUNT: usize = 100;
 const TRANSFORM_TYPE: &str = "test_noop";
 const TRANSFORM_KIND: &str = "transform";
 
+/// Per-event busy-spin duration used by the CPU-usage tests below.
+///
+/// OS-level thread CPU-time clocks (e.g. Windows' `GetThreadTimes`) only
+/// update at clock-tick granularity (commonly ~15ms). A bare passthrough
+/// transform does negligible real work, so its true CPU usage can round down
+/// to exactly zero over the whole test. Burning 1ms of real CPU per event,
+/// across `EVENT_COUNT` events, guarantees the cumulative usage comfortably
+/// exceeds that granularity on every supported platform.
+const CPU_BURN_MS: u64 = 1;
+
 fn has_transform_tags(metric: &Metric, transform_id: &str) -> bool {
     metric.tags().is_some_and(|tags| {
         tags.get("component_id") == Some(transform_id)
@@ -132,7 +142,7 @@ async fn run_cpu_topology(
 #[tokio::test]
 async fn component_cpu_usage_emitted_function_transform() {
     let id = "cpu_transform_fn";
-    let metrics = run_cpu_topology(id, true, |c| c).await;
+    let metrics = run_cpu_topology(id, true, |c| c.with_cpu_burn_ms(CPU_BURN_MS)).await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
@@ -142,8 +152,10 @@ async fn component_cpu_usage_emitted_function_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_task_transform() {
     let id = "cpu_transform_task";
-    let metrics =
-        run_cpu_topology(id, true, |_| NoopTransformConfig::from(TransformType::Task)).await;
+    let metrics = run_cpu_topology(id, true, |_| {
+        NoopTransformConfig::from(TransformType::Task).with_cpu_burn_ms(CPU_BURN_MS)
+    })
+    .await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
@@ -153,7 +165,10 @@ async fn component_cpu_usage_emitted_task_transform() {
 #[tokio::test]
 async fn component_cpu_usage_emitted_concurrent_transform() {
     let id = "cpu_transform_concurrent";
-    let metrics = run_cpu_topology(id, true, |c| c.with_concurrency()).await;
+    let metrics = run_cpu_topology(id, true, |c| {
+        c.with_concurrency().with_cpu_burn_ms(CPU_BURN_MS)
+    })
+    .await;
     assert_cpu_counter_positive(&metrics, id);
 }
 
