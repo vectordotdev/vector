@@ -21,7 +21,7 @@ use crate::{
         prelude::*,
         util::{
             BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
-            http::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -106,6 +106,10 @@ pub(super) struct StackdriverConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 pub(super) fn default_endpoint() -> String {
@@ -269,7 +273,10 @@ impl SinkConfig for StackdriverConfig {
         let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);

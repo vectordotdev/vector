@@ -6,6 +6,13 @@ edition = "2024"
 publish = false
 license = "MPL-2.0"
 
+[lints]
+workspace = true
+
+[features]
+# Enable the full VRL stdlib, which includes all available VRL functions.
+default = ["vrl/stdlib"]
+
 [dependencies]
 clap.workspace = true
 vector-vrl-functions.workspace = true

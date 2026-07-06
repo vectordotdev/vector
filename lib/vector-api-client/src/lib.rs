@@ -11,9 +11,9 @@
 //! let mut client = Client::new("http://localhost:9999".parse().unwrap());
 //! client.connect().await?;
 //!
-//! // Check health
-//! let health = client.health().await?;
-//! println!("Healthy: {}", health.healthy);
+//! // Check health (standard gRPC health check)
+//! client.health().await?;
+//! println!("Server is healthy");
 //!
 //! // Get components
 //! let components = client.get_components(0).await?;

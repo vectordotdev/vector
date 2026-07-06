@@ -20,6 +20,12 @@ pub mod metrics;
 
 pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
 
+/// Returns the Helm chart repo to use for E2E tests.
+/// Set `HELM_CHART_REPO` to override the default (e.g., a local chart path).
+pub fn helm_chart_repo() -> String {
+    env::var("HELM_CHART_REPO").unwrap_or_else(|_| "https://helm.vector.dev".to_string())
+}
+
 pub fn init() {
     _ = env_logger::builder().is_test(true).try_init();
 }

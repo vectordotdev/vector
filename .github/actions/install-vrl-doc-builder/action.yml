@@ -1,0 +1,25 @@
+name: "Install vector-vrl-doc-builder"
+description: "Install vector-vrl-doc-builder CLI tool with caching based on source code changes"
+
+branding:
+  icon: tool
+  color: purple
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache vrl-doc-builder binary
+      id: cache-vrl-doc-builder
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: ~/.cargo/bin/vector-vrl-doc-builder
+        key: ${{ runner.os }}-vrl-doc-builder-${{ hashFiles('lib/vector-vrl/**', 'Cargo.toml', 'Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vrl-doc-builder-
+
+    - name: Build and install vector-vrl-doc-builder
+      if: steps.cache-vrl-doc-builder.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "Building vector-vrl-doc-builder from source (cache miss)"
+        cargo install --path lib/vector-vrl/doc-builder --locked --force

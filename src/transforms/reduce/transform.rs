@@ -374,15 +374,13 @@ mod test {
 
     #[tokio::test]
     async fn reduce_from_condition() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -478,19 +476,17 @@ group_by = [ "request_id" ]
 
     #[tokio::test]
     async fn reduce_merge_strategies() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-merge_strategies.foo = "concat"
-merge_strategies.bar = "array"
-merge_strategies.baz = "max"
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            merge_strategies:
+              foo: concat
+              bar: array
+              baz: max
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -552,15 +548,13 @@ merge_strategies.baz = "max"
 
     #[tokio::test]
     async fn missing_group_by() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -629,14 +623,14 @@ group_by = [ "request_id" ]
 
     #[tokio::test]
     async fn max_events_0() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "id" ]
-merge_strategies.id = "retain"
-merge_strategies.message = "array"
-max_events = 0
-            "#,
-        );
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: retain
+              message: array
+            max_events: 0
+        "});
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
@@ -649,14 +643,14 @@ max_events = 0
 
     #[tokio::test]
     async fn max_events_1() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "id" ]
-merge_strategies.id = "retain"
-merge_strategies.message = "array"
-max_events = 1
-            "#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: retain
+              message: array
+            max_events: 1
+        "})
         .unwrap();
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
@@ -692,14 +686,14 @@ max_events = 1
 
     #[tokio::test]
     async fn max_events() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "id" ]
-merge_strategies.id = "retain"
-merge_strategies.message = "array"
-max_events = 3
-            "#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: retain
+              message: array
+            max_events: 3
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -756,18 +750,16 @@ max_events = 3
 
     #[tokio::test]
     async fn arrays() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-merge_strategies.foo = "array"
-merge_strategies.bar = "concat"
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            merge_strategies:
+              foo: array
+              bar: concat
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -849,18 +841,16 @@ merge_strategies.bar = "concat"
 
     #[tokio::test]
     async fn strategy_path_with_nested_fields() {
-        let reduce_config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            group_by = [ "id" ]
-
-            merge_strategies.id = "discard"
-            merge_strategies."message.a.b" = "array"
-
-            [ends_when]
-              type = "vrl"
-              source = "exists(.test_end)"
-            "#,
-        ))
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: discard
+              message.a.b: array
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -927,14 +917,13 @@ merge_strategies.bar = "concat"
 
     #[test]
     fn invalid_merge_strategies_containing_indexes() {
-        let config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            group_by = [ "id" ]
-
-            merge_strategies.id = "discard"
-            merge_strategies."nested.msg[0]" = "array"
-            "#,
-        ))
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: discard
+              'nested.msg[0]': array
+        "})
         .unwrap();
         let error = Reduce::new(
             &config,
@@ -950,18 +939,17 @@ merge_strategies.bar = "concat"
 
     #[tokio::test]
     async fn merge_objects_in_array() {
-        let config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            group_by = [ "id" ]
-            merge_strategies.events = "array"
-            merge_strategies."\"a-b\"" = "retain"
-            merge_strategies.another = "discard"
-
-            [ends_when]
-              type = "vrl"
-              source = "exists(.test_end)"
-            "#,
-        ))
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {r#"
+            group_by:
+              - id
+            merge_strategies:
+              events: array
+              '"a-b"': retain
+              another: discard
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "#})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -1014,13 +1002,11 @@ merge_strategies.bar = "concat"
 
     #[tokio::test]
     async fn merged_quoted_path() {
-        let config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            [ends_when]
-              type = "vrl"
-              source = "exists(.test_end)"
-            "#,
-        ))
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {

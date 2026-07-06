@@ -152,13 +152,10 @@ generated: components: sinks: greptimedb_logs: configuration: {
 			Note that these headers will override the existing headers.
 			"""
 		required: false
-		type: object: {
-			examples: [{}]
-			options: "*": {
-				description: "Extra header key-value pairs."
-				required:    true
-				type: string: {}
-			}
+		type: object: options: "*": {
+			description: "Extra header key-value pairs."
+			required:    true
+			type: string: {}
 		}
 	}
 	extra_params: {

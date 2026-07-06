@@ -1,4 +1,3 @@
-use async_compression::tokio::bufread::GzipDecoder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use std::{
@@ -18,6 +17,10 @@ use file_source_common::{
     AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
+use vector_common::compression::gzip_multiple_decoder;
+
+const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
+const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
 
 #[cfg(test)]
 mod tests;
@@ -57,6 +60,7 @@ pub struct FileWatcher {
     reached_eof: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    read_retry_delay: Duration,
     last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
@@ -128,7 +132,7 @@ impl FileWatcher {
                     (Box::new(null_reader()), 0)
                 }
                 (true, false, ReadFrom::Beginning) => {
-                    (Box::new(BufReader::new(GzipDecoder::new(reader))), 0)
+                    (Box::new(BufReader::new(gzip_multiple_decoder(reader))), 0)
                 }
                 (false, true, _) => {
                     let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
@@ -166,6 +170,7 @@ impl FileWatcher {
             reached_eof: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            read_retry_delay: EOF_READ_BACKOFF_MIN,
             last_seen: ts,
             max_line_bytes,
             line_delimiter,
@@ -184,7 +189,7 @@ impl FileWatcher {
                 if self.file_position != 0 {
                     Box::new(null_reader())
                 } else {
-                    Box::new(BufReader::new(GzipDecoder::new(reader)))
+                    Box::new(BufReader::new(gzip_multiple_decoder(reader)))
                 }
             } else {
                 reader.seek(io::SeekFrom::Start(self.file_position)).await?;
@@ -196,6 +201,8 @@ impl FileWatcher {
             self.devno = file_info.portable_dev();
             self.inode = file_info.portable_ino();
         }
+        self.reached_eof = false;
+        self.read_retry_delay = EOF_READ_BACKOFF_MIN;
         self.path = path;
         Ok(())
     }
@@ -235,7 +242,7 @@ impl FileWatcher {
         let file_position = &mut self.file_position;
         let initial_position = *file_position;
         match read_until_with_max_size(
-            Box::pin(reader),
+            reader.as_mut(),
             file_position,
             self.line_delimiter.as_ref(),
             &mut self.buf,
@@ -283,7 +290,7 @@ impl FileWatcher {
                         })
                     }
                 } else {
-                    self.reached_eof = true;
+                    self.track_read_eof();
                     Ok(RawLineResult {
                         raw_line: None,
                         discarded_for_size_and_truncated,
@@ -306,7 +313,22 @@ impl FileWatcher {
 
     #[inline]
     fn track_read_success(&mut self) {
+        self.reached_eof = false;
+        self.read_retry_delay = EOF_READ_BACKOFF_MIN;
         self.last_read_success = Instant::now();
+    }
+
+    #[inline]
+    fn track_read_eof(&mut self) {
+        self.read_retry_delay = if self.reached_eof {
+            std::cmp::min(
+                self.read_retry_delay.saturating_mul(2),
+                EOF_READ_BACKOFF_MAX,
+            )
+        } else {
+            EOF_READ_BACKOFF_MIN
+        };
+        self.reached_eof = true;
     }
 
     #[inline]
@@ -316,6 +338,10 @@ impl FileWatcher {
 
     #[inline]
     pub fn should_read(&self) -> bool {
+        if self.reached_eof && self.last_read_attempt.elapsed() < self.read_retry_delay {
+            return false;
+        }
+
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
     }

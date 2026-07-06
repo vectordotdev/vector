@@ -29,8 +29,7 @@ components: sources: redis: {
 	}
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"

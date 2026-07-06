@@ -46,10 +46,9 @@ transforms:
         ]
       }
 
-
 sinks:
   otel_sink:
-    inputs: [ "remap_otel" ]
+    inputs: ["remap_otel"]
     type: opentelemetry
     protocol: http
     uri: http://otel-collector-sink:5318/v1/logs

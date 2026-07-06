@@ -4,7 +4,6 @@ components: sinks: greptimedb_logs: {
 	title: "GreptimeDB Logs"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"

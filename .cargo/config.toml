@@ -2,12 +2,15 @@
 vdev = "run --quiet --package vdev --"
 
 [env]
-# Build with large pages so that Vector runs on systems with 64k pages or less (e.g. 4k) to support
-# CentOS 7, 8, and a few other Linux distributions.
+# Build jemalloc assuming 64K pages so binaries also run on aarch64 hosts whose
+# kernels ship with a 64K page size (notably EL8 aarch64). On 4K-page hosts this
+# coarsens jemalloc's allocation granularity; no regression was measured in
+# https://github.com/vectordotdev/vector/pull/18481.
 JEMALLOC_SYS_WITH_LG_PAGE = "16"
 
 [target.'cfg(all())']
 rustflags = [
+  "-D", "warnings",
   "-Dclippy::print_stdout",
   "-Dclippy::print_stderr",
   "-Dclippy::dbg_macro",
@@ -35,4 +38,4 @@ rustflags = ["-C", "link-args=-rdynamic"]
 
 [target.x86_64-pc-windows-msvc]
 # https://github.com/dtolnay/inventory/issues/58
-rustflags = ["-C", "codegen-units=1"]
+rustflags = ["-C", "codegen-units=1", "-Ctarget-feature=+crt-static"]

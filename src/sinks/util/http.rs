@@ -7,6 +7,7 @@ use futures::{Sink, future::BoxFuture};
 use headers::HeaderName;
 use http::{HeaderValue, Request, Response, StatusCode, header};
 use http_body::Body as _;
+use tracing::debug;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -550,14 +551,137 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
     }
 }
 
+/// Serializes and deserializes a [`Vec<StatusCode>`]
+mod status_code_vec {
+    use http::StatusCode;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
+
+    /// Deserializes a [`Vec<StatusCode>`]
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<StatusCode>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Vec::<u16>::deserialize(deserializer)?
+            .into_iter()
+            .map(StatusCode::from_u16)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Error::custom)
+    }
+
+    /// Serializes a [`Vec<StatusCode>`]
+    pub fn serialize<S>(status_codes: &[StatusCode], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        status_codes
+            .iter()
+            .map(StatusCode::as_u16)
+            .collect::<Vec<_>>()
+            .serialize(serializer)
+    }
+}
+
+/// Configurable retry strategy for `http` based sinks.
+///
+/// For more information about error responses, see [Client Error Responses][error_responses].
+///
+/// [error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+#[configurable_component]
+#[derive(Debug, Clone, Default, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The retry strategy enum."))]
+pub enum RetryStrategy {
+    /// Don't retry any errors, including request timeouts.
+    None,
+
+    /// Default strategy. See [`RetryStrategy::retry_action`] for more details.
+    #[default]
+    Default,
+
+    /// Retry on *all* HTTP status codes except for success codes (2xx)
+    All,
+
+    /// Custom retry strategy
+    Custom {
+        /// Retry on these specific HTTP status codes
+        #[serde(with = "status_code_vec")]
+        status_codes: Vec<StatusCode>,
+    },
+}
+
+impl RetryStrategy {
+    /// Returns the name of the retry strategy.
+    #[must_use]
+    const fn name(&self) -> &str {
+        match self {
+            Self::None => "Never retry strategy",
+            Self::Default => "Default retry strategy",
+            Self::All => "Retry all strategy",
+            Self::Custom { .. } => "Custom retry strategy",
+        }
+    }
+
+    /// Determines if the given status code should be retried.
+    ///
+    /// For the `Default` strategy, the following status codes will be retried:
+    /// - 429 (Too Many Requests)
+    /// - 408 (Request Timeout)
+    /// - 5xx (Server Error)
+    ///
+    /// For the `Custom` strategy, the status codes specified in the `status_codes` field will be retried.
+    ///
+    /// For the `All` strategy, all non-success status codes will be retried.
+    #[must_use]
+    pub fn retry_action<Req>(&self, status: http::StatusCode) -> RetryAction<Req> {
+        if status.is_success() {
+            return RetryAction::Successful;
+        }
+
+        let reason = format!(
+            "{}: {}",
+            self.name(),
+            status.canonical_reason().unwrap_or_else(|| status.as_str())
+        )
+        .into();
+
+        match self {
+            Self::None => RetryAction::DontRetry(reason),
+            Self::Default => match status {
+                StatusCode::TOO_MANY_REQUESTS | StatusCode::REQUEST_TIMEOUT => {
+                    RetryAction::Retry(reason)
+                }
+                StatusCode::NOT_IMPLEMENTED => RetryAction::DontRetry(reason),
+                _ => {
+                    if status.is_server_error() {
+                        RetryAction::Retry(reason)
+                    } else {
+                        RetryAction::DontRetry(reason)
+                    }
+                }
+            },
+            Self::All => RetryAction::Retry(reason),
+            Self::Custom { status_codes } => {
+                if status_codes.contains(&status) {
+                    RetryAction::Retry(reason)
+                } else {
+                    RetryAction::DontRetry(reason)
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HttpRetryLogic<Req> {
     request: PhantomData<Req>,
+    retry_strategy: RetryStrategy,
 }
+
 impl<Req> Default for HttpRetryLogic<Req> {
     fn default() -> Self {
         Self {
             request: PhantomData,
+            retry_strategy: RetryStrategy::Default,
         }
     }
 }
@@ -567,25 +691,28 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
     type Request = Req;
     type Response = hyper::Response<Bytes>;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false
+        } else {
+            error.is_retriable()
+        }
+    }
+
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         let status = response.status();
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
+        if !status.is_success() {
+            debug!(
+                message = "HTTP response.",
+                %status,
+                body = %String::from_utf8_lossy(response.body()),
+            );
         }
+        self.retry_strategy.retry_action(status)
     }
 }
 
@@ -596,6 +723,7 @@ pub struct HttpStatusRetryLogic<F, Req, Res> {
     func: F,
     request: PhantomData<Req>,
     response: PhantomData<Res>,
+    retry_strategy: RetryStrategy,
 }
 
 impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res>
@@ -604,11 +732,12 @@ where
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
-    pub const fn new(func: F) -> HttpStatusRetryLogic<F, Req, Res> {
+    pub const fn new(func: F, retry_strategy: RetryStrategy) -> HttpStatusRetryLogic<F, Req, Res> {
         HttpStatusRetryLogic {
             func,
             request: PhantomData,
             response: PhantomData,
+            retry_strategy,
         }
     }
 }
@@ -623,25 +752,21 @@ where
     type Request = Req;
     type Response = Res;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false
+        } else {
+            error.is_retriable()
+        }
+    }
+
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
     }
 
     fn should_retry_response(&self, response: &Res) -> RetryAction<Req> {
         let status = (self.func)(response);
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => {
-                RetryAction::Retry(format!("Http Status: {status}").into())
-            }
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("Http status: {status}").into()),
-        }
+        self.retry_strategy.retry_action(status)
     }
 }
 
@@ -654,6 +779,7 @@ where
             func: self.func.clone(),
             request: PhantomData,
             response: PhantomData,
+            retry_strategy: self.retry_strategy.clone(),
         }
     }
 }
@@ -820,12 +946,17 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Creates a `RetryLogic` for use with `HttpResponse`.
-pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>() -> HttpStatusRetryLogic<
+pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
+    retry_strategy: RetryStrategy,
+) -> HttpStatusRetryLogic<
     impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
 > {
-    HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status())
+    HttpStatusRetryLogic::new(
+        |req: &HttpResponse| req.http_response.status(),
+        retry_strategy,
+    )
 }
 
 /// Uses the estimated json encoded size to determine batch sizing.
@@ -966,6 +1097,93 @@ mod test {
             logic
                 .should_retry_response(&response_501)
                 .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_none_preserves_success_and_rejects_failures() {
+        let strategy = RetryStrategy::None;
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_none_disables_timeout_retries() {
+        let logic = HttpRetryLogic::<()> {
+            request: PhantomData,
+            retry_strategy: RetryStrategy::None,
+        };
+        let status_logic =
+            HttpStatusRetryLogic::<_, (), ()>::new(|_: &()| StatusCode::OK, RetryStrategy::None);
+
+        assert!(!logic.is_retriable_timeout());
+        assert!(!status_logic.is_retriable_timeout());
+    }
+
+    #[test]
+    fn retry_strategy_all_preserves_success_and_retries_failures() {
+        let strategy = RetryStrategy::All;
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::BAD_REQUEST)
+                .is_retryable()
+        );
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_custom_only_retries_configured_statuses() {
+        let strategy = RetryStrategy::Custom {
+            status_codes: vec![StatusCode::BAD_REQUEST],
+        };
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::BAD_REQUEST)
+                .is_retryable()
+        );
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_custom_serde_roundtrips_status_codes() {
+        let json = r#"{"type":"custom","status_codes":[400,503]}"#;
+        let strategy: RetryStrategy = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            strategy,
+            RetryStrategy::Custom {
+                status_codes: vec![StatusCode::BAD_REQUEST, StatusCode::SERVICE_UNAVAILABLE],
+            }
+        );
+        let encoded = serde_json::to_string(&strategy).unwrap();
+        let roundtrip: RetryStrategy = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(roundtrip, strategy);
+    }
+
+    #[test]
+    fn retry_strategy_custom_serde_rejects_invalid_status_codes() {
+        // `http::StatusCode::from_u16` only accepts 100–999; 1000 is out of range.
+        let json = r#"{"type":"custom","status_codes":[1000]}"#;
+        let result = serde_json::from_str::<RetryStrategy>(json);
+        assert!(
+            result.is_err(),
+            "expected invalid status code to fail deserialization"
         );
     }
 

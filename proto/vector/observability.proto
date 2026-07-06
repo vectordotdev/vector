@@ -8,14 +8,14 @@ import "event.proto";
 service ObservabilityService {
   // ========== Simple Queries ==========
 
-  // Check if the API server is healthy and responding
-  rpc Health(HealthRequest) returns (HealthResponse);
-
   // Get metadata about the Vector instance (version, hostname)
   rpc GetMeta(GetMetaRequest) returns (GetMetaResponse);
 
   // Get information about configured components (sources, transforms, sinks)
   rpc GetComponents(GetComponentsRequest) returns (GetComponentsResponse);
+
+  // Check whether allocation tracing is active on this instance
+  rpc GetAllocationTracingStatus(GetAllocationTracingStatusRequest) returns (GetAllocationTracingStatusResponse);
 
   // ========== Real-time Metric Streams ==========
   // All streaming RPCs send periodic updates at the specified interval
@@ -39,19 +39,19 @@ service ObservabilityService {
   rpc StreamOutputEvents(StreamOutputEventsRequest) returns (stream StreamOutputEventsResponse);
 }
 
-// ========== Health & Meta Messages ==========
-
-message HealthRequest {}
-
-message HealthResponse {
-  bool healthy = 1;
-}
+// ========== Meta Messages ==========
 
 message GetMetaRequest {}
 
 message GetMetaResponse {
   string version = 1;
   string hostname = 2;
+}
+
+message GetAllocationTracingStatusRequest {}
+
+message GetAllocationTracingStatusResponse {
+  bool enabled = 1;
 }
 
 // ========== Component Messages ==========

@@ -28,10 +28,6 @@ fn extra_params_examples() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])
 }
 
-fn extra_headers_examples() -> HashMap<String, String> {
-    HashMap::new()
-}
-
 /// Configuration for the `greptimedb_logs` sink.
 #[configurable_component(sink("greptimedb_logs", "Ingest logs data into GreptimeDB."))]
 #[derive(Clone, Debug, Default, Derivative)]
@@ -108,7 +104,6 @@ pub struct GreptimeDBLogsConfig {
     #[configurable(metadata(
         docs::additional_props_description = "Extra header key-value pairs."
     ))]
-    #[configurable(metadata(docs::examples = "extra_headers_examples()"))]
     pub extra_headers: Option<HashMap<String, String>>,
 
     #[configurable(derived)]

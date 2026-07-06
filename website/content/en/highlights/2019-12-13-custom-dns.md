@@ -20,8 +20,8 @@ servers in your configs.
 
 The configuration isn't complicated, it's a global array field `dns_servers`:
 
-```toml
-dns_servers = ["0.0.0.0:53"]
+```yaml
+dns_servers: ["0.0.0.0:53"]
 ```
 
 When `dns_servers` is set Vector will ignore the system configuration and use
