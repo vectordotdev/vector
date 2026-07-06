@@ -608,6 +608,9 @@ generated: components: sinks: kafka: configuration: {
 					SigV4-presigning the `kafka-cluster:Connect` action against the configured region. Mutually
 					exclusive with `username`/`password`. Requires TLS (MSK IAM listens on the SASL_SSL port,
 					`9098`).
+
+					Requires Vector to be built with the `aws-core` feature; otherwise enabling it is a
+					configuration error rather than being silently ignored.
 					"""
 				required: false
 				type: object: options: {

@@ -286,6 +286,11 @@ impl GenerateConfig for KafkaSinkConfig {
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Validate the client/auth config (TLS requirement, conflicting `librdkafka_options`,
+        // unsupported-feature) up front, so a misconfiguration fails fast rather than after the
+        // potentially-slow MSK IAM credential load below.
+        let _ = self.to_rdkafka()?;
+
         #[cfg(feature = "aws-core")]
         let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
 

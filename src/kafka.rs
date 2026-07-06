@@ -102,23 +102,26 @@ pub struct KafkaSaslConfig {
     /// SigV4-presigning the `kafka-cluster:Connect` action against the configured region. Mutually
     /// exclusive with `username`/`password`. Requires TLS (MSK IAM listens on the SASL_SSL port,
     /// `9098`).
-    #[cfg(feature = "aws-core")]
+    ///
+    /// Requires Vector to be built with the `aws-core` feature; otherwise enabling it is a
+    /// configuration error rather than being silently ignored.
     #[configurable(derived)]
     pub(crate) aws_msk_iam: Option<AwsMskIamConfig>,
 }
 
 /// Configuration for AWS MSK IAM authentication (SASL/OAUTHBEARER).
-#[cfg(feature = "aws-core")]
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct AwsMskIamConfig {
     /// Enables MSK IAM authentication.
     pub(crate) enabled: bool,
 
+    #[cfg(feature = "aws-core")]
     #[configurable(derived)]
     #[serde(flatten, default)]
     pub(crate) region: RegionOrEndpoint,
 
+    #[cfg(feature = "aws-core")]
     #[configurable(derived)]
     #[serde(default)]
     pub(crate) auth: AwsAuthentication,
@@ -126,15 +129,22 @@ pub struct AwsMskIamConfig {
 
 impl KafkaAuthConfig {
     pub(crate) fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
-        #[cfg(feature = "aws-core")]
         let msk_iam_enabled = self
             .sasl
             .as_ref()
             .and_then(|s| s.aws_msk_iam.as_ref())
             .map(|c| c.enabled)
             .unwrap_or(false);
+
+        // The `aws_msk_iam` config parses even without the `aws-core` feature (the block is inert),
+        // so reject an *enabled* MSK IAM config in that build instead of silently connecting without
+        // OAUTHBEARER/SASL_SSL.
         #[cfg(not(feature = "aws-core"))]
-        let msk_iam_enabled = false;
+        if msk_iam_enabled {
+            return Err(
+                "`sasl.aws_msk_iam` requires Vector to be built with the `aws-core` feature".into(),
+            );
+        }
 
         // MSK IAM (SASL/OAUTHBEARER) implies SASL even if the legacy `sasl.enabled` flag is unset.
         let sasl_enabled =
@@ -669,6 +679,26 @@ mod auth_tests {
                 .expect_err("librdkafka OAUTHBEARER without MSK IAM must be rejected");
             assert!(err.to_string().contains("aws_msk_iam"), "got: {err}");
         }
+    }
+
+    #[cfg(not(feature = "aws-core"))]
+    #[test]
+    fn msk_iam_without_aws_core_feature_is_rejected() {
+        // The `aws_msk_iam` block still parses without `aws-core`, but enabling it must be a hard
+        // error rather than being silently ignored (which would connect without OAUTHBEARER).
+        let auth = KafkaAuthConfig {
+            sasl: Some(KafkaSaslConfig {
+                enabled: Some(true),
+                aws_msk_iam: Some(AwsMskIamConfig { enabled: true }),
+                ..Default::default()
+            }),
+            tls: Some(tls(true)),
+        };
+        let mut cc = ClientConfig::new();
+        let err = auth
+            .apply(&mut cc)
+            .expect_err("must reject MSK IAM without the aws-core feature");
+        assert!(err.to_string().contains("aws-core"), "got: {err}");
     }
 
     #[cfg(feature = "aws-core")]

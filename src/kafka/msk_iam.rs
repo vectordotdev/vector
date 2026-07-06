@@ -133,12 +133,13 @@ fn next_refresh(expiry: Option<SystemTime>) -> Duration {
 /// resolving the partition suffix (e.g. `amazonaws.com.cn` for China regions).
 pub(crate) fn signing_host(region: &str, endpoint: Option<&str>) -> String {
     if let Some(endpoint) = endpoint {
-        // Strip scheme and any trailing slash so it can be used as a bare host.
-        return endpoint
+        // Reduce to the bare authority (`host[:port]`): strip the scheme, then drop any
+        // `/path`, `?query`, or `#fragment` so it is valid as both the URL host and Host header.
+        let no_scheme = endpoint
             .trim_start_matches("https://")
-            .trim_start_matches("http://")
-            .trim_end_matches('/')
-            .to_string();
+            .trim_start_matches("http://");
+        let authority = no_scheme.split(['/', '?', '#']).next().unwrap_or(no_scheme);
+        return authority.to_string();
     }
     let suffix = if region.starts_with("cn-") {
         "amazonaws.com.cn"
@@ -364,6 +365,11 @@ mod tests {
         assert_eq!(
             signing_host("us-east-1", Some("https://kafka.example.internal/")),
             "kafka.example.internal"
+        );
+        // A documented full-URL endpoint with a path reduces to just the authority.
+        assert_eq!(
+            signing_host("us-east-1", Some("http://127.0.0.1:5000/path/to/service")),
+            "127.0.0.1:5000"
         );
     }
 

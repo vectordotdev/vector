@@ -342,6 +342,18 @@ impl SourceConfig for KafkaSourceConfig {
             );
         }
 
+        // Validate the client/auth config (TLS requirement, conflicting `librdkafka_options`,
+        // unsupported-feature) up front, so a misconfiguration fails fast rather than after the
+        // potentially-slow MSK IAM credential load below.
+        {
+            let mut probe = ClientConfig::new();
+            self.auth.apply(&mut probe)?;
+            #[cfg(feature = "aws-core")]
+            if let Some(options) = &self.librdkafka_options {
+                self.auth.validate_librdkafka_overrides(options.iter())?;
+            }
+        }
+
         #[cfg(feature = "aws-core")]
         let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
 
