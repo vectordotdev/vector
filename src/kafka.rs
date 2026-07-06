@@ -151,6 +151,25 @@ impl KafkaAuthConfig {
             );
         }
 
+        // rust-rdkafka gates the OAUTHBEARER refresh callback on a compile-time associated const, so
+        // in `aws-core` builds it is enabled for the context whenever it exists. Vector only provides
+        // a token for it via MSK IAM. Reject a bare `OAUTHBEARER` mechanism up front with guidance,
+        // rather than letting the callback fire later with no token provider.
+        #[cfg(feature = "aws-core")]
+        if !msk_iam_enabled
+            && self
+                .sasl
+                .as_ref()
+                .and_then(|s| s.mechanism.as_deref())
+                .is_some_and(|m| m.eq_ignore_ascii_case("OAUTHBEARER"))
+        {
+            return Err(
+                "`sasl.mechanism = \"OAUTHBEARER\"` is only supported via `sasl.aws_msk_iam` \
+                 (AWS MSK IAM)"
+                    .into(),
+            );
+        }
+
         let protocol = match (sasl_enabled, tls_enabled) {
             (false, false) => "plaintext",
             (false, true) => "ssl",
@@ -505,6 +524,19 @@ mod auth_tests {
         assert_eq!(cc.get("sasl.mechanism"), Some("OAUTHBEARER"));
         assert_eq!(cc.get("sasl.username"), None);
         assert_eq!(cc.get("sasl.password"), None);
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn bare_oauthbearer_mechanism_is_rejected() {
+        // OAUTHBEARER is only wired up for MSK IAM; a manual mechanism must fail fast with guidance.
+        let auth = KafkaAuthConfig {
+            sasl: Some(sasl(Some(true), Some("OAUTHBEARER"), None)),
+            tls: Some(tls(true)),
+        };
+        let mut cc = ClientConfig::new();
+        let err = auth.apply(&mut cc).expect_err("bare OAUTHBEARER must be rejected");
+        assert!(err.to_string().contains("aws_msk_iam"), "got: {err}");
     }
 
     #[cfg(feature = "aws-core")]
