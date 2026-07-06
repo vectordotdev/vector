@@ -84,6 +84,8 @@ mod integration_test {
             config.clone(),
             confined_topic(topic),
             crate::config::SinkHealthcheckOptions::default(),
+            #[cfg(feature = "aws-core")]
+            None,
         )
         .await
         .unwrap();
@@ -118,6 +120,8 @@ mod integration_test {
             config.clone(),
             confined_topic(topic),
             crate::config::SinkHealthcheckOptions::default(),
+            #[cfg(feature = "aws-core")]
+            None,
         )
         .await
         .unwrap();
@@ -229,9 +233,16 @@ mod integration_test {
             config.clone(),
             topic.clone(),
             crate::config::SinkHealthcheckOptions::default(),
+            #[cfg(feature = "aws-core")]
+            None,
         )
         .await?;
-        KafkaSink::new(config.clone(), topic)
+        KafkaSink::new(
+            config.clone(),
+            topic,
+            #[cfg(feature = "aws-core")]
+            None,
+        )
     }
 
     #[tokio::test]
@@ -400,7 +411,13 @@ mod integration_test {
                 events.push(Event::Trace(trace.with_batch_notifier(&batch)));
             }
 
-            let sink = KafkaSink::new(config.clone(), confined_topic(topic)).unwrap();
+            let sink = KafkaSink::new(
+                config.clone(),
+                confined_topic(topic),
+                #[cfg(feature = "aws-core")]
+                None,
+            )
+            .unwrap();
             let sink = VectorSink::from_event_streamsink(sink);
             let stream = map_event_batch_stream(stream::iter(events), Some(batch));
             sink.run(stream).await.unwrap();
@@ -547,7 +564,13 @@ mod integration_test {
         let topic_template = confined_topic(topic_template);
         if test_telemetry_tags {
             assert_data_volume_sink_compliance(&DATA_VOLUME_SINK_TAGS, async move {
-                let sink = KafkaSink::new(config.clone(), topic_template).unwrap();
+                let sink = KafkaSink::new(
+                    config.clone(),
+                    topic_template,
+                    #[cfg(feature = "aws-core")]
+                    None,
+                )
+                .unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })
@@ -555,7 +578,13 @@ mod integration_test {
             .expect("Running sink failed");
         } else {
             assert_sink_compliance(&SINK_TAGS, async move {
-                let sink = KafkaSink::new(config.clone(), topic_template).unwrap();
+                let sink = KafkaSink::new(
+                    config.clone(),
+                    topic_template,
+                    #[cfg(feature = "aws-core")]
+                    None,
+                )
+                .unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })

@@ -357,8 +357,24 @@ impl ValidatedSink for KafkaSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedKafkaSink { topic } = validated;
-        let sink = KafkaSink::new(self.clone(), topic.clone())?;
-        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck).boxed();
+
+        #[cfg(feature = "aws-core")]
+        let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
+
+        let sink = KafkaSink::new(
+            self.clone(),
+            topic.clone(),
+            #[cfg(feature = "aws-core")]
+            msk_iam.clone(),
+        )?;
+        let hc = healthcheck(
+            self.clone(),
+            topic.clone(),
+            cx.healthcheck,
+            #[cfg(feature = "aws-core")]
+            msk_iam,
+        )
+        .boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 }
