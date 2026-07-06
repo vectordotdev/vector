@@ -1376,8 +1376,23 @@ impl KafkaSourceContext {
 }
 
 impl ClientContext for KafkaSourceContext {
+    // librdkafka calls into this (the consumer's) context, so the OAUTHBEARER refresh must be
+    // enabled and forwarded here — not just on the inner `KafkaStatisticsContext` (which only the
+    // sink uses directly). Without this, MSK IAM sources are configured with
+    // `sasl.mechanism=OAUTHBEARER` but never get a token provider.
+    #[cfg(feature = "aws-core")]
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
+
     fn stats(&self, statistics: Statistics) {
         self.stats.stats(statistics)
+    }
+
+    #[cfg(feature = "aws-core")]
+    fn generate_oauth_token(
+        &self,
+        oauthbearer_config: Option<&str>,
+    ) -> Result<rdkafka::client::OAuthToken, Box<dyn std::error::Error>> {
+        self.stats.generate_oauth_token(oauthbearer_config)
     }
 }
 
@@ -1419,6 +1434,34 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<KafkaSourceConfig>();
+    }
+
+    // Regression: the consumer's rdkafka context is `KafkaSourceContext`, not the inner
+    // `KafkaStatisticsContext`. It must enable and forward the OAUTHBEARER refresh callback, or MSK
+    // IAM sources get `sasl.mechanism=OAUTHBEARER` with no token provider and fail to authenticate.
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn source_context_enables_and_forwards_oauth_refresh() {
+        use rdkafka::ClientContext;
+
+        assert!(
+            <KafkaSourceContext as ClientContext>::ENABLE_REFRESH_OAUTH_TOKEN,
+            "source context must enable the OAUTHBEARER refresh callback"
+        );
+
+        // With no MSK creds, the call must surface OUR error (proving it delegates to the inner
+        // KafkaStatisticsContext) rather than rdkafka's default "must be overridden" error.
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let ctx = KafkaSourceContext::new(false, false, tx, Span::none(), None);
+        // `OAuthToken` is not `Debug`, so match instead of `expect_err`.
+        let err = match ctx.generate_oauth_token(None) {
+            Ok(_) => panic!("should error without MSK creds"),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            err.contains("MSK IAM is not configured"),
+            "expected delegated MSK error, got: {err}"
+        );
     }
 
     pub(super) fn make_config(

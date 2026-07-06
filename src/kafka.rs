@@ -128,7 +128,19 @@ pub struct AwsMskIamConfig {
 
 impl KafkaAuthConfig {
     pub(crate) fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
-        let sasl_enabled = self.sasl.as_ref().and_then(|s| s.enabled).unwrap_or(false);
+        #[cfg(feature = "aws-core")]
+        let msk_iam_enabled = self
+            .sasl
+            .as_ref()
+            .and_then(|s| s.aws_msk_iam.as_ref())
+            .map(|c| c.enabled)
+            .unwrap_or(false);
+        #[cfg(not(feature = "aws-core"))]
+        let msk_iam_enabled = false;
+
+        // MSK IAM (SASL/OAUTHBEARER) implies SASL even if the legacy `sasl.enabled` flag is unset.
+        let sasl_enabled =
+            self.sasl.as_ref().and_then(|s| s.enabled).unwrap_or(false) || msk_iam_enabled;
         let tls_enabled = self.tls.as_ref().and_then(|s| s.enabled).unwrap_or(false);
 
         let protocol = match (sasl_enabled, tls_enabled) {
@@ -141,15 +153,6 @@ impl KafkaAuthConfig {
 
         if sasl_enabled {
             let sasl = self.sasl.as_ref().unwrap();
-
-            #[cfg(feature = "aws-core")]
-            let msk_iam_enabled = sasl
-                .aws_msk_iam
-                .as_ref()
-                .map(|c| c.enabled)
-                .unwrap_or(false);
-            #[cfg(not(feature = "aws-core"))]
-            let msk_iam_enabled = false;
 
             if msk_iam_enabled {
                 // OAUTHBEARER: the token itself is produced by
@@ -354,5 +357,212 @@ impl rdkafka::producer::ProducerContext for KafkaStatisticsContext {
         _delivery_result: &rdkafka::producer::DeliveryResult<'_>,
         _delivery_opaque: Self::DeliveryOpaque,
     ) {
+    }
+}
+
+#[cfg(test)]
+mod auth_tests {
+    //! Exercises `KafkaAuthConfig::apply` across the full Kafka authentication matrix, mapped to the
+    //! AWS MSK connection options (docs: MSK "Port information"):
+    //!   * PLAINTEXT              (:9092)          -> `security.protocol=plaintext`
+    //!   * TLS encryption / mTLS  (:9094)          -> `security.protocol=ssl`
+    //!   * SASL/SCRAM over TLS    (:9096)          -> `security.protocol=sasl_ssl`, mechanism SCRAM
+    //!   * SASL/IAM over TLS      (:9098)          -> `security.protocol=sasl_ssl`, mechanism OAUTHBEARER
+    //! plus the non-MSK-but-valid librdkafka combos (SASL over plaintext) and the TLS<->non-TLS axis.
+    use super::*;
+    use rdkafka::ClientConfig;
+
+    fn applied(auth: &KafkaAuthConfig) -> ClientConfig {
+        let mut cc = ClientConfig::new();
+        auth.apply(&mut cc).expect("apply");
+        cc
+    }
+
+    fn sasl(enabled: Option<bool>, mechanism: Option<&str>, user: Option<&str>) -> KafkaSaslConfig {
+        KafkaSaslConfig {
+            enabled,
+            username: user.map(str::to_owned),
+            password: user.map(|_| "pw".to_owned().into()),
+            mechanism: mechanism.map(str::to_owned),
+            ..Default::default()
+        }
+    }
+
+    fn tls(enabled: bool) -> TlsEnableableConfig {
+        TlsEnableableConfig {
+            enabled: Some(enabled),
+            ..Default::default()
+        }
+    }
+
+    // ---- security.protocol matrix: (sasl_enabled x tls_enabled) ----
+
+    #[test]
+    fn protocol_plaintext_when_nothing_enabled() {
+        let cc = applied(&KafkaAuthConfig::default());
+        assert_eq!(cc.get("security.protocol"), Some("plaintext"));
+        assert_eq!(cc.get("sasl.mechanism"), None);
+    }
+
+    #[test]
+    fn protocol_ssl_when_only_tls() {
+        // MSK TLS encryption / mTLS listener (:9094).
+        let auth = KafkaAuthConfig {
+            sasl: None,
+            tls: Some(tls(true)),
+        };
+        let cc = applied(&auth);
+        assert_eq!(cc.get("security.protocol"), Some("ssl"));
+        assert_eq!(cc.get("sasl.mechanism"), None);
+    }
+
+    #[test]
+    fn protocol_sasl_plaintext_when_sasl_without_tls() {
+        // Not an MSK option, but a valid librdkafka combo for self-managed Kafka.
+        let auth = KafkaAuthConfig {
+            sasl: Some(sasl(Some(true), Some("SCRAM-SHA-512"), Some("u"))),
+            tls: None,
+        };
+        assert_eq!(applied(&auth).get("security.protocol"), Some("sasl_plaintext"));
+    }
+
+    #[test]
+    fn protocol_sasl_ssl_when_sasl_and_tls() {
+        let auth = KafkaAuthConfig {
+            sasl: Some(sasl(Some(true), Some("SCRAM-SHA-512"), Some("u"))),
+            tls: Some(tls(true)),
+        };
+        assert_eq!(applied(&auth).get("security.protocol"), Some("sasl_ssl"));
+    }
+
+    // ---- SASL mechanism selection (non-MSK) ----
+
+    #[test]
+    fn scram_sets_mechanism_and_credentials() {
+        // MSK SASL/SCRAM listener (:9096).
+        let auth = KafkaAuthConfig {
+            sasl: Some(sasl(Some(true), Some("SCRAM-SHA-512"), Some("alice"))),
+            tls: Some(tls(true)),
+        };
+        let cc = applied(&auth);
+        assert_eq!(cc.get("sasl.mechanism"), Some("SCRAM-SHA-512"));
+        assert_eq!(cc.get("sasl.username"), Some("alice"));
+        assert_eq!(cc.get("sasl.password"), Some("pw"));
+    }
+
+    #[test]
+    fn plain_mechanism_is_passed_through() {
+        let auth = KafkaAuthConfig {
+            sasl: Some(sasl(Some(true), Some("PLAIN"), Some("alice"))),
+            tls: Some(tls(true)),
+        };
+        assert_eq!(applied(&auth).get("sasl.mechanism"), Some("PLAIN"));
+    }
+
+    #[test]
+    fn sasl_present_but_disabled_sets_no_mechanism() {
+        let auth = KafkaAuthConfig {
+            sasl: Some(sasl(Some(false), Some("SCRAM-SHA-512"), Some("u"))),
+            tls: Some(tls(true)),
+        };
+        let cc = applied(&auth);
+        assert_eq!(cc.get("security.protocol"), Some("ssl")); // sasl off -> just TLS
+        assert_eq!(cc.get("sasl.mechanism"), None);
+    }
+
+    // ---- TLS option plumbing ----
+
+    #[test]
+    fn tls_verify_certificate_flag_is_plumbed() {
+        let mut t = tls(true);
+        t.options.verify_certificate = Some(false);
+        let auth = KafkaAuthConfig {
+            sasl: None,
+            tls: Some(t),
+        };
+        assert_eq!(
+            applied(&auth).get("enable.ssl.certificate.verification"),
+            Some("false")
+        );
+    }
+
+    // ---- MSK IAM (SASL/OAUTHBEARER) ----
+
+    #[cfg(feature = "aws-core")]
+    fn msk_sasl(sasl_enabled: Option<bool>, user: Option<&str>) -> KafkaSaslConfig {
+        KafkaSaslConfig {
+            enabled: sasl_enabled,
+            username: user.map(str::to_owned),
+            password: user.map(|_| "pw".to_owned().into()),
+            mechanism: None,
+            aws_msk_iam: Some(AwsMskIamConfig {
+                enabled: true,
+                ..Default::default()
+            }),
+        }
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn msk_iam_over_tls_uses_oauthbearer() {
+        // MSK SASL/IAM listener (:9098): SASL_SSL + OAUTHBEARER, no username/password.
+        let auth = KafkaAuthConfig {
+            sasl: Some(msk_sasl(Some(true), None)),
+            tls: Some(tls(true)),
+        };
+        let cc = applied(&auth);
+        assert_eq!(cc.get("security.protocol"), Some("sasl_ssl"));
+        assert_eq!(cc.get("sasl.mechanism"), Some("OAUTHBEARER"));
+        assert_eq!(cc.get("sasl.username"), None);
+        assert_eq!(cc.get("sasl.password"), None);
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn msk_iam_enables_sasl_without_legacy_flag() {
+        // Regression: `aws_msk_iam.enabled` alone must turn SASL on (sasl.enabled left unset).
+        let auth = KafkaAuthConfig {
+            sasl: Some(msk_sasl(None, None)),
+            tls: Some(tls(true)),
+        };
+        let cc = applied(&auth);
+        assert_eq!(cc.get("security.protocol"), Some("sasl_ssl"));
+        assert_eq!(cc.get("sasl.mechanism"), Some("OAUTHBEARER"));
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn msk_iam_ignores_username_password() {
+        // If both MSK IAM and username/password are set, OAUTHBEARER wins and no creds are emitted.
+        let auth = KafkaAuthConfig {
+            sasl: Some(msk_sasl(Some(true), Some("alice"))),
+            tls: Some(tls(true)),
+        };
+        let cc = applied(&auth);
+        assert_eq!(cc.get("sasl.mechanism"), Some("OAUTHBEARER"));
+        assert_eq!(cc.get("sasl.username"), None);
+        assert_eq!(cc.get("sasl.password"), None);
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn msk_iam_disabled_flag_falls_back_to_plain_sasl() {
+        // aws_msk_iam present but enabled=false -> behaves like ordinary SASL config.
+        let auth = KafkaAuthConfig {
+            sasl: Some(KafkaSaslConfig {
+                enabled: Some(true),
+                mechanism: Some("SCRAM-SHA-256".to_owned()),
+                username: Some("u".to_owned()),
+                password: Some("pw".to_owned().into()),
+                aws_msk_iam: Some(AwsMskIamConfig {
+                    enabled: false,
+                    ..Default::default()
+                }),
+            }),
+            tls: Some(tls(true)),
+        };
+        let cc = applied(&auth);
+        assert_eq!(cc.get("sasl.mechanism"), Some("SCRAM-SHA-256"));
+        assert_eq!(cc.get("sasl.username"), Some("u"));
     }
 }
