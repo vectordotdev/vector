@@ -5,7 +5,14 @@
 //! `kafka-cluster:Connect` action, base64url-encoded. This is a port of the official
 //! `aws-msk-iam-sasl-signer-go` `constructAuthToken`; correctness is proven offline in the tests
 //! below against an independent SigV4 oracle (fixed inputs -> known-answer signature).
+//!
+//! Token minting is fully synchronous: `build_token` only signs (no I/O, no async). AWS credential
+//! resolution — the one async step — is done ahead of time and cached in an `Arc<Mutex<Credentials>>`
+//! that a background task refreshes before expiry. This keeps `generate_oauth_token` free of any
+//! `block_on`, which is essential because for the source it is invoked while the `StreamConsumer` is
+//! polled *inside* the tokio runtime, where nested blocking would panic.
 
+use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use aws_credential_types::Credentials;
@@ -20,10 +27,19 @@ use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use snafu::{ResultExt, Snafu};
 
+/// MSK IAM presigned tokens are valid for at most 15 minutes. librdkafka refreshes at ~80% of the
+/// remaining lifetime, so 900s gives a comfortable refresh cadence.
 const EXPIRY_SECONDS: u64 = 900;
 const SIGNING_NAME: &str = "kafka-cluster";
 const ACTION: &str = "kafka-cluster:Connect";
 const USER_AGENT: &str = concat!("vector-msk-iam-signer/", env!("CARGO_PKG_VERSION"));
+
+/// Refresh cached credentials this long before they expire.
+const CRED_REFRESH_SKEW: Duration = Duration::from_secs(5 * 60);
+/// Floor for the refresh sleep, so a near-expired/expired credential doesn't spin.
+const CRED_REFRESH_MIN: Duration = Duration::from_secs(60);
+/// Cadence used when credentials advertise no expiry (e.g. static keys).
+const CRED_REFRESH_NO_EXPIRY: Duration = Duration::from_secs(15 * 60);
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -39,6 +55,9 @@ pub enum MskIamError {
     Signing { source: BoxError },
 }
 
+/// Shared, background-refreshed AWS credentials used to mint MSK IAM tokens.
+pub(crate) type CredentialsCache = Arc<Mutex<Credentials>>;
+
 /// Token librdkafka hands to the broker, plus its absolute expiry (unix-epoch ms).
 #[derive(Debug, Clone)]
 pub struct MskAuthToken {
@@ -46,22 +65,52 @@ pub struct MskAuthToken {
     pub lifetime_ms: i64,
 }
 
-/// Generate a fresh MSK IAM SASL/OAUTHBEARER token for `region`.
-pub async fn generate_auth_token(
-    region: &Region,
-    credentials_provider: &SharedCredentialsProvider,
-) -> Result<MskAuthToken, MskIamError> {
-    let credentials = credentials_provider
-        .provide_credentials()
-        .await
-        .context(CredentialsSnafu)?;
-    let signing_time = SystemTime::now();
-    build_token(region, &credentials, signing_time)
+/// Resolve credentials once (async), then spawn a background task that keeps them fresh, and return
+/// the shared cache. The `generate_oauth_token` callback reads this cache synchronously.
+///
+/// The refresher holds only a `Weak` reference, so it exits automatically once the owning
+/// component (and thus the last `CredentialsCache` clone) is dropped.
+pub(crate) async fn spawn_credentials_cache(
+    provider: SharedCredentialsProvider,
+) -> Result<CredentialsCache, MskIamError> {
+    let initial = provider.provide_credentials().await.context(CredentialsSnafu)?;
+    let cache: CredentialsCache = Arc::new(Mutex::new(initial));
+    tokio::spawn(refresh_loop(provider, Arc::downgrade(&cache)));
+    Ok(cache)
 }
 
-/// Deterministic core: given credentials + a fixed signing time, produce the token. Split out so
-/// tests can pin the time and assert a known-answer signature.
-fn build_token(
+async fn refresh_loop(provider: SharedCredentialsProvider, weak: Weak<Mutex<Credentials>>) {
+    loop {
+        let sleep_for = match weak.upgrade() {
+            None => break,
+            Some(cache) => next_refresh(cache.lock().ok().and_then(|c| c.expiry())),
+        };
+        tokio::time::sleep(sleep_for).await;
+
+        let Some(cache) = weak.upgrade() else { break };
+        // On failure keep the previous credentials and retry on the next iteration.
+        if let Ok(fresh) = provider.provide_credentials().await {
+            if let Ok(mut guard) = cache.lock() {
+                *guard = fresh;
+            }
+        }
+    }
+}
+
+fn next_refresh(expiry: Option<SystemTime>) -> Duration {
+    match expiry {
+        Some(exp) => exp
+            .duration_since(SystemTime::now())
+            .unwrap_or(Duration::ZERO)
+            .saturating_sub(CRED_REFRESH_SKEW)
+            .max(CRED_REFRESH_MIN),
+        None => CRED_REFRESH_NO_EXPIRY,
+    }
+}
+
+/// Mint a fresh MSK IAM SASL/OAUTHBEARER token for `region` from already-resolved `credentials`.
+/// Fully synchronous — safe to call from librdkafka's refresh callback on any thread.
+pub(crate) fn build_token(
     region: &Region,
     credentials: &Credentials,
     signing_time: SystemTime,
@@ -163,6 +212,14 @@ mod tests {
         UNIX_EPOCH + Duration::from_secs(FIXED_EPOCH_SECS)
     }
 
+    fn creds(session: bool) -> Credentials {
+        Credentials::from_keys(
+            ACCESS_KEY,
+            SECRET_KEY,
+            session.then(|| SESSION_TOKEN.to_string()),
+        )
+    }
+
     fn query_param<'a>(url: &'a str, key: &str) -> Option<&'a str> {
         let q = url.split_once('?')?.1;
         q.split('&').find_map(|kv| {
@@ -186,56 +243,37 @@ mod tests {
         (base.to_string(), params)
     }
 
-    // Full presigned URLs from the independent oracle (oracle/sigv4_oracle.py output).
+    // Full presigned URL from the independent oracle (oracle/sigv4_oracle.py output).
     const ORACLE_URL_WITH_TOKEN: &str = "https://kafka.ap-southeast-1.amazonaws.com/?Action=kafka-cluster%3AConnect&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIDEXAMPLE%2F20231114%2Fap-southeast-1%2Fkafka-cluster%2Faws4_request&X-Amz-Date=20231114T221320Z&X-Amz-Expires=900&X-Amz-Security-Token=IQoJb3Jp&X-Amz-SignedHeaders=host&X-Amz-Signature=4c02acd7700d674cecd2b27f6a906be056df725db5c7571700fd54a354a31904";
 
-    /// STRONGEST PROOF: the *entire* presigned URL (every param, every encoded value, the signature)
-    /// matches the independent oracle — not just the signature. Order-independent because MSK
-    /// re-canonicalizes the query on its side.
+    /// STRONGEST PROOF: the entire presigned URL (every param, every encoded value, the signature)
+    /// matches the independent oracle — order-independent because MSK re-canonicalizes the query.
     #[test]
     fn full_presigned_url_matches_oracle() {
-        let creds =
-            Credentials::from_keys(ACCESS_KEY, SECRET_KEY, Some(SESSION_TOKEN.to_string()));
-        let url = presign(&region(), &creds, fixed_time()).expect("presign");
+        let url = presign(&region(), &creds(true), fixed_time()).expect("presign");
         assert_eq!(normalize(&url), normalize(ORACLE_URL_WITH_TOKEN), "url={url}");
     }
 
-    /// KNOWN-ANSWER: the aws-sigv4 signature must equal the independent oracle's, byte-for-byte,
-    /// with a session token present (X-Amz-Security-Token in the signed canonical query).
+    /// KNOWN-ANSWER: aws-sigv4 signature must equal the oracle's, with a session token present.
     #[test]
     fn signature_matches_oracle_with_session_token() {
-        let creds =
-            Credentials::from_keys(ACCESS_KEY, SECRET_KEY, Some(SESSION_TOKEN.to_string()));
-        let url = presign(&region(), &creds, fixed_time()).expect("presign");
-
-        assert_eq!(
-            query_param(&url, "X-Amz-Signature"),
-            Some(GOLDEN_SIG_WITH_TOKEN),
-            "aws-sigv4 signature diverged from the independent SigV4 oracle\nurl={url}"
-        );
+        let url = presign(&region(), &creds(true), fixed_time()).expect("presign");
+        assert_eq!(query_param(&url, "X-Amz-Signature"), Some(GOLDEN_SIG_WITH_TOKEN));
         assert_eq!(query_param(&url, "X-Amz-Security-Token"), Some("IQoJb3Jp"));
     }
 
     /// KNOWN-ANSWER: same, without a session token (static long-term credentials).
     #[test]
     fn signature_matches_oracle_without_session_token() {
-        let creds = Credentials::from_keys(ACCESS_KEY, SECRET_KEY, None);
-        let url = presign(&region(), &creds, fixed_time()).expect("presign");
-
-        assert_eq!(
-            query_param(&url, "X-Amz-Signature"),
-            Some(GOLDEN_SIG_NO_TOKEN),
-            "aws-sigv4 signature diverged from the independent SigV4 oracle\nurl={url}"
-        );
+        let url = presign(&region(), &creds(false), fixed_time()).expect("presign");
+        assert_eq!(query_param(&url, "X-Amz-Signature"), Some(GOLDEN_SIG_NO_TOKEN));
         assert_eq!(query_param(&url, "X-Amz-Security-Token"), None);
     }
 
     /// Structural invariants the MSK broker requires of the presigned URL.
     #[test]
     fn presigned_url_has_required_msk_shape() {
-        let creds = Credentials::from_keys(ACCESS_KEY, SECRET_KEY, None);
-        let url = presign(&region(), &creds, fixed_time()).expect("presign");
-
+        let url = presign(&region(), &creds(false), fixed_time()).expect("presign");
         assert!(url.starts_with("https://kafka.ap-southeast-1.amazonaws.com/?"));
         assert_eq!(query_param(&url, "Action"), Some("kafka-cluster%3AConnect"));
         assert_eq!(query_param(&url, "X-Amz-Algorithm"), Some("AWS4-HMAC-SHA256"));
@@ -247,45 +285,41 @@ mod tests {
         );
     }
 
-    /// The final token is base64url-nopad of the presigned URL (+ appended User-Agent).
+    /// The token is base64url-nopad of the presigned URL (+ appended User-Agent), and its lifetime
+    /// is the absolute unix-epoch ms of signing-time + 900s.
     #[test]
-    fn token_is_base64url_nopad_of_presigned_url() {
-        let creds = Credentials::from_keys(ACCESS_KEY, SECRET_KEY, None);
-        let out = build_token(&region(), &creds, fixed_time()).expect("token");
-
+    fn build_token_encodes_and_sets_lifetime() {
+        let out = build_token(&region(), &creds(false), fixed_time()).expect("token");
         assert!(!out.token.contains('='), "token must be unpadded base64url");
         let decoded = URL_SAFE_NO_PAD.decode(out.token.as_bytes()).expect("decode");
         let url = String::from_utf8(decoded).expect("utf8");
         assert!(url.starts_with("https://kafka.ap-southeast-1.amazonaws.com/?"));
         assert!(url.ends_with(&format!("&User-Agent={USER_AGENT}")));
         assert!(url.contains(GOLDEN_SIG_NO_TOKEN));
-
-        // Absolute expiry = signing time + 900s, in unix-epoch ms.
         assert_eq!(out.lifetime_ms, (FIXED_EPOCH_SECS as i64) * 1000 + 900_000);
     }
 
-    /// End-to-end through the public async entrypoint with a static credentials provider.
+    /// The cache path: resolve via a static provider, then mint a token from the cached credentials.
     #[tokio::test]
-    async fn generate_auth_token_via_provider() {
-        let provider = SharedCredentialsProvider::new(Credentials::from_keys(
-            ACCESS_KEY,
-            SECRET_KEY,
-            Some(SESSION_TOKEN.to_string()),
-        ));
-        let out = generate_auth_token(&region(), &provider)
-            .await
-            .expect("generate");
+    async fn credentials_cache_then_build_token() {
+        let provider = SharedCredentialsProvider::new(creds(true));
+        let cache = spawn_credentials_cache(provider).await.expect("cache");
+        let cached = cache.lock().unwrap().clone();
+        let out = build_token(&region(), &cached, fixed_time()).expect("token");
+        let decoded = URL_SAFE_NO_PAD.decode(out.token.as_bytes()).unwrap();
+        let url = String::from_utf8(decoded).unwrap();
+        assert!(url.contains(GOLDEN_SIG_WITH_TOKEN));
+    }
 
-        let decoded = URL_SAFE_NO_PAD.decode(out.token.as_bytes()).expect("decode");
-        let url = String::from_utf8(decoded).expect("utf8");
-        assert!(url.contains("Action=kafka-cluster%3AConnect"));
-        assert!(url.contains("X-Amz-Signature="));
-        // Uses wall-clock now(): lifetime must be ~900s in the future, so comfortably positive.
-        let now_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
-        assert!(out.lifetime_ms > now_ms);
-        assert!(out.lifetime_ms <= now_ms + 900_000 + 5_000);
+    #[test]
+    fn refresh_uses_skew_and_floor() {
+        // Expiry far out -> refresh ~skew before it.
+        let far = SystemTime::now() + Duration::from_secs(3600);
+        assert!(next_refresh(Some(far)) >= Duration::from_secs(3600 - 5 * 60 - 5));
+        // Already expired -> clamped to the floor, never zero.
+        let past = SystemTime::now() - Duration::from_secs(10);
+        assert_eq!(next_refresh(Some(past)), CRED_REFRESH_MIN);
+        // No expiry -> loose cadence.
+        assert_eq!(next_refresh(None), CRED_REFRESH_NO_EXPIRY);
     }
 }

@@ -15,13 +15,11 @@ use crate::{
 mod msk_iam;
 
 #[cfg(feature = "aws-core")]
-use aws_credential_types::provider::SharedCredentialsProvider;
+use std::time::SystemTime;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 #[cfg(feature = "aws-core")]
 use rdkafka::client::OAuthToken;
-#[cfg(feature = "aws-core")]
-use tokio::runtime::Handle;
 #[cfg(feature = "aws-core")]
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
@@ -143,6 +141,16 @@ impl KafkaAuthConfig {
             self.sasl.as_ref().and_then(|s| s.enabled).unwrap_or(false) || msk_iam_enabled;
         let tls_enabled = self.tls.as_ref().and_then(|s| s.enabled).unwrap_or(false);
 
+        // MSK IAM is only offered on the SASL_SSL (IAM) listener, so TLS is mandatory. Reject early
+        // rather than silently negotiating `sasl_plaintext` and failing to connect.
+        if msk_iam_enabled && !tls_enabled {
+            return Err(
+                "`sasl.aws_msk_iam` requires TLS; set `tls.enabled = true` (MSK IAM uses the \
+                 SASL_SSL port, 9098)"
+                    .into(),
+            );
+        }
+
         let protocol = match (sasl_enabled, tls_enabled) {
             (false, false) => "plaintext",
             (false, true) => "ssl",
@@ -244,17 +252,20 @@ impl KafkaAuthConfig {
             .auth
             .credentials_provider(region.clone(), proxy, None)
             .await?;
-        Ok(Some(MskIamCredentials { region, provider }))
+        // Resolve now (fail fast on misconfig) and keep them refreshed in the background so the
+        // token callback stays synchronous.
+        let credentials = msk_iam::spawn_credentials_cache(provider).await?;
+        Ok(Some(MskIamCredentials { region, credentials }))
     }
 }
 
-/// AWS credential material captured at build time and moved into the rdkafka client context so the
-/// (synchronous) OAUTHBEARER refresh callback can mint fresh tokens.
+/// AWS credential material moved into the rdkafka client context so the (synchronous) OAUTHBEARER
+/// refresh callback can mint fresh tokens without any async/`block_on`.
 #[cfg(feature = "aws-core")]
 #[derive(Clone)]
 pub(crate) struct MskIamCredentials {
     pub(crate) region: Region,
-    pub(crate) provider: SharedCredentialsProvider,
+    pub(crate) credentials: msk_iam::CredentialsCache,
 }
 
 fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
@@ -268,11 +279,6 @@ pub(crate) struct KafkaStatisticsContext {
     /// Present only when MSK IAM (SASL/OAUTHBEARER) auth is enabled.
     #[cfg(feature = "aws-core")]
     pub(crate) msk_iam: Option<MskIamCredentials>,
-    /// Handle to the tokio runtime, captured at construction. The OAUTHBEARER callback runs on
-    /// librdkafka's own (non-tokio) thread, so it bridges to async credential resolution via
-    /// `Handle::block_on`. `Option` because construction may happen outside a runtime (e.g. tests).
-    #[cfg(feature = "aws-core")]
-    pub(crate) runtime: Option<Handle>,
 }
 
 impl KafkaStatisticsContext {
@@ -286,7 +292,6 @@ impl KafkaStatisticsContext {
             expose_lag_metrics,
             span,
             msk_iam,
-            runtime: Handle::try_current().ok(),
         }
     }
 
@@ -324,16 +329,15 @@ impl ClientContext for KafkaStatisticsContext {
             .msk_iam
             .as_ref()
             .ok_or("generate_oauth_token called but MSK IAM is not configured")?;
-        let runtime = self
-            .runtime
-            .as_ref()
-            .ok_or("no tokio runtime handle available to mint the MSK IAM token")?;
 
-        // The MSK signer signs a synthetic `kafka.{region}.amazonaws.com` host, so region +
-        // credentials are all the callback needs. block_on is safe: this runs on librdkafka's own
-        // (non-tokio) thread, so there is no runtime nesting.
-        let token =
-            runtime.block_on(msk_iam::generate_auth_token(&creds.region, &creds.provider))?;
+        // Fully synchronous: read the background-refreshed credentials and sign. No async / block_on,
+        // so this is safe even when invoked on the tokio runtime thread that polls the consumer.
+        let credentials = creds
+            .credentials
+            .lock()
+            .map_err(|_| "MSK IAM credential cache mutex poisoned")?
+            .clone();
+        let token = msk_iam::build_token(&creds.region, &credentials, SystemTime::now())?;
 
         Ok(OAuthToken {
             token: token.token,
@@ -345,20 +349,6 @@ impl ClientContext for KafkaStatisticsContext {
 }
 
 impl ConsumerContext for KafkaStatisticsContext {}
-
-// Enables `KafkaStatisticsContext` to back a `BaseProducer` directly (used by the sink healthcheck),
-// so the OAUTHBEARER token callback is available there too. The sink's `FutureProducer` wraps this
-// context separately and is unaffected.
-impl rdkafka::producer::ProducerContext for KafkaStatisticsContext {
-    type DeliveryOpaque = ();
-
-    fn delivery(
-        &self,
-        _delivery_result: &rdkafka::producer::DeliveryResult<'_>,
-        _delivery_opaque: Self::DeliveryOpaque,
-    ) {
-    }
-}
 
 #[cfg(test)]
 mod auth_tests {
@@ -515,6 +505,19 @@ mod auth_tests {
         assert_eq!(cc.get("sasl.mechanism"), Some("OAUTHBEARER"));
         assert_eq!(cc.get("sasl.username"), None);
         assert_eq!(cc.get("sasl.password"), None);
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn msk_iam_without_tls_is_rejected() {
+        // MSK IAM is SASL_SSL-only; applying without TLS must be a hard error, not sasl_plaintext.
+        let auth = KafkaAuthConfig {
+            sasl: Some(msk_sasl(Some(true), None)),
+            tls: None,
+        };
+        let mut cc = ClientConfig::new();
+        let err = auth.apply(&mut cc).expect_err("must reject MSK IAM without TLS");
+        assert!(err.to_string().contains("requires TLS"), "got: {err}");
     }
 
     #[cfg(feature = "aws-core")]

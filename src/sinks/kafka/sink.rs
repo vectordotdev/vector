@@ -3,7 +3,7 @@ use std::time::Duration;
 use rdkafka::{
     ClientConfig,
     error::KafkaError,
-    producer::{BaseProducer, FutureProducer, Producer},
+    producer::{FutureProducer, Producer},
 };
 use snafu::{ResultExt, Snafu};
 use tower::limit::RateLimit;
@@ -150,7 +150,10 @@ pub(crate) async fn healthcheck(
     let context = KafkaStatisticsContext::new(false, Span::current());
 
     tokio::task::spawn_blocking(move || {
-        let producer: BaseProducer<_> = client_config.create_with_context(context).unwrap();
+        // A `FutureProducer` runs its own background poll thread, which serves the OAUTHBEARER token
+        // refresh event; a `BaseProducer` would need an explicit `poll()` and the MSK IAM token
+        // would never be installed before `fetch_metadata`.
+        let producer: FutureProducer<_> = client_config.create_with_context(context).unwrap();
         let topic = topic.as_deref();
 
         producer
