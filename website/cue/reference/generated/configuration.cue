@@ -256,6 +256,18 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"memory\""
 					}
+					reload_behavior: {
+						type: string: {
+							enum: {
+								"clear-state":    "Always clear state on configuration reload."
+								"preserve-state": "Try to preserve state when possible."
+							}
+							default: "clear-state"
+						}
+						description:   "Behavior for memory table state on configuration reload."
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
 					scan_interval: {
 						type: uint: default: 30
 						description: """

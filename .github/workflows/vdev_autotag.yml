@@ -8,7 +8,7 @@ on:
       - "vdev/Cargo.toml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tag:

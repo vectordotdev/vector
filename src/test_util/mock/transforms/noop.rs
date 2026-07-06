@@ -25,6 +25,13 @@ pub struct NoopTransformConfig {
     /// This is intended for tests that need deterministic, non-zero component latency.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     delay_ms: Option<u64>,
+
+    /// When `true`, the transform reports `enable_concurrency() == true`, causing
+    /// the topology builder to run it on the concurrent (multi-task) code path.
+    ///
+    /// Only meaningful for `Function` and `Synchronous` transform types.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    enable_concurrency: bool,
 }
 
 impl GenerateConfig for NoopTransformConfig {
@@ -32,6 +39,7 @@ impl GenerateConfig for NoopTransformConfig {
         toml::Value::try_from(&Self {
             transform_type: TransformType::Function,
             delay_ms: None,
+            enable_concurrency: false,
         })
         .unwrap()
     }
@@ -40,6 +48,11 @@ impl GenerateConfig for NoopTransformConfig {
 impl NoopTransformConfig {
     pub fn with_delay_ms(mut self, delay_ms: u64) -> Self {
         self.delay_ms = Some(delay_ms);
+        self
+    }
+
+    pub fn with_concurrency(mut self) -> Self {
+        self.enable_concurrency = true;
         self
     }
 }
@@ -75,6 +88,10 @@ impl TransformConfig for NoopTransformConfig {
             TransformType::Task => Ok(Transform::Task(Box::new(NoopTransform { delay }))),
         }
     }
+
+    fn enable_concurrency(&self) -> bool {
+        self.enable_concurrency
+    }
 }
 
 impl From<TransformType> for NoopTransformConfig {
@@ -82,6 +99,7 @@ impl From<TransformType> for NoopTransformConfig {
         Self {
             transform_type,
             delay_ms: None,
+            enable_concurrency: false,
         }
     }
 }
