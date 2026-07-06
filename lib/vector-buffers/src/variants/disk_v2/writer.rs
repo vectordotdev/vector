@@ -781,11 +781,7 @@ where
         self.unflushed_bytes += record_size;
     }
 
-    fn flush_write_state(&mut self) {
-        self.flush_write_state_partial(self.unflushed_events, self.unflushed_bytes);
-    }
-
-    fn flush_write_state_partial(&mut self, flushed_events: u64, flushed_bytes: u64) {
+    fn publish_flushed_progress(&mut self, flushed_events: u64, flushed_bytes: u64) {
         debug_assert!(
             flushed_events <= self.unflushed_events,
             "tried to flush more events than are currently unflushed"
@@ -795,14 +791,11 @@ where
             "tried to flush more bytes than are currently unflushed"
         );
 
-        self.next_record_id = self
-            .ledger
-            .state()
-            .increment_next_writer_record_id(flushed_events);
         self.unflushed_events -= flushed_events;
         self.unflushed_bytes -= flushed_bytes;
-
-        self.ledger.track_write(flushed_events, flushed_bytes);
+        self.next_record_id = self
+            .ledger
+            .publish_writer_progress(flushed_events, flushed_bytes);
     }
 
     fn can_write(&self) -> bool {
@@ -1076,7 +1069,6 @@ where
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
             self.flush_inner(true).await?;
-            self.flush_write_state();
 
             self.reset();
         }
@@ -1306,11 +1298,10 @@ where
         self.track_write(record_events.get(), bytes_written as u64);
 
         // If we did flush some buffered writes during this write, however, we now compensate for
-        // that after updating our internal state.  We'll also notify the reader, too, since the
-        // data should be available to read:
+        // that after updating our internal state. Publishing the flushed state also notifies the
+        // reader, after all shared state reflects the readable bytes.
         if let Some(flush_result) = flush_result {
-            self.flush_write_state_partial(flush_result.events_flushed, flush_result.bytes_flushed);
-            self.ledger.notify_writer_waiters();
+            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
         }
 
         // A record at or above the write-buffer size forces the buffered writer to
@@ -1371,9 +1362,15 @@ where
         //
         // TODO: Windows has a page cache as well, and macOS _should_, but we should verify this
         // behavior works on those platforms as well.
-        if let Some(writer) = self.writer.as_mut() {
-            writer.flush().await?;
-            self.ledger.notify_writer_waiters();
+        let flush_result = if let Some(writer) = self.writer.as_mut() {
+            writer.flush().await?
+        } else {
+            None
+        };
+
+        if let Some(flush_result) = flush_result {
+            // Publish the readable bytes before waking the reader.
+            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
         }
 
         if self.ledger.should_flush() || force_full_flush {
@@ -1402,7 +1399,6 @@ where
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.flush_inner(false).await?;
-        self.flush_write_state();
         Ok(())
     }
 }

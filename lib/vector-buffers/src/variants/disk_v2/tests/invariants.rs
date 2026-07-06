@@ -80,6 +80,35 @@ async fn pending_read_returns_none_when_writer_closed_with_unflushed_write() {
 }
 
 #[tokio::test]
+async fn publishing_writer_progress_updates_ledger_before_waking_reader() {
+    let _a = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (_writer, _reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+
+            let mut wait_for_writer = spawn(ledger.wait_for_writer());
+            assert_pending!(wait_for_writer.poll());
+            assert!(!wait_for_writer.is_woken());
+
+            let next_record_id = ledger.publish_writer_progress(1, 128);
+
+            assert_eq!(next_record_id, 2);
+            assert_eq!(ledger.state().get_next_writer_record_id(), 2);
+            assert_eq!(ledger.get_total_buffer_size(), 128);
+            assert!(wait_for_writer.is_woken());
+            assert_ready!(wait_for_writer.poll());
+        }
+    });
+
+    let parent = trace_span!("publishing_writer_progress_updates_ledger_before_waking_reader");
+    fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
 async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stopped() {
     let assertion_registry = install_tracing_helpers();
 
