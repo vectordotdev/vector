@@ -342,7 +342,15 @@ impl SourceConfig for KafkaSourceConfig {
             );
         }
 
-        let (consumer, callback_rx) = create_consumer(self, acknowledgements)?;
+        #[cfg(feature = "aws-core")]
+        let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
+
+        let (consumer, callback_rx) = create_consumer(
+            self,
+            acknowledgements,
+            #[cfg(feature = "aws-core")]
+            msk_iam,
+        )?;
 
         Ok(Box::pin(kafka_source(
             self.clone(),
@@ -1188,6 +1196,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 fn create_consumer(
     config: &KafkaSourceConfig,
     acknowledgements: bool,
+    #[cfg(feature = "aws-core")] msk_iam: Option<kafka::MskIamCredentials>,
 ) -> crate::Result<(
     StreamConsumer<KafkaSourceContext>,
     UnboundedReceiver<KafkaCallback>,
@@ -1234,6 +1243,8 @@ fn create_consumer(
             acknowledgements,
             callbacks,
             Span::current(),
+            #[cfg(feature = "aws-core")]
+            msk_iam,
         ))
         .context(CreateSnafu)?;
 
@@ -1274,12 +1285,13 @@ impl KafkaSourceContext {
         acknowledgements: bool,
         callbacks: UnboundedSender<KafkaCallback>,
         span: Span,
+        #[cfg(feature = "aws-core")] msk_iam: Option<kafka::MskIamCredentials>,
     ) -> Self {
         Self {
-            stats: kafka::KafkaStatisticsContext {
-                expose_lag_metrics,
-                span,
-            },
+            #[cfg(feature = "aws-core")]
+            stats: kafka::KafkaStatisticsContext::new(expose_lag_metrics, span, msk_iam),
+            #[cfg(not(feature = "aws-core"))]
+            stats: kafka::KafkaStatisticsContext::new(expose_lag_metrics, span),
             acknowledgements,
             consumer: OnceLock::default(),
             callbacks,
@@ -1522,7 +1534,15 @@ mod test {
     #[tokio::test]
     async fn consumer_create_ok() {
         let config = make_config("topic", "group", LogNamespace::Legacy, None);
-        assert!(create_consumer(&config, true).is_ok());
+        assert!(
+            create_consumer(
+                &config,
+                true,
+                #[cfg(feature = "aws-core")]
+                None
+            )
+            .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -1531,7 +1551,15 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config("topic", "group", LogNamespace::Legacy, None)
         };
-        assert!(create_consumer(&config, true).is_err());
+        assert!(
+            create_consumer(
+                &config,
+                true,
+                #[cfg(feature = "aws-core")]
+                None
+            )
+            .is_err()
+        );
     }
 }
 
@@ -1816,7 +1844,13 @@ mod integration_test {
         .build()
         .unwrap();
 
-        let (consumer, callback_rx) = create_consumer(&config, acknowledgements).unwrap();
+        let (consumer, callback_rx) = create_consumer(
+            &config,
+            acknowledgements,
+            #[cfg(feature = "aws-core")]
+            None,
+        )
+        .unwrap();
 
         tokio::spawn(kafka_source(
             config,

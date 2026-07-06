@@ -280,8 +280,21 @@ impl GenerateConfig for KafkaSinkConfig {
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = KafkaSink::new(self.clone())?;
-        let hc = healthcheck(self.clone(), cx.healthcheck.clone()).boxed();
+        #[cfg(feature = "aws-core")]
+        let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
+
+        let sink = KafkaSink::new(
+            self.clone(),
+            #[cfg(feature = "aws-core")]
+            msk_iam.clone(),
+        )?;
+        let hc = healthcheck(
+            self.clone(),
+            cx.healthcheck.clone(),
+            #[cfg(feature = "aws-core")]
+            msk_iam,
+        )
+        .boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 

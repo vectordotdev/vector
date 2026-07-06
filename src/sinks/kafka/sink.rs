@@ -38,20 +38,29 @@ pub struct KafkaSink {
 
 pub(crate) fn create_producer(
     client_config: ClientConfig,
+    #[cfg(feature = "aws-core")] msk_iam: Option<crate::kafka::MskIamCredentials>,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
+    #[cfg(feature = "aws-core")]
+    let context = KafkaStatisticsContext::new(false, Span::current(), msk_iam);
+    #[cfg(not(feature = "aws-core"))]
+    let context = KafkaStatisticsContext::new(false, Span::current());
     let producer = client_config
-        .create_with_context(KafkaStatisticsContext {
-            expose_lag_metrics: false,
-            span: Span::current(),
-        })
+        .create_with_context(context)
         .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
 }
 
 impl KafkaSink {
-    pub(crate) fn new(config: KafkaSinkConfig) -> crate::Result<Self> {
+    pub(crate) fn new(
+        config: KafkaSinkConfig,
+        #[cfg(feature = "aws-core")] msk_iam: Option<crate::kafka::MskIamCredentials>,
+    ) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka()?;
-        let producer = create_producer(producer_config)?;
+        let producer = create_producer(
+            producer_config,
+            #[cfg(feature = "aws-core")]
+            msk_iam,
+        )?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -115,6 +124,7 @@ impl KafkaSink {
 pub(crate) async fn healthcheck(
     config: KafkaSinkConfig,
     healthcheck_options: SinkHealthcheckOptions,
+    #[cfg(feature = "aws-core")] msk_iam: Option<crate::kafka::MskIamCredentials>,
 ) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client_config = config.to_rdkafka().unwrap();
@@ -132,8 +142,15 @@ pub(crate) async fn healthcheck(
         },
     };
 
+    // Build the client context in the async context (so the tokio runtime handle is captured for
+    // the OAUTHBEARER token callback), then move it into the blocking task.
+    #[cfg(feature = "aws-core")]
+    let context = KafkaStatisticsContext::new(false, Span::current(), msk_iam);
+    #[cfg(not(feature = "aws-core"))]
+    let context = KafkaStatisticsContext::new(false, Span::current());
+
     tokio::task::spawn_blocking(move || {
-        let producer: BaseProducer = client_config.create().unwrap();
+        let producer: BaseProducer<_> = client_config.create_with_context(context).unwrap();
         let topic = topic.as_deref();
 
         producer
