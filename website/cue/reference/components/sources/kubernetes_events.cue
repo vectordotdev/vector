@@ -54,6 +54,29 @@ components: sources: kubernetes_events: {
 
 	configuration: generated.components.sources.kubernetes_events.configuration
 
+	how_it_works: {
+		leader_election: {
+			title: "Leader election and failover"
+			body: """
+				With `leader_election.enabled` set to `true`, replicas coordinate through a
+				`coordination.k8s.io/v1` Lease so that only one replica streams events at a time.
+
+				The active leader also records a delivery watermark—the newest event timestamp it has
+				forwarded downstream—as an annotation on the Lease, updated with each renewal. When
+				leadership changes hands, the new leader resumes from that watermark: during the initial
+				watch replay it skips events at or below the watermark, minus
+				`leader_election.watermark_grace_seconds` to tolerate out-of-order event timestamps,
+				instead of re-emitting everything within `max_event_age_seconds`.
+
+				Delivery is at-least-once: the watermark only advances over events that were handed to
+				the topology, so a crashed leader never causes silent gaps. Duplicates remain possible
+				in the failover window (for example, when a partitioned leader keeps sending until its
+				renew deadline expires). Downstream consumers that need exactly-once semantics can
+				deduplicate on the emitted `event_uid` together with the event's `resourceVersion`.
+				"""
+		}
+	}
+
 	output: logs: record: {
 		description: "Represents a Kubernetes [`Event`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#event-v1-events-k8s-io) object."
 		fields: {

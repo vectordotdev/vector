@@ -82,6 +82,8 @@ pub struct KubernetesEventsLeaderAcquired {
     pub identity: String,
     pub lease_namespace: String,
     pub lease_name: String,
+    /// The delivery watermark found on the Lease, below which replayed events are skipped.
+    pub resume_watermark: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl InternalEvent for KubernetesEventsLeaderAcquired {
@@ -91,6 +93,7 @@ impl InternalEvent for KubernetesEventsLeaderAcquired {
             identity = %self.identity,
             lease_namespace = %self.lease_namespace,
             lease_name = %self.lease_name,
+            resume_watermark = ?self.resume_watermark,
         );
     }
 }

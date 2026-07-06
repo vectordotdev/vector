@@ -2,10 +2,15 @@ package metadata
 
 generated: components: sources: kubernetes_events: configuration: {
 	dedupe_retention_seconds: {
-		description: "Retention window for deduplication state."
-		required:    false
+		description: """
+			Retention window for deduplication state.
+
+			This should be at least as large as `max_event_age_seconds`; otherwise a watch restart can
+			re-emit events that are older than the retention window but still within the maximum age.
+			"""
+		required: false
 		type: uint: {
-			default: 900
+			default: 3600
 			unit:    "seconds"
 		}
 	}
@@ -54,8 +59,18 @@ generated: components: sources: kubernetes_events: configuration: {
 		type: string: examples: ["type=Warning"]
 	}
 	leader_election: {
-		description: "Lease-based leader election settings for running multiple replicas safely."
-		required:    false
+		description: """
+			Lease-based leader election settings for running multiple replicas safely.
+
+			The elected leader records a delivery watermark (the newest event timestamp it has
+			forwarded) as an annotation on the Lease object. When another replica takes over, it skips
+			events at or below that watermark instead of replaying everything within
+			`max_event_age_seconds`. Duplicates can still occur during the failover window (for
+			example, if the old leader keeps sending until its renew deadline expires), so downstream
+			consumers that require exactly-once behavior should deduplicate on the emitted `event_uid`
+			and the event's `resourceVersion`.
+			"""
+		required: false
 		type: object: options: {
 			enabled: {
 				description: "Enables Lease-based leader election."
@@ -113,6 +128,22 @@ generated: components: sources: kubernetes_events: configuration: {
 				required:    false
 				type: uint: {
 					default: 2
+					unit:    "seconds"
+				}
+			}
+			watermark_grace_seconds: {
+				description: """
+					Tolerance for out-of-order event timestamps when resuming from the persisted watermark.
+
+					After taking over leadership, events whose timestamp falls within this window below the
+					stored watermark are re-emitted rather than skipped. This protects against losing events
+					whose timestamps lag their write to the API server (for example, batched `EventSeries`
+					updates), at the cost of a bounded number of duplicates per failover. Set to `0` to resume
+					exactly at the watermark.
+					"""
+				required: false
+				type: uint: {
+					default: 600
 					unit:    "seconds"
 				}
 			}
