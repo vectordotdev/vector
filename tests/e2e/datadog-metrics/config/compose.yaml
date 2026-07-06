@@ -42,7 +42,7 @@ services:
       - "/usr/bin/vector"
       - "-vvv"
       - "-c"
-      - "/home/vector/tests/e2e/datadog-metrics/data/vector.toml"
+      - "/home/vector/tests/e2e/datadog-metrics/data/vector.yaml"
     volumes:
       - ../../../..:/home/vector
 
