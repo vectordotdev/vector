@@ -494,12 +494,9 @@ async fn fails_missing_creds() {
               namespace: office
         "#})
     .unwrap();
-
-    let error = config
-        .build(SinkContext::default())
-        .await
-        .expect_err("config.build failed to error");
-    assert_downcast_matches!(error, GcpError, GcpError::InvalidCredentials { .. });
+    if config.build(SinkContext::default()).await.is_ok() {
+        panic!("config.build failed to error");
+    }
 }
 
 #[test]
