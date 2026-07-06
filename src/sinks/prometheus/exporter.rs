@@ -466,7 +466,7 @@ impl PrometheusExporter {
         let tls = MaybeTlsSettings::from_config(tls.as_ref(), true)?;
         let listener = tls.bind(&address).await?;
 
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             info!(message = "Building HTTP server.", address = %address);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
@@ -811,7 +811,7 @@ mod tests {
 
         let mut gz = GzDecoder::new(&body_raw[..]);
         let mut body_decoded = String::new();
-        let _ = gz.read_to_string(&mut body_decoded);
+        gz.read_to_string(&mut body_decoded).unwrap();
 
         assert!(body_raw.len() < expected.len());
         assert_eq!(body_decoded, expected);

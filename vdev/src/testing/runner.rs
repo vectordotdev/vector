@@ -29,6 +29,7 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
+const LOCAL_TEST_COMMAND: &[&str] = &["cargo", "nextest", "run", "--no-fail-fast"];
 const COVERAGE_COMMAND: &[&str] = &[
     "cargo",
     "llvm-cov",
@@ -417,7 +418,7 @@ impl TestRunner for LocalTestRunner {
         let test_cmd = if coverage {
             COVERAGE_COMMAND
         } else {
-            TEST_COMMAND
+            LOCAL_TEST_COMMAND
         };
         let mut command = Command::new(test_cmd[0]);
         command.args(&test_cmd[1..]);

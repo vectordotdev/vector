@@ -407,7 +407,7 @@ impl AgentDDSketch {
 
     fn insert_key_counts(&mut self, mut counts: Vec<(i16, u32)>) {
         // Counts need to be sorted by key.
-        counts.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
+        counts.sort_unstable_by_key(|(k1, _)| *k1);
 
         let mut temp = Vec::new();
 

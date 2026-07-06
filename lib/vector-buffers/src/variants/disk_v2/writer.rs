@@ -629,6 +629,25 @@ where
         self.current_data_file_size += u64::try_from(serialized_len)
             .expect("Serialized length of record should never exceed 2^64 bytes.");
 
+        // `archive_record` only hands back a flushable token after `can_write`
+        // confirmed this record fits the remaining room in the file, so the file
+        // never grows past its limit and a record never spans two files. A size
+        // counter that drifted past the limit here means the gate was fed a wrong
+        // on-disk size and a record was written across the boundary.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always_or_unreachable!(
+                self.current_data_file_size <= self.max_data_file_size,
+                "a record never spans two data files",
+                &serde_json::json!({
+                    "current_data_file_size": self.current_data_file_size,
+                    "max_data_file_size": self.max_data_file_size,
+                    "serialized_len": serialized_len,
+                })
+            );
+        }
+
         Ok((serialized_len, flush_result))
     }
 
@@ -998,6 +1017,9 @@ where
 
     /// Ensures this writer is ready to attempt writer the next record.
     #[instrument(skip(self), level = "debug")]
+    // The inline antithesis assertion block pushes this over the line limit. Its
+    // source lines count even when the feature is off, so the allow is unconditional.
+    #[allow(clippy::too_many_lines)]
     async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
@@ -1015,6 +1037,21 @@ where
                 max_buffer_size = self.config.max_buffer_size,
                 "Buffer size limit reached. Waiting for reader progress."
             );
+
+            // The writer is now blocked on a full buffer, the precondition for the
+            // backpressure path and for the underflow that can wedge it forever.
+            #[cfg(feature = "antithesis-disk-asserts")]
+            {
+                #![allow(clippy::disallowed_types)] // once_cell::Lazy
+                antithesis_sdk::assert_sometimes!(
+                    true,
+                    "the writer blocks on a full buffer",
+                    &serde_json::json!({
+                        "total_buffer_size": self.ledger.get_total_buffer_size() + self.unflushed_bytes,
+                        "max_buffer_size": self.config.max_buffer_size,
+                    })
+                );
+            }
 
             self.ledger.wait_for_reader().await;
         }
@@ -1138,6 +1175,20 @@ where
                     self.ledger.state().increment_writer_file_id();
                     self.ledger.notify_writer_waiters();
 
+                    // The writer just rolled to a fresh data file, the boundary the
+                    // crash, partial-write, and file-id-rollover faults act on.
+                    #[cfg(feature = "antithesis-disk-asserts")]
+                    {
+                        #![allow(clippy::disallowed_types)] // once_cell::Lazy
+                        antithesis_sdk::assert_sometimes!(
+                            true,
+                            "the writer rolls to a new data file",
+                            &serde_json::json!({
+                                "new_writer_file_id": self.ledger.get_current_writer_file_id(),
+                            })
+                        );
+                    }
+
                     debug!(
                         new_writer_file_id = self.ledger.get_current_writer_file_id(),
                         "Writer now on new data file."
@@ -1260,6 +1311,22 @@ where
         if let Some(flush_result) = flush_result {
             self.flush_write_state_partial(flush_result.events_flushed, flush_result.bytes_flushed);
             self.ledger.notify_writer_waiters();
+        }
+
+        // A record at or above the write-buffer size forces the buffered writer to
+        // flush mid-record, exercising the large-record path that splits a single
+        // record across multiple underlying writes.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_sometimes!(
+                bytes_written >= self.config.write_buffer_size,
+                "a record at or over the write-buffer size is written",
+                &serde_json::json!({
+                    "bytes_written": bytes_written,
+                    "write_buffer_size": self.config.write_buffer_size,
+                })
+            );
         }
 
         trace!(

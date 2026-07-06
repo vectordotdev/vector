@@ -80,7 +80,7 @@ impl GrpcServer {
         let router_serving = Arc::clone(&serving);
 
         // Spawn the server with the already-bound listener
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             // Build reflection service for tools like grpcurl
             let reflection_service = tonic_reflection::server::Builder::configure()
                 .register_encoded_file_descriptor_set(

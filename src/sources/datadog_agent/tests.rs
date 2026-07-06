@@ -118,7 +118,7 @@ fn test_decode_log_body() {
 
         let events = decode_log_body(body, api_key, &source).unwrap();
         assert_eq!(events.len(), msgs.len());
-        for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
+        for (msg, event) in msgs.into_iter().zip(events) {
             let log = event.as_log();
             assert_eq!(log["message"], msg.message.into());
             assert_eq!(log["status"], msg.status.into());
@@ -300,15 +300,15 @@ async fn source_with_sender(
         );
     }
     let (guard, address) = next_addr();
-    let config = toml::from_str::<DatadogAgentConfig>(&format!(
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
-            address = "{}"
-            compression = "none"
-            store_api_key = {}
-            acknowledgements = {}
-            multiple_outputs = {}
-            split_metric_namespace = {}
-            trace_proto = "v1v2"
+            address: "{}"
+            compression: none
+            store_api_key: {}
+            acknowledgements: {}
+            multiple_outputs: {}
+            split_metric_namespace: {}
+            trace_proto: v1v2
         "#},
         address, store_api_key, acknowledgements, multiple_outputs, split_metric_namespace
     ))
@@ -574,7 +574,7 @@ async fn api_key_in_url() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -632,7 +632,7 @@ async fn api_key_in_query_params() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -690,7 +690,7 @@ async fn api_key_in_header() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -779,9 +779,9 @@ async fn send_timeout_returns_service_unavailable() {
 
 #[test]
 fn parse_config_with_send_timeout_secs() {
-    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            send_timeout_secs = 1.5
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            send_timeout_secs: 1.5
         "#})
     .unwrap();
 
@@ -791,8 +791,8 @@ fn parse_config_with_send_timeout_secs() {
 
 #[test]
 fn parse_config_without_send_timeout_secs() {
-    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
         "#})
     .unwrap();
 
@@ -989,7 +989,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1015,7 +1015,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1046,7 +1046,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1084,7 +1084,7 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(metric.namespace(), Some("system"));
 
             assert_eq!(
-                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[3].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
         }
@@ -1180,7 +1180,7 @@ async fn decode_sketches() {
             }
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1343,7 +1343,7 @@ async fn decode_traces() {
                 0.577.into()
             );
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1361,7 +1361,7 @@ async fn decode_traces() {
             assert_eq!(span_from_apm_event["resource"], "a_resource".into());
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1423,7 +1423,7 @@ async fn decode_traces() {
                 0.577.into()
             );
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
         }
@@ -1512,7 +1512,7 @@ async fn split_outputs() {
                 ),
             );
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 "abcdefgh12345678abcdefgh12345678"
             );
         }
@@ -1535,7 +1535,7 @@ async fn split_outputs() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -2201,7 +2201,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2231,7 +2231,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2264,7 +2264,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("another_namespace"));
 
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2296,7 +2296,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), None);
 
             assert_eq!(
-                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[3].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2334,9 +2334,10 @@ async fn decode_series_endpoint_v2() {
 
 #[test]
 fn test_output_schema_definition_json_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "json"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: json
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
@@ -2393,9 +2394,10 @@ fn test_output_schema_definition_json_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_bytes_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "bytes"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: bytes
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
@@ -2453,9 +2455,10 @@ fn test_output_schema_definition_bytes_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_json_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "json"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: json
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)
@@ -2483,9 +2486,10 @@ fn test_output_schema_definition_json_legacy_namespace() {
 
 #[test]
 fn test_output_schema_definition_bytes_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "bytes"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: bytes
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)

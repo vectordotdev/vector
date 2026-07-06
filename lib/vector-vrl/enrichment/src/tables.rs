@@ -25,7 +25,7 @@
 //!
 //! This data within the `ArcSwap` is accessed through the `TableSearch`
 //! struct. Any transform that needs access to this can call
-//! `TableRegistry::as_readonly`. This returns a cheaply clonable struct that
+//! `TableRegistry::as_readonly`. This returns a cheaply cloneable struct that
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
@@ -167,7 +167,7 @@ impl TableRegistry {
         }
     }
 
-    /// Returns a cheaply clonable struct through that provides lock free read
+    /// Returns a cheaply cloneable struct through that provides lock free read
     /// access to the enrichment tables.
     pub fn as_readonly(&self) -> TableSearch {
         TableSearch(self.tables.clone())
@@ -194,6 +194,14 @@ impl TableRegistry {
                 .map(|table| table.needs_reload())
                 .unwrap_or(true),
             None => true,
+        }
+    }
+
+    /// Extracts state from the table if available.
+    pub fn extract_state(&self, table: &str) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        match &**self.tables.load() {
+            Some(tables) => tables.get(table).and_then(|t| t.extract_state()),
+            None => None,
         }
     }
 }

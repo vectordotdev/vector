@@ -59,7 +59,7 @@ async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
             splunk_api_address()
         ))
         .form(&vec![
-            ("search", &search_query[..]),
+            ("search", search_query.as_str()),
             ("exec_mode", "oneshot"),
             ("f", "*"),
         ])
