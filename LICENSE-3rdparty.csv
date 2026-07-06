@@ -729,6 +729,7 @@ sketches-ddsketch,https://github.com/mheffner/rust-sketches-ddsketch,Apache-2.0,
 slab,https://github.com/tokio-rs/slab,MIT,Carl Lerche <me@carllerche.com>
 smallvec,https://github.com/servo/rust-smallvec,MIT OR Apache-2.0,The Servo Project Developers
 smol,https://github.com/smol-rs/smol,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
+smol_str,https://github.com/rust-analyzer/smol_str,MIT OR Apache-2.0,Aleksey Kladov <aleksey.kladov@gmail.com>
 smpl_jwt,https://github.com/durch/rust-jwt,MIT,Drazen Urch <github@drazenur.ch>
 snafu,https://github.com/shepmaster/snafu,MIT OR Apache-2.0,Jake Goulding <jake.goulding@gmail.com>
 snafu-derive,https://github.com/shepmaster/snafu,MIT OR Apache-2.0,Jake Goulding <jake.goulding@gmail.com>
