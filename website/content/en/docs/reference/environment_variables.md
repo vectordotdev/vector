@@ -32,7 +32,7 @@ transforms:
 
 ## How interpolation can be misused
 
-Suppose Vector is started with interpolation enabled and the following configuration template:
+Vector configuration templates can use environment variable interpolation, for example:
 
 ```yaml
 sources:
@@ -42,19 +42,15 @@ sources:
       - "${LOG_PATH}"
 ```
 
-If an attacker can influence the value of `LOG_PATH`, they can point Vector at any file the process can read, including sensitive
-system files. For example:
+If an attacker can influence the value of LOG_PATH, they can point Vector at any file the process can read, including sensitive system files:
 
 ```shell
 export LOG_PATH=/etc/shadow
 ```
 
+After substitution, Vector reads `/etc/shadow` as if it were a log file and forward its contents to whatever sink is configured, leaking password hashes or other sensitive data.
 
-After substitution, Vector would read `/etc/shadow` as if it were a log file and forward its contents to whatever sink is configured,
-leaking password hashes or other sensitive data.
-
-
-This is just one example of the risks that environment variable interpolation exposes, hence why it is disabled by default.
+This is one example of the risks that environment variable interpolation exposes. Environment variable interpolation is disabled by default for this reason.
 
 ## Default values
 
