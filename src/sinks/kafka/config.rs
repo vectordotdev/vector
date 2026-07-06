@@ -364,6 +364,9 @@ impl ValidatedSink for KafkaSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedKafkaSink { topic } = validated;
 
+        // The client/auth config (TLS requirement, conflicting `librdkafka_options`, unsupported
+        // feature) is already checked in `validate()`, so a misconfiguration fails before the
+        // potentially-slow MSK IAM credential load below.
         #[cfg(feature = "aws-core")]
         let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
 
