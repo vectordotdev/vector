@@ -1571,6 +1571,19 @@ mod integration_test {
     const HEADER_KEY: &str = "my header";
     const HEADER_VALUE: &str = "my header value";
 
+    fn message_indices(events: &[Event]) -> HashSet<usize> {
+        events
+            .iter()
+            .map(|event| {
+                let key = event.as_log()["message_key"].to_string_lossy();
+                key.strip_prefix(&format!("{KEY} "))
+                    .expect("message_key should have the expected prefix")
+                    .parse()
+                    .expect("message_key suffix should be the message index")
+            })
+            .collect()
+    }
+
     fn kafka_test_topic() -> String {
         std::env::var("KAFKA_TEST_TOPIC")
             .unwrap_or_else(|_| format!("test-topic-{}", random_string(10)))
@@ -2145,10 +2158,26 @@ mod integration_test {
         );
         // Kafka only guarantees at-least-once delivery: a partition revoked mid-rebalance
         // can be re-read by the consumer it's reassigned to before the prior consumer's
-        // offset commit lands, so `total` may legitimately exceed `expect_count`.
+        // offset commit lands, so `total` may legitimately exceed `expect_count` if some
+        // messages were delivered more than once.
         assert!(
             total >= expect_count,
             "Consumers should not lose any messages: got {total}, expected at least {expect_count}"
+        );
+        // Duplicates alone could mask a real drop behind an inflated `total`, so also check
+        // that every message index was seen by at least one consumer.
+        let received: HashSet<usize> = message_indices(&events1)
+            .into_iter()
+            .chain(message_indices(&events2))
+            .chain(message_indices(&events3))
+            .collect();
+        let missing: Vec<usize> = (0..expect_count)
+            .filter(|i| !received.contains(i))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "Consumers should not lose any messages: got {total} events covering {}/{expect_count} indices, missing: {missing:?}",
+            received.len(),
         );
     }
 
