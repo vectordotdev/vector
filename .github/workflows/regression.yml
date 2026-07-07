@@ -36,9 +36,6 @@ on:
       comparison-sha:
         description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
         required: false
-      cases-ref:
-        description: "Git ref for regression test cases (branch, SHA, or tag). Defaults to comparison-sha."
-        required: false
   workflow_call:
     inputs:
       baseline-sha:
@@ -47,10 +44,6 @@ on:
         type: string
       comparison-sha:
         description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
-        required: false
-        type: string
-      cases-ref:
-        description: "Git ref for regression test cases (branch, SHA, or tag). Defaults to comparison-sha."
         required: false
         type: string
   schedule:
@@ -74,7 +67,6 @@ jobs:
       baseline-tag: ${{ steps.set_and_validate_shas.outputs.BASELINE_TAG }}
       comparison-tag: ${{ steps.set_and_validate_shas.outputs.COMPARISON_TAG }}
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
-      cases-ref: ${{ steps.set_cases_ref.outputs.CASES_REF }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -120,18 +112,6 @@ jobs:
 
           echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
-
-      - name: Set cases ref
-        id: set_cases_ref
-        env:
-          CASES_REF_INPUT: ${{ inputs.cases-ref }}
-          COMPARISON_SHA: ${{ steps.set_and_validate_shas.outputs.COMPARISON_SHA }}
-        run: |
-          if [ -z "${CASES_REF_INPUT}" ]; then
-            echo "CASES_REF=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
-          else
-            echo "CASES_REF=${CASES_REF_INPUT}" >> $GITHUB_OUTPUT
-          fi
 
       - name: Set SMP version
         id: experimental-meta
@@ -420,11 +400,6 @@ jobs:
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ needs.resolve-inputs.outputs.cases-ref }}
-          path: cases-source
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
@@ -451,7 +426,7 @@ jobs:
             --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.resolve-inputs.outputs.comparison-tag }} \
             --baseline-sha ${{ needs.resolve-inputs.outputs.baseline-sha }} \
             --comparison-sha ${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            --target-config-dir ${{ github.workspace }}/cases-source/regression/ \
+            --target-config-dir ${{ github.workspace }}/regression/ \
             --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }} \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --replicas ${{ env.SMP_REPLICAS }}
