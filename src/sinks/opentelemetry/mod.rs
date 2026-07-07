@@ -107,7 +107,7 @@ pub struct OpenTelemetryConfig {
 
     #[configurable(derived)]
     #[configurable(metadata(
-        docs::warnings = "The `grpc` protocol only supports `none` and `gzip`. Specifying any other algorithm causes Vector to fail at startup."
+        docs::warnings = "The `grpc` protocol only supports `none`, `gzip`, and `zstd`. Specifying any other algorithm causes Vector to fail at startup."
     ))]
     #[serde(default)]
     pub compression: Compression,
@@ -284,8 +284,9 @@ impl SinkConfig for OpenTelemetryConfig {
                 let grpc_compression = match self.compression {
                     Compression::None => GrpcCompression::None,
                     Compression::Gzip(_) => GrpcCompression::Gzip,
+                    Compression::Zstd(_) => GrpcCompression::Zstd,
                     other => return Err(format!(
-                        "gRPC transport only supports 'none' or 'gzip' compression, got '{other}'"
+                        "gRPC transport only supports 'none', 'gzip', or 'zstd' compression, got '{other}'"
                     )
                     .into()),
                 };

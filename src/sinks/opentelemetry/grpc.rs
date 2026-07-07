@@ -67,6 +67,21 @@ pub enum GrpcCompression {
     ///
     /// [gzip]: https://www.gzip.org/
     Gzip,
+
+    /// [Zstandard][zstd] compression.
+    ///
+    /// [zstd]: https://facebook.github.io/zstd/
+    Zstd,
+}
+
+impl GrpcCompression {
+    const fn as_tonic_encoding(self) -> Option<tonic::codec::CompressionEncoding> {
+        match self {
+            Self::None => None,
+            Self::Gzip => Some(tonic::codec::CompressionEncoding::Gzip),
+            Self::Zstd => Some(tonic::codec::CompressionEncoding::Zstd),
+        }
+    }
 }
 
 /// Configuration for the OpenTelemetry sink's gRPC transport.
@@ -136,7 +151,7 @@ impl GrpcSinkConfig {
         let tls_configured = self.tls.is_some();
         let tls = MaybeTlsSettings::tls_client(self.tls.as_ref())?;
 
-        let use_gzip = self.compression == GrpcCompression::Gzip;
+        let compression = self.compression.as_tonic_encoding();
 
         // Split headers into static (literal values) and dynamic (template values).
         // Static headers are pre-parsed once and used for the healthcheck and every export.
@@ -186,33 +201,32 @@ impl GrpcSinkConfig {
             .clone()
             .map(|u| u.uri)
             .or_else(|| static_uri.clone());
-        let healthcheck_uri = if !dynamic_grpc_header_templates.is_empty()
-            && raw_healthcheck_uri.is_none()
-        {
-            warn!(
-                "Skipping gRPC healthcheck: dynamic (templated) headers are configured and \
+        let healthcheck_uri =
+            if !dynamic_grpc_header_templates.is_empty() && raw_healthcheck_uri.is_none() {
+                warn!(
+                    "Skipping gRPC healthcheck: dynamic (templated) headers are configured and \
                  cannot be rendered at startup. Set a static `healthcheck.uri` override to \
                  re-enable the healthcheck."
-            );
-            None
-        } else if raw_healthcheck_uri.is_none() && self.uri.is_dynamic() {
-            warn!(
-                "Skipping gRPC healthcheck: `uri` is a dynamic template and no static \
+                );
+                None
+            } else if raw_healthcheck_uri.is_none() && self.uri.is_dynamic() {
+                warn!(
+                    "Skipping gRPC healthcheck: `uri` is a dynamic template and no static \
                  `healthcheck.uri` override is set. To enable healthchecking, use a static URI."
-            );
-            None
-        } else {
-            raw_healthcheck_uri
-                .map(|u| with_default_scheme(u, tls_configured))
-                .transpose()?
-        };
+                );
+                None
+            } else {
+                raw_healthcheck_uri
+                    .map(|u| with_default_scheme(u, tls_configured))
+                    .transpose()?
+            };
         let healthcheck = Box::pin(grpc_healthcheck(
             client.clone(),
             healthcheck_uri,
             static_grpc_headers.clone(),
             cx.healthcheck,
         ));
-        let service = OtlpGrpcService::new(client, use_gzip, static_grpc_headers);
+        let service = OtlpGrpcService::new(client, compression, static_grpc_headers);
 
         let request_settings = self.request.tower.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -412,7 +426,7 @@ struct OtlpGrpcService {
     /// Each Tower concurrency-slot clone owns its cache independently — no shared mutex needed.
     clients: Option<CachedClients>,
     hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-    compression: bool,
+    compression: Option<tonic::codec::CompressionEncoding>,
     headers: std::sync::Arc<
         Vec<(
             tonic::metadata::AsciiMetadataKey,
@@ -424,7 +438,7 @@ struct OtlpGrpcService {
 impl OtlpGrpcService {
     fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-        compression: bool,
+        compression: Option<tonic::codec::CompressionEncoding>,
         headers: Vec<(
             tonic::metadata::AsciiMetadataKey,
             tonic::metadata::AsciiMetadataValue,
@@ -446,10 +460,10 @@ impl OtlpGrpcService {
             let mut logs = LogsServiceClient::new(svc.clone());
             let mut metrics = MetricsServiceClient::new(svc.clone());
             let mut traces = TraceServiceClient::new(svc);
-            if self.compression {
-                logs = logs.send_compressed(tonic::codec::CompressionEncoding::Gzip);
-                metrics = metrics.send_compressed(tonic::codec::CompressionEncoding::Gzip);
-                traces = traces.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+            if let Some(enc) = self.compression {
+                logs = logs.send_compressed(enc).accept_compressed(enc);
+                metrics = metrics.send_compressed(enc).accept_compressed(enc);
+                traces = traces.send_compressed(enc).accept_compressed(enc);
             }
             self.clients = Some(CachedClients {
                 uri: uri.clone(),
@@ -1033,6 +1047,34 @@ mod tests {
         .unwrap();
         assert_eq!(config.uri.get_ref(), "https://otelcol.example.com:4317");
         assert_eq!(config.compression, GrpcCompression::Gzip);
+    }
+
+    #[test]
+    fn grpc_config_with_zstd() {
+        let config: GrpcSinkConfig = toml::from_str(
+            r#"
+            uri = "https://otelcol.example.com:4317"
+            compression = "zstd"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.uri.get_ref(), "https://otelcol.example.com:4317");
+        assert_eq!(config.compression, GrpcCompression::Zstd);
+    }
+
+    #[test]
+    fn grpc_compression_maps_to_tonic_encoding() {
+        use tonic::codec::CompressionEncoding;
+
+        assert!(GrpcCompression::None.as_tonic_encoding().is_none());
+        assert!(matches!(
+            GrpcCompression::Gzip.as_tonic_encoding(),
+            Some(CompressionEncoding::Gzip)
+        ));
+        assert!(matches!(
+            GrpcCompression::Zstd.as_tonic_encoding(),
+            Some(CompressionEncoding::Zstd)
+        ));
     }
 
     #[test]
