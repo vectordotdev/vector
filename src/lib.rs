@@ -44,15 +44,7 @@ pub use indoc::indoc;
 // re-export codecs for convenience
 pub use vector_lib::codecs;
 
-#[cfg(all(
-    unix,
-    feature = "tikv-jemallocator",
-    not(feature = "allocation-tracing")
-))]
-#[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-#[cfg(all(unix, feature = "tikv-jemallocator", feature = "allocation-tracing"))]
+#[cfg(all(unix, feature = "tikv-jemallocator"))]
 #[global_allocator]
 static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
     self::internal_telemetry::allocations::get_grouped_tracing_allocator(

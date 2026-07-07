@@ -147,7 +147,7 @@ async fn emits_component_discarded_events_total_for_send_batch() {
     let (mut sender, _recv) = SourceSender::new_test_sender_with_options(1, None);
 
     let expected_drop = 100;
-    let events: Vec<Event> = (0..(CHUNK_SIZE + expected_drop))
+    let events: Vec<Event> = (0..(chunk_size_events() + expected_drop))
         .map(|_| {
             Event::Metric(Metric::new(
                 "name",
@@ -157,7 +157,7 @@ async fn emits_component_discarded_events_total_for_send_batch() {
         })
         .collect();
 
-    // `CHUNK_SIZE` events will be sent into buffer but then the future will not be polled to completion.
+    // `chunk_size_events()` events will be sent into buffer but then the future will not be polled to completion.
     let res = timeout(
         std::time::Duration::from_millis(100),
         sender.send_batch(events),
