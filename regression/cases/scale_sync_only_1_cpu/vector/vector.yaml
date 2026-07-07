@@ -105,7 +105,7 @@ transforms:
     type: "sample"
     inputs: ["filter_service"]
     rate: 2
-    key_field: "service"
+    key_field: "{{ service }}"
 
   # Classify severity; every event falls into info branch since template emits level=info.
   classify_severity:

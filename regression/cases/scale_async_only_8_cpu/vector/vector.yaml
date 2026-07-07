@@ -19,7 +19,7 @@ transforms:
     inputs: ["http_source"]
     threshold: 10000000
     window_secs: 60
-    key_field: "service"
+    key_field: "{{ service }}"
 
   # Drop duplicates by correlation_id; template emits unique IDs so every event is a cache miss.
   dedupe:

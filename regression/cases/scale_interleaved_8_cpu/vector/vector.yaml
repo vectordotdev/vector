@@ -30,7 +30,7 @@ transforms:
     inputs: ["parse_raw_message"]
     threshold: 10000000
     window_secs: 60
-    key_field: "service"
+    key_field: "{{ service }}"
 
   # SYNC - classify severity from parsed and top-level fields.
   classify_severity:
