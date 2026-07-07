@@ -1,4 +1,4 @@
-use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
+use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput};
 use crate::serde::default_framing_message_based;
 use crate::sources::Source;
 use crate::sources::odbc::client::{Context, prepare_metadata_path, validate_tracking_state};
@@ -16,7 +16,7 @@ use vector_lib::codecs::{
     decoding::{DeserializerConfig, JsonDeserializerConfig},
 };
 use vector_lib::sensitive_string::SensitiveString;
-use vrl::prelude::{Kind, ObjectMap};
+use vrl::prelude::ObjectMap;
 
 /// Configuration for the `odbc` source.
 #[serde_as]
@@ -416,18 +416,10 @@ impl SourceConfig for OdbcConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let mut schema_definition = self
+        let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
-
-        if let Some(timestamp_key) = log_schema().timestamp_key() {
-            schema_definition = schema_definition.optional_field(
-                timestamp_key,
-                Kind::timestamp(),
-                Some("timestamp"),
-            )
-        }
 
         vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),

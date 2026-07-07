@@ -1,4 +1,4 @@
-use crate::config::{LogNamespace, SourceContext, log_schema};
+use crate::config::{LogNamespace, SourceContext};
 use crate::event::Event;
 use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::sinks::prelude::*;
@@ -354,10 +354,6 @@ impl Context {
 
             self.log_namespace
                 .insert_standard_vector_source_metadata(log, OdbcConfig::NAME, now);
-
-            if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
-                log.try_insert(timestamp_key, now);
-            }
         }
     }
 }
@@ -462,7 +458,7 @@ where
         .context(DbSnafu)?
         .collect::<Result<Vec<String>, _>>()
         .context(DbSnafu)?;
-    
+
     ensure_unique_column_names(&names)?;
 
     let types = (1..=names.len())
@@ -959,11 +955,7 @@ mod tests {
         );
         assert_eq!(
             value,
-            Value::Timestamp(
-                chrono::Utc
-                    .with_ymd_and_hms(2025, 4, 28, 1, 20, 4)
-                    .unwrap()
-            )
+            Value::Timestamp(chrono::Utc.with_ymd_and_hms(2025, 4, 28, 1, 20, 4).unwrap())
         );
     }
 
@@ -977,11 +969,7 @@ mod tests {
         );
         assert_eq!(
             value,
-            Value::Timestamp(
-                chrono::Utc
-                    .with_ymd_and_hms(2025, 4, 28, 6, 20, 4)
-                    .unwrap()
-            )
+            Value::Timestamp(chrono::Utc.with_ymd_and_hms(2025, 4, 28, 6, 20, 4).unwrap())
         );
     }
 
@@ -995,11 +983,7 @@ mod tests {
         );
         assert_eq!(
             value,
-            Value::Timestamp(
-                chrono::Utc
-                    .with_ymd_and_hms(2025, 4, 28, 1, 20, 4)
-                    .unwrap()
-            )
+            Value::Timestamp(chrono::Utc.with_ymd_and_hms(2025, 4, 28, 1, 20, 4).unwrap())
         );
     }
 
@@ -1013,11 +997,7 @@ mod tests {
         );
         assert_eq!(
             value,
-            Value::Timestamp(
-                chrono::Utc
-                    .with_ymd_and_hms(2025, 4, 28, 1, 20, 4)
-                    .unwrap()
-            )
+            Value::Timestamp(chrono::Utc.with_ymd_and_hms(2025, 4, 28, 1, 20, 4).unwrap())
         );
     }
 
