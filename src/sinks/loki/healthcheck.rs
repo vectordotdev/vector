@@ -1,18 +1,21 @@
 use http::Uri;
 
 use super::config::LokiConfig;
-use crate::{http::HttpClient, sinks::util::UriSerde};
+use crate::{
+    http::{Auth, HttpClient},
+    sinks::util::UriSerde,
+};
 
 async fn fetch_status(
     endpoint: &Uri,
-    config: &LokiConfig,
+    auth: Option<&Auth>,
     client: &HttpClient,
 ) -> crate::Result<http::StatusCode> {
     let mut req = http::Request::get(endpoint)
         .body(hyper::Body::empty())
         .expect("Building request never fails.");
 
-    if let Some(auth) = &config.auth {
+    if let Some(auth) = auth {
         auth.apply(&mut req);
     }
 
@@ -26,7 +29,8 @@ pub async fn healthcheck(
 ) -> crate::Result<()> {
     // Healthcheck URI has been explicitly configured
     if let Some(uri) = healthcheck_uri {
-        let status = fetch_status(&uri.uri, &config, &client).await?;
+        let auth = uri.auth.or(config.auth);
+        let status = fetch_status(&uri.uri, auth.as_ref(), &client).await?;
         return match status {
             http::StatusCode::OK => Ok(()),
             code => Err(format!("A non-successful status returned: {}", code.as_u16()).into()),
@@ -34,11 +38,11 @@ pub async fn healthcheck(
     }
 
     let endpoint = config.endpoint.append_path("ready")?;
-    let status = match fetch_status(&endpoint.uri, &config, &client).await? {
+    let status = match fetch_status(&endpoint.uri, config.auth.as_ref(), &client).await? {
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
-            fetch_status(&config.endpoint.uri, &config, &client).await?
+            fetch_status(&config.endpoint.uri, config.auth.as_ref(), &client).await?
         }
         status => status,
     };
