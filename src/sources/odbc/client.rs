@@ -19,7 +19,7 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::mem;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::select;
@@ -579,13 +579,25 @@ pub(crate) fn prepare_metadata_path(path: &str) -> Result<(), OdbcError> {
     fs::create_dir_all(parent).context(IoSnafu)
 }
 
+/// Returns a sibling temp path that is always distinct from `path`.
+///
+/// Appending `.tmp` to the full filename avoids `Path::with_extension("tmp")`
+/// returning the destination path when it already ends in `.tmp`.
+fn checkpoint_temp_path(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .map(|name| format!("{}.tmp", name.to_string_lossy()))
+        .unwrap_or_else(|| "checkpoint.tmp".into());
+    path.with_file_name(file_name)
+}
+
 /// Serializes and persists the latest tracked values for reuse as SQL parameters.
 ///
-/// Writes to a `.tmp` file and atomically replaces the checkpoint on success.
+/// Writes to a sibling `.tmp` file and atomically replaces the checkpoint on success.
 fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
     prepare_metadata_path(path)?;
     let path = Path::new(path);
-    let tmp_path = path.with_extension("tmp");
+    let tmp_path = checkpoint_temp_path(path);
     let json = serde_json::to_string(obj).context(JsonSnafu)?;
 
     {
@@ -1209,6 +1221,45 @@ mod tests {
         };
 
         assert!(matches!(error, OdbcError::Io { .. }));
+    }
+
+    #[test]
+    fn checkpoint_temp_path_appends_suffix_to_filename() {
+        assert_eq!(
+            checkpoint_temp_path(Path::new("tracking.json")),
+            Path::new("tracking.json.tmp")
+        );
+        assert_eq!(
+            checkpoint_temp_path(Path::new("nested/tracking.json")),
+            Path::new("nested/tracking.json.tmp")
+        );
+    }
+
+    #[test]
+    fn checkpoint_temp_path_is_distinct_when_destination_ends_with_tmp() {
+        let path = Path::new("tracking.tmp");
+        let tmp_path = checkpoint_temp_path(path);
+        assert_ne!(tmp_path, path);
+        assert_eq!(tmp_path, Path::new("tracking.tmp.tmp"));
+    }
+
+    #[test]
+    fn save_params_writes_checkpoint_when_destination_ends_with_tmp() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let path = temp_dir.path().join("tracking.tmp");
+        let path = path.to_str().expect("utf-8 path");
+        let mut obj = ObjectMap::new();
+        obj.insert(KeyString::from("id"), Value::Bytes(Bytes::from_static(b"1")));
+
+        save_params(path, &obj).expect("save params");
+
+        let saved: ObjectMap = serde_json::from_reader(File::open(path).expect("open checkpoint"))
+            .expect("parse checkpoint");
+        assert_eq!(
+            saved.get("id"),
+            Some(&Value::Bytes(Bytes::from_static(b"1")))
+        );
+        assert!(!temp_dir.path().join("tracking.tmp.tmp").exists());
     }
 
     #[test]
