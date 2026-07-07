@@ -314,7 +314,12 @@ impl KafkaAuthConfig {
             "sasl.mechanisms",
         ];
         for (key, _value) in options {
-            if RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r)) {
+            // Reject the whole `sasl.oauthbearer.*` namespace too: e.g. `sasl.oauthbearer.method=oidc`
+            // would divert librdkafka to its built-in OIDC flow and bypass the MSK SigV4 token
+            // callback, so the component would authenticate with the wrong token.
+            let reserved = RESERVED.iter().any(|r| key.eq_ignore_ascii_case(r))
+                || key.to_ascii_lowercase().starts_with("sasl.oauthbearer.");
+            if reserved {
                 return Err(format!(
                     "`librdkafka_options.{key}` conflicts with `sasl.aws_msk_iam`; remove it \
                      (MSK IAM manages `security.protocol` and `sasl.*`)"
@@ -616,9 +621,11 @@ mod auth_tests {
         for key in [
             "security.protocol",
             "sasl.mechanism",
-            "sasl.mechanisms", // librdkafka plural alias
+            "sasl.mechanisms",         // librdkafka plural alias
             "sasl.username",
             "sasl.password",
+            "sasl.oauthbearer.method", // would divert to librdkafka's OIDC flow
+            "sasl.oauthbearer.token.endpoint.url",
         ] {
             let opts = HashMap::from([(key.to_string(), "x".to_string())]);
             let err = auth
