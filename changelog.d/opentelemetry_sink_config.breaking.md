@@ -2,6 +2,9 @@ Changed the `opentelemetry` sink config fields to remove `protocol.*`. `protocol
 by `protocol` and all fields previously nested under `protocol` now can be placed in the top level
 configuration.
 
+The legacy nested `protocol.*` format is still accepted temporarily but is deprecated and logs a
+warning on startup. Migrate to the flat format before the fallback is removed in a future release.
+
 Before:
 
 ```yaml
