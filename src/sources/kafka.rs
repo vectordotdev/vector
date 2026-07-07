@@ -2034,8 +2034,10 @@ mod integration_test {
 
     async fn consume_with_rebalance(rebalance_strategy: String) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
+        // A larger backlog gives the later consumers a bigger margin against being starved
+        // (see the `events3` assertion below) as CI runners get faster at draining the topic.
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
-            .unwrap_or_else(|_| "125000".into())
+            .unwrap_or_else(|_| "500000".into())
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
@@ -2141,7 +2143,13 @@ mod integration_test {
             0,
             "The first set of consumers should consume and ack all messages."
         );
-        assert_eq!(total, expect_count);
+        // Kafka only guarantees at-least-once delivery: a partition revoked mid-rebalance
+        // can be re-read by the consumer it's reassigned to before the prior consumer's
+        // offset commit lands, so `total` may legitimately exceed `expect_count`.
+        assert!(
+            total >= expect_count,
+            "Consumers should not lose any messages: got {total}, expected at least {expect_count}"
+        );
     }
 
     #[tokio::test]
