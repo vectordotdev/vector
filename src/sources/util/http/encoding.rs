@@ -183,6 +183,19 @@ fn decompress_snappy(
     feature = "sources-opentelemetry",
     test
 ))]
+const ADDITIONAL_CAPACITY_FOR_CHUNKS_BEYOND_FIRST_TWO: usize = 8 * 1024;
+
+/// Collects the body into [`Bytes`] under `max_body_size`, mirroring the fast
+/// paths of hyper `to_bytes`. Collecting into a fresh `BytesMut` regressed
+/// throughput, since that always pays one allocation plus a full copy; instead
+/// we return a one- or two-chunk body directly and only grow a buffer once a
+/// third chunk arrives.
+/// (<https://github.com/hyperium/hyper/blob/v0.14.32/src/body/to_bytes.rs>).
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-opentelemetry",
+    test
+))]
 async fn collect_body_with_limit<S, B>(body: S, max_body_size: usize) -> Result<Bytes, ErrorMessage>
 where
     S: futures_util::Stream<Item = Result<B, warp::Error>>,
@@ -190,18 +203,45 @@ where
 {
     futures_util::pin_mut!(body);
 
-    let mut bytes = BytesMut::new();
+    let mut remaining_byte_allowance = max_body_size;
+    let mut admit_chunk_within_allowance =
+        |chunk: Result<B, warp::Error>| -> Result<B, ErrorMessage> {
+            let chunk = chunk.map_err(|error| {
+                ErrorMessage::new(
+                    StatusCode::BAD_REQUEST,
+                    format!("Failed reading request body: {error}"),
+                )
+            })?;
+
+            let chunk_len = chunk.remaining();
+            if chunk_len > remaining_byte_allowance {
+                return Err(request_body_too_large_error(max_body_size));
+            }
+
+            remaining_byte_allowance -= chunk_len;
+            Ok(chunk)
+        };
+
+    let mut first = if let Some(chunk) = body.next().await {
+        admit_chunk_within_allowance(chunk)?
+    } else {
+        return Ok(Bytes::new());
+    };
+
+    let second = if let Some(chunk) = body.next().await {
+        admit_chunk_within_allowance(chunk)?
+    } else {
+        return Ok(first.copy_to_bytes(first.remaining()));
+    };
+
+    let mut bytes = BytesMut::with_capacity(
+        first.remaining() + second.remaining() + ADDITIONAL_CAPACITY_FOR_CHUNKS_BEYOND_FIRST_TWO,
+    );
+    bytes.put(first);
+    bytes.put(second);
+
     while let Some(chunk) = body.next().await {
-        let chunk = chunk.map_err(|error| {
-            ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Failed reading request body: {error}"),
-            )
-        })?;
-        if chunk.remaining() > max_body_size.saturating_sub(bytes.len()) {
-            return Err(request_body_too_large_error(max_body_size));
-        }
-        bytes.put(chunk);
+        bytes.put(admit_chunk_within_allowance(chunk)?);
     }
 
     Ok(bytes.freeze())
