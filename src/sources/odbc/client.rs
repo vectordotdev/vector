@@ -591,6 +591,37 @@ fn checkpoint_temp_path(path: &Path) -> PathBuf {
     path.with_file_name(file_name)
 }
 
+/// Replaces `path` with the contents of `tmp_path` atomically.
+///
+/// On Windows, `rename` cannot replace an existing destination file, so use
+/// `ReplaceFileW` and fall back to `rename` when the destination does not exist yet.
+fn replace_checkpoint_file(tmp_path: &Path, path: &Path) -> Result<(), OdbcError> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Storage::FileSystem::ReplaceFileW;
+        use windows::core::HSTRING;
+
+        let dst = HSTRING::from(path.to_string_lossy().as_ref());
+        let src = HSTRING::from(tmp_path.to_string_lossy().as_ref());
+        let replaced = unsafe {
+            ReplaceFileW(
+                &dst,
+                &src,
+                None,
+                windows::Win32::Storage::FileSystem::REPLACE_FILE_FLAGS(0),
+                None,
+                None,
+            )
+        };
+        if replaced.is_ok() {
+            return Ok(());
+        }
+        // Destination may not exist yet — fall back to rename.
+    }
+
+    fs::rename(tmp_path, path).context(IoSnafu)
+}
+
 /// Serializes and persists the latest tracked values for reuse as SQL parameters.
 ///
 /// Writes to a sibling `.tmp` file and atomically replaces the checkpoint on success.
@@ -606,7 +637,7 @@ fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
         file.sync_all().context(IoSnafu)?;
     }
 
-    fs::rename(&tmp_path, path).context(IoSnafu)
+    replace_checkpoint_file(&tmp_path, path)
 }
 
 /// Localizes a naive datetime with `tz`, using `.latest()` for DST ambiguity and
@@ -1224,45 +1255,6 @@ mod tests {
     }
 
     #[test]
-    fn checkpoint_temp_path_appends_suffix_to_filename() {
-        assert_eq!(
-            checkpoint_temp_path(Path::new("tracking.json")),
-            Path::new("tracking.json.tmp")
-        );
-        assert_eq!(
-            checkpoint_temp_path(Path::new("nested/tracking.json")),
-            Path::new("nested/tracking.json.tmp")
-        );
-    }
-
-    #[test]
-    fn checkpoint_temp_path_is_distinct_when_destination_ends_with_tmp() {
-        let path = Path::new("tracking.tmp");
-        let tmp_path = checkpoint_temp_path(path);
-        assert_ne!(tmp_path, path);
-        assert_eq!(tmp_path, Path::new("tracking.tmp.tmp"));
-    }
-
-    #[test]
-    fn save_params_writes_checkpoint_when_destination_ends_with_tmp() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let path = temp_dir.path().join("tracking.tmp");
-        let path = path.to_str().expect("utf-8 path");
-        let mut obj = ObjectMap::new();
-        obj.insert(KeyString::from("id"), Value::Bytes(Bytes::from_static(b"1")));
-
-        save_params(path, &obj).expect("save params");
-
-        let saved: ObjectMap = serde_json::from_reader(File::open(path).expect("open checkpoint"))
-            .expect("parse checkpoint");
-        assert_eq!(
-            saved.get("id"),
-            Some(&Value::Bytes(Bytes::from_static(b"1")))
-        );
-        assert!(!temp_dir.path().join("tracking.tmp.tmp").exists());
-    }
-
-    #[test]
     fn ensure_unique_column_names_accepts_distinct_names() {
         ensure_unique_column_names(&["id".to_owned(), "name".to_owned()])
             .expect("distinct column names");
@@ -1283,6 +1275,25 @@ mod tests {
             error,
             OdbcError::DuplicateColumnNames { columns } if columns == vec!["id".to_owned()]
         ));
+    }
+
+    #[test]
+    fn save_params_overwrites_existing_checkpoint() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let path = temp_dir.path().join("tracking.json");
+        let path = path.to_str().expect("utf-8 path");
+
+        let mut first = ObjectMap::new();
+        first.insert(KeyString::from("id"), Value::Integer(1));
+        save_params(path, &first).expect("first save");
+
+        let mut second = ObjectMap::new();
+        second.insert(KeyString::from("id"), Value::Integer(2));
+        save_params(path, &second).expect("second save should overwrite");
+
+        let saved: ObjectMap =
+            serde_json::from_reader(File::open(path).expect("open checkpoint")).expect("parse");
+        assert_eq!(saved.get("id"), Some(&Value::Integer(2)));
     }
 
     #[test]

@@ -762,7 +762,7 @@ sources-mongodb_metrics = ["dep:mongodb"]
 sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-odbc = ["dep:odbc-api", "dep:cron"]
+sources-odbc = ["dep:odbc-api", "dep:cron", "dep:windows"]
 sources-okta = ["sources-utils-http-client"]
 sources-opentelemetry = [
   "dep:hex",
