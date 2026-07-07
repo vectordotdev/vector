@@ -77,6 +77,8 @@ transforms:
       log_count: sum
       error_count: sum
       latency_ms: max
+      "raw_message.upstream_latency_ms": max
+      "raw_message.retry_count": sum
       severity_class: retain
 
 sinks:
