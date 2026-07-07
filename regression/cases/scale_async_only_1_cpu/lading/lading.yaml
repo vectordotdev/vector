@@ -8,7 +8,7 @@ generator:
       parallel_connections: 20
       method:
         post:
-          maximum_prebuild_cache_size_bytes: "2 GiB"
+          maximum_prebuild_cache_size_bytes: "256 MiB"
           variant:
             templated_json:
               template_path: "/etc/lading/templates/template.yaml"
