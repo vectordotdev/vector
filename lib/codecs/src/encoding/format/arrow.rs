@@ -7,7 +7,10 @@
 use arrow::{
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     error::ArrowError,
-    ipc::writer::StreamWriter,
+    ipc::{
+        CompressionType,
+        writer::{IpcWriteOptions, StreamWriter},
+    },
     json::reader::ReaderBuilder,
     record_batch::RecordBatch,
 };
@@ -27,6 +30,35 @@ pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
     /// This is called during sink configuration build phase to fetch
     /// the schema once at startup, rather than at runtime.
     async fn get_schema(&self) -> Result<Schema, ArrowEncodingError>;
+}
+
+/// Block-level compression applied to Arrow IPC record batch buffers.
+///
+/// This is columnar compression applied inside the Arrow IPC stream itself, so each
+/// buffer is compressed independently and can be decompressed per column by the reader.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ArrowIpcCompression {
+    /// No compression.
+    #[default]
+    None,
+
+    /// LZ4 frame compression.
+    Lz4Frame,
+
+    /// Zstandard compression.
+    Zstd,
+}
+
+impl From<ArrowIpcCompression> for Option<CompressionType> {
+    fn from(value: ArrowIpcCompression) -> Self {
+        match value {
+            ArrowIpcCompression::None => None,
+            ArrowIpcCompression::Lz4Frame => Some(CompressionType::LZ4_FRAME),
+            ArrowIpcCompression::Zstd => Some(CompressionType::ZSTD),
+        }
+    }
 }
 
 /// Configuration for Arrow IPC stream serialization
@@ -49,6 +81,13 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
+
+    /// Block-level compression applied to the Arrow IPC record batch buffers.
+    ///
+    /// Compresses each buffer inside the IPC stream.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    #[configurable(derived)]
+    pub compression: ArrowIpcCompression,
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -62,6 +101,7 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
                     .map(|s| format!("{} fields", s.fields().len())),
             )
             .field("allow_nullable_fields", &self.allow_nullable_fields)
+            .field("compression", &self.compression)
             .finish()
     }
 }
@@ -72,6 +112,7 @@ impl ArrowStreamSerializerConfig {
         Self {
             schema: Some(schema),
             allow_nullable_fields: false,
+            compression: ArrowIpcCompression::None,
         }
     }
 
@@ -90,6 +131,7 @@ impl ArrowStreamSerializerConfig {
 #[derive(Clone, Debug)]
 pub struct ArrowStreamSerializer {
     schema: SchemaRef,
+    compression: ArrowIpcCompression,
 }
 
 impl ArrowStreamSerializer {
@@ -108,6 +150,7 @@ impl ArrowStreamSerializer {
 
     /// Create a new ArrowStreamSerializer with the given configuration
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
+        let compression = config.compression;
         let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
@@ -126,6 +169,7 @@ impl ArrowStreamSerializer {
 
         Ok(Self {
             schema: SchemaRef::new(schema),
+            compression,
         })
     }
 }
@@ -138,7 +182,8 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
             return Err(ArrowEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_arrow_ipc_stream(&events, self.schema.clone())?;
+        let bytes =
+            encode_events_to_arrow_ipc_stream(&events, self.schema.clone(), self.compression)?;
 
         buffer.extend_from_slice(&bytes);
         Ok(())
@@ -212,6 +257,7 @@ pub enum ArrowEncodingError {
 pub fn encode_events_to_arrow_ipc_stream(
     events: &[Event],
     schema: SchemaRef,
+    compression: ArrowIpcCompression,
 ) -> Result<Bytes, ArrowEncodingError> {
     if events.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
@@ -225,9 +271,14 @@ pub fn encode_events_to_arrow_ipc_stream(
 
     let record_batch = build_record_batch(schema, &json_values)?;
 
+    let write_options = IpcWriteOptions::default()
+        .try_with_compression(compression.into())
+        .context(IpcWriteSnafu)?;
+
     let mut buffer = BytesMut::new().writer();
     let mut writer =
-        StreamWriter::try_new(&mut buffer, record_batch.schema_ref()).context(IpcWriteSnafu)?;
+        StreamWriter::try_new_with_options(&mut buffer, record_batch.schema_ref(), write_options)
+            .context(IpcWriteSnafu)?;
     writer.write(&record_batch).context(IpcWriteSnafu)?;
     writer.finish().context(IpcWriteSnafu)?;
 
@@ -390,7 +441,8 @@ mod tests {
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone())?;
+        let bytes =
+            encode_events_to_arrow_ipc_stream(&events, schema.clone(), ArrowIpcCompression::None)?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
@@ -406,6 +458,61 @@ mod tests {
             log.insert(key, value.into());
         }
         Event::Log(log)
+    }
+
+    mod compression {
+        use super::*;
+
+        fn encode_with(compression: ArrowIpcCompression) -> (Bytes, SchemaRef) {
+            let schema = SchemaRef::new(Schema::new(vec![
+                Field::new("level", DataType::Utf8, false),
+                Field::new("n", DataType::Int64, false),
+            ]));
+            // Highly repetitive data so compression has an obvious effect.
+            let events: Vec<Event> = (0..512)
+                .map(|i| {
+                    create_event(vec![
+                        ("level", Value::from("INFO")),
+                        ("n", Value::from(i % 4)),
+                    ])
+                })
+                .collect();
+            let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone(), compression)
+                .expect("encode should succeed");
+            (bytes, schema)
+        }
+
+        fn decode(bytes: &Bytes) -> RecordBatch {
+            let mut reader = StreamReader::try_new(Cursor::new(bytes.clone()), None)
+                .expect("compressed IPC stream should be readable");
+            reader.next().unwrap().expect("record batch should decode")
+        }
+
+        #[test]
+        fn compressed_streams_round_trip_and_shrink() {
+            let (uncompressed, _) = encode_with(ArrowIpcCompression::None);
+            let (lz4, _) = encode_with(ArrowIpcCompression::Lz4Frame);
+            let (zstd, _) = encode_with(ArrowIpcCompression::Zstd);
+
+            // All variants must decode back to the same record batch.
+            let base = decode(&uncompressed);
+            assert_eq!(base, decode(&lz4), "lz4 stream must round-trip");
+            assert_eq!(base, decode(&zstd), "zstd stream must round-trip");
+
+            // Compression must actually shrink this highly-repetitive payload.
+            assert!(
+                lz4.len() < uncompressed.len(),
+                "lz4 ({}) should be smaller than uncompressed ({})",
+                lz4.len(),
+                uncompressed.len()
+            );
+            assert!(
+                zstd.len() < uncompressed.len(),
+                "zstd ({}) should be smaller than uncompressed ({})",
+                zstd.len(),
+                uncompressed.len()
+            );
+        }
     }
 
     mod comprehensive {
@@ -608,7 +715,8 @@ mod tests {
         fn test_encode_empty_events() {
             let schema = Schema::new(vec![Field::new("message", DataType::Utf8, true)]).into();
             let events: Vec<Event> = vec![];
-            let result = encode_events_to_arrow_ipc_stream(&events, schema);
+            let result =
+                encode_events_to_arrow_ipc_stream(&events, schema, ArrowIpcCompression::None);
             assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
         }
 
@@ -623,7 +731,8 @@ mod tests {
             )])
             .into();
 
-            let result = encode_events_to_arrow_ipc_stream(&events, schema);
+            let result =
+                encode_events_to_arrow_ipc_stream(&events, schema, ArrowIpcCompression::None);
             assert!(result.is_err());
         }
     }
@@ -885,7 +994,8 @@ mod tests {
             // Event is missing "required_field" entirely
             let event = create_event(vec![("optional_field", "hello")]);
 
-            let result = encode_events_to_arrow_ipc_stream(&[event], schema);
+            let result =
+                encode_events_to_arrow_ipc_stream(&[event], schema, ArrowIpcCompression::None);
             let err = result.unwrap_err().to_string();
             assert!(
                 err.contains("required_field"),
@@ -908,7 +1018,8 @@ mod tests {
             // Event has "id" but "name" is null
             let event = create_event(vec![("id", Value::Integer(1))]);
 
-            let result = encode_events_to_arrow_ipc_stream(&[event], schema);
+            let result =
+                encode_events_to_arrow_ipc_stream(&[event], schema, ArrowIpcCompression::None);
             let err = result.unwrap_err().to_string();
             assert!(
                 err.contains("name"),

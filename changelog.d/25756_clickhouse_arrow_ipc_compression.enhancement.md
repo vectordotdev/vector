@@ -1,0 +1,3 @@
+The `clickhouse` sink's `arrow_stream` batch encoding now supports block-level compression of the Arrow IPC buffers via a `compression` option (`none`, `lz4_frame`, or `zstd`, defaulting to `none`). Compression is applied inside the IPC stream so each column buffer is compressed independently, using substantially less CPU than an equivalent whole-payload HTTP `gzip` `Content-Encoding` at a comparable ratio. Enabling `compression` (`lz4_frame` or `zstd`) requires ClickHouse 23.11 or newer; the sink validates the server version at startup and rejects the configuration on older servers.
+
+authors: benjamin-awd

@@ -4,8 +4,8 @@ use std::fmt;
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
+use vector_lib::codecs::encoding::{ArrowIpcCompression, ArrowStreamSerializerConfig};
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
@@ -57,6 +57,10 @@ pub enum ClickhouseBatchEncoding {
     ///
     /// This is the streaming variant of the Arrow IPC format, which writes
     /// a continuous stream of record batches.
+    ///
+    /// Note: enabling the `compression` option (any value other than `none`) requires ClickHouse
+    /// 23.11 or newer. Older servers accept the insert but cannot read compressed Arrow IPC, so the
+    /// sink rejects that combination at startup.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
     ArrowStream(ArrowStreamSerializerConfig),
@@ -310,6 +314,29 @@ impl ClickhouseConfig {
 
             let ClickhouseBatchEncoding::ArrowStream(arrow_config) = batch_encoding;
             let mut arrow_config = arrow_config.clone();
+
+            if arrow_config.compression != ArrowIpcCompression::None
+                && self.compression != Compression::None
+            {
+                warn!(
+                    message = "Both Arrow IPC buffer compression \
+                        (`batch_encoding.arrow_stream.compression`) and HTTP compression \
+                        (`compression`) are enabled; performance may be improved by enabling \
+                        only one.",
+                    arrow_ipc_compression = ?arrow_config.compression,
+                    http_compression = ?self.compression,
+                );
+            }
+
+            // Older ClickHouse servers accept a compressed Arrow IPC insert but fail to read it,
+            // silently dropping the batch. Fail fast at startup instead.
+            super::arrow::ensure_arrow_compression_supported(
+                client,
+                &endpoint.to_string(),
+                auth,
+                arrow_config.compression,
+            )
+            .await?;
 
             self.resolve_arrow_schema(
                 client,
