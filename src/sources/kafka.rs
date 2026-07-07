@@ -2165,20 +2165,25 @@ mod integration_test {
             "Consumers should not lose any messages: got {total}, expected at least {expect_count}"
         );
         // Duplicates alone could mask a real drop behind an inflated `total`, so also check
-        // that every message index was seen by at least one consumer.
-        let received: HashSet<usize> = message_indices(&events1)
-            .into_iter()
-            .chain(message_indices(&events2))
-            .chain(message_indices(&events3))
-            .collect();
-        let missing: Vec<usize> = (0..expect_count)
-            .filter(|i| !received.contains(i))
-            .collect();
-        assert!(
-            missing.is_empty(),
-            "Consumers should not lose any messages: got {total} events covering {}/{expect_count} indices, missing: {missing:?}",
-            received.len(),
-        );
+        // that every message index was seen by at least one consumer. This only applies
+        // when we produced the messages ourselves via `send_events` (their `message_key`
+        // is `"{KEY} {index}"`); a pre-populated topic (`send_count == 0`, see above) can
+        // contain arbitrary records, so fall back to the count-only check in that case.
+        if send_count > 0 {
+            let received: HashSet<usize> = message_indices(&events1)
+                .into_iter()
+                .chain(message_indices(&events2))
+                .chain(message_indices(&events3))
+                .collect();
+            let missing: Vec<usize> = (0..expect_count)
+                .filter(|i| !received.contains(i))
+                .collect();
+            assert!(
+                missing.is_empty(),
+                "Consumers should not lose any messages: got {total} events covering {}/{expect_count} indices, missing: {missing:?}",
+                received.len(),
+            );
+        }
     }
 
     #[tokio::test]
