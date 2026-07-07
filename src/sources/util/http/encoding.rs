@@ -183,7 +183,8 @@ fn decompress_snappy(
     feature = "sources-opentelemetry",
     test
 ))]
-const ADDITIONAL_CAPACITY_FOR_CHUNKS_BEYOND_FIRST_TWO: usize = 8 * 1024;
+/// Spare capacity added to the initial buffer so a third or later chunk can be appended without reallocating right away.
+const ADDITIONAL_CAPACITY_FOR_CHUNKS_BEYOND_FIRST_TWO: usize = 16 * 1024;
 
 /// Collects the body into [`Bytes`] under `max_body_size`, mirroring the fast
 /// paths of hyper `to_bytes`. Collecting into a fresh `BytesMut` regressed
@@ -203,33 +204,31 @@ where
 {
     futures_util::pin_mut!(body);
 
-    let mut remaining_byte_allowance = max_body_size;
-    let mut admit_chunk_within_allowance =
-        |chunk: Result<B, warp::Error>| -> Result<B, ErrorMessage> {
-            let chunk = chunk.map_err(|error| {
-                ErrorMessage::new(
-                    StatusCode::BAD_REQUEST,
-                    format!("Failed reading request body: {error}"),
-                )
-            })?;
+    let mut total_body_size = 0;
+    let mut admit_chunk_within_limit = |chunk: Result<B, warp::Error>| -> Result<B, ErrorMessage> {
+        let chunk = chunk.map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Failed reading request body: {error}"),
+            )
+        })?;
 
-            let chunk_len = chunk.remaining();
-            if chunk_len > remaining_byte_allowance {
-                return Err(request_body_too_large_error(max_body_size));
-            }
+        total_body_size += chunk.remaining();
+        if total_body_size > max_body_size {
+            return Err(request_body_too_large_error(max_body_size));
+        }
 
-            remaining_byte_allowance -= chunk_len;
-            Ok(chunk)
-        };
+        Ok(chunk)
+    };
 
     let mut first = if let Some(chunk) = body.next().await {
-        admit_chunk_within_allowance(chunk)?
+        admit_chunk_within_limit(chunk)?
     } else {
         return Ok(Bytes::new());
     };
 
     let second = if let Some(chunk) = body.next().await {
-        admit_chunk_within_allowance(chunk)?
+        admit_chunk_within_limit(chunk)?
     } else {
         return Ok(first.copy_to_bytes(first.remaining()));
     };
@@ -241,7 +240,7 @@ where
     bytes.put(second);
 
     while let Some(chunk) = body.next().await {
-        bytes.put(admit_chunk_within_allowance(chunk)?);
+        bytes.put(admit_chunk_within_limit(chunk)?);
     }
 
     Ok(bytes.freeze())
