@@ -476,7 +476,7 @@ impl CuckooMemoryTable {
             };
 
             let res = if self.cuckoo_config.ttl_enabled || self.cuckoo_config.counter_enabled {
-                let ttl = self
+                let mut ttl = self
                     .config
                     .ttl_field
                     .path
@@ -487,7 +487,7 @@ impl CuckooMemoryTable {
                     .or(Some(self.config.ttl))
                     .map(|v| (v.div_ceil(self.config.scan_interval.get())).max(1))
                     .and_then(|v| u32::try_from(v).ok());
-                if let Some(ttl) = ttl {
+                if let Some(ttl) = &mut ttl {
                     let needed_bits = ttl.checked_ilog2().unwrap_or(0) + 1;
                     if needed_bits as usize > self.cuckoo_config.ttl_bits.get() {
                         warn!(
@@ -498,6 +498,8 @@ impl CuckooMemoryTable {
                             self.config.scan_interval.get()
                         );
                     }
+                    // Unchecked conversion to u32, because ttl_bits can't be higher than 32 anyways
+                    *ttl = 2_u32.pow(self.cuckoo_config.ttl_bits.get() as u32) - 1;
                 }
                 let counter = self
                     .cuckoo_config
