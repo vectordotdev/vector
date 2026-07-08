@@ -1986,6 +1986,169 @@ mod tests {
             .expect("gauge metric should exist");
         assert_eq!(actual_gauge.0.value(), expected_gauge.value());
     }
+
+    #[cfg(feature = "kubernetes")]
+    mod sar_auth_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_sar_config_validation_both_path_and_resource() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: Some("/metrics".to_string()),
+                    resource: Some("pods".to_string()),
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("exactly one of 'path'")
+            );
+        }
+
+        #[tokio::test]
+        async fn test_sar_config_validation_neither_path_nor_resource() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: None,
+                    resource: None,
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("exactly one of 'path'")
+            );
+        }
+
+        #[tokio::test]
+        async fn test_sar_config_validation_path_only_succeeds() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: Some("/metrics".to_string()),
+                    resource: None,
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn test_sar_config_validation_resource_only_succeeds() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: None,
+                    resource: Some("pods".to_string()),
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_deny_unknown_fields_in_sar_config() {
+            // Test that unknown fields are rejected
+            let config_str = r#"
+                strategy = "sar"
+                path = "/metrics"
+                verb = "get"
+                namesapce = "prod"
+            "#;
+
+            let result: Result<PrometheusExporterAuth, _> = toml::from_str(config_str);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("unknown field"));
+        }
+
+        #[test]
+        fn test_allowed_user_field_accepts_valid_config() {
+            let config_str = r#"
+                strategy = "sar"
+                path = "/metrics"
+                verb = "get"
+                allowed_user = "system:serviceaccount:monitoring:prometheus"
+            "#;
+
+            let result: Result<PrometheusExporterAuth, _> = toml::from_str(config_str);
+            assert!(result.is_ok());
+
+            if let PrometheusExporterAuth::Sar { allowed_user, .. } = result.unwrap() {
+                assert_eq!(
+                    allowed_user,
+                    Some("system:serviceaccount:monitoring:prometheus".to_string())
+                );
+            } else {
+                panic!("Expected SAR auth variant");
+            }
+        }
+
+        #[test]
+        fn test_allowed_groups_field_accepts_valid_config() {
+            let config_str = r#"
+                strategy = "sar"
+                resource = "pods"
+                verb = "get"
+                allowed_groups = ["system:authenticated", "system:masters"]
+            "#;
+
+            let result: Result<PrometheusExporterAuth, _> = toml::from_str(config_str);
+            assert!(result.is_ok());
+
+            if let PrometheusExporterAuth::Sar { allowed_groups, .. } = result.unwrap() {
+                assert_eq!(
+                    allowed_groups,
+                    Some(vec![
+                        "system:authenticated".to_string(),
+                        "system:masters".to_string()
+                    ])
+                );
+            } else {
+                panic!("Expected SAR auth variant");
+            }
+        }
+    }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
