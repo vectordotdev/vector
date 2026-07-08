@@ -24,7 +24,6 @@ sinks:
     keepalive:
       interval_secs: 5
       timeout_secs: 5
-      while_idle: true
     buffer:
       type: disk
       max_size: 8388608 # 8MiB (4 data files), small enough that a stalled reader fills it and blocks
