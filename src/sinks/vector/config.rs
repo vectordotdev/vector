@@ -81,10 +81,10 @@ pub struct VectorConfig {
 
     /// HTTP/2 keepalive settings for the sink's gRPC connections.
     ///
-    /// Keepalive is disabled unless this is configured. When enabled, the sink periodically sends
-    /// HTTP/2 PING frames so that a pooled connection to a downstream Vector instance that has gone
-    /// away (crashed and restarted, or cut off by a network partition) is detected and evicted
-    /// rather than reused indefinitely.
+    /// Keepalive is disabled unless this is configured. When enabled, the sink sends HTTP/2 PING
+    /// frames on idle connections so that a pooled connection to a downstream Vector instance that
+    /// has gone away (crashed, restarted, or cut off by a network partition) is detected and evicted
+    /// before it is reused, ensuring retries always go to a live connection.
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     keepalive: Option<VectorKeepaliveConfig>,
@@ -103,31 +103,25 @@ pub struct VectorConfig {
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorKeepaliveConfig {
-    /// The interval, in seconds, between HTTP/2 keepalive PING frames sent on a connection.
+    /// How often, in seconds, to send a keepalive PING on idle connections.
+    ///
+    /// Shorter intervals detect dead connections faster at the cost of additional traffic.
+    /// gRPC guidance recommends no less than 60 seconds to avoid tripping `too_many_pings`
+    /// policies on servers or proxies between source and destination.
     #[serde(default = "default_keepalive_interval_secs")]
     #[configurable(metadata(docs::human_name = "Keepalive Interval"))]
     pub interval_secs: NonZeroU64,
 
-    /// The time, in seconds, to wait for an acknowledgement of a keepalive PING before considering
-    /// the connection dead and closing it.
+    /// How long, in seconds, to wait for a keepalive PING acknowledgement before treating
+    /// the connection as dead and closing it.
     #[serde(default = "default_keepalive_timeout_secs")]
     #[configurable(metadata(docs::human_name = "Keepalive Timeout"))]
     pub timeout_secs: NonZeroU64,
-
-    /// Whether to send keepalive PING frames while the connection is idle (no requests in flight).
-    ///
-    /// This is required to detect a connection that dies while idle in the pool. However, some gRPC
-    /// servers and gRPC-aware proxies close a connection with a `too_many_pings` (`GOAWAY`) error
-    /// when keepalive PINGs are sent without active calls. Only enable this when the downstream
-    /// permits keepalive without active calls.
-    #[serde(default)]
-    #[configurable(metadata(docs::human_name = "Keepalive While Idle"))]
-    pub while_idle: bool,
 }
 
 const fn default_keepalive_interval_secs() -> NonZeroU64 {
-    // Aligned with gRPC keepalive guidance, which recommends against client intervals much below
-    // one minute to avoid tripping server-side `too_many_pings` policies.
+    // Aligned with gRPC keepalive guidance, which recommends no less than one minute to avoid
+    // tripping `too_many_pings` policies on proxies between the sink and downstream.
     unsafe { NonZeroU64::new_unchecked(60) }
 }
 
@@ -279,13 +273,15 @@ fn new_client(
     let mut builder = hyper::Client::builder();
     builder.http2_only(true);
 
-    // Keepalive is opt-in. When enabled, HTTP/2 PING frames let the pool detect and evict a
-    // connection to a peer that has gone away instead of reusing it indefinitely.
+    // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections
+    // are detected and evicted before they are reused, not during a request.
     if let Some(keepalive) = keepalive {
         builder
             .http2_keep_alive_interval(Duration::from_secs(keepalive.interval_secs.get()))
             .http2_keep_alive_timeout(Duration::from_secs(keepalive.timeout_secs.get()))
-            .http2_keep_alive_while_idle(keepalive.while_idle);
+            // Always ping idle connections: the downstream is always a Vector instance, which
+            // won't reject pings without active calls, so idle-keepalive is always safe here.
+            .http2_keep_alive_while_idle(true);
     }
 
     Ok(builder.build(proxy))
