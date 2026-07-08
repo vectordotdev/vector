@@ -659,9 +659,11 @@ async fn validate_token_with_sar(
     let sar = match (params.path, params.resource) {
         (Some(p), None) => {
             // NonResourceURL-based authorization
+            // Normalize verb to lowercase to match Kubernetes RBAC conventions
+            let normalized_verb = params.verb.to_lowercase();
             let non_resource_attrs = NonResourceAttributes {
                 path: Some(p.to_string()),
-                verb: Some(params.verb.to_string()),
+                verb: Some(normalized_verb.clone()),
             };
 
             debug!(
@@ -669,7 +671,7 @@ async fn validate_token_with_sar(
                 user = ?check_user,
                 groups = ?check_groups,
                 path = %p,
-                verb = %params.verb
+                verb = %normalized_verb
             );
 
             SubjectAccessReview {
@@ -684,10 +686,12 @@ async fn validate_token_with_sar(
         }
         (None, Some(r)) => {
             // Resource-based authorization
+            // Normalize verb to lowercase to match Kubernetes RBAC conventions
+            let normalized_verb = params.verb.to_lowercase();
             let resource_attrs = ResourceAttributes {
                 group: Some(params.resource_group.unwrap_or("").to_string()),
                 resource: Some(r.to_string()),
-                verb: Some(params.verb.to_string()),
+                verb: Some(normalized_verb.clone()),
                 namespace: params.namespace.clone(),
                 ..Default::default()
             };
@@ -697,7 +701,7 @@ async fn validate_token_with_sar(
                 user = ?check_user,
                 groups = ?check_groups,
                 resource = %r,
-                verb = %params.verb,
+                verb = %normalized_verb,
                 resource_group = %params.resource_group.unwrap_or(""),
                 namespace = ?params.namespace
             );

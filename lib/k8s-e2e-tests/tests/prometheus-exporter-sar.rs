@@ -302,15 +302,16 @@ async fn sar_auth_with_valid_token() -> Result<(), Box<dyn std::error::Error>> {
         9598,
     )?;
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    port_forward.wait_until_ready().await?;
+    let local_addr = port_forward.local_addr_ipv4();
 
     // Get Prometheus SA token
-    let token = get_service_account_token(&framework, &namespace, "prometheus-sa").await?;
+    let token = get_service_account_token(&namespace, "prometheus-sa").await?;
 
     // Make authenticated request with valid token
     let client = reqwest::Client::new();
     let response = client
-        .get("http://localhost:9598/metrics")
+        .get(format!("http://{}/metrics", local_addr))
         .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .send()
         .await?;
@@ -429,11 +430,15 @@ async fn sar_auth_rejects_missing_token() -> Result<(), Box<dyn std::error::Erro
         9598,
     )?;
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    port_forward.wait_until_ready().await?;
+    let local_addr = port_forward.local_addr_ipv4();
 
     // Make request without token
     let client = reqwest::Client::new();
-    let response = client.get("http://localhost:9598/metrics").send().await?;
+    let response = client
+        .get(format!("http://{}/metrics", local_addr))
+        .send()
+        .await?;
 
     assert_eq!(
         response.status(),
@@ -542,15 +547,16 @@ async fn sar_auth_rejects_unauthorized_token() -> Result<(), Box<dyn std::error:
         9598,
     )?;
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    port_forward.wait_until_ready().await?;
+    let local_addr = port_forward.local_addr_ipv4();
 
     // Get unprivileged SA token
-    let token = get_service_account_token(&framework, &namespace, "unprivileged-sa").await?;
+    let token = get_service_account_token(&namespace, "unprivileged-sa").await?;
 
     // Make request with unauthorized token
     let client = reqwest::Client::new();
     let response = client
-        .get("http://localhost:9598/metrics")
+        .get(format!("http://{}/metrics", local_addr))
         .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .send()
         .await?;
@@ -658,7 +664,8 @@ async fn sar_auth_short_circuits_non_metrics_routes() -> Result<(), Box<dyn std:
         9598,
     )?;
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    port_forward.wait_until_ready().await?;
+    let local_addr = port_forward.local_addr_ipv4();
 
     let client = reqwest::Client::new();
 
@@ -668,7 +675,7 @@ async fn sar_auth_short_circuits_non_metrics_routes() -> Result<(), Box<dyn std:
 
     for path in invalid_paths {
         let response = client
-            .get(format!("http://localhost:9598{}", path))
+            .get(format!("http://{}{}", local_addr, path))
             .send()
             .await?;
 
@@ -805,14 +812,15 @@ async fn sar_auth_allowed_user_filter() -> Result<(), Box<dyn std::error::Error>
         9598,
     )?;
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    port_forward.wait_until_ready().await?;
+    let local_addr = port_forward.local_addr_ipv4();
 
     let client = reqwest::Client::new();
 
     // Test with allowed SA - should succeed
-    let allowed_token = get_service_account_token(&framework, &namespace, "allowed-sa").await?;
+    let allowed_token = get_service_account_token(&namespace, "allowed-sa").await?;
     let response = client
-        .get("http://localhost:9598/metrics")
+        .get(format!("http://{}/metrics", local_addr))
         .header(header::AUTHORIZATION, format!("Bearer {}", allowed_token))
         .send()
         .await?;
@@ -824,9 +832,9 @@ async fn sar_auth_allowed_user_filter() -> Result<(), Box<dyn std::error::Error>
     );
 
     // Test with denied SA - should fail even though it has metrics RBAC
-    let denied_token = get_service_account_token(&framework, &namespace, "denied-sa").await?;
+    let denied_token = get_service_account_token(&namespace, "denied-sa").await?;
     let response = client
-        .get("http://localhost:9598/metrics")
+        .get(format!("http://{}/metrics", local_addr))
         .header(header::AUTHORIZATION, format!("Bearer {}", denied_token))
         .send()
         .await?;
