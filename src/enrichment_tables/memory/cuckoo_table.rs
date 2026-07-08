@@ -775,7 +775,7 @@ mod tests {
             export_interval: None,
             scanning_threads: None,
             concurrent_scanning: false,
-            lru_bits: default_cuckoo_ttl_bits(),
+            lru_bits: default_cuckoo_lru_bits(),
             lru_starting_value: default_cuckoo_lru_starting_value(),
             lru_increment: default_cuckoo_lru_increment(),
             lru_aging_strategy: CuckooLruAgingStrategy::default(),
