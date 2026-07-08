@@ -59,6 +59,12 @@ const LOCK_FAILED: &str = "Prometheus exporter data lock is poisoned";
 enum BuildError {
     #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
     FlushPeriodTooShort { min: u64 },
+
+    #[cfg(feature = "kubernetes")]
+    #[snafu(display(
+        "SubjectAccessReview auth must specify exactly one of 'path' (for nonResourceURLs) or 'resource' (for Kubernetes resources), not both or neither"
+    ))]
+    SarInvalidPathResourceConfig,
 }
 
 /// Authentication configuration for the Prometheus exporter.
@@ -355,6 +361,17 @@ impl SinkConfig for PrometheusExporterConfig {
         }
 
         validate_quantiles(&self.quantiles)?;
+
+        // Validate SAR configuration: must specify exactly one of path or resource
+        #[cfg(feature = "kubernetes")]
+        if let Some(PrometheusExporterAuth::Sar { path, resource, .. }) = &self.auth {
+            match (path, resource) {
+                (Some(_), Some(_)) | (None, None) => {
+                    return Err(Box::new(BuildError::SarInvalidPathResourceConfig));
+                }
+                _ => {} // Valid: exactly one is set
+            }
+        }
 
         let sink = PrometheusExporter::new(self.clone());
         let healthcheck = future::ok(()).boxed();
@@ -706,19 +723,23 @@ impl Handler {
     ) -> Response<Body> {
         let mut response = Response::new(Body::empty());
 
-        // Check authorization - SAR takes precedence over basic auth when both token and SAR config present
-        let is_authorized = self.check_authorization(&req).await;
+        // Short-circuit non-metrics routes before authorization checks to prevent
+        // unnecessary Kubernetes API calls for invalid paths, health probes, etc.
+        match (req.method(), req.uri().path()) {
+            (&Method::GET, "/metrics") => {
+                // Only perform authorization for the metrics endpoint
+                let is_authorized = self.check_authorization(&req).await;
 
-        match (is_authorized, req.method(), req.uri().path()) {
-            (false, _, _) => {
-                *response.status_mut() = StatusCode::UNAUTHORIZED;
-                response.headers_mut().insert(
-                    http::header::WWW_AUTHENTICATE,
-                    HeaderValue::from_static("Basic, Bearer"),
-                );
-            }
+                if !is_authorized {
+                    *response.status_mut() = StatusCode::UNAUTHORIZED;
+                    response.headers_mut().insert(
+                        http::header::WWW_AUTHENTICATE,
+                        HeaderValue::from_static("Basic, Bearer"),
+                    );
+                    return response;
+                }
 
-            (true, &Method::GET, "/metrics") => {
+                // Authorization passed, serve metrics
                 let metrics = metrics.read().expect(LOCK_FAILED);
 
                 let count = metrics.len();
@@ -754,7 +775,8 @@ impl Handler {
                 self.bytes_sent.emit(ByteSize(body_size));
             }
 
-            (true, _, _) => {
+            // All other routes return 404 without authorization checks
+            _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;
             }
         }
