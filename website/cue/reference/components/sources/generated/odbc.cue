@@ -22,10 +22,11 @@ generated: components: sources: odbc: configuration: {
 	}
 	last_run_metadata_path: {
 		description: """
-			The path to the file where the last row of the result set will be saved.
-			The last row of the result set is saved in JSON format.
-			This file provides parameters for the SQL query in the next scheduled run.
-			If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
+			The path to the file where tracked column values will be saved.
+			The tracked values are saved in JSON format and overlaid onto `statement_init_params`
+			for the next scheduled run.
+			If the file does not exist or the path is not specified, the initial values from
+			`statement_init_params` are used.
 
 			Tracking metadata is written only after all result batches are converted and sent.
 			If saving fails after events were already sent, the previous tracking values are kept
@@ -149,32 +150,66 @@ generated: components: sources: odbc: configuration: {
 	}
 	statement_init_params: {
 		description: """
-			Initial parameters for the first execution of the statement.
-			Used if `last_run_metadata_path` does not exist.
-			Values must be strings and follow the parameter order defined in the query.
+			Positional parameters for SQL statement placeholders (`?`).
+
+			Array order is the bind order. Static filter values and tracking bootstrap
+			values can be mixed; only names listed in `tracking_columns` are overlaid
+			from checkpoints or the previous result.
 
 			# Examples
 
-			When the source runs for the first time, the file at `last_run_metadata_path` does not exist.
-			In that case, declare the initial values in `statement_init_params`.
+			Incremental query with a static tenant filter:
 
 			```yaml
 			sources:
 			  odbc:
-			    statement: "SELECT * FROM users WHERE id = ?"
+			    statement: "SELECT * FROM users WHERE tenant_id = ? AND id > ?"
 			    statement_init_params:
-			      id: "0"
+			      - name: tenant_id
+			        value: "acme"
+			      - name: id
+			        value: "0"
 			    tracking_columns:
 			      - id
 			    last_run_metadata_path: /path/to/tracking.json
 			    # The rest of the fields are omitted
 			```
+
+			Static-only filter without tracking:
+
+			```yaml
+			sources:
+			  odbc:
+			    statement: "SELECT * FROM users WHERE tenant_id = ?"
+			    statement_init_params:
+			      - name: tenant_id
+			        value: "acme"
+			    # The rest of the fields are omitted
+			```
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "Initial value for the SQL statement parameters. The value is always a string."
-			required:    true
-			type: "*": {}
+		type: array: items: type: object: options: {
+			name: {
+				description: """
+					Parameter name.
+
+					When the same name appears in `tracking_columns`, later runs overlay the
+					checkpointed or last-row value onto this entry while preserving bind order.
+					"""
+				required: true
+				type: string: examples: ["id", "tenant_id"]
+			}
+			value: {
+				description: """
+					Initial value bound for this placeholder.
+
+					For non-tracking parameters this value is reused on every scheduled run.
+					For tracking parameters it is used until a checkpoint or previous result
+					provides an updated value.
+					"""
+				required: true
+				type: string: examples: ["0", "acme"]
+			}
 		}
 	}
 	statement_timeout: {
@@ -198,14 +233,15 @@ generated: components: sources: odbc: configuration: {
 	tracking_columns: {
 		description: """
 			Specifies the columns to track from the last row of the statement result set.
-			Their values are passed as parameters to the SQL statement in the next scheduled run.
+			Their values overlay matching entries in `statement_init_params` on later runs while
+			preserving the declared bind order.
 
 			Tracking metadata is saved only after all result batches are converted and sent.
 			If a run fails partway through, the previous tracking values are kept so rows are
 			not skipped on the next scheduled run.
 
-			Requires `statement_init_params` or `last_run_metadata_path` so the first scheduled
-			run has values to bind.
+			Requires `statement_init_params` entries whose names cover every tracking column.
+			Optional `last_run_metadata_path` overlays checkpointed values onto those entries.
 
 			# Examples
 
@@ -213,6 +249,9 @@ generated: components: sources: odbc: configuration: {
 			sources:
 			  odbc:
 			    statement: "SELECT * FROM users WHERE id = ?"
+			    statement_init_params:
+			      - name: id
+			        value: "0"
 			    tracking_columns:
 			      - id
 			    # The rest of the fields are omitted

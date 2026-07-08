@@ -1,5 +1,5 @@
 use crate::sources::odbc::client::execute_query;
-use crate::sources::odbc::config::OdbcConfig;
+use crate::sources::odbc::config::{OdbcConfig, OdbcStatementParam};
 use crate::test_util::components::SOURCE_TAGS;
 use crate::test_util::components::run_and_assert_source_compliance;
 use bytes::Bytes;
@@ -12,7 +12,6 @@ use std::fs;
 use std::time::Duration;
 use vector_lib::event::Event;
 use vector_lib::sensitive_string::SensitiveString;
-use vrl::prelude::*;
 use vrl::value::Value;
 
 enum DbType {
@@ -84,16 +83,21 @@ async fn parse_odbc_config() {
             schedule = "*/5 * * * * *"
             schedule_timezone = "UTC"
             last_run_metadata_path = "odbc_tracking.json"
-            tracking_columns = ["id", "name", "datetime"]
-            statement_init_params = {{ id = "0", name = "test" }}
+            tracking_columns = ["id"]
+            statement_init_params = [
+              {{ name = "id", value = "0" }},
+            ]
             iterations = 1
         "#
     );
-    let config = toml::from_str::<OdbcConfig>(&config_str);
-    assert!(
-        config.is_ok(),
-        "Failed to parse config: {}",
-        config.unwrap_err()
+    let config = toml::from_str::<OdbcConfig>(&config_str).expect("parse ODBC config");
+    assert_eq!(config.tracking_columns, Some(vec!["id".to_owned()]));
+    assert_eq!(
+        config.statement_init_params,
+        Some(vec![OdbcStatementParam {
+            name: "id".to_owned(),
+            value: "0".to_owned(),
+        }])
     );
 }
 
@@ -173,7 +177,10 @@ INSERT INTO odbc_table (name, datetime) VALUES
             Some(3),
         )
         .unwrap();
-    let params = ObjectMap::from([("id".into(), 0.into())]);
+    let params = vec![OdbcStatementParam {
+        name: "id".to_string(),
+        value: "0".to_string(),
+    }];
 
     let _ = fs::remove_file(LAST_RUN_METADATA_PATH);
 
@@ -270,7 +277,10 @@ INSERT INTO odbc_table (name, datetime) VALUES
             Some(3),
         )
         .unwrap();
-    let params = ObjectMap::from([("id".into(), 0.into())]);
+    let params = vec![OdbcStatementParam {
+        name: "id".to_string(),
+        value: "0".to_string(),
+    }];
 
     fs::write(CONNECTION_STRING_FILE_PATH, conn_str).unwrap();
     fs::write(

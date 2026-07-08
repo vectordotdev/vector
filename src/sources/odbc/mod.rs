@@ -38,8 +38,8 @@
 //!     connection_string: "driver={MariaDB Unicode};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
 //!     statement: "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
 //!     statement_init_params:
-//!       id: "0"
-//!       name: test
+//!       - name: id
+//!         value: "0"
 //!     schedule: "*/5 * * * * *"
 //!     schedule_timezone: UTC
 //!     odbc_batch_size: 100

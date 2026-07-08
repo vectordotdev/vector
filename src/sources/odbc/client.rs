@@ -3,7 +3,7 @@ use crate::event::{Event, LogEvent};
 use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::shutdown::ShutdownSignal;
 use crate::sinks::prelude::*;
-use crate::sources::odbc::config::OdbcConfig;
+use crate::sources::odbc::config::{OdbcConfig, OdbcStatementParam};
 use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
@@ -128,7 +128,7 @@ impl Context {
         #[cfg(test)]
         let mut count = 0;
 
-        let mut prev_result = self.cfg.statement_init_params.clone();
+        let mut prev_params = self.cfg.statement_init_params.clone();
 
         loop {
             select! {
@@ -145,7 +145,7 @@ impl Context {
                     let instant = Instant::now();
                     match self
                         .process(
-                            prev_result.clone(),
+                            prev_params.clone(),
                             &bytes_received,
                             &events_received,
                             shutdown.clone(),
@@ -153,9 +153,11 @@ impl Context {
                         .await
                     {
                         Ok(result) => {
-                            // Update the cached result when the query returns rows.
+                            // Cache the overlaid param list for runs without an on-disk
+                            // checkpoint. When `last_run_metadata_path` exists, later ticks
+                            // reload tracking from disk onto the config template instead.
                             if result.is_some() {
-                                prev_result = result;
+                                prev_params = result;
                             }
 
                             emit!(OdbcQueryExecuted {
@@ -202,11 +204,11 @@ impl Context {
     /// `statement_timeout`; with either set to `0`, that wait can block until the driver returns.
     async fn process(
         &self,
-        map: Option<ObjectMap>,
+        params: Option<Vec<OdbcStatementParam>>,
         bytes_received: &Registered<BytesReceived>,
         events_received: &Registered<EventsReceived>,
         mut shutdown: ShutdownSignal,
-    ) -> Result<Option<ObjectMap>, OdbcError> {
+    ) -> Result<Option<Vec<OdbcStatementParam>>, OdbcError> {
         let conn_str = self.cfg.connection_string_or_file().context(IoSnafu)?;
         let stmt_str = self.cfg.statement_or_file().context(IoSnafu)?;
         if stmt_str.trim().is_empty() {
@@ -220,19 +222,33 @@ impl Context {
         let out = self.cx.out.clone();
         let env = self.env;
 
-        // Load the last-run metadata from disk when available.
-        // If the file is missing, fall back to the initial parameters or the latest query result.
+        // Prefer on-disk tracking overlays when available. Otherwise bind the in-memory
+        // parameter list (config template, then prior run with tracking values overlaid).
         // Unreadable or corrupt metadata is treated as an error to avoid replaying old rows.
+        //
+        // When a checkpoint exists it is the tracking SSOT and is overlaid onto the config
+        // template (`prev_params` unused). Without a checkpoint, `current` is bound as-is.
         let tz = self.cfg.odbc_default_timezone;
-        let fallback_map = map.unwrap_or_default();
-        let stmt_params = if let Some(path) = &self.cfg.last_run_metadata_path {
-            match load_params(path, self.cfg.tracking_columns.as_ref(), tz)? {
-                Some(params) => params,
-                None => order_params(&fallback_map, self.cfg.tracking_columns.as_ref(), tz)?,
-            }
-        } else {
-            order_params(&fallback_map, self.cfg.tracking_columns.as_ref(), tz)?
+        let template = self
+            .cfg
+            .statement_init_params
+            .as_deref()
+            .unwrap_or_default();
+        let current = params.as_deref().unwrap_or(template);
+        let tracking_columns = self.cfg.tracking_columns.as_deref();
+        let overlay = self
+            .cfg
+            .last_run_metadata_path
+            .as_deref()
+            .map(load_tracking_map)
+            .transpose()?
+            .flatten();
+        let (base, overlay) = match overlay.as_ref() {
+            // Checkpoint overlays keep static template values intact.
+            Some(overlay) => (template, Some(overlay)),
+            None => (current, None),
         };
+        let stmt_params = order_params(base, overlay, tracking_columns, tz)?;
         let cfg = self.cfg.clone();
         let login_timeout = cfg.login_timeout;
         let statement_timeout = cfg.statement_timeout;
@@ -352,20 +368,23 @@ impl Context {
 
         // Advance tracking metadata only after all batches are converted and sent so a
         // partial failure does not skip rows on the next scheduled run.
-        let mut latest_result = None;
-        if let (Some(last), Some(tracking_columns)) =
-            (last_successfully_sent_row, cfg.tracking_columns.clone())
-        {
-            latest_result = extract_and_save_tracking(
-                cfg.last_run_metadata_path.as_deref(),
-                last,
-                tracking_columns,
-                tz,
-            )
-            .await?;
-        }
-
-        Ok(latest_result)
+        // Return the full ordered parameter list with static values preserved and tracking
+        // values overlaid so later in-memory runs keep non-tracking placeholders.
+        Ok(
+            match (last_successfully_sent_row, cfg.tracking_columns.as_ref()) {
+                (Some(last), Some(tracking_columns)) => {
+                    let tracking = extract_and_save_tracking(
+                        cfg.last_run_metadata_path.as_deref(),
+                        last,
+                        tracking_columns.clone(),
+                        tz,
+                    )
+                    .await?;
+                    Some(overlay_params(template, &tracking, tracking_columns, tz)?)
+                }
+                _ => None,
+            },
+        )
     }
 
     fn enrich_events(&self, events: &mut [Event]) {
@@ -391,7 +410,7 @@ async fn shutdown_query(
     events_received: &Registered<EventsReceived>,
     total_payload_byte_size: usize,
     total_events: CountByteSize,
-) -> Result<Option<ObjectMap>, OdbcError> {
+) -> Result<Option<Vec<OdbcStatementParam>>, OdbcError> {
     drop(rx);
     let blocking_result = blocking.await.context(BlockingTaskSnafu);
 
@@ -447,7 +466,7 @@ async fn extract_and_save_tracking(
     obj: Value,
     tracking_columns: Vec<String>,
     tz: Tz,
-) -> Result<Option<ObjectMap>, OdbcError> {
+) -> Result<ObjectMap, OdbcError> {
     let Value::Object(obj) = obj else {
         return Err(OdbcError::InvalidTrackingRow);
     };
@@ -464,7 +483,7 @@ async fn extract_and_save_tracking(
     if let Some(path) = path {
         save_params(path, &save_obj)?;
     }
-    Ok(Some(save_obj))
+    Ok(save_obj)
 }
 
 /// Returns an error when the query result contains duplicate column labels.
@@ -588,15 +607,10 @@ where
     Ok(())
 }
 
-/// Loads the previously saved result and returns it as SQL parameters.
-/// Parameters are generated in the order specified by `columns_order`.
+/// Loads tracked column overlays from disk.
 ///
 /// Returns `Ok(None)` only when the metadata file does not exist.
-fn load_params(
-    path: &str,
-    columns_order: Option<&Vec<String>>,
-    tz: Tz,
-) -> Result<Option<Vec<VarCharBox>>, OdbcError> {
+fn load_tracking_map(path: &str) -> Result<Option<ObjectMap>, OdbcError> {
     let file = match File::open(path) {
         Ok(file) => file,
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -604,38 +618,70 @@ fn load_params(
     };
     let reader = BufReader::new(file);
     let map: ObjectMap = serde_json::from_reader(reader).context(JsonSnafu)?;
-
-    order_params(&map, columns_order, tz).map(Some)
+    Ok(Some(map))
 }
 
-/// Orders the parameters of a given `ObjectMap` based on an optional column order.
+/// Resolves a single statement parameter value.
 ///
-/// When `columns_order` is set, every declared column must be present in `map` and
-/// convertible to an ODBC parameter. Missing or unconvertible values return an error
-/// instead of being silently dropped.
+/// Tracking columns use `overlay` when present; otherwise the configured value is kept.
+fn resolve_param_value(
+    param: &OdbcStatementParam,
+    overlay: Option<&ObjectMap>,
+    tracking: &HashSet<&str>,
+    tz: Tz,
+) -> Result<String, OdbcError> {
+    match (tracking.contains(param.name.as_str()), overlay) {
+        (true, Some(overlay)) => {
+            Ok(resolve_tracking_column_parameter(overlay, param.name.as_str(), tz)?.1)
+        }
+        _ => Ok(param.value.clone()),
+    }
+}
+
+/// Builds ODBC bind parameters from the ordered `statement_init_params` list.
+///
+/// Array order is the bind order. When `overlay` is set, tracking-column values are
+/// taken from it; non-tracking values always keep the template entry.
 fn order_params(
-    map: &ObjectMap,
-    columns_order: Option<&Vec<String>>,
+    params: &[OdbcStatementParam],
+    overlay: Option<&ObjectMap>,
+    tracking_columns: Option<&[String]>,
     tz: Tz,
 ) -> Result<Vec<VarCharBox>, OdbcError> {
-    if columns_order.is_none_or(Vec::is_empty) {
-        let params = map
-            .values()
-            .filter_map(|value| {
-                value_to_sql_parameter(value, tz).map(|param| param.into_parameter())
+    let tracking: HashSet<&str> = tracking_columns
+        .unwrap_or_default()
+        .iter()
+        .map(String::as_str)
+        .collect();
+
+    params
+        .iter()
+        .map(|param| {
+            resolve_param_value(param, overlay, &tracking, tz).map(|value| value.into_parameter())
+        })
+        .collect()
+}
+
+/// Returns `params` with tracking-column values overlaid from `overlay`.
+///
+/// Non-tracking entries and overall array order are preserved.
+fn overlay_params(
+    params: &[OdbcStatementParam],
+    overlay: &ObjectMap,
+    tracking_columns: &[String],
+    tz: Tz,
+) -> Result<Vec<OdbcStatementParam>, OdbcError> {
+    let tracking: HashSet<&str> = tracking_columns.iter().map(String::as_str).collect();
+
+    params
+        .iter()
+        .map(|param| {
+            Ok(OdbcStatementParam {
+                name: param.name.clone(),
+                value: resolve_param_value(param, Some(overlay), &tracking, tz)?,
             })
-            .collect_vec();
-        return Ok(params);
-    }
-
-    let columns = columns_order.expect("non-empty tracking_columns checked above");
-    let mut params = Vec::with_capacity(columns.len());
-    for column in columns {
-        let (_, param) = resolve_tracking_column_parameter(map, column.as_str(), tz)?;
-        params.push(param.into_parameter());
-    }
-
-    Ok(params)
+        })
+        .collect()
 }
 
 /// Creates parent directories for the metadata path when needed.
@@ -1243,58 +1289,99 @@ mod tests {
     }
 
     #[test]
-    fn order_params_follows_tracking_column_order() {
-        let mut map = ObjectMap::new();
-        map.insert(KeyString::from("id"), Value::Integer(1));
-        map.insert(KeyString::from("name"), Value::from("vector"));
-        let columns = vec!["id".to_owned(), "name".to_owned()];
-        let expected: Vec<String> = columns
-            .iter()
-            .map(|column| {
-                value_to_sql_parameter(map.get(column.as_str()).unwrap(), chrono_tz::UTC).unwrap()
-            })
-            .collect();
+    fn order_params_preserves_static_and_array_order() {
+        let params = vec![
+            OdbcStatementParam {
+                name: "tenant_id".to_owned(),
+                value: "acme".to_owned(),
+            },
+            OdbcStatementParam {
+                name: "id".to_owned(),
+                value: "0".to_owned(),
+            },
+            OdbcStatementParam {
+                name: "region".to_owned(),
+                value: "us-east".to_owned(),
+            },
+        ];
+        let mut overlay = ObjectMap::new();
+        overlay.insert(KeyString::from("id"), Value::Integer(42));
+        let tracking = vec!["id".to_owned()];
 
-        let params = order_params(&map, Some(&columns), chrono_tz::UTC).expect("params");
+        let bound = order_params(&params, Some(&overlay), Some(&tracking), chrono_tz::UTC)
+            .expect("order params");
 
-        assert_eq!(expected, vec!["1", "vector"]);
-        assert_eq!(params.len(), expected.len());
+        assert_eq!(bound.len(), 3);
+        // Array order is the bind order even when static params surround tracking ones.
+        let expected = ["acme", "42", "us-east"];
+        for (param, expected) in bound.iter().zip(expected) {
+            assert_eq!(
+                std::str::from_utf8(param.as_bytes().expect("bound bytes")).expect("utf-8"),
+                expected
+            );
+        }
     }
 
     #[test]
-    fn order_params_errors_on_missing_tracking_column() {
-        let mut map = ObjectMap::new();
-        map.insert(KeyString::from("id"), Value::Integer(1));
+    fn order_params_errors_on_missing_tracking_overlay() {
+        let params = vec![
+            OdbcStatementParam {
+                name: "tenant_id".to_owned(),
+                value: "acme".to_owned(),
+            },
+            OdbcStatementParam {
+                name: "id".to_owned(),
+                value: "0".to_owned(),
+            },
+        ];
+        let overlay = ObjectMap::new();
+        let tracking = vec!["id".to_owned()];
 
-        let error = match order_params(
-            &map,
-            Some(&vec!["id".to_owned(), "name".to_owned()]),
-            chrono_tz::UTC,
-        ) {
+        let error = match order_params(&params, Some(&overlay), Some(&tracking), chrono_tz::UTC) {
             Err(error) => error,
             Ok(_) => panic!("expected missing tracking column error"),
         };
 
         assert!(matches!(
             error,
-            OdbcError::MissingTrackingColumn { column } if column == "name"
+            OdbcError::MissingTrackingColumn { column } if column == "id"
         ));
     }
 
     #[test]
-    fn order_params_errors_on_unconvertible_tracking_value() {
-        let mut map = ObjectMap::new();
-        map.insert(KeyString::from("id"), Value::Null);
+    fn overlay_params_keeps_static_values() {
+        let params = vec![
+            OdbcStatementParam {
+                name: "tenant_id".to_owned(),
+                value: "acme".to_owned(),
+            },
+            OdbcStatementParam {
+                name: "id".to_owned(),
+                value: "0".to_owned(),
+            },
+        ];
+        let mut overlay = ObjectMap::new();
+        overlay.insert(
+            KeyString::from("id"),
+            Value::Bytes(Bytes::from_static(b"42")),
+        );
+        let tracking = vec!["id".to_owned()];
 
-        let error = match order_params(&map, Some(&vec!["id".to_owned()]), chrono_tz::UTC) {
-            Err(error) => error,
-            Ok(_) => panic!("expected invalid tracking value error"),
-        };
+        let next = overlay_params(&params, &overlay, &tracking, chrono_tz::UTC).expect("overlay");
 
-        assert!(matches!(
-            error,
-            OdbcError::InvalidTrackingValue { column } if column == "id"
-        ));
+        assert_eq!(
+            next,
+            vec![
+                OdbcStatementParam {
+                    name: "tenant_id".to_owned(),
+                    value: "acme".to_owned(),
+                },
+                OdbcStatementParam {
+                    name: "id".to_owned(),
+                    value: "42".to_owned(),
+                },
+            ]
+        );
     }
 
     #[tokio::test]
@@ -1353,8 +1440,7 @@ mod tests {
             chrono_tz::UTC,
         )
         .await
-        .expect("saved tracking state")
-        .expect("tracking object");
+        .expect("saved tracking state");
 
         assert_eq!(saved.len(), 2);
         assert_eq!(
@@ -1369,18 +1455,18 @@ mod tests {
     }
 
     #[test]
-    fn load_params_reads_valid_tracking_metadata() {
+    fn load_tracking_map_reads_valid_tracking_metadata() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let path = temp_dir.path().join("tracking.json");
         fs::write(&path, r#"{"id":1,"name":"vector"}"#).expect("write metadata");
         let path = path.to_str().expect("utf-8 path");
-        let columns = vec!["id".to_owned(), "name".to_owned()];
 
-        let params = load_params(path, Some(&columns), chrono_tz::UTC)
-            .expect("load params")
-            .expect("metadata params");
+        let map = load_tracking_map(path)
+            .expect("load tracking map")
+            .expect("metadata map");
 
-        assert_eq!(params.len(), 2);
+        assert_eq!(map.get("id"), Some(&Value::Integer(1)));
+        assert_eq!(map.get("name"), Some(&Value::from("vector")));
     }
 
     #[test]

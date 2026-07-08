@@ -6,6 +6,7 @@ use chrono_tz::Tz;
 use futures_util::FutureExt;
 use serde_with::DurationSeconds;
 use serde_with::serde_as;
+use std::collections::HashSet;
 use std::fs;
 use std::io::BufReader;
 use std::time::Duration;
@@ -14,7 +15,33 @@ use vector_lib::config::DataType;
 use vector_lib::schema;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::prelude::ObjectMap;
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{KeyString, Kind, Value, kind::Collection};
+
+/// A positional SQL parameter for an ODBC statement placeholder (`?`).
+///
+/// Array order is the single source of truth for bind order and is independent of
+/// configuration format key sorting.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OdbcStatementParam {
+    /// Parameter name.
+    ///
+    /// When the same name appears in `tracking_columns`, later runs overlay the
+    /// checkpointed or last-row value onto this entry while preserving bind order.
+    #[configurable(metadata(docs::examples = "id"))]
+    #[configurable(metadata(docs::examples = "tenant_id"))]
+    pub name: String,
+
+    /// Initial value bound for this placeholder.
+    ///
+    /// For non-tracking parameters this value is reused on every scheduled run.
+    /// For tracking parameters it is used until a checkpoint or previous result
+    /// provides an updated value.
+    #[configurable(metadata(docs::examples = "0"))]
+    #[configurable(metadata(docs::examples = "acme"))]
+    pub value: String,
+}
 
 /// Configuration for the `odbc` source.
 #[serde_as]
@@ -80,30 +107,43 @@ pub struct OdbcConfig {
     #[serde_as(as = "DurationSeconds<u64>")]
     pub login_timeout: Duration,
 
-    /// Initial parameters for the first execution of the statement.
-    /// Used if `last_run_metadata_path` does not exist.
-    /// Values must be strings and follow the parameter order defined in the query.
+    /// Positional parameters for SQL statement placeholders (`?`).
+    ///
+    /// Array order is the bind order. Static filter values and tracking bootstrap
+    /// values can be mixed; only names listed in `tracking_columns` are overlaid
+    /// from checkpoints or the previous result.
     ///
     /// # Examples
     ///
-    /// When the source runs for the first time, the file at `last_run_metadata_path` does not exist.
-    /// In that case, declare the initial values in `statement_init_params`.
+    /// Incremental query with a static tenant filter:
     ///
     /// ```yaml
     /// sources:
     ///   odbc:
-    ///     statement: "SELECT * FROM users WHERE id = ?"
+    ///     statement: "SELECT * FROM users WHERE tenant_id = ? AND id > ?"
     ///     statement_init_params:
-    ///       id: "0"
+    ///       - name: tenant_id
+    ///         value: "acme"
+    ///       - name: id
+    ///         value: "0"
     ///     tracking_columns:
     ///       - id
     ///     last_run_metadata_path: /path/to/tracking.json
     ///     # The rest of the fields are omitted
     /// ```
-    #[configurable(metadata(
-        docs::additional_props_description = "Initial value for the SQL statement parameters. The value is always a string."
-    ))]
-    pub statement_init_params: Option<ObjectMap>,
+    ///
+    /// Static-only filter without tracking:
+    ///
+    /// ```yaml
+    /// sources:
+    ///   odbc:
+    ///     statement: "SELECT * FROM users WHERE tenant_id = ?"
+    ///     statement_init_params:
+    ///       - name: tenant_id
+    ///         value: "acme"
+    ///     # The rest of the fields are omitted
+    /// ```
+    pub statement_init_params: Option<Vec<OdbcStatementParam>>,
 
     /// Cron expression used to schedule database queries. This field is required.
     #[configurable(derived)]
@@ -149,14 +189,15 @@ pub struct OdbcConfig {
     pub odbc_default_timezone: Tz,
 
     /// Specifies the columns to track from the last row of the statement result set.
-    /// Their values are passed as parameters to the SQL statement in the next scheduled run.
+    /// Their values overlay matching entries in `statement_init_params` on later runs while
+    /// preserving the declared bind order.
     ///
     /// Tracking metadata is saved only after all result batches are converted and sent.
     /// If a run fails partway through, the previous tracking values are kept so rows are
     /// not skipped on the next scheduled run.
     ///
-    /// Requires `statement_init_params` or `last_run_metadata_path` so the first scheduled
-    /// run has values to bind.
+    /// Requires `statement_init_params` entries whose names cover every tracking column.
+    /// Optional `last_run_metadata_path` overlays checkpointed values onto those entries.
     ///
     /// # Examples
     ///
@@ -164,6 +205,9 @@ pub struct OdbcConfig {
     /// sources:
     ///   odbc:
     ///     statement: "SELECT * FROM users WHERE id = ?"
+    ///     statement_init_params:
+    ///       - name: id
+    ///         value: "0"
     ///     tracking_columns:
     ///       - id
     ///     # The rest of the fields are omitted
@@ -171,10 +215,11 @@ pub struct OdbcConfig {
     #[configurable(metadata(docs::examples = "id"))]
     pub tracking_columns: Option<Vec<String>>,
 
-    /// The path to the file where the last row of the result set will be saved.
-    /// The last row of the result set is saved in JSON format.
-    /// This file provides parameters for the SQL query in the next scheduled run.
-    /// If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
+    /// The path to the file where tracked column values will be saved.
+    /// The tracked values are saved in JSON format and overlaid onto `statement_init_params`
+    /// for the next scheduled run.
+    /// If the file does not exist or the path is not specified, the initial values from
+    /// `statement_init_params` are used.
     ///
     /// Tracking metadata is written only after all result batches are converted and sent.
     /// If saving fails after events were already sent, the previous tracking values are kept
@@ -234,29 +279,87 @@ impl OdbcConfig {
         }
     }
 
+    fn validate_statement_init_params(&self) -> Result<(), String> {
+        let Some(params) = &self.statement_init_params else {
+            return Ok(());
+        };
+
+        if params.is_empty() {
+            return Err("`statement_init_params` must not be empty when set".to_owned());
+        }
+
+        let mut seen = HashSet::with_capacity(params.len());
+        for param in params {
+            if param.name.trim().is_empty() {
+                return Err("`statement_init_params[].name` must not be empty".to_owned());
+            }
+            if !seen.insert(param.name.as_str()) {
+                return Err(format!(
+                    "duplicate `statement_init_params` name `{}`; parameter names must be unique",
+                    param.name
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
     fn validate_tracking_columns(&self) -> Result<(), String> {
-        let uses_init_params_or_metadata =
-            self.statement_init_params.is_some() || self.last_run_metadata_path.is_some();
+        let has_metadata = self.last_run_metadata_path.is_some();
+        let has_statement_init_params = self
+            .statement_init_params
+            .as_ref()
+            .is_some_and(|params| !params.is_empty());
         let has_tracking_columns = self
             .tracking_columns
             .as_ref()
             .is_some_and(|columns| !columns.is_empty());
 
-        if uses_init_params_or_metadata && !has_tracking_columns {
+        // Checkpoint files store tracking overlays only; static-only `statement_init_params`
+        // do not require tracking columns. Bind order always comes from `statement_init_params`.
+        if has_metadata && !has_tracking_columns {
             return Err(
-                "`tracking_columns` must be set when using `statement_init_params` or `last_run_metadata_path`"
+                "`tracking_columns` must be set when using `last_run_metadata_path`".to_owned(),
+            );
+        }
+
+        if has_tracking_columns && !has_statement_init_params {
+            return Err(
+                "`statement_init_params` must be set when using `tracking_columns` so bind order is explicit"
                     .to_owned(),
             );
         }
 
-        if has_tracking_columns && !uses_init_params_or_metadata {
-            return Err(
-                "`statement_init_params` or `last_run_metadata_path` must be set when using `tracking_columns`"
-                    .to_owned(),
-            );
+        if let (Some(tracking_columns), Some(params)) = (
+            self.tracking_columns.as_ref(),
+            self.statement_init_params.as_ref(),
+        ) {
+            let param_names: HashSet<&str> =
+                params.iter().map(|param| param.name.as_str()).collect();
+            for column in tracking_columns {
+                if !param_names.contains(column.as_str()) {
+                    return Err(format!(
+                        "`tracking_columns` entry `{column}` must also appear in `statement_init_params`"
+                    ));
+                }
+            }
         }
 
         Ok(())
+    }
+
+    fn statement_init_params_as_object_map(&self) -> Option<ObjectMap> {
+        self.statement_init_params.as_ref().map(|params| {
+            params
+                .iter()
+                .map(|param| {
+                    (
+                        KeyString::from(param.name.as_str()),
+                        Value::from(param.value.as_str()),
+                    )
+                })
+                .collect()
+        })
     }
 
     fn validate_tracking_bootstrap(&self) -> Result<(), String> {
@@ -268,12 +371,16 @@ impl OdbcConfig {
             return Ok(());
         };
 
+        // `validate_tracking_columns` already requires matching `statement_init_params`.
+        let init_params = self.statement_init_params_as_object_map().ok_or_else(|| {
+            "`statement_init_params` must be set when using `tracking_columns`".to_owned()
+        })?;
         let tz = self.odbc_default_timezone;
 
         if let Some(path) = &self.last_run_metadata_path {
             prepare_metadata_path(path).map_err(|error| error.to_string())?;
 
-            match fs::metadata(path) {
+            return match fs::metadata(path) {
                 Ok(_) => {
                     let file = fs::File::open(path).map_err(|source| {
                         format!("unable to read `last_run_metadata_path` `{path}`: {source}")
@@ -282,33 +389,18 @@ impl OdbcConfig {
                         serde_json::from_reader(BufReader::new(file)).map_err(|source| {
                             format!("unable to parse `last_run_metadata_path` `{path}`: {source}")
                         })?;
-                    validate_tracking_state(&map, tracking_columns, tz)?;
-                    return Ok(());
+                    validate_tracking_state(&map, tracking_columns, tz)
                 }
                 Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-                    let Some(init_params) = &self.statement_init_params else {
-                        return Err(format!(
-                            "`last_run_metadata_path` `{path}` does not exist and `statement_init_params` is not set"
-                        ));
-                    };
-                    validate_tracking_state(init_params, tracking_columns, tz)?;
-                    return Ok(());
+                    validate_tracking_state(&init_params, tracking_columns, tz)
                 }
-                Err(source) => {
-                    return Err(format!(
-                        "unable to access `last_run_metadata_path` `{path}`: {source}"
-                    ));
-                }
-            }
+                Err(source) => Err(format!(
+                    "unable to access `last_run_metadata_path` `{path}`: {source}"
+                )),
+            };
         }
 
-        let Some(init_params) = &self.statement_init_params else {
-            return Err(
-                "`statement_init_params` must be set when using `tracking_columns` without `last_run_metadata_path`"
-                    .to_owned(),
-            );
-        };
-        validate_tracking_state(init_params, tracking_columns, tz)
+        validate_tracking_state(&init_params, tracking_columns, tz)
     }
 }
 
@@ -410,13 +502,9 @@ impl SourceConfig for OdbcConfig {
             return Err("`odbc_batch_size` must be greater than 0".into());
         }
 
-        if let Err(error) = self.validate_tracking_columns() {
-            return Err(error.into());
-        }
-
-        if let Err(error) = self.validate_tracking_bootstrap() {
-            return Err(error.into());
-        }
+        self.validate_statement_init_params()?;
+        self.validate_tracking_columns()?;
+        self.validate_tracking_bootstrap()?;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
         let guard = Context::new(self.clone(), cx, log_namespace)?;
@@ -439,5 +527,101 @@ impl SourceConfig for OdbcConfig {
     // At-most-once when `last_run_metadata_path` is set; for use cases where occasional row loss is acceptable.
     fn can_acknowledge(&self) -> bool {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{OdbcConfig, OdbcStatementParam};
+
+    #[test]
+    fn parses_statement_init_params_array_preserving_order() {
+        let config: OdbcConfig = toml::from_str(
+            r#"
+            connection_string = "driver={MariaDB Unicode};server=localhost;database=db;uid=u;pwd=p;"
+            statement = "SELECT * FROM t WHERE tenant_id = ? AND id > ?"
+            schedule = "*/5 * * * * *"
+            statement_init_params = [
+              { name = "tenant_id", value = "acme" },
+              { name = "id", value = "0" },
+            ]
+            tracking_columns = ["id"]
+            last_run_metadata_path = "tracking.json"
+            "#,
+        )
+        .expect("parse config");
+
+        assert_eq!(
+            config.statement_init_params,
+            Some(vec![
+                OdbcStatementParam {
+                    name: "tenant_id".to_owned(),
+                    value: "acme".to_owned(),
+                },
+                OdbcStatementParam {
+                    name: "id".to_owned(),
+                    value: "0".to_owned(),
+                },
+            ])
+        );
+    }
+
+    #[test]
+    fn allows_static_statement_init_params_without_tracking() {
+        let config = OdbcConfig {
+            statement_init_params: Some(vec![OdbcStatementParam {
+                name: "tenant_id".to_owned(),
+                value: "acme".to_owned(),
+            }]),
+            tracking_columns: None,
+            last_run_metadata_path: None,
+            ..Default::default()
+        };
+
+        config
+            .validate_statement_init_params()
+            .expect("statement params");
+        config
+            .validate_tracking_columns()
+            .expect("static-only params allowed");
+    }
+
+    #[test]
+    fn rejects_tracking_columns_missing_from_statement_init_params() {
+        let config = OdbcConfig {
+            statement_init_params: Some(vec![OdbcStatementParam {
+                name: "tenant_id".to_owned(),
+                value: "acme".to_owned(),
+            }]),
+            tracking_columns: Some(vec!["id".to_owned()]),
+            ..Default::default()
+        };
+
+        let error = config
+            .validate_tracking_columns()
+            .expect_err("tracking name must exist in statement_init_params");
+        assert!(error.contains("`id`"));
+    }
+
+    #[test]
+    fn rejects_duplicate_statement_param_names() {
+        let config = OdbcConfig {
+            statement_init_params: Some(vec![
+                OdbcStatementParam {
+                    name: "id".to_owned(),
+                    value: "0".to_owned(),
+                },
+                OdbcStatementParam {
+                    name: "id".to_owned(),
+                    value: "1".to_owned(),
+                },
+            ]),
+            ..Default::default()
+        };
+
+        let error = config
+            .validate_statement_init_params()
+            .expect_err("duplicate names");
+        assert!(error.contains("duplicate"));
     }
 }
