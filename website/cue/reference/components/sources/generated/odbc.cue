@@ -50,6 +50,8 @@ generated: components: sources: odbc: configuration: {
 			If the connection does not succeed within this window, the attempt fails
 			and is retried at the next scheduled run.
 			Set to 0 to disable the timeout and wait indefinitely.
+			Prefer a positive timeout: Vector shutdown waits for any in-flight connect/execute, and
+			`0` can delay exit until the ODBC driver returns.
 			The default is 3 seconds.
 			"""
 		required: false
@@ -80,6 +82,8 @@ generated: components: sources: odbc: configuration: {
 		description: """
 			Timezone applied to database date/time columns that lack timezone information.
 			Ambiguous DST times use the latest matching instant; nonexistent times are kept as text.
+			Offset-bearing SQL or RFC3339 timestamp text is preserved as bytes and is not rewritten
+			with this timezone, so tracking parameters can round-trip the exact ODBC text.
 			The default is UTC.
 			"""
 		required: false
@@ -178,6 +182,8 @@ generated: components: sources: odbc: configuration: {
 			Maximum time to allow the SQL statement to run.
 			If the query does not finish within this window, it is canceled and retried at the next scheduled run.
 			Set to 0 to disable the timeout and wait indefinitely.
+			Prefer a positive timeout: Vector shutdown waits for any in-flight connect/execute, and
+			`0` can delay exit until the ODBC driver returns.
 			The default is 3 seconds.
 			"""
 		required: false

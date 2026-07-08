@@ -104,6 +104,9 @@ impl InternalEvent for OdbcFailedError<'_> {
                 )
                 .increment(1);
             }
+            OdbcError::Shutdown => {
+                // Handled by the scheduler as a clean exit, not as a failure metric.
+            }
         }
     }
 }

@@ -35,6 +35,11 @@ components: sources: odbc: {
 				downstream delivery is fully acknowledged, rows can still be lost because this
 				source does not provide acknowledgements.
 				""",
+			"""
+				Setting `login_timeout` or `statement_timeout` to `0` disables that bound.
+				Shutdown still waits for any in-flight ODBC connect or execute, so `0` can
+				delay Vector exit until the driver returns. Prefer positive timeouts.
+				""",
 		]
 		notices: []
 	}

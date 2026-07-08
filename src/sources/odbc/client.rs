@@ -1,6 +1,7 @@
 use crate::config::{LogNamespace, SourceContext};
 use crate::event::{Event, LogEvent};
 use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted};
+use crate::shutdown::ShutdownSignal;
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
 use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
@@ -87,6 +88,9 @@ pub enum OdbcError {
         "Query returned duplicate column names: {columns:?}; alias columns in the SQL statement"
     ))]
     DuplicateColumnNames { columns: Vec<String> },
+
+    #[snafu(display("ODBC source shutting down"))]
+    Shutdown,
 }
 
 pub(crate) struct Context {
@@ -140,7 +144,12 @@ impl Context {
 
                     let instant = Instant::now();
                     match self
-                        .process(prev_result.clone(), &bytes_received, &events_received)
+                        .process(
+                            prev_result.clone(),
+                            &bytes_received,
+                            &events_received,
+                            shutdown.clone(),
+                        )
                         .await
                     {
                         Ok(result) => {
@@ -153,6 +162,13 @@ impl Context {
                                 statement: &self.cfg.statement.clone().unwrap_or_default(),
                                 elapsed: instant.elapsed().as_millis(),
                             });
+                        }
+                        Err(OdbcError::Shutdown) => {
+                            debug!(
+                                message =
+                                    "Shutdown signal received during ODBC query. Shutting down ODBC source."
+                            );
+                            break;
                         }
                         Err(error) => {
                             emit!(OdbcFailedError {
@@ -180,11 +196,16 @@ impl Context {
 
     /// Executes the scheduled ODBC query, sends the result as events in bounded batches,
     /// then updates tracking metadata after all batches are successfully converted and sent.
+    ///
+    /// Shutdown closes the batch channel so the blocking fetch stops on the next send, then
+    /// waits for the blocking task. Connect/execute still depend on `login_timeout` /
+    /// `statement_timeout`; with either set to `0`, that wait can block until the driver returns.
     async fn process(
         &self,
         map: Option<ObjectMap>,
         bytes_received: &Registered<BytesReceived>,
         events_received: &Registered<EventsReceived>,
+        mut shutdown: ShutdownSignal,
     ) -> Result<Option<ObjectMap>, OdbcError> {
         let conn_str = self.cfg.connection_string_or_file().context(IoSnafu)?;
         let stmt_str = self.cfg.statement_or_file().context(IoSnafu)?;
@@ -247,7 +268,25 @@ impl Context {
         let mut total_events = CountByteSize(0, JsonSize::zero());
         let mut stream_error = None;
 
-        while let Some(batch_rows) = rx.recv().await {
+        loop {
+            let batch_rows = select! {
+                _ = &mut shutdown => {
+                    return shutdown_query(
+                        rx,
+                        blocking,
+                        bytes_received,
+                        events_received,
+                        total_payload_byte_size,
+                        total_events,
+                    )
+                    .await;
+                }
+                batch = rx.recv() => batch,
+            };
+
+            let Some(batch_rows) = batch_rows else {
+                break;
+            };
             if batch_rows.is_empty() {
                 continue;
             }
@@ -269,7 +308,22 @@ impl Context {
                 // Use the post-enrichment size for both received-bytes and events metrics
                 // so they stay consistent.
                 let byte_size = events.estimated_json_encoded_size_of();
-                if let Err(error) = out.clone().send_batch(events).await.context(SendSnafu) {
+                let mut out = out.clone();
+                let send_result = select! {
+                    _ = &mut shutdown => {
+                        return shutdown_query(
+                            rx,
+                            blocking,
+                            bytes_received,
+                            events_received,
+                            total_payload_byte_size,
+                            total_events,
+                        )
+                        .await;
+                    }
+                    send_result = out.send_batch(events) => send_result,
+                };
+                if let Err(error) = send_result.context(SendSnafu) {
                     stream_error = Some(error);
                     break;
                 }
@@ -282,13 +336,12 @@ impl Context {
 
         drop(rx);
         let blocking_result = blocking.await.context(BlockingTaskSnafu)?;
-
-        if total_payload_byte_size > 0 {
-            bytes_received.emit(ByteSize(total_payload_byte_size));
-        }
-        if total_events.0 > 0 {
-            events_received.emit(total_events);
-        }
+        emit_received_metrics(
+            bytes_received,
+            events_received,
+            total_payload_byte_size,
+            total_events,
+        );
 
         if let Some(error) = stream_error {
             let _ = blocking_result;
@@ -326,6 +379,45 @@ impl Context {
             self.log_namespace
                 .insert_standard_vector_source_metadata(log, OdbcConfig::NAME, now);
         }
+    }
+}
+
+/// Closes the batch channel, waits for the blocking ODBC task, and emits metrics
+/// for rows already sent before returning `OdbcError::Shutdown`.
+async fn shutdown_query(
+    rx: tokio::sync::mpsc::Receiver<Rows>,
+    blocking: tokio::task::JoinHandle<Result<(), OdbcError>>,
+    bytes_received: &Registered<BytesReceived>,
+    events_received: &Registered<EventsReceived>,
+    total_payload_byte_size: usize,
+    total_events: CountByteSize,
+) -> Result<Option<ObjectMap>, OdbcError> {
+    drop(rx);
+    let blocking_result = blocking.await.context(BlockingTaskSnafu);
+
+    // Emit sent-rows metrics even when the blocking task fails to join, so a join error
+    // does not under-count rows already handed to the pipeline.
+    emit_received_metrics(
+        bytes_received,
+        events_received,
+        total_payload_byte_size,
+        total_events,
+    );
+    let _ = blocking_result?;
+    Err(OdbcError::Shutdown)
+}
+
+fn emit_received_metrics(
+    bytes_received: &Registered<BytesReceived>,
+    events_received: &Registered<EventsReceived>,
+    total_payload_byte_size: usize,
+    total_events: CountByteSize,
+) {
+    if total_payload_byte_size > 0 {
+        bytes_received.emit(ByteSize(total_payload_byte_size));
+    }
+    if total_events.0 > 0 {
+        events_received.emit(total_events);
     }
 }
 

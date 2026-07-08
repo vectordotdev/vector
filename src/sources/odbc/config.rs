@@ -54,6 +54,8 @@ pub struct OdbcConfig {
     /// Maximum time to allow the SQL statement to run.
     /// If the query does not finish within this window, it is canceled and retried at the next scheduled run.
     /// Set to 0 to disable the timeout and wait indefinitely.
+    /// Prefer a positive timeout: Vector shutdown waits for any in-flight connect/execute, and
+    /// `0` can delay exit until the ODBC driver returns.
     /// The default is 3 seconds.
     #[configurable(metadata(docs::examples = 3))]
     #[configurable(metadata(
@@ -67,6 +69,8 @@ pub struct OdbcConfig {
     /// If the connection does not succeed within this window, the attempt fails
     /// and is retried at the next scheduled run.
     /// Set to 0 to disable the timeout and wait indefinitely.
+    /// Prefer a positive timeout: Vector shutdown waits for any in-flight connect/execute, and
+    /// `0` can delay exit until the ODBC driver returns.
     /// The default is 3 seconds.
     #[configurable(metadata(docs::examples = 3))]
     #[configurable(metadata(
