@@ -624,6 +624,10 @@ impl Table for CuckooMemoryTable {
     fn needs_reload(&self) -> bool {
         false
     }
+
+    fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        Some(Box::new(self.clone()))
+    }
 }
 
 impl std::fmt::Debug for CuckooMemoryTable {
@@ -798,6 +802,48 @@ mod tests {
         };
 
         let result = memory.find_table_row(Case::Sensitive, &[condition], None, None, None);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
+        // Cuckoo fingerprint is provided too
+        assert!(result.contains_key("fingerprint"));
+    }
+
+    #[test]
+    fn restores_state() {
+        let memory = CuckooMemoryTable::new(Default::default(), build_cuckoo_config(|_| {}))
+            .expect("default cuckoo memory table should build correctly");
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        let result = memory.find_table_row(
+            Case::Sensitive,
+            std::slice::from_ref(&condition),
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
+        // Cuckoo fingerprint is provided too
+        assert!(result.contains_key("fingerprint"));
+
+        let restored_memory = CuckooMemoryTable::from_previous_state(
+            Default::default(),
+            build_cuckoo_config(|_| {}),
+            memory
+                .extract_state()
+                .expect("cuckoo memory table should allow state extraction"),
+        )
+        .expect("cuckoo memory table build from previous state should succeed");
+
+        let result =
+            restored_memory.find_table_row(Case::Sensitive, &[condition], None, None, None);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
