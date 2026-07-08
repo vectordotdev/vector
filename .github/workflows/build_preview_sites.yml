@@ -15,8 +15,6 @@ jobs:
     permissions:
       contents: read # Required by the reusable workflow
       actions: read # Required to download artifacts
-      issues: write # Required to post preview link comments
-      pull-requests: write # Required to post preview link comments
       statuses: write # Required to update commit status
     uses: ./.github/workflows/create_preview_sites.yml
     with:
@@ -32,8 +30,6 @@ jobs:
     permissions:
       contents: read # Required by the reusable workflow
       actions: read # Required to download artifacts
-      issues: write # Required to post preview link comments
-      pull-requests: write # Required to post preview link comments
       statuses: write # Required to update commit status
     uses: ./.github/workflows/create_preview_sites.yml
     with:
@@ -49,8 +45,6 @@ jobs:
     permissions:
       contents: read # Required by the reusable workflow
       actions: read # Required to download artifacts
-      issues: write # Required to post preview link comments
-      pull-requests: write # Required to post preview link comments
       statuses: write # Required to update commit status
     uses: ./.github/workflows/create_preview_sites.yml
     with:
@@ -60,3 +54,89 @@ jobs:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
+
+  # Single writer for the sticky preview-links comment: the 3 deploy jobs above only kick off the
+  # Amplify builds and report their outcome via outputs, so there is never more than one job racing
+  # to read-modify-write the PR comment.
+  comment_preview_links:
+    if: ${{ always() && github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
+    needs:
+      - deploy_vector_preview_site
+      - deploy_rust_doc_preview_site
+      - deploy_vrl_playground_preview_site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Since this is now the only job that writes the comment (no sibling fan-out), a concurrency
+    # group per branch safely de-races overlapping workflow runs for rapid successive pushes.
+    concurrency:
+      group: preview-comment-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
+    permissions:
+      issues: write # Required to post the preview link comment
+      pull-requests: write # Required to post the preview link comment
+    steps:
+      - name: Post preview links comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VECTOR_DEV_RESULT: ${{ needs.deploy_vector_preview_site.result }}
+          VECTOR_DEV_BRANCH: ${{ needs.deploy_vector_preview_site.outputs.sanitized_branch_name }}
+          RUST_DOC_RESULT: ${{ needs.deploy_rust_doc_preview_site.result }}
+          RUST_DOC_BRANCH: ${{ needs.deploy_rust_doc_preview_site.outputs.sanitized_branch_name }}
+          VRL_PLAYGROUND_RESULT: ${{ needs.deploy_vrl_playground_preview_site.result }}
+          VRL_PLAYGROUND_BRANCH: ${{ needs.deploy_vrl_playground_preview_site.outputs.sanitized_branch_name }}
+          PR_NUMBER: ${{ needs.deploy_vector_preview_site.outputs.pr_number || needs.deploy_rust_doc_preview_site.outputs.pr_number || needs.deploy_vrl_playground_preview_site.outputs.pr_number }}
+        with:
+          script: |
+            const APPS = [
+              { name: 'vector.dev', appId: 'd1a7j77663uxsc', result: process.env.VECTOR_DEV_RESULT, branch: process.env.VECTOR_DEV_BRANCH },
+              { name: 'Rust Doc', appId: 'd1hoyoksbulg25', result: process.env.RUST_DOC_RESULT, branch: process.env.RUST_DOC_BRANCH },
+              { name: 'VRL Playground', appId: 'd2lr4eds605rpz', result: process.env.VRL_PLAYGROUND_RESULT, branch: process.env.VRL_PLAYGROUND_BRANCH },
+            ];
+
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            if (isNaN(prNumber)) {
+              core.setFailed('No successful preview deploy produced a PR number');
+              return;
+            }
+
+            const lines = APPS
+              .filter(app => app.result === 'success')
+              .map(app => `- [${app.name} preview](https://${app.branch}.${app.appId}.amplifyapp.com)`);
+
+            if (lines.length === 0) {
+              core.info('No successful preview deploys, skipping comment');
+              return;
+            }
+
+            const STICKY_MARKER = '<!-- preview-sites-comment -->';
+            const body = [
+              STICKY_MARKER,
+              'Your preview sites will be ready in a few minutes, please allow time for them to build.',
+              '',
+              ...lines,
+            ].join('\n');
+
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const existing = comments.data.find(c => c.body.includes(STICKY_MARKER));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }

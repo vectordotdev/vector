@@ -21,6 +21,13 @@ on:
       ENDPOINT:
         description: "Request endpoint"
         required: true
+    outputs:
+      pr_number:
+        description: "PR number the preview was built for"
+        value: ${{ jobs.create_preview_site.outputs.pr_number }}
+      sanitized_branch_name:
+        description: "Sanitized branch name used for the preview URL"
+        value: ${{ jobs.create_preview_site.outputs.sanitized_branch_name }}
 
 permissions:
   contents: read # Restrictive default
@@ -32,9 +39,10 @@ jobs:
     permissions:
       contents: read # Required for repository context
       actions: read # Required to download artifacts
-      issues: write # Required to post preview link comments
-      pull-requests: write # Required to post preview link comments
       statuses: write # Required to update commit status
+    outputs:
+      pr_number: ${{ steps.extract.outputs.pr_number }}
+      sanitized_branch_name: ${{ steps.extract.outputs.sanitized_branch_name }}
     steps:
       # Get the artifacts with the PR number and branch name
       - name: Download artifact
@@ -58,6 +66,7 @@ jobs:
 
       # Extract the info from the artifact and set variables
       - name: Extract PR info from artifact
+        id: extract
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -82,6 +91,8 @@ jobs:
             core.exportVariable('BRANCH_NAME', branchName);
             core.exportVariable('PR_NUMBER', prNumber);
             core.exportVariable('INTEGRITY', integrity);
+            core.setOutput('sanitized_branch_name', sanitizedBranchName);
+            core.setOutput('pr_number', prNumber);
 
       # Validate the integrity of the artifact
       - name: Validate Artifact Integrity
@@ -162,87 +173,4 @@ jobs:
 
             if (!response.ok) {
               core.setFailed(`Request failed with response code ${response.status}`);
-            }
-
-      # Add/update this app's preview link in a single sticky comment shared by all preview site jobs.
-      # The 3 sibling jobs (vector.dev, Rust Doc, VRL Playground) run concurrently and each read-modify-write
-      # the same comment, so this retries with a fresh read if a concurrent write clobbers our entry.
-      - name: Comment Preview Link
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APP_ID: ${{ inputs.APP_ID }}
-          APP_NAME: ${{ inputs.APP_NAME }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env;
-            const fs = require('fs');
-            const prNumber = fs.readFileSync('./pr/number', 'utf8');
-            const issueNumber = parseInt(prNumber);
-
-            const STICKY_MARKER = '<!-- preview-sites-comment -->';
-            const appMarker = `<!-- preview-app:${APP_NAME} -->`;
-            const entry = `${appMarker}\n- [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`;
-            const header = `${STICKY_MARKER}\nYour preview sites will be ready in a few minutes, please allow time for them to build.`;
-
-            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-            const MAX_ATTEMPTS = 5;
-            for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-              const comments = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issueNumber,
-                per_page: 100,
-              });
-              const existing = comments.data.find(c => c.body.includes(STICKY_MARKER));
-
-              const entries = new Map();
-              if (existing) {
-                const entryRegex = /<!-- preview-app:([^>]+) -->\n- \[.*?\]\(.*?\)/g;
-                for (const match of existing.body.matchAll(entryRegex)) {
-                  entries.set(match[1], match[0]);
-                }
-              }
-              entries.set(APP_NAME, entry);
-
-              const body = [header, ...entries.values()].join('\n\n');
-
-              if (existing) {
-                await github.rest.issues.updateComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: existing.id,
-                  body,
-                });
-              } else {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  body,
-                });
-              }
-
-              // Verify our entry survived: a concurrent sibling job may have read the comment
-              // before our write and clobbered it with a stale merge. Re-fetch and check.
-              const verifyComments = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issueNumber,
-                per_page: 100,
-              });
-              const verifyComment = verifyComments.data.find(c => c.body.includes(STICKY_MARKER));
-              if (verifyComment && verifyComment.body.includes(appMarker)) {
-                core.info(`Preview link for ${APP_NAME} confirmed on attempt ${attempt}`);
-                break;
-              }
-
-              if (attempt === MAX_ATTEMPTS) {
-                core.setFailed(`Failed to persist preview link for ${APP_NAME} after ${MAX_ATTEMPTS} attempts`);
-              } else {
-                core.info(`Preview link for ${APP_NAME} was clobbered by a concurrent update, retrying (attempt ${attempt})`);
-                await sleep(500 + Math.random() * 1000);
-              }
             }
