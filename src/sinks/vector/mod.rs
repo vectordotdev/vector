@@ -36,6 +36,16 @@ mod test {
     fn generate_config() {
         crate::test_util::test_generate_config::<super::VectorConfig>();
     }
+
+    #[test]
+    fn config_keepalive_rejects_zero() {
+        for field in &["interval_secs", "timeout_secs"] {
+            let result = toml::from_str::<super::VectorConfig>(&format!(
+                "address = \"127.0.0.1:6000\"\n[keepalive]\n{field} = 0"
+            ));
+            assert!(result.is_err(), "{field} = 0 should be rejected");
+        }
+    }
 }
 
 #[cfg(test)]
