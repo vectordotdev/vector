@@ -70,7 +70,7 @@ enum BuildError {
 /// Authentication configuration for the Prometheus exporter.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(tag = "strategy")]
+#[serde(tag = "strategy", deny_unknown_fields)]
 #[serde(rename_all = "lowercase")]
 #[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum PrometheusExporterAuth {
@@ -204,19 +204,27 @@ pub enum PrometheusExporterAuth {
         #[serde(default)]
         namespace: Option<String>,
 
-        /// Override the user to check access for. If not specified, uses the user from the TokenReview.
-        /// Typically left unset to validate the actual token holder's permissions.
+        /// Restrict access to a specific user identity.
+        ///
+        /// If specified, the authenticated user from TokenReview must exactly match this value.
+        /// If not specified, any authenticated user's permissions will be checked.
+        ///
+        /// Use this to restrict the endpoint to a specific service account or user.
         #[serde(default)]
         #[configurable(metadata(
             docs::examples = "system:serviceaccount:my-namespace:myserviceaccount"
         ))]
-        user: Option<String>,
+        allowed_user: Option<String>,
 
-        /// Override the groups to check access for. If not specified, uses the groups from the TokenReview.
-        /// Typically left unset to validate the actual token holder's permissions.
+        /// Restrict access to users in specific groups.
+        ///
+        /// If specified, the authenticated user from TokenReview must be a member of at least one
+        /// of these groups. If not specified, any authenticated user's permissions will be checked.
+        ///
+        /// Use this to restrict the endpoint to specific teams or roles.
         #[serde(default)]
         #[configurable(metadata(docs::examples = "system:authenticated"))]
-        groups: Option<Vec<String>>,
+        allowed_groups: Option<Vec<String>>,
     },
 }
 
@@ -558,9 +566,37 @@ async fn validate_token_with_sar(
         extra = ?user_info.extra
     );
 
-    // Determine the user and groups to check
-    let check_user = params.user.clone().or(user_info.username);
-    let check_groups = params.groups.clone().or(user_info.groups);
+    // Check if user matches allowed_user filter (if configured)
+    if let Some(allowed_user) = params.user {
+        if user_info.username.as_deref() != Some(allowed_user) {
+            warn!(
+                message = "User does not match allowed_user filter",
+                authenticated_user = ?user_info.username,
+                allowed_user = %allowed_user
+            );
+            return Ok(false);
+        }
+    }
+
+    // Check if user is in at least one allowed_groups (if configured)
+    if let Some(allowed_groups) = params.groups {
+        let user_groups = user_info.groups.as_deref().unwrap_or(&[]);
+        let has_allowed_group = allowed_groups.iter().any(|ag| user_groups.contains(ag));
+
+        if !has_allowed_group {
+            warn!(
+                message = "User is not in any allowed_groups",
+                authenticated_user = ?user_info.username,
+                user_groups = ?user_groups,
+                allowed_groups = ?allowed_groups
+            );
+            return Ok(false);
+        }
+    }
+
+    // Use the actual authenticated user's identity for SAR check
+    let check_user = user_info.username;
+    let check_groups = user_info.groups;
 
     // Step 2: Create SubjectAccessReview with appropriate attributes
     let sar = match (params.path, params.resource) {
@@ -793,8 +829,8 @@ impl Handler {
             verb,
             resource_group,
             namespace,
-            user,
-            groups,
+            allowed_user,
+            allowed_groups,
         }) = &self.auth
         {
             // Ensure we have a Kubernetes client
@@ -822,8 +858,8 @@ impl Handler {
                         resource: resource.as_deref(),
                         resource_group: Some(resource_group.as_str()),
                         namespace,
-                        user,
-                        groups,
+                        user: allowed_user,
+                        groups: allowed_groups,
                     },
                 )
                 .await
