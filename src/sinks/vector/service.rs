@@ -1,7 +1,7 @@
 use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
-use http::Uri;
+use http::{HeaderValue, Uri, header::AUTHORIZATION};
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
@@ -71,11 +71,13 @@ impl VectorService {
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         uri: Uri,
         compression: VectorCompression,
+        auth: Option<HeaderValue>,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
         let mut proto_client = proto_vector::Client::new(HyperSvc {
             uri,
             client: hyper_client,
+            auth,
         });
 
         if let Some(encoding) = compression.as_tonic_encoding() {
@@ -137,6 +139,7 @@ impl Service<VectorRequest> for VectorService {
 pub struct HyperSvc {
     uri: Uri,
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    auth: Option<HeaderValue>,
 }
 
 impl Service<hyper::Request<BoxBody>> for HyperSvc {
@@ -159,6 +162,10 @@ impl Service<hyper::Request<BoxBody>> for HyperSvc {
             .unwrap();
 
         *req.uri_mut() = uri;
+
+        if let Some(auth) = &self.auth {
+            req.headers_mut().insert(AUTHORIZATION, auth.clone());
+        }
 
         Box::pin(self.client.request(req))
     }
