@@ -331,6 +331,15 @@ pub(crate) fn build_record_batch(
         });
     }
 
+    decode_rows_to_record_batch(schema, events)
+}
+
+/// Serialize rows through Arrow's JSON decoder into one RecordBatch. Parquet `AutoInfer`
+/// encodes from the rows it inferred the schema from, so the two stay in sync (e.g. `inf`->`null`).
+pub(crate) fn decode_rows_to_record_batch<T: serde::Serialize>(
+    schema: SchemaRef,
+    rows: &[T],
+) -> Result<RecordBatch, ArrowEncodingError> {
     let mut decoder = ReaderBuilder::new(schema)
         .build_decoder()
         .inspect_err(|e| {
@@ -342,7 +351,7 @@ pub(crate) fn build_record_batch(
         .context(RecordBatchCreationSnafu)?;
 
     decoder
-        .serialize(events)
+        .serialize(rows)
         .inspect_err(|e| {
             vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
                 error: e,

@@ -29,7 +29,7 @@ use vector_common::internal_event::{
 use vector_config::configurable_component;
 use vector_core::event::{Event, LogEvent};
 
-use super::arrow::{ArrowEncodingError, build_record_batch};
+use super::arrow::{ArrowEncodingError, build_record_batch, decode_rows_to_record_batch};
 use crate::encoding::format::arrow::vector_log_events_to_json_values;
 use crate::internal_events::{ArrowWriterError, JsonSerializationError, SchemaGenerationError};
 
@@ -336,7 +336,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        match self.schema_mode {
+        let record_batch = match self.schema_mode {
             // In strict mode, check for extra top-level fields not in the schema.
             ParquetSchemaMode::Strict => {
                 for log in &logs {
@@ -352,6 +352,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                         }
                     }
                 }
+                build_record_batch(Arc::clone(&self.schema), &logs).map_err(Box::new)?
             }
             ParquetSchemaMode::AutoInfer => {
                 // Schema inference is driven by Arrow's JSON schema inference, which still
@@ -367,12 +368,13 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                 self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
                     &events, schema,
                 ));
+                decode_rows_to_record_batch(Arc::clone(&self.schema), &json_values)
+                    .map_err(Box::new)?
             }
-            ParquetSchemaMode::Relaxed => {}
-        }
-
-        let record_batch =
-            build_record_batch(Arc::clone(&self.schema), &logs).map_err(Box::new)?;
+            ParquetSchemaMode::Relaxed => {
+                build_record_batch(Arc::clone(&self.schema), &logs).map_err(Box::new)?
+            }
+        };
 
         Self::write_record_batch(&record_batch, buffer, &self.writer_props).map_err(Box::new)?;
 
@@ -626,6 +628,16 @@ mod tests {
                 .unwrap_or_else(|_| panic!("field '{field_name}' should exist in schema"));
             assert_eq!(field.data_type(), &DataType::Utf8);
         }
+    }
+
+    #[test]
+    fn autoinfer_encodes_non_finite_floats() {
+        let events = vec![
+            create_event(vec![("ratio", f64::INFINITY)]),
+            create_event(vec![("ratio", f64::NEG_INFINITY)]),
+        ];
+        let (_schema, num_rows) = encode_autoinfer_and_read_schema(events);
+        assert_eq!(num_rows, 2);
     }
 
     #[test]
