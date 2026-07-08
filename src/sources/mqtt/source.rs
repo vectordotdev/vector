@@ -1,4 +1,10 @@
-use std::ops::ControlFlow;
+use std::{
+    ops::ControlFlow,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 use futures::StreamExt;
 use itertools::Itertools;
@@ -9,7 +15,7 @@ use tokio::sync::mpsc;
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
-    finalizer::UnorderedFinalizer,
+    finalizer::OrderedFinalizer,
     internal_event::EventsReceived,
     lookup::path,
 };
@@ -147,22 +153,23 @@ fn warn_subscribe_failed() {
 
 fn warn_event_backlog_saturated() {
     warn!(
-        message = "MQTT event backlog is saturated because downstream is not keeping up; dropping this message. It was not yet acknowledged, so the broker's own retry timer will redeliver it independently of any reconnect.",
+        message = "MQTT event backlog is saturated because downstream is not keeping up; dropping this message. It was not yet acknowledged, so the broker still considers it unacknowledged; whether and when it's redelivered depends on the broker (some retry independently of a reconnect, others only redeliver after this connection reconnects for some other reason).",
         internal_log_rate_limit = true,
     );
 }
 
 /// Whether dropping this specific polled event under a saturated backlog is
 /// protocol-safe. Only a QoS 1/2 publish that will actually be deferred-acked
-/// (acknowledgements enabled, see `publish_ack_decision`) is safe to drop here:
-/// only then does the broker still consider it unacknowledged and worth
-/// retrying on its own. Everything else must never be dropped this way:
-/// connection lifecycle events (ConnAck/SubAck/Disconnect) drive `ProtocolState`
-/// and losing one desyncs it from the real connection (e.g. permanently skipping
-/// a post-reconnect resubscribe); a publish rumqttc has already auto-acked
-/// (acknowledgements disabled) or that has no acknowledgement at all (QoS 0) has
-/// no redelivery guarantee, so dropping it would be true, unrecoverable data
-/// loss rather than a redelivered retry.
+/// (acknowledgements enabled, see `publish_ack_decision`) is safe to drop
+/// here: only then does the broker still consider it unacknowledged, and
+/// therefore a candidate for redelivery (see `warn_event_backlog_saturated`
+/// for the caveat on when that actually happens). Everything else must never
+/// be dropped this way: connection lifecycle events (ConnAck/SubAck/
+/// Disconnect) drive `ProtocolState` and losing one desyncs it from the real
+/// connection (e.g. permanently skipping a post-reconnect resubscribe); a
+/// publish rumqttc has already auto-acked (acknowledgements disabled) or that
+/// has no acknowledgement at all (QoS 0) has no redelivery guarantee at all,
+/// so dropping it would be true, unrecoverable data loss.
 fn safe_to_drop_under_backlog(event: &PolledMqttEvent, acknowledgements: bool) -> bool {
     match event {
         PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::Publish(publish))) => {
@@ -175,26 +182,44 @@ fn safe_to_drop_under_backlog(event: &PolledMqttEvent, acknowledgements: bool) -
 // Polls the MQTT event loop on a dedicated task so the main task (see `run`) can
 // use the blocking `client.ack`/`client.subscribe` without risking a deadlock:
 // `EventLoop::poll` is the only thing that drains rumqttc's outgoing request
-// channel (used by those calls), so this task must never block on anything other
-// than `poll` itself.
+// channel (used by those calls), so this task must never block on anything
+// other than `poll` itself.
 //
-// Polled events are split across two channels by `safe_to_drop_under_backlog`:
-// - Events safe to drop go through a bounded channel with a non-blocking
-//   `try_send`; if the main task falls behind and it fills, the event is
-//   dropped (with a warning) rather than buffered without bound or blocking.
-//   An earlier version of this forced a reconnect on saturation instead, but
-//   that reintroduces the underlying problem immediately: the broker refloods
-//   a freshly (re)connected client from the same backlog, so under sustained
-//   backpressure it degenerates into a reconnect storm instead of actually
-//   recovering.
-// - Everything else is forwarded over an unbounded channel and never dropped.
-//   `send` on an unbounded channel never blocks, so this doesn't reintroduce
-//   the deadlock this task is designed to avoid.
+// Polled events are forwarded over a single unbounded channel, preserving the
+// order they were polled in: a ConnAck/Disconnect must be observed by the main
+// task before any publish that arrived after it, or `ProtocolState` can be
+// acted on (or acked against) while stale. An earlier version of this used two
+// separate channels split by drop-safety, but `tokio::select!` doesn't
+// preserve relative order between two channels when both have items ready, so
+// a backlogged publish could reach the main task before a ConnAck that was
+// actually polled first.
+//
+// Memory is still bounded despite the channel being unbounded: events safe to
+// drop under backlog (see `safe_to_drop_under_backlog`) are only sent while
+// `droppable_backlog`'s count of currently-outstanding droppable events is
+// under `EVENTS_CHANNEL_CAPACITY`; once it saturates, further ones are dropped
+// (with a warning) instead of sent. `send` on an unbounded channel never
+// blocks, so none of this risks the deadlock this task is designed to avoid.
+// Everything else (connection lifecycle events, and any publish that isn't
+// safe to drop) is sent unconditionally and never dropped.
+//
+// This deliberately does not try to force a reconnect when the backlog stays
+// saturated: an earlier version did (via `EventLoop::clean`), reasoning that
+// the MQTT spec ties QoS >0 redelivery to reconnection rather than guaranteeing
+// an independent retry-while-connected timer. In practice that forced,
+// non-graceful reconnect triggered broker-specific error handling (observed
+// against EMQX as an `unexpected_sock_close`/`einval` server-side error) after
+// which the session stopped delivering anything further at all — worse than
+// the problem it was meant to solve. Forcing a *correct* reconnect (e.g. a
+// graceful `client.disconnect()` sequenced so the broker actually receives it
+// before the socket closes) needs more investigation than fits here, so for
+// now this only drops and relies on whatever the broker/connection naturally
+// provides, same as before this file started attempting to force anything.
 async fn poll_mqtt_connection(
     mut connection: EventLoop,
     acknowledgements: bool,
-    droppable_tx: mpsc::Sender<PolledMqttEvent>,
-    guaranteed_tx: mpsc::UnboundedSender<PolledMqttEvent>,
+    events_tx: mpsc::UnboundedSender<PolledMqttEvent>,
+    droppable_backlog: Arc<AtomicUsize>,
     shutdown: ShutdownSignal,
 ) {
     loop {
@@ -207,12 +232,14 @@ async fn poll_mqtt_connection(
         };
 
         if safe_to_drop_under_backlog(&event, acknowledgements) {
-            match droppable_tx.try_send(event) {
-                Ok(()) => {}
-                Err(mpsc::error::TrySendError::Full(_)) => warn_event_backlog_saturated(),
-                Err(mpsc::error::TrySendError::Closed(_)) => break,
+            if droppable_backlog.load(Ordering::Acquire) >= EVENTS_CHANNEL_CAPACITY {
+                warn_event_backlog_saturated();
+                continue;
             }
-        } else if guaranteed_tx.send(event).is_err() {
+            droppable_backlog.fetch_add(1, Ordering::AcqRel);
+        }
+
+        if events_tx.send(event).is_err() {
             break;
         }
     }
@@ -245,13 +272,13 @@ impl MqttSource {
 
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (client, connection) = self.connector.connect();
-        let (droppable_tx, mut droppable_rx) = mpsc::channel(EVENTS_CHANNEL_CAPACITY);
-        let (guaranteed_tx, mut guaranteed_rx) = mpsc::unbounded_channel();
+        let (events_tx, mut events_rx) = mpsc::unbounded_channel();
+        let droppable_backlog = Arc::new(AtomicUsize::new(0));
         tokio::spawn(poll_mqtt_connection(
             connection,
             self.acknowledgements,
-            droppable_tx,
-            guaranteed_tx,
+            events_tx,
+            Arc::clone(&droppable_backlog),
             shutdown.clone(),
         ));
 
@@ -260,10 +287,11 @@ impl MqttSource {
         // Finalizer drives end-to-end acknowledgements: each in-flight publish is
         // registered with its batch-status receiver, and we send the QoS-1 PUBACK
         // only once the sinks report `Delivered`. Unused when acknowledgements are
-        // disabled (rumqttc auto-acks in that mode). MQTT PUBACKs are independent
-        // per packet id (unlike Kafka offsets), so finalization is unordered — a
-        // slow/stuck batch must not hold back acks for already-delivered publishes.
-        let (finalizer, mut ack_stream) = UnorderedFinalizer::<FinalizerEntry>::maybe_new(
+        // disabled (rumqttc auto-acks in that mode). PUBACKs must be sent in the
+        // order their publishes were received ([MQTT-4.6.0-2]), so finalization is
+        // ordered: a slow/stuck earlier batch holds back acks for publishes
+        // received after it, same as the `kafka` source's ordered offset commits.
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::maybe_new(
             self.acknowledgements,
             Some(shutdown.clone()),
         );
@@ -272,7 +300,28 @@ impl MqttSource {
 
         loop {
             tokio::select! {
+                // Deliberately not `biased`: a connection-lifecycle event
+                // already sitting in `events_rx` when an ack-stream
+                // completion is also ready should ideally be processed first
+                // (`should_ack_finalized_publish` needs `protocol_state` to
+                // reflect it, or it can act on a dead connection), but always
+                // favoring `events_rx` was tried and starves the ack-stream
+                // branch outright under sustained publish volume -- exactly
+                // the saturated-backlog scenario this file already has to
+                // handle -- since `events_rx` being ready again by the next
+                // loop iteration is the common case, not the exception, and
+                // `biased` would then never yield to the other branch. Fair
+                // random selection keeps that race narrow (both branches
+                // must be ready in the same instant) instead of guaranteeing
+                // it under exactly the load this needs to keep working under.
                 _ = shutdown.clone() => return Ok(()),
+                mqtt_event = events_rx.recv() => {
+                    if let ControlFlow::Break(result) = self.handle_mqtt_event(
+                        mqtt_event, &mut out, &finalizer, &mut protocol_state, &client, &droppable_backlog,
+                    ).await {
+                        return result;
+                    }
+                },
                 entry = ack_stream.next() => {
                     // Only PUBACK delivered events. On Errored/Rejected we skip the
                     // ack so the broker redelivers after reconnect (QoS-1 +
@@ -288,20 +337,6 @@ impl MqttSource {
                         )
                     {
                         client.ack(&entry.publish).await.map_err(|_| ())?;
-                    }
-                },
-                mqtt_event = droppable_rx.recv() => {
-                    if let ControlFlow::Break(result) = self.handle_mqtt_event(
-                        mqtt_event, &mut out, &finalizer, &mut protocol_state, &client,
-                    ).await {
-                        return result;
-                    }
-                },
-                mqtt_event = guaranteed_rx.recv() => {
-                    if let ControlFlow::Break(result) = self.handle_mqtt_event(
-                        mqtt_event, &mut out, &finalizer, &mut protocol_state, &client,
-                    ).await {
-                        return result;
                     }
                 },
             }
@@ -323,10 +358,21 @@ impl MqttSource {
         &self,
         mqtt_event: Option<PolledMqttEvent>,
         out: &mut SourceSender,
-        finalizer: &Option<UnorderedFinalizer<FinalizerEntry>>,
+        finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
         protocol_state: &mut ProtocolState,
         client: &AsyncClient,
+        droppable_backlog: &AtomicUsize,
     ) -> ControlFlow<Result<(), ()>> {
+        // Mirrors the poller's own count of this event against
+        // `EVENTS_CHANNEL_CAPACITY` (see `poll_mqtt_connection`); recomputing
+        // the same predicate here, rather than tagging the event itself, keeps
+        // `PolledMqttEvent` free of backlog-accounting concerns.
+        if let Some(event) = &mqtt_event
+            && safe_to_drop_under_backlog(event, self.acknowledgements)
+        {
+            droppable_backlog.fetch_sub(1, Ordering::AcqRel);
+        }
+
         match mqtt_event {
             Some(PolledMqttEvent::Event(MqttEvent::Incoming(Incoming::Publish(publish)))) => {
                 self.process_message(
@@ -414,7 +460,7 @@ impl MqttSource {
         &self,
         mut publish: Publish,
         out: &mut SourceSender,
-        finalizer: Option<&UnorderedFinalizer<FinalizerEntry>>,
+        finalizer: Option<&OrderedFinalizer<FinalizerEntry>>,
         connection_generation: u64,
     ) {
         emit!(EndpointBytesReceived {

@@ -236,8 +236,9 @@ async fn mqtt_redelivers_unacknowledged_messages() {
 /// channel, since the poller is also the only thing that drains it). This test
 /// proves that path actually recovers instead of hanging, and that every message
 /// is still eventually delivered afterward: a dropped QoS 1 publish was never
-/// acknowledged, so the broker's own retry timer redelivers it independently of
-/// the connection ever reconnecting.
+/// acknowledged, so the broker's own retry timer redelivers it (see
+/// `compose.yaml`'s shortened `retry_interval`) independently of whatever else
+/// is still flowing through.
 #[tokio::test]
 async fn mqtt_recovers_from_downstream_saturation() {
     trace_init();
