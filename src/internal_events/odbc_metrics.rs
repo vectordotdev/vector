@@ -57,7 +57,7 @@ impl InternalEvent for OdbcFailedError<'_> {
                 )
                 .increment(1);
             }
-            OdbcError::Json { .. } | OdbcError::Decode { .. } => {
+            OdbcError::Json { .. } | OdbcError::InvalidResultRow => {
                 error!(
                     message = "Unable to execute statement.",
                     statement = %self.statement,

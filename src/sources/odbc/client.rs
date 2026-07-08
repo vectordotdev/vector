@@ -1,9 +1,8 @@
 use crate::config::{LogNamespace, SourceContext};
-use crate::event::Event;
+use crate::event::{Event, LogEvent};
 use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
-use bytes::BytesMut;
 use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
@@ -23,13 +22,11 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::select;
-use tokio_util::codec::Decoder as _;
 use vector_common::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_common::json_size::JsonSize;
 use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::codecs::Decoder;
 use vector_lib::emit;
 use vector_lib::source_sender::SendError;
 use vrl::prelude::*;
@@ -69,11 +66,6 @@ pub enum OdbcError {
     #[snafu(display("JSON error: {source}"))]
     Json { source: serde_json::Error },
 
-    #[snafu(display("Decode error: {source}"))]
-    Decode {
-        source: vector_lib::codecs::decoding::Error,
-    },
-
     #[snafu(display("Blocking ODBC task failed: {source}"))]
     BlockingTask { source: tokio::task::JoinError },
 
@@ -88,6 +80,9 @@ pub enum OdbcError {
     #[snafu(display("Last query result row is not an object; cannot extract tracking columns"))]
     InvalidTrackingRow,
 
+    #[snafu(display("Query result row is not an object; cannot convert to a log event"))]
+    InvalidResultRow,
+
     #[snafu(display(
         "Query returned duplicate column names: {columns:?}; alias columns in the SQL statement"
     ))]
@@ -98,7 +93,6 @@ pub(crate) struct Context {
     cfg: OdbcConfig,
     env: &'static Environment,
     cx: SourceContext,
-    decoder: Decoder,
     log_namespace: LogNamespace,
 }
 
@@ -106,7 +100,6 @@ impl Context {
     pub(crate) fn new(
         cfg: OdbcConfig,
         cx: SourceContext,
-        decoder: Decoder,
         log_namespace: LogNamespace,
     ) -> Result<Self, OdbcError> {
         let env = environment().context(DbSnafu)?;
@@ -115,7 +108,6 @@ impl Context {
             cfg,
             env,
             cx,
-            decoder,
             log_namespace,
         })
     }
@@ -187,7 +179,7 @@ impl Context {
     }
 
     /// Executes the scheduled ODBC query, sends the result as events in bounded batches,
-    /// then updates tracking metadata after all batches are successfully decoded and sent.
+    /// then updates tracking metadata after all batches are successfully converted and sent.
     async fn process(
         &self,
         map: Option<ObjectMap>,
@@ -260,7 +252,9 @@ impl Context {
                 continue;
             }
 
-            let (mut events, payload_byte_size) = match self.decode_rows(&batch_rows) {
+            // Keep the last raw row for tracking before rows are moved into events.
+            let last_row = batch_rows.last().cloned();
+            let mut events = match rows_to_events(batch_rows) {
                 Ok(result) => result,
                 Err(error) => {
                     stream_error = Some(error);
@@ -268,20 +262,22 @@ impl Context {
                 }
             };
 
-            total_payload_byte_size += payload_byte_size;
             self.enrich_events(&mut events);
 
             let event_count = events.len();
             if event_count > 0 {
+                // Use the post-enrichment size for both received-bytes and events metrics
+                // so they stay consistent.
                 let byte_size = events.estimated_json_encoded_size_of();
                 if let Err(error) = out.clone().send_batch(events).await.context(SendSnafu) {
                     stream_error = Some(error);
                     break;
                 }
+                total_payload_byte_size += byte_size.get();
                 total_events += CountByteSize(event_count, byte_size);
             }
 
-            last_successfully_sent_row = batch_rows.into_iter().next_back();
+            last_successfully_sent_row = last_row;
         }
 
         drop(rx);
@@ -301,7 +297,7 @@ impl Context {
 
         blocking_result?;
 
-        // Advance tracking metadata only after all batches are decoded and sent so a
+        // Advance tracking metadata only after all batches are converted and sent so a
         // partial failure does not skip rows on the next scheduled run.
         let mut latest_result = None;
         if let (Some(last), Some(tracking_columns)) =
@@ -319,31 +315,6 @@ impl Context {
         Ok(latest_result)
     }
 
-    fn decode_rows(&self, rows: &Rows) -> Result<(Vec<Event>, usize), OdbcError> {
-        if rows.is_empty() {
-            return Ok((Vec::new(), 0));
-        }
-
-        let payload = serde_json::to_vec(rows).context(JsonSnafu)?;
-        let payload_byte_size = payload.len();
-        let mut buf = BytesMut::from(payload.as_slice());
-        let mut events = Vec::new();
-        let mut decoder = self.decoder.clone();
-
-        loop {
-            match decoder.decode_eof(&mut buf) {
-                Ok(Some((next, _))) => events.extend(next),
-                Ok(None) => break,
-                Err(error) => {
-                    // tracking metadata is not advanced past rows that were not decoded.
-                    return Err(OdbcError::Decode { source: error });
-                }
-            }
-        }
-
-        Ok((events, payload_byte_size))
-    }
-
     fn enrich_events(&self, events: &mut [Event]) {
         let now = Utc::now();
 
@@ -356,6 +327,22 @@ impl Context {
                 .insert_standard_vector_source_metadata(log, OdbcConfig::NAME, now);
         }
     }
+}
+
+/// Converts ODBC result rows into log events without a JSON round-trip so typed
+/// values such as timestamps and integers are preserved for downstream transforms.
+fn rows_to_events(rows: Rows) -> Result<Vec<Event>, OdbcError> {
+    let mut events = Vec::with_capacity(rows.len());
+
+    for row in rows {
+        let Value::Object(obj) = row else {
+            return Err(OdbcError::InvalidResultRow);
+        };
+
+        events.push(LogEvent::from(obj).into());
+    }
+
+    Ok(events)
 }
 
 /// Extracts specified tracking columns from the given object,
@@ -900,6 +887,48 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use chrono::TimeZone;
+
+    #[test]
+    fn rows_to_events_preserves_typed_values() {
+        let timestamp = chrono::Utc
+            .with_ymd_and_hms(2025, 10, 4, 12, 34, 56)
+            .unwrap();
+        let mut row = ObjectMap::new();
+        row.insert(KeyString::from("id"), Value::Integer(1));
+        row.insert(KeyString::from("active"), Value::Boolean(true));
+        row.insert(KeyString::from("datetime_col"), Value::Timestamp(timestamp));
+        row.insert(
+            KeyString::from("date_col"),
+            Value::Bytes(Bytes::from_static(b"2025-10-04")),
+        );
+
+        let rows = vec![Value::Object(row)];
+        let events = rows_to_events(rows).expect("events");
+
+        assert_eq!(events.len(), 1);
+
+        let Event::Log(log) = &events[0] else {
+            panic!("expected log event");
+        };
+
+        assert_eq!(log.get("id").unwrap(), &Value::Integer(1));
+        assert_eq!(log.get("active").unwrap(), &Value::Boolean(true));
+        assert_eq!(
+            log.get("datetime_col").unwrap(),
+            &Value::Timestamp(timestamp)
+        );
+        assert_eq!(
+            log.get("date_col").unwrap(),
+            &Value::Bytes(Bytes::from_static(b"2025-10-04"))
+        );
+    }
+
+    #[test]
+    fn rows_to_events_errors_on_non_object_row() {
+        let rows = vec![Value::Integer(1)];
+        let error = rows_to_events(rows).expect_err("expected error");
+        assert!(matches!(error, OdbcError::InvalidResultRow));
+    }
 
     #[test]
     fn map_value_integer_in_range() {

@@ -21,18 +21,19 @@ components: sources: odbc: {
 				service: services.odbc
 			}
 		}
-		multiline: enabled: true
-		encoding: enabled:  true
+		multiline: enabled: false
 	}
 
 	support: {
 		requirements: []
 		warnings: [
 			"""
-				When `last_run_metadata_path` is set, tracking metadata is updated before events
-				are sent downstream. If Vector restarts or a downstream sink fails after the
-				checkpoint is saved, rows can be lost and will not be replayed on the next
-				scheduled run.
+				When `last_run_metadata_path` is set, tracking metadata is updated only after
+				all result batches are converted and sent. If saving the checkpoint then fails,
+				previous tracking values are kept and the next scheduled run may re-emit the
+				same rows. If Vector restarts after a successful checkpoint write but before
+				downstream delivery is fully acknowledged, rows can still be lost because this
+				source does not provide acknowledgements.
 				""",
 		]
 		notices: []
@@ -46,7 +47,13 @@ components: sources: odbc: {
 
 	output: {
 		logs: record: {
-			description: "A single row returned by the ODBC query."
+			description: """
+				A single row returned by the ODBC query. Each column becomes a
+				top-level log field and retains its Vector typed value when possible
+				(for example timestamps, integers, booleans, and floats). Columns
+				that cannot be represented as a native Vector type are emitted as
+				bytes.
+				"""
 			fields: {
 				"*": {
 					common:      false
@@ -135,24 +142,33 @@ components: sources: odbc: {
 						run a query periodically, and send the results to Vector.
 						Start by providing a database connection string.
 
-						```toml
-						[sources.odbc]
-						type = "odbc"
-						connection_string = "driver={MariaDB Unicode};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
-						statement = "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
-						statement_init_params = { id = "0" }
-						schedule = "*/5 * * * * *"
-						schedule_timezone = "UTC"
-						last_run_metadata_path = "/path/to/odbc_tracking.json"
-						tracking_columns = ["id"]
+						```yaml
+						sources:
+						  odbc:
+						    type: odbc
+						    connection_string: "driver={MariaDB Unicode};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
+						    statement: "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
+						    statement_init_params:
+						      id: "0"
+						    schedule: "*/5 * * * * *"
+						    schedule_timezone: UTC
+						    last_run_metadata_path: /path/to/odbc_tracking.json
+						    tracking_columns:
+						      - id
 
-						[sinks.console]
-						type = "console"
-						inputs = ["odbc"]
-						encoding.codec = "json"
+						sinks:
+						  console:
+						    type: console
+						    inputs:
+						      - odbc
+						    encoding:
+						      codec: json
 						```
 
-						Every five seconds, the source produces output similar to the following.
+						Every five seconds, the source emits one log event per result row.
+						Column values keep their Vector types when possible (for example
+						`datetime` as a timestamp and `id` as an integer). When a sink
+						encodes events as JSON, the output looks similar to the following.
 
 						```json
 						{"datetime":"2025-04-28T01:20:04Z","id":1,"name":"test1","source_type":"odbc","timestamp":"2025-04-28T01:50:45.075484Z"}

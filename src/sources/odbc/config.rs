@@ -1,5 +1,4 @@
-use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput};
-use crate::serde::default_framing_message_based;
+use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
 use crate::sources::Source;
 use crate::sources::odbc::client::{Context, prepare_metadata_path, validate_tracking_state};
 use crate::sources::odbc::schedule::OdbcSchedule;
@@ -11,12 +10,11 @@ use std::fs;
 use std::io::BufReader;
 use std::time::Duration;
 use vector_config_macros::configurable_component;
-use vector_lib::codecs::{
-    DecodingConfig,
-    decoding::{DeserializerConfig, JsonDeserializerConfig},
-};
+use vector_lib::config::DataType;
+use vector_lib::schema;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::prelude::ObjectMap;
+use vrl::value::{Kind, kind::Collection};
 
 /// Configuration for the `odbc` source.
 #[serde_as]
@@ -25,6 +23,7 @@ use vrl::prelude::ObjectMap;
     "Periodically pulls observability data from an ODBC interface by running a scheduled query."
 ))]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct OdbcConfig {
     /// The connection string to use for ODBC.
     /// If the `connection_string_filepath` is set, this value is ignored.
@@ -86,13 +85,16 @@ pub struct OdbcConfig {
     /// When the source runs for the first time, the file at `last_run_metadata_path` does not exist.
     /// In that case, declare the initial values in `statement_init_params`.
     ///
-    /// ```toml
-    /// [sources.odbc]
-    /// statement = "SELECT * FROM users WHERE id = ?"
-    /// statement_init_params = { "id": "0" }
-    /// tracking_columns = ["id"]
-    /// last_run_metadata_path = "/path/to/tracking.json"
-    /// # The rest of the fields are omitted
+    /// ```yaml
+    /// sources:
+    ///   odbc:
+    ///     statement: "SELECT * FROM users WHERE id = ?"
+    ///     statement_init_params:
+    ///       id: "0"
+    ///     tracking_columns:
+    ///       - id
+    ///     last_run_metadata_path: /path/to/tracking.json
+    ///     # The rest of the fields are omitted
     /// ```
     #[configurable(metadata(
         docs::additional_props_description = "Initial value for the SQL statement parameters. The value is always a string."
@@ -115,7 +117,7 @@ pub struct OdbcConfig {
     #[serde(default = "default_schedule_timezone")]
     pub schedule_timezone: Tz,
 
-    /// Number of rows to fetch, decode, and send per batch.
+    /// Number of rows to fetch, convert, and send per batch.
     /// This bounds ODBC driver fetch buffers and in-memory processing for each batch.
     /// Must be greater than 0.
     /// The default is 100.
@@ -143,7 +145,7 @@ pub struct OdbcConfig {
     /// Specifies the columns to track from the last row of the statement result set.
     /// Their values are passed as parameters to the SQL statement in the next scheduled run.
     ///
-    /// Tracking metadata is saved only after all result batches are decoded and sent.
+    /// Tracking metadata is saved only after all result batches are converted and sent.
     /// If a run fails partway through, the previous tracking values are kept so rows are
     /// not skipped on the next scheduled run.
     ///
@@ -152,11 +154,13 @@ pub struct OdbcConfig {
     ///
     /// # Examples
     ///
-    /// ```toml
-    /// [sources.odbc]
-    /// statement = "SELECT * FROM users WHERE id = ?"
-    /// tracking_columns = ["id"]
-    /// # The rest of the fields are omitted
+    /// ```yaml
+    /// sources:
+    ///   odbc:
+    ///     statement: "SELECT * FROM users WHERE id = ?"
+    ///     tracking_columns:
+    ///       - id
+    ///     # The rest of the fields are omitted
     /// ```
     #[configurable(metadata(docs::examples = "id"))]
     pub tracking_columns: Option<Vec<String>>,
@@ -166,7 +170,7 @@ pub struct OdbcConfig {
     /// This file provides parameters for the SQL query in the next scheduled run.
     /// If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
     ///
-    /// Tracking metadata is written only after all result batches are decoded and sent.
+    /// Tracking metadata is written only after all result batches are converted and sent.
     /// If saving fails after events were already sent, the previous tracking values are kept
     /// and the next scheduled run may emit duplicate rows.
     ///
@@ -181,15 +185,6 @@ pub struct OdbcConfig {
     /// ```
     #[configurable(metadata(docs::examples = "/path/to/tracking.json"))]
     pub last_run_metadata_path: Option<String>,
-
-    /// Decoder to use for query results.
-    ///
-    /// Query rows are serialized to a JSON array before decoding.
-    /// The default is the JSON codec so each result row becomes a separate log event
-    /// with its columns available as top-level fields.
-    #[configurable(derived)]
-    #[serde(default = "default_odbc_decoding")]
-    pub decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -230,14 +225,6 @@ impl OdbcConfig {
         } else {
             Ok(String::new())
         }
-    }
-
-    pub fn get_decoding_config(&self, log_namespace: LogNamespace) -> DecodingConfig {
-        DecodingConfig::new(
-            default_framing_message_based(),
-            self.decoding.clone(),
-            log_namespace,
-        )
     }
 
     fn validate_tracking_columns(&self) -> Result<(), String> {
@@ -348,8 +335,27 @@ fn default_schedule() -> OdbcSchedule {
     "0 * * * * *".into()
 }
 
-fn default_odbc_decoding() -> DeserializerConfig {
-    JsonDeserializerConfig::default().into()
+fn odbc_schema_definition(log_namespace: LogNamespace) -> schema::Definition {
+    // Query rows are always objects whose columns become top-level fields. Column
+    // types vary by SQL query, so unknown fields allow any VRL value including timestamps.
+    let row_fields = Collection::empty().with_unknown(Kind::json().or_timestamp());
+
+    match log_namespace {
+        LogNamespace::Legacy => {
+            let mut definition = schema::Definition::empty_legacy_namespace()
+                .unknown_fields(Kind::json().or_timestamp());
+
+            if let Some(timestamp_key) = log_schema().timestamp_key() {
+                definition =
+                    definition.try_with_field(timestamp_key, Kind::timestamp(), Some("timestamp"));
+            }
+
+            definition
+        }
+        LogNamespace::Vector => {
+            schema::Definition::new_with_default_metadata(Kind::object(row_fields), [log_namespace])
+        }
+    }
 }
 
 impl Default for OdbcConfig {
@@ -368,7 +374,6 @@ impl Default for OdbcConfig {
             odbc_default_timezone: Tz::UTC,
             tracking_columns: None,
             last_run_metadata_path: None,
-            decoding: default_odbc_decoding(),
             log_namespace: None,
             statement_filepath: None,
             #[cfg(test)]
@@ -407,8 +412,7 @@ impl SourceConfig for OdbcConfig {
         }
 
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let decoder = self.get_decoding_config(log_namespace).build()?;
-        let guard = Context::new(self.clone(), cx, decoder, log_namespace)?;
+        let guard = Context::new(self.clone(), cx, log_namespace)?;
         let context = Box::new(guard);
         Ok(context.run_schedule().boxed())
     }
@@ -416,13 +420,11 @@ impl SourceConfig for OdbcConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = self
-            .decoding
-            .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+        let schema_definition =
+            odbc_schema_definition(log_namespace).with_standard_vector_source_metadata();
 
         vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
+            DataType::Log,
             schema_definition,
         )]
     }
