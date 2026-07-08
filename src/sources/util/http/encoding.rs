@@ -221,17 +221,15 @@ where
         Ok(chunk)
     };
 
-    let mut first = if let Some(chunk) = body.next().await {
-        admit_chunk_within_limit(chunk)?
-    } else {
+    let Some(chunk) = body.next().await else {
         return Ok(Bytes::new());
     };
+    let mut first = admit_chunk_within_limit(chunk)?;
 
-    let second = if let Some(chunk) = body.next().await {
-        admit_chunk_within_limit(chunk)?
-    } else {
+    let Some(chunk) = body.next().await else {
         return Ok(first.copy_to_bytes(first.remaining()));
     };
+    let second = admit_chunk_within_limit(chunk)?;
 
     let mut bytes = BytesMut::with_capacity(
         first.remaining() + second.remaining() + ADDITIONAL_CAPACITY_FOR_CHUNKS_BEYOND_FIRST_TWO,
