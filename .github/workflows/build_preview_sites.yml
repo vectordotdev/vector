@@ -10,8 +10,51 @@ permissions:
   contents: read # Restrictive default
 
 jobs:
+  # Reads which "preview: <app>" labels were present on the PR at trigger time (captured into
+  # the artifact by preview_site_trigger.yml) so each deploy job below can be gated individually.
+  read_requested_apps:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read # Required for repository context
+      actions: read # Required to download artifacts
+    outputs:
+      website: ${{ steps.read.outputs.website }}
+      playground: ${{ steps.read.outputs.playground }}
+      rust_doc: ${{ steps.read.outputs.rust_doc }}
+    steps:
+      - name: Read requested preview apps from artifact
+        id: read
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }},
+            });
+            const matchArtifact = artifacts.data.artifacts.find(a => a.name === 'pr');
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip',
+            });
+            fs.writeFileSync(`${process.env.GITHUB_WORKSPACE}/pr.zip`, Buffer.from(download.data));
+            execSync(`unzip -o pr.zip -d pr`);
+
+            const apps = JSON.parse(fs.readFileSync('pr/apps', 'utf8'));
+            core.setOutput('website', apps.website === true);
+            core.setOutput('playground', apps.playground === true);
+            core.setOutput('rust_doc', apps.rustDoc === true);
+
   deploy_vector_preview_site:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
+    needs: read_requested_apps
+    if: ${{ needs.read_requested_apps.outputs.website == 'true' }}
     permissions:
       contents: read # Required by the reusable workflow
       actions: read # Required to download artifacts
@@ -26,7 +69,8 @@ jobs:
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
 
   deploy_rust_doc_preview_site:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
+    needs: read_requested_apps
+    if: ${{ needs.read_requested_apps.outputs.rust_doc == 'true' }}
     permissions:
       contents: read # Required by the reusable workflow
       actions: read # Required to download artifacts
@@ -41,7 +85,8 @@ jobs:
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
 
   deploy_vrl_playground_preview_site:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
+    needs: read_requested_apps
+    if: ${{ needs.read_requested_apps.outputs.playground == 'true' }}
     permissions:
       contents: read # Required by the reusable workflow
       actions: read # Required to download artifacts
@@ -59,8 +104,9 @@ jobs:
   # Amplify builds and report their outcome via outputs, so there is never more than one job racing
   # to read-modify-write the PR comment.
   comment_preview_links:
-    if: ${{ always() && github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
+    if: ${{ always() && github.event.workflow_run.conclusion == 'success' }}
     needs:
+      - read_requested_apps
       - deploy_vector_preview_site
       - deploy_rust_doc_preview_site
       - deploy_vrl_playground_preview_site
