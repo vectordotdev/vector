@@ -206,10 +206,11 @@ pub struct OdbcConfig {
 impl OdbcConfig {
     /// Returns the connection string to use for ODBC.
     /// If the `connection_string_filepath` is set, read the file and return its content.
+    /// Trailing `\r`/`\n` from the file contents are stripped.
     pub fn connection_string_or_file(&self) -> Result<String, std::io::Error> {
         if let Some(path) = &self.connection_string_filepath {
             match fs::read_to_string(path) {
-                Ok(content) => Ok(content),
+                Ok(content) => Ok(content.trim_end_matches(['\r', '\n']).to_string()),
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                     Ok(self.connection_string.inner().to_string())
                 }
