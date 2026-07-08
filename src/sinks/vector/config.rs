@@ -1,3 +1,4 @@
+use std::num::NonZeroU64;
 use std::time::Duration;
 
 use http::Uri;
@@ -104,16 +105,14 @@ pub struct VectorConfig {
 pub struct VectorKeepaliveConfig {
     /// The interval, in seconds, between HTTP/2 keepalive PING frames sent on a connection.
     #[serde(default = "default_keepalive_interval_secs")]
-    #[configurable(validation(range(min = 1)))]
     #[configurable(metadata(docs::human_name = "Keepalive Interval"))]
-    pub interval_secs: u64,
+    pub interval_secs: NonZeroU64,
 
     /// The time, in seconds, to wait for an acknowledgement of a keepalive PING before considering
     /// the connection dead and closing it.
     #[serde(default = "default_keepalive_timeout_secs")]
-    #[configurable(validation(range(min = 1)))]
     #[configurable(metadata(docs::human_name = "Keepalive Timeout"))]
-    pub timeout_secs: u64,
+    pub timeout_secs: NonZeroU64,
 
     /// Whether to send keepalive PING frames while the connection is idle (no requests in flight).
     ///
@@ -126,15 +125,15 @@ pub struct VectorKeepaliveConfig {
     pub while_idle: bool,
 }
 
-const fn default_keepalive_interval_secs() -> u64 {
+const fn default_keepalive_interval_secs() -> NonZeroU64 {
     // Aligned with gRPC keepalive guidance, which recommends against client intervals much below
     // one minute to avoid tripping server-side `too_many_pings` policies.
-    60
+    unsafe { NonZeroU64::new_unchecked(60) }
 }
 
-const fn default_keepalive_timeout_secs() -> u64 {
+const fn default_keepalive_timeout_secs() -> NonZeroU64 {
     // Matches hyper's default keepalive timeout.
-    20
+    unsafe { NonZeroU64::new_unchecked(20) }
 }
 
 impl VectorConfig {
@@ -284,8 +283,8 @@ fn new_client(
     // connection to a peer that has gone away instead of reusing it indefinitely.
     if let Some(keepalive) = keepalive {
         builder
-            .http2_keep_alive_interval(Duration::from_secs(keepalive.interval_secs))
-            .http2_keep_alive_timeout(Duration::from_secs(keepalive.timeout_secs))
+            .http2_keep_alive_interval(Duration::from_secs(keepalive.interval_secs.get()))
+            .http2_keep_alive_timeout(Duration::from_secs(keepalive.timeout_secs.get()))
             .http2_keep_alive_while_idle(keepalive.while_idle);
     }
 
