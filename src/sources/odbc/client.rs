@@ -994,8 +994,9 @@ fn resolve_tracking_column_parameter(
 /// Unlike `Value::to_string()`, this does not use VRL literal syntax (e.g. quoted
 /// strings or `t'…'` timestamps).
 ///
-/// Timestamps are formatted in `tz` as naive local datetimes so they compare
-/// consistently with timezone-less database date/time columns.
+/// Only `Value::Timestamp` is reformatted in `tz` as a naive local datetime.
+/// Byte/string values are preserved as-is so VARCHAR tracking columns that
+/// happen to look like RFC3339 are not coerced into timestamp predicates.
 fn value_to_sql_parameter(value: &Value, tz: Tz) -> Option<String> {
     match value {
         Value::Integer(i) => Some(i.to_string()),
@@ -1005,13 +1006,7 @@ fn value_to_sql_parameter(value: &Value, tz: Tz) -> Option<String> {
         Value::Timestamp(t) => Some(format_timestamp_for_sql_parameter(*t, tz)),
         Value::Null => None,
         other => serde_json::to_value(other).ok().and_then(|v| match v {
-            serde_json::Value::String(s) => {
-                if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(&s) {
-                    Some(format_timestamp_for_sql_parameter(datetime.into(), tz))
-                } else {
-                    Some(s)
-                }
-            }
+            serde_json::Value::String(s) => Some(s),
             serde_json::Value::Number(n) => Some(n.to_string()),
             serde_json::Value::Bool(b) => Some(boolean_to_sql_parameter(b)),
             _ => None,
@@ -1285,6 +1280,31 @@ mod tests {
                     .with_ymd_and_hms(2025, 10, 4, 12, 34, 56)
                     .unwrap()
             )
+        );
+    }
+
+    #[test]
+    fn value_to_sql_parameter_preserves_rfc3339_looking_string_bytes() {
+        // VARCHAR/TEXT tracking values must round-trip unchanged even when they
+        // parse as RFC3339; only Value::Timestamp is reformatted.
+        let raw = "2024-06-01T00:00:00Z";
+        let value = Value::Bytes(Bytes::from_static(raw.as_bytes()));
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::Asia::Seoul),
+            Some(raw.to_owned())
+        );
+    }
+
+    #[test]
+    fn value_to_sql_parameter_formats_timestamp_in_odbc_timezone() {
+        let value = Value::Timestamp(
+            chrono::Utc
+                .with_ymd_and_hms(2024, 6, 1, 0, 0, 0)
+                .unwrap(),
+        );
+        assert_eq!(
+            value_to_sql_parameter(&value, chrono_tz::Asia::Seoul),
+            Some("2024-06-01 09:00:00".to_owned())
         );
     }
 
