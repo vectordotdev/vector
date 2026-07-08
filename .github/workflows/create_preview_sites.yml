@@ -29,11 +29,6 @@ jobs:
   create_preview_site:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    # Serialize the sibling preview-site jobs (vector.dev, Rust Doc, VRL Playground) triggered
-    # from the same workflow run so they don't race when upserting the shared sticky comment.
-    concurrency:
-      group: preview-comment-${{ github.event.workflow_run.id }}
-      cancel-in-progress: false
     permissions:
       contents: read # Required for repository context
       actions: read # Required to download artifacts
@@ -169,7 +164,9 @@ jobs:
               core.setFailed(`Request failed with response code ${response.status}`);
             }
 
-      # Add/update this app's preview link in a single sticky comment shared by all preview site jobs
+      # Add/update this app's preview link in a single sticky comment shared by all preview site jobs.
+      # The 3 sibling jobs (vector.dev, Rust Doc, VRL Playground) run concurrently and each read-modify-write
+      # the same comment, so this retries with a fresh read if a concurrent write clobbers our entry.
       - name: Comment Preview Link
         if: success()
         env:
@@ -179,51 +176,73 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env;
             const fs = require('fs');
             const prNumber = fs.readFileSync('./pr/number', 'utf8');
             const issueNumber = parseInt(prNumber);
-            const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env;
 
             const STICKY_MARKER = '<!-- preview-sites-comment -->';
             const appMarker = `<!-- preview-app:${APP_NAME} -->`;
             const entry = `${appMarker}\n- [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`;
-
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber,
-              per_page: 100,
-            });
-            const existing = comments.data.find(c => c.body.includes(STICKY_MARKER));
-
             const header = `${STICKY_MARKER}\nYour preview sites will be ready in a few minutes, please allow time for them to build.`;
 
-            let entries;
-            if (existing) {
-              entries = new Map();
-              const entryRegex = /<!-- preview-app:([^>]+) -->\n- \[.*?\]\(.*?\)/g;
-              for (const match of existing.body.matchAll(entryRegex)) {
-                entries.set(match[1], match[0]);
-              }
-            } else {
-              entries = new Map();
-            }
-            entries.set(APP_NAME, entry);
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-            const body = [header, ...entries.values()].join('\n\n');
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
+            const MAX_ATTEMPTS = 5;
+            for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+              const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issueNumber,
-                body,
+                per_page: 100,
               });
+              const existing = comments.data.find(c => c.body.includes(STICKY_MARKER));
+
+              const entries = new Map();
+              if (existing) {
+                const entryRegex = /<!-- preview-app:([^>]+) -->\n- \[.*?\]\(.*?\)/g;
+                for (const match of existing.body.matchAll(entryRegex)) {
+                  entries.set(match[1], match[0]);
+                }
+              }
+              entries.set(APP_NAME, entry);
+
+              const body = [header, ...entries.values()].join('\n\n');
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body,
+                });
+              }
+
+              // Verify our entry survived: a concurrent sibling job may have read the comment
+              // before our write and clobbered it with a stale merge. Re-fetch and check.
+              const verifyComments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              });
+              const verifyComment = verifyComments.data.find(c => c.body.includes(STICKY_MARKER));
+              if (verifyComment && verifyComment.body.includes(appMarker)) {
+                core.info(`Preview link for ${APP_NAME} confirmed on attempt ${attempt}`);
+                break;
+              }
+
+              if (attempt === MAX_ATTEMPTS) {
+                core.setFailed(`Failed to persist preview link for ${APP_NAME} after ${MAX_ATTEMPTS} attempts`);
+              } else {
+                core.info(`Preview link for ${APP_NAME} was clobbered by a concurrent update, retrying (attempt ${attempt})`);
+                await sleep(500 + Math.random() * 1000);
+              }
             }
