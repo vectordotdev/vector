@@ -1,4 +1,4 @@
-use futures::StreamExt;
+use futures::{StreamExt, stream::BoxStream};
 use itertools::Itertools;
 use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::{
@@ -36,6 +36,16 @@ struct ProtocolState {
     connected: bool,
     pending_resubscribe: bool,
     connection_generation: u64,
+    /// Set once a publish in the current generation finalizes as anything
+    /// other than `Delivered`. MQTT requires PUBACKs to be sent in the order
+    /// their publishes were received ([MQTT-4.6.0-2]); acking a later packet
+    /// while an earlier one in the same generation was never acked would
+    /// violate that order, so once set, no further acks are sent until the
+    /// next reconnect. The withheld ones are redelivered the same way the
+    /// packet that triggered this already is.
+    ///
+    /// [MQTT-4.6.0-2]: https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
+    ack_suppressed: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -48,14 +58,14 @@ struct LoopActions {
 struct ConnAckActions {
     warn_session_not_resumed: bool,
     clear_pending_acks: bool,
-    flush_finalizer: bool,
+    recreate_finalizer: bool,
     resubscribe: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct DisconnectActions {
     clear_pending_acks: bool,
-    flush_finalizer: bool,
+    recreate_finalizer: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,12 +90,13 @@ impl ProtocolState {
         let actions = ConnAckActions {
             warn_session_not_resumed: acknowledgements && !session_present,
             clear_pending_acks: true,
-            flush_finalizer: true,
+            recreate_finalizer: true,
             resubscribe: self.connection_generation > 0 && !session_present,
         };
 
         self.connected = true;
         self.connection_generation += 1;
+        self.ack_suppressed = false;
 
         actions
     }
@@ -95,7 +106,7 @@ impl ProtocolState {
 
         DisconnectActions {
             clear_pending_acks: true,
-            flush_finalizer: true,
+            recreate_finalizer: true,
         }
     }
 
@@ -103,8 +114,21 @@ impl ProtocolState {
         self.pending_resubscribe = !success;
     }
 
-    fn should_ack_finalized_publish(&self, status: BatchStatus, entry_generation: u64) -> bool {
-        status == BatchStatus::Delivered && entry_generation == self.connection_generation
+    /// Whether this finalized publish should be acked. Also updates
+    /// `ack_suppressed`: see its doc comment for why a non-`Delivered` status
+    /// in the current generation withholds every ack after it, not just its
+    /// own.
+    fn should_ack_finalized_publish(&mut self, status: BatchStatus, entry_generation: u64) -> bool {
+        if entry_generation != self.connection_generation {
+            return false;
+        }
+
+        if status != BatchStatus::Delivered {
+            self.ack_suppressed = true;
+            return false;
+        }
+
+        !self.ack_suppressed
     }
 }
 
@@ -221,10 +245,7 @@ impl MqttSource {
         // order their publishes were received ([MQTT-4.6.0-2]), so finalization is
         // ordered: a slow/stuck earlier batch holds back acks for publishes
         // received after it, same as the `kafka` source's ordered offset commits.
-        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::maybe_new(
-            self.acknowledgements,
-            Some(shutdown.clone()),
-        );
+        let (mut finalizer, mut ack_stream) = self.new_finalizer(&shutdown);
 
         // PUBACKs that rumqttc's bounded request channel was too full to accept,
         // retained for retry rather than dropped. Dropping a PUBACK for an already
@@ -316,10 +337,8 @@ impl MqttSource {
                             if actions.clear_pending_acks {
                                 pending_acks.clear();
                             }
-                            if actions.flush_finalizer
-                                && let Some(finalizer) = &finalizer
-                            {
-                                finalizer.flush();
+                            if actions.recreate_finalizer {
+                                (finalizer, ack_stream) = self.new_finalizer(&shutdown);
                             }
                             if actions.resubscribe {
                                 protocol_state.on_resubscribe_result(self.try_subscribe(&client));
@@ -332,10 +351,8 @@ impl MqttSource {
                             if actions.clear_pending_acks {
                                 pending_acks.clear();
                             }
-                            if actions.flush_finalizer
-                                && let Some(finalizer) = &finalizer
-                            {
-                                finalizer.flush();
+                            if actions.recreate_finalizer {
+                                (finalizer, ack_stream) = self.new_finalizer(&shutdown);
                             }
                         }
                         _ => {}
@@ -343,6 +360,28 @@ impl MqttSource {
                 }
             }
         }
+    }
+
+    // Builds a fresh finalizer/ack-stream pair, discarding whatever the
+    // previous one held. Used instead of `FinalizerSet::flush` on
+    // (re)connect: `flush` only clears entries already pulled into its
+    // internal ordered set, not ones a concurrent `finalizer.add` call sent
+    // but that the finalizer's background task hadn't yet picked up: those
+    // survive the flush and get pushed into the set anyway. Because
+    // `OrderedFinalizer` won't yield anything newer until that stale entry
+    // resolves, it can hold back acks for the new connection generation even
+    // though `should_ack_finalized_publish` would correctly skip it once
+    // yielded. Dropping the old `finalizer` (and so its sender) instead lets
+    // its background task see the channel closed and exit outright, taking
+    // any not-yet-picked-up entries with it — no race window.
+    fn new_finalizer(
+        &self,
+        shutdown: &ShutdownSignal,
+    ) -> (
+        Option<OrderedFinalizer<FinalizerEntry>>,
+        BoxStream<'static, (BatchStatus, FinalizerEntry)>,
+    ) {
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(self.acknowledgements, Some(shutdown.clone()))
     }
 
     fn try_subscribe(&self, client: &rumqttc::AsyncClient) -> bool {
@@ -593,7 +632,7 @@ mod tests {
 
             assert_eq!(actions.warn_session_not_resumed, expected_warn);
             assert!(actions.clear_pending_acks);
-            assert!(actions.flush_finalizer);
+            assert!(actions.recreate_finalizer);
             assert!(!actions.resubscribe);
             assert!(state.connected);
             assert_eq!(state.connection_generation, 1);
@@ -607,7 +646,7 @@ mod tests {
             ConnAckActions {
                 warn_session_not_resumed: false,
                 clear_pending_acks: true,
-                flush_finalizer: true,
+                recreate_finalizer: true,
                 resubscribe: false,
             }
         );
@@ -621,7 +660,7 @@ mod tests {
             ConnAckActions {
                 warn_session_not_resumed: true,
                 clear_pending_acks: true,
-                flush_finalizer: true,
+                recreate_finalizer: true,
                 resubscribe: true,
             }
         );
@@ -670,7 +709,7 @@ mod tests {
             actions,
             DisconnectActions {
                 clear_pending_acks: true,
-                flush_finalizer: true,
+                recreate_finalizer: true,
             }
         );
         assert!(!state.connected);
@@ -701,5 +740,26 @@ mod tests {
                 should_ack
             );
         }
+    }
+
+    // [MQTT-4.6.0-2] requires PUBACKs to be sent in the order their publishes
+    // were received: once an earlier packet in a generation goes unacked
+    // (Errored/Rejected), a later packet in that same generation must not be
+    // acked either, even if it was Delivered -- or the ack order would be
+    // violated. Only a reconnect (new generation) should resume acking.
+    #[test]
+    fn finalization_suppresses_later_acks_in_generation_after_a_failure() {
+        let mut state = ProtocolState::default();
+        state.on_connack(true, true);
+
+        assert!(state.should_ack_finalized_publish(BatchStatus::Delivered, 1));
+
+        assert!(!state.should_ack_finalized_publish(BatchStatus::Rejected, 1));
+        assert!(!state.should_ack_finalized_publish(BatchStatus::Delivered, 1));
+        assert!(!state.should_ack_finalized_publish(BatchStatus::Delivered, 1));
+
+        // A reconnect starts a fresh generation, resuming normal acking.
+        state.on_connack(true, false);
+        assert!(state.should_ack_finalized_publish(BatchStatus::Delivered, 2));
     }
 }
