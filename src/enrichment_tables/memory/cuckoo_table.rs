@@ -494,7 +494,7 @@ impl CuckooMemoryTable {
                             "`ttl_bits` ({}) must be set to at least {} to support the provided `ttl` value ({}) at the configured scan interval ({}).",
                             self.cuckoo_config.ttl_bits.get(),
                             needed_bits,
-                            self.config.ttl,
+                            ttl,
                             self.config.scan_interval.get()
                         );
                     }
