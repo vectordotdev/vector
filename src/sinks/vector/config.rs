@@ -104,12 +104,14 @@ pub struct VectorConfig {
 pub struct VectorKeepaliveConfig {
     /// The interval, in seconds, between HTTP/2 keepalive PING frames sent on a connection.
     #[serde(default = "default_keepalive_interval_secs")]
+    #[configurable(validation(range(min = 1)))]
     #[configurable(metadata(docs::human_name = "Keepalive Interval"))]
     pub interval_secs: u64,
 
     /// The time, in seconds, to wait for an acknowledgement of a keepalive PING before considering
     /// the connection dead and closing it.
     #[serde(default = "default_keepalive_timeout_secs")]
+    #[configurable(validation(range(min = 1)))]
     #[configurable(metadata(docs::human_name = "Keepalive Timeout"))]
     pub timeout_secs: u64,
 
