@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
     sync::{
         LazyLock, Mutex, MutexGuard, OnceLock,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 
@@ -16,12 +16,12 @@ use tokio::sync::{
     oneshot,
 };
 use tokio_stream::wrappers::BroadcastStream;
-use tracing::{Event, Subscriber};
+use tracing::{Event, Metadata, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
     Layer,
     filter::LevelFilter,
-    layer::{Context, SubscriberExt},
+    layer::{Context, Filter, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
 };
@@ -53,6 +53,76 @@ static SUBSCRIBERS: Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> =
 /// has been initialized.
 static SENDER: OnceLock<Sender<LogEvent>> = OnceLock::new();
 
+/// BROADCAST_MAX_LEVEL holds the maximum verbosity of log events delivered to the broadcast
+/// channel that feeds `internal_logs` sources, encoded as a usize (see [`level_filter_to_usize`]).
+/// It defaults to `INFO` and is raised by [`raise_broadcast_max_level`] when an `internal_logs`
+/// source is built with a more verbose `level`. This keeps the log events delivered to
+/// `internal_logs` sources decoupled from the console log level (`VECTOR_LOG`, `--verbose`,
+/// `--quiet`).
+static BROADCAST_MAX_LEVEL: AtomicUsize = AtomicUsize::new(DEFAULT_BROADCAST_MAX_LEVEL);
+
+/// The default broadcast verbosity (3 = `INFO`).
+const DEFAULT_BROADCAST_MAX_LEVEL: usize = 3;
+
+/// Encodes a [`LevelFilter`] as a usize such that greater values are more verbose, allowing the
+/// broadcast level to be raised monotonically with `fetch_max`.
+const fn level_filter_to_usize(level: LevelFilter) -> usize {
+    match level.into_level() {
+        None => 0,
+        Some(tracing::Level::ERROR) => 1,
+        Some(tracing::Level::WARN) => 2,
+        Some(tracing::Level::INFO) => 3,
+        Some(tracing::Level::DEBUG) => 4,
+        Some(tracing::Level::TRACE) => 5,
+    }
+}
+
+const fn usize_to_level_filter(level: usize) -> LevelFilter {
+    match level {
+        0 => LevelFilter::OFF,
+        1 => LevelFilter::ERROR,
+        2 => LevelFilter::WARN,
+        3 => LevelFilter::INFO,
+        4 => LevelFilter::DEBUG,
+        _ => LevelFilter::TRACE,
+    }
+}
+
+fn broadcast_max_level() -> LevelFilter {
+    usize_to_level_filter(BROADCAST_MAX_LEVEL.load(Ordering::Relaxed))
+}
+
+/// Raises the maximum verbosity of log events delivered to `internal_logs` sources.
+///
+/// The level only ever increases in verbosity: the broadcast channel is shared by all
+/// `internal_logs` sources, so it must carry events for the most verbose of them. Each source is
+/// responsible for dropping events below its own configured level.
+///
+/// Rebuilding the callsite interest cache prompts `tracing` to re-evaluate which callsites are
+/// enabled (including the global max level hint), so a raise takes effect even though the
+/// subscriber was installed before the source was built.
+pub fn raise_broadcast_max_level(level: LevelFilter) {
+    let new = level_filter_to_usize(level);
+    let old = BROADCAST_MAX_LEVEL.fetch_max(new, Ordering::SeqCst);
+    if new > old {
+        tracing_core::callsite::rebuild_interest_cache();
+    }
+}
+
+/// A level filter for the broadcast layer that reads [`BROADCAST_MAX_LEVEL`] on every check,
+/// so that it can be raised at runtime, after the subscriber has been installed.
+struct BroadcastFilter;
+
+impl<S: Subscriber> Filter<S> for BroadcastFilter {
+    fn enabled(&self, metadata: &Metadata<'_>, _cx: &Context<'_, S>) -> bool {
+        broadcast_max_level() >= *metadata.level()
+    }
+
+    fn max_level_hint(&self) -> Option<LevelFilter> {
+        Some(broadcast_max_level())
+    }
+}
+
 fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
@@ -75,6 +145,11 @@ pub fn init(
     // that users can capture ALL internal Vector logs for debugging/monitoring. Rate limiting can
     // be opted into by passing `Some(rate)` for `broadcast_rate_limit`.
     //
+    // It is filtered by `BroadcastFilter` rather than the console filter so that the log events
+    // delivered to `internal_logs` sources are decoupled from the console log level: each such
+    // source declares its own `level` (defaulting to `INFO`) and raises the broadcast level
+    // accordingly when it is built.
+    //
     // Two separate `Option<Layer>` values are used rather than a single branch because
     // `RateLimitedLayer<BroadcastLayer<S>>` and `BroadcastLayer<S>` are distinct types.
     // `tracing_subscriber` implements `Layer` for `Option<L>`, which allows the unused layer to be
@@ -82,11 +157,11 @@ pub fn init(
     let rate_limited_broadcast = broadcast_rate_limit.map(|rate| {
         RateLimitedLayer::new(BroadcastLayer::new())
             .with_default_limit(rate.get())
-            .with_filter(fmt_filter.clone())
+            .with_filter(BroadcastFilter)
     });
     let unlimited_broadcast = broadcast_rate_limit
         .is_none()
-        .then(|| BroadcastLayer::new().with_filter(fmt_filter.clone()));
+        .then(|| BroadcastLayer::new().with_filter(BroadcastFilter));
     debug_assert_ne!(
         rate_limited_broadcast.is_some(),
         unlimited_broadcast.is_some()
