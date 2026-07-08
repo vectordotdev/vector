@@ -98,6 +98,44 @@ generated: components: sinks: vector: configuration: {
 			}
 		}
 	}
+	keepalive: {
+		description: """
+			HTTP/2 keepalive settings for the sink's gRPC connections.
+
+			Keepalive is disabled unless this is configured. When enabled, the sink periodically sends
+			HTTP/2 PING frames so that a pooled connection to a downstream Vector instance that has gone
+			away (crashed and restarted, or cut off by a network partition) is detected and evicted
+			rather than reused indefinitely.
+			"""
+		required: false
+		type: object: options: {
+			interval_secs: {
+				description: "The interval, in seconds, between HTTP/2 keepalive PING frames sent on a connection."
+				required:    false
+				type: uint: default: 60
+			}
+			timeout_secs: {
+				description: """
+					The time, in seconds, to wait for an acknowledgement of a keepalive PING before considering
+					the connection dead and closing it.
+					"""
+				required: false
+				type: uint: default: 20
+			}
+			while_idle: {
+				description: """
+					Whether to send keepalive PING frames while the connection is idle (no requests in flight).
+
+					This is required to detect a connection that dies while idle in the pool. However, some gRPC
+					servers and gRPC-aware proxies close a connection with a `too_many_pings` (`GOAWAY`) error
+					when keepalive PINGs are sent without active calls. Only enable this when the downstream
+					permits keepalive without active calls.
+					"""
+				required: false
+				type: bool: default: false
+			}
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
