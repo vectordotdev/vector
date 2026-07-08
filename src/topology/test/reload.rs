@@ -566,6 +566,94 @@ async fn topology_reload_preserves_enrichment_table_state() {
     }
 }
 
+#[tokio::test]
+async fn topology_reload_reuses_removed_enrichment_table_source_key() {
+    test_util::trace_init();
+
+    let table_source_key = "memory_test_source";
+    let (old_tx, old_rx) = channel();
+
+    let mut old_config = Config::builder();
+    old_config.add_source(
+        "in",
+        UnitTestSourceConfig {
+            events: vec![Event::Log(LogEvent::from("old"))],
+        },
+    );
+
+    let mut old_memory_config = MemoryConfig::default();
+    old_memory_config.source_config = Some(MemorySourceConfig {
+        export_interval: Some(NonZeroU64::new(1).unwrap()),
+        source_key: table_source_key.to_string(),
+        export_batch_size: None,
+        remove_after_export: false,
+        export_expired_items: false,
+    });
+    old_config.add_enrichment_table(
+        "memory_test",
+        &["in"],
+        EnrichmentTables::Memory(old_memory_config),
+    );
+    old_config.add_sink("old_out", &[table_source_key], oneshot_sink(old_tx));
+
+    let (new_tx, new_rx) = channel();
+    let mut new_config = Config::builder();
+    new_config.add_enrichment_table(
+        "memory_test",
+        &[],
+        EnrichmentTables::Memory(MemoryConfig::default()),
+    );
+    new_config.add_source(
+        table_source_key,
+        UnitTestSourceConfig {
+            events: vec![Event::Log(LogEvent::from("new"))],
+        },
+    );
+    new_config.add_sink("new_out", &[table_source_key], oneshot_sink(new_tx));
+
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    tokio::select! {
+        events = old_rx => {
+            let events = events
+                .expect("old table source must send output before reload")
+                .into_events()
+                .collect::<Vec<_>>();
+            assert!(!events.is_empty());
+        },
+        _ = tokio::time::sleep(Duration::from_secs(5)) => {
+            panic!("old table source never produced output")
+        }
+        error = crash_stream.next() => panic!("topology crashed before reload: {error:?}"),
+    }
+
+    let reload_result = tokio::time::timeout(
+        Duration::from_secs(5),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+    )
+    .await;
+    assert!(
+        reload_result.is_ok(),
+        "reload stalled while reusing removed enrichment table source key"
+    );
+    reload_result.unwrap().unwrap();
+
+    tokio::select! {
+        events = new_rx => {
+            let events = events
+                .expect("new source must send output after reload")
+                .into_events()
+                .collect::<Vec<_>>();
+            assert_eq!(events.len(), 1);
+        },
+        _ = tokio::time::sleep(Duration::from_secs(5)) => {
+            panic!("new source never produced output after reload")
+        }
+        error = crash_stream.next() => panic!("topology crashed after reload: {error:?}"),
+    }
+}
+
 async fn reload_sink_test(
     old_config: Config,
     new_config: Config,
