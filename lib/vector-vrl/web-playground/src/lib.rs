@@ -218,6 +218,9 @@ mod tests {
     // An empty event renders the same as before (`JSON.stringify({}, null, "\t")`).
     #[test]
     fn to_pretty_json_renders_empty_object() {
-        assert_eq!(to_pretty_json(&Value::Object(ObjectMap::new())).unwrap(), "{}");
+        assert_eq!(
+            to_pretty_json(&Value::Object(ObjectMap::new())).unwrap(),
+            "{}"
+        );
     }
 }
