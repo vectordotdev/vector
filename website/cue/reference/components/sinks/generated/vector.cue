@@ -29,7 +29,7 @@ generated: components: sinks: vector: configuration: {
 	}
 	address: {
 		deprecated:         true
-		deprecated_message: "This option has been deprecated, use `endpoints` instead."
+		deprecated_message: "This option has been deprecated, use `routing.endpoints` instead."
 		description: """
 			The downstream Vector address to which to connect.
 
@@ -37,10 +37,10 @@ generated: components: sinks: vector: configuration: {
 
 			The address _must_ include a port.
 
-			This option is mutually exclusive with `endpoints`. Set exactly one of
-			`address` or `endpoints`.
+			This option is mutually exclusive with `routing`. Set exactly one of
+			`address` or `routing`.
 
-			This option has been deprecated, use `endpoints` instead.
+			This option has been deprecated, use `routing.endpoints` instead.
 			"""
 		required: false
 		type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
@@ -103,88 +103,6 @@ generated: components: sinks: vector: configuration: {
 					[zstd]: https://facebook.github.io/zstd/
 					"""
 			}
-		}
-	}
-	endpoint_health: {
-		description: "Options for determining the health of Vector endpoints."
-		required:    false
-		type: object: options: {
-			retry_initial_backoff_secs: {
-				description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
-				required:    false
-				type: uint: {
-					default: 1
-					unit:    "seconds"
-				}
-			}
-			retry_max_duration_secs: {
-				description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
-				required:    false
-				type: uint: {
-					default: 3600
-					unit:    "seconds"
-				}
-			}
-		}
-	}
-	endpoint_strategy: {
-		description: """
-			Strategy for routing requests across multiple configured endpoints.
-
-			This option is only used when `endpoints` is configured.
-			"""
-		required: false
-		type: string: {
-			default: "load_balance"
-			enum: {
-				failover: """
-					Use one endpoint at a time. When the active endpoint fails, continue
-					through the configured endpoints from the next endpoint.
-
-					This mode keeps using the last successful endpoint until it fails. Use
-					`failover_primary` instead when retriable failures should re-check the
-					first configured endpoint before trying secondary endpoints.
-
-					Requests are serialized for this strategy, regardless of the configured
-					request concurrency, to preserve one active endpoint at a time.
-					"""
-				failover_primary: """
-					Use one endpoint at a time. When the active endpoint fails, retry from
-					the configured endpoint order so the sink can return to its configured
-					primary endpoint.
-
-					This is useful when receiver-side connection recycling, such as
-					`max_connection_age_secs`, should converge the sink back to the first
-					configured endpoint when it is available.
-
-					Requests are serialized for this strategy, regardless of the configured
-					request concurrency, to preserve one active endpoint at a time.
-					"""
-				load_balance: """
-					Distribute requests across healthy endpoints using Vector's existing
-					Tower distributed service. Endpoint health is tracked using
-					`endpoint_health`, and unhealthy endpoints are backed off and probed
-					according to that configuration. This mode does not preserve a single
-					active endpoint or prefer the first configured endpoint.
-					"""
-			}
-		}
-	}
-	endpoints: {
-		description: """
-			The downstream Vector endpoints to which to connect.
-
-			Both IP addresses and hostnames are accepted formats.
-
-			Each endpoint _must_ include a port.
-
-			This option is mutually exclusive with `address`. Set exactly one of
-			`address` or `endpoints`.
-			"""
-		required: false
-		type: array: {
-			default: []
-			items: type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
 		}
 	}
 	request: {
@@ -369,6 +287,103 @@ generated: components: sinks: vector: configuration: {
 				type: uint: {
 					default: 60
 					unit:    "seconds"
+				}
+			}
+		}
+	}
+	routing: {
+		description: """
+			Routing options for sending requests to one or more downstream Vector endpoints.
+
+			This option is mutually exclusive with `address`. Set exactly one of
+			`address` or `routing`.
+			"""
+		required: false
+		type: object: options: {
+			endpoints: {
+				description: """
+					The downstream Vector endpoints to which to connect.
+
+					Both IP addresses and hostnames are accepted formats.
+
+					Each endpoint _must_ include a port.
+					"""
+				required: false
+				type: array: {
+					default: []
+					items: type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
+				}
+			}
+			health: {
+				description: """
+					Options for determining the health and backoff behavior of
+					load-balanced Vector endpoints.
+
+					This option is only used when `strategy` is set to `load_balance`.
+					"""
+				required: false
+				type: object: options: {
+					retry_initial_backoff_secs: {
+						description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
+					}
+					retry_max_duration_secs: {
+						description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
+						required:    false
+						type: uint: {
+							default: 3600
+							unit:    "seconds"
+						}
+					}
+				}
+			}
+			strategy: {
+				description: """
+					Strategy for routing requests across configured endpoints.
+
+					When only one endpoint is configured, the sink uses the standard
+					single-endpoint service path and strategy-specific routing semantics are
+					not applied.
+					"""
+				required: false
+				type: string: {
+					default: "load_balance"
+					enum: {
+						failover: """
+															Use one endpoint at a time. When the active endpoint fails, continue
+															through the configured endpoints from the next endpoint.
+
+															This mode keeps using the last successful endpoint until it fails. Use
+															`failover_primary` instead when retriable failures should re-check the
+															first configured endpoint before trying secondary endpoints.
+
+															Requests are serialized for this strategy, regardless of the configured
+															request concurrency, to preserve one active endpoint at a time.
+															"""
+						failover_primary: """
+															Use one endpoint at a time. When the active endpoint fails, retry from
+															the configured endpoint order so the sink can return to its configured
+															primary endpoint.
+
+															This is useful when receiver-side connection recycling, such as
+															`max_connection_age_secs`, should converge the sink back to the first
+															configured endpoint when it is available.
+
+															Requests are serialized for this strategy, regardless of the configured
+															request concurrency, to preserve one active endpoint at a time.
+															"""
+						load_balance: """
+															Distribute requests across healthy endpoints using Vector's existing
+															Tower distributed service. Endpoint health is tracked using
+															`routing.health`, and unhealthy endpoints are backed off and probed
+															according to that configuration. This mode does not preserve a single
+															active endpoint or prefer the first configured endpoint.
+															"""
+					}
 				}
 			}
 		}

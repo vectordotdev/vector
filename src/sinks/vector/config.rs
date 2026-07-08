@@ -58,30 +58,26 @@ pub struct VectorConfig {
     ///
     /// The address _must_ include a port.
     ///
-    /// This option is mutually exclusive with `endpoints`. Set exactly one of
-    /// `address` or `endpoints`.
+    /// This option is mutually exclusive with `routing`. Set exactly one of
+    /// `address` or `routing`.
     ///
-    /// This option has been deprecated, use `endpoints` instead.
+    /// This option has been deprecated, use `routing.endpoints` instead.
     #[configurable(validation(format = "uri"))]
-    #[configurable(deprecated = "This option has been deprecated, use `endpoints` instead.")]
+    #[configurable(
+        deprecated = "This option has been deprecated, use `routing.endpoints` instead."
+    )]
     #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
     address: Option<String>,
 
-    /// The downstream Vector endpoints to which to connect.
-    ///
-    /// Both IP addresses and hostnames are accepted formats.
-    ///
-    /// Each endpoint _must_ include a port.
+    /// Routing options for sending requests to one or more downstream Vector endpoints.
     ///
     /// This option is mutually exclusive with `address`. Set exactly one of
-    /// `address` or `endpoints`.
-    #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
-    #[configurable(metadata(docs::examples = "https://somehost:6000"))]
+    /// `address` or `routing`.
     #[serde(default)]
-    endpoints: Vec<String>,
+    #[configurable(derived)]
+    routing: Option<RoutingConfig>,
 
     /// Compression algorithm for requests.
     ///
@@ -105,17 +101,6 @@ pub struct VectorConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    /// Options for determining the health of Vector endpoints.
-    #[serde(default)]
-    #[configurable(derived)]
-    pub endpoint_health: Option<HealthConfig>,
-
-    /// Strategy for routing requests across multiple configured endpoints.
-    ///
-    /// This option is only used when `endpoints` is configured.
-    #[serde(default)]
-    pub endpoint_strategy: EndpointStrategy,
-
     #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
@@ -127,6 +112,43 @@ pub struct VectorConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
+}
+
+/// Routing options for sending requests to downstream Vector endpoints.
+///
+/// Load-balanced sinks healthcheck all configured endpoints on startup.
+/// Failover sinks healthcheck only the initially active endpoint by default,
+/// which is the first configured endpoint, unless `healthcheck.uri` is set.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+struct RoutingConfig {
+    /// The downstream Vector endpoints to which to connect.
+    ///
+    /// Both IP addresses and hostnames are accepted formats.
+    ///
+    /// Each endpoint _must_ include a port.
+    #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "https://somehost:6000"))]
+    #[serde(default)]
+    endpoints: Vec<String>,
+
+    /// Strategy for routing requests across configured endpoints.
+    ///
+    /// When only one endpoint is configured, the sink uses the standard
+    /// single-endpoint service path and strategy-specific routing semantics are
+    /// not applied.
+    #[serde(default)]
+    strategy: EndpointStrategy,
+
+    /// Options for determining the health and backoff behavior of
+    /// load-balanced Vector endpoints.
+    ///
+    /// This option is only used when `strategy` is set to `load_balance`.
+    #[serde(default)]
+    #[configurable(derived)]
+    health: Option<HealthConfig>,
 }
 
 impl VectorConfig {
@@ -147,12 +169,10 @@ fn default_config(address: &str) -> VectorConfig {
     VectorConfig {
         version: None,
         address: Some(address.to_owned()),
-        endpoints: Vec::new(),
+        routing: None,
         compression: VectorCompression::None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
-        endpoint_health: None,
-        endpoint_strategy: EndpointStrategy::default(),
         tls: None,
         acknowledgements: Default::default(),
     }
@@ -164,15 +184,14 @@ impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uris = self.uris(tls.is_tls())?;
+        let endpoint_strategy = self
+            .routing
+            .as_ref()
+            .map_or_else(EndpointStrategy::default, |routing| routing.strategy);
 
         let client = new_client(&tls, cx.proxy())?;
 
-        let healthcheck = healthchecks(
-            client.clone(),
-            &uris,
-            cx.healthcheck,
-            self.endpoint_strategy,
-        );
+        let healthcheck = healthchecks(client.clone(), &uris, cx.healthcheck, endpoint_strategy);
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -185,7 +204,7 @@ impl SinkConfig for VectorConfig {
             })
             .collect::<Vec<_>>();
 
-        let sink = match self.endpoint_strategy {
+        let sink = match endpoint_strategy {
             _ if services.len() == 1 => {
                 let service = ServiceBuilder::new()
                     .settings(request_settings, VectorGrpcRetryLogic)
@@ -200,8 +219,9 @@ impl SinkConfig for VectorConfig {
                 let service = request_settings.distributed_service(
                     VectorGrpcRetryLogic,
                     services,
-                    self.endpoint_health
-                        .clone()
+                    self.routing
+                        .as_ref()
+                        .and_then(|routing| routing.health.clone())
                         .unwrap_or_else(default_endpoint_health_config),
                     VectorGrpcHealthLogic,
                     1,
@@ -214,7 +234,7 @@ impl SinkConfig for VectorConfig {
             }
             EndpointStrategy::Failover | EndpointStrategy::FailoverPrimary => {
                 let endpoint_timeout = request_settings.timeout;
-                let max_endpoint_attempts = match self.endpoint_strategy {
+                let max_endpoint_attempts = match endpoint_strategy {
                     EndpointStrategy::Failover => services.len(),
                     EndpointStrategy::FailoverPrimary => services.len() + 1,
                     EndpointStrategy::LoadBalance => {
@@ -235,7 +255,7 @@ impl SinkConfig for VectorConfig {
                             .map(|(_endpoint, service)| service)
                             .collect(),
                         endpoint_timeout,
-                        self.endpoint_strategy,
+                        endpoint_strategy,
                     ));
 
                 VectorSinkType::from_event_streamsink(VectorSink {
@@ -264,7 +284,7 @@ impl SinkConfig for VectorConfig {
 pub enum EndpointStrategy {
     /// Distribute requests across healthy endpoints using Vector's existing
     /// Tower distributed service. Endpoint health is tracked using
-    /// `endpoint_health`, and unhealthy endpoints are backed off and probed
+    /// `routing.health`, and unhealthy endpoints are backed off and probed
     /// according to that configuration. This mode does not preserve a single
     /// active endpoint or prefer the first configured endpoint.
     #[default]
@@ -602,13 +622,18 @@ fn is_retriable_vector_error(error: &crate::Error) -> bool {
 
 impl VectorConfig {
     fn validate_endpoint_options(&self) -> crate::Result<()> {
-        match (self.address.as_ref(), self.endpoints.as_slice()) {
-            (Some(_), [_, ..]) => Err(
-                "`address` and `endpoints` options are mutually exclusive. Please use `endpoints` for multiple Vector endpoints."
+        match (self.address.as_ref(), self.routing.as_ref()) {
+            (Some(_), Some(_)) => Err(
+                "`address` and `routing` options are mutually exclusive. Please use `routing.endpoints` for multiple Vector endpoints."
                     .into(),
             ),
-            (None, []) => Err("No Vector endpoint configured. Please set `address` or `endpoints`.".into()),
-            (Some(_), []) | (None, [_, ..]) => Ok(()),
+            (None, None) => {
+                Err("No Vector endpoint configured. Please set `address` or `routing.endpoints`.".into())
+            }
+            (None, Some(routing)) if routing.endpoints.is_empty() => {
+                Err("`routing.endpoints` must contain at least one endpoint.".into())
+            }
+            (Some(_), None) | (None, Some(_)) => Ok(()),
         }
     }
 
@@ -618,7 +643,10 @@ impl VectorConfig {
         if let Some(address) = self.address.as_ref() {
             Ok(vec![with_default_scheme(address, tls)?])
         } else {
-            self.endpoints
+            self.routing
+                .as_ref()
+                .expect("routing must be present after validation")
+                .endpoints
                 .iter()
                 .map(|endpoint| with_default_scheme(endpoint, tls))
                 .collect()
@@ -863,6 +891,30 @@ mod tests {
         }) as crate::Error);
 
         assert_eq!(VectorGrpcHealthLogic.is_healthy(&response), Some(false));
+    }
+
+    #[test]
+    fn parse_routing_health_config() {
+        let config: VectorConfig = toml::from_str(
+            r#"
+                [routing]
+                endpoints = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
+
+                [routing.health]
+                retry_initial_backoff_secs = 2
+                retry_max_duration_secs = 30
+            "#,
+        )
+        .unwrap();
+
+        let health = config
+            .routing
+            .as_ref()
+            .and_then(|routing| routing.health.as_ref())
+            .expect("routing.health should parse");
+
+        assert_eq!(health.retry_initial_backoff_secs, 2);
+        assert_eq!(health.retry_max_duration_secs, Duration::from_secs(30));
     }
 
     #[test]

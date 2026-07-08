@@ -91,38 +91,64 @@ mod tests {
         };
 
         assert!(
-            err.to_string()
-                .contains("No Vector endpoint configured. Please set `address` or `endpoints`."),
+            err.to_string().contains(
+                "No Vector endpoint configured. Please set `address` or `routing.endpoints`."
+            ),
             "{err}"
         );
     }
 
     #[tokio::test]
-    async fn build_rejects_address_and_endpoints() {
+    async fn build_rejects_address_and_routing() {
         let config: VectorConfig = toml::from_str(
             r#"
                 address = "http://127.0.0.1:6000"
+
+                [routing]
                 endpoints = ["http://127.0.0.1:6001"]
             "#,
         )
         .unwrap();
 
         let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("address and endpoints should be mutually exclusive"),
+            Ok(_) => panic!("address and routing should be mutually exclusive"),
             Err(err) => err,
         };
 
         assert!(
             err.to_string()
-                .contains("`address` and `endpoints` options are mutually exclusive"),
+                .contains("`address` and `routing` options are mutually exclusive"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn build_rejects_empty_routing_endpoints() {
+        let config: VectorConfig = toml::from_str(
+            r#"
+                [routing]
+                strategy = "failover"
+            "#,
+        )
+        .unwrap();
+
+        let err = match config.build(SinkContext::default()).await {
+            Ok(_) => panic!("routing without endpoints should fail"),
+            Err(err) => err,
+        };
+
+        assert!(
+            err.to_string()
+                .contains("`routing.endpoints` must contain at least one endpoint"),
             "{err}"
         );
     }
 
     #[test]
-    fn parse_endpoints_config() {
+    fn parse_routing_config() {
         let config: Result<VectorConfig, _> = toml::from_str(
             r#"
+                [routing]
                 endpoints = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
             "#,
         );
@@ -134,8 +160,9 @@ mod tests {
     fn parse_failover_endpoint_strategy() {
         let config: Result<VectorConfig, _> = toml::from_str(
             r#"
+                [routing]
                 endpoints = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
-                endpoint_strategy = "failover"
+                strategy = "failover"
             "#,
         );
 
@@ -146,8 +173,9 @@ mod tests {
     fn parse_failover_primary_endpoint_strategy() {
         let config: Result<VectorConfig, _> = toml::from_str(
             r#"
+                [routing]
                 endpoints = ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
-                endpoint_strategy = "failover_primary"
+                strategy = "failover_primary"
             "#,
         );
 
@@ -250,6 +278,7 @@ mod tests {
 
         let config = format!(
             r#"
+                [routing]
                 endpoints = ["http://{addr1}/", "http://{addr2}/"]
             "#
         );
@@ -307,8 +336,9 @@ mod tests {
 
         let config = format!(
             r#"
+                [routing]
                 endpoints = ["http://{addr1}/", "http://{addr2}/"]
-                endpoint_strategy = "failover"
+                strategy = "failover"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -359,8 +389,9 @@ mod tests {
 
         let config = format!(
             r#"
+                [routing]
                 endpoints = ["http://{addr1}/", "http://{addr2}/"]
-                endpoint_strategy = "failover"
+                strategy = "failover"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -400,8 +431,9 @@ mod tests {
 
         let config = format!(
             r#"
+                [routing]
                 endpoints = ["http://{addr1}/", "http://{addr2}/"]
-                endpoint_strategy = "failover_primary"
+                strategy = "failover_primary"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -476,10 +508,12 @@ mod tests {
 
         let config = format!(
             r#"
-                endpoints = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
-                endpoint_strategy = "failover"
                 batch.max_events = 1
                 request.concurrency = 1
+
+                [routing]
+                endpoints = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
+                strategy = "failover"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -554,10 +588,12 @@ mod tests {
 
         let config = format!(
             r#"
-                endpoints = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
-                endpoint_strategy = "failover_primary"
                 batch.max_events = 1
                 request.concurrency = 1
+
+                [routing]
+                endpoints = ["http://{addr1}/", "http://{addr2}/", "http://{addr3}/"]
+                strategy = "failover_primary"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -638,8 +674,9 @@ mod tests {
 
         let config = format!(
             r#"
+                [routing]
                 endpoints = ["http://{addr1}/", "http://{addr2}/"]
-                endpoint_strategy = "failover"
+                strategy = "failover"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -687,11 +724,12 @@ mod tests {
 
         let config = format!(
             r#"
-                endpoints = ["http://{addr1}/", "http://{addr2}/"]
-                endpoint_strategy = "failover"
-
                 [request]
                 timeout_secs = 1
+
+                [routing]
+                endpoints = ["http://{addr1}/", "http://{addr2}/"]
+                strategy = "failover"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -745,13 +783,14 @@ mod tests {
 
         let config = format!(
             r#"
-                endpoints = ["http://{addr}/"]
-                endpoint_strategy = "failover"
-
                 [request]
                 timeout_secs = 1
                 retry_initial_backoff_secs = 1
                 retry_max_duration_secs = 5
+
+                [routing]
+                endpoints = ["http://{addr}/"]
+                strategy = "failover"
             "#
         );
         let config: VectorConfig = toml::from_str(&config).unwrap();
