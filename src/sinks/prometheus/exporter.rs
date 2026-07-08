@@ -22,7 +22,9 @@ use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
-use tracing::{Instrument, Span, error, info, warn};
+#[cfg(feature = "kubernetes")]
+use tracing::warn;
+use tracing::{Instrument, Span, error, info};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
@@ -225,6 +227,26 @@ pub enum PrometheusExporterAuth {
         #[serde(default)]
         #[configurable(metadata(docs::examples = "system:authenticated"))]
         allowed_groups: Option<Vec<String>>,
+
+        /// Required audience for token validation.
+        ///
+        /// The bearer token presented by the client must have been issued for this audience.
+        /// This prevents tokens minted for the Kubernetes API server from being replayed
+        /// to scrape this metrics endpoint.
+        ///
+        /// **Security**: It is strongly recommended to set this to a unique value specific
+        /// to your Vector metrics endpoint (e.g., "https://vector.my-namespace.svc.cluster.local").
+        ///
+        /// If not specified, tokens are validated for the default Kubernetes API server audience,
+        /// which allows API server tokens to be replayed (not recommended for production).
+        ///
+        /// When using projected service account tokens, configure your scraper (e.g., Prometheus)
+        /// to mount a token with this audience.
+        #[serde(default)]
+        #[configurable(metadata(
+            docs::examples = "https://vector-metrics.monitoring.svc.cluster.local"
+        ))]
+        audience: Option<String>,
     },
 }
 
@@ -499,6 +521,7 @@ struct SarAuthParams<'a> {
     namespace: &'a Option<String>,
     user: &'a Option<String>,
     groups: &'a Option<Vec<String>>,
+    audience: &'a Option<String>,
 }
 
 /// Validates a Bearer token using Kubernetes TokenReview and SubjectAccessReview.
@@ -526,19 +549,23 @@ async fn validate_token_with_sar(
     debug!(
         message = "Validating bearer token",
         path = ?params.path,
-        resource = ?params.resource
+        resource = ?params.resource,
+        audience = ?params.audience
     );
 
     // Step 1: Validate the client's token using TokenReview
     let token_review = TokenReview {
         spec: TokenReviewSpec {
             token: Some(token.to_string()),
-            audiences: None,
+            audiences: params.audience.as_ref().map(|aud| vec![aud.clone()]),
         },
         ..Default::default()
     };
 
-    debug!(message = "Calling TokenReview API");
+    debug!(
+        message = "Calling TokenReview API",
+        requested_audience = ?params.audience
+    );
     let token_api: Api<TokenReview> = Api::all(client.clone());
     let token_result = token_api.create(&Default::default(), &token_review).await?;
 
@@ -550,6 +577,36 @@ async fn validate_token_with_sar(
     if !token_status.authenticated.unwrap_or(false) {
         warn!(message = "Token authentication failed via TokenReview");
         return Ok(false);
+    }
+
+    // Validate audience if one was requested
+    if let Some(required_audience) = params.audience {
+        let token_audiences = token_status.audiences.as_ref();
+
+        match token_audiences {
+            Some(auds) if auds.contains(required_audience) => {
+                debug!(
+                    message = "Token audience validated",
+                    required_audience = %required_audience,
+                    token_audiences = ?auds
+                );
+            }
+            Some(auds) => {
+                warn!(
+                    message = "Token audience mismatch",
+                    required_audience = %required_audience,
+                    token_audiences = ?auds
+                );
+                return Ok(false);
+            }
+            None => {
+                warn!(
+                    message = "Token has no audience but one was required",
+                    required_audience = %required_audience
+                );
+                return Ok(false);
+            }
+        }
     }
 
     // Extract user info from the validated token
@@ -695,6 +752,7 @@ async fn validate_token_with_sar(
 }
 
 /// Extracts the Bearer token from the Authorization header.
+#[cfg(feature = "kubernetes")]
 fn extract_bearer_token<T: HttpBody>(req: &Request<T>) -> Option<String> {
     req.headers()
         .get(hyper::header::AUTHORIZATION)?
@@ -831,6 +889,7 @@ impl Handler {
             namespace,
             allowed_user,
             allowed_groups,
+            audience,
         }) = &self.auth
         {
             // Ensure we have a Kubernetes client
@@ -844,6 +903,39 @@ impl Handler {
                     return false;
                 }
             };
+
+            // For path-based (nonResourceURL) SAR, validate that configured path/verb
+            // match the actual request being authorized
+            if let Some(configured_path) = path {
+                let request_path = req.uri().path();
+                let request_method = req.method().as_str().to_lowercase();
+
+                if configured_path != request_path {
+                    error!(
+                        message = "SAR path mismatch: configured path does not match actual request",
+                        configured_path = %configured_path,
+                        request_path = %request_path,
+                        security_note = "This prevents authorizing /metrics based on permission for a different URL"
+                    );
+                    return false;
+                }
+
+                if verb.to_lowercase() != request_method {
+                    error!(
+                        message = "SAR verb mismatch: configured verb does not match actual request",
+                        configured_verb = %verb,
+                        request_method = %request_method,
+                        security_note = "This prevents authorizing GET based on permission for POST"
+                    );
+                    return false;
+                }
+
+                debug!(
+                    message = "SAR request validation passed",
+                    path = %request_path,
+                    method = %request_method
+                );
+            }
 
             // Validate token with SubjectAccessReview
             if let Some(token) = extract_bearer_token(req) {
@@ -860,6 +952,7 @@ impl Handler {
                         namespace,
                         user: allowed_user,
                         groups: allowed_groups,
+                        audience,
                     },
                 )
                 .await
