@@ -446,6 +446,52 @@ impl CuckooMemoryTable {
         }
     }
 
+    async fn scan(&self, scans_in_progress: &Arc<AtomicUsize>) {
+        let mut handles = JoinSet::new();
+        let filter = self.filter.clone();
+        let count = self
+            .cuckoo_config
+            .scanning_threads
+            .unwrap_or(NonZeroUsize::new(1).unwrap());
+        scans_in_progress.fetch_add(count.get(), Ordering::AcqRel);
+        for i in 0..count.get() {
+            let filter = filter.clone();
+            let scans_in_progress = Arc::clone(scans_in_progress);
+            let lru_deletion_enabled = self.cuckoo_config.lru_deletion_enabled;
+            let task = async move {
+                let expired = if lru_deletion_enabled {
+                    filter.scan_and_update_lru_partition(count, i);
+                    // Run TTL scan separately when LRU deletion is enabled, to ensure
+                    // correct TTL expired count
+                    filter.scan_and_update_ttl_partition(count, i)
+                } else {
+                    filter.scan_and_update_full_partition(count, i)
+                };
+                emit!(MemoryEnrichmentTableTtlExpiredCount {
+                    count: expired as u64
+                });
+                scans_in_progress.fetch_sub(1, Ordering::AcqRel);
+            }
+            .in_current_span();
+            handles.spawn(task);
+        }
+        if !self.cuckoo_config.concurrent_scanning {
+            let _ = handles.join_all().await;
+            emit!(MemoryEnrichmentTableFlushed {
+                new_objects_count: filter.get_item_count(),
+                new_byte_size: filter.get_memory_usage()
+            });
+        } else {
+            tokio::spawn(async move {
+                let _ = handles.join_all().await;
+                emit!(MemoryEnrichmentTableFlushed {
+                    new_objects_count: filter.get_item_count(),
+                    new_byte_size: filter.get_memory_usage()
+                });
+            });
+        }
+    }
+
     fn export_to(&self, mut writer: impl Write) -> Result<(), ()> {
         match self.filter.exporter().write_to(&mut writer) {
             Ok(()) => {
@@ -497,9 +543,9 @@ impl CuckooMemoryTable {
                             ttl,
                             self.config.scan_interval.get()
                         );
+                        // Unchecked conversion to u32, because ttl_bits can't be higher than 32 anyways
+                        *ttl = 2_u32.pow(self.cuckoo_config.ttl_bits.get() as u32) - 1;
                     }
-                    // Unchecked conversion to u32, because ttl_bits can't be higher than 32 anyways
-                    *ttl = 2_u32.pow(self.cuckoo_config.ttl_bits.get() as u32) - 1;
                 }
                 let counter = self
                     .cuckoo_config
@@ -708,45 +754,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
                         warn!("Previous scan still in progress for cuckoo enrichment table. New scan will be skipped until previous one is complete. Consider increasing scan interval.");
                         continue;
                     }
-                    let mut handles = JoinSet::new();
-                    let filter = self.filter.clone();
-                    let count = self.cuckoo_config.scanning_threads.unwrap_or(NonZeroUsize::new(1).unwrap());
-                    scans_in_progress.fetch_add(count.get(), Ordering::AcqRel);
-                    for i in 0..count.get() {
-                        let filter = filter.clone();
-                        let scans_in_progress = Arc::clone(&scans_in_progress);
-                        let lru_deletion_enabled = self.cuckoo_config.lru_deletion_enabled;
-                        let task = async move {
-                            let expired = if lru_deletion_enabled {
-                                filter.scan_and_update_lru_partition(count, i);
-                                // Run TTL scan separately when LRU deletion is enabled, to ensure
-                                // correct TTL expired count
-                                filter.scan_and_update_ttl_partition(count, i)
-                            } else {
-                                filter.scan_and_update_full_partition(count, i)
-                            };
-                            emit!(MemoryEnrichmentTableTtlExpiredCount {
-                                count: expired as u64
-                            });
-                            scans_in_progress.fetch_sub(1, Ordering::AcqRel);
-                        }.in_current_span();
-                        handles.spawn(task);
-                    }
-                    if !self.cuckoo_config.concurrent_scanning {
-                        let _ = handles.join_all().await;
-                        emit!(MemoryEnrichmentTableFlushed {
-                            new_objects_count: filter.get_item_count(),
-                            new_byte_size: filter.get_memory_usage()
-                        });
-                    } else {
-                        tokio::spawn(async move {
-                            let _ = handles.join_all().await;
-                            emit!(MemoryEnrichmentTableFlushed {
-                                new_objects_count: filter.get_item_count(),
-                                new_byte_size: filter.get_memory_usage()
-                            });
-                        });
-                    }
+                    self.scan(&scans_in_progress).await;
                 }
             }
         }
@@ -760,6 +768,13 @@ impl StreamSink<Event> for CuckooMemoryTable {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZero;
+
+    use futures::future::ready;
+    use vector_lib::{event::LogEvent, sink::VectorSink};
+
+    use crate::test_util::components::{SINK_TAGS, run_and_assert_sink_compliance};
+
     use super::*;
 
     fn build_cuckoo_config(modfn: impl Fn(&mut CuckooMemoryConfig)) -> CuckooMemoryConfig {
@@ -807,6 +822,86 @@ mod tests {
         assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
         // Cuckoo fingerprint is provided too
         assert!(result.contains_key("fingerprint"));
+    }
+
+    #[tokio::test]
+    async fn sink_spec_compliance() {
+        let event = Event::Log(LogEvent::from(ObjectMap::from([(
+            "test_key".into(),
+            Value::from(5),
+        )])));
+
+        let memory = CuckooMemoryTable::new(Default::default(), build_cuckoo_config(|_| {}))
+            .expect("default cuckoo memory table should build correctly");
+
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(memory),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
+    }
+
+    #[test]
+    fn missing_key() {
+        let memory = CuckooMemoryTable::new(Default::default(), build_cuckoo_config(|_| {}))
+            .expect("default cuckoo memory table should build correctly");
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        assert!(
+            memory
+                .find_table_rows(Case::Sensitive, &[condition], None, None, None)
+                .unwrap()
+                .pop()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn updates_ttl_on_scan_interval() {
+        let ttl = 100;
+        let mut core_conf = MemoryConfig::default();
+        core_conf.ttl = ttl;
+        core_conf.scan_interval = NonZero::new(1).unwrap();
+        let memory = CuckooMemoryTable::new(
+            core_conf,
+            build_cuckoo_config(|c| {
+                c.ttl_enabled = true;
+                c.ttl_bits = NonZero::new(8).unwrap();
+            }),
+        )
+        .expect("TTL cuckoo memory table should build correctly");
+
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        let result = memory.find_table_row(
+            Case::Sensitive,
+            std::slice::from_ref(&condition),
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
+        assert_eq!(result.get("ttl").unwrap(), &Value::from(100));
+
+        memory.scan(&Arc::new(AtomicUsize::default())).await;
+
+        let result = memory.find_table_row(Case::Sensitive, &[condition], None, None, None);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
+        assert_eq!(result.get("ttl").unwrap(), &Value::from(99));
     }
 
     #[test]
