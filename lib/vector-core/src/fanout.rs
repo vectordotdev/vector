@@ -870,13 +870,14 @@ mod tests {
             .expect("should not fail");
     }
 
+    #[cfg(debug_assertions)]
     #[tokio::test]
     #[should_panic(expected = "Fanout received empty event batch from upstream component")]
     async fn fanout_panics_on_empty_event_array_in_debug_builds() {
         let (mut fanout, _, _receivers) = fanout_from_senders(&[2, 2]);
         let empty: EventArray = Vec::<LogEvent>::new().into();
 
-        let _ = fanout.send(empty, None).await;
+        _ = fanout.send(empty, None).await;
     }
 
     #[tokio::test]

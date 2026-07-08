@@ -128,7 +128,7 @@ pub fn trace_init() {
 
     let levels = std::env::var("VECTOR_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels, 10);
+    trace::init(color, false, &levels, 10, None);
 
     // Initialize metrics as well
     vector_lib::metrics::init_test();
@@ -152,7 +152,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
 
     let mut sink = FramedWrite::new(stream, encoder);
 
-    let mut lines = stream::iter(lines.into_iter()).map(Ok);
+    let mut lines = stream::iter(lines).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut();

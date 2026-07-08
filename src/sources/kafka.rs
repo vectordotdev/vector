@@ -1309,13 +1309,15 @@ impl KafkaSourceContext {
             return;
         }
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsAssigned(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsAssigned(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             // no-op: wait for partition assignment handler to complete
@@ -1329,13 +1331,15 @@ impl KafkaSourceContext {
     /// sender is dropped by the callback handler.
     fn revoke_partitions(&self, tpl: &TopicPartitionList) {
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsRevoked(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsRevoked(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             self.commit_consumer_state();

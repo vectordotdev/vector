@@ -98,7 +98,7 @@ Partitioning, or “topics” in Kafka terminology, refers to separating data in
 
 ### Global Aggregation
 
-Because Vector can deployed anywhere in your infrastructure, it offers a unique approach to global aggregation. Aggregation can be tiered, allowing local aggregators to reduce data before forwarding to your global aggregators.
+Because Vector can be deployed anywhere in your infrastructure, it offers a unique approach to global aggregation. Aggregation can be tiered, allowing local aggregators to reduce data before forwarding to your global aggregators.
 
 ![Aggregator](/img/going-to-prod/global-aggregation.png)
 

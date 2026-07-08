@@ -1180,6 +1180,8 @@ mod fault_tolerance_tests {
 
 #[cfg(test)]
 mod acknowledgement_tests {
+    use indoc::indoc;
+
     use super::*;
     use crate::config::{SourceAcknowledgementsConfig, SourceConfig};
 
@@ -1237,37 +1239,40 @@ mod acknowledgement_tests {
 
     #[test]
     fn test_acknowledgements_toml_parsing() {
-        // Test parsing from TOML with acknowledgements enabled
-        let toml_with_acks = r#"
-            channels = ["System"]
-            acknowledgements = true
-        "#;
+        // Test parsing from YAML with acknowledgements enabled
+        let yaml_with_acks = indoc! {r#"
+            channels:
+              - System
+            acknowledgements: true
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_acks).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_acks).expect("YAML parsing should succeed");
         assert!(
             config.acknowledgements.enabled(),
-            "Acknowledgements should be enabled from TOML"
+            "Acknowledgements should be enabled from YAML"
         );
 
         // Test parsing with acknowledgements as struct
-        let toml_with_acks_struct = r#"
-            channels = ["System"]
-            [acknowledgements]
-            enabled = true
-        "#;
+        let yaml_with_acks_struct = indoc! {r#"
+            channels:
+              - System
+            acknowledgements:
+              enabled: true
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_acks_struct).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_acks_struct).expect("YAML parsing should succeed");
         assert!(
             config.acknowledgements.enabled(),
-            "Acknowledgements should be enabled from TOML struct"
+            "Acknowledgements should be enabled from YAML struct"
         );
 
         // Test parsing without acknowledgements (default)
-        let toml_without_acks = r#"
-            channels = ["System"]
-        "#;
+        let yaml_without_acks = indoc! {r#"
+            channels:
+              - System
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_without_acks).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_without_acks).expect("YAML parsing should succeed");
         assert!(
             !config.acknowledgements.enabled(),
             "Acknowledgements should be disabled by default"
@@ -1281,6 +1286,8 @@ mod acknowledgement_tests {
 
 #[cfg(test)]
 mod rate_limiting_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1305,15 +1312,16 @@ mod rate_limiting_tests {
 
     #[test]
     fn test_rate_limiting_toml_parsing() {
-        let toml_with_rate_limit = r#"
-            channels = ["System"]
-            events_per_second = 50
-        "#;
+        let yaml_with_rate_limit = indoc! {r#"
+            channels:
+              - System
+            events_per_second: 50
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_rate_limit).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_rate_limit).expect("YAML parsing should succeed");
         assert_eq!(
             config.events_per_second, 50,
-            "Rate limiting should be parsed from TOML"
+            "Rate limiting should be parsed from YAML"
         );
     }
 
@@ -1343,6 +1351,8 @@ mod rate_limiting_tests {
 
 #[cfg(test)]
 mod checkpoint_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1357,15 +1367,16 @@ mod checkpoint_tests {
 
     #[test]
     fn test_checkpoint_toml_parsing() {
-        let toml_with_data_dir = r#"
-            channels = ["System"]
-            data_dir = "/var/lib/vector/wineventlog"
-        "#;
+        let yaml_with_data_dir = indoc! {r#"
+            channels:
+              - System
+            data_dir: /var/lib/vector/wineventlog
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_data_dir).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_data_dir).expect("YAML parsing should succeed");
         assert!(
             config.data_dir.is_some(),
-            "data_dir should be parsed from TOML"
+            "data_dir should be parsed from YAML"
         );
     }
 
@@ -1383,6 +1394,8 @@ mod checkpoint_tests {
 
 #[cfg(test)]
 mod message_rendering_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1396,15 +1409,16 @@ mod message_rendering_tests {
 
     #[test]
     fn test_render_message_config_enabled() {
-        let toml_with_render = r#"
-            channels = ["System"]
-            render_message = true
-        "#;
+        let yaml_with_render = indoc! {r#"
+            channels:
+              - System
+            render_message: true
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_render).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_render).expect("YAML parsing should succeed");
         assert!(
             config.render_message,
-            "render_message should be enabled from TOML"
+            "render_message should be enabled from YAML"
         );
     }
 
@@ -1486,6 +1500,8 @@ mod message_rendering_tests {
 
 #[cfg(test)]
 mod truncation_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1500,15 +1516,16 @@ mod truncation_tests {
 
     #[test]
     fn test_max_event_data_length_toml_parsing() {
-        let toml_with_truncation = r#"
-            channels = ["System"]
-            max_event_data_length = 256
-        "#;
+        let yaml_with_truncation = indoc! {r#"
+            channels:
+              - System
+            max_event_data_length: 256
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_truncation).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_truncation).expect("YAML parsing should succeed");
         assert_eq!(
             config.max_event_data_length, 256,
-            "max_event_data_length should be parsed from TOML"
+            "max_event_data_length should be parsed from YAML"
         );
     }
 

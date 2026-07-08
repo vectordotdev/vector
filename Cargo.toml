@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.56.0"
+version = "0.57.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -12,7 +12,7 @@ default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
-rust-version = "1.92"
+rust-version = "1.95"
 
 [[bin]]
 name = "vector"
@@ -47,8 +47,8 @@ lto = "fat"
 [profile.bench]
 debug = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+[lints]
+workspace = true
 
 [package.metadata.deb]
 name = "vector"
@@ -132,14 +132,28 @@ members = [
   "lib/vector-vrl/metrics",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "tests/antithesis/harness",
   "vdev",
 ]
 
+[workspace.lints.rust]
+# 'cfg(tokio_unstable)' used in vector; 'cfg(ddsketch_extended)' used in vector-core
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(ddsketch_extended)'] }
+
+[workspace.lints.clippy]
+string_slice = "warn"
+await_holding_lock = "warn"
+let_underscore_must_use = "warn"
+
 [workspace.dependencies]
+antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
+antithesis_sdk = { version = "0.2", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 arc-swap = { version = "1.8.2", default-features = false }
+async-compression = { version = "0.4.42", default-features = false, features = ["tokio", "gzip"] }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
+axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
@@ -170,6 +184,7 @@ libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
+mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
@@ -189,8 +204,8 @@ reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.149", default-features = false, features = ["preserve_order", "raw_value", "std"] }
-serde_with = { version = "3.20.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
+serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
@@ -211,6 +226,7 @@ tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.22.0", features = ["v4", "v7", "serde", "fast-rng"] }
+vector-buffers = { path = "lib/vector-buffers" }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
@@ -240,8 +256,6 @@ uuid.workspace = true
 vrl.workspace = true
 
 # Internal libs
-dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
-dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-common = { path = "lib/vector-common", default-features = false }
@@ -336,11 +350,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { version = "2.0.1", optional = true }
-# The SDK returns prost-types 0.14 DescriptorProto values; prost-reflect (used by the rest
-# of the sink) is on prost-types 0.13. We bridge the two via wire-format re-encoding.
-prost-014 = { package = "prost", version = "0.14", optional = true }
-prost-types-014 = { package = "prost-types", version = "0.14", optional = true }
+databricks-zerobus-ingest-sdk = { version = "2.3.0", optional = true, features = ["arrow-flight"] }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
@@ -360,10 +370,10 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
-async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
-arrow-schema = { version = "56.2.0", default-features = false, optional = true }
-parquet = { version = "56.2.0", default-features = false, features = [
+async-compression = { workspace = true, features = ["zstd"], optional = true }
+arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "58.2.0", default-features = false, optional = true }
+parquet = { version = "58.2.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
@@ -413,6 +423,7 @@ itertools.workspace = true
 k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31"], optional = true }
 kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
+libc.workspace = true
 lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
@@ -444,10 +455,9 @@ sqlx = { version = "0.8.6", default-features = false, features = ["derive", "pos
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
-tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.18", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
-hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
 tonic-health = { workspace = true, optional = true }
 tonic-reflection = { workspace = true, optional = true }
@@ -463,22 +473,29 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-deps", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+mlua = { workspace = true, features = ["macros"], optional = true }
 sysinfo = "0.37.2"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Threading"] }
 windows-service = "0.8.0"
 windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Foundation", "Win32_System_Com", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"], optional = true }
 quick-xml = { version = "0.31", default-features = false, features = ["serialize"], optional = true }
 rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
+libc.workspace = true
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
 tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
+dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
+dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
+hickory-proto = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
+# antithesis-instrumentation links a native .a via ELF .init_array -- Linux only.
+antithesis-instrumentation = { workspace = true, optional = true }
 
 [build-dependencies]
 prost-build = { workspace = true, optional = true }
@@ -526,11 +543,13 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # macOS releases pick it up through the `target-aarch64-apple-darwin` feature (see target
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
-default = ["enable-unix"]
+default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
+antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
+antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
-docs = ["enable-unix"]
+docs = ["enable-api-client", "sources-dnstap"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
+default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 
 # Enables Kerberos / GSSAPI SASL support for kafka via dynamic linkage to a
 # system-provided libsasl2 (and the host's GSS implementation). Requires
@@ -553,11 +572,8 @@ vendored = ["gssapi-vendored"]
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
-enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
-
-default-msvc = ["enable-api-client", "rdkafka?/cmake_build"]
-default-musl = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
-default-no-api-client = ["base", "sources-dnstap", "unix", "vendored"]
+default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
+default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -577,23 +593,19 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
 target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
-target-unix = ["target-base", "unix"]
-target-aarch64-unknown-linux-gnu =      ["target-unix"]
-target-aarch64-unknown-linux-musl =     ["target-unix"]
-target-armv7-unknown-linux-gnueabihf =  ["target-unix"]
+target-aarch64-unknown-linux-gnu =      ["target-base", "tikv-jemallocator"]
+target-aarch64-unknown-linux-musl =     ["target-base", "tikv-jemallocator"]
+target-armv7-unknown-linux-gnueabihf =  ["target-base", "tikv-jemallocator"]
 target-armv7-unknown-linux-musleabihf = ["target-base"]
-target-arm-unknown-linux-gnueabi =      ["target-unix"]
+target-arm-unknown-linux-gnueabi =      ["target-base", "tikv-jemallocator"]
 target-arm-unknown-linux-musleabi =     ["target-base"]
-target-x86_64-unknown-linux-gnu =       ["target-unix", "vendored"]
-target-x86_64-unknown-linux-musl =      ["target-unix"]
+target-x86_64-unknown-linux-gnu =       ["target-base", "tikv-jemallocator", "vendored"]
+target-x86_64-unknown-linux-musl =      ["target-base", "tikv-jemallocator"]
 # Apple targets opt into `gssapi` (dynamic linkage to system libsasl2 + Apple's
 # GSS framework). The `gssapi-vendored` path does not currently link on
 # macOS arm64 (unresolved gss_* symbols).
-target-aarch64-apple-darwin =           ["enable-unix", "gssapi"]
+target-aarch64-apple-darwin =           ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "gssapi"]
 
-# Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator", "allocation-tracing"]
-allocation-tracing = ["vector-lib/allocation-tracing"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -934,7 +946,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
-sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "dep:prost-reflect", "dep:prost-014", "dep:prost-types-014", "dep:base64"]
+sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow", "arrow/ipc_compression"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
@@ -984,7 +996,6 @@ all-integration-tests = [
   "aws-integration-tests",
   "axiom-integration-tests",
   "azure-integration-tests",
-  "chronicle-integration-tests",
   "clickhouse-integration-tests",
   "databend-integration-tests",
   "datadog-agent-integration-tests",
@@ -1055,14 +1066,13 @@ aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 azure-logs-ingestion-integration-tests = ["sinks-azure_logs_ingestion"]
-chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics", "dep:prost"]
 datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
-docker-logs-integration-tests = ["sources-docker_logs", "unix"]
+docker-logs-integration-tests = ["sources-docker_logs"]
 doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
@@ -1092,8 +1102,8 @@ dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 windows-event-log-integration-tests = ["sources-windows_event_log-integration-tests"]
 disable-resolv-conf = []
-shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
-cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap"]
+shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap"]
+cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap", "transforms-filter", "transforms-aws_ec2_metadata"]
 test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features

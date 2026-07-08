@@ -421,6 +421,7 @@ mod tests {
     use std::{collections::BTreeSet, sync::Arc, task::Poll};
 
     use futures::stream;
+    use indoc::indoc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::config::{ComponentKey, LogNamespace};
@@ -1113,11 +1114,9 @@ mod tests {
 
     #[tokio::test]
     async fn transform_shutdown() {
-        let agg = toml::from_str::<AggregateConfig>(
-            r"
-interval_ms = 999999
-",
-        )
+        let agg = serde_yaml::from_str::<AggregateConfig>(indoc! {"
+            interval_ms: 999999
+        "})
         .unwrap()
         .build(&TransformContext::default())
         .await
@@ -1175,7 +1174,7 @@ interval_ms = 999999
 
     #[tokio::test]
     async fn transform_interval() {
-        let transform_config = toml::from_str::<AggregateConfig>("").unwrap();
+        let transform_config = serde_yaml::from_str::<AggregateConfig>("{}").unwrap();
 
         let counter_a_1 = make_metric(
             "counter_a",

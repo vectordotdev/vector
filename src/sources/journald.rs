@@ -1110,10 +1110,7 @@ impl Checkpointer {
             0 => Ok(None),
             _ => {
                 let text = String::from_utf8_lossy(&buf);
-                match text.find('\n') {
-                    Some(nl) => Ok(Some(String::from(&text[..nl]))),
-                    None => Ok(None), // Maybe return an error?
-                }
+                Ok(text.split_once('\n').map(|(line, _)| line.to_string()))
             }
         }
     }

@@ -263,6 +263,21 @@ where
         let next_writer_id = self.state().get_next_writer_record_id();
         let last_reader_id = self.state().get_last_reader_record_id();
 
+        // The wrapped id difference is always >= 1. A 0 makes the `- 1` below
+        // underflow to ~2^64 and report a bogus record count.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always_greater_than_or_equal_to!(
+                next_writer_id.wrapping_sub(last_reader_id),
+                1u64,
+                "ledger get_total_records never underflows on a drained buffer",
+                &serde_json::json!({
+                    "next_writer_id": next_writer_id,
+                    "last_reader_id": last_reader_id,
+                })
+            );
+        }
         next_writer_id.wrapping_sub(last_reader_id) - 1
     }
 
@@ -289,6 +304,18 @@ where
 
     /// Decrements the total number of bytes for all unread records in the buffer.
     pub fn decrement_total_buffer_size(&self, amount: u64) {
+        // Never decrement below zero. An underflow wraps the counter to a
+        // near-maximum value, which makes the buffer look permanently full and
+        // wedges the writer.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always_greater_than_or_equal_to!(
+                self.total_buffer_size.load(Ordering::Acquire),
+                amount,
+                "ledger total_buffer_size decrement never underflows"
+            );
+        }
         let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -471,7 +498,7 @@ where
         );
 
         trace!(
-            unacked_reader_file_id_offset = result.map(|n| n - 1).unwrap_or(0),
+            unacked_reader_file_id_offset = result.map_or(0, |n| n - 1),
             acked_reader_file_id_offset = new_reader_file_id,
             "Incremented acknowledged reader file ID offset with corresponding unacknowledged decrement."
         );
@@ -690,6 +717,19 @@ where
                     );
                 }
             }
+        }
+
+        // A non-zero sum means the buffer reopened on top of records left on disk by
+        // a previous run, the reseed path whose value the reader later draws down and
+        // the one most exposed to the buffer-size underflow.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_sometimes!(
+                total_buffer_size > 0,
+                "the buffer reopens with pre-existing on-disk records",
+                &serde_json::json!({ "total_buffer_size": total_buffer_size })
+            );
         }
 
         self.increment_total_buffer_size(total_buffer_size);

@@ -1329,6 +1329,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_rejects_gzip_bomb_with_413() {
+        // A modestly-sized gzipped blob of zeros that would expand past the default
+        // 100 MiB cap if decompression were unbounded.
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        let chunk = [0u8; 8 * 1024];
+        for _ in 0..(200 * 1024 * 1024 / chunk.len()) {
+            encoder.write_all(&chunk).unwrap();
+        }
+        let body = encoder.finish().unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Encoding", "gzip".parse().unwrap());
+
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            None,
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(413, send_bytes(addr, body, headers).await);
+    }
+
+    #[tokio::test]
     async fn http_path() {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(

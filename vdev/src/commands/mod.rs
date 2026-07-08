@@ -71,6 +71,7 @@ mod build;
 mod check;
 mod complete;
 mod crate_versions;
+mod deprecation;
 mod e2e;
 mod features;
 mod fmt;
@@ -90,6 +91,7 @@ cli_commands! {
     check,
     complete,
     crate_versions,
+    deprecation,
     e2e,
     features,
     fmt,
