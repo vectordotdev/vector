@@ -29,6 +29,11 @@ jobs:
   create_preview_site:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # Serialize the sibling preview-site jobs (vector.dev, Rust Doc, VRL Playground) triggered
+    # from the same workflow run so they don't race when upserting the shared sticky comment.
+    concurrency:
+      group: preview-comment-${{ github.event.workflow_run.id }}
+      cancel-in-progress: false
     permissions:
       contents: read # Required for repository context
       actions: read # Required to download artifacts
@@ -164,7 +169,7 @@ jobs:
               core.setFailed(`Request failed with response code ${response.status}`);
             }
 
-      # Add preview link to comment if all 3 sites successfully start
+      # Add/update this app's preview link in a single sticky comment shared by all preview site jobs
       - name: Comment Preview Link
         if: success()
         env:
@@ -179,9 +184,46 @@ jobs:
             const issueNumber = parseInt(prNumber);
             const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env;
 
-            await github.rest.issues.createComment({
+            const STICKY_MARKER = '<!-- preview-sites-comment -->';
+            const appMarker = `<!-- preview-app:${APP_NAME} -->`;
+            const entry = `${appMarker}\n- [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`;
+
+            const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
-              body: `Your preview site for the **${APP_NAME}** will be ready in a few minutes, please allow time for it to build. \n \n Heres your preview link: \n [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`
+              per_page: 100,
             });
+            const existing = comments.data.find(c => c.body.includes(STICKY_MARKER));
+
+            const header = `${STICKY_MARKER}\nYour preview sites will be ready in a few minutes, please allow time for them to build.`;
+
+            let entries;
+            if (existing) {
+              entries = new Map();
+              const entryRegex = /<!-- preview-app:([^>]+) -->\n- \[.*?\]\(.*?\)/g;
+              for (const match of existing.body.matchAll(entryRegex)) {
+                entries.set(match[1], match[0]);
+              }
+            } else {
+              entries = new Map();
+            }
+            entries.set(APP_NAME, entry);
+
+            const body = [header, ...entries.values()].join('\n\n');
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body,
+              });
+            }
