@@ -79,14 +79,9 @@ jobs:
             const prNumber = fs.readFileSync(path.join('pr', 'number'), 'utf8').trim();
             const integrity = fs.readFileSync(path.join('pr', 'integrity'), 'utf8').trim();
 
-            // Validate branch name again (only allow alphanumeric, dash, and underscore)
-            const branchNameRegex = /^[a-zA-Z0-9_\-]+$/;
-            if (!branchNameRegex.test(branchName)) {
-              core.setFailed(`Invalid branch name detected: ${branchName}`);
-              return;
-            }
-
-            const sanitizedBranchName = branchName.replace(/[\/\.]/g, '-');
+            // Any character outside a-zA-Z0-9 becomes a dash, so any git-legal branch name is
+            // safe to use in the Amplify subdomain regardless of its raw content.
+            const sanitizedBranchName = branchName.replace(/[^a-zA-Z0-9]/g, '-');
             core.exportVariable('SANITIZED_BRANCH_NAME', sanitizedBranchName);
             core.exportVariable('BRANCH_NAME', branchName);
             core.exportVariable('PR_NUMBER', prNumber);
