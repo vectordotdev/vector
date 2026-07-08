@@ -4,7 +4,7 @@ use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
-    finalizer::UnorderedFinalizer,
+    finalizer::OrderedFinalizer,
     internal_event::EventsReceived,
     lookup::path,
 };
@@ -217,10 +217,11 @@ impl MqttSource {
         // Finalizer drives end-to-end acknowledgements: each in-flight publish is
         // registered with its batch-status receiver, and we send the QoS-1 PUBACK
         // only once the sinks report `Delivered`. Unused when acknowledgements are
-        // disabled (rumqttc auto-acks in that mode). MQTT PUBACKs are independent
-        // per packet id (unlike Kafka offsets), so finalization is unordered — a
-        // slow/stuck batch must not hold back acks for already-delivered publishes.
-        let (finalizer, mut ack_stream) = UnorderedFinalizer::<FinalizerEntry>::maybe_new(
+        // disabled (rumqttc auto-acks in that mode). PUBACKs must be sent in the
+        // order their publishes were received ([MQTT-4.6.0-2]), so finalization is
+        // ordered: a slow/stuck earlier batch holds back acks for publishes
+        // received after it, same as the `kafka` source's ordered offset commits.
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::maybe_new(
             self.acknowledgements,
             Some(shutdown.clone()),
         );
@@ -374,7 +375,7 @@ impl MqttSource {
         &self,
         mut publish: Publish,
         out: &mut SourceSender,
-        finalizer: Option<&UnorderedFinalizer<FinalizerEntry>>,
+        finalizer: Option<&OrderedFinalizer<FinalizerEntry>>,
         connection_generation: u64,
     ) {
         emit!(EndpointBytesReceived {
