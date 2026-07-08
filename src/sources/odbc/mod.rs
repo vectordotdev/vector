@@ -57,8 +57,10 @@
 //! ```
 //!
 //! Every five seconds, the source emits one log event per result row. Column values
-//! keep their Vector types where possible (for example `datetime` as a timestamp and
-//! `id` as an integer). When encoded to JSON by a sink, the events look similar to:
+//! keep their Vector types where possible (for example naive `datetime` values as
+//! timestamps via `odbc_default_timezone`, and `id` as an integer). Offset-bearing
+//! SQL or RFC3339 timestamp text is kept as bytes so tracking parameters round-trip
+//! the exact ODBC text. When encoded to JSON by a sink, the events look similar to:
 //!
 //! ```json
 //! {"datetime":"2025-04-28T01:20:04Z","id":1,"name":"test1","source_type":"odbc","timestamp":"2025-04-28T01:50:45.075484Z"}

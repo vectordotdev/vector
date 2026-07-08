@@ -50,9 +50,11 @@ components: sources: odbc: {
 			description: """
 				A single row returned by the ODBC query. Each column becomes a
 				top-level log field and retains its Vector typed value when possible
-				(for example timestamps, integers, booleans, and floats). Columns
-				that cannot be represented as a native Vector type are emitted as
-				bytes.
+				(for example naive timestamps via `odbc_default_timezone`, integers,
+				booleans, and floats). Offset-bearing SQL or RFC3339 timestamp text
+				is emitted as bytes so tracking parameters can reuse the exact ODBC
+				text. Other columns that cannot be represented as a native Vector
+				type are also emitted as bytes.
 				"""
 			fields: {
 				"*": {
@@ -167,8 +169,11 @@ components: sources: odbc: {
 
 						Every five seconds, the source emits one log event per result row.
 						Column values keep their Vector types when possible (for example
-						`datetime` as a timestamp and `id` as an integer). When a sink
-						encodes events as JSON, the output looks similar to the following.
+						naive `datetime` values as timestamps via `odbc_default_timezone`,
+						and `id` as an integer). Offset-bearing SQL or RFC3339 timestamp
+						text is kept as bytes so tracking parameters round-trip the exact
+						ODBC text. When a sink encodes events as JSON, the output looks
+						similar to the following.
 
 						```json
 						{"datetime":"2025-04-28T01:20:04Z","id":1,"name":"test1","source_type":"odbc","timestamp":"2025-04-28T01:50:45.075484Z"}
@@ -180,6 +185,20 @@ components: sources: odbc: {
 						"""
 				},
 			]
+		}
+
+		timestamp_mapping: {
+			title: "Timestamp mapping"
+			body: """
+				Naive date/time text from the driver is parsed to a Vector timestamp
+				using `odbc_default_timezone`. Timestamp text that already includes a
+				zone, such as SQL-style `YYYY-MM-DD HH:MM:SS+02:00` or RFC3339 values
+				like `2025-04-28T01:20:04Z` / `2025-04-28T01:20:04+02:00`, is preserved
+				as bytes. That keeps tracking-column round-trips faithful to the
+				original ODBC text instead of rebinding a naive local datetime that can
+				skip or replay rows when the database offset differs from
+				`odbc_default_timezone`.
+				"""
 		}
 
 		check_license: {

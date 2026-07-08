@@ -134,6 +134,8 @@ pub struct OdbcConfig {
 
     /// Timezone applied to database date/time columns that lack timezone information.
     /// Ambiguous DST times use the latest matching instant; nonexistent times are kept as text.
+    /// Offset-bearing SQL or RFC3339 timestamp text is preserved as bytes and is not rewritten
+    /// with this timezone, so tracking parameters can round-trip the exact ODBC text.
     /// The default is UTC.
     #[configurable(metadata(docs::examples = "UTC"))]
     #[configurable(metadata(
