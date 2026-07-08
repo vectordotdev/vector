@@ -553,6 +553,10 @@ pub mod test_util {
 
     // InfluxDB strips off trailing zeros in timestamps in metrics
     fn strip_timestamp(timestamp: String) -> String {
+        #[expect(
+            clippy::string_slice,
+            reason = "last two bytes are always ASCII ('0Z' or '.Z'), guaranteed char boundaries"
+        )]
         let strip_one = || format!("{}Z", &timestamp[..timestamp.len() - 2]);
         match timestamp {
             _ if timestamp.ends_with("0Z") => strip_timestamp(strip_one()),
@@ -580,13 +584,13 @@ mod tests {
 
     #[test]
     fn test_influxdb_settings_both() {
-        let config = r#"
-        bucket = "my-bucket"
-        org = "my-org"
-        token = "my-token"
-        database = "my-database"
-    "#;
-        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
+        let config = indoc::indoc! {r#"
+        bucket: "my-bucket"
+        org: "my-org"
+        token: "my-token"
+        database: "my-database"
+        "#};
+        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             settings.expect_err("expected error").to_string(),
@@ -596,9 +600,8 @@ mod tests {
 
     #[test]
     fn test_influxdb_settings_missing() {
-        let config = r"
-    ";
-        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
+        let config = "{}";
+        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             settings.expect_err("expected error").to_string(),
@@ -608,21 +611,21 @@ mod tests {
 
     #[test]
     fn test_influxdb1_settings() {
-        let config = r#"
-        database = "my-database"
-    "#;
-        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
+        let config = indoc::indoc! {r#"
+        database: "my-database"
+        "#};
+        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
         _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
     #[test]
     fn test_influxdb2_settings() {
-        let config = r#"
-        bucket = "my-bucket"
-        org = "my-org"
-        token = "my-token"
-    "#;
-        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
+        let config = indoc::indoc! {r#"
+        bucket: "my-bucket"
+        org: "my-org"
+        token: "my-token"
+        "#};
+        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
         _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 

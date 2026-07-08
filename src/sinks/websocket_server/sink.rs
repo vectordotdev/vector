@@ -888,7 +888,8 @@ mod tests {
                 }
             }
 
-            let _ = tx.close().await;
+            // Error is ignored since it only fails if the channel is already closed.
+            tx.close().await.ok();
         })
     }
 

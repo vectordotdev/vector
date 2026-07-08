@@ -389,8 +389,8 @@ macro_rules! define_stat_struct {
                 for line in text.lines(){
                     if false {}
                     $(
-                        else if line.starts_with(concat!(stringify!($field), ' ')) {
-                            result.$field = line[stringify!($field).len()+1..].parse()?;
+                        else if let Some(rest) = line.strip_prefix(concat!(stringify!($field), ' ')) {
+                            result.$field = rest.parse()?;
                         }
                     )*
                 }
@@ -487,7 +487,11 @@ mod tests {
 
     #[tokio::test]
     async fn generates_cgroups_metrics() {
-        let config: HostMetricsConfig = toml::from_str(r#"collectors = ["cgroups"]"#).unwrap();
+        let config: HostMetricsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            collectors:
+              - cgroups
+        "#})
+        .unwrap();
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
         let metrics = buffer.metrics;
@@ -600,12 +604,12 @@ mod tests {
 
         async fn test(&self) {
             let path = self.0.path();
-            let config: HostMetricsConfig = toml::from_str(&format!(
-                r#"
-                collectors = ["cgroups"]
-                cgroups.base_dir = {path:?}
-                "#
-            ))
+            let config: HostMetricsConfig = serde_yaml::from_str(&indoc::formatdoc! {r#"
+                collectors:
+                  - cgroups
+                cgroups:
+                  base_dir: {path:?}
+            "#})
             .unwrap();
             let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(config).cgroups_metrics(&mut buffer).await;

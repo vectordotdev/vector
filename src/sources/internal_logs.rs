@@ -238,7 +238,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn receives_logs() {
-        trace::init(false, false, "debug", 10);
+        trace::init(false, false, "debug", 10, None);
         trace::reset_early_buffer();
 
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
@@ -363,7 +363,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn registered_extra_span_field_is_captured() {
-        trace::init(false, false, "info", 10);
+        trace::init(false, false, "info", 10, None);
         trace::reset_early_buffer();
 
         let test_id: u8 = rand::random();
@@ -400,7 +400,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn repeated_logs_are_not_rate_limited() {
-        trace::init(false, false, "info", 10);
+        trace::init(false, false, "info", 10, None);
         trace::reset_early_buffer();
 
         let rx = start_source().await;

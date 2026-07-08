@@ -511,7 +511,7 @@ async fn test_include_xml_well_formed() {
     assert!(
         xml_str.contains("<Event") && xml_str.contains("</Event>"),
         "XML field should contain well-formed <Event>...</Event>, got: {}",
-        &xml_str[..xml_str.len().min(200)]
+        xml_str.chars().take(200).collect::<String>()
     );
 }
 
@@ -1583,7 +1583,7 @@ async fn test_full_data_path_produces_checkpoint() {
         contents.contains("\"version\"") && contents.contains("\"channels\""),
         "Checkpoint file should contain valid JSON with version and channels. \
          Got: {}",
-        &contents[..contents.len().min(200)]
+        contents.chars().take(200).collect::<String>()
     );
 }
 

@@ -65,7 +65,7 @@ Automated steps include:
   - [ ] Ensure any deprecations are highlighted in the release upgrade guide.
   - [ ] Review generated changelog entries to ensure they are understandable to end-users.
   - [ ] Ensure the date matches the scheduled release date.
-  - [ ] Add a link to pending deprecation items from [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md).
+  - [ ] Run `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"` to review new deprecation announcements in this release.
 - [ ] PR review & approval.
 
 # On the day of release

@@ -877,7 +877,7 @@ mod tests {
         let (mut fanout, _, _receivers) = fanout_from_senders(&[2, 2]);
         let empty: EventArray = Vec::<LogEvent>::new().into();
 
-        let _ = fanout.send(empty, None).await;
+        _ = fanout.send(empty, None).await;
     }
 
     #[tokio::test]

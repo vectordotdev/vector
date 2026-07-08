@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt, stream};

@@ -32,6 +32,8 @@ mod common;
 mod conditions;
 #[cfg(feature = "sources-datadog_agent")]
 mod datadog_agent;
+#[cfg(feature = "sinks-datadog_logs")]
+mod datadog_logs;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
@@ -186,6 +188,8 @@ pub(crate) use self::aws_kinesis_firehose::*;
 pub(crate) use self::aws_sqs::*;
 #[cfg(feature = "sources-datadog_agent")]
 pub(crate) use self::datadog_agent::*;
+#[cfg(feature = "sinks-datadog_logs")]
+pub(crate) use self::datadog_logs::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
 #[cfg(feature = "sinks-datadog_traces")]
