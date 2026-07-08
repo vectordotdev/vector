@@ -102,37 +102,31 @@ generated: components: sinks: vector: configuration: {
 		description: """
 			HTTP/2 keepalive settings for the sink's gRPC connections.
 
-			Keepalive is disabled unless this is configured. When enabled, the sink periodically sends
-			HTTP/2 PING frames so that a pooled connection to a downstream Vector instance that has gone
-			away (crashed and restarted, or cut off by a network partition) is detected and evicted
-			rather than reused indefinitely.
+			Keepalive is disabled unless this is configured. When enabled, the sink sends HTTP/2 PING
+			frames on idle connections so that a pooled connection to a downstream Vector instance that
+			has gone away (crashed, restarted, or cut off by a network partition) is detected and evicted
+			before it is reused, ensuring retries always go to a live connection.
 			"""
 		required: false
 		type: object: options: {
 			interval_secs: {
-				description: "The interval, in seconds, between HTTP/2 keepalive PING frames sent on a connection."
-				required:    false
+				description: """
+					How often, in seconds, to send a keepalive PING on idle connections.
+
+					Shorter intervals detect dead connections faster at the cost of additional traffic.
+					gRPC guidance recommends no less than 60 seconds to avoid tripping `too_many_pings`
+					policies on servers or proxies between source and destination.
+					"""
+				required: false
 				type: uint: default: 60
 			}
 			timeout_secs: {
 				description: """
-					The time, in seconds, to wait for an acknowledgement of a keepalive PING before considering
-					the connection dead and closing it.
+					How long, in seconds, to wait for a keepalive PING acknowledgement before treating
+					the connection as dead and closing it.
 					"""
 				required: false
 				type: uint: default: 20
-			}
-			while_idle: {
-				description: """
-					Whether to send keepalive PING frames while the connection is idle (no requests in flight).
-
-					This is required to detect a connection that dies while idle in the pool. However, some gRPC
-					servers and gRPC-aware proxies close a connection with a `too_many_pings` (`GOAWAY`) error
-					when keepalive PINGs are sent without active calls. Only enable this when the downstream
-					permits keepalive without active calls.
-					"""
-				required: false
-				type: bool: default: false
 			}
 		}
 	}
