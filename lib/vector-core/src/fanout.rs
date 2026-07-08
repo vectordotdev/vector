@@ -7,7 +7,10 @@ use tokio::sync::mpsc;
 use tokio_util::sync::ReusableBoxFuture;
 use vector_buffers::topology::channel::BufferSender;
 
-use crate::{config::ComponentKey, event::EventArray};
+use crate::{
+    config::ComponentKey,
+    event::{EventArray, EventContainer},
+};
 
 pub enum ControlMessage {
     /// Adds a new sink to the fanout.
@@ -45,15 +48,17 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 pub struct Fanout {
     senders: IndexMap<ComponentKey, Option<Sender>>,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
+    upstream_component: ComponentKey,
 }
 
 impl Fanout {
-    pub fn new() -> (Self, ControlChannel) {
+    pub fn new(upstream_component: ComponentKey) -> (Self, ControlChannel) {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
         let fanout = Self {
             senders: Default::default(),
             control_channel: control_rx,
+            upstream_component,
         };
 
         (fanout, control_tx)
@@ -220,6 +225,27 @@ impl Fanout {
         // Wait for any senders that are paused to be replaced first before continuing with the send.
         self.wait_for_replacements().await;
 
+        // Drop empty event batches before they reach any downstream buffer, this is technically
+        // programmer error. In debug/test builds the `debug_assert!` makes the underlying bug fail
+        // loudly.
+        debug_assert!(
+            !events.is_empty(),
+            "Fanout received empty event batch from upstream component '{}'",
+            self.upstream_component,
+        );
+        // TODO: Wrap the conditional below with `std::hint::unlikely` once it stabilizes. This is an
+        // applicable situation to use it in since the following conditional should never evaluate to
+        // true.
+        #[cfg(not(debug_assertions))]
+        if events.is_empty() {
+            warn!(
+                message = "Dropping empty event batch emitted by upstream component. This is likely a bug in that component.",
+                component_id = %self.upstream_component,
+                downstream_count = self.senders.len(),
+            );
+            return Ok(());
+        }
+
         // Nothing to send if we have no sender.
         if self.senders.is_empty() {
             trace!("No senders present.");
@@ -332,6 +358,10 @@ impl<'a> SendGroup<'a> {
 
     fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
         if let Some(send) = self.sends.remove(id) {
+            // Deliberately not instrumented with the current span: this drains a send to a sink
+            // that has just been detached from the topology, so it is unrelated to the upstream
+            // component that owns this fanout. Attaching the current span would mis-tag this
+            // task's logs with the upstream component's identity rather than the detached sink's.
             tokio::spawn(async move {
                 if let Err(e) = send.await {
                     warn!(
@@ -525,7 +555,7 @@ mod tests {
         UnboundedSender<ControlMessage>,
         Vec<BufferReceiver<EventArray>>,
     ) {
-        let (mut fanout, control) = Fanout::new();
+        let (mut fanout, control) = Fanout::new(ComponentKey::from("test_upstream"));
         let pairs = build_sender_pairs(capacities);
 
         let mut receivers = Vec::new();
@@ -827,7 +857,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_no_sinks() {
-        let (mut fanout, _) = Fanout::new();
+        let (mut fanout, _) = Fanout::new(ComponentKey::from("test_upstream"));
         let events = make_events(2);
 
         fanout
@@ -838,6 +868,16 @@ mod tests {
             .send(events[1].clone().into(), None)
             .await
             .expect("should not fail");
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    #[should_panic(expected = "Fanout received empty event batch from upstream component")]
+    async fn fanout_panics_on_empty_event_array_in_debug_builds() {
+        let (mut fanout, _, _receivers) = fanout_from_senders(&[2, 2]);
+        let empty: EventArray = Vec::<LogEvent>::new().into();
+
+        _ = fanout.send(empty, None).await;
     }
 
     #[tokio::test]

@@ -13,14 +13,13 @@ export PATH := $(mkfile_dir)scripts/environment/npm-tools/node_modules/.bin:$(PA
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
     export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
-    export FEATURES ?= default-msvc
     undefine DNSTAP_BENCHES
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
     export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
-    export FEATURES ?= default
     export DNSTAP_BENCHES := dnstap-benches
 endif
+export FEATURES ?=
 
 # When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
 # coverage data. Run `make coverage-report` afterwards to emit the lcov file.
@@ -46,16 +45,7 @@ export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
-export CONTAINER_TOOL ?= auto
-ifeq ($(CONTAINER_TOOL),auto)
-	ifeq ($(shell docker version >/dev/null 2>&1 && echo docker), docker)
-		override CONTAINER_TOOL = docker
-	else ifeq ($(shell podman version >/dev/null 2>&1 && echo podman), podman)
-		override CONTAINER_TOOL = podman
-	else
-		override CONTAINER_TOOL = unknown
-	endif
-endif
+CONTAINER_TOOL ?= $(shell docker version >/dev/null 2>&1 && echo docker || (podman version >/dev/null 2>&1 && echo podman) || echo unknown)
 # If we're using podman create pods else if we're using docker create networks.
 export CURRENT_DIR = $(shell pwd)
 
@@ -94,19 +84,12 @@ help:
 	@printf -- "\n"
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ Environment
-
-.PHONY: check-container-tool
-check-container-tool: ## Checks what container tool is installed
-	@echo -n "Checking if $(CONTAINER_TOOL) is available..." && \
-	$(CONTAINER_TOOL) version 1>/dev/null && echo "yes"
-
 ##@ Building
 .PHONY: build
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode
-	cargo build --release --no-default-features --features ${FEATURES}
+	cargo build --release $(if $(FEATURES),--no-default-features --features "$(FEATURES)")
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -262,11 +245,11 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${TEST_RUNNER} --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	${TEST_RUNNER} --workspace --no-fail-fast $(if $(FEATURES),--no-default-features --features "$(FEATURES)") ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
-	cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	cargo test --doc --workspace --no-fail-fast $(if $(FEATURES),--no-default-features --features "$(FEATURES)") ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.

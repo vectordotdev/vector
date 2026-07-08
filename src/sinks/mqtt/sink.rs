@@ -60,7 +60,7 @@ impl MqttSink {
         let (client, mut connection) = self.connector.connect();
 
         // This is necessary to keep the mqtt event loop moving forward.
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             loop {
                 // If an error is returned here there is currently no way to tie this back
                 // to the event that was posted which means we can't accurately provide

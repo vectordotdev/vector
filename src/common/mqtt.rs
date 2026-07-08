@@ -96,7 +96,7 @@ pub enum ConfigurationError {
     /// Invalid credentials provided error
     #[snafu(display("Username and password must be either both provided or both missing."))]
     InvalidCredentials,
-    /// Invalid client ID provied error
+    /// Invalid client ID provided error
     #[snafu(display(
         "Client ID must be 1-23 characters long and must consist of only alphanumeric characters."
     ))]

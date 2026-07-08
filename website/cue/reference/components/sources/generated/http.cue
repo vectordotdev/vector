@@ -33,10 +33,14 @@ generated: components: sources: http: configuration: {
 	}
 	auth: {
 		description: """
-			Configuration of the authentication strategy for server mode sinks and sources.
+			HTTP authentication configuration.
 
-			Use the HTTP authentication with HTTPS only. The authentication credentials are passed as an
+			Use HTTP authentication with HTTPS only. The authentication credentials are passed as an
 			HTTP header without any additional encryption beyond what is provided by the transport itself.
+
+			When using the `custom` strategy, the VRL program may write `%field = value` to enrich
+			authenticated events. These metadata fields are injected into the event body (legacy
+			namespace) or under `http_server.<field>` in event metadata (Vector namespace).
 			"""
 		required: false
 		type: object: options: {
@@ -66,7 +70,7 @@ generated: components: sources: http: configuration: {
 					custom: """
 						Custom authentication using VRL code.
 
-						Takes in request and validates it using VRL code.
+						Takes in request and validates it using VRL code. The VRL program must return a boolean.
 						"""
 				}
 			}
@@ -115,7 +119,7 @@ generated: components: sources: http: configuration: {
 				required:    true
 				type: string: enum: {
 					avro: """
-						Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+						Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
 						"""

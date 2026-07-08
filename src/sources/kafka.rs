@@ -455,7 +455,7 @@ async fn kafka_source(
             .map_or(config.session_timeout_ms / 2, Duration::from_millis);
         let consumer_state =
             ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace, span);
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             coordinate_kafka_callbacks(
                 consumer,
                 callback_rx,
@@ -1309,13 +1309,15 @@ impl KafkaSourceContext {
             return;
         }
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsAssigned(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsAssigned(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             // no-op: wait for partition assignment handler to complete
@@ -1329,13 +1331,15 @@ impl KafkaSourceContext {
     /// sender is dropped by the callback handler.
     fn revoke_partitions(&self, tpl: &TopicPartitionList) {
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsRevoked(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsRevoked(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             self.commit_consumer_state();

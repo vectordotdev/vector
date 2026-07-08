@@ -4,26 +4,11 @@
 ARG RUST_VERSION=1
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie AS builder
 
-# TODO: unify this apt list with tests/e2e/Dockerfile.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    clang \
-    cmake \
-    curl \
-    git \
-    libclang-dev \
-    libsasl2-dev \
-    libssl-dev \
-    libxxhash-dev \
-    perl \
-    pkg-config \
-    unzip \
-    zlib1g-dev \
-  && rm -rf /var/lib/apt/lists/*
-
 # Copy the whole scripts/environment/ tree so prepare.sh can source its sibling
 # scripts on older checkouts in regression baseline builds.
 COPY scripts/environment/ /scripts/environment/
+
+RUN bash /scripts/environment/install-debian-build-deps.sh
 
 WORKDIR /vector
 COPY rust-toolchain.toml .
@@ -35,7 +20,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/vector/target \
-    cargo build --bin vector --release && \
+    /usr/bin/mold -run cargo build --bin vector --release && \
     cp target/release/vector .
 
 #

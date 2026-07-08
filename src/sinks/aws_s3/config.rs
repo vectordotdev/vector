@@ -380,23 +380,17 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_batch_encoding_correct_toml_shape() {
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            schema_mode = "auto_infer"
-            codec = "parquet"
-
-            [batch_encoding.compression]
-            algorithm = "snappy"
-
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              schema_mode: auto_infer
+              codec: parquet
+              compression:
+                algorithm: snappy
+            "#})
         .expect("correct batch_encoding shape should parse");
 
         let batch_enc = config
@@ -470,24 +464,19 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_content_type_user_override_preserved() {
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-            content_type = "application/octet-stream"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "auto_infer"
-
-            [batch_encoding.compression]
-            algorithm = "gzip"
-            level = 9
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            content_type: "application/octet-stream"
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: auto_infer
+              compression:
+                algorithm: gzip
+                level: 9
+            "#})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
@@ -534,20 +523,16 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_filename_extension_user_override() {
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-            filename_extension = "pq"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "auto_infer"
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            filename_extension: pq
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: auto_infer
+            "#})
         .unwrap();
 
         assert_eq!(config.filename_extension.as_deref(), Some("pq"));
@@ -559,18 +544,14 @@ mod tests {
     fn parquet_schema_mode_defaults_to_relaxed() {
         use vector_lib::codecs::encoding::format::ParquetSchemaMode;
 
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+            "#})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
@@ -583,20 +564,16 @@ mod tests {
     fn parquet_schema_mode_strict_parsed() {
         use vector_lib::codecs::encoding::format::ParquetSchemaMode;
 
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "strict"
-            schema_file = "tmp/something.schema"
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: strict
+              schema_file: tmp/something.schema
+            "#})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();

@@ -60,9 +60,9 @@ Changes to CI, website, playground and similar are generally not considered user
 
   <type>(<scope>)!: <description>
 
-  * `type` = chore, enhancement, feat, fix, docs, revert
+  * `type` = chore, enhancement, feat, fix, docs, revert, perf
   * `!` = OPTIONAL: signals a breaking change
-  * `scope` = Optional when `type` is "chore" or "docs", available scopes https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L31
+  * `scope` = Optional but appreciated; letters, digits, spaces, hyphens, underscores (e.g. `kafka source`, `amazon-linux`)
   * `description` = short description of the change
 
 Examples:

@@ -203,17 +203,20 @@ async fn insert_events_unix_timestamps_toml_config() {
     let table = random_table_name();
     let host = clickhouse_address();
 
-    let config: ClickhouseConfig = toml::from_str(&format!(
-        r#"
-host = "{host}"
-table = "{table}"
-compression = "none"
-[request]
-retry_attempts = 1
-[batch]
-max_events = 1
-[encoding]
-timestamp_format = "unix""#
+    let config: ClickhouseConfig = serde_yaml::from_str(&format!(
+        indoc::indoc! {r#"
+            host: "{host}"
+            table: "{table}"
+            compression: "none"
+            request:
+              retry_attempts: 1
+            batch:
+              max_events: 1
+            encoding:
+              timestamp_format: "unix"
+        "#},
+        host = host,
+        table = table,
     ))
     .unwrap();
 
