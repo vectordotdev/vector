@@ -1584,6 +1584,22 @@ mod integration_test {
             .collect()
     }
 
+    fn message_offsets(events: &[Event]) -> HashSet<(i64, i64)> {
+        events
+            .iter()
+            .map(|event| {
+                let log = event.as_log();
+                let partition = log["partition"].to_string_lossy().parse().expect(
+                    "partition should be an integer, since it was pulled from a `sources::kafka::Keys.partition` field",
+                );
+                let offset = log["offset"].to_string_lossy().parse().expect(
+                    "offset should be an integer, since it was pulled from a `sources::kafka::Keys.offset` field",
+                );
+                (partition, offset)
+            })
+            .collect()
+    }
+
     fn kafka_test_topic() -> String {
         std::env::var("KAFKA_TEST_TOPIC")
             .unwrap_or_else(|_| format!("test-topic-{}", random_string(10)))
@@ -2165,10 +2181,13 @@ mod integration_test {
             "Consumers should not lose any messages: got {total}, expected at least {expect_count}"
         );
         // Duplicates alone could mask a real drop behind an inflated `total`, so also check
-        // that every message index was seen by at least one consumer. This only applies
-        // when we produced the messages ourselves via `send_events` (their `message_key`
-        // is `"{KEY} {index}"`); a pre-populated topic (`send_count == 0`, see above) can
-        // contain arbitrary records, so fall back to the count-only check in that case.
+        // that every message was seen by at least one consumer. When we produced the messages
+        // ourselves via `send_events` (their `message_key` is `"{KEY} {index}"`), we can check
+        // this by index. A pre-populated topic (`send_count == 0`, see above) can contain
+        // arbitrary records, so instead we check the number of distinct Kafka
+        // `(partition, offset)` pairs seen: since each source record has a unique offset,
+        // duplicates can't inflate that count the way they inflate `total`, so it must equal
+        // `expect_count` exactly for no message to have been lost.
         if send_count > 0 {
             let received: HashSet<usize> = message_indices(&events1)
                 .into_iter()
@@ -2181,6 +2200,18 @@ mod integration_test {
             assert!(
                 missing.is_empty(),
                 "Consumers should not lose any messages: got {total} events covering {}/{expect_count} indices, missing: {missing:?}",
+                received.len(),
+            );
+        } else {
+            let received: HashSet<(i64, i64)> = message_offsets(&events1)
+                .into_iter()
+                .chain(message_offsets(&events2))
+                .chain(message_offsets(&events3))
+                .collect();
+            assert_eq!(
+                received.len(),
+                expect_count,
+                "Consumers should not lose any messages: got {total} events covering only {}/{expect_count} unique offsets",
                 received.len(),
             );
         }
