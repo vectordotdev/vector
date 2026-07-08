@@ -44,6 +44,8 @@ pub mod host_metrics;
 pub mod http_client;
 #[cfg(feature = "sources-http_server")]
 pub mod http_server;
+#[cfg(feature = "sources-iggy")]
+pub mod iggy;
 #[cfg(feature = "sources-internal_logs")]
 pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]

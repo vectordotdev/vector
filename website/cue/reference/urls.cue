@@ -279,6 +279,8 @@ urls: {
 	iana_time_zones:                            "\(wikipedia)/wiki/List_of_tz_database_time_zones"
 	ieee_754:                                   "\(wikipedia)/wiki/IEEE_754"
 	ietf_rfc_6750:                              "https://tools.ietf.org/html/rfc6750"
+	iggy:                                       "https://iggy.apache.org/"
+	iggy_connection_string:                     "https://iggy.apache.org/docs/sdks/rust-sdk/connection-string"
 	idn:                                        "\(wikipedia)/wiki/Internationalized_domain_name"
 	initd:                                      "https://bash.cyberciti.biz/guide//etc/init.d"
 	influxdb:                                   "https://www.influxdata.com/products/influxdb-overview/"
