@@ -344,7 +344,10 @@ generated: configuration: {
 								type: string: {}
 								description: """
 																		Path to the file to export data to periodically and on exit.
-																		Data will be imported from this file on startup.
+																		Data will be imported from this file on startup and reload.
+
+																		If table `reload_behavior` is set to `clear-state` and this is set, the persisted state will
+																		still be read after reload.
 																		"""
 								required: false
 							}
