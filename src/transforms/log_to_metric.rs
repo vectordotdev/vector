@@ -1005,9 +1005,10 @@ mod tests {
     }
 
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
+        use vrl::path::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
         let mut log = Event::Log(LogEvent::from("i am a log"));
-        log.as_mut_log()
-            .insert(&vrl::path::parse_target_path(key).unwrap(), value);
+        let path = OwnedTargetPath::event(OwnedValuePath::from(vec![OwnedSegment::field(key)]));
+        log.as_mut_log().insert(&path, value);
         log.as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
         log
