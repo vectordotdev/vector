@@ -1,0 +1,3 @@
+The `vector` sink and gRPC-based sources now enable HTTP/2 adaptive flow-control windows. Previously both sides ran with the protocol-default 64 KiB stream/connection windows, which caps a single sink connection at roughly `64 KiB / request-round-trip`. With end-to-end acknowledgements enabled the round trip includes downstream processing on the receiving Vector instance, so a vector-to-vector link would plateau at a few MB/s per connection no matter how `batch` or `request.concurrency` were tuned. Letting hyper/tonic size the windows from the observed bandwidth-delay product removes this ceiling.
+
+authors: Evador

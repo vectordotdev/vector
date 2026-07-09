@@ -784,7 +784,16 @@ fn new_client(
 ) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
     let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
 
-    Ok(hyper::Client::builder().http2_only(true).build(proxy))
+    Ok(hyper::Client::builder()
+        .http2_only(true)
+        // The default HTTP/2 flow-control windows (64 KiB) cap a single
+        // connection at roughly window_size / request_rtt. With end-to-end
+        // acknowledgements the peer only releases window credit once the
+        // request has been fully processed, so an untuned window throttles
+        // the sink to a few MB/s per connection regardless of batch size or
+        // concurrency. Let hyper size the windows from the observed BDP.
+        .http2_adaptive_window(true)
+        .build(proxy))
 }
 
 #[derive(Debug, Clone)]

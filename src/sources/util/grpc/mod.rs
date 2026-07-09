@@ -379,6 +379,10 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
+        // See the note on `http2_adaptive_window` in the `vector` sink: the
+        // 64 KiB default flow-control windows throttle high-throughput
+        // senders, so size them dynamically from the observed BDP.
+        .http2_adaptive_window(Some(true))
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've
@@ -420,6 +424,10 @@ pub async fn run_grpc_server_with_routes(
     info!(%address, "Building gRPC server.");
 
     Server::builder()
+        // See the note on `http2_adaptive_window` in the `vector` sink: the
+        // 64 KiB default flow-control windows throttle high-throughput
+        // senders, so size them dynamically from the observed BDP.
+        .http2_adaptive_window(Some(true))
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         .layer(DecompressionAndMetricsLayer)
