@@ -130,6 +130,12 @@ components: sources: internal_logs: {
 				startup by the `VECTOR_LOG` environment variable and the `--quiet` and `--verbose`
 				command-line options, so, for example, logs can be collected by this source even when
 				console logging is disabled entirely with `VECTOR_LOG=off`.
+
+				The one exception is early startup: the handful of log events emitted before the
+				configuration has been loaded are captured at the console log level, with a floor of
+				`info`. Exposing `debug` or `trace` events from early startup therefore additionally
+				requires starting Vector with a verbose console log level (for example,
+				`VECTOR_LOG=debug`).
 				"""
 		}
 	}

@@ -49,6 +49,11 @@ pub struct InternalLogsConfig {
     /// Log events at this severity level and above are delivered to this source,
     /// independently of the console log level Vector was started with (`VECTOR_LOG`,
     /// `--verbose`, and `--quiet`).
+    ///
+    /// This setting takes effect once the configuration has been loaded. The few events emitted
+    /// before that, during early startup, are captured at the console log level (with a floor of
+    /// `info`), so exposing `debug` or `trace` events from early startup additionally requires
+    /// starting Vector with a verbose console log level (for example, `VECTOR_LOG=debug`).
     #[serde(default = "default_level")]
     level: LogLevel,
 
@@ -182,23 +187,29 @@ impl SourceConfig for InternalLogsConfig {
         let pid_key = self.pid_key.clone().path;
 
         // The broadcast channel feeding all `internal_logs` sources is filtered at the most
-        // verbose level requested by any such source; events below this source's own level are
-        // dropped from its stream in `run`.
-        crate::trace::raise_broadcast_max_level(self.level.into());
+        // verbose level registered by any running source; events below this source's own level
+        // are dropped from its stream in `run`. The registration lives as long as the source, so
+        // that removing or reconfiguring the source through a reload lowers the level again.
+        let broadcast_registration = crate::trace::register_broadcast_level(self.level.into());
 
         let subscription = TraceSubscription::subscribe();
 
+        let level = self.level;
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(run(
-            host_key,
-            pid_key,
-            self.level,
-            subscription,
-            cx.out,
-            cx.shutdown,
-            log_namespace,
-        )))
+        Ok(Box::pin(async move {
+            let _broadcast_registration = broadcast_registration;
+            run(
+                host_key,
+                pid_key,
+                level,
+                subscription,
+                cx.out,
+                cx.shutdown,
+                log_namespace,
+            )
+            .await
+        }))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -454,17 +465,21 @@ mod tests {
         rx
     }
 
-    // The console log level is set to `debug` here, so debug events are generated, but the
-    // source's default `level` of `info` must keep them out of its output.
+    // The console log level is set to `debug` here, so during the startup window debug events
+    // are captured into the early buffer, and the source's default `level` of `info` must drop
+    // the buffered debug event from its output. Once the source is running, the broadcast level
+    // falls to the source's `info`, keeping later debug events out as well.
     #[tokio::test]
     #[serial]
     async fn drops_events_below_configured_level() {
         trace::init(false, false, "debug", 10, None);
         trace::reset_early_buffer();
 
+        let test_id: u8 = rand::random();
+        debug!(message = "Buffered debug message.", %test_id);
+
         let rx = start_source().await;
 
-        let test_id: u8 = rand::random();
         debug!(message = "Debug message.", %test_id);
         info!(message = "Info message.", %test_id);
 

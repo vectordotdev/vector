@@ -19,7 +19,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Metadata, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
-    Layer,
+    Layer, Registry,
     filter::LevelFilter,
     layer::{Context, Filter, SubscriberExt},
     registry::LookupSpan,
@@ -53,19 +53,31 @@ static SUBSCRIBERS: Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> =
 /// has been initialized.
 static SENDER: OnceLock<Sender<LogEvent>> = OnceLock::new();
 
-/// BROADCAST_MAX_LEVEL holds the maximum verbosity of log events delivered to the broadcast
+/// BROADCAST_MAX_LEVEL caches the maximum verbosity of log events delivered to the broadcast
 /// channel that feeds `internal_logs` sources, encoded as a usize (see [`level_filter_to_usize`]).
-/// It defaults to `INFO` and is raised by [`raise_broadcast_max_level`] when an `internal_logs`
-/// source is built with a more verbose `level`. This keeps the log events delivered to
-/// `internal_logs` sources decoupled from the console log level (`VECTOR_LOG`, `--verbose`,
-/// `--quiet`).
+/// It is recomputed by [`recompute_broadcast_max_level`] whenever one of its inputs changes: the
+/// levels registered by running `internal_logs` sources (via [`register_broadcast_level`]) and,
+/// while early buffering is active, [`STARTUP_BROADCAST_LEVEL`]. This keeps the log events
+/// delivered to `internal_logs` sources decoupled from the console log level (`VECTOR_LOG`,
+/// `--verbose`, `--quiet`).
 static BROADCAST_MAX_LEVEL: AtomicUsize = AtomicUsize::new(DEFAULT_BROADCAST_MAX_LEVEL);
 
 /// The default broadcast verbosity (3 = `INFO`).
 const DEFAULT_BROADCAST_MAX_LEVEL: usize = 3;
 
-/// Encodes a [`LevelFilter`] as a usize such that greater values are more verbose, allowing the
-/// broadcast level to be raised monotonically with `fetch_max`.
+/// STARTUP_BROADCAST_LEVEL holds the verbosity of log events captured while early buffering is
+/// active, before the configuration has been loaded and thus before the `level` of any
+/// `internal_logs` source is known. It is seeded by [`init`] from the console log level, with a
+/// floor of `INFO` so that an `internal_logs` source with the default `level` receives its
+/// startup log events even when the console is quieter.
+static STARTUP_BROADCAST_LEVEL: AtomicUsize = AtomicUsize::new(DEFAULT_BROADCAST_MAX_LEVEL);
+
+/// BROADCAST_LEVEL_REGISTRY counts the running `internal_logs` sources registered at each encoded
+/// level, updated by [`register_broadcast_level`] and [`BroadcastLevelRegistration`]'s `Drop`.
+static BROADCAST_LEVEL_REGISTRY: Mutex<[usize; 6]> = Mutex::new([0; 6]);
+
+/// Encodes a [`LevelFilter`] as a usize such that greater values are more verbose, allowing
+/// levels to be compared numerically and stored atomically.
 const fn level_filter_to_usize(level: LevelFilter) -> usize {
     match level.into_level() {
         None => 0,
@@ -92,20 +104,66 @@ fn broadcast_max_level() -> LevelFilter {
     usize_to_level_filter(BROADCAST_MAX_LEVEL.load(Ordering::Relaxed))
 }
 
-/// Raises the maximum verbosity of log events delivered to `internal_logs` sources.
-///
-/// The level only ever increases in verbosity: the broadcast channel is shared by all
-/// `internal_logs` sources, so it must carry events for the most verbose of them. Each source is
-/// responsible for dropping events below its own configured level.
+fn get_broadcast_level_registry() -> MutexGuard<'static, [usize; 6]> {
+    BROADCAST_LEVEL_REGISTRY
+        .lock()
+        .expect("Couldn't acquire lock on broadcast level registry")
+}
+
+/// Recomputes [`BROADCAST_MAX_LEVEL`] from the levels registered by running `internal_logs`
+/// sources and, while early buffering is active, [`STARTUP_BROADCAST_LEVEL`]. With no registered
+/// sources and early buffering stopped, the level is `OFF` and the broadcast layer is disabled
+/// entirely.
 ///
 /// Rebuilding the callsite interest cache prompts `tracing` to re-evaluate which callsites are
-/// enabled (including the global max level hint), so a raise takes effect even though the
-/// subscriber was installed before the source was built.
-pub fn raise_broadcast_max_level(level: LevelFilter) {
-    let new = level_filter_to_usize(level);
-    let old = BROADCAST_MAX_LEVEL.fetch_max(new, Ordering::SeqCst);
-    if new > old {
+/// enabled (including the global max level hint), so a change takes effect even though the
+/// subscriber was installed earlier.
+fn recompute_broadcast_max_level(registry: &[usize; 6]) {
+    let registered = registry
+        .iter()
+        .rposition(|&sources| sources > 0)
+        .unwrap_or(0);
+    let startup = if SHOULD_BUFFER.load(Ordering::Acquire) {
+        STARTUP_BROADCAST_LEVEL.load(Ordering::Relaxed)
+    } else {
+        0
+    };
+    let new = registered.max(startup);
+    let old = BROADCAST_MAX_LEVEL.swap(new, Ordering::SeqCst);
+    if new != old {
         tracing_core::callsite::rebuild_interest_cache();
+    }
+}
+
+/// Registers a verbosity level of log events to deliver to `internal_logs` sources, for the
+/// lifetime of the returned registration.
+///
+/// The broadcast channel is shared by all `internal_logs` sources, so it carries events for the
+/// most verbose of them, and each source is responsible for dropping events below its own
+/// configured level. Dropping the registration — when its source is stopped or removed by a
+/// configuration reload — recomputes the level, so the process does not keep paying for a
+/// verbosity that no running source asks for.
+pub fn register_broadcast_level(level: LevelFilter) -> BroadcastLevelRegistration {
+    let level = level_filter_to_usize(level);
+    let mut registry = get_broadcast_level_registry();
+    registry[level] += 1;
+    recompute_broadcast_max_level(&registry);
+    BroadcastLevelRegistration { level }
+}
+
+/// A running `internal_logs` source's interest in log events at a given level, created by
+/// [`register_broadcast_level`]. Dropping it deregisters the level and recomputes the verbosity
+/// of the broadcast channel.
+#[derive(Debug)]
+pub struct BroadcastLevelRegistration {
+    level: usize,
+}
+
+impl Drop for BroadcastLevelRegistration {
+    fn drop(&mut self) {
+        let mut registry = get_broadcast_level_registry();
+        registry[self.level] = registry[self.level].saturating_sub(1);
+        recompute_broadcast_max_level(&registry);
     }
 }
 
@@ -138,6 +196,20 @@ pub fn init(
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
 
+    // Seed the verbosity of the early-buffering window: the `level` of any `internal_logs`
+    // sources is not known until the configuration has been loaded, so startup log events are
+    // captured at the console log level, with a floor of `INFO` to match the default
+    // `internal_logs` level. Once early buffering stops, only registered source levels apply.
+    let startup_level = Filter::<Registry>::max_level_hint(&fmt_filter)
+        .map_or(level_filter_to_usize(LevelFilter::TRACE), |hint| {
+            level_filter_to_usize(hint)
+        });
+    STARTUP_BROADCAST_LEVEL.store(
+        startup_level.max(DEFAULT_BROADCAST_MAX_LEVEL),
+        Ordering::Relaxed,
+    );
+    recompute_broadcast_max_level(&get_broadcast_level_registry());
+
     let metrics_layer =
         metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
@@ -147,8 +219,8 @@ pub fn init(
     //
     // It is filtered by `BroadcastFilter` rather than the console filter so that the log events
     // delivered to `internal_logs` sources are decoupled from the console log level: each such
-    // source declares its own `level` (defaulting to `INFO`) and raises the broadcast level
-    // accordingly when it is built.
+    // source declares its own `level` (defaulting to `INFO`) and registers it for its lifetime
+    // when it is built.
     //
     // Two separate `Option<Layer>` values are used rather than a single branch because
     // `RateLimitedLayer<BroadcastLayer<S>>` and `BroadcastLayer<S>` are distinct types.
@@ -216,9 +288,16 @@ pub fn init(
     }
 }
 
+/// Resets the early-buffering machinery to its process-start state, so that each test can
+/// exercise the full startup lifecycle regardless of which tests ran in the same process before
+/// it.
 #[cfg(test)]
 pub fn reset_early_buffer() -> Option<Vec<LogEvent>> {
-    get_early_buffer().replace(Vec::new())
+    *get_trace_subscriber_list() = Some(Vec::new());
+    SHOULD_BUFFER.store(true, Ordering::Release);
+    let events = get_early_buffer().replace(Vec::new());
+    recompute_broadcast_max_level(&get_broadcast_level_registry());
+    events
 }
 
 /// Gets a  mutable reference to the early buffer.
@@ -339,6 +418,10 @@ pub fn stop_early_buffering() {
             _ = subscriber_tx.send(buffered_events.clone());
         }
     }
+
+    // The startup level only applies while early buffering is active; from here on, the broadcast
+    // level reflects only the levels registered by running `internal_logs` sources.
+    recompute_broadcast_max_level(&get_broadcast_level_registry());
 }
 
 /// A subscription to the log events flowing in via `tracing`, in the Vector native format.
@@ -592,5 +675,39 @@ mod tests {
             messages[2]
         );
         assert_eq!(messages[3], "Rate limited broadcast message.");
+    }
+
+    /// The broadcast level must track the levels of the registered `internal_logs` sources —
+    /// dropping down again as registrations are dropped, and all the way to `OFF` when none
+    /// remain — plus the startup level while early buffering is active.
+    #[test]
+    #[serial]
+    fn broadcast_level_follows_registrations() {
+        // Simulate startup being complete, so that only registrations count.
+        SHOULD_BUFFER.store(false, Ordering::Release);
+        recompute_broadcast_max_level(&get_broadcast_level_registry());
+        assert_eq!(broadcast_max_level(), LevelFilter::OFF);
+
+        let info_registration = register_broadcast_level(LevelFilter::INFO);
+        assert_eq!(broadcast_max_level(), LevelFilter::INFO);
+
+        let trace_registration = register_broadcast_level(LevelFilter::TRACE);
+        assert_eq!(broadcast_max_level(), LevelFilter::TRACE);
+
+        drop(trace_registration);
+        assert_eq!(broadcast_max_level(), LevelFilter::INFO);
+
+        drop(info_registration);
+        assert_eq!(broadcast_max_level(), LevelFilter::OFF);
+
+        // While early buffering is active, the startup level applies even with no registrations.
+        STARTUP_BROADCAST_LEVEL.store(level_filter_to_usize(LevelFilter::DEBUG), Ordering::Relaxed);
+        SHOULD_BUFFER.store(true, Ordering::Release);
+        recompute_broadcast_max_level(&get_broadcast_level_registry());
+        assert_eq!(broadcast_max_level(), LevelFilter::DEBUG);
+
+        // Leave the process-global state as a fresh test expects it.
+        STARTUP_BROADCAST_LEVEL.store(DEFAULT_BROADCAST_MAX_LEVEL, Ordering::Relaxed);
+        recompute_broadcast_max_level(&get_broadcast_level_registry());
     }
 }

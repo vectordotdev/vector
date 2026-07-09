@@ -21,6 +21,11 @@ generated: components: sources: internal_logs: configuration: {
 			Log events at this severity level and above are delivered to this source,
 			independently of the console log level Vector was started with (`VECTOR_LOG`,
 			`--verbose`, and `--quiet`).
+
+			This setting takes effect once the configuration has been loaded. The few events emitted
+			before that, during early startup, are captured at the console log level (with a floor of
+			`info`), so exposing `debug` or `trace` events from early startup additionally requires
+			starting Vector with a verbose console log level (for example, `VECTOR_LOG=debug`).
 			"""
 		required: false
 		type: string: {
