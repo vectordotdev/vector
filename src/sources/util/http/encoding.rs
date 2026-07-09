@@ -187,10 +187,10 @@ fn decompress_snappy(
 const ADDITIONAL_CAPACITY_FOR_CHUNKS_BEYOND_FIRST_TWO: usize = 16 * 1024;
 
 /// Collects the body into [`Bytes`] under `max_body_size`, mirroring the fast
-/// paths of hyper `to_bytes`. Collecting into a fresh `BytesMut` regressed
-/// throughput, since that always pays one allocation plus a full copy; instead
-/// we return a one- or two-chunk body directly and only grow a buffer once a
-/// third chunk arrives.
+/// paths of hyper `to_bytes`. Single-chunk bodies avoid the `BytesMut`
+/// allocation: a buffer sized for both chunks plus an arbitrary 16 KiB (to try
+/// to avoid having to reallocate multiple times once other chunks arrive) is
+/// only allocated once a second chunk arrives.
 /// (<https://github.com/hyperium/hyper/blob/v0.14.32/src/body/to_bytes.rs>).
 #[cfg(any(
     feature = "sources-utils-http-prelude",
@@ -213,7 +213,7 @@ where
             )
         })?;
 
-        total_body_size += chunk.remaining();
+        total_body_size = total_body_size.saturating_add(chunk.remaining());
         if total_body_size > max_body_size {
             return Err(request_body_too_large_error(max_body_size));
         }
