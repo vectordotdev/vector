@@ -29,13 +29,3 @@ dd_url: http://fakeintake-agent:80
 additional_endpoints:
   "http://vector:8181":
     - DEADBEEF
-
-# Since Agent 7.81.0, series metrics default to the v3 intake API, which
-# fakeintake/Vector don't speak here and which 404s on non-Datadog endpoints.
-# Keep both endpoints on v2 so the test's series_api_version matrix (v1/v2)
-# still matches what's actually submitted.
-use_v3_api:
-  series:
-    endpoints:
-      "http://fakeintake-agent:80": "false"
-      "http://vector:8181": "false"
