@@ -1,0 +1,61 @@
+data_dir: "/var/lib/vector"
+
+# 3 async transforms in a chain: throttle, dedupe, reduce.
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+  http_source:
+    type: "http"
+    acknowledgements: false
+    address: "0.0.0.0:8282"
+    decoding:
+      codec: "json"
+
+transforms:
+  # Per-service rate limiter; threshold is huge so steady-state is all-pass.
+  throttle:
+    type: "throttle"
+    inputs: ["http_source"]
+    threshold: 10000000
+    window_secs: 60
+    key_field: "{{ service }}"
+
+  # Drop duplicates by correlation_id; template emits unique IDs so every event is a cache miss.
+  dedupe:
+    type: "dedupe"
+    inputs: ["throttle"]
+    fields:
+      match:
+        - "correlation_id"
+
+  # Aggregate per (service, host): 4x4 = 16 buckets.
+  reduce:
+    type: "reduce"
+    inputs: ["dedupe"]
+    group_by:
+      - "service"
+      - "host"
+    merge_strategies:
+      log_count: sum
+      error_count: sum
+      latency_ms: max
+      message: retain
+
+sinks:
+  prometheus:
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
+    address: "0.0.0.0:9090"
+
+  http_sink:
+    type: "http"
+    inputs: ["reduce"]
+    uri: "http://localhost:8080"
+    encoding:
+      codec: "json"
+    healthcheck:
+      enabled: false
+    buffer:
+      type: "memory"
+      max_events: 50000

@@ -36,7 +36,7 @@ CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
 CARGO_LLVM_COV_VERSION="0.8.4"
-WASM_PACK_VERSION="0.13.1"
+WASM_PACK_VERSION="0.15.0"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
 

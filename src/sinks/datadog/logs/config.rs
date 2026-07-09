@@ -7,6 +7,8 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
+use hyper::{Body, client::connect::Connect};
+
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     common::datadog,
@@ -107,12 +109,15 @@ impl DatadogLogsConfig {
             .to_string()
     }
 
-    pub fn build_processor(
+    pub fn build_processor<C>(
         &self,
         dd_common: &DatadogCommonConfig,
-        client: HttpClient,
+        client: HttpClient<Body, C>,
         dd_evp_origin: String,
-    ) -> crate::Result<VectorSink> {
+    ) -> crate::Result<VectorSink>
+    where
+        C: Connect + Clone + Send + Sync + 'static,
+    {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.into_settings();
 
