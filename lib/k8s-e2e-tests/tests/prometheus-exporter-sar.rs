@@ -1,20 +1,56 @@
 #![allow(clippy::await_holding_lock)]
 
-use indoc::{formatdoc, indoc};
+use indoc::formatdoc;
 use k8s_e2e_tests::*;
-use k8s_test_framework::{
-    lock, namespace, vector::Config as VectorConfig, wait_for_resource::WaitFor,
-};
+use k8s_test_framework::{lock, vector::Config as VectorConfig};
 use reqwest::{StatusCode, header};
 use tokio::io::AsyncWriteExt;
 
-const VECTOR_NAMESPACE: &str = "vector-test";
+/// RAII guard for cluster-scoped RBAC resources that ensures cleanup on drop.
+/// This prevents resource leakage when tests fail before reaching explicit cleanup.
+struct ClusterRbacCleanup {
+    kubectl_command: String,
+    resources: Vec<(String, String)>, // (resource_type, name)
+}
+
+impl ClusterRbacCleanup {
+    fn new(kubectl_command: String) -> Self {
+        Self {
+            kubectl_command,
+            resources: Vec::new(),
+        }
+    }
+
+    fn track(&mut self, resource_type: &str, name: String) {
+        self.resources.push((resource_type.to_string(), name));
+    }
+}
+
+impl Drop for ClusterRbacCleanup {
+    fn drop(&mut self) {
+        // Best-effort cleanup - spawn a blocking task to delete resources
+        let kubectl = self.kubectl_command.clone();
+        let resources = self.resources.clone();
+
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async move {
+                for (resource_type, name) in resources {
+                    let _ = tokio::process::Command::new(&kubectl)
+                        .args(["delete", &resource_type, &name, "--ignore-not-found=true"])
+                        .output()
+                        .await;
+                }
+            });
+        });
+    }
+}
 
 /// Helper to clean up cluster-scoped resources (ClusterRoles and ClusterRoleBindings)
 /// Silently ignores errors (resources may already be deleted)
-async fn cleanup_cluster_resources(resource_names: &[(&str, &str)]) {
+async fn cleanup_cluster_resources(kubectl_command: &str, resource_names: &[(&str, &str)]) {
     for (resource_type, name) in resource_names {
-        let _ = tokio::process::Command::new("kubectl")
+        let _ = tokio::process::Command::new(kubectl_command)
             .args(["delete", resource_type, name, "--ignore-not-found=true"])
             .output()
             .await;
@@ -22,8 +58,11 @@ async fn cleanup_cluster_resources(resource_names: &[(&str, &str)]) {
 }
 
 /// Helper to create a namespace using kubectl
-async fn create_namespace(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let output = tokio::process::Command::new("kubectl")
+async fn create_namespace(
+    kubectl_command: &str,
+    namespace: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let output = tokio::process::Command::new(kubectl_command)
         .args(["create", "namespace", namespace])
         .output()
         .await?;
@@ -40,10 +79,11 @@ async fn create_namespace(namespace: &str) -> Result<(), Box<dyn std::error::Err
 
 /// Helper to create a ServiceAccount using kubectl
 async fn create_service_account(
+    kubectl_command: &str,
     namespace: &str,
     name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let output = tokio::process::Command::new("kubectl")
+    let output = tokio::process::Command::new(kubectl_command)
         .args(["create", "serviceaccount", name, "-n", namespace])
         .output()
         .await?;
@@ -59,7 +99,10 @@ async fn create_service_account(
 }
 
 /// Helper to create a ClusterRole for SAR permissions
-async fn create_clusterrole_for_sar(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn create_clusterrole_for_sar(
+    kubectl_command: &str,
+    name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let yaml = formatdoc!(
         r#"
         apiVersion: rbac.authorization.k8s.io/v1
@@ -77,7 +120,7 @@ async fn create_clusterrole_for_sar(name: &str) -> Result<(), Box<dyn std::error
         name = name
     );
 
-    let mut child = tokio::process::Command::new("kubectl")
+    let mut child = tokio::process::Command::new(kubectl_command)
         .args(["apply", "-f", "-"])
         .stdin(std::process::Stdio::piped())
         .spawn()?;
@@ -101,7 +144,10 @@ async fn create_clusterrole_for_sar(name: &str) -> Result<(), Box<dyn std::error
 }
 
 /// Helper to create a ClusterRole for metrics access
-async fn create_clusterrole_for_metrics(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn create_clusterrole_for_metrics(
+    kubectl_command: &str,
+    name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let yaml = formatdoc!(
         r#"
         apiVersion: rbac.authorization.k8s.io/v1
@@ -115,7 +161,7 @@ async fn create_clusterrole_for_metrics(name: &str) -> Result<(), Box<dyn std::e
         name = name
     );
 
-    let mut child = tokio::process::Command::new("kubectl")
+    let mut child = tokio::process::Command::new(kubectl_command)
         .args(["apply", "-f", "-"])
         .stdin(std::process::Stdio::piped())
         .spawn()?;
@@ -140,12 +186,13 @@ async fn create_clusterrole_for_metrics(name: &str) -> Result<(), Box<dyn std::e
 
 /// Helper to create a ClusterRoleBinding
 async fn create_clusterrolebinding(
+    kubectl_command: &str,
     name: &str,
     role_name: &str,
     sa_name: &str,
     sa_namespace: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let output = tokio::process::Command::new("kubectl")
+    let output = tokio::process::Command::new(kubectl_command)
         .args([
             "create",
             "clusterrolebinding",
@@ -173,13 +220,14 @@ async fn create_clusterrolebinding(
 /// This uses `kubectl create token` which works on Kubernetes 1.24+ where
 /// legacy token Secrets are no longer automatically created.
 async fn get_service_account_token(
+    kubectl_command: &str,
     namespace: &str,
     sa_name: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Wait a bit for SA to be fully initialized
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-    let output = tokio::process::Command::new("kubectl")
+    let output = tokio::process::Command::new(kubectl_command)
         .args([
             "create",
             "token",
@@ -213,37 +261,57 @@ async fn sar_auth_with_valid_token() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
     let override_name = get_override_name(&namespace, "vector");
 
+    // Create cleanup guard to ensure RBAC resources are deleted even on test failure
+    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+
     // Create namespace first
     // Namespace creation
-    create_namespace(&namespace).await?;
+    create_namespace(framework.kubectl_command(), &namespace).await?;
 
     // Create ServiceAccount for Vector with SAR permissions
 
-    create_service_account(&namespace, "vector-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "vector-sa").await?;
 
-    create_clusterrole_for_sar(&format!("{}-sar-role", namespace)).await?;
+    create_clusterrole_for_sar(
+        framework.kubectl_command(),
+        &format!("{}-sar-role", namespace),
+    )
+    .await?;
+    cleanup.track("clusterrole", format!("{}-sar-role", namespace));
 
-    let sar_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-sar-binding", namespace),
         &format!("{}-sar-role", namespace),
         "vector-sa",
         &namespace,
-    );
-    framework.create(sar_binding).await?;
+    )
+    .await?;
+    cleanup.track("clusterrolebinding", format!("{}-sar-binding", namespace));
 
     // Create ServiceAccount for Prometheus scraper with metrics permission
 
-    create_service_account(&namespace, "prometheus-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "prometheus-sa").await?;
 
-    create_clusterrole_for_metrics(&format!("{}-metrics-role", namespace)).await?;
+    create_clusterrole_for_metrics(
+        framework.kubectl_command(),
+        &format!("{}-metrics-role", namespace),
+    )
+    .await?;
+    cleanup.track("clusterrole", format!("{}-metrics-role", namespace));
 
-    let metrics_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-metrics-binding", namespace),
         &format!("{}-metrics-role", namespace),
         "prometheus-sa",
         &namespace,
+    )
+    .await?;
+    cleanup.track(
+        "clusterrolebinding",
+        format!("{}-metrics-binding", namespace),
     );
-    framework.create(metrics_binding).await?;
 
     // Deploy Vector with SAR auth
     let helm_values = formatdoc!(
@@ -306,7 +374,8 @@ async fn sar_auth_with_valid_token() -> Result<(), Box<dyn std::error::Error>> {
     let local_addr = port_forward.local_addr_ipv4();
 
     // Get Prometheus SA token
-    let token = get_service_account_token(&namespace, "prometheus-sa").await?;
+    let token =
+        get_service_account_token(framework.kubectl_command(), &namespace, "prometheus-sa").await?;
 
     // Make authenticated request with valid token
     let client = reqwest::Client::new();
@@ -330,17 +399,7 @@ async fn sar_auth_with_valid_token() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(vector);
 
-    // Clean up cluster-scoped RBAC resources
-    cleanup_cluster_resources(&[
-        ("clusterrole", &format!("{}-sar-role", namespace)),
-        ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
-        ("clusterrole", &format!("{}-metrics-role", namespace)),
-        (
-            "clusterrolebinding",
-            &format!("{}-metrics-binding", namespace),
-        ),
-    ])
-    .await;
+    // Cleanup guard will automatically delete cluster-scoped resources on drop
 
     Ok(())
 }
@@ -355,23 +414,33 @@ async fn sar_auth_rejects_missing_token() -> Result<(), Box<dyn std::error::Erro
     let framework = make_framework();
     let override_name = get_override_name(&namespace, "vector");
 
+    // Create cleanup guard to ensure RBAC resources are deleted even on test failure
+    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+
     // Create namespace first
     // Namespace creation
-    create_namespace(&namespace).await?;
+    create_namespace(framework.kubectl_command(), &namespace).await?;
 
     // Create ServiceAccount for Vector with SAR permissions
 
-    create_service_account(&namespace, "vector-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "vector-sa").await?;
 
-    create_clusterrole_for_sar(&format!("{}-sar-role", namespace)).await?;
+    create_clusterrole_for_sar(
+        framework.kubectl_command(),
+        &format!("{}-sar-role", namespace),
+    )
+    .await?;
+    cleanup.track("clusterrole", format!("{}-sar-role", namespace));
 
-    let sar_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-sar-binding", namespace),
         &format!("{}-sar-role", namespace),
         "vector-sa",
         &namespace,
-    );
-    framework.create(sar_binding).await?;
+    )
+    .await?;
+    cleanup.track("clusterrolebinding", format!("{}-sar-binding", namespace));
 
     // Deploy Vector with SAR auth
     let helm_values = formatdoc!(
@@ -449,10 +518,13 @@ async fn sar_auth_rejects_missing_token() -> Result<(), Box<dyn std::error::Erro
     drop(vector);
 
     // Clean up cluster-scoped RBAC resources
-    cleanup_cluster_resources(&[
-        ("clusterrole", &format!("{}-sar-role", namespace)),
-        ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
-    ])
+    cleanup_cluster_resources(
+        framework.kubectl_command(),
+        &[
+            ("clusterrole", &format!("{}-sar-role", namespace)),
+            ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
+        ],
+    )
     .await;
 
     Ok(())
@@ -468,27 +540,37 @@ async fn sar_auth_rejects_unauthorized_token() -> Result<(), Box<dyn std::error:
     let framework = make_framework();
     let override_name = get_override_name(&namespace, "vector");
 
+    // Create cleanup guard to ensure RBAC resources are deleted even on test failure
+    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+
     // Create namespace first
     // Namespace creation
-    create_namespace(&namespace).await?;
+    create_namespace(framework.kubectl_command(), &namespace).await?;
 
     // Create ServiceAccount for Vector with SAR permissions
 
-    create_service_account(&namespace, "vector-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "vector-sa").await?;
 
-    create_clusterrole_for_sar(&format!("{}-sar-role", namespace)).await?;
+    create_clusterrole_for_sar(
+        framework.kubectl_command(),
+        &format!("{}-sar-role", namespace),
+    )
+    .await?;
+    cleanup.track("clusterrole", format!("{}-sar-role", namespace));
 
-    let sar_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-sar-binding", namespace),
         &format!("{}-sar-role", namespace),
         "vector-sa",
         &namespace,
-    );
-    framework.create(sar_binding).await?;
+    )
+    .await?;
+    cleanup.track("clusterrolebinding", format!("{}-sar-binding", namespace));
 
     // Create ServiceAccount WITHOUT metrics permission
 
-    create_service_account(&namespace, "unprivileged-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "unprivileged-sa").await?;
 
     // Deploy Vector with SAR auth
     let helm_values = formatdoc!(
@@ -551,7 +633,9 @@ async fn sar_auth_rejects_unauthorized_token() -> Result<(), Box<dyn std::error:
     let local_addr = port_forward.local_addr_ipv4();
 
     // Get unprivileged SA token
-    let token = get_service_account_token(&namespace, "unprivileged-sa").await?;
+    let token =
+        get_service_account_token(framework.kubectl_command(), &namespace, "unprivileged-sa")
+            .await?;
 
     // Make request with unauthorized token
     let client = reqwest::Client::new();
@@ -570,10 +654,13 @@ async fn sar_auth_rejects_unauthorized_token() -> Result<(), Box<dyn std::error:
     drop(vector);
 
     // Clean up cluster-scoped RBAC resources
-    cleanup_cluster_resources(&[
-        ("clusterrole", &format!("{}-sar-role", namespace)),
-        ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
-    ])
+    cleanup_cluster_resources(
+        framework.kubectl_command(),
+        &[
+            ("clusterrole", &format!("{}-sar-role", namespace)),
+            ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
+        ],
+    )
     .await;
 
     Ok(())
@@ -589,23 +676,33 @@ async fn sar_auth_short_circuits_non_metrics_routes() -> Result<(), Box<dyn std:
     let framework = make_framework();
     let override_name = get_override_name(&namespace, "vector");
 
+    // Create cleanup guard to ensure RBAC resources are deleted even on test failure
+    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+
     // Create namespace first
     // Namespace creation
-    create_namespace(&namespace).await?;
+    create_namespace(framework.kubectl_command(), &namespace).await?;
 
     // Create ServiceAccount for Vector with SAR permissions
 
-    create_service_account(&namespace, "vector-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "vector-sa").await?;
 
-    create_clusterrole_for_sar(&format!("{}-sar-role", namespace)).await?;
+    create_clusterrole_for_sar(
+        framework.kubectl_command(),
+        &format!("{}-sar-role", namespace),
+    )
+    .await?;
+    cleanup.track("clusterrole", format!("{}-sar-role", namespace));
 
-    let sar_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-sar-binding", namespace),
         &format!("{}-sar-role", namespace),
         "vector-sa",
         &namespace,
-    );
-    framework.create(sar_binding).await?;
+    )
+    .await?;
+    cleanup.track("clusterrolebinding", format!("{}-sar-binding", namespace));
 
     // Deploy Vector with SAR auth
     let helm_values = formatdoc!(
@@ -690,10 +787,13 @@ async fn sar_auth_short_circuits_non_metrics_routes() -> Result<(), Box<dyn std:
     drop(vector);
 
     // Clean up cluster-scoped RBAC resources
-    cleanup_cluster_resources(&[
-        ("clusterrole", &format!("{}-sar-role", namespace)),
-        ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
-    ])
+    cleanup_cluster_resources(
+        framework.kubectl_command(),
+        &[
+            ("clusterrole", &format!("{}-sar-role", namespace)),
+            ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
+        ],
+    )
     .await;
 
     Ok(())
@@ -709,48 +809,73 @@ async fn sar_auth_allowed_user_filter() -> Result<(), Box<dyn std::error::Error>
     let framework = make_framework();
     let override_name = get_override_name(&namespace, "vector");
 
+    // Create cleanup guard to ensure RBAC resources are deleted even on test failure
+    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+
     // Create namespace first
     // Namespace creation
-    create_namespace(&namespace).await?;
+    create_namespace(framework.kubectl_command(), &namespace).await?;
 
     // Create ServiceAccount for Vector with SAR permissions
 
-    create_service_account(&namespace, "vector-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "vector-sa").await?;
 
-    create_clusterrole_for_sar(&format!("{}-sar-role", namespace)).await?;
+    create_clusterrole_for_sar(
+        framework.kubectl_command(),
+        &format!("{}-sar-role", namespace),
+    )
+    .await?;
+    cleanup.track("clusterrole", format!("{}-sar-role", namespace));
 
-    let sar_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-sar-binding", namespace),
         &format!("{}-sar-role", namespace),
         "vector-sa",
         &namespace,
-    );
-    framework.create(sar_binding).await?;
+    )
+    .await?;
+    cleanup.track("clusterrolebinding", format!("{}-sar-binding", namespace));
 
     // Create two ServiceAccounts, both with metrics permission
 
-    create_service_account(&namespace, "allowed-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "allowed-sa").await?;
 
-    create_service_account(&namespace, "denied-sa").await?;
+    create_service_account(framework.kubectl_command(), &namespace, "denied-sa").await?;
 
-    create_clusterrole_for_metrics(&format!("{}-metrics-role", namespace)).await?;
+    create_clusterrole_for_metrics(
+        framework.kubectl_command(),
+        &format!("{}-metrics-role", namespace),
+    )
+    .await?;
+    cleanup.track("clusterrole", format!("{}-metrics-role", namespace));
 
     // Both get metrics RBAC permission
-    let allowed_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-allowed-binding", namespace),
         &format!("{}-metrics-role", namespace),
         "allowed-sa",
         &namespace,
+    )
+    .await?;
+    cleanup.track(
+        "clusterrolebinding",
+        format!("{}-allowed-binding", namespace),
     );
-    framework.create(allowed_binding).await?;
 
-    let denied_binding = make_clusterrolebinding(
+    create_clusterrolebinding(
+        framework.kubectl_command(),
         &format!("{}-denied-binding", namespace),
         &format!("{}-metrics-role", namespace),
         "denied-sa",
         &namespace,
+    )
+    .await?;
+    cleanup.track(
+        "clusterrolebinding",
+        format!("{}-denied-binding", namespace),
     );
-    framework.create(denied_binding).await?;
 
     // Deploy Vector with SAR auth and allowed_user filter
     let allowed_user_identity = format!("system:serviceaccount:{}:allowed-sa", namespace);
@@ -818,7 +943,8 @@ async fn sar_auth_allowed_user_filter() -> Result<(), Box<dyn std::error::Error>
     let client = reqwest::Client::new();
 
     // Test with allowed SA - should succeed
-    let allowed_token = get_service_account_token(&namespace, "allowed-sa").await?;
+    let allowed_token =
+        get_service_account_token(framework.kubectl_command(), &namespace, "allowed-sa").await?;
     let response = client
         .get(format!("http://{}/metrics", local_addr))
         .header(header::AUTHORIZATION, format!("Bearer {}", allowed_token))
@@ -832,7 +958,8 @@ async fn sar_auth_allowed_user_filter() -> Result<(), Box<dyn std::error::Error>
     );
 
     // Test with denied SA - should fail even though it has metrics RBAC
-    let denied_token = get_service_account_token(&namespace, "denied-sa").await?;
+    let denied_token =
+        get_service_account_token(framework.kubectl_command(), &namespace, "denied-sa").await?;
     let response = client
         .get(format!("http://{}/metrics", local_addr))
         .header(header::AUTHORIZATION, format!("Bearer {}", denied_token))
@@ -848,19 +975,22 @@ async fn sar_auth_allowed_user_filter() -> Result<(), Box<dyn std::error::Error>
     drop(vector);
 
     // Clean up cluster-scoped RBAC resources
-    cleanup_cluster_resources(&[
-        ("clusterrole", &format!("{}-sar-role", namespace)),
-        ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
-        ("clusterrole", &format!("{}-metrics-role", namespace)),
-        (
-            "clusterrolebinding",
-            &format!("{}-allowed-binding", namespace),
-        ),
-        (
-            "clusterrolebinding",
-            &format!("{}-denied-binding", namespace),
-        ),
-    ])
+    cleanup_cluster_resources(
+        framework.kubectl_command(),
+        &[
+            ("clusterrole", &format!("{}-sar-role", namespace)),
+            ("clusterrolebinding", &format!("{}-sar-binding", namespace)),
+            ("clusterrole", &format!("{}-metrics-role", namespace)),
+            (
+                "clusterrolebinding",
+                &format!("{}-allowed-binding", namespace),
+            ),
+            (
+                "clusterrolebinding",
+                &format!("{}-denied-binding", namespace),
+            ),
+        ],
+    )
     .await;
 
     Ok(())

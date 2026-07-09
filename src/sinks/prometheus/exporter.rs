@@ -625,7 +625,7 @@ async fn validate_token_with_sar(
 
     // Check if user matches allowed_user filter (if configured)
     if let Some(allowed_user) = params.user {
-        if user_info.username.as_deref() != Some(allowed_user) {
+        if user_info.username.as_deref() != Some(allowed_user as &str) {
             warn!(
                 message = "User does not match allowed_user filter",
                 authenticated_user = ?user_info.username,
@@ -2099,6 +2099,7 @@ mod tests {
                     verb: "get".to_string(),
                     resource_group: "".to_string(),
                     namespace: None,
+                    audience: None,
                     allowed_user: None,
                     allowed_groups: None,
                 }),
@@ -2126,6 +2127,7 @@ mod tests {
                     verb: "get".to_string(),
                     resource_group: "".to_string(),
                     namespace: None,
+                    audience: None,
                     allowed_user: None,
                     allowed_groups: None,
                 }),
@@ -2153,6 +2155,7 @@ mod tests {
                     verb: "get".to_string(),
                     resource_group: "".to_string(),
                     namespace: None,
+                    audience: None,
                     allowed_user: None,
                     allowed_groups: None,
                 }),
@@ -2174,6 +2177,7 @@ mod tests {
                     verb: "get".to_string(),
                     resource_group: "".to_string(),
                     namespace: None,
+                    audience: None,
                     allowed_user: None,
                     allowed_groups: None,
                 }),

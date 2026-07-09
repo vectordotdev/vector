@@ -19,6 +19,11 @@ impl Framework {
         Self { interface }
     }
 
+    /// Get the kubectl command configured for this framework.
+    pub fn kubectl_command(&self) -> &str {
+        &self.interface.kubectl_command
+    }
+
     /// Deploy a Helm chart into a cluster.
     pub async fn helm_chart(
         &self,
