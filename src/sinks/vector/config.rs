@@ -122,12 +122,12 @@ pub struct VectorKeepaliveConfig {
 const fn default_keepalive_interval_secs() -> NonZeroU64 {
     // Aligned with gRPC keepalive guidance, which recommends no less than one minute to avoid
     // tripping `too_many_pings` policies on proxies between the sink and downstream.
-    unsafe { NonZeroU64::new_unchecked(60) }
+    NonZeroU64::new(60).expect("keepalive interval default must be nonzero")
 }
 
 const fn default_keepalive_timeout_secs() -> NonZeroU64 {
     // Matches hyper's default keepalive timeout.
-    unsafe { NonZeroU64::new_unchecked(20) }
+    NonZeroU64::new(20).expect("keepalive timeout default must be nonzero")
 }
 
 impl VectorConfig {
