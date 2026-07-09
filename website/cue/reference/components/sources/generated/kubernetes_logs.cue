@@ -128,7 +128,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: uint: {
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}
@@ -138,7 +138,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: array: {
 			default: [
-				"**/*",
+				"**/*"
 			]
 			items: type: string: examples: ["**/include/**"]
 		}

@@ -108,7 +108,7 @@ generated: components: sinks: greptimedb_logs: configuration: {
 		type: string: {
 			default: "public"
 			examples: [
-				"public",
+				"public"
 			]
 			syntax: "template"
 		}

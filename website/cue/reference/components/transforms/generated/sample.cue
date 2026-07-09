@@ -51,7 +51,7 @@ generated: components: transforms: sample: configuration: {
 			"""
 		required: false
 		type: uint: examples: [
-			1500,
+			1500
 		]
 	}
 	rate_field: {
@@ -77,7 +77,7 @@ generated: components: transforms: sample: configuration: {
 			"""
 		required: false
 		type: float: examples: [
-			0.13,
+			0.13
 		]
 	}
 	ratio_field: {

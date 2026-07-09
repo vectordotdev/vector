@@ -520,7 +520,7 @@ generated: components: sources: redis: configuration: {
 		description: "The Redis key to read messages from."
 		required:    true
 		type: string: examples: [
-			"vector",
+			"vector"
 		]
 	}
 	list: {

@@ -123,7 +123,7 @@ generated: components: sinks: nats: configuration: {
 		type: string: {
 			default: "vector"
 			examples: [
-				"foo",
+				"foo"
 			]
 		}
 	}

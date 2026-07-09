@@ -145,7 +145,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"text",
+			"text"
 		]
 	}
 	namespace: {
@@ -380,7 +380,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"source",
+			"source"
 		]
 	}
 	tags: {

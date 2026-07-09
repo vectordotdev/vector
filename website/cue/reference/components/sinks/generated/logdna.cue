@@ -70,7 +70,7 @@ generated: components: sinks: logdna: configuration: {
 		type: string: {
 			default: "vector"
 			examples: [
-				"my-app",
+				"my-app"
 			]
 		}
 	}

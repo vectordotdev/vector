@@ -652,7 +652,7 @@ generated: components: sources: mqtt: configuration: {
 		type: string: {
 			default: "topic"
 			examples: [
-				"topic",
+				"topic"
 			]
 		}
 	}
