@@ -223,6 +223,77 @@ async fn mqtt_redelivers_unacknowledged_messages() {
     drop(source2.await);
 }
 
+/// A withheld ack (the sink rejects the message, so its PUBACK is never sent)
+/// must force a reconnect on its own -- without an external trigger like a
+/// process restart or manual disconnect -- so the broker redelivers the
+/// still-unacknowledged publish. Otherwise a broker that only redelivers
+/// QoS 1 messages on reconnect (rather than on an independent timer) would
+/// leave the source connected but stuck, never receiving it again.
+#[tokio::test]
+async fn mqtt_forces_reconnect_after_withheld_ack() {
+    trace_init();
+
+    let topic = "source-forced-reconnect-test";
+    let client_id = format!("sourceForcedReconnectTest{}", random_string(6));
+    let message = random_string(32);
+
+    let config = MqttSourceConfig {
+        common: MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(client_id),
+            ..Default::default()
+        },
+        topic: OneOrMany::One(topic.to_owned()),
+        acknowledgements: true.into(),
+        ..MqttSourceConfig::default()
+    };
+
+    // The first delivery attempt for any publish is rejected (withholding its
+    // ack); every attempt after that succeeds. So the only way a second
+    // delivery of the same message shows up is a broker redelivery following
+    // a reconnect the source must have forced itself.
+    let (tx, mut rx) = SourceSender::new_test_errors(|count| count == 0);
+    let source = tokio::spawn(async move {
+        config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+    });
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let producer = get_mqtt_client().await;
+    producer
+        .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
+        .await
+        .unwrap();
+
+    let first = timeout(Duration::from_secs(5), rx.next())
+        .await
+        .expect("timed out waiting for first delivery")
+        .expect("source stream ended unexpectedly");
+    assert_eq!(message_body(&first), message);
+
+    let redelivered = timeout(Duration::from_secs(10), rx.next())
+        .await
+        .expect(
+            "timed out waiting for the forced reconnect to trigger redelivery: \
+             the source never reconnected on its own",
+        )
+        .expect("source stream ended unexpectedly");
+    assert_eq!(
+        message_body(&redelivered),
+        message,
+        "redelivered message did not match the original"
+    );
+
+    source.abort();
+    drop(source.await);
+}
+
 #[tokio::test]
 async fn mqtt_many_topics_happy() {
     trace_init();
