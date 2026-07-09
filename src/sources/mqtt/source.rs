@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use futures::{StreamExt, stream::BoxStream};
 use itertools::Itertools;
 use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
@@ -21,6 +23,16 @@ use crate::{
 
 const SUBSCRIPTION_QOS: QoS = QoS::AtLeastOnce;
 
+/// Minimum time between forced reconnects triggered by a withheld ack (see
+/// `ack_suppressed`). Brokers that only redeliver in-flight QoS 1 messages on
+/// reconnect would otherwise leave a withheld publish (and everything
+/// suppressed after it) stuck until some unrelated reconnect happens, so a
+/// forced reconnect gives it another chance. But if the downstream failure
+/// causing the suppression is persistent, the redelivered publish will likely
+/// fail again immediately, and reconnecting on every failure would thrash the
+/// connection; this cooldown caps that to at most once per interval.
+const FORCED_RECONNECT_COOLDOWN: Duration = Duration::from_secs(30);
+
 /// Identifies an in-flight publish so its QoS-1 PUBACK can be sent once the
 /// downstream sinks confirm delivery. Only the packet id (carried by `Publish`)
 /// is needed to ack; the payload is cleared before the entry is retained so
@@ -34,7 +46,13 @@ struct FinalizerEntry {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct ProtocolState {
     connected: bool,
+    /// A (re)subscribe is needed and has not yet been confirmed by a SUBACK.
     pending_resubscribe: bool,
+    /// A (re)subscribe request has been queued and we're waiting to see
+    /// whether it results in a SUBACK, so `loop_actions` doesn't keep
+    /// resending it every iteration in the meantime. Cleared by `on_suback`
+    /// (success) or by queueing failing again (so the next iteration retries).
+    resubscribe_awaiting_suback: bool,
     connection_generation: u64,
     /// Set once a publish in the current generation finalizes as anything
     /// other than `Delivered`. MQTT requires PUBACKs to be sent in the order
@@ -74,11 +92,19 @@ struct PublishAckDecision {
     warn_unsupported_qos: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct FinalizedPublishDecision {
+    should_ack: bool,
+    just_suppressed: bool,
+}
+
 impl ProtocolState {
     const fn loop_actions(&self) -> LoopActions {
         LoopActions {
             retry_pending_acks: self.connected,
-            retry_resubscribe: self.connected && self.pending_resubscribe,
+            retry_resubscribe: self.connected
+                && self.pending_resubscribe
+                && !self.resubscribe_awaiting_suback,
         }
     }
 
@@ -87,16 +113,32 @@ impl ProtocolState {
         acknowledgements: bool,
         session_present: bool,
     ) -> ConnAckActions {
+        // `session_present` alone can't be trusted when a previous (re)subscribe
+        // was never confirmed by a SUBACK: the broker's persistent session can
+        // exist (session_present = true) while missing that subscription,
+        // because the SUBSCRIBE that would have added it was lost (e.g. a
+        // disconnect racing the send) before this reconnect. So once a
+        // resubscribe is needed, it stays needed across reconnects regardless
+        // of what this connection's `session_present` says, until a SUBACK
+        // actually confirms it (`on_suback`).
+        let resubscribe =
+            self.pending_resubscribe || (self.connection_generation > 0 && !session_present);
+
         let actions = ConnAckActions {
             warn_session_not_resumed: acknowledgements && !session_present,
             clear_pending_acks: true,
             recreate_finalizer: true,
-            resubscribe: self.connection_generation > 0 && !session_present,
+            resubscribe,
         };
 
         self.connected = true;
         self.connection_generation += 1;
         self.ack_suppressed = false;
+        self.pending_resubscribe = resubscribe;
+        // A fresh connection means any previous queue attempt no longer
+        // applies (its SUBACK, if it ever arrives, would be for a subscribe
+        // on a connection that's gone) -- retry immediately on this one.
+        self.resubscribe_awaiting_suback = false;
 
         actions
     }
@@ -110,25 +152,54 @@ impl ProtocolState {
         }
     }
 
-    const fn on_resubscribe_result(&mut self, success: bool) {
-        self.pending_resubscribe = !success;
+    /// Records whether a (re)subscribe request was successfully queued.
+    /// `pending_resubscribe` is intentionally left set either way: queueing
+    /// only means rumqttc accepted the request locally, not that the broker
+    /// received or processed it, so it's only cleared once a SUBACK actually
+    /// confirms success (`on_suback`). A request that's lost (e.g. a
+    /// disconnect racing the send) is retried on the next reconnect.
+    const fn on_resubscribe_result(&mut self, queued: bool) {
+        self.resubscribe_awaiting_suback = queued;
     }
 
-    /// Whether this finalized publish should be acked. Also updates
-    /// `ack_suppressed`: see its doc comment for why a non-`Delivered` status
-    /// in the current generation withholds every ack after it, not just its
-    /// own.
-    fn should_ack_finalized_publish(&mut self, status: BatchStatus, entry_generation: u64) -> bool {
+    /// A SUBACK confirms the broker processed the (re)subscribe, so stop
+    /// retrying it.
+    const fn on_suback(&mut self) {
+        self.pending_resubscribe = false;
+        self.resubscribe_awaiting_suback = false;
+    }
+
+    /// Decides whether a finalized publish should be acked, and whether this
+    /// is the moment its generation's `ack_suppressed` first became set. See
+    /// `ack_suppressed`'s doc comment for why a non-`Delivered` status
+    /// withholds every ack after it, not just its own; `just_suppressed` is
+    /// how the caller learns it needs to force a reconnect so the broker
+    /// redelivers the withheld publish (see `FORCED_RECONNECT_COOLDOWN`).
+    fn finalize_publish(
+        &mut self,
+        status: BatchStatus,
+        entry_generation: u64,
+    ) -> FinalizedPublishDecision {
         if entry_generation != self.connection_generation {
-            return false;
+            return FinalizedPublishDecision {
+                should_ack: false,
+                just_suppressed: false,
+            };
         }
 
         if status != BatchStatus::Delivered {
+            let just_suppressed = !self.ack_suppressed;
             self.ack_suppressed = true;
-            return false;
+            return FinalizedPublishDecision {
+                should_ack: false,
+                just_suppressed,
+            };
         }
 
-        !self.ack_suppressed
+        FinalizedPublishDecision {
+            should_ack: !self.ack_suppressed,
+            just_suppressed: false,
+        }
     }
 }
 
@@ -164,6 +235,13 @@ fn warn_session_not_resumed() {
 fn warn_resubscribe_failed() {
     warn!(
         message = "Failed to queue MQTT re-subscribe request after reconnect; will retry while connected.",
+        internal_log_rate_limit = true,
+    );
+}
+
+fn warn_forcing_reconnect_after_suppressed_ack() {
+    warn!(
+        message = "An MQTT publish was not delivered and its acknowledgement was withheld; forcing a reconnect so the broker redelivers it.",
         internal_log_rate_limit = true,
     );
 }
@@ -256,6 +334,14 @@ impl MqttSource {
         let mut protocol_state = ProtocolState::default();
         let mut pending_acks = PendingAcks::default();
 
+        // Set when a graceful MQTT `Disconnect` (forced by a withheld ack, see
+        // `FORCED_RECONNECT_COOLDOWN`) couldn't be queued immediately (rumqttc's
+        // request channel was full); retried below until it succeeds. Cleared
+        // on the next disconnect, since by then the reconnect it was asking
+        // for has already happened.
+        let mut forced_reconnect_pending = false;
+        let mut forced_reconnect_cooldown_until: Option<tokio::time::Instant> = None;
+
         loop {
             let actions = protocol_state.loop_actions();
             if actions.retry_resubscribe {
@@ -270,6 +356,10 @@ impl MqttSource {
                 pending_acks.retry(&client);
             }
 
+            if forced_reconnect_pending {
+                forced_reconnect_pending = client.try_disconnect().is_err();
+            }
+
             tokio::select! {
                 _ = shutdown.clone() => return Ok(()),
                 entry = ack_stream.next() => {
@@ -280,13 +370,36 @@ impl MqttSource {
                     // this same task polls the event loop that drains rumqttc's request
                     // channel. If that channel is full, retain the PUBACK for retry
                     // (above) instead of dropping it.
-                    if let Some((status, entry)) = entry
-                        && protocol_state.should_ack_finalized_publish(
+                    if let Some((status, entry)) = entry {
+                        let decision = protocol_state.finalize_publish(
                             status,
                             entry.connection_generation,
-                        )
-                    {
-                        pending_acks.try_ack(protocol_state.connected, entry.publish, &client);
+                        );
+                        if decision.should_ack {
+                            pending_acks.try_ack(protocol_state.connected, entry.publish, &client);
+                        }
+                        // A withheld ack leaves the publish (and everything
+                        // suppressed after it) stuck until the connection
+                        // reconnects, so force one -- rate-limited so a
+                        // persistent downstream failure (the redelivered
+                        // publish failing again immediately) can't thrash the
+                        // connection. Graceful (`try_disconnect`, an MQTT
+                        // `Disconnect` packet) rather than dropping the
+                        // network directly: an earlier attempt at the latter
+                        // (`EventLoop::clean()`) was verified against a live
+                        // EMQX broker to trigger a broker-side
+                        // `unexpected_sock_close` error that stopped delivery
+                        // entirely, whereas an explicit `Disconnect` is a
+                        // normal, expected client-initiated close.
+                        if decision.just_suppressed {
+                            let now = tokio::time::Instant::now();
+                            if forced_reconnect_cooldown_until.is_none_or(|until| now >= until) {
+                                forced_reconnect_cooldown_until =
+                                    Some(now + FORCED_RECONNECT_COOLDOWN);
+                                warn_forcing_reconnect_after_suppressed_ack();
+                                forced_reconnect_pending = client.try_disconnect().is_err();
+                            }
+                        }
                     }
                 },
                 mqtt_event = connection.poll() => {
@@ -308,18 +421,23 @@ impl MqttSource {
                                 protocol_state.connection_generation,
                             ).await;
                         }
-                        Ok(MqttEvent::Incoming(Incoming::SubAck(suback)))
-                            if self.acknowledgements =>
-                        {
-                            for return_code in suback.return_codes {
-                                if let rumqttc::SubscribeReasonCode::Success(qos) = return_code
-                                    && !publish_supports_end_to_end_acknowledgements(qos)
-                                {
-                                    warn!(
-                                        message = "MQTT broker granted a subscription QoS below the level required for end-to-end acknowledgements.",
-                                        ?qos,
-                                        internal_log_rate_limit = true,
-                                    );
+                        Ok(MqttEvent::Incoming(Incoming::SubAck(suback))) => {
+                            // A SUBACK confirms the broker processed our (re)subscribe;
+                            // stop retrying it regardless of whether acknowledgements
+                            // are enabled (retry tracking isn't ack-specific).
+                            protocol_state.on_suback();
+
+                            if self.acknowledgements {
+                                for return_code in suback.return_codes {
+                                    if let rumqttc::SubscribeReasonCode::Success(qos) = return_code
+                                        && !publish_supports_end_to_end_acknowledgements(qos)
+                                    {
+                                        warn!(
+                                            message = "MQTT broker granted a subscription QoS below the level required for end-to-end acknowledgements.",
+                                            ?qos,
+                                            internal_log_rate_limit = true,
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -344,16 +462,34 @@ impl MqttSource {
                                 protocol_state.on_resubscribe_result(self.try_subscribe(&client));
                             }
                         }
-                        // Connection lost: same stale-packet-id reasoning, and rumqttc
-                        // drops its own queued acks while reconnecting.
+                        // Connection lost: same stale-packet-id reasoning. `poll()`
+                        // already called `EventLoop::clean()` internally before
+                        // returning this error, which moves any PUBACK/PUBREC that
+                        // `try_ack` had queued but that hadn't reached the network yet
+                        // into `connection.pending` for automatic replay on the next
+                        // connection. Those reference packet ids from the connection
+                        // that just died, so drop them here too, or the broker could
+                        // receive a stale ack for the wrong publish (or be sent one at
+                        // all when it started a fresh session) once reconnected.
                         Err(_) => {
                             let actions = protocol_state.on_disconnect();
                             if actions.clear_pending_acks {
                                 pending_acks.clear();
+                                connection.pending.retain(|request| {
+                                    !matches!(
+                                        request,
+                                        rumqttc::Request::PubAck(_) | rumqttc::Request::PubRec(_)
+                                    )
+                                });
                             }
                             if actions.recreate_finalizer {
                                 (finalizer, ack_stream) = self.new_finalizer(&shutdown);
                             }
+                            // The reconnect a pending forced-disconnect was
+                            // asking for has now happened (by this error, if
+                            // not by the disconnect itself); no need to send
+                            // another once reconnected.
+                            forced_reconnect_pending = false;
                         }
                         _ => {}
                     }
@@ -370,7 +506,7 @@ impl MqttSource {
     // survive the flush and get pushed into the set anyway. Because
     // `OrderedFinalizer` won't yield anything newer until that stale entry
     // resolves, it can hold back acks for the new connection generation even
-    // though `should_ack_finalized_publish` would correctly skip it once
+    // though `finalize_publish` would correctly skip it once
     // yielded. Dropping the old `finalizer` (and so its sender) instead lets
     // its background task see the channel closed and exit outright, taking
     // any not-yet-picked-up entries with it — no race window.
@@ -667,19 +803,21 @@ mod tests {
         assert_eq!(fresh_session.connection_generation, 2);
     }
 
+    // Queueing a (re)subscribe request only means rumqttc accepted it
+    // locally, not that the broker processed it: a disconnect can lose it
+    // between queueing and actually reaching the broker, and the broker's
+    // next SUBACK-less reconnect can report `session_present = true` for a
+    // session that never got the subscription. So `pending_resubscribe` may
+    // only be cleared by an actual SUBACK (`on_suback`), and a successfully
+    // queued request must stop the loop from resending it every iteration
+    // (`resubscribe_awaiting_suback`) without yet considering it done.
     #[test]
     fn protocol_contract_matrix_for_pending_resubscribe() {
         let mut state = ProtocolState::default();
-        state.on_resubscribe_result(false);
-        assert_eq!(
-            state.loop_actions(),
-            LoopActions {
-                retry_pending_acks: false,
-                retry_resubscribe: false,
-            }
-        );
-
         state.on_connack(true, true);
+        state.on_disconnect();
+        let actions = state.on_connack(true, false);
+        assert!(actions.resubscribe);
         assert_eq!(
             state.loop_actions(),
             LoopActions {
@@ -688,12 +826,72 @@ mod tests {
             }
         );
 
+        // Successfully queueing it stops the per-iteration resend, but does
+        // not yet count as done: only a SUBACK can do that.
         state.on_resubscribe_result(true);
         assert_eq!(
             state.loop_actions(),
             LoopActions {
                 retry_pending_acks: true,
                 retry_resubscribe: false,
+            }
+        );
+
+        // The queued request never reaches the broker (lost in a race with
+        // a disconnect); failing to queue it again resumes the per-iteration
+        // retry rather than leaving it stuck waiting for a SUBACK that will
+        // never come.
+        state.on_resubscribe_result(false);
+        assert_eq!(
+            state.loop_actions(),
+            LoopActions {
+                retry_pending_acks: true,
+                retry_resubscribe: true,
+            }
+        );
+
+        // Queued again, and this time a SUBACK actually confirms it.
+        state.on_resubscribe_result(true);
+        state.on_suback();
+        assert_eq!(
+            state.loop_actions(),
+            LoopActions {
+                retry_pending_acks: true,
+                retry_resubscribe: false,
+            }
+        );
+    }
+
+    // A fresh-session reconnect whose queued SUBSCRIBE is lost (dropped
+    // before reaching the broker) must not be considered resubscribed just
+    // because a later reconnect happens to report `session_present = true`
+    // for that now-subscription-less session: only a SUBACK may clear
+    // `pending_resubscribe`.
+    #[test]
+    fn resubscribe_stays_pending_across_a_session_present_reconnect_without_suback() {
+        let mut state = ProtocolState::default();
+        state.on_connack(true, true);
+        state.on_disconnect();
+        state.on_connack(true, false);
+        state.on_resubscribe_result(true);
+        assert!(state.pending_resubscribe);
+
+        // The connection drops again before a SUBACK arrives, and the next
+        // reconnect reports the (empty) session as present.
+        state.on_disconnect();
+        let actions = state.on_connack(true, true);
+
+        assert!(
+            actions.resubscribe,
+            "must still resubscribe: the previous attempt was never confirmed by a SUBACK, \
+             even though this reconnect reports session_present = true"
+        );
+        assert!(state.pending_resubscribe);
+        assert_eq!(
+            state.loop_actions(),
+            LoopActions {
+                retry_pending_acks: true,
+                retry_resubscribe: true,
             }
         );
     }
@@ -736,7 +934,7 @@ mod tests {
             (BatchStatus::Rejected, 2, false),
         ] {
             assert_eq!(
-                state.should_ack_finalized_publish(status, entry_generation),
+                state.finalize_publish(status, entry_generation).should_ack,
                 should_ack
             );
         }
@@ -752,14 +950,67 @@ mod tests {
         let mut state = ProtocolState::default();
         state.on_connack(true, true);
 
-        assert!(state.should_ack_finalized_publish(BatchStatus::Delivered, 1));
+        assert!(
+            state
+                .finalize_publish(BatchStatus::Delivered, 1)
+                .should_ack
+        );
 
-        assert!(!state.should_ack_finalized_publish(BatchStatus::Rejected, 1));
-        assert!(!state.should_ack_finalized_publish(BatchStatus::Delivered, 1));
-        assert!(!state.should_ack_finalized_publish(BatchStatus::Delivered, 1));
+        assert!(
+            !state
+                .finalize_publish(BatchStatus::Rejected, 1)
+                .should_ack
+        );
+        assert!(
+            !state
+                .finalize_publish(BatchStatus::Delivered, 1)
+                .should_ack
+        );
+        assert!(
+            !state
+                .finalize_publish(BatchStatus::Delivered, 1)
+                .should_ack
+        );
 
         // A reconnect starts a fresh generation, resuming normal acking.
         state.on_connack(true, false);
-        assert!(state.should_ack_finalized_publish(BatchStatus::Delivered, 2));
+        assert!(
+            state
+                .finalize_publish(BatchStatus::Delivered, 2)
+                .should_ack
+        );
+    }
+
+    // A withheld ack must trigger a forced reconnect (so the broker
+    // redelivers the withheld publish) exactly once per suppression episode,
+    // not on every subsequent non-`Delivered` finalization in the same
+    // generation -- the caller only needs one signal to act on, and a fresh
+    // generation (after that reconnect) can trigger it again if it too fails.
+    #[test]
+    fn finalize_publish_signals_just_suppressed_once_per_episode() {
+        let mut state = ProtocolState::default();
+        state.on_connack(true, true);
+
+        let first = state.finalize_publish(BatchStatus::Rejected, 1);
+        assert!(!first.should_ack);
+        assert!(first.just_suppressed);
+
+        let second = state.finalize_publish(BatchStatus::Errored, 1);
+        assert!(!second.should_ack);
+        assert!(
+            !second.just_suppressed,
+            "already suppressed in this generation; must not re-signal"
+        );
+
+        // A new generation can independently signal suppression again.
+        state.on_connack(true, false);
+        let after_reconnect = state.finalize_publish(BatchStatus::Rejected, 2);
+        assert!(after_reconnect.just_suppressed);
+
+        // An out-of-generation (stale) entry never signals, even if its
+        // status would otherwise suppress.
+        let stale = state.finalize_publish(BatchStatus::Rejected, 1);
+        assert!(!stale.should_ack);
+        assert!(!stale.just_suppressed);
     }
 }
