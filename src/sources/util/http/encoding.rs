@@ -204,7 +204,7 @@ where
 {
     futures_util::pin_mut!(body);
 
-    let mut total_body_size = 0;
+    let mut total_body_size: usize = 0;
     let mut admit_chunk_within_limit = |chunk: Result<B, warp::Error>| -> Result<B, ErrorMessage> {
         let chunk = chunk.map_err(|error| {
             ErrorMessage::new(
