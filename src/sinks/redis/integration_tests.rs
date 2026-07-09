@@ -327,7 +327,7 @@ async fn redis_sink_sorted_set_zadd() {
     for i in 0..num_events {
         let s: String = i.to_string();
         let mut e = LogEvent::from(s);
-        e.insert("num", i);
+        e.insert(vrl::event_path!("num"), i);
         events.push(e.into());
     }
     let input = stream::iter(events.clone().into_iter().map(Into::into));
@@ -651,8 +651,8 @@ async fn redis_sink_traces() {
 
         // Create a  trace event
         let mut trace = TraceEvent::default();
-        trace.insert("name", "test_trace");
-        trace.insert("service", "redis_test");
+        trace.insert(vrl::event_path!("name"), "test_trace");
+        trace.insert(vrl::event_path!("service"), "redis_test");
 
         // Set up batch notification for checking delivery status
         let (batch, receiver) = BatchNotifier::new_with_receiver();

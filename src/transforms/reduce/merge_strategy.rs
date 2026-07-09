@@ -367,7 +367,7 @@ impl ReduceValueMerger for TimestampWindowMerger {
         v: &mut LogEvent,
     ) -> Result<(), String> {
         v.insert(
-            format!("{path}_end").as_str(),
+            &vrl::path::parse_target_path(&format!("{path}_end")).unwrap(),
             Value::Timestamp(self.latest),
         );
         v.insert(path, Value::Timestamp(self.started));

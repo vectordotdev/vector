@@ -117,12 +117,14 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
                 chrono::Utc::now()
             };
 
-            log.insert(
-                (PathPrefix::Event, self.timestamp_field.as_str()),
-                serde_json::Value::String(
-                    timestamp.to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
-                ),
-            );
+            if let Ok(ts_path) = vrl::path::parse_value_path(&self.timestamp_field) {
+                log.insert(
+                    (PathPrefix::Event, &ts_path),
+                    serde_json::Value::String(
+                        timestamp.to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+                    ),
+                );
+            }
         }
 
         self.encoder.encode_input(input, writer)

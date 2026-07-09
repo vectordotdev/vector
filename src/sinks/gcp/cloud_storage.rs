@@ -501,6 +501,7 @@ mod tests {
         partition::Partitioner,
         request_metadata::GroupedCountByteSize,
     };
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -547,7 +548,7 @@ mod tests {
 
         let message = "hello world".to_string();
         let mut event = LogEvent::from(message);
-        event.insert("key", "value");
+        event.insert(event_path!("key"), "value");
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),

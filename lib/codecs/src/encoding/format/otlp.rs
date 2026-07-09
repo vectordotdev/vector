@@ -8,7 +8,7 @@ use opentelemetry_proto::proto::{
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
-use vrl::protobuf::encode::Options;
+use vrl::{event_path, protobuf::encode::Options};
 
 /// Config used to build an `OtlpSerializer`.
 #[configurable_component]
@@ -103,9 +103,9 @@ impl Encoder<Event> for OtlpSerializer {
         // The deserializer uses use_json_names: true, so fields are in camelCase
         match &event {
             Event::Log(log) => {
-                if log.contains(RESOURCE_LOGS_JSON_FIELD) {
+                if log.contains(event_path!(RESOURCE_LOGS_JSON_FIELD)) {
                     self.logs_descriptor.encode(event, buffer)
-                } else if log.contains(RESOURCE_METRICS_JSON_FIELD) {
+                } else if log.contains(event_path!(RESOURCE_METRICS_JSON_FIELD)) {
                     // Currently the OTLP metrics are Vector logs (not metrics).
                     self.metrics_descriptor.encode(event, buffer)
                 } else {
@@ -116,7 +116,7 @@ impl Encoder<Event> for OtlpSerializer {
                 }
             }
             Event::Trace(trace) => {
-                if trace.contains(RESOURCE_SPANS_JSON_FIELD) {
+                if trace.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
                     self.traces_descriptor.encode(event, buffer)
                 } else {
                     Err(format!(

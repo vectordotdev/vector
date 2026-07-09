@@ -1148,7 +1148,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1203,11 +1205,15 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in no_lowercase_expected {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
         for (exp_key, exp_value) in expected_map {
-            let value = lowercase_log_event.get(exp_key).unwrap();
+            let value = lowercase_log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1242,7 +1248,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1337,7 +1345,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }

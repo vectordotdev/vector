@@ -76,11 +76,13 @@ impl Mmdb {
             let mut filtered = Value::from(ObjectMap::new());
             let mut data_value = Value::from(data);
             for field in fields {
+                let field_path = vrl::path::parse_value_path(field).ok();
+                let Some(field_path) = field_path else {
+                    continue;
+                };
                 filtered.insert(
-                    field.as_str(),
-                    data_value
-                        .remove(field.as_str(), false)
-                        .unwrap_or(Value::Null),
+                    &field_path,
+                    data_value.remove(&field_path, false).unwrap_or(Value::Null),
                 );
             }
             filtered.into_object()

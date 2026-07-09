@@ -701,7 +701,7 @@ mod tests {
     #[test]
     fn render_log_unsigned_number_dynamic() {
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("foo", 123);
+        event.as_mut_log().insert(event_path!("foo"), 123);
 
         let template = UnsignedIntTemplate::try_from("{{ foo }}").unwrap();
         assert_eq!(Ok(123), template.render(&event))
@@ -710,7 +710,9 @@ mod tests {
     #[test]
     fn render_log_dynamic() {
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("log_stream", "stream");
+        event
+            .as_mut_log()
+            .insert(event_path!("log_stream"), "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
@@ -730,7 +732,9 @@ mod tests {
     #[test]
     fn render_log_dynamic_with_prefix() {
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("log_stream", "stream");
+        event
+            .as_mut_log()
+            .insert(event_path!("log_stream"), "stream");
         let template = Template::try_from("abcd-{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
@@ -739,7 +743,9 @@ mod tests {
     #[test]
     fn render_log_dynamic_with_postfix() {
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("log_stream", "stream");
+        event
+            .as_mut_log()
+            .insert(event_path!("log_stream"), "stream");
         let template = Template::try_from("{{log_stream}}-abcd").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
@@ -761,8 +767,8 @@ mod tests {
     #[test]
     fn render_log_dynamic_multiple_keys() {
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("foo", "bar");
-        event.as_mut_log().insert("baz", "quux");
+        event.as_mut_log().insert(event_path!("foo"), "bar");
+        event.as_mut_log().insert(event_path!("baz"), "quux");
         let template = Template::try_from("stream-{{foo}}-{{baz}}.log").unwrap();
 
         assert_eq!(
@@ -774,8 +780,8 @@ mod tests {
     #[test]
     fn render_log_dynamic_weird_junk() {
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("foo", "bar");
-        event.as_mut_log().insert("baz", "quux");
+        event.as_mut_log().insert(event_path!("foo"), "bar");
+        event.as_mut_log().insert(event_path!("baz"), "quux");
         let template = Template::try_from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log").unwrap();
 
         assert_eq!(
@@ -809,9 +815,14 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("@timestamp", ts);
+        event.as_mut_log().insert(event_path!("@timestamp"), ts);
         // use Vector namespace instead of legacy
-        LogNamespace::Vector.insert_vector_metadata(event.as_mut_log(), Some("foo"), "foo", "bar");
+        LogNamespace::Vector.insert_vector_metadata(
+            event.as_mut_log(),
+            Some(vrl::path!("foo")),
+            vrl::path!("foo"),
+            "bar",
+        );
         let new_schema = event
             .as_mut_log()
             .metadata()
@@ -857,7 +868,7 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("foo", "butts");
+        event.as_mut_log().insert(event_path!("foo"), "butts");
         event.as_mut_log().insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
@@ -879,7 +890,7 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("format", "%F");
+        event.as_mut_log().insert(event_path!("format"), "%F");
         event.as_mut_log().insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
@@ -901,7 +912,9 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert("\"%F\"", "foo");
+        event
+            .as_mut_log()
+            .insert(&parse_target_path("\"%F\"").unwrap(), "foo");
         event.as_mut_log().insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,

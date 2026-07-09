@@ -1,4 +1,5 @@
 use vector_lib::config::{log_schema, proxy::ProxyConfig};
+use vrl::event_path;
 
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
@@ -31,7 +32,7 @@ async fn interpolate_labels() {
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
-    e1.as_mut_log().insert("foo", "bar");
+    e1.as_mut_log().insert(event_path!("foo"), "bar");
 
     let mut record = sink.encoder.encode_event(e1).unwrap();
 
@@ -72,7 +73,7 @@ async fn use_label_from_dropped_fields() {
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
-    e1.as_mut_log().insert("foo", "bar");
+    e1.as_mut_log().insert(event_path!("foo"), "bar");
 
     let record = sink.encoder.encode_event(e1).unwrap();
 
@@ -195,7 +196,7 @@ async fn structured_metadata_as_json() {
     let mut sink = LokiSink::new(config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
-    e1.as_mut_log().insert("foo", "bar");
+    e1.as_mut_log().insert(event_path!("foo"), "bar");
 
     let event = sink.encoder.encode_event(e1).unwrap();
     let body = serde_json::json!(event.event);

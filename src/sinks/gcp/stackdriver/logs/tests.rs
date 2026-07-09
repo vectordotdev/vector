@@ -162,10 +162,10 @@ fn encode_inserts_timestamp() {
     );
 
     let mut log = LogEvent::default();
-    log.insert("message", Value::Bytes("hello world".into()));
-    log.insert("anumber", Value::Bytes("100".into()));
+    log.insert(event_path!("message"), Value::Bytes("hello world".into()));
+    log.insert(event_path!("anumber"), Value::Bytes("100".into()));
     log.insert(
-        "timestamp",
+        event_path!("timestamp"),
         Value::Timestamp(
             Utc.with_ymd_and_hms(2020, 1, 1, 12, 30, 0)
                 .single()

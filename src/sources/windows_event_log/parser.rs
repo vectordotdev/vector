@@ -1,5 +1,8 @@
 use vector_lib::config::{LogNamespace, log_schema};
-use vrl::value::{ObjectMap, Value};
+use vrl::{
+    event_path,
+    value::{ObjectMap, Value},
+};
 
 use vector_lib::event::LogEvent;
 
@@ -138,58 +141,94 @@ impl EventLogParser {
         event: &WindowsEvent,
     ) -> Result<(), WindowsEventLogError> {
         // Core Windows Event Log fields
-        log_event.insert("event_id", Value::Integer(event.event_id as i64));
-
-        log_event.insert("record_id", Value::Integer(event.record_id as i64));
-
-        log_event.insert("level", Value::Bytes(event.level_name().into()));
-
-        log_event.insert("level_value", Value::Integer(event.level as i64));
-
-        log_event.insert("channel", Value::Bytes(event.channel.clone().into()));
+        log_event.insert(
+            event_path!("event_id"),
+            Value::Integer(event.event_id as i64),
+        );
 
         log_event.insert(
-            "provider_name",
+            event_path!("record_id"),
+            Value::Integer(event.record_id as i64),
+        );
+
+        log_event.insert(
+            event_path!("level"),
+            Value::Bytes(event.level_name().into()),
+        );
+
+        log_event.insert(
+            event_path!("level_value"),
+            Value::Integer(event.level as i64),
+        );
+
+        log_event.insert(
+            event_path!("channel"),
+            Value::Bytes(event.channel.clone().into()),
+        );
+
+        log_event.insert(
+            event_path!("provider_name"),
             Value::Bytes(event.provider_name.clone().into()),
         );
 
         if let Some(ref provider_guid) = event.provider_guid {
-            log_event.insert("provider_guid", Value::Bytes(provider_guid.clone().into()));
+            log_event.insert(
+                event_path!("provider_guid"),
+                Value::Bytes(provider_guid.clone().into()),
+            );
         }
 
-        log_event.insert("computer", Value::Bytes(event.computer.clone().into()));
+        log_event.insert(
+            event_path!("computer"),
+            Value::Bytes(event.computer.clone().into()),
+        );
 
         if let Some(ref user_id) = event.user_id {
-            log_event.insert("user_id", Value::Bytes(user_id.clone().into()));
+            log_event.insert(event_path!("user_id"), Value::Bytes(user_id.clone().into()));
         }
 
         if let Some(ref user_name) = event.user_name {
-            log_event.insert("user_name", Value::Bytes(user_name.clone().into()));
+            log_event.insert(
+                event_path!("user_name"),
+                Value::Bytes(user_name.clone().into()),
+            );
         }
 
-        log_event.insert("process_id", Value::Integer(event.process_id as i64));
+        log_event.insert(
+            event_path!("process_id"),
+            Value::Integer(event.process_id as i64),
+        );
 
-        log_event.insert("thread_id", Value::Integer(event.thread_id as i64));
+        log_event.insert(
+            event_path!("thread_id"),
+            Value::Integer(event.thread_id as i64),
+        );
 
         if event.task != 0 {
-            log_event.insert("task", Value::Integer(event.task as i64));
+            log_event.insert(event_path!("task"), Value::Integer(event.task as i64));
 
             if let Some(ref task_name) = event.task_name {
-                log_event.insert("task_name", Value::Bytes(task_name.clone().into()));
+                log_event.insert(
+                    event_path!("task_name"),
+                    Value::Bytes(task_name.clone().into()),
+                );
             }
         }
 
         if event.opcode != 0 {
-            log_event.insert("opcode", Value::Integer(event.opcode as i64));
+            log_event.insert(event_path!("opcode"), Value::Integer(event.opcode as i64));
 
             if let Some(ref opcode_name) = event.opcode_name {
-                log_event.insert("opcode_name", Value::Bytes(opcode_name.clone().into()));
+                log_event.insert(
+                    event_path!("opcode_name"),
+                    Value::Bytes(opcode_name.clone().into()),
+                );
             }
         }
 
         if event.keywords != 0 {
             log_event.insert(
-                "keywords",
+                event_path!("keywords"),
                 Value::Bytes(format!("0x{:016X}", event.keywords).into()),
             );
 
@@ -199,28 +238,31 @@ impl EventLogParser {
                     .iter()
                     .map(|s| Value::Bytes(s.clone().into()))
                     .collect();
-                log_event.insert("keyword_names", Value::Array(kw_values));
+                log_event.insert(event_path!("keyword_names"), Value::Array(kw_values));
             }
         }
 
         if let Some(ref activity_id) = event.activity_id {
-            log_event.insert("activity_id", Value::Bytes(activity_id.clone().into()));
+            log_event.insert(
+                event_path!("activity_id"),
+                Value::Bytes(activity_id.clone().into()),
+            );
         }
 
         if let Some(ref related_activity_id) = event.related_activity_id {
             log_event.insert(
-                "related_activity_id",
+                event_path!("related_activity_id"),
                 Value::Bytes(related_activity_id.clone().into()),
             );
         }
 
         // New FluentBit-compatible fields
         if let Some(version) = event.version {
-            log_event.insert("version", Value::Integer(version as i64));
+            log_event.insert(event_path!("version"), Value::Integer(version as i64));
         }
 
         if let Some(qualifiers) = event.qualifiers {
-            log_event.insert("qualifiers", Value::Integer(qualifiers as i64));
+            log_event.insert(event_path!("qualifiers"), Value::Integer(qualifiers as i64));
         }
 
         // StringInserts field for FluentBit compatibility
@@ -230,12 +272,15 @@ impl EventLogParser {
                 .iter()
                 .map(|s| Value::Bytes(s.clone().into()))
                 .collect();
-            log_event.insert("string_inserts", Value::Array(string_inserts));
+            log_event.insert(event_path!("string_inserts"), Value::Array(string_inserts));
         }
 
         // Include raw XML if requested
         if self.config.include_xml && !event.raw_xml.is_empty() {
-            log_event.insert("xml", Value::Bytes(event.raw_xml.clone().into()));
+            log_event.insert(
+                event_path!("xml"),
+                Value::Bytes(event.raw_xml.clone().into()),
+            );
         }
 
         // Include event data if configured
@@ -245,7 +290,7 @@ impl EventLogParser {
                 let typed_value = self.coerce_field_value(key, value);
                 event_data_map.insert(key.clone().into(), typed_value);
             }
-            log_event.insert("event_data", Value::Object(event_data_map));
+            log_event.insert(event_path!("event_data"), Value::Object(event_data_map));
         }
 
         // Include user data if configured
@@ -255,7 +300,7 @@ impl EventLogParser {
                 let typed_value = self.coerce_field_value(key, value);
                 user_data_map.insert(key.clone().into(), typed_value);
             }
-            log_event.insert("user_data", Value::Object(user_data_map));
+            log_event.insert(event_path!("user_data"), Value::Object(user_data_map));
         }
 
         Ok(())
@@ -509,38 +554,44 @@ mod tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Check core fields
-        assert_eq!(log_event.get("event_id").unwrap(), &Value::Integer(1000));
-        assert_eq!(log_event.get("record_id").unwrap(), &Value::Integer(12345));
         assert_eq!(
-            log_event.get("level").unwrap(),
+            log_event.get(event_path!("event_id")).unwrap(),
+            &Value::Integer(1000)
+        );
+        assert_eq!(
+            log_event.get(event_path!("record_id")).unwrap(),
+            &Value::Integer(12345)
+        );
+        assert_eq!(
+            log_event.get(event_path!("level")).unwrap(),
             &Value::Bytes("Information".into())
         );
         assert_eq!(
-            log_event.get("channel").unwrap(),
+            log_event.get(event_path!("channel")).unwrap(),
             &Value::Bytes("TestChannel".into())
         );
         assert_eq!(
-            log_event.get("provider_name").unwrap(),
+            log_event.get(event_path!("provider_name")).unwrap(),
             &Value::Bytes("TestProvider".into())
         );
         assert_eq!(
-            log_event.get("computer").unwrap(),
+            log_event.get(event_path!("computer")).unwrap(),
             &Value::Bytes("TEST-PC".into())
         );
 
         // Enriched fields from the new resolution methods
         // opcode=2 -> "Stop"
         assert_eq!(
-            log_event.get("opcode_name").unwrap(),
+            log_event.get(event_path!("opcode_name")).unwrap(),
             &Value::Bytes("Stop".into())
         );
         // keywords=0x8000000000000000 -> ["Classic"]
         assert_eq!(
-            log_event.get("keyword_names").unwrap(),
+            log_event.get(event_path!("keyword_names")).unwrap(),
             &Value::Array(vec![Value::Bytes("Classic".into())])
         );
         // task=1 with provider "TestProvider" has no known mapping
-        assert!(log_event.get("task_name").is_none());
+        assert!(log_event.get(event_path!("task_name")).is_none());
     }
 
     #[test]
@@ -582,26 +633,29 @@ mod tests {
 
         // Level 0 should map to "Information" (not "Unknown")
         assert_eq!(
-            log_event.get("level").unwrap(),
+            log_event.get(event_path!("level")).unwrap(),
             &Value::Bytes("Information".into())
         );
-        assert_eq!(log_event.get("level_value").unwrap(), &Value::Integer(0));
+        assert_eq!(
+            log_event.get(event_path!("level_value")).unwrap(),
+            &Value::Integer(0)
+        );
 
         // Task 12544 -> "Logon"
         assert_eq!(
-            log_event.get("task_name").unwrap(),
+            log_event.get(event_path!("task_name")).unwrap(),
             &Value::Bytes("Logon".into())
         );
 
         // keywords=Audit Success
         assert_eq!(
-            log_event.get("keyword_names").unwrap(),
+            log_event.get(event_path!("keyword_names")).unwrap(),
             &Value::Array(vec![Value::Bytes("Audit Success".into())])
         );
 
         // opcode=0 is not emitted since the condition is `if event.opcode != 0`
-        assert!(log_event.get("opcode").is_none());
-        assert!(log_event.get("opcode_name").is_none());
+        assert!(log_event.get(event_path!("opcode")).is_none());
+        assert!(log_event.get(event_path!("opcode_name")).is_none());
     }
 
     #[test]
@@ -614,9 +668,9 @@ mod tests {
 
         let log_event = parser.parse_event(event.clone()).unwrap();
 
-        assert!(log_event.get("xml").is_some());
+        assert!(log_event.get(event_path!("xml")).is_some());
         assert_eq!(
-            log_event.get("xml").unwrap(),
+            log_event.get(event_path!("xml")).unwrap(),
             &Value::Bytes(event.raw_xml.into())
         );
     }
@@ -631,7 +685,7 @@ mod tests {
 
         let log_event = parser.parse_event(event.clone()).unwrap();
 
-        if let Some(Value::Object(event_data)) = log_event.get("event_data") {
+        if let Some(Value::Object(event_data)) = log_event.get(event_path!("event_data")) {
             assert_eq!(event_data.get("key1"), Some(&Value::Bytes("value1".into())));
             assert_eq!(event_data.get("key2"), Some(&Value::Bytes("value2".into())));
         } else {
@@ -653,7 +707,7 @@ mod tests {
 
         // event_id should be converted to string
         assert_eq!(
-            log_event.get("event_id").unwrap(),
+            log_event.get(event_path!("event_id")).unwrap(),
             &Value::Bytes("1000".into())
         );
     }
@@ -670,8 +724,8 @@ mod tests {
         let log_event = parser.parse_event(event).unwrap();
 
         // Only included fields should be present
-        assert!(log_event.get("event_id").is_some());
-        assert!(log_event.get("level").is_some());
+        assert!(log_event.get(event_path!("event_id")).is_some());
+        assert!(log_event.get(event_path!("level")).is_some());
         // Other fields should be filtered out
         // Note: This test might need adjustment based on actual field filtering implementation
     }
@@ -688,10 +742,10 @@ mod tests {
         let log_event = parser.parse_event(event).unwrap();
 
         // Excluded fields should not be present
-        assert!(log_event.get("raw_xml").is_none());
-        assert!(log_event.get("provider_guid").is_none());
+        assert!(log_event.get(event_path!("raw_xml")).is_none());
+        assert!(log_event.get(event_path!("provider_guid")).is_none());
         // Other fields should still be there
-        assert!(log_event.get("event_id").is_some());
+        assert!(log_event.get(event_path!("event_id")).is_some());
     }
 
     #[test]
@@ -768,13 +822,13 @@ mod tests {
         let log_event = parser.parse_event(event).unwrap();
 
         // event_id and level should be present (in include list, not in exclude list)
-        assert!(log_event.get("event_id").is_some());
-        assert!(log_event.get("level").is_some());
+        assert!(log_event.get(event_path!("event_id")).is_some());
+        assert!(log_event.get(event_path!("level")).is_some());
         // channel should be excluded (in both include and exclude, exclude wins)
-        assert!(log_event.get("channel").is_none());
+        assert!(log_event.get(event_path!("channel")).is_none());
         // Fields not in include list should be absent
-        assert!(log_event.get("computer").is_none());
-        assert!(log_event.get("record_id").is_none());
+        assert!(log_event.get(event_path!("computer")).is_none());
+        assert!(log_event.get(event_path!("record_id")).is_none());
     }
 
     #[test]

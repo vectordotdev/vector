@@ -1,6 +1,8 @@
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
+use vrl::event_path;
+
 use azure_core::http::StatusCode;
 use azure_storage_blob::BlobContainerClient;
 
@@ -431,7 +433,7 @@ fn random_lines_with_stream_with_group_key(
         .map(move |(i, line)| {
             let mut log = LogEvent::from(line);
             let i = ((i / key) + 1) as i32;
-            log.insert("key", i);
+            log.insert(event_path!("key"), i);
             Event::from(log)
         })
         .fold((0, Vec::new()), |(mut size, mut events), event| {

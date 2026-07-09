@@ -214,6 +214,7 @@ mod tests {
     use vrl::value::kind::Collection;
 
     use serial_test::serial;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -289,7 +290,7 @@ mod tests {
         sleep(Duration::from_millis(1)).await;
         let mut events = collect_ready(rx).await;
         let test_id = Value::from(test_id.to_string());
-        events.retain(|event| event.as_log().get("test_id") == Some(&test_id));
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id));
 
         let end = chrono::Utc::now();
 
@@ -320,9 +321,9 @@ mod tests {
             assert_eq!(log["metadata.level"], "ERROR".into());
             // The first log event occurs outside our custom span
             if i == 0 {
-                assert!(log.get("vector.component_id").is_none());
-                assert!(log.get("vector.component_kind").is_none());
-                assert!(log.get("vector.component_type").is_none());
+                assert!(log.get(event_path!("vector", "component_id")).is_none());
+                assert!(log.get(event_path!("vector", "component_kind")).is_none());
+                assert!(log.get(event_path!("vector", "component_type")).is_none());
             } else if i < 3 {
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "source".into());
@@ -336,7 +337,7 @@ mod tests {
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
                 assert_eq!(log["vector.component_new_field"], "baz".into());
                 assert_eq!(log["vector.component_numerical_field"], 1.into());
-                assert!(log.get("vector.ignored_field").is_none());
+                assert!(log.get(event_path!("vector", "ignored_field")).is_none());
             }
         }
     }
@@ -383,7 +384,7 @@ mod tests {
         sleep(Duration::from_millis(1)).await;
         let mut events = collect_ready(rx).await;
         let test_id_value = Value::from(test_id.to_string());
-        events.retain(|event| event.as_log().get("test_id") == Some(&test_id_value));
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id_value));
 
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
@@ -392,7 +393,7 @@ mod tests {
             "captured".into()
         );
         // The unregistered span field is still filtered out.
-        assert!(log.get("vector.some_other_field").is_none());
+        assert!(log.get(event_path!("vector", "some_other_field")).is_none());
     }
 
     // NOTE: This test requires #[serial] because it directly interacts with global tracing state.
@@ -418,7 +419,7 @@ mod tests {
             .iter()
             .filter(|e| {
                 e.as_log()
-                    .get("message")
+                    .get(event_path!("message"))
                     .map(|m| m.to_string_lossy() == "Repeated test message.")
                     .unwrap_or(false)
             })
