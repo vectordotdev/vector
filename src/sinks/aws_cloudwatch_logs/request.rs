@@ -10,6 +10,7 @@ use aws_sdk_cloudwatchlogs::{
     operation::{
         create_log_group::CreateLogGroupError,
         create_log_stream::CreateLogStreamError,
+        describe_log_streams::{DescribeLogStreamsError, DescribeLogStreamsOutput},
         put_log_events::{PutLogEventsError, PutLogEventsOutput},
         put_retention_policy::PutRetentionPolicyError,
     },
@@ -31,14 +32,12 @@ pub struct CloudwatchFuture {
     // Batches still waiting to be sent after `current`.
     events: Vec<Vec<InputLogEvent>>,
     // The batch currently in flight. Retained so it can be resent after a
-    // missing log group/stream is created: `PutLogEvents` returns
-    // `ResourceNotFoundException` when the stream does not exist yet, and we
-    // need the events to replay once it does.
+    // missing log group/stream is created.
     current: Vec<InputLogEvent>,
-    // Set once we have created (or tried to create) the group/stream in
-    // response to a `ResourceNotFoundException`, so a second failure is a hard
-    // error rather than an infinite create loop.
-    created_missing: bool,
+    // Set once we've dropped into the describe/create path from a
+    // `ResourceNotFoundException`, so a second one is a hard error rather than
+    // an infinite resolve loop.
+    resolving: bool,
 }
 
 struct Client {
@@ -56,6 +55,7 @@ type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E, HttpResponse>
 enum State {
     CreateGroup(ClientResult<(), CreateLogGroupError>),
     CreateStream(ClientResult<(), CreateLogStreamError>),
+    DescribeStream(ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError>),
     Put(ClientResult<PutLogEventsOutput, PutLogEventsError>),
     PutRetentionPolicy(ClientResult<(), PutRetentionPolicyError>),
 }
@@ -88,12 +88,12 @@ impl CloudwatchFuture {
 
         // Since January 2023, CloudWatch Logs no longer requires a sequence
         // token on `PutLogEvents` and never returns `InvalidSequenceToken`, so
-        // we write directly instead of first calling `DescribeLogStreams` to
-        // fetch a token. That describe call ran once per batch (and again on
-        // every retry), and is account+region-wide throttled at a low default
-        // quota (25 TPS for `DescribeLogStreams`), so on large fleets it became
-        // the bottleneck and starved the sink. Writing straight to
-        // `PutLogEvents` removes that dependency entirely.
+        // we write directly. The old sink called `DescribeLogStreams` before
+        // every batch (and again on every retry) just to fetch that token,
+        // which is throttled account+region-wide at a low default quota
+        // (25 TPS) and starved the sink under load. We now only fall back to
+        // `DescribeLogStreams` when `PutLogEvents` reports the group/stream is
+        // missing, i.e. once per new stream, not once per batch.
         // https://aws.amazon.com/about-aws/whats-new/2023/01/amazon-cloudwatch-logs-log-stream-transaction-quota-sequencetoken-requirement/
         let current = events.pop().expect("No Events to send");
         let state = State::Put(client.put_logs(current.clone()));
@@ -104,7 +104,7 @@ impl CloudwatchFuture {
             client,
             events,
             current,
-            created_missing: false,
+            resolving: false,
             state,
             create_missing_group,
             create_missing_stream,
@@ -133,28 +133,54 @@ impl Future for CloudwatchFuture {
                             }
                         }
                         Err(err) => {
-                            // The stream (or its group) does not exist yet.
-                            // Create it once, then replay the same batch.
-                            if !self.created_missing
-                                && is_resource_not_found(&err)
-                                && (self.create_missing_group || self.create_missing_stream)
-                            {
-                                self.created_missing = true;
-                                if self.create_missing_group {
-                                    info!(
-                                        "Log group provided does not exist; creating a new one."
-                                    );
-                                    self.state =
-                                        State::CreateGroup(self.client.create_log_group());
-                                } else {
-                                    info!("Provided stream does not exist; creating a new one.");
-                                    self.state =
-                                        State::CreateStream(self.client.create_log_stream());
-                                }
+                            // The group or stream is missing. Resolve it once
+                            // with a describe (which distinguishes a missing
+                            // group from a missing stream), then replay.
+                            if !self.resolving && is_resource_not_found(&err) {
+                                self.resolving = true;
+                                self.state = State::DescribeStream(self.client.describe_stream());
                                 continue;
                             }
                             return Poll::Ready(Err(CloudwatchError::Put(err)));
                         }
+                    }
+                }
+
+                State::DescribeStream(fut) => {
+                    let response = match ready!(fut.poll_unpin(cx)) {
+                        Ok(response) => response,
+                        Err(err) => {
+                            if let SdkError::ServiceError(inner) = &err
+                                && matches!(
+                                    inner.err(),
+                                    DescribeLogStreamsError::ResourceNotFoundException(_)
+                                )
+                                && self.create_missing_group
+                            {
+                                info!("Log group provided does not exist; creating a new one.");
+
+                                self.state = State::CreateGroup(self.client.create_log_group());
+                                continue;
+                            }
+                            return Poll::Ready(Err(CloudwatchError::DescribeLogStreams(err)));
+                        }
+                    };
+
+                    let stream_name = &self.client.stream_name;
+
+                    if response
+                        .log_streams
+                        .ok_or(CloudwatchError::NoStreamsFound)?
+                        .into_iter()
+                        .any(|log_stream| log_stream.log_stream_name == Some(stream_name.clone()))
+                    {
+                        debug!(message = "Stream found.", stream = ?stream_name);
+                        self.state = State::Put(self.client.put_logs(self.current.clone()));
+                    } else if self.create_missing_stream {
+                        info!("Provided stream does not exist; creating a new one.");
+                        self.state = State::CreateStream(self.client.create_log_stream());
+                    } else {
+                        return Poll::Ready(Err(CloudwatchError::NoStreamsFound));
                     }
                 }
 
@@ -183,8 +209,9 @@ impl Future for CloudwatchFuture {
                         continue;
                     }
 
-                    // A newly created group never has any streams, so create
-                    // one regardless of `create_missing_stream`.
+                    // self does not abide by `create_missing_stream` since a group
+                    // never has any streams and thus we need to create one if a group
+                    // is created no matter what.
                     self.state = State::CreateStream(self.client.create_log_stream());
                 }
 
@@ -207,7 +234,7 @@ impl Future for CloudwatchFuture {
 
                     info!(message = "Stream created.", name = %self.client.stream_name);
 
-                    // Replay the batch that hit the missing group/stream.
+                    // No sequence token needed, so replay the batch straight away.
                     self.state = State::Put(self.client.put_logs(self.current.clone()));
                 }
 
@@ -258,6 +285,22 @@ impl Client {
                         req.headers_mut().insert(header.clone(), value.clone());
                     }
                 })
+                .send()
+                .await
+        })
+    }
+
+    pub fn describe_stream(
+        &self,
+    ) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
+        let client = self.client.clone();
+        let group_name = self.group_name.clone();
+        let stream_name = self.stream_name.clone();
+        Box::pin(async move {
+            client
+                .describe_log_streams()
+                .log_group_name(group_name)
+                .log_stream_name_prefix(stream_name)
                 .send()
                 .await
         })

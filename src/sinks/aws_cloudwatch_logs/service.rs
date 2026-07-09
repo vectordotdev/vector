@@ -8,7 +8,8 @@ use aws_sdk_cloudwatchlogs::{
     Client as CloudwatchLogsClient,
     operation::{
         create_log_group::CreateLogGroupError, create_log_stream::CreateLogStreamError,
-        put_log_events::PutLogEventsError, put_retention_policy::PutRetentionPolicyError,
+        describe_log_streams::DescribeLogStreamsError, put_log_events::PutLogEventsError,
+        put_retention_policy::PutRetentionPolicyError,
     },
     types::InputLogEvent,
 };
@@ -64,21 +65,27 @@ type Svc = Buffer<
 #[derive(Debug)]
 pub enum CloudwatchError {
     Put(SdkError<PutLogEventsError, HttpResponse>),
+    DescribeLogStreams(SdkError<DescribeLogStreamsError, HttpResponse>),
     CreateStream(SdkError<CreateLogStreamError, HttpResponse>),
     CreateGroup(SdkError<CreateLogGroupError, HttpResponse>),
     PutRetentionPolicy(SdkError<PutRetentionPolicyError, HttpResponse>),
+    NoStreamsFound,
 }
 
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {error}"),
+            CloudwatchError::DescribeLogStreams(error) => {
+                write!(f, "CloudwatchError::DescribeLogStreams: {error}")
+            }
             CloudwatchError::CreateStream(error) => {
                 write!(f, "CloudwatchError::CreateStream: {error}")
             }
             CloudwatchError::CreateGroup(error) => {
                 write!(f, "CloudwatchError::CreateGroup: {error}")
             }
+            CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::PutRetentionPolicy(error) => {
                 write!(f, "CloudwatchError::PutRetentionPolicy: {error}")
             }
@@ -91,6 +98,12 @@ impl std::error::Error for CloudwatchError {}
 impl From<SdkError<PutLogEventsError, HttpResponse>> for CloudwatchError {
     fn from(error: SdkError<PutLogEventsError, HttpResponse>) -> Self {
         CloudwatchError::Put(error)
+    }
+}
+
+impl From<SdkError<DescribeLogStreamsError, HttpResponse>> for CloudwatchError {
+    fn from(error: SdkError<DescribeLogStreamsError, HttpResponse>) -> Self {
+        CloudwatchError::DescribeLogStreams(error)
     }
 }
 
