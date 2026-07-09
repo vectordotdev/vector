@@ -951,7 +951,7 @@ mod tests {
                 let event: Event = event.into();
                 let string = event
                     .as_log()
-                    .get(vrl::event_path!("message"))
+                    .get_message()
                     .unwrap()
                     .to_string_lossy()
                     .into_owned();

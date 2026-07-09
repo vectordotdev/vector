@@ -58,33 +58,24 @@ impl EventLogParser {
         let log_schema = log_schema();
 
         // Set timestamp
-        if let Some(timestamp_key) = log_schema.timestamp_key() {
-            log_event.try_insert(
-                timestamp_key.to_string().as_str(),
-                Value::Timestamp(event.time_created),
-            );
+        if let Some(timestamp_key) = log_schema.timestamp_key_target_path() {
+            log_event.try_insert(timestamp_key, Value::Timestamp(event.time_created));
         }
 
         // Set message (rendered message or event data)
-        if let Some(message_key) = log_schema.message_key() {
+        if let Some(message_key) = log_schema.message_key_target_path() {
             let message = event
                 .rendered_message
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.try_insert(
-                message_key.to_string().as_str(),
-                Value::Bytes(message.into()),
-            );
+            log_event.try_insert(message_key, Value::Bytes(message.into()));
         }
 
         // Set source/host
-        if let Some(host_key) = log_schema.host_key() {
-            log_event.try_insert(
-                host_key.to_string().as_str(),
-                Value::Bytes(event.computer.clone().into()),
-            );
+        if let Some(host_key) = log_schema.host_key_target_path() {
+            log_event.try_insert(host_key, Value::Bytes(event.computer.clone().into()));
         }
 
         // Set Windows-specific fields
@@ -102,31 +93,22 @@ impl EventLogParser {
         let log_schema = log_schema();
 
         // Set standard fields
-        if let Some(timestamp_key) = log_schema.timestamp_key() {
-            log_event.try_insert(
-                timestamp_key.to_string().as_str(),
-                Value::Timestamp(event.time_created),
-            );
+        if let Some(timestamp_key) = log_schema.timestamp_key_target_path() {
+            log_event.try_insert(timestamp_key, Value::Timestamp(event.time_created));
         }
 
-        if let Some(message_key) = log_schema.message_key() {
+        if let Some(message_key) = log_schema.message_key_target_path() {
             let message = event
                 .rendered_message
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.try_insert(
-                message_key.to_string().as_str(),
-                Value::Bytes(message.into()),
-            );
+            log_event.try_insert(message_key, Value::Bytes(message.into()));
         }
 
-        if let Some(host_key) = log_schema.host_key() {
-            log_event.try_insert(
-                host_key.to_string().as_str(),
-                Value::Bytes(event.computer.clone().into()),
-            );
+        if let Some(host_key) = log_schema.host_key_target_path() {
+            log_event.try_insert(host_key, Value::Bytes(event.computer.clone().into()));
         }
 
         // Set Windows-specific fields at root level
@@ -389,14 +371,18 @@ impl EventLogParser {
                 .collect();
 
             for key in keys_to_remove {
-                log_event.remove(key.as_str());
+                if let Ok(path) = vrl::path::parse_target_path(&key) {
+                    log_event.remove(&path);
+                }
             }
         }
 
         // Remove fields in exclude_fields list - single pass removal
         if let Some(ref exclude_fields) = filter.exclude_fields {
             for field in exclude_fields {
-                log_event.remove(field.as_str());
+                if let Ok(path) = vrl::path::parse_target_path(field) {
+                    log_event.remove(&path);
+                }
             }
         }
 
@@ -408,9 +394,12 @@ impl EventLogParser {
         log_event: &mut LogEvent,
     ) -> Result<(), WindowsEventLogError> {
         for (field_name, format) in &self.config.event_data_format {
-            if let Some(current_value) = log_event.get(field_name.as_str()) {
+            let Ok(path) = vrl::path::parse_target_path(field_name) else {
+                continue;
+            };
+            if let Some(current_value) = log_event.get(&path) {
                 let formatted_value = self.format_value(current_value, format)?;
-                log_event.insert(field_name.as_str(), formatted_value);
+                log_event.insert(&path, formatted_value);
             }
         }
 

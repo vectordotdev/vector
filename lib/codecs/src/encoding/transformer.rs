@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
-use lookup::{PathPrefix, event_path, lookup_v2::ConfigValuePath};
+use lookup::{PathPrefix, lookup_v2::ConfigValuePath};
 use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
@@ -197,7 +197,7 @@ impl Transformer {
                 None
             };
             if let Some(ts) = timestamp {
-                log.insert(event_path!(), ts.into());
+                log.insert(&vrl::path::OwnedTargetPath::event_root(), ts.into());
             }
         }
     }
@@ -265,7 +265,7 @@ mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
     use indoc::indoc;
-    use lookup::path::parse_target_path;
+    use lookup::{event_path, path::parse_target_path};
     use vector_core::{
         config::{LogNamespace, log_schema},
         schema,

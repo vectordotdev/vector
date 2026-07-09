@@ -1159,9 +1159,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                         .and_then(|e| e.value.clone())
                 });
             if let Some(v) = val {
-                metadata
-                    .value_mut()
-                    .insert(&vrl::path::parse_value_path(meta_path).unwrap(), v);
+                metadata.value_mut().insert(
+                    &vrl::path::parse_value_path(meta_path)
+                        .expect("hardcoded splunk_hec metadata path is a valid VRL path"),
+                    v,
+                );
             }
         }
 
@@ -1173,7 +1175,8 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             .or_else(|| self.channel.clone());
         if let Some(ch) = channel {
             metadata.value_mut().insert(
-                &vrl::path::parse_value_path("splunk_hec.channel").unwrap(),
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
                 ch,
             );
         }
@@ -1751,12 +1754,14 @@ fn raw_event(
             }
             if let Some(ref h) = host {
                 meta.value_mut().insert(
-                    &vrl::path::parse_value_path("splunk_hec.host").unwrap(),
+                    &vrl::path::parse_value_path("splunk_hec.host")
+                        .expect("splunk_hec.host is a valid VRL path"),
                     h.clone(),
                 );
             }
             meta.value_mut().insert(
-                &vrl::path::parse_value_path("splunk_hec.channel").unwrap(),
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
                 channel.clone(),
             );
             decoder.with_metadata_template(meta)
