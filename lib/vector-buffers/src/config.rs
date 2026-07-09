@@ -154,7 +154,7 @@ impl<'de> Deserialize<'de> for BufferType {
 }
 
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(500) }
+    const { NonZeroUsize::new(500).unwrap() }
 }
 
 /// Disk usage configuration for disk-backed buffers.

@@ -86,7 +86,7 @@ const fn default_client_key_config() -> ClientKeyConfig {
 }
 
 const fn default_max_events() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(1000) }
+    const { NonZeroUsize::new(1000).unwrap() }
 }
 
 const LAST_RECEIVED_QUERY_PARAM_NAME: &str = "last_received";
