@@ -6,19 +6,26 @@ use k8s_test_framework::{lock, vector::Config as VectorConfig};
 use reqwest::{StatusCode, header};
 use tokio::io::AsyncWriteExt;
 
-/// RAII guard for cluster-scoped RBAC resources that ensures cleanup on drop.
+/// RAII guard for test resources that ensures cleanup on drop.
 /// This prevents resource leakage when tests fail before reaching explicit cleanup.
-struct ClusterRbacCleanup {
+/// Tracks both cluster-scoped RBAC resources and the test namespace.
+struct TestResourceCleanup {
     kubectl_command: String,
+    namespace: Option<String>,
     resources: Vec<(String, String)>, // (resource_type, name)
 }
 
-impl ClusterRbacCleanup {
+impl TestResourceCleanup {
     fn new(kubectl_command: String) -> Self {
         Self {
             kubectl_command,
+            namespace: None,
             resources: Vec::new(),
         }
+    }
+
+    fn track_namespace(&mut self, namespace: String) {
+        self.namespace = Some(namespace);
     }
 
     fn track(&mut self, resource_type: &str, name: String) {
@@ -26,23 +33,37 @@ impl ClusterRbacCleanup {
     }
 }
 
-impl Drop for ClusterRbacCleanup {
+impl Drop for TestResourceCleanup {
     fn drop(&mut self) {
-        // Best-effort cleanup - spawn a blocking task to delete resources
+        // Best-effort cleanup - run synchronously to ensure completion before test exit
         let kubectl = self.kubectl_command.clone();
         let resources = self.resources.clone();
+        let namespace = self.namespace.clone();
 
-        std::thread::spawn(move || {
+        // Join the thread to ensure cleanup completes before Drop returns
+        let handle = std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
+                // First delete cluster-scoped RBAC resources
                 for (resource_type, name) in resources {
                     let _ = tokio::process::Command::new(&kubectl)
                         .args(["delete", &resource_type, &name, "--ignore-not-found=true"])
                         .output()
                         .await;
                 }
+
+                // Then delete the namespace (which also deletes ServiceAccounts in it)
+                if let Some(ns) = namespace {
+                    let _ = tokio::process::Command::new(&kubectl)
+                        .args(["delete", "namespace", &ns, "--ignore-not-found=true"])
+                        .output()
+                        .await;
+                }
             });
         });
+
+        // Wait for cleanup to complete (ignore errors - best effort)
+        let _ = handle.join();
     }
 }
 
@@ -262,11 +283,12 @@ async fn sar_auth_with_valid_token() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector");
 
     // Create cleanup guard to ensure RBAC resources are deleted even on test failure
-    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+    let mut cleanup = TestResourceCleanup::new(framework.kubectl_command().to_string());
 
     // Create namespace first
     // Namespace creation
     create_namespace(framework.kubectl_command(), &namespace).await?;
+    cleanup.track_namespace(namespace.clone());
 
     // Create ServiceAccount for Vector with SAR permissions
 
@@ -415,11 +437,12 @@ async fn sar_auth_rejects_missing_token() -> Result<(), Box<dyn std::error::Erro
     let override_name = get_override_name(&namespace, "vector");
 
     // Create cleanup guard to ensure RBAC resources are deleted even on test failure
-    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+    let mut cleanup = TestResourceCleanup::new(framework.kubectl_command().to_string());
 
     // Create namespace first
     // Namespace creation
     create_namespace(framework.kubectl_command(), &namespace).await?;
+    cleanup.track_namespace(namespace.clone());
 
     // Create ServiceAccount for Vector with SAR permissions
 
@@ -541,11 +564,12 @@ async fn sar_auth_rejects_unauthorized_token() -> Result<(), Box<dyn std::error:
     let override_name = get_override_name(&namespace, "vector");
 
     // Create cleanup guard to ensure RBAC resources are deleted even on test failure
-    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+    let mut cleanup = TestResourceCleanup::new(framework.kubectl_command().to_string());
 
     // Create namespace first
     // Namespace creation
     create_namespace(framework.kubectl_command(), &namespace).await?;
+    cleanup.track_namespace(namespace.clone());
 
     // Create ServiceAccount for Vector with SAR permissions
 
@@ -677,11 +701,12 @@ async fn sar_auth_short_circuits_non_metrics_routes() -> Result<(), Box<dyn std:
     let override_name = get_override_name(&namespace, "vector");
 
     // Create cleanup guard to ensure RBAC resources are deleted even on test failure
-    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+    let mut cleanup = TestResourceCleanup::new(framework.kubectl_command().to_string());
 
     // Create namespace first
     // Namespace creation
     create_namespace(framework.kubectl_command(), &namespace).await?;
+    cleanup.track_namespace(namespace.clone());
 
     // Create ServiceAccount for Vector with SAR permissions
 
@@ -810,11 +835,12 @@ async fn sar_auth_allowed_user_filter() -> Result<(), Box<dyn std::error::Error>
     let override_name = get_override_name(&namespace, "vector");
 
     // Create cleanup guard to ensure RBAC resources are deleted even on test failure
-    let mut cleanup = ClusterRbacCleanup::new(framework.kubectl_command().to_string());
+    let mut cleanup = TestResourceCleanup::new(framework.kubectl_command().to_string());
 
     // Create namespace first
     // Namespace creation
     create_namespace(framework.kubectl_command(), &namespace).await?;
+    cleanup.track_namespace(namespace.clone());
 
     // Create ServiceAccount for Vector with SAR permissions
 
