@@ -13457,6 +13457,7 @@ dependencies = [
  "getrandom 0.4.2",
  "gloo-utils",
  "serde",
+ "serde_json",
  "vector-vrl-functions",
  "vrl",
  "wasm-bindgen",
