@@ -19,7 +19,6 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::{FutureExt, future::BoxFuture};
 use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
-use tokio::sync::oneshot;
 
 use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
 
@@ -40,7 +39,6 @@ pub struct CloudwatchFuture {
     // response to a `ResourceNotFoundException`, so a second failure is a hard
     // error rather than an infinite create loop.
     created_missing: bool,
-    token_tx: Option<oneshot::Sender<Option<String>>>,
 }
 
 struct Client {
@@ -76,10 +74,6 @@ impl CloudwatchFuture {
         kms_key: Option<String>,
         tags: Option<HashMap<String, String>>,
         mut events: Vec<Vec<InputLogEvent>>,
-        // Kept for backwards compatibility with the caller; the sequence token
-        // is no longer used (see below) and is always ignored.
-        _token: Option<String>,
-        token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
         let retention_days = retention.days;
         let client = Client {
@@ -112,7 +106,6 @@ impl CloudwatchFuture {
             current,
             created_missing: false,
             state,
-            token_tx: Some(token_tx),
             create_missing_group,
             create_missing_stream,
             retention_enabled,
@@ -136,13 +129,6 @@ impl Future for CloudwatchFuture {
                                     State::Put(self.client.put_logs(self.current.clone()));
                             } else {
                                 info!(message = "Putting logs was successful.");
-
-                                self.token_tx
-                                    .take()
-                                    .expect("Put was polled after finishing.")
-                                    .send(None)
-                                    .expect("CloudwatchLogsSvc was dropped unexpectedly");
-
                                 return Poll::Ready(Ok(()));
                             }
                         }
