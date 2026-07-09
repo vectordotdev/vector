@@ -73,8 +73,7 @@ pub mod postgresql_metrics;
 #[cfg(any(
     feature = "sources-prometheus-scrape",
     feature = "sources-prometheus-remote-write",
-    feature = "sources-prometheus-pushgateway",
-    feature = "sources-prometheus-kubernetes-sd"
+    feature = "sources-prometheus-pushgateway"
 ))]
 pub mod prometheus;
 #[cfg(feature = "sources-pulsar")]

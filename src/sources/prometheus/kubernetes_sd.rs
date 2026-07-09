@@ -1,16 +1,8 @@
-//! `prometheus_kubernetes_sd` source.
+//! Kubernetes service-discovery helpers for the `prometheus_scrape` source.
 //!
-//! Auto-discovers and scrapes Prometheus metrics from Kubernetes Pods using
-//! Prometheus-compatible `prometheus.io/*` annotations. Equivalent in spirit to
-//! Prometheus' `kubernetes_sd_configs` with `role: pod`.
-//!
-//! The source watches Pods via the Kubernetes API, applies annotation-based
-//! discovery rules to derive a set of scrape targets, and periodically scrapes
-//! them concurrently. The list of targets is refreshed on every scrape tick by
-//! reading the latest reflector state, so discovery is fully dynamic and does
-//! not require a Vector config reload when Pods come and go.
-
-#![deny(missing_docs)]
+//! Provides Kubernetes Pod discovery via the `kube` crate and annotation-based
+//! target resolution (`prometheus.io/*` annotations). Used by the
+//! `prometheus_scrape` source when `targets` includes a `kubernetes` block.
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -36,7 +28,6 @@ use snafu::Snafu;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    config::LogNamespace,
     configurable::configurable_component,
     event::{Event, Metric},
     json_size::JsonSize,
@@ -47,7 +38,6 @@ use super::parser;
 use crate::{
     SourceSender,
     built_info::{PKG_NAME, PKG_VERSION},
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
@@ -55,12 +45,11 @@ use crate::{
         PrometheusKubernetesSdTargetsDiscovered, PrometheusParseError, StreamClosedError,
     },
     kubernetes::{custom_reflector, meta_cache::MetaCache},
-    sources::util::http_client::{default_interval, default_timeout, warn_if_interval_too_low},
-    tls::{TlsConfig, TlsSettings},
+    tls::TlsSettings,
 };
 
 /// Env var consulted for the current node name when `use_self_node_only` is set.
-const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+pub(crate) const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Default delay between observing a Pod deletion and removing it from the
 /// reflector store; matches `kubernetes_logs` and gives in-flight scrapes time
@@ -79,14 +68,6 @@ fn default_path() -> String {
 
 fn default_annotation_prefix() -> String {
     "prometheus.io".to_string()
-}
-
-fn default_instance_tag() -> Option<String> {
-    Some("instance".to_string())
-}
-
-fn default_endpoint_tag() -> Option<String> {
-    Some("endpoint".to_string())
 }
 
 /// Discovery role.
@@ -130,32 +111,17 @@ impl Scheme {
     }
 }
 
-/// Configuration for the `prometheus_kubernetes_sd` source.
+/// Kubernetes service-discovery configuration.
+///
+/// Controls how the source discovers scrape targets from Kubernetes Pods via
+/// `prometheus.io/*` annotations.
 #[serde_as]
-#[configurable_component(source(
-    "prometheus_kubernetes_sd",
-    "Auto-discover and scrape Prometheus metrics from Kubernetes Pods using prometheus.io/* annotations."
-))]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub struct PrometheusKubernetesSdConfig {
+pub struct KubernetesScrapeConfig {
     /// Discovery role. Only `pod` is supported in this release.
     role: Role,
-
-    /// Interval between scrape ticks.
-    ///
-    /// On each tick, the current set of discovered targets is snapshotted and
-    /// scraped concurrently.
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    #[serde(rename = "scrape_interval_secs")]
-    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
-    interval: Duration,
-
-    /// Per-target HTTP request timeout.
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    #[serde(rename = "scrape_timeout_secs")]
-    #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
-    timeout: Duration,
 
     /// Annotation prefix to read scrape configuration from.
     ///
@@ -163,7 +129,7 @@ pub struct PrometheusKubernetesSdConfig {
     /// The source reads `<prefix>/scrape`, `<prefix>/port`, `<prefix>/path`,
     /// `<prefix>/scheme`, and `<prefix>/param_<name>` from Pod annotations.
     #[configurable(metadata(docs::examples = "prometheus.io"))]
-    annotation_prefix: String,
+    pub(crate) annotation_prefix: String,
 
     /// Restrict discovery to Pods on the current node.
     ///
@@ -171,46 +137,46 @@ pub struct PrometheusKubernetesSdConfig {
     /// `<node>` is read from the `VECTOR_SELF_NODE_NAME` environment variable
     /// (or the `self_node_name` option). Use this when deploying Vector as a
     /// DaemonSet.
-    use_self_node_only: bool,
+    pub(crate) use_self_node_only: bool,
 
     /// Override for the node name used by `use_self_node_only`.
     ///
     /// If unset and `use_self_node_only` is `true`, the `VECTOR_SELF_NODE_NAME`
     /// environment variable is read instead.
     #[configurable(metadata(docs::examples = "node-01"))]
-    self_node_name: Option<String>,
+    pub(crate) self_node_name: Option<String>,
 
     /// Additional field selector merged with the built-in filter.
     #[configurable(metadata(docs::examples = "metadata.namespace=monitoring"))]
-    extra_field_selector: String,
+    pub(crate) extra_field_selector: String,
 
     /// Additional label selector merged with the built-in `vector.dev/exclude!=true` filter.
     #[configurable(metadata(docs::examples = "tier=frontend"))]
-    extra_label_selector: String,
+    pub(crate) extra_label_selector: String,
 
     /// Restrict discovery to specific namespaces.
     ///
     /// When non-empty, only Pods in the listed namespaces are watched. When
     /// empty, all namespaces are watched (requires cluster-wide RBAC).
     #[configurable(metadata(docs::examples = "monitoring"))]
-    namespaces: Vec<String>,
+    pub(crate) namespaces: Vec<String>,
 
     /// Path to a kubeconfig file.
     ///
     /// When unset, the source falls back to the local kubeconfig followed by
     /// in-cluster service-account credentials.
-    kube_config_file: Option<PathBuf>,
+    pub(crate) kube_config_file: Option<PathBuf>,
 
     /// Delay between observing a Pod deletion event and removing the Pod from
     /// the discovery store, in milliseconds.
-    delay_deletion_ms: u64,
+    pub(crate) delay_deletion_ms: u64,
 
     /// Default scheme when `<prefix>/scheme` is not set on a Pod.
-    default_scheme: Scheme,
+    pub(crate) default_scheme: Scheme,
 
     /// Default scrape path when `<prefix>/path` is not set on a Pod.
     #[configurable(metadata(docs::examples = "/metrics"))]
-    default_path: String,
+    pub(crate) default_path: String,
 
     /// Allowlist of Pod labels to add as metric tags.
     ///
@@ -218,44 +184,17 @@ pub struct PrometheusKubernetesSdConfig {
     /// metric. Default is empty to avoid cardinality blow-ups.
     #[configurable(metadata(docs::examples = "app"))]
     #[configurable(metadata(docs::examples = "version"))]
-    pod_label_tags: Vec<String>,
+    pub(crate) pod_label_tags: Vec<String>,
 
     /// Allowlist of Pod annotations to add as metric tags.
     #[configurable(metadata(docs::examples = "owner"))]
-    pod_annotation_tags: Vec<String>,
-
-    /// Tag name under which to record the scraped instance (host:port).
-    ///
-    /// Mirrors the `instance_tag` option of `prometheus_scrape`. Set to `null`
-    /// to disable.
-    instance_tag: Option<String>,
-
-    /// Tag name under which to record the full scrape endpoint URL.
-    ///
-    /// Mirrors the `endpoint_tag` option of `prometheus_scrape`. Set to `null`
-    /// to disable.
-    endpoint_tag: Option<String>,
-
-    /// Honor labels emitted by the scraped target.
-    ///
-    /// Mirrors the `honor_labels` option of `prometheus_scrape` and the
-    /// equivalent Prometheus setting.
-    honor_labels: bool,
-
-    #[configurable(derived)]
-    tls: Option<TlsConfig>,
-
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
-    auth: Option<Auth>,
+    pub(crate) pod_annotation_tags: Vec<String>,
 }
 
-impl Default for PrometheusKubernetesSdConfig {
+impl Default for KubernetesScrapeConfig {
     fn default() -> Self {
         Self {
             role: Role::default(),
-            interval: default_interval(),
-            timeout: default_timeout(),
             annotation_prefix: default_annotation_prefix(),
             use_self_node_only: false,
             self_node_name: None,
@@ -268,18 +207,7 @@ impl Default for PrometheusKubernetesSdConfig {
             default_path: default_path(),
             pod_label_tags: Vec::new(),
             pod_annotation_tags: Vec::new(),
-            instance_tag: default_instance_tag(),
-            endpoint_tag: default_endpoint_tag(),
-            honor_labels: false,
-            tls: None,
-            auth: None,
         }
-    }
-}
-
-impl GenerateConfig for PrometheusKubernetesSdConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 
@@ -301,78 +229,8 @@ enum BuildError {
     Client { source: kube::Error },
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_kubernetes_sd")]
-impl SourceConfig for PrometheusKubernetesSdConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        warn_if_interval_too_low(self.timeout, self.interval);
-
-        let client = build_kube_client(self.kube_config_file.as_ref()).await?;
-        let tls = TlsSettings::from_options(self.tls.as_ref())?;
-
-        // Resolve self node name if filtering by node.
-        let self_node_name = if self.use_self_node_only {
-            let resolved = match self.self_node_name.clone() {
-                Some(n) => n,
-                None => std::env::var(SELF_NODE_NAME_ENV_KEY)
-                    .map_err(|_| Box::new(BuildError::SelfNodeNameMissing) as crate::Error)?,
-            };
-            Some(resolved)
-        } else {
-            None
-        };
-
-        let field_selector =
-            build_field_selector(self_node_name.as_deref(), &self.extra_field_selector);
-        let label_selector = build_label_selector(&self.extra_label_selector);
-
-        let parser_cfg = AnnotationParserConfig {
-            prefix: self.annotation_prefix.clone(),
-            default_scheme: self.default_scheme,
-            default_path: self.default_path.clone(),
-            pod_label_tags: self.pod_label_tags.clone(),
-            pod_annotation_tags: self.pod_annotation_tags.clone(),
-        };
-
-        let scrape_cfg = ScrapeConfig {
-            interval: self.interval,
-            timeout: self.timeout,
-            instance_tag: self.instance_tag.clone(),
-            endpoint_tag: self.endpoint_tag.clone(),
-            honor_labels: self.honor_labels,
-            auth: self.auth.clone(),
-        };
-
-        let delay_deletion = Duration::from_millis(self.delay_deletion_ms);
-        let namespaces = self.namespaces.clone();
-        let proxy = cx.proxy.clone();
-
-        Ok(Box::pin(run(
-            client,
-            tls,
-            proxy,
-            namespaces,
-            field_selector,
-            label_selector,
-            delay_deletion,
-            parser_cfg,
-            scrape_cfg,
-            cx.out,
-            cx.shutdown,
-        )))
-    }
-
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_metrics()]
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
 /// Build a Kubernetes client mirroring the pattern used by `kubernetes_logs`.
-async fn build_kube_client(kube_config_file: Option<&PathBuf>) -> crate::Result<Client> {
+pub(crate) async fn build_kube_client(kube_config_file: Option<&PathBuf>) -> crate::Result<Client> {
     let mut client_config = match kube_config_file {
         Some(kc) => ClientConfig::from_custom_kubeconfig(
             config::Kubeconfig::read_from(kc)
@@ -394,7 +252,7 @@ async fn build_kube_client(kube_config_file: Option<&PathBuf>) -> crate::Result<
         .map_err(|source| Box::new(BuildError::Client { source }) as crate::Error)
 }
 
-fn build_field_selector(self_node_name: Option<&str>, extra: &str) -> Option<String> {
+pub(crate) fn build_field_selector(self_node_name: Option<&str>, extra: &str) -> Option<String> {
     let mut parts = Vec::new();
     if let Some(node) = self_node_name {
         parts.push(format!("spec.nodeName={node}"));
@@ -409,7 +267,7 @@ fn build_field_selector(self_node_name: Option<&str>, extra: &str) -> Option<Str
     }
 }
 
-fn build_label_selector(extra: &str) -> String {
+pub(crate) fn build_label_selector(extra: &str) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";
     if extra.is_empty() {
         BUILT_IN.to_string()
@@ -420,18 +278,18 @@ fn build_label_selector(extra: &str) -> String {
 
 /// Per-target scrape parameters that don't depend on the discovered Pod.
 #[derive(Clone)]
-struct ScrapeConfig {
-    interval: Duration,
-    timeout: Duration,
-    instance_tag: Option<String>,
-    endpoint_tag: Option<String>,
-    honor_labels: bool,
-    auth: Option<Auth>,
+pub(crate) struct ScrapeConfig {
+    pub(crate) interval: Duration,
+    pub(crate) timeout: Duration,
+    pub(crate) instance_tag: Option<String>,
+    pub(crate) endpoint_tag: Option<String>,
+    pub(crate) honor_labels: bool,
+    pub(crate) auth: Option<Auth>,
 }
 
 /// Top-level scrape loop. Owns the reflector spawn and the periodic scraper.
 #[allow(clippy::too_many_arguments)]
-async fn run(
+pub(crate) async fn run(
     client: Client,
     tls: TlsSettings,
     proxy: vector_lib::config::proxy::ProxyConfig,
@@ -441,6 +299,7 @@ async fn run(
     delay_deletion: Duration,
     parser_cfg: AnnotationParserConfig,
     scrape_cfg: ScrapeConfig,
+    static_targets: Vec<Target>,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
@@ -502,7 +361,13 @@ async fn run(
             break Ok(());
         }
 
-        let targets = collect_targets(&store_r, &parser_cfg, &allowed_namespaces);
+        let mut targets = collect_targets(&store_r, &parser_cfg, &allowed_namespaces);
+        // Prepend static targets so they are scraped first.
+        if !static_targets.is_empty() {
+            let mut combined = static_targets.clone();
+            combined.append(&mut targets);
+            targets = combined;
+        }
         emit!(PrometheusKubernetesSdTargetsDiscovered {
             count: targets.len()
         });
@@ -557,28 +422,30 @@ fn collect_targets(
     out
 }
 
-/// A single scrape target derived from a Pod annotation set.
+/// A single scrape target derived from a Pod annotation set or static config.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Target {
-    uri: Uri,
-    instance: String,
-    namespace: String,
-    pod_name: String,
-    pod_uid: String,
-    node_name: Option<String>,
-    container_name: Option<String>,
+pub(crate) struct Target {
+    pub(crate) uri: Uri,
+    pub(crate) instance: String,
+    /// When `true`, kubernetes-specific tags (namespace, pod, node, container) are not added.
+    pub(crate) is_static: bool,
+    pub(crate) namespace: String,
+    pub(crate) pod_name: String,
+    pub(crate) pod_uid: String,
+    pub(crate) node_name: Option<String>,
+    pub(crate) container_name: Option<String>,
     /// Additional metric tags to apply (pod labels/annotations allowlist).
-    extra_tags: BTreeMap<String, String>,
+    pub(crate) extra_tags: BTreeMap<String, String>,
 }
 
 /// Annotation-parser configuration shared across ticks.
 #[derive(Clone, Debug)]
-struct AnnotationParserConfig {
-    prefix: String,
-    default_scheme: Scheme,
-    default_path: String,
-    pod_label_tags: Vec<String>,
-    pod_annotation_tags: Vec<String>,
+pub(crate) struct AnnotationParserConfig {
+    pub(crate) prefix: String,
+    pub(crate) default_scheme: Scheme,
+    pub(crate) default_path: String,
+    pub(crate) pod_label_tags: Vec<String>,
+    pub(crate) pod_annotation_tags: Vec<String>,
 }
 
 #[derive(Debug, Snafu)]
@@ -679,6 +546,7 @@ fn extract_targets(
         targets.push(Target {
             uri,
             instance,
+            is_static: false,
             namespace: namespace.clone(),
             pod_name: pod_name.clone(),
             pod_uid: pod_uid.clone(),
@@ -949,7 +817,9 @@ fn enrich_events(events: &mut [Event], target: &Target, cfg: &ScrapeConfig) {
         if let Some(tag) = &cfg.endpoint_tag {
             super::merge_honor_label_tag(metric, tag, &target.uri.to_string(), cfg.honor_labels);
         }
-        // Base discovery tags.
+        if target.is_static {
+            continue;
+        }
         super::merge_honor_label_tag(metric, "namespace", &target.namespace, cfg.honor_labels);
         super::merge_honor_label_tag(metric, "pod", &target.pod_name, cfg.honor_labels);
         if let Some(node) = &target.node_name {
@@ -1021,11 +891,6 @@ mod tests {
             pod_label_tags: vec![],
             pod_annotation_tags: vec![],
         }
-    }
-
-    #[test]
-    fn generate_config_smoke() {
-        crate::test_util::test_generate_config::<PrometheusKubernetesSdConfig>();
     }
 
     #[test]

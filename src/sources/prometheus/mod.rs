@@ -1,7 +1,7 @@
 pub(crate) mod parser;
 
-#[cfg(feature = "sources-prometheus-kubernetes-sd")]
-mod kubernetes_sd;
+#[cfg(feature = "kubernetes")]
+pub(crate) mod kubernetes_sd;
 #[cfg(feature = "sources-prometheus-pushgateway")]
 mod pushgateway;
 #[cfg(feature = "sources-prometheus-remote-write")]
@@ -9,8 +9,6 @@ mod remote_write;
 #[cfg(feature = "sources-prometheus-scrape")]
 mod scrape;
 
-#[cfg(feature = "sources-prometheus-kubernetes-sd")]
-pub use kubernetes_sd::PrometheusKubernetesSdConfig;
 #[cfg(feature = "sources-prometheus-pushgateway")]
 pub use pushgateway::PrometheusPushgatewayConfig;
 #[cfg(feature = "sources-prometheus-remote-write")]
@@ -26,10 +24,7 @@ pub use scrape::PrometheusScrapeConfig;
 /// - If the metric does not have the tag, set it to the new value.
 ///
 /// Shared by `prometheus_scrape` and `prometheus_kubernetes_sd` to guarantee identical behavior.
-#[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-kubernetes-sd"
-))]
+#[cfg(any(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
 pub(crate) fn merge_honor_label_tag(
     metric: &mut vector_lib::event::Metric,
     tag: &str,

@@ -3,7 +3,7 @@
 #[cfg(feature = "sources-prometheus-scrape")]
 use std::borrow::Cow;
 
-#[cfg(feature = "sources-prometheus-kubernetes-sd")]
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
 use vector_lib::internal_event::GaugeName;
 #[cfg(feature = "sources-prometheus-scrape")]
 use vector_lib::prometheus::parser::ParserError;
@@ -92,13 +92,13 @@ impl InternalEvent for PrometheusNormalizationError {
     }
 }
 
-#[cfg(feature = "sources-prometheus-kubernetes-sd")]
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusKubernetesSdTargetsDiscovered {
     pub count: usize,
 }
 
-#[cfg(feature = "sources-prometheus-kubernetes-sd")]
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
 impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
     fn emit(self) {
         debug!(
@@ -110,7 +110,7 @@ impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
     }
 }
 
-#[cfg(feature = "sources-prometheus-kubernetes-sd")]
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusKubernetesSdAnnotationParseError<'a> {
     pub pod: &'a str,
@@ -118,7 +118,7 @@ pub struct PrometheusKubernetesSdAnnotationParseError<'a> {
     pub error: &'a str,
 }
 
-#[cfg(feature = "sources-prometheus-kubernetes-sd")]
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
 impl InternalEvent for PrometheusKubernetesSdAnnotationParseError<'_> {
     fn emit(self) {
         warn!(

@@ -19,7 +19,6 @@ pub mod http;
 #[cfg(any(
     feature = "sources-http_client",
     feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-kubernetes-sd",
     feature = "sources-okta"
 ))]
 pub mod http_client;
