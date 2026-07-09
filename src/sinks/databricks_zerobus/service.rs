@@ -1043,12 +1043,12 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e1 = LogEvent::default();
-        e1.insert("id", 1i64);
-        e1.insert("body", "hello");
-        e1.insert("ts", Utc::now());
+        e1.insert(vrl::event_path!("id"), 1i64);
+        e1.insert(vrl::event_path!("body"), "hello");
+        e1.insert(vrl::event_path!("ts"), Utc::now());
 
         let mut e2 = LogEvent::default();
-        e2.insert("id", 2i64);
+        e2.insert(vrl::event_path!("id"), 2i64);
         // `body` and `ts` omitted — both nullable, so they encode as null.
 
         let batch =
@@ -1086,7 +1086,7 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e = LogEvent::default();
-        e.insert("body", "no id here"); // `id` omitted
+        e.insert(vrl::event_path!("body"), "no id here"); // `id` omitted
 
         let err = ZerobusService::encode_batch(&resolved, &[Event::Log(e)]).unwrap_err();
         assert!(matches!(err, ZerobusSinkError::EncodingError { .. }));

@@ -2,6 +2,7 @@ use std::{convert::TryFrom, iter::zip};
 
 use vector_common::sensitive_string::SensitiveString;
 use vector_lib::lookup::PathPrefix;
+use vrl::event_path;
 
 use crate::{
     codecs::Transformer,
@@ -50,7 +51,7 @@ async fn sets_create_action_when_configured() {
             .single()
             .expect("invalid timestamp"),
     );
-    log.insert("action", "crea");
+    log.insert(event_path!("action"), "crea");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -118,8 +119,8 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
             .single()
             .expect("invalid timestamp"),
     );
-    log.insert("my_field", "1337");
-    log.insert("my_id", "42");
+    log.insert(event_path!("my_field"), "1337");
+    log.insert(event_path!("my_id"), "42");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -168,8 +169,8 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
             .single()
             .expect("invalid timestamp"),
     );
-    log.insert("my_field", "1337");
-    log.insert("my_id", "42");
+    log.insert(event_path!("my_field"), "1337");
+    log.insert(event_path!("my_id"), "42");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -251,7 +252,7 @@ async fn encode_datastream_mode() {
             .expect("invalid timestamp"),
     );
     log.insert(
-        "data_stream",
+        event_path!("data_stream"),
         data_stream_body(
             Some("synthetics".to_string()),
             Some("testing".to_string()),
@@ -301,7 +302,7 @@ async fn encode_datastream_mode_no_routing() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        "data_stream",
+        event_path!("data_stream"),
         data_stream_body(
             Some("synthetics".to_string()),
             Some("testing".to_string()),
@@ -391,8 +392,8 @@ async fn decode_bulk_action_error() {
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello world");
-    log.insert("foo", "bar");
-    log.insert("idx", "purple");
+    log.insert(event_path!("foo"), "bar");
+    log.insert(event_path!("idx"), "purple");
     let action = es.mode.bulk_action(&log);
     assert!(action.is_none());
 }
@@ -454,7 +455,7 @@ async fn encode_datastream_mode_no_sync() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        "data_stream",
+        event_path!("data_stream"),
         data_stream_body(
             Some("synthetics".to_string()),
             Some("testing".to_string()),
@@ -501,8 +502,8 @@ async fn allows_using_except_fields() {
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
-    log.insert("foo", "bar");
-    log.insert("idx", "purple");
+    log.insert(event_path!("foo"), "bar");
+    log.insert(event_path!("idx"), "purple");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -536,8 +537,8 @@ async fn allows_using_only_fields() {
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
-    log.insert("foo", "bar");
-    log.insert("idx", "purple");
+    log.insert(event_path!("foo"), "bar");
+    log.insert(event_path!("idx"), "purple");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -662,7 +663,7 @@ async fn datastream_index_name() {
     for test_case in test_cases {
         let mut log = LogEvent::from("hello there");
         log.insert(
-            "data_stream",
+            event_path!("data_stream"),
             data_stream_body(
                 test_case.dtype.clone(),
                 test_case.dataset.clone(),

@@ -793,6 +793,7 @@ mod test {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use vector_lib::codecs::ReadyFrames;
     use vector_lib::lookup::OwnedTargetPath;
+    use vrl::event_path;
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -859,15 +860,17 @@ mod test {
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
         assert_eq!(
-            log.get("message").unwrap().to_string_lossy(),
+            log.get(event_path!("message")).unwrap().to_string_lossy(),
             "Hello, world!".to_string()
         );
         assert_eq!(
-            log.get("source_type").unwrap().to_string_lossy(),
+            log.get(event_path!("source_type"))
+                .unwrap()
+                .to_string_lossy(),
             "logstash".to_string()
         );
-        assert!(log.get("host").is_some());
-        assert!(log.get("timestamp").is_some());
+        assert!(log.get(event_path!("host")).is_some());
+        assert!(log.get(event_path!("timestamp")).is_some());
     }
 
     fn push_req(req: &mut BytesMut, seq: u32, pairs: &[(&str, &str)]) {
@@ -1278,6 +1281,7 @@ mod integration_tests {
 
     use futures::Stream;
     use tokio::time::timeout;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -1312,12 +1316,15 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(
-            log.get("@metadata.beat"),
+            log.get(event_path!("@metadata", "beat")),
             Some(String::from("heartbeat").into()).as_ref()
         );
-        assert_eq!(log.get("summary.up"), Some(1.into()).as_ref());
-        assert!(log.get("timestamp").is_some());
-        assert!(log.get("host").is_some());
+        assert_eq!(
+            log.get(event_path!("summary", "up")),
+            Some(1.into()).as_ref()
+        );
+        assert!(log.get(event_path!("timestamp")).is_some());
+        assert!(log.get(event_path!("host")).is_some());
     }
 
     fn logstash_address() -> String {
@@ -1355,12 +1362,12 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert!(
-            log.get("line")
+            log.get(event_path!("line"))
                 .unwrap()
                 .to_string_lossy()
                 .contains("Hello World")
         );
-        assert!(log.get("host").is_some());
+        assert!(log.get(event_path!("host")).is_some());
     }
 
     async fn source(

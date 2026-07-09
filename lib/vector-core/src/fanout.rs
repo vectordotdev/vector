@@ -517,7 +517,7 @@ mod tests {
             channel::{BufferReceiver, BufferSender},
         },
     };
-    use vrl::value::Value;
+    use vrl::{event_path, value::Value};
 
     use super::{ControlMessage, Fanout};
     use crate::{
@@ -653,7 +653,7 @@ mod tests {
             .expect("must have at least one event");
         let event = event.into_log();
         event
-            .get("message")
+            .get(event_path!("message"))
             .and_then(Value::as_bytes)
             .and_then(|b| String::from_utf8(b.to_vec()).ok())
             .expect("must be valid log event with `message` field")
