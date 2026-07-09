@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
 
 use aws_sdk_cloudwatchlogs::operation::{
-    create_log_stream::CreateLogStreamError, describe_log_streams::DescribeLogStreamsError,
-    put_log_events::PutLogEventsError,
+    create_log_stream::CreateLogStreamError, put_log_events::PutLogEventsError,
 };
 use aws_smithy_runtime_api::client::result::SdkError;
 
@@ -49,15 +48,6 @@ impl<Request: Send + Sync + 'static, Response: Send + Sync + 'static> RetryLogic
                 if let SdkError::ServiceError(inner) = err {
                     let err = inner.err();
                     if matches!(err, PutLogEventsError::ServiceUnavailableException(_)) {
-                        return true;
-                    }
-                }
-                is_retriable_error(err)
-            }
-            CloudwatchError::DescribeLogStreams(err) => {
-                if let SdkError::ServiceError(inner) = err {
-                    let err = inner.err();
-                    if matches!(err, DescribeLogStreamsError::ServiceUnavailableException(_)) {
                         return true;
                     }
                 }
