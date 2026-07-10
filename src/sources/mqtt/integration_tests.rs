@@ -3,8 +3,8 @@
 
 use std::{collections::HashSet, time::Duration};
 
-use futures::StreamExt;
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use futures::{Stream, StreamExt};
+use rumqttc::{AsyncClient, Event as MqttEvent, Incoming, MqttOptions, QoS};
 use tokio::time::timeout;
 
 use crate::{
@@ -223,6 +223,58 @@ async fn mqtt_redelivers_unacknowledged_messages() {
     drop(source2.await);
 }
 
+/// Forces a server-side disconnect of whatever client currently holds
+/// `client_id`: a second connection with the same client ID makes the broker
+/// disconnect the existing one ([MQTT-3.1.4-2]). With `clean_session = false`
+/// the persistent session (subscriptions and unacknowledged in-flight
+/// messages) survives the takeover; with `clean_session = true` the broker
+/// additionally discards that session. The takeover connection is closed
+/// immediately afterwards, freeing the client ID for the victim to
+/// reconnect.
+async fn kick_mqtt_client(client_id: &str, discard_session: bool) {
+    let mut options = MqttOptions::new(client_id, mqtt_broker_address(), mqtt_broker_port());
+    options.set_keep_alive(Duration::from_secs(5));
+    options.set_clean_session(discard_session);
+    let (client, mut eventloop) = AsyncClient::new(options, 10);
+
+    // Wait until the broker accepts the takeover (kicking the victim).
+    loop {
+        match timeout(Duration::from_secs(5), eventloop.poll())
+            .await
+            .expect("timed out connecting the takeover client")
+        {
+            Ok(MqttEvent::Incoming(Incoming::ConnAck(_))) => break,
+            Ok(_) => {}
+            Err(error) => panic!("takeover client failed to connect: {error:?}"),
+        }
+    }
+
+    client.disconnect().await.unwrap();
+    // Drive the DISCONNECT out; polling errors once the connection closes.
+    while timeout(Duration::from_secs(5), eventloop.poll())
+        .await
+        .expect("timed out closing the takeover client")
+        .is_ok()
+    {}
+}
+
+/// Receives from the source until every message in `expected` has been seen
+/// at least once (duplicates are permitted: QoS 1 is at-least-once),
+/// panicking if `each_timeout` passes without progress.
+async fn collect_expected_messages(
+    rx: &mut (impl Stream<Item = Event> + Unpin),
+    mut expected: HashSet<String>,
+    each_timeout: Duration,
+) {
+    while !expected.is_empty() {
+        let event = timeout(each_timeout, rx.next())
+            .await
+            .unwrap_or_else(|_| panic!("timed out; still missing {} messages", expected.len()))
+            .expect("source stream ended unexpectedly");
+        expected.remove(&message_body(&event));
+    }
+}
+
 /// A withheld ack (the sink rejects the message, so its PUBACK is never sent)
 /// must force a reconnect on its own -- without an external trigger like a
 /// process restart or manual disconnect -- so the broker redelivers the
@@ -289,6 +341,210 @@ async fn mqtt_forces_reconnect_after_withheld_ack() {
         message,
         "redelivered message did not match the original"
     );
+
+    source.abort();
+    drop(source.await);
+}
+
+/// A server-initiated disconnect (broker kicks the client) must be survived
+/// transparently when the session is preserved: the source reconnects,
+/// resumes the session (`session_present = true`, no resubscribe needed),
+/// and messages published while it was offline are delivered from the
+/// session's queue.
+#[tokio::test]
+async fn mqtt_recovers_from_server_side_disconnect() {
+    trace_init();
+
+    let topic = "source-server-kick-test";
+    let client_id = format!("sourceKickTest{}", random_string(6));
+    let msg_before = random_string(32);
+    let msg_after = random_string(32);
+
+    let config = MqttSourceConfig {
+        common: MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(client_id.clone()),
+            ..Default::default()
+        },
+        topic: OneOrMany::One(topic.to_owned()),
+        acknowledgements: true.into(),
+        ..MqttSourceConfig::default()
+    };
+
+    let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let source = tokio::spawn(async move {
+        config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let producer = get_mqtt_client().await;
+    producer
+        .publish(topic, QoS::AtLeastOnce, false, msg_before.as_bytes())
+        .await
+        .unwrap();
+    let received = timeout(Duration::from_secs(5), rx.next())
+        .await
+        .expect("timed out waiting for pre-kick delivery")
+        .expect("source stream ended unexpectedly");
+    assert_eq!(message_body(&received), msg_before);
+
+    // Kick the source off the broker, keeping its session intact, and
+    // publish while it is (briefly) offline: the persistent session queues
+    // the message for delivery once the source has reconnected.
+    kick_mqtt_client(&client_id, false).await;
+    producer
+        .publish(topic, QoS::AtLeastOnce, false, msg_after.as_bytes())
+        .await
+        .unwrap();
+
+    let redelivered = timeout(Duration::from_secs(10), rx.next())
+        .await
+        .expect("timed out: the source did not recover from the server-side disconnect")
+        .expect("source stream ended unexpectedly");
+    assert_eq!(message_body(&redelivered), msg_after);
+
+    source.abort();
+    drop(source.await);
+}
+
+/// When the broker discards the persistent session entirely (here: a
+/// takeover connection with `clean_session = true`, but a broker restart
+/// without persistence behaves the same), the source's reconnect sees
+/// `session_present = false` for a session with no subscriptions and must
+/// resubscribe on its own before messages flow again.
+#[tokio::test]
+async fn mqtt_resubscribes_after_broker_discards_the_session() {
+    trace_init();
+
+    let topic = "source-session-loss-test";
+    let client_id = format!("sourceSessionLossTest{}", random_string(6));
+    let msg_before = random_string(32);
+    let msg_after = random_string(32);
+
+    let config = MqttSourceConfig {
+        common: MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(client_id.clone()),
+            ..Default::default()
+        },
+        topic: OneOrMany::One(topic.to_owned()),
+        acknowledgements: true.into(),
+        ..MqttSourceConfig::default()
+    };
+
+    let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let source = tokio::spawn(async move {
+        config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let producer = get_mqtt_client().await;
+    producer
+        .publish(topic, QoS::AtLeastOnce, false, msg_before.as_bytes())
+        .await
+        .unwrap();
+    let received = timeout(Duration::from_secs(5), rx.next())
+        .await
+        .expect("timed out waiting for pre-kick delivery")
+        .expect("source stream ended unexpectedly");
+    assert_eq!(message_body(&received), msg_before);
+
+    // Kick the source AND discard its session (subscriptions included).
+    kick_mqtt_client(&client_id, true).await;
+
+    // A publish only reaches the source once it has reconnected and its
+    // resubscribe has been processed; QoS 1 publishes to a topic with no
+    // subscribers are simply dropped, so publish repeatedly until one lands
+    // rather than guessing at the resubscribe timing.
+    let mut received_after = None;
+    for _ in 0..20 {
+        producer
+            .publish(topic, QoS::AtLeastOnce, false, msg_after.as_bytes())
+            .await
+            .unwrap();
+        if let Ok(event) = timeout(Duration::from_millis(500), rx.next()).await {
+            received_after = event;
+            break;
+        }
+    }
+    let received_after = received_after
+        .expect("the source never resubscribed after the broker discarded its session");
+    assert_eq!(message_body(&received_after), msg_after);
+
+    source.abort();
+    drop(source.await);
+}
+
+/// The default mode (acknowledgements off, rumqttc auto-acks) must not lose
+/// messages across a server-side disconnect either: in this mode a buffered
+/// publish can already be acknowledged to the broker before the source
+/// processes it, so anything the disconnect path drops locally would be gone
+/// for good (the broker won't redeliver what it saw acked).
+#[tokio::test]
+async fn mqtt_does_not_lose_messages_across_server_side_disconnect_without_acks() {
+    trace_init();
+
+    let topic = "source-kick-no-acks-test";
+    let client_id = format!("sourceKickNoAcksTest{}", random_string(6));
+    let num_messages = 10;
+
+    let config = MqttSourceConfig {
+        common: MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(client_id.clone()),
+            ..Default::default()
+        },
+        topic: OneOrMany::One(topic.to_owned()),
+        ..MqttSourceConfig::default()
+    };
+
+    let (tx, mut rx) = SourceSender::new_test();
+    let source = tokio::spawn(async move {
+        config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let producer = get_mqtt_client().await;
+
+    let (batch_before, ..) = random_lines_with_stream(100, num_messages, None);
+    send_test_events(&producer, topic, &batch_before).await;
+    collect_expected_messages(
+        &mut rx,
+        batch_before.into_iter().collect(),
+        Duration::from_secs(5),
+    )
+    .await;
+
+    // Kick the source (session preserved) and publish the second batch while
+    // it is offline; the session queues it for delivery after reconnect.
+    kick_mqtt_client(&client_id, false).await;
+    let (batch_after, ..) = random_lines_with_stream(100, num_messages, None);
+    send_test_events(&producer, topic, &batch_after).await;
+
+    collect_expected_messages(
+        &mut rx,
+        batch_after.into_iter().collect(),
+        Duration::from_secs(10),
+    )
+    .await;
 
     source.abort();
     drop(source.await);
