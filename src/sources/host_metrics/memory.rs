@@ -10,6 +10,9 @@ use vector_lib::event::MetricTags;
 use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
 
+#[cfg(target_os = "linux")]
+const OOM_KILL: &str = "oom_kill";
+
 impl HostMetrics {
     pub async fn memory_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "memory";
@@ -121,5 +124,63 @@ impl HostMetrics {
                 });
             }
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub async fn vmstat_metrics(&self, output: &mut super::MetricsBuffer) {
+        output.name = "memory";
+
+        // Spawn blocking task to avoid blocking the async runtime with synchronous I/O
+        let result = tokio::task::spawn_blocking(procfs::vmstat)
+            .await
+            .unwrap_or_else(|join_error| {
+                Err(procfs::ProcError::Other(format!(
+                    "Failed to join blocking task: {}",
+                    join_error
+                )))
+            });
+
+        match result {
+            Ok(stats) => {
+                if let Some(&oom_kill) = stats.get("oom_kill") {
+                    output.counter(OOM_KILL, oom_kill as f64, MetricTags::default());
+                }
+            }
+            Err(error) => {
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load vmstat info.",
+                    error,
+                });
+            }
+        }
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use crate::event::metric::MetricValue;
+    use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
+
+    use super::OOM_KILL;
+
+    #[tokio::test]
+    async fn generates_vmstat_oom_kill_metric() {
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .vmstat_metrics(&mut buffer)
+            .await;
+        let metrics = buffer.metrics;
+
+        assert_eq!(metrics.len(), 1);
+
+        let metric = &metrics[0];
+        assert_eq!(metric.name(), OOM_KILL);
+        assert!(
+            matches!(metric.value(), MetricValue::Counter { .. }),
+            "oom_kill metric should be a counter"
+        );
+
+        let tags = metric.tags().expect("metric must have tags");
+        assert_eq!(tags.get("collector"), Some("memory"));
     }
 }
