@@ -185,6 +185,43 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			}
 		}
 	}
+	per_tag_limits: {
+		description: """
+			Global per-tag-key overrides, applied to every metric that does not match a
+			`per_metric_limits` entry. Each entry sets `mode: limit_override` (with a
+			per-tag `value_limit`) or `mode: excluded` (bypass tracking for that tag).
+
+			See the "Per-tag overrides" section under "How it works" for a worked example
+			and the precedence rules.
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "An individual tag configuration."
+			required:    true
+			type: object: options: {
+				mode: {
+					description: "Controls how this tag key is handled."
+					required:    true
+					type: string: enum: {
+						excluded: """
+																			Opt this tag out of cardinality tracking entirely. All values pass through
+																			without being recorded or checked against any `value_limit`.
+																			"""
+						limit_override: """
+																			Track this tag with a per-tag value limit. The enclosing per-metric tracking
+																			algorithm and all other settings still apply.
+																			"""
+					}
+				}
+				value_limit: {
+					description:   "Maximum number of distinct values to accept for this tag key."
+					relevant_when: "mode = \"limit_override\""
+					required:      true
+					type: uint: {}
+				}
+			}
+		}
+	}
 	tracking_scope: {
 		description: "Controls how tag tracking state is partitioned across metrics."
 		required:    false

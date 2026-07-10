@@ -49,6 +49,19 @@ pub struct Config {
     )]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
+
+    /// Global per-tag-key overrides, applied to every metric that does not match a
+    /// `per_metric_limits` entry. Each entry sets `mode: limit_override` (with a
+    /// per-tag `value_limit`) or `mode: excluded` (bypass tracking for that tag).
+    ///
+    /// See the "Per-tag overrides" section under "How it works" for a worked example
+    /// and the precedence rules.
+    #[configurable(
+        derived,
+        metadata(docs::additional_props_description = "An individual tag configuration.")
+    )]
+    #[serde(default)]
+    pub per_tag_limits: HashMap<String, PerTagConfig>,
 }
 
 /// Controls how tag tracking state is partitioned across metrics.
@@ -311,6 +324,7 @@ impl GenerateConfig for Config {
             tracking_scope: TrackingScope::default(),
             max_tracked_keys: None,
             per_metric_limits: HashMap::default(),
+            per_tag_limits: HashMap::default(),
         })
         .unwrap()
     }

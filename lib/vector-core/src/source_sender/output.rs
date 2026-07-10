@@ -11,7 +11,9 @@ use metrics::Histogram;
 use tracing::Span;
 use vector_buffers::{
     config::MemoryBufferSize,
-    topology::channel::{self, ChannelMetricMetadata, LimitedReceiver, LimitedSender},
+    topology::channel::{
+        self, BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender,
+    },
 };
 use vector_common::{
     byte_size_of::ByteSizeOf,
@@ -29,8 +31,6 @@ use crate::{
     event::{Event, EventArray, EventContainer as _, EventRef, array},
     schema::Definition,
 };
-
-const UTILIZATION_METRIC_PREFIX: &str = "source_buffer";
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,
@@ -140,7 +140,7 @@ impl Output {
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
         let channel_metrics =
-            ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
+            ChannelMetricMetadata::new(BufferChannelKind::Source, Some(output.clone()));
         let (tx, rx) = channel::limited(limit, Some(channel_metrics), ewma_half_life_seconds);
         (
             Self {
