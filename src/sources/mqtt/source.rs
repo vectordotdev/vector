@@ -701,14 +701,33 @@ impl MqttSource {
             // and yields them one per poll; `clean()` does NOT clear that
             // buffer, so events from the dead connection would otherwise be
             // yielded *after* the next ConnAck and be indistinguishable from
-            // new-connection traffic: a stale Publish would be tagged with
-            // the new generation (and its stale packet id acked on the new
-            // connection), and a stale SubAck would falsely confirm the new
-            // connection's subscribe. Everything buffered here belongs to the
-            // dead connection -- the reconnect ConnAck is returned directly
-            // by `poll()`, never through this buffer -- so drop it all. Any
-            // dropped publish is unacked and will be redelivered.
-            connection.state.events.clear();
+            // new-connection traffic. Everything buffered here belongs to the
+            // dead connection (the reconnect ConnAck is returned directly by
+            // `poll()`, never through this buffer), but what's safe to drop
+            // depends on the ack mode:
+            if self.acknowledgements {
+                // Manual-ack mode: nothing buffered has been acked (acks are
+                // only sent after end-to-end finalization, and these publishes
+                // were never even yielded), so the broker redelivers all of
+                // it. Dropping everything prevents a stale Publish from being
+                // tagged with the new generation (its stale packet id then
+                // acked on the new connection) and a stale SubAck from
+                // falsely confirming the new connection's subscribe.
+                connection.state.events.clear();
+            } else {
+                // Auto-ack mode: rumqttc queues the PUBACK the moment it
+                // buffers a publish, so it may already be on the wire and the
+                // broker is then allowed to never redeliver -- dropping a
+                // buffered publish here would lose it outright. Keep the
+                // publishes for processing (there's no generation-sensitive
+                // ack machinery in this mode to confuse); drop only the
+                // stale non-publish events, so e.g. a stale SubAck can't
+                // falsely confirm the new connection's subscribe.
+                connection
+                    .state
+                    .events
+                    .retain(|event| matches!(event, MqttEvent::Incoming(Incoming::Publish(_))));
+            }
         }
         // The reconnect any scheduled forced-disconnect was asking for has
         // now happened; no need to send another once reconnected.
