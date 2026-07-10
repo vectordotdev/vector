@@ -1414,4 +1414,376 @@ mod tests {
         let actions = state.on_connack(true, true);
         assert!(!actions.resubscribe);
     }
+
+    // ------------------------------------------------------------------
+    // Exhaustive protocol-state model check.
+    //
+    // The tests above sample hand-picked transition sequences; review kept
+    // finding holes in the sequences nobody picked (a forced reconnect
+    // skipped inside the cooldown with nothing left to re-trigger it, SUBACK
+    // failures treated as confirmation, ...). This test explores EVERY
+    // reachable abstract state of the protocol machinery instead:
+    // `ProtocolState` + `ForcedReconnectSchedule` + the resubscribe retry
+    // timer, under every legal interleaving of connection, finalization and
+    // timer events, checking on every transition the invariants that past
+    // findings violated.
+    //
+    // The event glue in `Model::apply` mirrors `run()`'s select branches;
+    // when changing `run()`, change it to match. Timer state is abstracted
+    // to armed/not-armed (which timestamps hold never affects WHETHER a
+    // transition is legal, only when it happens), so the abstract state
+    // space is finite and small; the BFS runs to fixpoint.
+    // ------------------------------------------------------------------
+
+    /// Cap for state-space purposes; behavior only distinguishes
+    /// `generation == 0` from `> 0`, so higher counts add nothing.
+    const MODEL_MAX_GENERATION: u64 = 2;
+
+    /// Enough to have one suppressed publish plus one still-in-flight.
+    const MODEL_MAX_INFLIGHT: u8 = 2;
+
+    #[derive(Clone, Copy, Debug)]
+    enum ModelEvent {
+        /// `poll()` yielded ConnAck; `subscribe_queued` is the outcome of the
+        /// `try_subscribe` the handler issues when `actions.resubscribe`.
+        ConnAck {
+            session_present: bool,
+            subscribe_queued: bool,
+        },
+        /// `poll()` yielded a Publish which was processed and registered
+        /// with the finalizer.
+        ReceivePublish,
+        /// The ack stream yielded a finalization for a current-generation
+        /// entry (stale-generation entries cannot be yielded: the finalizer
+        /// is recreated on every ConnAck and disconnect).
+        FinalizePublish { status: BatchStatus },
+        /// `poll()` yielded a SUBACK for the outstanding (re)subscribe.
+        SubAck { all_granted: bool },
+        /// `poll()` returned an error (includes failed reconnect attempts,
+        /// so it is legal in any state).
+        PollError,
+        /// The forced-reconnect timer fired; `disconnect_queued` is the
+        /// outcome of `try_disconnect`.
+        ForcedReconnectDue { disconnect_queued: bool },
+        /// The escalation deadline fired: the broker never closed after our
+        /// `Disconnect`, so the connection is dropped locally.
+        EscalationDue,
+        /// The paced resubscribe retry timer fired.
+        ResubscribeRetryDue { subscribe_queued: bool },
+        /// The top-of-loop resubscribe retry ran (it runs before every
+        /// select; modeling it as an optional event covers both orders).
+        LoopTopResubscribe { subscribe_queued: bool },
+    }
+
+    const MODEL_EVENTS: [ModelEvent; 15] = [
+        ModelEvent::ConnAck {
+            session_present: false,
+            subscribe_queued: false,
+        },
+        ModelEvent::ConnAck {
+            session_present: false,
+            subscribe_queued: true,
+        },
+        ModelEvent::ConnAck {
+            session_present: true,
+            subscribe_queued: false,
+        },
+        ModelEvent::ConnAck {
+            session_present: true,
+            subscribe_queued: true,
+        },
+        ModelEvent::ReceivePublish,
+        ModelEvent::FinalizePublish {
+            status: BatchStatus::Delivered,
+        },
+        ModelEvent::FinalizePublish {
+            status: BatchStatus::Rejected,
+        },
+        ModelEvent::SubAck { all_granted: true },
+        ModelEvent::SubAck { all_granted: false },
+        ModelEvent::PollError,
+        ModelEvent::ForcedReconnectDue {
+            disconnect_queued: true,
+        },
+        ModelEvent::ForcedReconnectDue {
+            disconnect_queued: false,
+        },
+        ModelEvent::EscalationDue,
+        ModelEvent::ResubscribeRetryDue {
+            subscribe_queued: true,
+        },
+        ModelEvent::LoopTopResubscribe {
+            subscribe_queued: true,
+        },
+    ];
+
+    #[derive(Clone)]
+    struct Model {
+        state: ProtocolState,
+        forced: ForcedReconnectSchedule,
+        resubscribe_retry_scheduled: bool,
+        /// Unfinalized publishes registered with the current finalizer.
+        inflight: u8,
+        now: tokio::time::Instant,
+    }
+
+    /// The abstraction the BFS dedups on: timer instants collapse to
+    /// armed/not-armed, the generation saturates.
+    type ModelKey = (bool, bool, bool, bool, u64, bool, bool, bool, bool, u8);
+
+    impl Model {
+        fn initial() -> Self {
+            Self {
+                state: ProtocolState {
+                    pending_resubscribe: true,
+                    ..ProtocolState::default()
+                },
+                forced: ForcedReconnectSchedule::default(),
+                resubscribe_retry_scheduled: false,
+                inflight: 0,
+                now: tokio::time::Instant::now(),
+            }
+        }
+
+        fn key(&self) -> ModelKey {
+            (
+                self.state.connected,
+                self.state.pending_resubscribe,
+                self.state.resubscribe_awaiting_suback,
+                self.state.ack_suppressed,
+                self.state.connection_generation.min(MODEL_MAX_GENERATION),
+                self.forced.due_at().is_some(),
+                self.forced.cooldown_until.is_some(),
+                self.forced.escalate_at().is_some(),
+                self.resubscribe_retry_scheduled,
+                self.inflight,
+            )
+        }
+
+        fn legal(&self, event: ModelEvent) -> bool {
+            match event {
+                // ConnAck is strictly the first event of a connection.
+                ModelEvent::ConnAck { .. } => !self.state.connected,
+                ModelEvent::ReceivePublish => {
+                    self.state.connected && self.inflight < MODEL_MAX_INFLIGHT
+                }
+                ModelEvent::FinalizePublish { .. } => self.inflight > 0,
+                // A SUBACK only arrives for an outstanding SUBSCRIBE.
+                ModelEvent::SubAck { .. } => {
+                    self.state.connected && self.state.resubscribe_awaiting_suback
+                }
+                ModelEvent::PollError => true,
+                ModelEvent::ForcedReconnectDue { .. } => {
+                    self.forced.due_at().is_some() && self.state.connected
+                }
+                ModelEvent::EscalationDue => self.forced.escalate_at().is_some(),
+                ModelEvent::ResubscribeRetryDue { .. } => self.resubscribe_retry_scheduled,
+                ModelEvent::LoopTopResubscribe { .. } => {
+                    self.state.loop_actions().retry_resubscribe
+                        && !self.forced.disconnect_sent()
+                }
+            }
+        }
+
+        /// Mirrors the corresponding handler glue in `run()`.
+        fn apply(&mut self, event: ModelEvent, acknowledgements: bool) {
+            self.now += Duration::from_secs(1);
+            match event {
+                ModelEvent::ConnAck {
+                    session_present,
+                    subscribe_queued,
+                } => {
+                    let actions = self.state.on_connack(acknowledgements, session_present);
+                    // recreate_finalizer drops all registered entries.
+                    assert!(actions.recreate_finalizer);
+                    self.inflight = 0;
+                    if actions.resubscribe {
+                        self.state.on_resubscribe_result(subscribe_queued);
+                    }
+                    self.resubscribe_retry_scheduled = false;
+                }
+                ModelEvent::ReceivePublish => self.inflight += 1,
+                ModelEvent::FinalizePublish { status } => {
+                    self.inflight -= 1;
+                    let decision = self
+                        .state
+                        .finalize_publish(status, self.state.connection_generation);
+                    if decision.should_ack {
+                        // Emitting an ack while a `Disconnect` is unanswered
+                        // would violate [MQTT-3.14.4-1]; `disconnect_sent`
+                        // implies the generation is suppressed, which implies
+                        // `should_ack` is false.
+                        assert!(
+                            !self.forced.disconnect_sent(),
+                            "ack emitted while draining after a Disconnect"
+                        );
+                    }
+                    if decision.just_suppressed {
+                        self.forced.schedule(self.now);
+                    }
+                }
+                ModelEvent::SubAck { all_granted } => {
+                    if all_granted {
+                        self.state.on_suback();
+                        self.resubscribe_retry_scheduled = false;
+                    } else {
+                        self.resubscribe_retry_scheduled = true;
+                    }
+                }
+                ModelEvent::PollError => self.connection_lost(),
+                ModelEvent::ForcedReconnectDue { disconnect_queued } => {
+                    // Firing the timer while a previous `Disconnect` is
+                    // still unanswered would send a second one.
+                    assert!(
+                        !self.forced.disconnect_sent(),
+                        "forced-reconnect timer fired while a Disconnect is already unanswered"
+                    );
+                    if disconnect_queued {
+                        self.forced.sent(self.now);
+                    } else {
+                        self.forced.retry(self.now);
+                    }
+                }
+                ModelEvent::EscalationDue => {
+                    self.forced.escalated();
+                    // `connection.clean()` + shared disconnect handling.
+                    self.connection_lost();
+                }
+                ModelEvent::ResubscribeRetryDue { subscribe_queued } => {
+                    self.resubscribe_retry_scheduled = false;
+                    if self.state.connected
+                        && self.state.pending_resubscribe
+                        && !self.forced.disconnect_sent()
+                    {
+                        self.state.on_resubscribe_result(subscribe_queued);
+                    }
+                }
+                ModelEvent::LoopTopResubscribe { subscribe_queued } => {
+                    self.state.on_resubscribe_result(subscribe_queued);
+                }
+            }
+        }
+
+        /// Mirrors `handle_connection_lost`.
+        fn connection_lost(&mut self) {
+            let actions = self.state.on_disconnect();
+            assert!(actions.recreate_finalizer);
+            self.inflight = 0;
+            self.forced.cancel();
+            self.resubscribe_retry_scheduled = false;
+        }
+
+        fn check_invariants(&self, trace: &[ModelEvent]) {
+            let describe = || {
+                format!(
+                    "state: {:?}, forced: {:?}, retry_scheduled: {}, inflight: {}\ntrace: {trace:?}",
+                    self.state, self.forced, self.resubscribe_retry_scheduled, self.inflight,
+                )
+            };
+
+            // The invariant behind the cooldown-skip finding: a suppressed,
+            // still-connected generation must always have a recovery action
+            // armed (the reconnect timer or the escalation deadline), or the
+            // source is stuck forever with nothing left to trigger recovery.
+            if self.state.connected && self.state.ack_suppressed {
+                assert!(
+                    self.forced.due_at().is_some() || self.forced.escalate_at().is_some(),
+                    "suppressed generation with no recovery action armed\n{}",
+                    describe()
+                );
+            }
+
+            // Per-connection schedules must die with the connection: a timer
+            // surviving a disconnect would fire against the next connection.
+            if !self.state.connected {
+                assert!(
+                    self.forced.due_at().is_none()
+                        && self.forced.escalate_at().is_none()
+                        && !self.resubscribe_retry_scheduled,
+                    "per-connection schedule survived a disconnect\n{}",
+                    describe()
+                );
+            }
+
+            // The invariant behind the SUBACK findings: while connected with
+            // an unconfirmed subscription, some path toward retrying it must
+            // remain live (the loop-top retry, an outstanding SUBACK that
+            // will either confirm or reject-and-pace, or the paced retry
+            // timer). While draining, the pending flag itself survives to
+            // the next connection, whose ConnAck re-issues the subscribe.
+            if self.state.connected
+                && self.state.pending_resubscribe
+                && !self.forced.disconnect_sent()
+            {
+                assert!(
+                    self.state.loop_actions().retry_resubscribe
+                        || self.state.resubscribe_awaiting_suback
+                        || self.resubscribe_retry_scheduled,
+                    "unconfirmed subscription with no retry path armed\n{}",
+                    describe()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn exhaustive_protocol_state_model_check() {
+        for acknowledgements in [true, false] {
+            let mut visited = std::collections::HashSet::<ModelKey>::new();
+            // Keep a short trace per state for debuggable failures.
+            let mut queue = std::collections::VecDeque::<(Model, Vec<ModelEvent>)>::new();
+
+            let initial = Model::initial();
+            initial.check_invariants(&[]);
+            visited.insert(initial.key());
+            queue.push_back((initial, Vec::new()));
+
+            let mut transitions = 0usize;
+            let mut reached_suppressed = false;
+            let mut reached_draining = false;
+            let mut reached_retry_pacing = false;
+
+            while let Some((model, trace)) = queue.pop_front() {
+                for event in MODEL_EVENTS {
+                    if !model.legal(event) {
+                        continue;
+                    }
+                    let mut next = model.clone();
+                    next.apply(event, acknowledgements);
+                    transitions += 1;
+
+                    let mut next_trace = trace.clone();
+                    next_trace.push(event);
+                    next.check_invariants(&next_trace);
+
+                    // Transition-level invariant: `pending_resubscribe` may
+                    // only be cleared by a fully granted SUBACK.
+                    if model.state.pending_resubscribe && !next.state.pending_resubscribe {
+                        assert!(
+                            matches!(event, ModelEvent::SubAck { all_granted: true }),
+                            "pending_resubscribe cleared by {event:?}, not a granted SUBACK\ntrace: {next_trace:?}"
+                        );
+                    }
+
+                    reached_suppressed |= next.state.ack_suppressed;
+                    reached_draining |= next.forced.disconnect_sent();
+                    reached_retry_pacing |= next.resubscribe_retry_scheduled;
+
+                    if visited.insert(next.key()) {
+                        queue.push_back((next, next_trace));
+                    }
+                }
+            }
+
+            // Guard against the model check passing vacuously.
+            assert!(visited.len() > 50, "suspiciously small state space");
+            assert!(transitions > 200, "suspiciously few transitions");
+            assert!(reached_suppressed, "never reached a suppressed state");
+            assert!(reached_draining, "never reached a draining state");
+            assert!(
+                reached_retry_pacing,
+                "never reached a paced-resubscribe-retry state"
+            );
+        }
+    }
 }
