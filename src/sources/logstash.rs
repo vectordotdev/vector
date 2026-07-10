@@ -161,6 +161,7 @@ impl SourceConfig for LogstashConfig {
             self.keepalive,
             shutdown_secs,
             tls,
+            None, // tls_reloader: not wired for this source
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
