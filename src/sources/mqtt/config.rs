@@ -144,6 +144,21 @@ impl MqttSourceConfig {
                 .context(ConfigurationSnafu);
         }
 
+        // An invalid filter is a permanent configuration error: rumqttc
+        // queues the SUBSCRIBE without validating it, so it would otherwise
+        // only surface at runtime as the broker rejecting (or dropping) the
+        // subscription over and over -- a running source that receives
+        // nothing. Fail here instead.
+        if let Some(topic) = self
+            .topic
+            .clone()
+            .to_vec()
+            .into_iter()
+            .find(|topic| !rumqttc::valid_filter(topic))
+        {
+            return Err(ConfigurationError::InvalidTopicFilter { topic }).context(ConfigurationSnafu);
+        }
+
         let client_id = self.common.client_id.clone().unwrap_or_else(|| {
             let hash = rand::rng()
                 .sample_iter(&rand_distr::Alphanumeric)
@@ -259,5 +274,42 @@ mod test {
         assert!(config.build_connector(true).is_err());
         // Without acknowledgements, disabling keep-alive stays allowed.
         assert!(config.build_connector(false).is_ok());
+    }
+
+    // An invalid topic filter is a permanent configuration error and must
+    // fail at build time: rumqttc queues the SUBSCRIBE without validating it,
+    // so it would otherwise only surface as a running source that receives
+    // nothing while the broker rejects the subscription over and over.
+    #[test]
+    fn invalid_topic_filters_fail_at_build() {
+        let config_with_topic = |topic: OneOrMany<String>| MqttSourceConfig {
+            topic,
+            ..Default::default()
+        };
+
+        for invalid in ["foo/#/bar", "foo/bar#", "foo/b+r", ""] {
+            assert!(
+                config_with_topic(OneOrMany::One(invalid.into()))
+                    .build_connector(false)
+                    .is_err(),
+                "{invalid:?} must be rejected"
+            );
+        }
+
+        // One invalid filter among valid ones still fails.
+        assert!(
+            config_with_topic(OneOrMany::Many(vec!["ok/#".into(), "foo/#/bar".into()]))
+                .build_connector(false)
+                .is_err()
+        );
+
+        for valid in ["foo/#", "foo/+/bar", "+/tele/#", "plain/topic"] {
+            assert!(
+                config_with_topic(OneOrMany::One(valid.into()))
+                    .build_connector(false)
+                    .is_ok(),
+                "{valid:?} must be accepted"
+            );
+        }
     }
 }
