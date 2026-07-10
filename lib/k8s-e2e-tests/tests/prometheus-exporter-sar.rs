@@ -46,7 +46,7 @@ impl Drop for TestResourceCleanup {
             rt.block_on(async move {
                 // First delete cluster-scoped RBAC resources
                 for (resource_type, name) in resources {
-                    let _ = tokio::process::Command::new(&kubectl)
+                    let _output = tokio::process::Command::new(&kubectl)
                         .args(["delete", &resource_type, &name, "--ignore-not-found=true"])
                         .output()
                         .await;
@@ -54,7 +54,7 @@ impl Drop for TestResourceCleanup {
 
                 // Then delete the namespace (which also deletes ServiceAccounts in it)
                 if let Some(ns) = namespace {
-                    let _ = tokio::process::Command::new(&kubectl)
+                    let _output = tokio::process::Command::new(&kubectl)
                         .args(["delete", "namespace", &ns, "--ignore-not-found=true"])
                         .output()
                         .await;
@@ -63,7 +63,7 @@ impl Drop for TestResourceCleanup {
         });
 
         // Wait for cleanup to complete (ignore errors - best effort)
-        let _ = handle.join();
+        let _result = handle.join();
     }
 }
 
@@ -71,7 +71,7 @@ impl Drop for TestResourceCleanup {
 /// Silently ignores errors (resources may already be deleted)
 async fn cleanup_cluster_resources(kubectl_command: &str, resource_names: &[(&str, &str)]) {
     for (resource_type, name) in resource_names {
-        let _ = tokio::process::Command::new(kubectl_command)
+        let _output = tokio::process::Command::new(kubectl_command)
             .args(["delete", resource_type, name, "--ignore-not-found=true"])
             .output()
             .await;
