@@ -1,8 +1,10 @@
 use std::{
+    collections::HashMap,
     fmt,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
+    sync::{LazyLock, Mutex},
 };
 
 use super::{
@@ -324,9 +326,11 @@ impl TlsSettings {
 
         if let Some(alpn) = &self.alpn_protocols {
             if for_server {
-                let server_proto = alpn.clone();
-                // See https://github.com/sfackler/rust-openssl/pull/2360.
-                let server_proto_ref: &'static [u8] = Box::leak(server_proto.into_boxed_slice());
+                // The server ALPN select callback requires a `'static` protocol list (see
+                // https://github.com/sfackler/rust-openssl/pull/2360). Intern it so the intentional
+                // leak happens at most once per distinct list, rather than leaking a fresh copy
+                // every time the context is (re)built.
+                let server_proto_ref = intern_alpn_protocols(alpn);
                 context.set_alpn_select_callback(move |_, client_proto| {
                     select_next_proto(server_proto_ref, client_proto).ok_or(AlpnError::NOACK)
                 });
@@ -352,6 +356,26 @@ impl TlsSettings {
         }
         Ok(())
     }
+}
+
+/// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
+///
+/// `SslContextBuilder::set_alpn_select_callback` requires the protocol list to outlive the context
+/// with a `'static` lifetime, so the bytes must be leaked. Interning by content means rebuilding an
+/// acceptor with the same ALPN configuration (e.g. on every certificate reload) reuses the existing
+/// allocation instead of leaking a fresh copy each time, keeping the leak bounded and one-time.
+fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
+    static INTERNED: LazyLock<Mutex<HashMap<Vec<u8>, &'static [u8]>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    let mut interned = INTERNED.lock().expect("mutex poisoned");
+
+    if let Some(existing) = interned.get(protocols).copied() {
+        return existing;
+    }
+    let leaked: &'static [u8] = Box::leak(protocols.to_vec().into_boxed_slice());
+    interned.insert(protocols.to_vec(), leaked);
+    leaked
 }
 
 impl TlsConfig {
