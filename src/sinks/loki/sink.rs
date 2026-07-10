@@ -573,6 +573,8 @@ mod tests {
         lookup::PathPrefix,
     };
 
+    use vrl::event_path;
+
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
         codecs::Encoder, config::log_schema, sinks::loki::config::OutOfOrderAction,
@@ -644,13 +646,13 @@ mod tests {
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
-        log.insert("name", "foo");
-        log.insert("value", "bar");
+        log.insert(event_path!("name"), "foo");
+        log.insert(event_path!("value"), "bar");
 
         let mut test_dict = ObjectMap::default();
         test_dict.insert("one".into(), Value::from("foo"));
         test_dict.insert("two".into(), Value::from("baz"));
-        log.insert("dict", Value::from(test_dict));
+        log.insert(event_path!("dict"), Value::from(test_dict));
 
         let record = encoder.encode_event(event).unwrap();
         assert!(
@@ -847,8 +849,8 @@ mod tests {
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
-        log.insert("name", "foo");
-        log.insert("value", "bar");
+        log.insert(event_path!("name"), "foo");
+        log.insert(event_path!("value"), "bar");
         let record = encoder.encode_event(event).unwrap();
         assert!(!String::from_utf8_lossy(&record.event.event).contains("value"));
     }

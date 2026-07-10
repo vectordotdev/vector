@@ -4,7 +4,6 @@ components: sinks: influxdb_metrics: {
 	title: "InfluxDB Metrics"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"

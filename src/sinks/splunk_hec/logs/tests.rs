@@ -72,14 +72,24 @@ fn get_processed_event_timestamp(
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
         .as_mut_log()
-        .insert("event_sourcetype", "test_sourcetype");
-    event.as_mut_log().insert("event_source", "test_source");
-    event.as_mut_log().insert("event_index", "test_index");
-    event.as_mut_log().insert("host_key", "test_host");
-    event.as_mut_log().insert("event_field1", "test_value1");
-    event.as_mut_log().insert("event_field2", "test_value2");
-    event.as_mut_log().insert("key", "value");
-    event.as_mut_log().insert("int_val", 123);
+        .insert(event_path!("event_sourcetype"), "test_sourcetype");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_source"), "test_source");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_index"), "test_index");
+    event
+        .as_mut_log()
+        .insert(event_path!("host_key"), "test_host");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_field1"), "test_value1");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_field2"), "test_value2");
+    event.as_mut_log().insert(event_path!("key"), "value");
+    event.as_mut_log().insert(event_path!("int_val"), 123);
 
     if let Some(OptionalTargetPath {
         path: Some(ts_path),
@@ -150,8 +160,8 @@ fn splunk_process_log_event() {
     assert_eq!(metadata.source, Some("test_source".to_string()));
     assert_eq!(metadata.index, Some("test_index".to_string()));
     assert_eq!(metadata.host, Some(Value::from("test_host")));
-    assert!(metadata.fields.contains("event_field1"));
-    assert!(metadata.fields.contains("event_field2"));
+    assert!(metadata.fields.contains(vrl::event_path!("event_field1")));
+    assert!(metadata.fields.contains(vrl::event_path!("event_field2")));
 }
 
 fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {

@@ -310,7 +310,7 @@ fn configuration_path_recomputed() {
     // Signal reload
     kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
 
-    // Message to assert, sended to console source and picked up from
+    // Message to assert, sent to console source and picked up from
     // console sink, both added in the second configuration file.
     vector
         .stdin

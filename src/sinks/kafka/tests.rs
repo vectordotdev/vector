@@ -18,6 +18,7 @@ mod integration_test {
         event::{BatchNotifier, BatchStatus},
         lookup::lookup_v2::ConfigTargetPath,
     };
+    use vrl::event_path;
 
     use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
     use crate::{
@@ -352,9 +353,9 @@ mod integration_test {
                 expected_messages.push(message.clone());
 
                 let mut trace = TraceEvent::default();
-                trace.insert("message", message);
-                trace.insert("trace_key", trace_key);
-                trace.insert("timestamp", chrono::Utc::now());
+                trace.insert(event_path!("message"), message);
+                trace.insert(event_path!("trace_key"), trace_key);
+                trace.insert(event_path!("timestamp"), chrono::Utc::now());
 
                 let mut trace_headers = ObjectMap::new();
                 trace_headers.insert(header_key.into(), Value::Bytes(Bytes::from(header_value)));

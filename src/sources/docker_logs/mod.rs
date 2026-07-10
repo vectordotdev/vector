@@ -22,7 +22,6 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use serde_with::serde_as;
 use tokio::sync::mpsc;
-use tracing_futures::Instrument;
 use vector_lib::{
     codecs::{BytesDeserializer, BytesDeserializerConfig},
     config::{LegacyKey, LogNamespace},
@@ -740,39 +739,36 @@ impl EventStreamBuilder {
     /// Spawn a task to runs event stream until shutdown.
     fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
         let this = self.clone();
-        tokio::spawn(
-            async move {
-                if let Some(duration) = backoff {
-                    tokio::time::sleep(duration).await;
-                }
+        crate::spawn_in_current_span(async move {
+            if let Some(duration) = backoff {
+                tokio::time::sleep(duration).await;
+            }
 
-                match this
-                    .core
-                    .docker
-                    .inspect_container(id.as_str(), None::<InspectContainerOptions>)
-                    .await
-                {
-                    Ok(details) => match ContainerMetadata::from_details(details) {
-                        Ok(metadata) => {
-                            let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                            this.run_event_stream(info).await;
-                            return;
-                        }
-                        Err(error) => emit!(DockerLogsTimestampParseError {
-                            error,
-                            container_id: id.as_str()
-                        }),
-                    },
-                    Err(error) => emit!(DockerLogsContainerMetadataFetchError {
+            match this
+                .core
+                .docker
+                .inspect_container(id.as_str(), None::<InspectContainerOptions>)
+                .await
+            {
+                Ok(details) => match ContainerMetadata::from_details(details) {
+                    Ok(metadata) => {
+                        let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                        this.run_event_stream(info).await;
+                        return;
+                    }
+                    Err(error) => emit!(DockerLogsTimestampParseError {
                         error,
                         container_id: id.as_str()
                     }),
-                }
-
-                this.finish(Err((id, ErrorPersistence::Transient)));
+                },
+                Err(error) => emit!(DockerLogsContainerMetadataFetchError {
+                    error,
+                    container_id: id.as_str()
+                }),
             }
-            .in_current_span(),
-        );
+
+            this.finish(Err((id, ErrorPersistence::Transient)));
+        });
 
         ContainerState::new_running()
     }
@@ -781,7 +777,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(this.run_event_stream(info).in_current_span());
+            crate::spawn_in_current_span(this.run_event_stream(info));
         }
     }
 
@@ -1341,7 +1337,7 @@ fn line_agg_adapter(
     let line_agg_in = inner.map(move |mut log| {
         let message_value = match log_namespace {
             LogNamespace::Vector => log
-                .remove(event_path!())
+                .remove(&vrl::path::OwnedTargetPath::event_root())
                 .expect("`.` must exist in the event"),
             LogNamespace::Legacy => log
                 .remove(
@@ -1367,7 +1363,7 @@ fn line_agg_adapter(
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(move |(_, message, mut log, _)| {
         match log_namespace {
-            LogNamespace::Vector => log.insert(event_path!(), message),
+            LogNamespace::Vector => log.insert(&vrl::path::OwnedTargetPath::event_root(), message),
             LogNamespace::Legacy => log.insert(
                 log_schema()
                     .message_key_target_path()

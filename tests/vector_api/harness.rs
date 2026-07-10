@@ -97,7 +97,10 @@ impl TestHarness {
         let mut cmd =
             Command::cargo_bin("vector").map_err(|e| format!("Failed to get cargo bin: {e}"))?;
 
-        cmd.arg("-c").arg(&config_path);
+        cmd.arg("-c")
+            .arg(&config_path)
+            .arg("--graceful-shutdown-limit-secs")
+            .arg("1");
 
         if watch_mode {
             cmd.arg("-w");

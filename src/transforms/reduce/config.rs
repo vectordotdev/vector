@@ -231,6 +231,55 @@ impl TransformConfig for ReduceConfig {
 
         vec![TransformOutput::new(DataType::Log, output_definitions)]
     }
+
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if self.ends_when.is_some() && self.starts_when.is_some() {
+            errors.push("only one of `ends_when` and `starts_when` can be provided".to_string());
+        }
+
+        for (path, _) in &self.merge_strategies {
+            match parse_target_path(path) {
+                Err(_) => errors.push(format!("Could not parse path: `{path}`")),
+                Ok(parsed) if parsed.path.segments.iter().any(|s| s.is_index()) => {
+                    errors.push(format!(
+                        "Merge strategies with indexes are currently not supported. Path: `{path}`"
+                    ));
+                }
+                Ok(_) => {}
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if let Some(Err(e)) = self
+            .ends_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("ends_when: {e}"));
+        }
+        if let Some(Err(e)) = self
+            .starts_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("starts_when: {e}"));
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 #[cfg(test)]

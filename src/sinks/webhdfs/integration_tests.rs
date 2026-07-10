@@ -67,7 +67,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 

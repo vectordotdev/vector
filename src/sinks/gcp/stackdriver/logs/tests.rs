@@ -162,10 +162,10 @@ fn encode_inserts_timestamp() {
     );
 
     let mut log = LogEvent::default();
-    log.insert("message", Value::Bytes("hello world".into()));
-    log.insert("anumber", Value::Bytes("100".into()));
+    log.insert(event_path!("message"), Value::Bytes("hello world".into()));
+    log.insert(event_path!("anumber"), Value::Bytes("100".into()));
     log.insert(
-        "timestamp",
+        event_path!("timestamp"),
         Value::Timestamp(
             Utc.with_ymd_and_hms(2020, 1, 1, 12, 30, 0)
                 .single()
@@ -317,11 +317,12 @@ async fn correct_request() {
 
 #[tokio::test]
 async fn fails_missing_creds() {
-    let config: StackdriverConfig = toml::from_str(indoc! {r#"
-            project_id = "project"
-            log_id = "testlogs"
-            resource.type = "generic_node"
-            resource.namespace = "office"
+    let config: StackdriverConfig = serde_yaml::from_str(indoc! {r#"
+            project_id: project
+            log_id: testlogs
+            resource:
+              type: generic_node
+              namespace: office
         "#})
     .unwrap();
     if config.build(SinkContext::default()).await.is_ok() {
@@ -331,19 +332,21 @@ async fn fails_missing_creds() {
 
 #[test]
 fn fails_invalid_log_names() {
-    toml::from_str::<StackdriverConfig>(indoc! {r#"
-            log_id = "testlogs"
-            resource.type = "generic_node"
-            resource.namespace = "office"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+            log_id: testlogs
+            resource:
+              type: generic_node
+              namespace: office
         "#})
     .expect_err("Config parsing failed to error with missing ids");
 
-    toml::from_str::<StackdriverConfig>(indoc! {r#"
-            project_id = "project"
-            folder_id = "folder"
-            log_id = "testlogs"
-            resource.type = "generic_node"
-            resource.namespace = "office"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+            project_id: project
+            folder_id: folder
+            log_id: testlogs
+            resource:
+              type: generic_node
+              namespace: office
         "#})
     .expect_err("Config parsing failed to error with extraneous ids");
 }

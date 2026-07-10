@@ -148,7 +148,7 @@ where
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        let checkpoint_task_handle = tokio::spawn(checkpoint_writer(
+        let checkpoint_task_handle = vector_common::spawn_in_current_span(checkpoint_writer(
             checkpointer,
             self.glob_minimum_cooldown,
             shutdown_checkpointer,

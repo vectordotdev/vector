@@ -7,8 +7,28 @@ use std::{
     time::Duration,
 };
 
+use super::S3SinkConfig;
 #[cfg(feature = "codecs-parquet")]
 use super::config::S3BatchEncoding;
+use crate::{
+    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
+    common::s3::S3ClientBuilder,
+    config::{Config, SinkContext},
+    sinks::{
+        aws_s3::config::default_filename_time_format,
+        s3_common::config::{S3Options, S3ServerSideEncryption},
+        util::{BatchConfig, Compression, TowerRequestConfig},
+    },
+    test_util::{
+        self,
+        components::{
+            AWS_SINK_TAGS, COMPONENT_ERROR_TAGS, run_and_assert_sink_compliance,
+            run_and_assert_sink_error,
+        },
+        mock::basic_source,
+        random_lines_with_stream, random_string, start_topology,
+    },
+};
 use aws_sdk_s3::{
     Client as S3Client,
     operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
@@ -29,27 +49,6 @@ use vector_lib::{
     codecs::{TextSerializerConfig, encoding::FramingConfig},
     config::{ComponentKey, proxy::ProxyConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
-};
-
-use super::S3SinkConfig;
-use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
-    common::s3::S3ClientBuilder,
-    config::{Config, SinkContext},
-    sinks::{
-        aws_s3::config::default_filename_time_format,
-        s3_common::config::{S3Options, S3ServerSideEncryption},
-        util::{BatchConfig, Compression, TowerRequestConfig},
-    },
-    test_util::{
-        self,
-        components::{
-            AWS_SINK_TAGS, COMPONENT_ERROR_TAGS, run_and_assert_sink_compliance,
-            run_and_assert_sink_error,
-        },
-        mock::basic_source,
-        random_lines_with_stream, random_string, start_topology,
-    },
 };
 
 fn s3_address() -> String {
@@ -199,7 +198,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 
@@ -453,7 +452,7 @@ async fn s3_flush_on_exhaustion() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 
@@ -490,6 +489,7 @@ async fn s3_parquet_insert_message() {
     use vector_lib::codecs::encoding::format::{
         ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
     };
+    use vrl::event_path;
 
     let cx = SinkContext::default();
     let bucket = uuid::Uuid::new_v4().to_string();
@@ -514,7 +514,7 @@ async fn s3_parquet_insert_message() {
     let events: Vec<Event> = (0..10)
         .map(|i| {
             let mut log = LogEvent::from(format!("message_{}", i));
-            log.insert("host", format!("host_{}", i % 3));
+            log.insert(event_path!("host"), format!("host_{}", i % 3));
             Event::from(log).with_batch_notifier(&batch_notifier)
         })
         .collect();

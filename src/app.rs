@@ -205,6 +205,11 @@ impl Application {
     ) -> Result<(Runtime, Self), ExitCode> {
         opts.root.init_global();
 
+        #[cfg(feature = "sources-utils-http-encoding")]
+        crate::sources::util::http::set_max_decompressed_size_bytes(
+            opts.root.max_decompressed_size_bytes,
+        );
+
         let color = opts.root.color.use_color();
 
         init_logging(
@@ -212,7 +217,13 @@ impl Application {
             opts.root.log_format,
             opts.log_level(),
             opts.root.internal_log_rate_limit,
+            opts.root.internal_logs_source_rate_limit,
         );
+
+        #[cfg(unix)]
+        if opts.root.raise_fd_limit {
+            crate::cli::raise_file_descriptor_limit();
+        }
 
         // Set global color preference for downstream modules
         crate::set_global_color(color);
@@ -224,7 +235,11 @@ impl Application {
             );
         }
 
-        let runtime = build_runtime(opts.root.threads, "vector-worker")?;
+        let runtime = build_runtime(
+            opts.root.threads,
+            opts.root.chunk_size_events,
+            "vector-worker",
+        )?;
 
         // Signal handler for OS and provider messages.
         let mut signals = SignalPair::new(&runtime);
@@ -536,7 +551,11 @@ fn get_log_levels(default: &str) -> String {
         .unwrap_or_else(|_| default.into())
 }
 
-pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
+pub fn build_runtime(
+    threads: Option<usize>,
+    chunk_size_events: Option<NonZeroUsize>,
+    thread_name: &str,
+) -> Result<Runtime, ExitCode> {
     let mut rt_builder = runtime::Builder::new_multi_thread();
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
@@ -551,7 +570,32 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    debug!(message = "Building runtime.", worker_threads = threads);
+    let chunk_size_events = chunk_size_events
+        .map(NonZeroUsize::get)
+        .unwrap_or(vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS);
+
+    let Some(source_sender_buffer_size) = threads.checked_mul(chunk_size_events) else {
+        error!(
+            "The `chunk_size_events` argument is too large for the configured number of threads."
+        );
+        return Err(exitcode::CONFIG);
+    };
+    let Some(ready_array_capacity) =
+        chunk_size_events.checked_mul(crate::topology::builder::READY_ARRAY_CAPACITY_CHUNKS)
+    else {
+        error!("The `chunk_size_events` argument is too large.");
+        return Err(exitcode::CONFIG);
+    };
+
+    vector_lib::source_sender::set_chunk_size_events(chunk_size_events);
+    crate::topology::builder::set_source_sender_buffer_size(source_sender_buffer_size);
+    crate::topology::builder::set_ready_array_capacity(ready_array_capacity);
+
+    debug!(
+        message = "Building runtime.",
+        worker_threads = threads,
+        chunk_size_events
+    );
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
@@ -611,11 +655,19 @@ pub async fn load_configs(
         for (name, table) in config.enrichment_tables() {
             let files = table.inner.files_to_watch();
             let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
+                files.clone().into_iter().cloned().collect(),
                 name.clone(),
                 ComponentType::EnrichmentTable,
             );
             watched_component_paths.push(component_config);
+            if table.as_sink(name).is_some() {
+                let sink_component_config = ComponentConfig::new(
+                    files.into_iter().cloned().collect(),
+                    name.clone(),
+                    ComponentType::Sink,
+                );
+                watched_component_paths.push(sink_component_config);
+            }
         }
 
         info!(
@@ -653,19 +705,33 @@ pub async fn load_configs(
     Ok(config)
 }
 
-pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {
+pub fn init_logging(
+    color: bool,
+    format: LogFormat,
+    log_level: &str,
+    internal_log_rate_limit_secs: u64,
+    internal_logs_source_rate_limit_secs: Option<NonZeroU64>,
+) {
     let level = get_log_levels(log_level);
     let json = match format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
 
-    trace::init(color, json, &level, rate);
+    trace::init(
+        color,
+        json,
+        &level,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs,
+    );
     debug!(
         message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs =
+            internal_logs_source_rate_limit_secs.map(NonZeroU64::get),
     );
-    info!(message = "Log level is enabled.", level = ?level);
+    info!(message = "Log level is enabled.", ?level);
 }
 
 pub fn watcher_config(

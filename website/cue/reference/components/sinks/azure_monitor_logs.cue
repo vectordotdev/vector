@@ -4,7 +4,6 @@ components: sinks: azure_monitor_logs: {
 	title: "Azure Monitor Logs"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "deprecated"
 		egress_method: "batch"

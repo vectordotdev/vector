@@ -837,6 +837,7 @@ mod tests {
     };
     use tokio_util::codec::Decoder;
     use vector_lib::{assert_event_data_eq, lookup::OwnedTargetPath, schema::Definition};
+    use vrl::event_path;
     use vrl::value::{ObjectMap, Value, kind::Collection};
 
     use super::{message::FluentMessageOptions, *};
@@ -1125,10 +1126,16 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
-        assert_eq!(log.get("field").unwrap(), &msg.into());
-        assert!(matches!(log.get("host").unwrap(), Value::Bytes(_)));
-        assert!(matches!(log.get("timestamp").unwrap(), Value::Timestamp(_)));
-        assert_eq!(log.get("tag").unwrap(), &tag.into());
+        assert_eq!(log.get(event_path!("field")).unwrap(), &msg.into());
+        assert!(matches!(
+            log.get(event_path!("host")).unwrap(),
+            Value::Bytes(_)
+        ));
+        assert!(matches!(
+            log.get(event_path!("timestamp")).unwrap(),
+            Value::Timestamp(_)
+        ));
+        assert_eq!(log.get(event_path!("tag")).unwrap(), &tag.into());
 
         (result, output.into())
     }
@@ -1257,6 +1264,7 @@ mod integration_tests {
     use futures::Stream;
     use tokio::time::sleep;
     use vector_lib::event::{Event, EventStatus};
+    use vrl::event_path;
 
     use crate::{
         SourceSender,
@@ -1349,8 +1357,8 @@ mod integration_tests {
             let log = events[0].as_log();
             assert_eq!(log["tag"], "http.0".into());
             assert_eq!(log["message"], msg.into());
-            assert!(log.get("timestamp").is_some());
-            assert!(log.get("host").is_some());
+            assert!(log.get(event_path!("timestamp")).is_some());
+            assert!(log.get(event_path!("host")).is_some());
         })
         .await;
     }
@@ -1428,8 +1436,8 @@ mod integration_tests {
             assert_eq!(events.len(), 1);
             assert_eq!(events[0].as_log()["tag"], "".into());
             assert_eq!(events[0].as_log()["message"], msg.into());
-            assert!(events[0].as_log().get("timestamp").is_some());
-            assert!(events[0].as_log().get("host").is_some());
+            assert!(events[0].as_log().get(event_path!("timestamp")).is_some());
+            assert!(events[0].as_log().get(event_path!("host")).is_some());
         })
         .await;
     }

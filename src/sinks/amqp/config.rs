@@ -164,6 +164,7 @@ pub(super) async fn healthcheck(channels: AmqpSinkChannels) -> crate::Result<()>
 mod tests {
     use super::*;
     use crate::config::format::{Format, deserialize};
+    use vrl::event_path;
 
     #[test]
     pub fn generate_config() {
@@ -276,7 +277,7 @@ mod tests {
             let config: AmqpSinkConfig = deserialize(config, format).unwrap();
             let event = {
                 let mut event = LogEvent::from_str_legacy("message");
-                event.insert("priority", 2);
+                event.insert(event_path!("priority"), 2);
                 event
             };
             assert_config_priority_eq(config, &event, 2);
