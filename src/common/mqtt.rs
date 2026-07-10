@@ -109,6 +109,11 @@ pub enum ConfigurationError {
         "A stable `client_id` must be set when `acknowledgements` are enabled, so the MQTT session and its unacknowledged messages can be resumed after a restart."
     ))]
     AcknowledgementsRequireClientId,
+    /// Acknowledgements enabled with keep-alive disabled
+    #[snafu(display(
+        "`keep_alive` must be at least 1 second when `acknowledgements` are enabled: with keep-alive disabled, a silently dead connection is never detected on a quiet topic, and unacknowledged messages would never be redelivered."
+    ))]
+    AcknowledgementsRequireKeepAlive,
 }
 
 #[derive(Clone)]

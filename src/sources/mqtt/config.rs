@@ -135,6 +135,15 @@ impl MqttSourceConfig {
                 .context(ConfigurationSnafu);
         }
 
+        // The ack machinery's liveness (detecting dead connections so unacked
+        // messages get redelivered, and its retry timers making progress on a
+        // quiet topic) depends on keep-alive traffic; `keep_alive = 0`
+        // disables it entirely in rumqttc.
+        if acknowledgements && self.common.keep_alive == 0 {
+            return Err(ConfigurationError::AcknowledgementsRequireKeepAlive)
+                .context(ConfigurationSnafu);
+        }
+
         let client_id = self.common.client_id.clone().unwrap_or_else(|| {
             let hash = rand::rng()
                 .sample_iter(&rand_distr::Alphanumeric)
@@ -232,5 +241,23 @@ mod test {
             ..Default::default()
         };
         assert!(with_client_id.build_connector(true).is_ok());
+    }
+
+    // With keep-alive disabled a silently dead connection is never detected
+    // on a quiet topic, so unacknowledged messages would never be redelivered
+    // and the ack machinery's retry timers would never make progress.
+    #[test]
+    fn acknowledgements_require_keep_alive() {
+        let config = MqttSourceConfig {
+            common: MqttCommonConfig {
+                client_id: Some("stable-id".to_owned()),
+                keep_alive: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(config.build_connector(true).is_err());
+        // Without acknowledgements, disabling keep-alive stays allowed.
+        assert!(config.build_connector(false).is_ok());
     }
 }
