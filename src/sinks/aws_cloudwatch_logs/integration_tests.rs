@@ -7,6 +7,7 @@ use chrono::Duration;
 use futures::{StreamExt, stream};
 use similar_asserts::assert_eq;
 use vector_lib::{codecs::TextSerializerConfig, lookup};
+use vrl::event_path;
 
 use super::*;
 use crate::{
@@ -485,7 +486,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .map(|(i, e)| {
             let mut event = LogEvent::from(e);
             let stream = (i % 2).to_string();
-            event.insert("key", stream);
+            event.insert(event_path!("key"), stream);
             Event::Log(event)
         })
         .collect::<Vec<_>>();

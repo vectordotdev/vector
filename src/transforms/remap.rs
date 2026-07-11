@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
@@ -277,6 +280,16 @@ impl TransformConfig for RemapConfig {
         Ok(transform)
     }
 
+    fn validate_env(&self, context: &TransformContext) -> std::result::Result<(), Vec<String>> {
+        self.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
+            context.merged_schema_definition.clone(),
+        )
+        .map(|_| ())
+        .map_err(|e| vec![e.to_string()])
+    }
+
     fn input(&self) -> Input {
         Input::all()
     }
@@ -321,7 +334,7 @@ impl TransformConfig for RemapConfig {
                         // Attempt to copy over the meanings from the input definition.
                         // The function will fail if the meaning that now points to a field that no longer exists,
                         // this is fine since we will no longer want that meaning in the output definition.
-                        let _ = new_type_def.try_with_meaning(path.clone(), id);
+                        new_type_def.try_with_meaning(path.clone(), id).ok();
                     }
 
                     // Apply any semantic meanings set in the VRL program
@@ -765,7 +778,7 @@ mod tests {
     fn get_field_string(event: &Event, field: &str) -> String {
         event
             .as_log()
-            .get(field)
+            .get(&vrl::path::parse_target_path(field).unwrap())
             .unwrap()
             .to_string_lossy()
             .into_owned()
@@ -785,7 +798,7 @@ mod tests {
 
         let event1 = {
             let mut event1 = LogEvent::from("event1");
-            event1.insert("sentinel", "bar");
+            event1.insert(vrl::event_path!("sentinel"), "bar");
             Event::from(event1)
         };
         let result1 = transform_one(&mut tform, event1).unwrap();
@@ -799,7 +812,7 @@ mod tests {
         };
         let result2 = transform_one(&mut tform, event2).unwrap();
         assert_eq!(get_field_string(&result2, "message"), "event2");
-        assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
+        assert_eq!(result2.as_log().get(event_path!("foo")), Some(&Value::Null));
         assert!(tform.runner().runtime.is_empty());
     }
 
@@ -816,7 +829,7 @@ mod tests {
                 .insert(&owned_value_path!("vector"), BTreeMap::new());
 
             let mut event = LogEvent::new_with_metadata(metadata);
-            event.insert("copy_from", "buz");
+            event.insert(event_path!("copy_from"), "buz");
             Event::from(event)
         };
 
@@ -849,7 +862,7 @@ mod tests {
     fn check_remap_adds() {
         let event = {
             let mut event = LogEvent::from("augment me");
-            event.insert("copy_from", "buz");
+            event.insert(event_path!("copy_from"), "buz");
             Event::from(event)
         };
 
@@ -880,7 +893,7 @@ mod tests {
         let event = {
             let mut event = LogEvent::from("augment me");
             event.insert(
-                "events",
+                event_path!("events"),
                 vec![btreemap!("message" => "foo"), btreemap!("message" => "bar")],
             );
             Event::from(event)
@@ -914,7 +927,7 @@ mod tests {
     fn check_remap_error() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -933,16 +946,19 @@ mod tests {
 
         let event = transform_one(&mut tform, event).unwrap();
 
-        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
-        assert!(event.as_log().get("foo").is_none());
-        assert!(event.as_log().get("baz").is_none());
+        assert_eq!(
+            event.as_log().get(event_path!("bar")),
+            Some(&Value::from("is a string"))
+        );
+        assert!(event.as_log().get(event_path!("foo")).is_none());
+        assert!(event.as_log().get(event_path!("baz")).is_none());
     }
 
     #[test]
     fn check_remap_error_drop() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -966,7 +982,7 @@ mod tests {
     fn check_remap_error_infallible() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -984,16 +1000,25 @@ mod tests {
 
         let event = transform_one(&mut tform, event).unwrap();
 
-        assert_eq!(event.as_log().get("foo"), Some(&Value::from("foo")));
-        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
-        assert_eq!(event.as_log().get("baz"), Some(&Value::from(12)));
+        assert_eq!(
+            event.as_log().get(event_path!("foo")),
+            Some(&Value::from("foo"))
+        );
+        assert_eq!(
+            event.as_log().get(event_path!("bar")),
+            Some(&Value::from("is a string"))
+        );
+        assert_eq!(
+            event.as_log().get(event_path!("baz")),
+            Some(&Value::from(12))
+        );
     }
 
     #[test]
     fn check_remap_abort() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -1012,16 +1037,19 @@ mod tests {
 
         let event = transform_one(&mut tform, event).unwrap();
 
-        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
-        assert!(event.as_log().get("foo").is_none());
-        assert!(event.as_log().get("baz").is_none());
+        assert_eq!(
+            event.as_log().get(event_path!("bar")),
+            Some(&Value::from("is a string"))
+        );
+        assert!(event.as_log().get(event_path!("foo")).is_none());
+        assert!(event.as_log().get(event_path!("baz")).is_none());
     }
 
     #[test]
     fn check_remap_abort_drop() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -1543,27 +1571,25 @@ mod tests {
     async fn check_remap_branching_metrics_with_output() {
         init_test();
 
-        let config: ConfigBuilder = toml::from_str(indoc! {r#"
-            [transforms.foo]
-            inputs = []
-            type = "remap"
-            drop_on_abort = true
-            reroute_dropped = true
-            source = "abort"
-
-            [[tests]]
-            name = "metric output"
-
-            [tests.input]
-                insert_at = "foo"
-                value = "none"
-
-            [[tests.outputs]]
-                extract_from = "foo.dropped"
-                [[tests.outputs.conditions]]
-                type = "vrl"
-                source = "true"
-        "#})
+        let config: ConfigBuilder = serde_yaml::from_str(indoc! {"
+            transforms:
+              foo:
+                inputs: []
+                type: remap
+                drop_on_abort: true
+                reroute_dropped: true
+                source: abort
+            tests:
+              - name: metric output
+                input:
+                  insert_at: foo
+                  value: none
+                outputs:
+                  - extract_from: foo.dropped
+                    conditions:
+                      - type: vrl
+                        source: \"true\"
+        "})
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1959,7 +1985,7 @@ mod tests {
             event
                 .metadata_mut()
                 .value_mut()
-                .insert("vector", BTreeMap::new());
+                .insert(vrl::path!("vector"), BTreeMap::new());
             Event::from(event)
         };
 
@@ -1978,7 +2004,7 @@ mod tests {
         let result = transform_one(&mut tform, event).unwrap();
 
         // Legacy namespace nests this under "message", Vector should set it as the root
-        assert_eq!(result.as_log().get("."), Some(&Value::Null));
+        assert_eq!(result.as_log().get(event_path!()), Some(&Value::Null));
 
         let outputs1 = conf.outputs(
             &Default::default(),

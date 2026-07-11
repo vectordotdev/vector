@@ -14,6 +14,7 @@ Table of Contents:
 - [Running Tests](#running-tests)
   - [Running Integration tests](#running-integration-tests)
 - [Developing vdev](#developing-vdev)
+- [Releasing vdev](#releasing-vdev)
 
 ## Pre-requisites
 
@@ -80,3 +81,7 @@ cargo install -f --path vdev
 The CLI uses [Clap](https://github.com/clap-rs/clap) with the `derive` construction mechanism and is stored in the [commands](src/commands) directory.
 
 Every command group/namespace has its own directory with a `cli` module, including the root `vdev` command group. All commands have an `exec` method that provides the actual implementation, which in the case of command groups will be calling sub-commands.
+
+## Releasing vdev
+
+To release a new version of vdev, open a PR that bumps the `version` field in `vdev/Cargo.toml`. When the PR merges to `master`, CI automatically creates the `vdev-vX.Y.Z` tag, which triggers the publish workflow to build the binaries and publish the crate to crates.io.

@@ -88,6 +88,7 @@ impl Deserializer for BytesDeserializer {
 
 #[cfg(test)]
 mod tests {
+    use vrl::event_path;
     use vrl::value::Value;
 
     use super::*;
@@ -117,6 +118,9 @@ mod tests {
         let events = deserializer.parse(input, LogNamespace::Vector).unwrap();
         assert_eq!(events.len(), 1);
 
-        assert_eq!(events[0].as_log().get(".").unwrap(), &Value::from("foo"));
+        assert_eq!(
+            events[0].as_log().get(event_path!()).unwrap(),
+            &Value::from("foo")
+        );
     }
 }

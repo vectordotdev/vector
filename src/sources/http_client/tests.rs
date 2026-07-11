@@ -10,6 +10,7 @@ use vector_lib::{
     config::LogNamespace,
     event::Event,
 };
+use vrl::event_path;
 use warp::{Filter, http::HeaderMap};
 
 use super::HttpClientConfig;
@@ -226,7 +227,9 @@ async fn request_query_applied() {
     ]);
 
     for log in logs {
-        let query = log.get("data").expect("data must be available");
+        let query = log
+            .get(event_path!("data"))
+            .expect("data must be available");
         let mut got: HashMap<String, Vec<String>> = HashMap::new();
         for (k, v) in
             url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
@@ -356,7 +359,9 @@ async fn request_query_vrl_applied() {
     }
 
     for log in logs {
-        let query = log.get("data").expect("data must be available");
+        let query = log
+            .get(event_path!("data"))
+            .expect("data must be available");
         let mut got: HashMap<String, Vec<String>> = HashMap::new();
         for (k, v) in
             url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
@@ -417,7 +422,9 @@ async fn request_query_vrl_dynamic_updates() {
 
     let mut timestamps = Vec::new();
     for log in logs {
-        let query = log.get("data").expect("data must be available");
+        let query = log
+            .get(event_path!("data"))
+            .expect("data must be available");
         let query_bytes = query.as_bytes().expect("byte conversion should succeed");
 
         // Parse the timestamp value
@@ -545,8 +552,11 @@ async fn post_with_body() {
 
     // Verify the body was echoed back correctly
     for log in logs {
-        assert_eq!(log.get("key").unwrap().as_str().unwrap(), "value");
-        let number = log.get("number").unwrap();
+        assert_eq!(
+            log.get(event_path!("key")).unwrap().as_str().unwrap(),
+            "value"
+        );
+        let number = log.get(event_path!("number")).unwrap();
         match number {
             vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
             _ => panic!("Expected integer value"),
@@ -653,8 +663,11 @@ async fn post_with_vrl_body() {
 
     // Verify VRL was evaluated correctly
     for log in logs {
-        assert_eq!(log.get("message").unwrap().as_str().unwrap(), "HELLO");
-        let value = log.get("value").unwrap();
+        assert_eq!(
+            log.get(event_path!("message")).unwrap().as_str().unwrap(),
+            "HELLO"
+        );
+        let value = log.get(event_path!("value")).unwrap();
         match value {
             vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
             _ => panic!("Expected integer value"),

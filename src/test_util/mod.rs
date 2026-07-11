@@ -88,7 +88,7 @@ macro_rules! log_event {
             let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
             let log = event.as_mut_log();
             $(
-                log.insert($key, $value);
+                log.insert(::vrl::event_path!($key), $value);
             )*
             event
         }

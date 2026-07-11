@@ -106,6 +106,24 @@ impl TransformConfig for DelayConfig {
             clone_input_definitions(input_definitions),
         )]
     }
+
+    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+        if self.delay_ms.as_millis() == 0 {
+            Err(vec!["delay must not be zero".to_string()])
+        } else {
+            Ok(())
+        }
+    }
+
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        self.condition
+            .as_ref()
+            .map(|c| {
+                c.validate(&context.enrichment_tables, &context.metrics_storage)
+                    .map_err(|e| vec![format!("condition: {e}")])
+            })
+            .unwrap_or(Ok(()))
+    }
 }
 
 pub struct Delay {
@@ -243,8 +261,8 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events() {
-        let config = toml::from_str::<DelayConfig>(indoc! {"
-            delay_ms = 200
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
         "})
         .unwrap();
 
@@ -271,11 +289,11 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events_at_capacity_drop_newest() {
-        let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_ms = 200
-            queue_capacity = 1
-            overflow_strategy = "drop_newest"
-        "#})
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
+            queue_capacity: 1
+            overflow_strategy: drop_newest
+        "})
         .unwrap();
 
         let delay =
@@ -306,11 +324,11 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events_at_capacity_pass() {
-        let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_ms = 200
-            queue_capacity = 1
-            overflow_strategy = "forward"
-        "#})
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
+            queue_capacity: 1
+            overflow_strategy: forward
+        "})
         .unwrap();
 
         let delay =

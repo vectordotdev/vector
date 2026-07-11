@@ -1309,13 +1309,15 @@ impl KafkaSourceContext {
             return;
         }
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsAssigned(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsAssigned(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             // no-op: wait for partition assignment handler to complete
@@ -1329,13 +1331,15 @@ impl KafkaSourceContext {
     /// sender is dropped by the callback handler.
     fn revoke_partitions(&self, tpl: &TopicPartitionList) {
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsRevoked(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsRevoked(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             self.commit_consumer_state();
@@ -1717,8 +1721,8 @@ mod integration_test {
                     now.trunc_subsecs(3).into()
                 );
                 assert_eq!(event.as_log()["topic"], topic.clone().into());
-                assert!(event.as_log().contains("partition"));
-                assert!(event.as_log().contains("offset"));
+                assert!(event.as_log().contains(event_path!("partition")));
+                assert!(event.as_log().contains(event_path!("offset")));
                 let mut expected_headers = ObjectMap::new();
                 expected_headers.insert(HEADER_KEY.into(), Value::from(HEADER_VALUE));
                 assert_eq!(event.as_log()["headers"], Value::from(expected_headers));

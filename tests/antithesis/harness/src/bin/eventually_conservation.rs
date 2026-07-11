@@ -226,7 +226,14 @@ async fn main() {
     // post retry until one sticks, since a node can briefly refuse a write while it is
     // still recovering. A wedged node never delivers it and fails here. Runs
     // unconditionally.
-    let deadline = time::Instant::now() + time::Duration::from_secs(45);
+    //
+    // The recovery gate above only proves the metrics endpoint answers. That is a
+    // separate listener from the source's data path, so the source and sink can still
+    // be unready while metrics already serve, and a just-restarted node needs time to
+    // bring them up. The round-trip is therefore the real readiness signal and gets the
+    // same budget as recovery rather than a tight window that expires before the data
+    // path is serving.
+    let deadline = time::Instant::now() + time::Duration::from_secs(180);
     let mut probe = None;
     let mut progressed = false;
     while !progressed && time::Instant::now() < deadline {

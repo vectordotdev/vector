@@ -237,7 +237,7 @@ runs:
     - name: Install libsasl2
       if: ${{ inputs.libsasl2 == 'true' }}
       shell: bash
-      run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      run: timeout 30m sudo apt-get update && timeout 30m sudo apt-get install -y libsasl2-dev
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries

@@ -1,0 +1,3 @@
+The `vector` sink now supports optional HTTP/2 keepalive on its pooled gRPC connections, configured via a new `keepalive` block (`interval_secs` and `timeout_secs`). When enabled, the sink periodically sends HTTP/2 PING frames so that a connection to a downstream Vector instance that has gone away is detected and evicted rather than reused indefinitely (which could otherwise stall delivery until the connection was replaced). Keepalive is disabled by default; when enabled, `interval_secs` defaults to 60 (aligned with gRPC keepalive guidance to avoid tripping `too_many_pings` policies) and `timeout_secs` defaults to 20. PINGs are sent on idle connections so an idle-but-dead connection is still detected.
+
+authors: graphcareful

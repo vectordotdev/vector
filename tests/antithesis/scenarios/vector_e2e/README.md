@@ -26,9 +26,7 @@ One Vector node and one oracle container.
 
 - **vector** takes an `http_server` source (`:8080`) and delivers over `http` to
   the oracle through an in-memory buffer with `when_full: block` and e2e acks. It
-  also exposes Prometheus metrics (`:9598`) for the health gate, and runs the
-  reload fault: an `anytime_` command swaps `vector.yaml`/`vector.b.yaml` and sends
-  `SIGHUP`, forcing the sink to rebuild mid-run.
+  also exposes Prometheus metrics (`:9598`) for the health gate.
 - **oracle** (`:8686`) is one container that injects unique event ids at the node
   and runs the HTTP endpoint the node's sink delivers back to.
 
