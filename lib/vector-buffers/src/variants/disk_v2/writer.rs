@@ -1186,6 +1186,45 @@ where
         Ok(())
     }
 
+    /// Moves the writer to an empty reader checkpoint when recovery proves the reader is one file
+    /// ahead and no unread bytes remain in the checkpoint window.
+    ///
+    /// The same file-ID relationship can represent a completely full wrapped window, so the zero
+    /// unread-byte check is required before treating it as the reader-ahead recovery state.
+    pub(super) async fn align_with_reader_ahead_checkpoint(
+        &mut self,
+        unread_buffer_size: u64,
+    ) -> Result<bool, WriterError<T>> {
+        let reader_file_id = self.ledger.get_current_reader_file_id();
+        let writer_file_id = self.ledger.get_current_writer_file_id();
+        if unread_buffer_size != 0 || reader_file_id != self.ledger.get_next_writer_file_id() {
+            return Ok(false);
+        }
+
+        let reader_data_file_path = self.ledger.get_current_reader_data_file_path();
+        let reader_data_file = self
+            .ledger
+            .filesystem()
+            .open_file_writable(&reader_data_file_path)
+            .await
+            .context(IoSnafu)?;
+        reader_data_file.truncate(0).await.context(IoSnafu)?;
+        reader_data_file.sync_all().await.context(IoSnafu)?;
+        drop(reader_data_file);
+
+        self.reset();
+        self.mark_for_skip();
+        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.ledger.flush().context(IoSnafu)?;
+
+        debug!(
+            previous_writer_file_id = writer_file_id,
+            reader_file_id, "Advanced writer to empty reader-ahead checkpoint."
+        );
+
+        Ok(true)
+    }
+
     fn is_buffer_full(&self) -> bool {
         let total_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes;
         let max_buffer_size = self.config.max_buffer_size;
@@ -1268,10 +1307,16 @@ where
             // read yet.
             //
             // In order to handle this situation, we loop here, trying to create the file.  Readers
-            // are responsible deleting a file once they have read it entirely, so our first loop
-            // iteration is the happy path, trying to create the new file.  If we can't create it,
+            // logically complete files once they have read and acknowledged them, and cleanup then
+            // deletes stale files in the background. Our first loop iteration is the happy path,
+            // trying to create the new file. If we can't create it,
             // this may be because it already exists and we're just picking up where we left off
             // from last time, but it could also be a data file that a reader hasn't completed yet.
+            let cleanup_guard = if should_open_next {
+                Some(self.ledger.lock_data_file_cleanup().await)
+            } else {
+                None
+            };
             let data_file_path = if should_open_next {
                 self.ledger.get_next_writer_data_file_path()
             } else {
@@ -1375,7 +1420,11 @@ where
             }
 
             // The file is still present and waiting for a reader to finish reading it in order
-            // to delete it.  Wait until the reader signals progress and try again.
+            // for cleanup to delete it. Release the cleanup guard first so the background cleaner
+            // can make that progress.
+            drop(cleanup_guard);
+
+            // Wait until the reader signals progress and try again.
             debug!("Target data file is still present and not yet processed. Waiting for reader.");
             self.ledger.wait_for_reader().await;
         }

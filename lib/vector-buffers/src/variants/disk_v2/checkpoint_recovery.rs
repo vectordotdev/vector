@@ -14,7 +14,7 @@ use tracing::{debug, error, warn};
 
 use super::{
     Filesystem,
-    common::DataFileIdRangeInclusive,
+    common::{MAX_FILE_ID, data_file_id_in_range, parse_data_file_id},
     io::AsyncFile,
     reader::{BufferReader, ReadToken, ReaderError, RecordReader, decode_record_payload},
     record::{RecordStatus, try_as_record_archive, validate_record_archive},
@@ -24,9 +24,30 @@ use crate::Bufferable;
 struct CheckpointRecord {
     id: u64,
     bytes: u64,
-    events: u64,
-    next_id: u64,
-    last_id: u64,
+    events: Option<u64>,
+    next_id: Option<u64>,
+    last_id: Option<u64>,
+}
+
+impl CheckpointRecord {
+    /// Preserves the validated record span when its payload cannot provide event-count metadata.
+    fn undecodable(id: u64, bytes: u64) -> Self {
+        Self {
+            id,
+            bytes,
+            events: None,
+            next_id: None,
+            last_id: None,
+        }
+    }
+
+    /// Returns the last record ID covered by the reader checkpoint classification.
+    fn checkpoint_last_id(&self) -> u64 {
+        // Reader checkpoints advance only after an entire record is acknowledged. If the payload
+        // cannot provide its event count, its starting ID is therefore enough to classify its
+        // validated byte span as either acknowledged or unread.
+        self.last_id.unwrap_or(self.id)
+    }
 }
 
 #[derive(Default)]
@@ -76,17 +97,28 @@ where
         let writer_file_id = self.ledger().get_current_writer_file_id();
         let reader_last_record_id = self.ledger().state().get_last_reader_record_id();
         let writer_next_record_id = self.ledger().state().get_next_writer_record_id();
+        let checkpoint_data_file_ids = self
+            .checkpoint_data_file_ids(reader_file_id, writer_file_id)
+            .await?;
         // The ledger's reader file ID is only the durable file checkpoint. It can lag behind the
         // durable record checkpoint when the reader acknowledged records in later files but crashed
         // before flushing the advanced file ID, so re-evaluate the effective reader boundary from
         // `reader_last_record_id`.
         let effective_reader_file_id = self
-            .find_checkpoint_reader_file_id(reader_file_id, writer_file_id, reader_last_record_id)
+            .find_checkpoint_reader_file_id(
+                &checkpoint_data_file_ids,
+                reader_file_id,
+                writer_file_id,
+                reader_last_record_id,
+            )
             .await?;
         let mut unread_buffer_size = 0;
+        let effective_reader_position = checkpoint_data_file_ids
+            .iter()
+            .position(|&data_file_id| data_file_id == effective_reader_file_id)
+            .expect("effective reader file ID must be in the checkpoint window");
 
-        for data_file_id in DataFileIdRangeInclusive::new(effective_reader_file_id, writer_file_id)
-        {
+        for &data_file_id in &checkpoint_data_file_ids[effective_reader_position..] {
             let data_file_path = self.ledger().get_data_file_path(data_file_id);
             unread_buffer_size += if effective_reader_file_id == writer_file_id {
                 self.reconcile_checkpoint_reader_writer_boundary_data_file(
@@ -136,9 +168,48 @@ where
         Ok(unread_buffer_size)
     }
 
+    /// Lists the checkpoint-window files in reader-to-writer order.
+    ///
+    /// File IDs alone cannot distinguish a completely full, wrapped window from the temporary
+    /// state where the reader is exactly one file ahead of the writer after abandoning a bad file.
+    /// Iterating only IDs that exist avoids probing every possible file ID in the latter case while
+    /// retaining every file in a genuinely full window. The writer boundary is always included so
+    /// a missing boundary file still receives normal recovery handling.
+    async fn checkpoint_data_file_ids(
+        &self,
+        reader_file_id: u16,
+        writer_file_id: u16,
+    ) -> Result<Vec<u16>, ReaderError<T>> {
+        let mut data_file_ids = self
+            .ledger()
+            .filesystem()
+            .list_files(&self.ledger().config().data_dir)
+            .await
+            .map_err(|source| ReaderError::Io { source })?
+            .into_iter()
+            .filter_map(|data_file_path| parse_data_file_id(&data_file_path))
+            .filter(|&data_file_id| {
+                data_file_id_in_range(data_file_id, reader_file_id, writer_file_id)
+            })
+            .collect::<Vec<_>>();
+
+        data_file_ids.sort_unstable_by_key(|&data_file_id| {
+            let start = u32::from(reader_file_id);
+            (u32::from(data_file_id) + u32::from(MAX_FILE_ID) - start) % u32::from(MAX_FILE_ID)
+        });
+        data_file_ids.dedup();
+
+        if data_file_ids.last() != Some(&writer_file_id) {
+            data_file_ids.push(writer_file_id);
+        }
+
+        Ok(data_file_ids)
+    }
+
     /// Finds the first checkpointed file that may contain records the reader has not acknowledged.
     async fn find_checkpoint_reader_file_id(
         &self,
+        checkpoint_data_file_ids: &[u16],
         reader_file_id: u16,
         writer_file_id: u16,
         reader_last_record_id: u64,
@@ -147,7 +218,7 @@ where
         // record-level checkpoint when file completion was not flushed before shutdown. Walk from
         // the durable reader file toward the writer and stop at the first file that may still
         // contain unread data.
-        for data_file_id in DataFileIdRangeInclusive::new(reader_file_id, writer_file_id) {
+        for &data_file_id in checkpoint_data_file_ids {
             if data_file_id == writer_file_id {
                 // The writer file is the final file in the durable checkpoint window. Even if all
                 // of its records are already acknowledged, the caller must scan it as a boundary
@@ -317,10 +388,15 @@ where
             )
             .await?
         {
-            let record = Self::decode_checkpoint_record(&mut record_reader, token)?;
+            let record = Self::decode_checkpoint_record(
+                &mut record_reader,
+                token,
+                data_file_id,
+                data_file_path,
+            );
             scan_result.include_record(
                 &record,
-                record.last_id <= skip_through_record_id,
+                record.checkpoint_last_id() <= skip_through_record_id,
             );
         }
 
@@ -373,7 +449,12 @@ where
                 break;
             }
 
-            let record = Self::decode_checkpoint_record(&mut record_reader, token)?;
+            let record = Self::decode_checkpoint_record(
+                &mut record_reader,
+                token,
+                data_file_id,
+                data_file_path,
+            );
             if self
                 .truncate_if_checkpoint_crossing_record(
                     data_file_id,
@@ -441,7 +522,12 @@ where
                 break;
             }
 
-            let record = Self::decode_checkpoint_record(&mut record_reader, token)?;
+            let record = Self::decode_checkpoint_record(
+                &mut record_reader,
+                token,
+                data_file_id,
+                data_file_path,
+            );
             if self
                 .truncate_if_checkpoint_crossing_record(
                     data_file_id,
@@ -457,7 +543,7 @@ where
 
             scan_result.include_record(
                 &record,
-                record.last_id <= skip_through_record_id,
+                record.checkpoint_last_id() <= skip_through_record_id,
             );
         }
 
@@ -521,27 +607,54 @@ where
         }
     }
 
+    /// Extracts checkpoint metadata while retaining validated byte spans for undecodable payloads.
     fn decode_checkpoint_record(
         record_reader: &mut RecordReader<FS::File, T>,
         token: ReadToken,
-    ) -> Result<CheckpointRecord, ReaderError<T>> {
+        data_file_id: u16,
+        data_file_path: &Path,
+    ) -> CheckpointRecord {
         let id = token.record_id();
         let bytes = token.record_bytes() as u64;
-        let record = record_reader.read_record(token)?;
+        let record = match record_reader.read_record(token) {
+            Ok(record) => record,
+            Err(error) => {
+                warn!(
+                    data_file_id,
+                    data_file_path = data_file_path.to_string_lossy().as_ref(),
+                    record_id = id,
+                    record_bytes = bytes,
+                    %error,
+                    "Counting validated checkpoint record bytes despite undecodable payload."
+                );
+                return CheckpointRecord::undecodable(id, bytes);
+            }
+        };
         let events: u64 = record
             .event_count()
             .try_into()
             .expect("Event count for a record cannot exceed 2^64 events.");
+        if events == 0 {
+            warn!(
+                data_file_id,
+                data_file_path = data_file_path.to_string_lossy().as_ref(),
+                record_id = id,
+                record_bytes = bytes,
+                "Counting validated checkpoint record bytes despite empty payload."
+            );
+            return CheckpointRecord::undecodable(id, bytes);
+        }
+
         let next_id = id + events;
         let last_id = next_id - 1;
 
-        Ok(CheckpointRecord {
+        CheckpointRecord {
             id,
             bytes,
-            events,
-            next_id,
-            last_id,
-        })
+            events: Some(events),
+            next_id: Some(next_id),
+            last_id: Some(last_id),
+        }
     }
 
     /// Truncates before a record whose starting ID is outside the durable writer checkpoint.
@@ -580,7 +693,10 @@ where
         record: &CheckpointRecord,
         record_start_offset: u64,
     ) -> Result<bool, ReaderError<T>> {
-        if record.next_id <= stop_before_record_id {
+        let Some(next_id) = record.next_id else {
+            return Ok(false);
+        };
+        if next_id <= stop_before_record_id {
             return Ok(false);
         }
 
@@ -589,7 +705,9 @@ where
             data_file_path = data_file_path.to_string_lossy().as_ref(),
             stop_before_record_id,
             record_id = record.id,
-            record_events = record.events,
+            record_events = record
+                .events
+                .expect("a record with a next ID must have an event count"),
             truncate_at = record_start_offset,
             "Truncating data file at record that crosses durable writer checkpoint."
         );
@@ -639,9 +757,10 @@ mod tests {
     use crate::{
         Bufferable,
         buffer_usage_data::BufferUsageHandle,
-        test::{MultiEventRecord, SizedRecord, with_temp_dir},
+        test::{MultiEventRecord, SizedRecord, UndecodableRecord, with_temp_dir},
         variants::disk_v2::{
-            DiskBufferConfigBuilder, Ledger, ProductionFilesystem, writer::RecordWriter,
+            DiskBufferConfigBuilder, Ledger, ProductionFilesystem, common::MAX_FILE_ID,
+            writer::RecordWriter,
         },
     };
 
@@ -713,6 +832,7 @@ mod tests {
             while self.ledger.get_current_reader_file_id() != target_file_id {
                 self.ledger.increment_acked_reader_file_id();
             }
+            self.ledger.publish_cleanup_reader_file_id_for_test();
         }
 
         fn set_writer_file_id(&self, target_file_id: u16) {
@@ -830,6 +950,29 @@ mod tests {
             )
             .await
         }
+    }
+
+    #[tokio::test]
+    async fn same_file_window_counts_undecodable_record_bytes() {
+        with_temp_dir(|dir| {
+            let data_dir = dir.to_path_buf();
+
+            async move {
+                let fixture = RecoveryFixture::<UndecodableRecord>::new(&data_dir).await;
+                let record_bytes = fixture
+                    .write_record_values(0, [(1, UndecodableRecord)])
+                    .await;
+                fixture.set_checkpoint(0, 0, 0, 2);
+
+                assert_eq!(record_bytes[0], fixture.recover_unread_bytes().await);
+                assert_eq!(record_bytes[0], fixture.data_file_size(0).await);
+
+                fixture.set_checkpoint(0, 0, 1, 2);
+                assert_eq!(0, fixture.recover_unread_bytes().await);
+                assert_eq!(record_bytes[0], fixture.data_file_size(0).await);
+            }
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -973,6 +1116,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn full_wrapped_checkpoint_window_counts_every_data_file() {
+        with_temp_dir(|dir| {
+            let data_dir = dir.to_path_buf();
+
+            async move {
+                let fixture = RecoveryFixture::new(&data_dir).await;
+                let mut expected_unread_bytes = 0;
+                for data_file_id in 0..MAX_FILE_ID {
+                    let record_id = u64::from(data_file_id) + 1;
+                    expected_unread_bytes += fixture
+                        .write_sized_records(data_file_id, &[(record_id, 64)])
+                        .await[0];
+                }
+
+                // reader == next(writer) is ambiguous: unlike the empty reader-ahead recovery
+                // state, every file ID exists here and all of their records are unread.
+                fixture.set_checkpoint(0, MAX_FILE_ID - 1, 0, u64::from(MAX_FILE_ID) + 1);
+
+                assert_eq!(expected_unread_bytes, fixture.recover_unread_bytes().await);
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn missing_boundary_data_files_contribute_no_bytes() {
         with_temp_dir(|dir| {
             let data_dir = dir.to_path_buf();
@@ -1057,6 +1225,88 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stale_data_file_cleanup_deletes_files_outside_checkpoint_window() {
+        with_temp_dir(|dir| {
+            let data_dir = dir.to_path_buf();
+
+            async move {
+                let fixture = RecoveryFixture::<SizedRecord>::new(&data_dir).await;
+                for data_file_id in 0..MAX_FILE_ID {
+                    fixture.create_empty_data_file(data_file_id).await;
+                }
+
+                fixture.set_checkpoint(2, 4, 3, 7);
+
+                assert_eq!(
+                    3,
+                    fixture
+                        .ledger
+                        .cleanup_stale_data_files()
+                        .await
+                        .expect("cleanup should not fail")
+                );
+                assert!(!fixture.data_file_exists(0).await);
+                assert!(!fixture.data_file_exists(1).await);
+                assert!(fixture.data_file_exists(2).await);
+                assert!(fixture.data_file_exists(3).await);
+                assert!(fixture.data_file_exists(4).await);
+                assert!(!fixture.data_file_exists(5).await);
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn stale_data_file_cleanup_uses_last_published_reader_checkpoint() {
+        with_temp_dir(|dir| {
+            let data_dir = dir.to_path_buf();
+
+            async move {
+                let fixture = RecoveryFixture::<SizedRecord>::new(&data_dir).await;
+                for data_file_id in 0..MAX_FILE_ID {
+                    fixture.create_empty_data_file(data_file_id).await;
+                }
+
+                fixture.set_checkpoint(1, 4, 3, 7);
+
+                fixture.ledger.increment_acked_reader_file_id();
+                fixture.ledger.increment_acked_reader_file_id();
+
+                assert_eq!(
+                    2,
+                    fixture
+                        .ledger
+                        .cleanup_stale_data_files()
+                        .await
+                        .expect("cleanup should not fail")
+                );
+                assert!(!fixture.data_file_exists(0).await);
+                assert!(fixture.data_file_exists(1).await);
+                assert!(fixture.data_file_exists(2).await);
+                assert!(fixture.data_file_exists(3).await);
+                assert!(fixture.data_file_exists(4).await);
+                assert!(!fixture.data_file_exists(5).await);
+
+                fixture.ledger.publish_cleanup_reader_file_id_for_test();
+
+                assert_eq!(
+                    2,
+                    fixture
+                        .ledger
+                        .cleanup_stale_data_files()
+                        .await
+                        .expect("cleanup should not fail")
+                );
+                assert!(!fixture.data_file_exists(1).await);
+                assert!(!fixture.data_file_exists(2).await);
+                assert!(fixture.data_file_exists(3).await);
+                assert!(fixture.data_file_exists(4).await);
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn recovery_should_not_count_fully_acknowledged_middle_files() {
         with_temp_dir(|dir| {
             let data_dir = dir.to_path_buf();
@@ -1124,5 +1374,4 @@ mod tests {
         })
         .await;
     }
-
 }

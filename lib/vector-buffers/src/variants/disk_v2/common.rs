@@ -30,6 +30,8 @@ pub const MINIMUM_MAX_RECORD_SIZE: usize = align16(RECORD_HEADER_LEN + 1);
 // have it configured.
 pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
+pub const DEFAULT_DATA_FILE_CLEANUP_INTERVAL: Duration = Duration::from_secs(1);
+
 // Using 256KB as it aligns nicely with the I/O size exposed by major cloud providers.  This may not
 // be the underlying block size used by the OS, but it still aligns well with what will happen on
 // the "backend" for cloud providers, which is simply a useful default for when we want to look at
@@ -44,38 +46,27 @@ pub const MAX_FILE_ID: u16 = u16::MAX;
 #[cfg(test)]
 pub const MAX_FILE_ID: u16 = 6;
 
-pub(crate) fn next_data_file_id(file_id: u16) -> u16 {
-    (file_id + 1) % MAX_FILE_ID
-}
-
-#[derive(Debug)]
-pub(crate) struct DataFileIdRangeInclusive {
-    next: Option<u16>,
-    end: u16,
-}
-
-impl DataFileIdRangeInclusive {
-    pub(crate) fn new(start: u16, end: u16) -> Self {
-        Self {
-            next: Some(start),
-            end,
-        }
+pub(crate) fn data_file_id_in_range(file_id: u16, start: u16, end: u16) -> bool {
+    if start <= end {
+        (start..=end).contains(&file_id)
+    } else {
+        file_id >= start || file_id <= end
     }
 }
 
-impl Iterator for DataFileIdRangeInclusive {
-    type Item = u16;
+pub(crate) fn data_file_name(file_id: u16) -> String {
+    format!("buffer-data-{file_id}.dat")
+}
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let current = self.next?;
-        self.next = if current == self.end {
-            None
-        } else {
-            Some(next_data_file_id(current))
-        };
+pub(crate) fn parse_data_file_id(path: &Path) -> Option<u16> {
+    let file_name = path.file_name()?.to_str()?;
+    let id = file_name
+        .strip_prefix("buffer-data-")?
+        .strip_suffix(".dat")?
+        .parse()
+        .ok()?;
 
-        Some(current)
-    }
+    (id < MAX_FILE_ID).then_some(id)
 }
 
 // The alignment used by the record serializer.
@@ -455,8 +446,7 @@ mod tests {
     use proptest::{prop_assert, proptest, test_runner::Config};
 
     use super::{
-        BuildError, DataFileIdRangeInclusive, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE,
-        SERIALIZER_ALIGNMENT, align16,
+        BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT, align16,
     };
     use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
 
@@ -467,24 +457,6 @@ mod tests {
         // that's a huge amount even on 32-bit systems and in non-test code, we only use `align16` in a const context,
         // so it will panic during compilation, not at runtime.
         align16(MAX_ALIGNABLE_AMOUNT + 1);
-    }
-
-    #[test]
-    fn data_file_id_range_inclusive_handles_non_wrapping_range() {
-        let ids = DataFileIdRangeInclusive::new(1, 4).collect::<Vec<_>>();
-        assert_eq!(ids, vec![1, 2, 3, 4]);
-    }
-
-    #[test]
-    fn data_file_id_range_inclusive_handles_wrapping_range() {
-        let ids = DataFileIdRangeInclusive::new(4, 1).collect::<Vec<_>>();
-        assert_eq!(ids, vec![4, 5, 0, 1]);
-    }
-
-    #[test]
-    fn data_file_id_range_inclusive_handles_single_file_range() {
-        let ids = DataFileIdRangeInclusive::new(3, 3).collect::<Vec<_>>();
-        assert_eq!(ids, vec![3]);
     }
 
     proptest! {

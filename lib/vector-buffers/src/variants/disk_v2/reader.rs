@@ -3,7 +3,6 @@ use std::{
     io::{self, ErrorKind},
     marker::PhantomData,
     num::NonZeroU64,
-    path::PathBuf,
     sync::Arc,
 };
 
@@ -407,7 +406,7 @@ where
     data_file_marked_record_count: u64,
     ready_to_read: bool,
     record_acks: OrderedAcknowledgements<u64, u64>,
-    data_file_acks: OrderedAcknowledgements<u64, (PathBuf, u64)>,
+    data_file_acks: OrderedAcknowledgements<u64, ()>,
     finalizer: OrderedFinalizer<u64>,
     _t: PhantomData<T>,
 }
@@ -510,28 +509,34 @@ where
         }
     }
 
+    fn track_dropped_read(&mut self, record_bytes: u64) {
+        // The record boundary was valid, so the reader has consumed these bytes even though the
+        // payload could not be delivered. Keep the file cursor accounting complete so a later
+        // abandoned-tail adjustment cannot count the same bytes again.
+        self.bytes_read += record_bytes;
+        if !self.ready_to_read {
+            return;
+        }
+
+        // Dropped records never enter the acknowledgement path. Remove their bytes immediately
+        // and wake a writer that may be waiting for buffer capacity.
+        self.ledger.decrement_total_buffer_size(record_bytes);
+        self.ledger.notify_reader_waiters();
+    }
+
     #[cfg_attr(test, instrument(skip_all, level = "debug"))]
-    async fn delete_completed_data_file(
-        &mut self,
-        data_file_path: PathBuf,
-        bytes_read: Option<u64>,
-    ) -> io::Result<()> {
-        // TODO: Could we actually make this a background task to remove the tail latency from the
-        // read path?  Technically all that's needed is a handle to the ledger and the data file
-        // path, so as long as the logic is still right, we can notify writers out-of-band.
+    async fn account_abandoned_data_file_tail(&mut self) -> io::Result<()> {
+        if !self.ready_to_read {
+            return Ok(());
+        }
+
+        let data_file_path = self.ledger.get_current_reader_data_file_path();
+        let bytes_read = self.bytes_read;
         debug!(
             data_file_path = data_file_path.to_string_lossy().as_ref(),
-            bytes_read, "Deleting completed data file."
+            bytes_read, "Accounting abandoned data file tail before rolling reader."
         );
 
-        // Grab the size of the data file before we delete it. For normal post-read deletion,
-        // `bytes_read` is known, and any unread tail left in the file must be removed from
-        // `total_buffer_size`.
-        //
-        // During startup fast-forward deletion, `bytes_read` is `None`. Initialization does not
-        // mutate `total_buffer_size` incrementally; `seek_to_next_record` installs the recomputed
-        // unread total after it finishes positioning the reader. In that mode this method only
-        // deletes the file and advances the persisted reader file id.
         let data_file = self
             .ledger
             .filesystem()
@@ -539,62 +544,34 @@ where
             .await?;
         let metadata = data_file.metadata().await?;
 
-        let decrease_amount = bytes_read.map_or_else(
-            // `None` is only passed from `seek_to_next_record`'s fast path while it deletes
-            // fully-read straggler files during initialization. Initialization does not mutate
-            // `total_buffer_size` incrementally -- the authoritative value is installed once at the
-            // end of the seek -- so deleting a file here must not decrement it.
-            || 0,
-            |bytes_read| {
-                // A file shorter than bytes_read makes the delta below underflow
-                // and feed a wrapped value into decrement_total_buffer_size.
-                #[cfg(feature = "antithesis-disk-asserts")]
-                {
-                    #![allow(clippy::disallowed_types)] // once_cell::Lazy
-                    antithesis_sdk::assert_always_greater_than_or_equal_to!(
-                        metadata.len(),
-                        bytes_read,
-                        "reader data-file size delta never underflows"
-                    );
-                }
-                let size_delta = metadata.len() - bytes_read;
-                if size_delta > 0 {
-                    debug!(
-                        actual_file_size = metadata.len(),
-                        bytes_read,
-                        "Data file was only partially read. Adjusting buffer size to compensate.",
-                    );
-                }
-
-                size_delta
-            },
-        );
-
-        if decrease_amount > 0 {
-            self.ledger.decrement_total_buffer_size(decrease_amount);
+        // A file shorter than bytes_read makes the delta below underflow
+        // and feed a wrapped value into decrement_total_buffer_size.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always_greater_than_or_equal_to!(
+                metadata.len(),
+                bytes_read,
+                "reader data-file size delta never underflows"
+            );
         }
-
-        drop(data_file);
-
-        // Delete the current data file, and increment our actual reader file ID.
-        self.ledger
-            .filesystem()
-            .delete_file(&data_file_path)
-            .await?;
-        self.ledger.increment_acked_reader_file_id();
-        self.ledger.flush()?;
-
-        debug!("Flushed after deleting data file, notifying writers and continuing.");
-
-        // Notify any waiting writers that we've deleted a data file, which they may be waiting on
-        // because they're looking to reuse the file ID of the file we just finished reading.
-        self.ledger.notify_reader_waiters();
+        let abandoned_tail_bytes = metadata.len().saturating_sub(bytes_read);
+        if abandoned_tail_bytes > 0 {
+            debug!(
+                actual_file_size = metadata.len(),
+                bytes_read,
+                abandoned_tail_bytes,
+                "Data file tail was abandoned after bad read. Adjusting buffer size to compensate.",
+            );
+            self.ledger
+                .decrement_total_buffer_size(abandoned_tail_bytes);
+        }
 
         Ok(())
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
-    async fn handle_pending_acknowledgements(
+    fn handle_pending_acknowledgements(
         &mut self,
         force_check_pending_data_files: bool,
     ) -> io::Result<()> {
@@ -607,7 +584,7 @@ where
         //
         // We only do this if we actually consume any acknowledgements, and immediately update the
         // buffer and ledger to more quickly get those metrics into good shape.  We defer notifying
-        // writers until after, though, in case we also have data files to delete, so that we can
+        // writers until after, though, in case we also complete any data files, so that we can
         // coalesce the notifications together at the very end of the method.
         let mut had_eligible_records = false;
         let mut records_acknowledged: u64 = 0;
@@ -679,32 +656,38 @@ where
         // If we processed any eligible records, we may now also have eligible data files.
         //
         // Alternatively, the core `next` logic may have just rolled over to a new data file, and
-        // we're seeing if we can fast track any eligible data file deletions rather than waiting
+        // we're seeing if we can fast track any eligible data file completions rather than waiting
         // for more acknowledgements to come in.
         let mut had_eligible_data_files = false;
-        let mut data_files_deleted: u16 = 0;
+        let mut data_files_completed: u16 = 0;
 
         if had_eligible_records || force_check_pending_data_files {
-            // Now handle data file deletion.  We unconditionally check to see if any data files are
-            // eligible for deletion, and process them immediately.
+            // Now handle data file completion.  We unconditionally check to see if any data files are
+            // eligible for logical completion, and process them immediately. Physical deletion is
+            // handled by the background cleanup task.
 
-            while let Some(EligibleMarker { data, .. }) =
-                self.data_file_acks.get_next_eligible_marker()
-            {
+            let mut completed_data_files = 0u16;
+            while let Some(EligibleMarker { .. }) = self.data_file_acks.get_next_eligible_marker() {
                 had_eligible_data_files = true;
 
-                let (data_file_path, bytes_read) =
-                    data.expect("data file deletion marker should never be empty");
-                self.delete_completed_data_file(data_file_path, Some(bytes_read))
-                    .await?;
-
-                data_files_deleted = data_files_deleted
+                completed_data_files = completed_data_files
                     .checked_add(1)
-                    .expect("deleting more than 2^16 data files at a time is obviously a bug");
+                    .expect("completing more than 2^16 data files at a time is obviously a bug");
+            }
+
+            if had_eligible_data_files {
+                // Advance every logically completed file before flushing so the durable file
+                // checkpoint cannot lag behind the record checkpoint if we crash before deletion.
+                for _ in 0..completed_data_files {
+                    self.ledger.increment_acked_reader_file_id();
+                }
+                self.ledger.flush_reader_file_checkpoint()?;
+
+                data_files_completed = completed_data_files;
             }
         }
 
-        // If we managed to processed any records _or_ any data file deletions, we've made
+        // If we managed to process any records _or_ any data file completions, we've made
         // meaningful progress that writers may care about, so notify them.
         if had_eligible_data_files || had_eligible_records {
             self.ledger.notify_reader_waiters();
@@ -716,7 +699,7 @@ where
                     events_acknowledged,
                     events_skipped,
                     bytes_acknowledged,
-                    data_files_deleted,
+                    data_files_completed,
                     "Finished handling acknowledgements."
                 );
             }
@@ -728,8 +711,8 @@ where
     /// Switches the reader over to the next data file to read.
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     fn roll_to_next_data_file(&mut self) {
-        // Add a marker for this data file so we know when it can be safely deleted.  We also need
-        // to track the necessary data to do our buffer accounting when it's eligible for deletion.
+        // Add a marker for this data file so we know when every record read from it has been
+        // acknowledged, at which point we can durably advance the reader file checkpoint.
         //
         // In the rare case where the very first read in a new data file is corrupted/invalid and we
         // roll to the next data file, we simply use the last reader record ID we have, which yields
@@ -752,7 +735,7 @@ where
             record_count = data_file_record_count,
             event_count = data_file_event_count,
             bytes_read,
-            "Marking data file for deletion."
+            "Marking data file for completion."
         );
 
         let data_file_marker_id = self.data_file_marked_record_count;
@@ -760,12 +743,8 @@ where
         self.data_file_record_count = 0;
 
         self.data_file_acks
-            .add_marker(
-                data_file_marker_id,
-                Some(data_file_record_count),
-                Some((data_file_path, bytes_read)),
-            )
-            .expect("should not fail to add marker for data file deletion");
+            .add_marker(data_file_marker_id, Some(data_file_record_count), None)
+            .expect("should not fail to add marker for data file completion");
 
         // Now reset our internal state so we can go for the next data file.
         self.reset();
@@ -857,17 +836,16 @@ where
             "Seeking to last acknowledged record for reader."
         );
 
-        // We may end up in a situation where a data file hasn't yet been deleted but we've moved on
-        // to the next data file, including reading acknowledging records within it.  If Vector
-        // is stopped at a point like this, and we restart it and load the buffer, we'll start on
-        // the old data file.  That's wasteful to read all over again.
+        // We may end up in a situation where a data file hasn't yet been physically deleted but
+        // we've moved on to the next data file, including acknowledging records within it. If
+        // Vector is stopped at a point like this, and we restart it and load the buffer, we'll start
+        // on the old data file. That's wasteful to read all over again.
         //
         // In our seek loop, we have a fast path where we check the last record of a data file while
-        // the reader and writer file IDs don't match.  If we see that the record is still below the
-        // last reader record ID, we do the necessary clean up to delete that file and move to the
-        // next file.  This is safe because we know that if we managed to acknowledge records with
-        // an ID higher than the highest record ID in the data file, it was meant to have been
-        // deleted.
+        // the reader and writer file IDs don't match. If we see that the record is still below the
+        // last reader record ID, we durably advance the reader file checkpoint and move to the next
+        // file. This is safe because we know that if we managed to acknowledge records with an ID
+        // higher than the highest record ID in the data file, it was fully consumed.
         //
         // Once the reader/writer file IDs are identical, we fall back to the slow path.
         while self.ledger.get_current_reader_file_id() != self.ledger.get_current_writer_file_id() {
@@ -905,16 +883,17 @@ where
                     let last_record_id_in_data_file =
                         last_record_id + record_events.saturating_sub(1);
 
-                    // If we're past this data file, delete it and move on. We do this manually
-                    // versus faking it via `roll_to_next_data_file` because that emits a deletion
-                    // marker, but the internal state tracking first/last record ID, bytes read,
-                    // etc, won't actually be usable.
+                    // If we're past this data file, mark it complete and move on. We do this
+                    // manually versus faking it via `roll_to_next_data_file` because that emits an
+                    // acknowledgement marker, but the internal state tracking first/last record ID,
+                    // bytes read, etc, won't actually be usable.
                     if ledger_last > last_record_id_in_data_file {
-                        // This fully-read file is behind `ledger_last`, so startup can delete it
-                        // and advance. Passing `None` marks init fast-forward mode: buffer size is
-                        // recomputed once `seek_to_next_record` finishes positioning the reader.
-                        self.delete_completed_data_file(data_file_path, None)
-                            .await
+                        // This fully-read file is behind `ledger_last`, so startup can advance its
+                        // logical reader file checkpoint. Buffer size is recomputed once
+                        // `seek_to_next_record` finishes positioning the reader.
+                        self.ledger.increment_acked_reader_file_id();
+                        self.ledger
+                            .flush_reader_file_checkpoint()
                             .context(IoSnafu)?;
                         self.reset();
                     } else {
@@ -999,15 +978,14 @@ where
         let token = loop {
             // Handle any pending acknowledgements first.
             self.handle_pending_acknowledgements(force_check_pending_data_files)
-                .await
                 .context(IoSnafu)?;
             force_check_pending_data_files = false;
 
             // If the writer has marked themselves as done, and the buffer has been emptied, then
             // we're done and can return.  We have to look at something besides simply the writer
             // being marked as done to know if we're actually done or not, and "buffer size" is better
-            // than "total records" because we update buffer size when handling acknowledgements,
-            // whether it's an individual ack or an entire file being deleted.
+            // than "total records" because buffer size is decremented when records are acknowledged
+            // and when the reader abandons a bad tail.
             //
             // If we used "total records", we could end up stuck in cases where we skipped
             // corrupted records, but hadn't yet had a "good" record that we could read, since the
@@ -1083,6 +1061,9 @@ where
                                 })
                             );
                         }
+                        self.account_abandoned_data_file_tail()
+                            .await
+                            .context(IoSnafu)?;
                         self.roll_to_next_data_file();
                     }
 
@@ -1149,11 +1130,18 @@ where
         let record_id = token.record_id();
         let record_bytes = token.record_bytes() as u64;
 
-        let reader = self
+        let read_result = self
             .reader
             .as_mut()
-            .expect("reader should exist after `ensure_ready_for_read`");
-        let mut record = reader.read_record(token)?;
+            .expect("reader should exist after `ensure_ready_for_read`")
+            .read_record(token);
+        let mut record = match read_result {
+            Ok(record) => record,
+            Err(error) => {
+                self.track_dropped_read(record_bytes);
+                return Err(error);
+            }
+        };
 
         // A record only reaches delivery after `try_next_record` accepted it on the
         // `Valid` arm, which rejects a zero-length record and issues a token whose
@@ -1177,9 +1165,10 @@ where
             .event_count()
             .try_into()
             .expect("Event count for a record cannot exceed 2^64 events.");
-        let record_events = record_events
-            .try_into()
-            .map_err(|_| ReaderError::EmptyRecord)?;
+        let Ok(record_events) = record_events.try_into() else {
+            self.track_dropped_read(record_bytes);
+            return Err(ReaderError::EmptyRecord);
+        };
         self.track_read(record_id, record_bytes, record_events);
 
         let (batch, receiver) = BatchNotifier::new_with_receiver();

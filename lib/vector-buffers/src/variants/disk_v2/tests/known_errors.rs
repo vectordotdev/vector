@@ -248,6 +248,110 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
     .await;
 }
 
+#[tokio::test]
+async fn reader_accounts_abandoned_tail_when_runtime_bad_read_rolls_file() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, mut reader, ledger) =
+                create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
+
+            let first_record_size = 32;
+            let first_bytes_written = writer
+                .write_record(SizedRecord::new(first_record_size))
+                .await
+                .expect("write should not fail");
+            let second_record_size = 33;
+            let second_bytes_written = writer
+                .write_record(SizedRecord::new(second_record_size))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let first_data_file_len = first_bytes_written + second_bytes_written;
+            let first_data_file_path = ledger.get_current_writer_data_file_path();
+            assert_buffer_size!(ledger, 2, first_data_file_len);
+            assert_reader_writer_v2_file_positions!(ledger, 0, 0);
+
+            let third_record_size = 34;
+            let third_bytes_written = writer
+                .write_record(SizedRecord::new(third_record_size))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            assert_buffer_size!(ledger, 3, first_data_file_len + third_bytes_written);
+            assert_reader_writer_v2_file_positions!(ledger, 0, 1);
+
+            // Corrupt the already-open reader file after startup while preserving its length, so
+            // the runtime bad-read path accounts for the whole abandoned unread tail rather than
+            // startup recovery truncating it first.
+            let mut data_file = OpenOptions::new()
+                .write(true)
+                .open(&first_data_file_path)
+                .await
+                .expect("open should not fail");
+            assert_eq!(
+                first_data_file_len as u64,
+                data_file
+                    .metadata()
+                    .await
+                    .expect("metadata should not fail")
+                    .len()
+            );
+            let corrupt_offset = u64::try_from(first_bytes_written)
+                .expect("record size should fit in u64")
+                + 8;
+            data_file
+                .seek(SeekFrom::Start(corrupt_offset))
+                .await
+                .expect("seek should not fail");
+            data_file
+                .write_all(&[0xFF; 8])
+                .await
+                .expect("write should not fail");
+            data_file.flush().await.expect("flush should not fail");
+            data_file.sync_all().await.expect("sync should not fail");
+            drop(data_file);
+            writer.close();
+
+            let first_read = await_timeout!(reader.next(), 2).expect("read should not fail");
+            assert_eq!(first_read, Some(SizedRecord::new(first_record_size)));
+            acknowledge(first_read.unwrap()).await;
+
+            let expected_after_ack = second_bytes_written + third_bytes_written;
+            let expected_after_bad_read = third_bytes_written;
+            let bad_read = await_timeout!(reader.next(), 2).expect_err("read should fail");
+            assert!(matches!(
+                bad_read,
+                ReaderError::Checksum { .. }
+                    | ReaderError::Deserialization { .. }
+                    | ReaderError::PartialWrite
+            ));
+            assert_eq!(
+                expected_after_bad_read as u64,
+                ledger.get_total_buffer_size(),
+                "runtime bad-read recovery should subtract the unread abandoned tail from the buffer size"
+            );
+            assert!(
+                ledger.get_total_buffer_size() < expected_after_ack as u64,
+                "test should prove the abandoned-tail accounting changed the buffer size"
+            );
+            assert_reader_writer_v2_file_positions!(ledger, 1, 1);
+
+            let third_read = await_timeout!(reader.next(), 2).expect("read should not fail");
+            assert_eq!(third_read, Some(SizedRecord::new(third_record_size)));
+            acknowledge(third_read.unwrap()).await;
+
+            let final_read = await_timeout!(reader.next(), 2).expect("read should not fail");
+            assert_eq!(final_read, None);
+            assert_reader_writer_v2_file_positions!(ledger, 1, 1);
+        }
+    })
+    .await;
+}
+
 // TODO: Add test that emulates "reader throws error when" such that we write three records, each to
 // a separate data file, corrupt the write in the second data file, and make sure that we get our
 // first and third record back and that after reading and acking the first and third record (plus
@@ -350,19 +454,28 @@ async fn reader_throws_error_when_record_has_decoding_error() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, _ledger) = create_default_buffer_v2(data_dir).await;
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
 
             // Write an `UndecodableRecord` record which will encode correctly, but always throw an
             // error when attempting to decode.
-            writer
+            let bytes_written = writer
                 .write_record(UndecodableRecord)
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
+            assert_eq!(bytes_written as u64, ledger.get_total_buffer_size());
 
-            // Now try to read it back, which should return an error.
+            // Reading drops the record because its validated byte range cannot be decoded. Those
+            // bytes cannot be acknowledged, so they must leave the logical buffer immediately.
             let read_result = reader.next().await;
             assert!(matches!(read_result, Err(ReaderError::Decode { .. })));
+            assert_eq!(0, ledger.get_total_buffer_size());
+
+            // Once the writer closes, the empty logical buffer must terminate instead of waiting
+            // forever for bytes that were already dropped.
+            drop(writer);
+            let final_read = await_timeout!(reader.next(), 2).expect("read should not fail");
+            assert_eq!(None, final_read);
         }
     })
     .await;

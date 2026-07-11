@@ -15,13 +15,20 @@ use fslock::LockFile;
 use futures::StreamExt;
 use rkyv::{Archive, Serialize, with::Atomic};
 use snafu::{ResultExt, Snafu};
-use tokio::{fs, io::AsyncWriteExt, sync::Notify};
+use tokio::{
+    fs,
+    io::AsyncWriteExt,
+    sync::{Mutex, MutexGuard, Notify},
+};
 use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
     Filesystem,
     backed_archive::BackedArchive,
-    common::{DiskBufferConfig, MAX_FILE_ID, align16},
+    common::{
+        DEFAULT_DATA_FILE_CLEANUP_INTERVAL, DiskBufferConfig, MAX_FILE_ID, align16,
+        data_file_id_in_range, data_file_name, parse_data_file_id,
+    },
     io::{AsyncFile, WritableMemoryMap},
     ser::SerializeError,
 };
@@ -104,6 +111,39 @@ pub struct LedgerState {
     /// The last record ID read by the reader.
     #[with(Atomic)]
     reader_last_record: AtomicU64,
+}
+
+/// Runtime-only coordination state for stale data file cleanup.
+///
+/// This deliberately lives outside [`LedgerState`]: it is derived from the durable checkpoint at
+/// startup and updated only after successful checkpoint flushes, but it is not part of the on-disk
+/// ledger format.
+struct DataFileCleanupState {
+    // Coordinates asynchronous stale-file cleanup with reader/writer file ID transitions.
+    guard: Mutex<()>,
+    // Last reader file ID whose checkpoint is known to have been flushed successfully.
+    reader_file_id: AtomicU16,
+}
+
+impl DataFileCleanupState {
+    fn new(reader_file_id: u16) -> Self {
+        Self {
+            guard: Mutex::new(()),
+            reader_file_id: AtomicU16::new(reader_file_id),
+        }
+    }
+
+    async fn lock(&self) -> MutexGuard<'_, ()> {
+        self.guard.lock().await
+    }
+
+    fn reader_file_id(&self) -> u16 {
+        self.reader_file_id.load(Ordering::Acquire)
+    }
+
+    fn publish_reader_checkpoint(&self, reader_file_id: u16) {
+        self.reader_file_id.store(reader_file_id, Ordering::Release);
+    }
 }
 
 impl Default for LedgerState {
@@ -211,6 +251,8 @@ where
     pending_acks: AtomicU64,
     // The file ID offset of the reader past the acknowledged reader file ID.
     unacked_reader_file_id_offset: AtomicU16,
+    // Runtime-only coordination and durable-boundary state for stale data file cleanup.
+    data_file_cleanup: DataFileCleanupState,
     // Last flush of all unflushed files: ledger, data file, etc.
     last_flush: AtomicCell<Instant>,
     // Tracks usage data about the buffer.
@@ -368,9 +410,85 @@ where
 
     /// Gets the data file path for an arbitrary file ID.
     pub fn get_data_file_path(&self, file_id: u16) -> PathBuf {
-        self.config
-            .data_dir
-            .join(format!("buffer-data-{file_id}.dat"))
+        self.config.data_dir.join(data_file_name(file_id))
+    }
+
+    pub(super) async fn lock_data_file_cleanup(&self) -> MutexGuard<'_, ()> {
+        self.data_file_cleanup.lock().await
+    }
+
+    fn get_cleanup_reader_file_id(&self) -> u16 {
+        self.data_file_cleanup.reader_file_id()
+    }
+
+    fn publish_cleanup_reader_file_id(&self) {
+        let reader_file_id = self.state().get_current_reader_file_id();
+        self.data_file_cleanup
+            .publish_reader_checkpoint(reader_file_id);
+    }
+
+    #[cfg(test)]
+    pub(super) fn publish_cleanup_reader_file_id_for_test(&self) {
+        self.publish_cleanup_reader_file_id();
+    }
+
+    pub(super) fn flush_reader_file_checkpoint(&self) -> io::Result<()> {
+        self.flush()?;
+        self.publish_cleanup_reader_file_id();
+
+        Ok(())
+    }
+
+    /// Deletes data files that are outside the durable reader/writer checkpoint window.
+    ///
+    /// The reader advances the durable reader file checkpoint as soon as a data file's records are
+    /// fully acknowledged. Physical deletion can then happen asynchronously: if deletion fails or
+    /// the process exits first, this scan will retry later.
+    pub(super) async fn cleanup_stale_data_files(&self) -> io::Result<usize> {
+        let _cleanup_guard = self.lock_data_file_cleanup().await;
+        let reader_file_id = self.get_cleanup_reader_file_id();
+        let writer_file_id = self.state().get_current_writer_file_id();
+        let data_files = self.filesystem().list_files(&self.config.data_dir).await?;
+        let mut deleted_files = 0;
+
+        for data_file_path in data_files {
+            let Some(data_file_id) = parse_data_file_id(&data_file_path) else {
+                continue;
+            };
+
+            if data_file_id_in_range(data_file_id, reader_file_id, writer_file_id) {
+                continue;
+            }
+
+            match self.filesystem().delete_file(&data_file_path).await {
+                Ok(()) => {
+                    deleted_files += 1;
+                    debug!(
+                        data_file_path = data_file_path.to_string_lossy().as_ref(),
+                        "Deleted stale data file outside checkpoint window."
+                    );
+                }
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    debug!(
+                        data_file_path = data_file_path.to_string_lossy().as_ref(),
+                        "Stale data file was already deleted."
+                    );
+                }
+                Err(error) => {
+                    warn!(
+                        data_file_path = data_file_path.to_string_lossy().as_ref(),
+                        error = %error,
+                        "Failed to delete stale data file; will retry."
+                    );
+                }
+            }
+        }
+
+        if deleted_files > 0 {
+            self.notify_reader_waiters();
+        }
+
+        Ok(deleted_files)
     }
 
     /// Waits for a signal from the reader that progress has been made.
@@ -471,8 +589,8 @@ where
     ///
     /// Instead, we allow the reader to move ahead of the latest acknowledged record by tracking
     /// their current file ID and acknowledged file ID separately.  Once all records in a file have
-    /// been acknowledged, the data file can be deleted and the reader file ID can be durably
-    /// stored in the ledger.
+    /// been acknowledged, the reader file ID can be durably stored in the ledger and the data file
+    /// can be deleted.
     ///
     /// Callers use [`increment_unacked_reader_file_id`] to move to the next data file without
     /// tracking that the previous data file has been durably processed and can be deleted, and
@@ -654,20 +772,22 @@ where
             .open_mmap_writable(&ledger_path)
             .await
             .context(IoSnafu)?;
-        let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
-            // Deserialized the ledger state without issue from an existing file.
-            Ok(backed) => backed,
-            // Either invalid data, or the buffer doesn't represent a valid ledger structure.
-            Err(e) => {
-                return Err(LedgerLoadCreateError::FailedToDeserialize {
-                    reason: e.into_inner(),
-                });
-            }
-        };
+        let ledger_state: BackedArchive<_, LedgerState> =
+            match BackedArchive::from_backing(ledger_mmap) {
+                // Deserialized the ledger state without issue from an existing file.
+                Ok(backed) => backed,
+                // Either invalid data, or the buffer doesn't represent a valid ledger structure.
+                Err(e) => {
+                    return Err(LedgerLoadCreateError::FailedToDeserialize {
+                        reason: e.into_inner(),
+                    });
+                }
+            };
 
         // Create the ledger object, and synchronize the buffer statistics with the buffer usage
         // handle.  This handles making sure we account for the starting size of the buffer, and
         // what not.
+        let cleanup_reader_file_id = ledger_state.get_archive_ref().get_current_reader_file_id();
         let ledger = Ledger {
             config,
             lock,
@@ -678,6 +798,7 @@ where
             writer_done: AtomicBool::new(false),
             pending_acks: AtomicU64::new(0),
             unacked_reader_file_id_offset: AtomicU16::new(0),
+            data_file_cleanup: DataFileCleanupState::new(cleanup_reader_file_id),
             last_flush: AtomicCell::new(Instant::now()),
             usage_handle,
         };
@@ -705,6 +826,31 @@ where
             }
         });
         finalizer
+    }
+
+    pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>)
+    where
+        FS: 'static,
+    {
+        let ledger = Arc::downgrade(self);
+        vector_common::spawn_in_current_span(async move {
+            loop {
+                tokio::time::sleep(DEFAULT_DATA_FILE_CLEANUP_INTERVAL).await;
+
+                let Some(ledger) = ledger.upgrade() else {
+                    break;
+                };
+
+                if let Err(error) = ledger.cleanup_stale_data_files().await {
+                    debug!(
+                        error = %error,
+                        "Failed to scan stale data files; will retry."
+                    );
+                }
+
+                drop(ledger);
+            }
+        });
     }
 }
 

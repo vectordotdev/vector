@@ -263,10 +263,20 @@ where
         let finalizer = Arc::clone(&ledger).spawn_finalizer();
 
         let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
-        let unread_buffer_size = reader
+        let mut unread_buffer_size = reader
             .reconcile_checkpoint_window()
             .await
             .context(ReaderSeekFailedSnafu)?;
+        if writer
+            .align_with_reader_ahead_checkpoint(unread_buffer_size)
+            .await
+            .context(WriterSeekFailedSnafu)?
+        {
+            unread_buffer_size = reader
+                .reconcile_checkpoint_window()
+                .await
+                .context(ReaderSeekFailedSnafu)?;
+        }
         reader
             .seek_to_next_record()
             .await
@@ -295,6 +305,9 @@ where
         );
 
         ledger.synchronize_buffer_usage();
+        if ledger.filesystem().supports_background_cleanup() {
+            ledger.spawn_data_file_cleanup();
+        }
 
         Ok((writer, reader, ledger))
     }

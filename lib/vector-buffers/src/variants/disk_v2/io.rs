@@ -1,4 +1,8 @@
-use std::{io, path::Path};
+use std::{
+    future::Future,
+    io,
+    path::{Path, PathBuf},
+};
 
 use tokio::{
     fs::OpenOptions,
@@ -84,7 +88,26 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to delete the file, an error variant will be
     /// returned describing the underlying error.
-    async fn delete_file(&self, path: &Path) -> io::Result<()>;
+    fn delete_file<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<()>> + Send + 'a;
+
+    /// Lists files in a directory.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error occurred when attempting to list the directory, an error variant will be
+    /// returned describing the underlying error.
+    fn list_files<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<Vec<PathBuf>>> + Send + 'a;
+
+    /// Returns whether the buffer should spawn its periodic stale data file cleanup task.
+    fn supports_background_cleanup(&self) -> bool {
+        true
+    }
 }
 
 pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
@@ -168,8 +191,30 @@ impl Filesystem for ProductionFilesystem {
         unsafe { memmap2::MmapMut::map_mut(&std_file) }
     }
 
-    async fn delete_file(&self, path: &Path) -> io::Result<()> {
-        tokio::fs::remove_file(path).await
+    fn delete_file<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<()>> + Send + 'a {
+        tokio::fs::remove_file(path)
+    }
+
+    #[allow(clippy::manual_async_fn)]
+    fn list_files<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<Vec<PathBuf>>> + Send + 'a {
+        async move {
+            let mut entries = tokio::fs::read_dir(path).await?;
+            let mut files = Vec::new();
+
+            while let Some(entry) = entries.next_entry().await? {
+                if entry.file_type().await?.is_file() {
+                    files.push(entry.path());
+                }
+            }
+
+            Ok(files)
+        }
     }
 }
 
