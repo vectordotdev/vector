@@ -2,8 +2,9 @@
 //!
 //! This data source runs a database query through the ODBC interface on the required `schedule` (cron expression).
 //! Query results are fetched, converted to log events, and sent in batches bounded by `odbc_batch_size`.
-//! Each row is emitted as a log event. The final row of the result set is saved to disk and used as a
-//! parameter for the next scheduled SQL query after all batches are successfully converted and sent.
+//! Each row is emitted as a log event. When tracking is enabled, the final row of the result set is
+//! validated and checkpointed before events are emitted, then used as a parameter for the next
+//! scheduled SQL query.
 //!
 //! The ODBC data source offers functionality similar to the [Logstash JDBC plugin](https://www.elastic.co/docs/reference/logstash/plugins/plugins-inputs-jdbc).
 //!

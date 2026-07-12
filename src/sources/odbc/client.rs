@@ -89,6 +89,16 @@ pub enum OdbcError {
     ))]
     DuplicateColumnNames { columns: Vec<String> },
 
+    /// Pipeline send failed after the tracking checkpoint was already committed.
+    ///
+    /// The schedule must still advance `prev_params` with `next_params` so in-memory
+    /// tracking (no `last_run_metadata_path`) does not re-emit rows already handed off.
+    #[snafu(display("Send failed after tracking checkpoint was committed: {source}"))]
+    SendFailedAfterCheckpoint {
+        source: SendError,
+        next_params: Vec<OdbcStatementParam>,
+    },
+
     #[snafu(display("ODBC source shutting down"))]
     Shutdown,
 }
@@ -172,6 +182,18 @@ impl Context {
                             );
                             break;
                         }
+                        Err(OdbcError::SendFailedAfterCheckpoint {
+                            source,
+                            next_params,
+                        }) => {
+                            // Checkpoint was committed before emit; advance in-memory overlay
+                            // so the next tick does not replay rows already handed to the pipeline.
+                            prev_params = Some(next_params);
+                            emit!(OdbcFailedError {
+                                statement: &self.cfg.statement.clone().unwrap_or_default(),
+                                error: OdbcError::SendError { source },
+                            });
+                        }
                         Err(error) => {
                             emit!(OdbcFailedError {
                                 statement: &self.cfg.statement.clone().unwrap_or_default(),
@@ -196,8 +218,17 @@ impl Context {
         Ok(())
     }
 
-    /// Executes the scheduled ODBC query, sends the result as events in bounded batches,
-    /// then updates tracking metadata after all batches are successfully converted and sent.
+    /// Executes the scheduled ODBC query and sends the result as events in bounded batches.
+    ///
+    /// When `tracking_columns` is set, batches are buffered until the query finishes, the
+    /// final-row checkpoint is validated, overlaid onto `statement_init_params`, persisted,
+    /// and only then are events emitted. That preserves at-most-once tracking semantics: a
+    /// missing/unbindable tracking value fails the poll before any emit (avoiding infinite
+    /// replay), while a send failure after a successful checkpoint save may skip those rows
+    /// on the next run. When `last_run_metadata_path` is unset, the in-memory overlay is still
+    /// advanced after a post-checkpoint send failure so already-emitted rows are not replayed.
+    ///
+    /// Without tracking, batches are streamed to the pipeline as they arrive.
     ///
     /// Shutdown closes the batch channel so the blocking fetch stops on the next send, then
     /// waits for the blocking task. Connect/execute still depend on `login_timeout` /
@@ -236,6 +267,7 @@ impl Context {
             .unwrap_or_default();
         let current = params.as_deref().unwrap_or(template);
         let tracking_columns = self.cfg.tracking_columns.as_deref();
+        let tracking_enabled = tracking_columns.is_some_and(|columns| !columns.is_empty());
         let overlay = self
             .cfg
             .last_run_metadata_path
@@ -278,8 +310,10 @@ impl Context {
             result
         });
 
-        // Last row of the most recently sent batch. Used for tracking only after every batch succeeds.
-        let mut last_successfully_sent_row = None;
+        // With tracking enabled, hold converted batches and the final row until the query
+        // completes so checkpoint validation can run before any emit.
+        let mut pending_batches = Vec::new();
+        let mut final_row = None;
         let mut total_payload_byte_size = 0;
         let mut total_events = CountByteSize(0, JsonSize::zero());
         let mut stream_error = None;
@@ -308,7 +342,9 @@ impl Context {
             }
 
             // Keep the last raw row for tracking before rows are moved into events.
-            let last_row = batch_rows.last().cloned();
+            if tracking_enabled {
+                final_row = batch_rows.last().cloned();
+            }
             let mut events = match rows_to_events(batch_rows) {
                 Ok(result) => result,
                 Err(error) => {
@@ -319,39 +355,105 @@ impl Context {
 
             self.enrich_events(&mut events);
 
-            let event_count = events.len();
-            if event_count > 0 {
-                // Use the post-enrichment size for both received-bytes and events metrics
-                // so they stay consistent.
-                let byte_size = events.estimated_json_encoded_size_of();
-                let mut out = out.clone();
-                let send_result = select! {
-                    _ = &mut shutdown => {
-                        return shutdown_query(
-                            rx,
-                            blocking,
-                            bytes_received,
-                            events_received,
-                            total_payload_byte_size,
-                            total_events,
-                        )
-                        .await;
-                    }
-                    send_result = out.send_batch(events) => send_result,
-                };
-                if let Err(error) = send_result.context(SendSnafu) {
+            if events.is_empty() {
+                continue;
+            }
+
+            if tracking_enabled {
+                pending_batches.push(events);
+                continue;
+            }
+
+            match send_enriched_batch(&out, events, &mut shutdown).await {
+                Ok((byte_size, event_count)) => {
+                    record_sent(
+                        &mut total_payload_byte_size,
+                        &mut total_events,
+                        byte_size,
+                        event_count,
+                    );
+                }
+                Err(OdbcError::Shutdown) => {
+                    return shutdown_query(
+                        rx,
+                        blocking,
+                        bytes_received,
+                        events_received,
+                        total_payload_byte_size,
+                        total_events,
+                    )
+                    .await;
+                }
+                Err(error) => {
                     stream_error = Some(error);
                     break;
                 }
-                total_payload_byte_size += byte_size.get();
-                total_events += CountByteSize(event_count, byte_size);
             }
-
-            last_successfully_sent_row = last_row;
         }
 
         drop(rx);
         let blocking_result = blocking.await.context(BlockingTaskSnafu)?;
+
+        if let Some(error) = stream_error {
+            // Prefer the stream conversion/send error over a later join outcome.
+            drop(blocking_result);
+            return fail_with_received_metrics(
+                bytes_received,
+                events_received,
+                total_payload_byte_size,
+                total_events,
+                error,
+            );
+        }
+
+        blocking_result?;
+
+        // Tracking path: validate + overlay + persist the final-row checkpoint before any
+        // emit so a missing/null tracking value cannot replay forever, and an overlay
+        // failure cannot leave a persisted checkpoint that would skip unsent rows.
+        let next_params = match (final_row, cfg.tracking_columns.as_ref()) {
+            (Some(last), Some(tracking_columns)) => Some(prepare_tracking_checkpoint(
+                cfg.last_run_metadata_path.as_deref(),
+                last,
+                template,
+                tracking_columns,
+                tz,
+            )?),
+            _ => None,
+        };
+
+        for events in pending_batches {
+            match send_enriched_batch(&out, events, &mut shutdown).await {
+                Ok((byte_size, event_count)) => {
+                    record_sent(
+                        &mut total_payload_byte_size,
+                        &mut total_events,
+                        byte_size,
+                        event_count,
+                    );
+                }
+                Err(error) => {
+                    emit_received_metrics(
+                        bytes_received,
+                        events_received,
+                        total_payload_byte_size,
+                        total_events,
+                    );
+                    // Checkpoint is already committed. Advance in-memory tracking on send
+                    // failure so the next tick cannot replay rows already emitted.
+                    return match (next_params, error) {
+                        (Some(next_params), OdbcError::SendError { source }) => {
+                            Err(OdbcError::SendFailedAfterCheckpoint {
+                                source,
+                                next_params,
+                            })
+                        }
+                        (_, error) => Err(error),
+                    };
+                }
+            }
+        }
+
         emit_received_metrics(
             bytes_received,
             events_received,
@@ -359,32 +461,7 @@ impl Context {
             total_events,
         );
 
-        if let Some(error) = stream_error {
-            let _ = blocking_result;
-            return Err(error);
-        }
-
-        blocking_result?;
-
-        // Advance tracking metadata only after all batches are converted and sent so a
-        // partial failure does not skip rows on the next scheduled run.
-        // Return the full ordered parameter list with static values preserved and tracking
-        // values overlaid so later in-memory runs keep non-tracking placeholders.
-        Ok(
-            match (last_successfully_sent_row, cfg.tracking_columns.as_ref()) {
-                (Some(last), Some(tracking_columns)) => {
-                    let tracking = extract_and_save_tracking(
-                        cfg.last_run_metadata_path.as_deref(),
-                        last,
-                        tracking_columns.clone(),
-                        tz,
-                    )
-                    .await?;
-                    Some(overlay_params(template, &tracking, tracking_columns, tz)?)
-                }
-                _ => None,
-            },
-        )
+        Ok(next_params)
     }
 
     fn enrich_events(&self, events: &mut [Event]) {
@@ -412,7 +489,7 @@ async fn shutdown_query(
     total_events: CountByteSize,
 ) -> Result<Option<Vec<OdbcStatementParam>>, OdbcError> {
     drop(rx);
-    let blocking_result = blocking.await.context(BlockingTaskSnafu);
+    let join_result = blocking.await.context(BlockingTaskSnafu);
 
     // Emit sent-rows metrics even when the blocking task fails to join, so a join error
     // does not under-count rows already handed to the pipeline.
@@ -422,8 +499,60 @@ async fn shutdown_query(
         total_payload_byte_size,
         total_events,
     );
-    let _ = blocking_result?;
-    Err(OdbcError::Shutdown)
+    // Join errors are fatal. The query outcome is ignored on shutdown because the poll is
+    // ending and any rows already sent were counted above.
+    match join_result {
+        Ok(_) => Err(OdbcError::Shutdown),
+        Err(error) => Err(error),
+    }
+}
+
+/// Sends one enriched batch to the pipeline, racing against shutdown.
+///
+/// Returns `(json_size, event_count)` using the post-enrichment JSON size so
+/// received-bytes and events metrics stay consistent.
+async fn send_enriched_batch(
+    out: &crate::SourceSender,
+    events: Vec<Event>,
+    shutdown: &mut ShutdownSignal,
+) -> Result<(JsonSize, usize), OdbcError> {
+    let event_count = events.len();
+    let byte_size = events.estimated_json_encoded_size_of();
+    let mut out = out.clone();
+    let send_result = select! {
+        _ = &mut *shutdown => {
+            return Err(OdbcError::Shutdown);
+        }
+        send_result = out.send_batch(events) => send_result,
+    };
+    send_result.context(SendSnafu)?;
+    Ok((byte_size, event_count))
+}
+
+fn record_sent(
+    total_payload_byte_size: &mut usize,
+    total_events: &mut CountByteSize,
+    byte_size: JsonSize,
+    event_count: usize,
+) {
+    *total_payload_byte_size += byte_size.get();
+    *total_events += CountByteSize(event_count, byte_size);
+}
+
+fn fail_with_received_metrics(
+    bytes_received: &Registered<BytesReceived>,
+    events_received: &Registered<EventsReceived>,
+    total_payload_byte_size: usize,
+    total_events: CountByteSize,
+    error: OdbcError,
+) -> Result<Option<Vec<OdbcStatementParam>>, OdbcError> {
+    emit_received_metrics(
+        bytes_received,
+        events_received,
+        total_payload_byte_size,
+        total_events,
+    );
+    Err(error)
 }
 
 fn emit_received_metrics(
@@ -456,15 +585,13 @@ fn rows_to_events(rows: Rows) -> Result<Vec<Event>, OdbcError> {
     Ok(events)
 }
 
-/// Extracts specified tracking columns from the given object,
-/// saves them to a file if a path is provided.
+/// Extracts declared tracking columns from the final result row as SQL bind text.
 ///
 /// Checkpoint values are stored as the exact SQL parameter text used for ODBC binding
 /// so JSON roundtrips do not lose timestamp timezone formatting.
-async fn extract_and_save_tracking(
-    path: Option<&str>,
+fn extract_tracking(
     obj: Value,
-    tracking_columns: Vec<String>,
+    tracking_columns: &[String],
     tz: Tz,
 ) -> Result<ObjectMap, OdbcError> {
     let Value::Object(obj) = obj else {
@@ -479,11 +606,25 @@ async fn extract_and_save_tracking(
             Value::Bytes(Bytes::from(param)),
         );
     }
-
-    if let Some(path) = path {
-        save_params(path, &save_obj)?;
-    }
     Ok(save_obj)
+}
+
+/// Validates the final-row checkpoint, builds the next in-memory parameter list, then
+/// persists tracking state. Persistence runs only after overlay succeeds so a bind-list
+/// failure cannot advance an on-disk checkpoint that would skip unsent rows.
+fn prepare_tracking_checkpoint(
+    path: Option<&str>,
+    last_row: Value,
+    template: &[OdbcStatementParam],
+    tracking_columns: &[String],
+    tz: Tz,
+) -> Result<Vec<OdbcStatementParam>, OdbcError> {
+    let tracking = extract_tracking(last_row, tracking_columns, tz)?;
+    let next_params = overlay_params(template, &tracking, tracking_columns, tz)?;
+    if let Some(path) = path {
+        save_params(path, &tracking)?;
+    }
+    Ok(next_params)
 }
 
 /// Returns an error when the query result contains duplicate column labels.
@@ -1027,6 +1168,7 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use chrono::TimeZone;
+    use vrl::event_path;
 
     #[test]
     fn rows_to_events_preserves_typed_values() {
@@ -1051,14 +1193,14 @@ mod tests {
             panic!("expected log event");
         };
 
-        assert_eq!(log.get("id").unwrap(), &Value::Integer(1));
-        assert_eq!(log.get("active").unwrap(), &Value::Boolean(true));
+        assert_eq!(log.get(event_path!("id")).unwrap(), &Value::Integer(1));
+        assert_eq!(log.get(event_path!("active")).unwrap(), &Value::Boolean(true));
         assert_eq!(
-            log.get("datetime_col").unwrap(),
+            log.get(event_path!("datetime_col")).unwrap(),
             &Value::Timestamp(timestamp)
         );
         assert_eq!(
-            log.get("date_col").unwrap(),
+            log.get(event_path!("date_col")).unwrap(),
             &Value::Bytes(Bytes::from_static(b"2025-10-04"))
         );
     }
@@ -1404,22 +1546,17 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn extract_and_save_tracking_errors_on_missing_column() {
+    #[test]
+    fn extract_tracking_errors_on_missing_column() {
         let mut obj = ObjectMap::new();
         obj.insert(KeyString::from("id"), Value::Integer(1));
 
-        let error = match extract_and_save_tracking(
-            None,
+        let error = extract_tracking(
             Value::Object(obj),
-            vec!["id".to_owned(), "name".to_owned()],
+            &["id".to_owned(), "name".to_owned()],
             chrono_tz::UTC,
         )
-        .await
-        {
-            Err(error) => error,
-            Ok(_) => panic!("expected missing tracking column error"),
-        };
+        .expect_err("expected missing tracking column error");
 
         assert!(matches!(
             error,
@@ -1427,42 +1564,112 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
-    async fn extract_and_save_tracking_errors_on_invalid_tracking_row() {
-        let error = match extract_and_save_tracking(
-            None,
-            Value::Integer(1),
-            vec!["id".to_owned()],
-            chrono_tz::UTC,
-        )
-        .await
-        {
-            Err(error) => error,
-            Ok(_) => panic!("expected invalid tracking row error"),
-        };
+    #[test]
+    fn extract_tracking_errors_on_null_tracking_value() {
+        let mut obj = ObjectMap::new();
+        obj.insert(KeyString::from("id"), Value::Null);
+
+        let error = extract_tracking(Value::Object(obj), &["id".to_owned()], chrono_tz::UTC)
+            .expect_err("expected invalid tracking value error");
+
+        assert!(matches!(
+            error,
+            OdbcError::InvalidTrackingValue { column } if column == "id"
+        ));
+    }
+
+    #[test]
+    fn extract_tracking_errors_on_invalid_tracking_row() {
+        let error = extract_tracking(Value::Integer(1), &["id".to_owned()], chrono_tz::UTC)
+            .expect_err("expected invalid tracking row error");
 
         assert!(matches!(error, OdbcError::InvalidTrackingRow));
     }
 
-    #[tokio::test]
-    async fn extract_and_save_tracking_persists_declared_columns() {
+    #[test]
+    fn prepare_tracking_checkpoint_does_not_persist_when_extract_fails() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let path = temp_dir.path().join("tracking.json");
+        let path = path.to_str().expect("utf-8 path");
+        let mut obj = ObjectMap::new();
+        obj.insert(KeyString::from("id"), Value::Null);
+        let template = vec![OdbcStatementParam {
+            name: "id".to_owned(),
+            value: "0".to_owned(),
+        }];
+
+        let error = prepare_tracking_checkpoint(
+            Some(path),
+            Value::Object(obj),
+            &template,
+            &["id".to_owned()],
+            chrono_tz::UTC,
+        )
+        .expect_err("expected invalid tracking value");
+
+        assert!(matches!(
+            error,
+            OdbcError::InvalidTrackingValue { column } if column == "id"
+        ));
+        assert!(
+            !std::path::Path::new(path).exists(),
+            "checkpoint must not be written when extract fails"
+        );
+    }
+
+    #[test]
+    fn prepare_tracking_checkpoint_persists_after_overlay() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let path = temp_dir.path().join("tracking.json");
         let path = path.to_str().expect("utf-8 path");
         let mut obj = ObjectMap::new();
         obj.insert(KeyString::from("id"), Value::Integer(42));
         obj.insert(KeyString::from("name"), Value::from("vector"));
+        let template = vec![
+            OdbcStatementParam {
+                name: "tenant_id".to_owned(),
+                value: "acme".to_owned(),
+            },
+            OdbcStatementParam {
+                name: "id".to_owned(),
+                value: "0".to_owned(),
+            },
+            OdbcStatementParam {
+                name: "name".to_owned(),
+                value: "init".to_owned(),
+            },
+        ];
 
-        let saved = extract_and_save_tracking(
+        let next = prepare_tracking_checkpoint(
             Some(path),
             Value::Object(obj),
-            vec!["id".to_owned(), "name".to_owned()],
+            &template,
+            &["id".to_owned(), "name".to_owned()],
             chrono_tz::UTC,
         )
-        .await
-        .expect("saved tracking state");
+        .expect("prepared tracking checkpoint");
 
-        assert_eq!(saved.len(), 2);
+        assert_eq!(
+            next,
+            vec![
+                OdbcStatementParam {
+                    name: "tenant_id".to_owned(),
+                    value: "acme".to_owned(),
+                },
+                OdbcStatementParam {
+                    name: "id".to_owned(),
+                    value: "42".to_owned(),
+                },
+                OdbcStatementParam {
+                    name: "name".to_owned(),
+                    value: "vector".to_owned(),
+                },
+            ]
+        );
+
+        let saved = load_tracking_map(path)
+            .expect("load checkpoint")
+            .expect("checkpoint exists");
         assert_eq!(
             saved.get("id"),
             Some(&Value::Bytes(Bytes::from_static(b"42")))
@@ -1471,7 +1678,6 @@ mod tests {
             saved.get("name"),
             Some(&Value::Bytes(Bytes::from_static(b"vector")))
         );
-        assert!(std::path::Path::new(path).exists());
     }
 
     #[test]

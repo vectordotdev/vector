@@ -70,7 +70,7 @@ const fn get_conn_opt() -> ConnectionOptions {
 }
 
 fn get_value_from_event<'a>(event: &'a Event, key: &str) -> Option<Cow<'a, str>> {
-    event.as_log().get(key)?.as_str()
+    event.as_log().value().as_object()?.get(key)?.as_str()
 }
 
 #[tokio::test]

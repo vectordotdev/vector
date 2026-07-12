@@ -42,7 +42,7 @@ impl InternalEvent for OdbcFailedError<'_> {
                 )
                 .increment(1);
             }
-            OdbcError::SendError { .. } => {
+            OdbcError::SendError { .. } | OdbcError::SendFailedAfterCheckpoint { .. } => {
                 error!(
                     message = "Unable to execute statement.",
                     statement = %self.statement,
