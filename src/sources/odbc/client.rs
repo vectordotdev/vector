@@ -9,16 +9,17 @@ use chrono_tz::Tz;
 use futures::pin_mut;
 use futures_util::StreamExt;
 use itertools::Itertools;
-use odbc_api::buffers::TextRowSet;
+use odbc_api::buffers::{AnySlice, BufferDesc, ColumnarAnyBuffer};
 use odbc_api::parameter::VarCharBox;
 use odbc_api::{
-    ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata, environment,
+    ConnectionOptions, Cursor, DataType, Environment, IntoParameter, ResultSetMetadata, environment,
 };
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::mem;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -45,7 +46,7 @@ const TIMESTAMP_FORMATS: &[&str] = &[
 
 struct Column {
     column_name: String,
-    column_type: odbc_api::DataType,
+    column_type: DataType,
 }
 
 /// Columns of the query result.
@@ -649,6 +650,131 @@ fn ensure_unique_column_names(names: &[String]) -> Result<(), OdbcError> {
     }
 }
 
+/// Returns true for ODBC binary column types that must be fetched with a binary buffer.
+const fn is_binary_data_type(data_type: &DataType) -> bool {
+    matches!(
+        data_type,
+        DataType::Varbinary { .. } | DataType::Binary { .. } | DataType::LongVarbinary { .. }
+    )
+}
+
+/// Caps a driver-reported cell size the same way `TextRowSet::for_cursor` does.
+///
+/// When `max_str_limit` is set, missing reports fall back to that upper bound.
+/// When unset, a missing report cannot allocate a buffer.
+fn capped_buffer_length(
+    reported: Option<usize>,
+    max_str_limit: Option<usize>,
+    buffer_index: u16,
+    batch_size: usize,
+) -> Result<usize, OdbcError> {
+    match max_str_limit {
+        Some(upper_bound) => Ok(reported.unwrap_or(upper_bound).min(upper_bound)),
+        None => reported.ok_or(OdbcError::Db {
+            source: odbc_api::Error::TooLargeColumnBufferSize {
+                buffer_index,
+                num_elements: batch_size,
+                element_size: usize::MAX,
+            },
+        }),
+    }
+}
+
+/// Chooses a fetch buffer for one column.
+///
+/// Binary SQL types use `BufferDesc::Binary` with the octet length (not the hex
+/// display size). All other types stay text so existing timestamp/decimal/tracking
+/// text round-trips are unchanged.
+///
+/// `reported_fallback` is used when the SQL type does not carry a length: binary
+/// columns fall back to `col_octet_length`, text columns to `col_display_size`.
+fn buffer_desc_for_data_type(
+    data_type: &DataType,
+    reported_fallback: Option<usize>,
+    max_str_limit: Option<usize>,
+    buffer_index: u16,
+    batch_size: usize,
+) -> Result<BufferDesc, OdbcError> {
+    if is_binary_data_type(data_type) {
+        let reported = match data_type {
+            DataType::Varbinary { length }
+            | DataType::Binary { length }
+            | DataType::LongVarbinary { length } => {
+                length.map(NonZeroUsize::get).or(reported_fallback)
+            }
+            _ => reported_fallback,
+        };
+        let length = capped_buffer_length(reported, max_str_limit, buffer_index, batch_size)?;
+        Ok(BufferDesc::Binary { length })
+    } else {
+        // Match `TextRowSet::for_cursor` / `utf8_display_sizes`: prefer UTF-8 length
+        // from the SQL type, otherwise use the driver-reported fallback.
+        let reported = data_type
+            .utf8_len()
+            .map(NonZeroUsize::get)
+            .or(reported_fallback);
+        let max_str_len = capped_buffer_length(reported, max_str_limit, buffer_index, batch_size)?;
+        Ok(BufferDesc::Text { max_str_len })
+    }
+}
+
+/// Builds per-column fetch buffers for a result set cursor.
+fn buffer_descs_for_columns(
+    cursor: &mut impl ResultSetMetadata,
+    columns: &[Column],
+    max_str_limit: Option<usize>,
+    batch_size: usize,
+) -> Result<Vec<BufferDesc>, OdbcError> {
+    columns
+        .iter()
+        .enumerate()
+        .map(|(index, column)| {
+            let col_index = (index + 1) as u16;
+            let buffer_index = index as u16;
+
+            let reported_fallback = if is_binary_data_type(&column.column_type) {
+                match &column.column_type {
+                    DataType::Varbinary { length: None }
+                    | DataType::Binary { length: None }
+                    | DataType::LongVarbinary { length: None } => cursor
+                        .col_octet_length(col_index)
+                        .context(DbSnafu)?
+                        .map(NonZeroUsize::get),
+                    _ => None,
+                }
+            } else if column.column_type.utf8_len().is_none() {
+                cursor
+                    .col_display_size(col_index)
+                    .context(DbSnafu)?
+                    .map(NonZeroUsize::get)
+            } else {
+                None
+            };
+
+            buffer_desc_for_data_type(
+                &column.column_type,
+                reported_fallback,
+                max_str_limit,
+                buffer_index,
+                batch_size,
+            )
+        })
+        .collect()
+}
+
+/// Reads one cell from a columnar batch as optional bytes.
+///
+/// Only text and binary column buffers are allocated by [`buffer_descs_for_columns`].
+fn cell_bytes<'a>(column: AnySlice<'a>, row_index: usize) -> Option<&'a [u8]> {
+    if let Some(view) = column.as_bin_view() {
+        view.get(row_index)
+    } else if let Some(view) = column.as_text_view() {
+        view.get(row_index)
+    } else {
+        unreachable!("ODBC fetch buffers are only text or binary")
+    }
+}
+
 /// Executes an ODBC SQL query with optional parameters and invokes `on_batch` for each
 /// fetched batch instead of accumulating the full result set in memory.
 ///
@@ -712,7 +838,8 @@ where
         })
         .collect::<Columns>();
 
-    let buffer = TextRowSet::for_cursor(batch_size, &mut cursor, max_str_limit).context(DbSnafu)?;
+    let descs = buffer_descs_for_columns(&mut cursor, &columns, max_str_limit, batch_size)?;
+    let buffer = ColumnarAnyBuffer::try_from_descs(batch_size, descs).context(DbSnafu)?;
     let mut row_set_cursor = cursor.bind_buffer(buffer).context(DbSnafu)?;
     let mut batch_rows = Rows::with_capacity(batch_size);
 
@@ -728,7 +855,7 @@ where
             for (index, column) in columns.iter().enumerate() {
                 let data_name = &column.column_name;
                 let data_type = &column.column_type;
-                let data_value = batch.at(index, row_index);
+                let data_value = cell_bytes(batch.column(index), row_index);
                 let key = KeyString::from(data_name.as_str());
                 let value = map_value(data_type, data_value, tz);
                 cols.insert(key, value);
@@ -974,25 +1101,33 @@ fn map_timestamp_value(value: &[u8], tz: Tz) -> Value {
 ///
 /// # Arguments
 /// * `data_type`: The ODBC data type.
-/// * `value`: The ODBC value to convert.
+/// * `value`: The ODBC value to convert. Binary columns are raw bytes from a binary
+///   buffer; character and other text-fetched columns are driver text bytes.
 /// * `tz`: The timezone to use for date/time conversions.
 ///
 /// # Returns
 /// A `Value` compatible with Vector events.
-fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Value {
+fn map_value(data_type: &DataType, value: Option<&[u8]>, tz: Tz) -> Value {
     match data_type {
-        // Convert to bytes.
-        odbc_api::DataType::Unknown
-        | odbc_api::DataType::Char { .. }
-        | odbc_api::DataType::WChar { .. }
-        | odbc_api::DataType::Varchar { .. }
-        | odbc_api::DataType::WVarchar { .. }
-        | odbc_api::DataType::LongVarchar { .. }
-        | odbc_api::DataType::WLongVarchar { .. }
-        | odbc_api::DataType::Varbinary { .. }
-        | odbc_api::DataType::Binary { .. }
-        | odbc_api::DataType::Other { .. }
-        | odbc_api::DataType::LongVarbinary { .. } => {
+        // Character / unknown text-fetched columns.
+        DataType::Unknown
+        | DataType::Char { .. }
+        | DataType::WChar { .. }
+        | DataType::Varchar { .. }
+        | DataType::WVarchar { .. }
+        | DataType::LongVarchar { .. }
+        | DataType::WLongVarchar { .. }
+        | DataType::Other { .. } => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            Value::Bytes(Bytes::copy_from_slice(value))
+        }
+
+        // Binary columns are fetched with `BufferDesc::Binary` so these bytes are the
+        // original octet sequence, not ODBC's hex text conversion of binary values.
+        DataType::Varbinary { .. } | DataType::Binary { .. } | DataType::LongVarbinary { .. } => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1001,10 +1136,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         }
 
         // Convert to integer.
-        odbc_api::DataType::TinyInt
-        | odbc_api::DataType::SmallInt
-        | odbc_api::DataType::BigInt
-        | odbc_api::DataType::Integer => {
+        DataType::TinyInt | DataType::SmallInt | DataType::BigInt | DataType::Integer => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1017,9 +1149,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         }
 
         // Convert to float.
-        odbc_api::DataType::Float { .. }
-        | odbc_api::DataType::Real
-        | odbc_api::DataType::Double => {
+        DataType::Float { .. } | DataType::Real | DataType::Double => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1034,7 +1164,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         }
 
         // Preserve exact decimal values from the database.
-        odbc_api::DataType::Decimal { .. } | odbc_api::DataType::Numeric { .. } => {
+        DataType::Decimal { .. } | DataType::Numeric { .. } => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1043,7 +1173,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         }
 
         // Convert to timestamp.
-        odbc_api::DataType::Timestamp { .. } => {
+        DataType::Timestamp { .. } => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1055,7 +1185,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         // instead of a full timestamp such as `1970-01-01 15:30:00`.
         // MariaDB TIME can represent durations outside a clock-of-day range (for example
         // `25:00:00`), so keep the ODBC text even when chrono cannot parse it.
-        odbc_api::DataType::Time { .. } => {
+        DataType::Time { .. } => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1067,7 +1197,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         // instead of a full timestamp such as `2025-10-04 00:00:00`.
         // MariaDB/MySQL zero dates such as `0000-00-00` are not chrono-compatible but
         // remain valid for SQL comparison and tracking parameter binding.
-        odbc_api::DataType::Date => {
+        DataType::Date => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1076,7 +1206,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         }
 
         // Convert to boolean.
-        odbc_api::DataType::Bit => {
+        DataType::Bit => {
             let Some(value) = value else {
                 return Value::Null;
             };
@@ -1138,6 +1268,8 @@ fn resolve_tracking_column_parameter(
 /// Only `Value::Timestamp` is reformatted in `tz` as a naive local datetime.
 /// Byte/string values are preserved as-is so VARCHAR tracking columns that
 /// happen to look like RFC3339 are not coerced into timestamp predicates.
+/// Non-UTF-8 bytes (for example raw `VARBINARY` payloads) cannot be bound as
+/// text parameters and return `None`.
 fn value_to_sql_parameter(value: &Value, tz: Tz) -> Option<String> {
     match value {
         Value::Integer(i) => Some(i.to_string()),
@@ -1194,7 +1326,10 @@ mod tests {
         };
 
         assert_eq!(log.get(event_path!("id")).unwrap(), &Value::Integer(1));
-        assert_eq!(log.get(event_path!("active")).unwrap(), &Value::Boolean(true));
+        assert_eq!(
+            log.get(event_path!("active")).unwrap(),
+            &Value::Boolean(true)
+        );
         assert_eq!(
             log.get(event_path!("datetime_col")).unwrap(),
             &Value::Timestamp(timestamp)
@@ -1231,6 +1366,115 @@ mod tests {
             value_to_sql_parameter(&value, chrono_tz::UTC),
             Some("18446744073709551615".to_owned())
         );
+    }
+
+    #[test]
+    fn map_value_binary_preserves_raw_bytes_not_hex_text() {
+        // ODBC text conversion would turn 0x00FF into ASCII "00FF"; binary fetch must keep
+        // the original octets so event payloads and any future binary binding stay correct.
+        let raw = &[0x00, 0xFF, 0x10];
+        for data_type in [
+            DataType::Varbinary {
+                length: NonZeroUsize::new(3),
+            },
+            DataType::Binary {
+                length: NonZeroUsize::new(3),
+            },
+            DataType::LongVarbinary {
+                length: NonZeroUsize::new(3),
+            },
+        ] {
+            let value = map_value(&data_type, Some(raw), chrono_tz::UTC);
+            assert_eq!(value, Value::Bytes(Bytes::copy_from_slice(raw)));
+            assert_eq!(
+                value_to_sql_parameter(&value, chrono_tz::UTC),
+                None,
+                "non-UTF-8 binary payloads must not bind as text tracking parameters"
+            );
+        }
+    }
+
+    #[test]
+    fn capped_buffer_length_matches_text_row_set_rules() {
+        assert_eq!(
+            capped_buffer_length(Some(8192), Some(4096), 0, 100).unwrap(),
+            4096
+        );
+        assert_eq!(
+            capped_buffer_length(None, Some(4096), 0, 100).unwrap(),
+            4096
+        );
+        assert_eq!(
+            capped_buffer_length(Some(128), Some(4096), 0, 100).unwrap(),
+            128
+        );
+        assert!(matches!(
+            capped_buffer_length(None, None, 2, 50),
+            Err(OdbcError::Db {
+                source: odbc_api::Error::TooLargeColumnBufferSize {
+                    buffer_index: 2,
+                    num_elements: 50,
+                    element_size: usize::MAX,
+                },
+            })
+        ));
+    }
+
+    #[test]
+    fn binary_buffer_desc_uses_octet_length_not_hex_display_size() {
+        // ODBC display_size for VARBINARY(3) is 6 (two hex chars per byte). Fetching with a
+        // text buffer of that size is what caused the hex-text bug; binary buffers must use 3.
+        assert_eq!(
+            DataType::Varbinary {
+                length: NonZeroUsize::new(3),
+            }
+            .display_size()
+            .map(NonZeroUsize::get),
+            Some(6)
+        );
+
+        let desc = buffer_desc_for_data_type(
+            &DataType::Varbinary {
+                length: NonZeroUsize::new(3),
+            },
+            None,
+            Some(4096),
+            0,
+            100,
+        )
+        .unwrap();
+        assert_eq!(desc, BufferDesc::Binary { length: 3 });
+
+        let text_desc = buffer_desc_for_data_type(
+            &DataType::Varchar {
+                length: NonZeroUsize::new(3),
+            },
+            None,
+            Some(4096),
+            0,
+            100,
+        )
+        .unwrap();
+        // VARCHAR(3) UTF-8 buffer is 3 * 4 = 12, matching TextRowSet::for_cursor.
+        assert_eq!(text_desc, BufferDesc::Text { max_str_len: 12 });
+    }
+
+    #[test]
+    fn is_binary_data_type_detects_binary_sql_types() {
+        assert!(is_binary_data_type(&DataType::Varbinary {
+            length: NonZeroUsize::new(16)
+        }));
+        assert!(is_binary_data_type(&DataType::Binary {
+            length: NonZeroUsize::new(16)
+        }));
+        assert!(is_binary_data_type(&DataType::LongVarbinary {
+            length: None
+        }));
+        assert!(!is_binary_data_type(&DataType::Varchar {
+            length: NonZeroUsize::new(16)
+        }));
+        assert!(!is_binary_data_type(&DataType::Unknown));
+        assert!(!is_binary_data_type(&DataType::Integer));
     }
 
     #[test]
@@ -1439,11 +1683,7 @@ mod tests {
 
     #[test]
     fn value_to_sql_parameter_formats_timestamp_in_odbc_timezone() {
-        let value = Value::Timestamp(
-            chrono::Utc
-                .with_ymd_and_hms(2024, 6, 1, 0, 0, 0)
-                .unwrap(),
-        );
+        let value = Value::Timestamp(chrono::Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap());
         assert_eq!(
             value_to_sql_parameter(&value, chrono_tz::Asia::Seoul),
             Some("2024-06-01 09:00:00".to_owned())

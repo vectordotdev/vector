@@ -169,8 +169,9 @@ pub struct OdbcConfig {
     #[serde(default = "default_odbc_batch_size")]
     pub odbc_batch_size: usize,
 
-    /// Maximum string length for ODBC driver operations.
-    /// Set to `0` to omit the upper bound and use driver-reported sizes instead.
+    /// Maximum bytes per cell when allocating ODBC text and binary fetch buffers.
+    /// Caps driver-reported sizes. Set to `0` to omit the upper bound and use
+    /// driver-reported sizes instead.
     /// The default is 4096.
     #[configurable(metadata(docs::examples = 4096))]
     #[serde(default = "default_odbc_max_str_limit")]
@@ -200,6 +201,8 @@ pub struct OdbcConfig {
     ///
     /// Requires `statement_init_params` entries whose names cover every tracking column.
     /// Optional `last_run_metadata_path` overlays checkpointed values onto those entries.
+    /// Prefer non-binary tracking columns: checkpoints bind text parameters, so raw
+    /// `BINARY`/`VARBINARY`/`BYTEA` values that are not valid UTF-8 fail validation.
     ///
     /// # Examples
     ///

@@ -685,6 +685,94 @@ INSERT INTO string_columns (
 }
 
 #[tokio::test]
+async fn query_binary_columns_emit_raw_bytes_not_hex_text() {
+    let conn_str = get_conn_str();
+    let env = odbc_api::environment().unwrap();
+    let conn = env
+        .connect_with_connection_string(&conn_str, get_conn_opt())
+        .unwrap();
+    let _ = conn
+        .execute("DROP TABLE IF EXISTS binary_columns;", (), Some(3))
+        .unwrap();
+    let _ = conn
+        .execute(
+            match get_db_type() {
+                DbType::MariaDb => r#"
+CREATE TABLE binary_columns (
+    id INT PRIMARY KEY,
+    bin_col BINARY(3) NULL,
+    varbin_col VARBINARY(16) NULL,
+    blob_col BLOB NULL
+);
+                "#,
+                DbType::Postgres => r#"
+CREATE TABLE binary_columns (
+    id INT PRIMARY KEY,
+    bin_col BYTEA,
+    varbin_col BYTEA,
+    blob_col BYTEA
+);
+                "#,
+            },
+            (),
+            Some(3),
+        )
+        .unwrap();
+
+    let _ = conn
+        .execute(
+            match get_db_type() {
+                // 0x00FF10 must arrive as three octets, not the ASCII hex text "00FF10".
+                DbType::MariaDb => {
+                    r#"INSERT INTO binary_columns (id, bin_col, varbin_col, blob_col)
+                       VALUES (1, X'00FF10', X'00FF10', X'00FF10');"#
+                }
+                DbType::Postgres => {
+                    r#"INSERT INTO binary_columns (id, bin_col, varbin_col, blob_col)
+                       VALUES (1, '\x00ff10', '\x00ff10', '\x00ff10');"#
+                }
+            },
+            (),
+            Some(3),
+        )
+        .unwrap();
+
+    let rows = collect_query_rows(
+        env,
+        &conn_str,
+        "SELECT * FROM binary_columns;",
+        vec![],
+        Duration::from_secs(3),
+        Duration::from_secs(3),
+        Tz::UTC,
+        10,
+        Some(1000),
+    )
+    .unwrap();
+
+    let Value::Object(row) = &rows[0] else {
+        panic!("No rows returned")
+    };
+
+    let expected = Bytes::from_static(&[0x00, 0xFF, 0x10]);
+    let hex_text_regression = Bytes::from_static(b"00FF10");
+
+    for column in ["bin_col", "varbin_col", "blob_col"] {
+        let value = row.get(column).unwrap_or_else(|| panic!("missing {column}"));
+        assert_eq!(
+            value,
+            &Value::Bytes(expected.clone()),
+            "{column} must be raw binary octets"
+        );
+        assert_ne!(
+            value,
+            &Value::Bytes(hex_text_regression.clone()),
+            "{column} must not be ODBC hex text"
+        );
+    }
+}
+
+#[tokio::test]
 async fn query_timestamp_columns() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
