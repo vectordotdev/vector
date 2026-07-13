@@ -93,12 +93,21 @@ pub enum CounterName {
     SqsS3EventRecordIgnoredTotal,
     ComponentAllocatedBytesTotal,
     ComponentDeallocatedBytesTotal,
+     /// Deprecated: superseded by `MemoryEnrichmentTableFailedInsertionsTotal`. Retained
+    /// temporarily so both names are emitted during a deprecation window.
     MemoryEnrichmentTableFailedInsertions,
+    MemoryEnrichmentTableFailedInsertionsTotal,
+    /// Deprecated: superseded by `MemoryEnrichmentTableFailedReadsTotal`. Retained
+    /// temporarily so both names are emitted during a deprecation window.
     MemoryEnrichmentTableFailedReads,
+    MemoryEnrichmentTableFailedReadsTotal,
     MemoryEnrichmentTableFlushesTotal,
     MemoryEnrichmentTableInsertionsTotal,
     MemoryEnrichmentTableReadsTotal,
+    /// Deprecated: superseded by `MemoryEnrichmentTableTtlExpirationsTotal`. Retained
+    /// temporarily so both names are emitted during a deprecation window.
     MemoryEnrichmentTableTtlExpirations,
+    MemoryEnrichmentTableTtlExpirationsTotal,
     ComponentCpuUsageNsTotal,
     DatadogLogsReservedAttributeConflictsTotal,
 }
@@ -359,13 +368,22 @@ impl CounterName {
             Self::MemoryEnrichmentTableFailedInsertions => {
                 "memory_enrichment_table_failed_insertions"
             }
+            Self::MemoryEnrichmentTableFailedInsertionsTotal => {
+                "memory_enrichment_table_failed_insertions_total"
+            }
             Self::MemoryEnrichmentTableFailedReads => "memory_enrichment_table_failed_reads",
+            Self::MemoryEnrichmentTableFailedReadsTotal => {
+                "memory_enrichment_table_failed_reads_total"
+            }
             Self::MemoryEnrichmentTableFlushesTotal => "memory_enrichment_table_flushes_total",
             Self::MemoryEnrichmentTableInsertionsTotal => {
                 "memory_enrichment_table_insertions_total"
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::MemoryEnrichmentTableTtlExpirationsTotal => {
+                "memory_enrichment_table_ttl_expirations_total"
+            }
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
             Self::DatadogLogsReservedAttributeConflictsTotal => {
                 "datadog_logs_reserved_attribute_conflicts_total"

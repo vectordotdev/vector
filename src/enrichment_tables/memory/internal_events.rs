@@ -82,11 +82,17 @@ impl InternalEvent for MemoryEnrichmentTableTtlExpired<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
+                CounterName::MemoryEnrichmentTableTtlExpirationsTotal,
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+            counter!(
                 CounterName::MemoryEnrichmentTableTtlExpirations,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
+            counter!(CounterName::MemoryEnrichmentTableTtlExpirationsTotal,).increment(1);
             counter!(CounterName::MemoryEnrichmentTableTtlExpirations,).increment(1);
         }
     }
@@ -102,11 +108,17 @@ impl InternalEvent for MemoryEnrichmentTableReadFailed<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
+                CounterName::MemoryEnrichmentTableFailedReadsTotal,
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+            counter!(
                 CounterName::MemoryEnrichmentTableFailedReads,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
+            counter!(CounterName::MemoryEnrichmentTableFailedReadsTotal,).increment(1);
             counter!(CounterName::MemoryEnrichmentTableFailedReads,).increment(1);
         }
     }
@@ -122,11 +134,17 @@ impl InternalEvent for MemoryEnrichmentTableInsertFailed<'_> {
     fn emit(self) {
         if self.include_key_metric_tag {
             counter!(
+                CounterName::MemoryEnrichmentTableFailedInsertionsTotal,
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+            counter!(
                 CounterName::MemoryEnrichmentTableFailedInsertions,
                 "key" => self.key.to_owned()
             )
             .increment(1);
         } else {
+            counter!(CounterName::MemoryEnrichmentTableFailedInsertionsTotal,).increment(1);
             counter!(CounterName::MemoryEnrichmentTableFailedInsertions,).increment(1);
         }
     }
