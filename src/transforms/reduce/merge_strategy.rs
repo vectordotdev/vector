@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use dyn_clone::DynClone;
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
-use vrl::path::OwnedTargetPath;
+use vrl::path::{OwnedSegment, OwnedTargetPath};
 
 use crate::event::{LogEvent, Value};
 
@@ -366,10 +366,14 @@ impl ReduceValueMerger for TimestampWindowMerger {
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(
-            format!("{path}_end").as_str(),
-            Value::Timestamp(self.latest),
-        );
+        // Build "<path>_end" by suffixing the last segment. String
+        // round-tripping via Display fails on quoted/literal paths whose
+        // rendered form isn't valid path syntax once "_end" is appended.
+        let mut end_path = path.clone();
+        if let Some(OwnedSegment::Field(last)) = end_path.path.segments.last_mut() {
+            *last = format!("{last}_end").into();
+        }
+        v.insert(&end_path, Value::Timestamp(self.latest));
         v.insert(path, Value::Timestamp(self.started));
         Ok(())
     }
@@ -937,5 +941,27 @@ mod test {
         let out_path = owned_event_path!("out");
         merger.insert_into(&out_path, &mut output)?;
         Ok(output.remove(&out_path).unwrap())
+    }
+
+    // Regression: `TimestampWindowMerger::insert_into` used to build the
+    // "<path>_end" companion path by round-tripping through `Display` and
+    // `parse_target_path`, which panics when the rendered path form isn't
+    // valid syntax (e.g. quoted/literal segments containing a dot).
+    #[test]
+    fn timestamp_window_merger_handles_quoted_path() {
+        let t1 = Utc::now();
+        let t2 = t1 + chrono::Duration::seconds(5);
+
+        // TimestampWindowMerger is selected implicitly for Timestamp values.
+        let mut merger: Box<dyn ReduceValueMerger> = Value::Timestamp(t1).into();
+        merger.add(Value::Timestamp(t2)).unwrap();
+
+        let mut out = LogEvent::default();
+        let path = vrl::path::parse_target_path("\"foo.bar\"").unwrap();
+        merger.insert_into(&path, &mut out).expect("insert_into");
+
+        assert_eq!(out.get(&path), Some(&Value::Timestamp(t1)));
+        let end_path = vrl::path::parse_target_path("\"foo.bar_end\"").unwrap();
+        assert_eq!(out.get(&end_path), Some(&Value::Timestamp(t2)));
     }
 }

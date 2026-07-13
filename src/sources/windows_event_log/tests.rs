@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use chrono::Utc;
 use vector_lib::config::LogNamespace;
-use vrl::value::Value;
+use vrl::{event_path, value::Value};
 
 use super::{config::*, error::*, parser::*, xml_parser::*};
 use crate::{
@@ -300,27 +300,42 @@ mod parser_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Check core fields
-        assert_eq!(log_event.get("event_id"), Some(&Value::Integer(4624)));
-        assert_eq!(log_event.get("record_id"), Some(&Value::Integer(12345)));
         assert_eq!(
-            log_event.get("level"),
+            log_event.get(event_path!("event_id")),
+            Some(&Value::Integer(4624))
+        );
+        assert_eq!(
+            log_event.get(event_path!("record_id")),
+            Some(&Value::Integer(12345))
+        );
+        assert_eq!(
+            log_event.get(event_path!("level")),
             Some(&Value::Bytes("Information".into()))
         );
-        assert_eq!(log_event.get("level_value"), Some(&Value::Integer(4)));
         assert_eq!(
-            log_event.get("channel"),
+            log_event.get(event_path!("level_value")),
+            Some(&Value::Integer(4))
+        );
+        assert_eq!(
+            log_event.get(event_path!("channel")),
             Some(&Value::Bytes("Security".into()))
         );
         assert_eq!(
-            log_event.get("provider_name"),
+            log_event.get(event_path!("provider_name")),
             Some(&Value::Bytes("Microsoft-Windows-Security-Auditing".into()))
         );
         assert_eq!(
-            log_event.get("computer"),
+            log_event.get(event_path!("computer")),
             Some(&Value::Bytes("WIN-SERVER-01".into()))
         );
-        assert_eq!(log_event.get("process_id"), Some(&Value::Integer(716)));
-        assert_eq!(log_event.get("thread_id"), Some(&Value::Integer(796)));
+        assert_eq!(
+            log_event.get(event_path!("process_id")),
+            Some(&Value::Integer(716))
+        );
+        assert_eq!(
+            log_event.get(event_path!("thread_id")),
+            Some(&Value::Integer(796))
+        );
     }
 
     #[test]
@@ -334,8 +349,8 @@ mod parser_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // XML should be included
-        assert!(log_event.get("xml").is_some());
-        if let Some(Value::Bytes(xml_bytes)) = log_event.get("xml") {
+        assert!(log_event.get(event_path!("xml")).is_some());
+        if let Some(Value::Bytes(xml_bytes)) = log_event.get(event_path!("xml")) {
             let xml_string = String::from_utf8_lossy(xml_bytes);
             assert!(xml_string.contains("<Event xmlns"));
             assert!(xml_string.contains("EventID>4624<"));
@@ -353,7 +368,7 @@ mod parser_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Event data should be included
-        if let Some(Value::Object(event_data)) = log_event.get("event_data") {
+        if let Some(Value::Object(event_data)) = log_event.get(event_path!("event_data")) {
             assert_eq!(
                 event_data.get("TargetUserName"),
                 Some(&Value::Bytes("admin".into()))
@@ -381,12 +396,12 @@ mod parser_tests {
 
         // event_id should be formatted as string
         assert_eq!(
-            log_event.get("event_id"),
+            log_event.get(event_path!("event_id")),
             Some(&Value::Bytes("4624".into()))
         );
 
         // process_id should be formatted as float
-        if let Some(Value::Float(process_id)) = log_event.get("process_id") {
+        if let Some(Value::Float(process_id)) = log_event.get(event_path!("process_id")) {
             assert_eq!(process_id.into_inner(), 716.0);
         } else {
             panic!("process_id should be formatted as float");
@@ -1440,7 +1455,7 @@ mod message_rendering_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Should have fallback message format: "Event ID X from Provider on Computer"
-        if let Some(message) = log_event.get("message") {
+        if let Some(message) = log_event.get(event_path!("message")) {
             let msg_str = message.to_string_lossy();
             assert!(
                 msg_str.contains("Event ID") || msg_str.contains(&event.event_id.to_string()),
@@ -1465,7 +1480,7 @@ mod message_rendering_tests {
 
         let log_event = parser.parse_event(event).unwrap();
 
-        if let Some(message) = log_event.get("message") {
+        if let Some(message) = log_event.get(event_path!("message")) {
             let msg_str = message.to_string_lossy();
             assert_eq!(
                 msg_str, "The service started successfully.",
@@ -1546,7 +1561,7 @@ mod truncation_tests {
         let log_event = parser.parse_event(event).unwrap();
 
         let inserts = log_event
-            .get("string_inserts")
+            .get(event_path!("string_inserts"))
             .expect("string_inserts should be present");
         if let Value::Array(arr) = inserts {
             assert!(!arr.is_empty(), "string_inserts should not be empty");
@@ -1575,7 +1590,7 @@ mod truncation_tests {
 
         let log_event = parser.parse_event(event).unwrap();
 
-        if let Some(Value::Bytes(xml)) = log_event.get("xml") {
+        if let Some(Value::Bytes(xml)) = log_event.get(event_path!("xml")) {
             // XML should be truncated or limited
             assert!(
                 xml.len() <= 40000,

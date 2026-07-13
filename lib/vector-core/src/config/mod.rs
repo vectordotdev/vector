@@ -652,7 +652,7 @@ mod test {
         valid_event
             .metadata_mut()
             .value_mut()
-            .insert(path!("vector").concat("zork"), 32);
+            .insert(path!("vector").concat(path!("zork")), 32);
 
         let valid_event = valid_event.into();
 
@@ -663,7 +663,7 @@ mod test {
         invalid_event
             .metadata_mut()
             .value_mut()
-            .insert(path!("vector").concat("zork"), "noog");
+            .insert(path!("vector").concat(path!("zork")), "noog");
 
         let invalid_event = invalid_event.into();
 

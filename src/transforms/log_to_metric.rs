@@ -1005,8 +1005,10 @@ mod tests {
     }
 
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
+        use vrl::path::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
         let mut log = Event::Log(LogEvent::from("i am a log"));
-        log.as_mut_log().insert(key, value);
+        let path = OwnedTargetPath::event(OwnedValuePath::from(vec![OwnedSegment::field(key)]));
+        log.as_mut_log().insert(&path, value);
         log.as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
         log
@@ -1113,8 +1115,8 @@ mod tests {
         );
 
         let mut event = create_event("message", "i am log");
-        event.as_mut_log().insert("method", "post");
-        event.as_mut_log().insert("code", "200");
+        event.as_mut_log().insert(event_path!("method"), "post");
+        event.as_mut_log().insert(event_path!("code"), "200");
         let mut metadata =
             event
                 .metadata()
@@ -1167,7 +1169,7 @@ mod tests {
         let mut test_dict = ObjectMap::default();
         test_dict.insert("one".into(), Value::from("foo"));
         test_dict.insert("two".into(), Value::from("baz"));
-        log.insert("dict", Value::from(test_dict));
+        log.insert(event_path!("dict"), Value::from(test_dict));
 
         let mut metadata =
             event
@@ -1218,11 +1220,11 @@ mod tests {
 
         let mut map1 = ObjectMap::default();
         map1.insert("key1".into(), Value::from("val1"));
-        log.insert("map1", Value::from(map1));
+        log.insert(event_path!("map1"), Value::from(map1));
 
         let mut map2 = ObjectMap::default();
         map2.insert("l1_key1".into(), Value::from("val2"));
-        log.insert("map2", Value::from(map2));
+        log.insert(event_path!("map2"), Value::from(map2));
 
         let mut metadata =
             event
@@ -1294,7 +1296,7 @@ mod tests {
 
         let mut test_dict = ObjectMap::default();
         test_dict.insert("one".into(), Value::from(vec!["foo", "baz"]));
-        log.insert("dict", Value::from(test_dict));
+        log.insert(event_path!("dict"), Value::from(test_dict));
 
         let metric = do_transform(config, event).await.unwrap().into_metric();
         let tags = metric.tags().expect("Metric should have tags");
@@ -1576,8 +1578,10 @@ mod tests {
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
-        event.as_mut_log().insert("status", "42");
-        event.as_mut_log().insert("backtrace", "message");
+        event.as_mut_log().insert(event_path!("status"), "42");
+        event
+            .as_mut_log()
+            .insert(event_path!("backtrace"), "message");
         let mut metadata =
             event
                 .metadata()
@@ -1638,11 +1642,13 @@ mod tests {
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
-        event.as_mut_log().insert("status", "42");
-        event.as_mut_log().insert("backtrace", "message");
-        event.as_mut_log().insert("host", "local");
-        event.as_mut_log().insert("worker", "abc");
-        event.as_mut_log().insert("service", "xyz");
+        event.as_mut_log().insert(event_path!("status"), "42");
+        event
+            .as_mut_log()
+            .insert(event_path!("backtrace"), "message");
+        event.as_mut_log().insert(event_path!("host"), "local");
+        event.as_mut_log().insert(event_path!("worker"), "abc");
+        event.as_mut_log().insert(event_path!("service"), "xyz");
         let mut metadata =
             event
                 .metadata()
@@ -1819,10 +1825,10 @@ mod tests {
     fn create_log_event_with_namespace(json_str: &str, namespace: Option<&str>) -> Event {
         let mut log_value: Value =
             serde_json::from_str(json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
+        log_value.insert(vrl::path!("timestamp"), ts());
 
         if let Some(namespace) = namespace {
-            log_value.insert("namespace", namespace);
+            log_value.insert(vrl::path!("namespace"), namespace);
         }
 
         let mut metadata = EventMetadata::default();

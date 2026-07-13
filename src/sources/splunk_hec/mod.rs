@@ -1159,7 +1159,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                         .and_then(|e| e.value.clone())
                 });
             if let Some(v) = val {
-                metadata.value_mut().insert(*meta_path, v);
+                metadata.value_mut().insert(
+                    &vrl::path::parse_value_path(meta_path)
+                        .expect("hardcoded splunk_hec metadata path is a valid VRL path"),
+                    v,
+                );
             }
         }
 
@@ -1170,7 +1174,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             .map(|s| Value::from(s.to_string()))
             .or_else(|| self.channel.clone());
         if let Some(ch) = channel {
-            metadata.value_mut().insert("splunk_hec.channel", ch);
+            metadata.value_mut().insert(
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
+                ch,
+            );
         }
 
         metadata
@@ -1745,10 +1753,17 @@ fn raw_event(
                 meta.set_splunk_hec_token(Arc::clone(token));
             }
             if let Some(ref h) = host {
-                meta.value_mut().insert("splunk_hec.host", h.clone());
+                meta.value_mut().insert(
+                    &vrl::path::parse_value_path("splunk_hec.host")
+                        .expect("splunk_hec.host is a valid VRL path"),
+                    h.clone(),
+                );
             }
-            meta.value_mut()
-                .insert("splunk_hec.channel", channel.clone());
+            meta.value_mut().insert(
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
+                channel.clone(),
+            );
             decoder.with_metadata_template(meta)
         };
 
@@ -2390,8 +2405,8 @@ mod tests {
         .await;
 
         let mut log = LogEvent::default();
-        log.insert("greeting", "hello");
-        log.insert("name", "bob");
+        log.insert(event_path!("greeting"), "hello");
+        log.insert(event_path!("name"), "bob");
         sink.run_events(vec![log.into()]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0).into_log();
@@ -2437,7 +2452,7 @@ mod tests {
         .await;
 
         let mut event = LogEvent::default();
-        event.insert("line", "hello");
+        event.insert(event_path!("line"), "hello");
         sink.run_events(vec![event.into()]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
@@ -3447,7 +3462,7 @@ mod tests {
             let event = collect_n(source, 1).await.remove(0);
             let log = event.as_log();
             assert_eq!(log["foo"], "bar".into());
-            assert_eq!(*log.get("nested.k").unwrap(), 1.into());
+            assert_eq!(*log.get(event_path!("nested", "k")).unwrap(), 1.into());
             assert_eq!(
                 log[log_schema().host_key().unwrap().to_string().as_str()],
                 "h".into()
@@ -3634,14 +3649,14 @@ mod tests {
             // The /event request produces one log with `foo=bar`.
             let event_log = events
                 .iter()
-                .find(|e| e.as_log().contains("foo"))
+                .find(|e| e.as_log().contains(event_path!("foo")))
                 .expect("expected /event request to produce a log with `foo` set");
             assert_eq!(event_log.as_log()["foo"], "bar".into());
 
             // The /raw request produces three logs whose messages are the lines.
             let raw_messages: Vec<String> = events
                 .iter()
-                .filter(|e| !e.as_log().contains("foo"))
+                .filter(|e| !e.as_log().contains(event_path!("foo")))
                 .map(|e| {
                     e.as_log()[log_schema().message_key().unwrap().to_string()]
                         .to_string_lossy()

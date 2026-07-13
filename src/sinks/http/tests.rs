@@ -20,6 +20,8 @@ use vector_lib::{
     finalization::AddBatchNotifier,
 };
 
+use vrl::event_path;
+
 use super::{
     config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
     encoder::HttpEncoder,
@@ -295,8 +297,10 @@ async fn http_passes_template_headers() {
         "#},
         || {
             let mut event = Event::Log(LogEvent::from("test message"));
-            event.as_mut_log().insert("level", "info");
-            event.as_mut_log().insert("message", "templated message");
+            event.as_mut_log().insert(event_path!("level"), "info");
+            event
+                .as_mut_log()
+                .insert(event_path!("message"), "templated message");
             event
         },
         10,
@@ -352,7 +356,9 @@ async fn http_template_headers_missing_fields() {
         "#},
         || {
             let mut event = Event::Log(LogEvent::from("good event"));
-            event.as_mut_log().insert("required_field", "present");
+            event
+                .as_mut_log()
+                .insert(event_path!("required_field"), "present");
             event
         },
         10,

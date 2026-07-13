@@ -192,6 +192,7 @@ mod tests {
         codecs::JsonSerializerConfig,
         event::{Event, LogEvent},
     };
+    use vrl::event_path;
 
     use super::*;
     use crate::test_util::{
@@ -226,8 +227,8 @@ mod tests {
     #[test]
     fn encode_event_apply_rules() {
         let mut evt = Event::Log(LogEvent::from("vector"));
-        evt.as_mut_log().insert("magic", "key");
-        evt.as_mut_log().insert("process", "foo");
+        evt.as_mut_log().insert(event_path!("magic"), "key");
+        evt.as_mut_log().insert(event_path!("process"), "foo");
 
         let mut encoder = PapertrailEncoder {
             pid: 0,

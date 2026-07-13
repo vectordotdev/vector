@@ -468,6 +468,8 @@ mod tests {
     };
     use tokio_stream::wrappers::ReceiverStream;
 
+    use vrl::event_path;
+
     use super::*;
     use crate::{
         event::{
@@ -626,11 +628,17 @@ mod tests {
             "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
-                event.insert("name", "Bob");
+                event.insert(event_path!("name"), "Bob");
 
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out, "in").await.as_log().get("name"), None);
+                assert_eq!(
+                    next_event(&out, "in")
+                        .await
+                        .as_log()
+                        .get(event_path!("name")),
+                    None
+                );
             },
         )
         .await;
@@ -671,7 +679,7 @@ mod tests {
             "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
-                event.insert("host", "127.0.0.1");
+                event.insert(event_path!("host"), "127.0.0.1");
                 tx.send(event.into()).await.unwrap();
 
                 assert!(out.lock().await.recv().await.is_some());
@@ -801,7 +809,13 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out, "in").await.as_log().get("junk"), None);
+                assert_eq!(
+                    next_event(&out, "in")
+                        .await
+                        .as_log()
+                        .get(event_path!("junk")),
+                    None
+                );
             },
         )
         .await;
@@ -847,7 +861,13 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out, "in").await.as_log().get("result"), None);
+                assert_eq!(
+                    next_event(&out, "in")
+                        .await
+                        .as_log()
+                        .get(event_path!("result")),
+                    None
+                );
             },
         )
         .await;
@@ -954,8 +974,8 @@ mod tests {
             "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
-                event.insert("name", "Bob");
-                event.insert("friend", "Alice");
+                event.insert(event_path!("name"), "Bob");
+                event.insert(event_path!("friend"), "Alice");
                 tx.send(event.into()).await.unwrap();
 
                 let output = next_event(&out, "in").await;

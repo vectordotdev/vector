@@ -1,0 +1,100 @@
+data_dir: "/var/lib/vector"
+
+# 6 transforms alternating sync and async: parse_json(sync), throttle(async),
+# remap_vrl(sync), dedupe(async), add_fields(sync), reduce(async).
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+  http_source:
+    type: "http"
+    acknowledgements: false
+    address: "0.0.0.0:8282"
+    decoding:
+      codec: "json"
+
+transforms:
+  # SYNC - decode raw_message JSON string into a nested object.
+  parse_raw_message:
+    type: "remap"
+    inputs: ["http_source"]
+    source: |
+      parsed, err = parse_json(string!(.raw_message))
+      if err == null && is_object(parsed) {
+        .raw_message = parsed
+      }
+
+  # ASYNC - per-service rate limiter; threshold is huge, steady-state all-pass.
+  throttle:
+    type: "throttle"
+    inputs: ["parse_raw_message"]
+    threshold: 10000000
+    window_secs: 60
+    key_field: "{{ service }}"
+
+  # SYNC - classify severity from parsed and top-level fields.
+  classify_severity:
+    type: "remap"
+    inputs: ["throttle"]
+    source: |
+      lvl = to_string(.level) ?? "info"
+      status_code = to_int(get!(.raw_message, ["upstream_status"])) ?? 0
+      if status_code >= 500 {
+        .severity_class = "error"
+      } else if status_code >= 400 {
+        .severity_class = "warning"
+      } else if includes(["error", "err", "fatal"], lvl) {
+        .severity_class = "error"
+      } else {
+        .severity_class = "info"
+      }
+      .processed_by = "scale_interleaved"
+
+  # ASYNC - drop duplicates by correlation_id; unique IDs mean every event is a cache miss.
+  dedupe:
+    type: "dedupe"
+    inputs: ["classify_severity"]
+    fields:
+      match:
+        - "correlation_id"
+
+  # SYNC - stamp post-classification pipeline metadata.
+  add_metadata:
+    type: "remap"
+    inputs: ["dedupe"]
+    source: |
+      .pipeline_stage = "classified"
+      .region_canonical = "us-east-1-prod"
+
+  # ASYNC - aggregate per (service, host) = 16 buckets.
+  reduce:
+    type: "reduce"
+    inputs: ["add_metadata"]
+    group_by:
+      - "service"
+      - "host"
+    merge_strategies:
+      log_count: sum
+      error_count: sum
+      latency_ms: max
+      "raw_message.upstream_latency_ms": max
+      "raw_message.retry_count": sum
+      severity_class: retain
+
+sinks:
+  prometheus:
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
+    address: "0.0.0.0:9090"
+
+  http_sink:
+    type: "http"
+    inputs: ["reduce"]
+    uri: "http://localhost:8080"
+    encoding:
+      codec: "json"
+    healthcheck:
+      enabled: false
+    buffer:
+      type: "memory"
+      max_events: 50000

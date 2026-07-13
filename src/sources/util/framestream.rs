@@ -419,6 +419,7 @@ pub fn build_framestream_tcp_source(
             addr,
             listenfd,
             &tls,
+            None, // tls_reloader: not wired for this source
             frame_handler
                 .allowed_origins()
                 .map(|origins| origins.to_vec()),
