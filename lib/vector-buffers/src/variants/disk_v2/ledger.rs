@@ -252,9 +252,8 @@ where
         #[cfg(feature = "antithesis-disk-asserts")]
         {
             #![allow(clippy::disallowed_types)] // once_cell::Lazy
-            antithesis_sdk::assert_always_greater_than_or_equal_to!(
-                next_writer_id - last_reader_id,
-                1u64,
+            antithesis_sdk::assert_always!(
+                next_writer_id > last_reader_id,
                 "ledger get_total_records never underflows on a drained buffer",
                 &serde_json::json!({
                     "next_writer_id": next_writer_id,
