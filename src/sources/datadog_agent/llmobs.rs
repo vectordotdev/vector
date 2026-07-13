@@ -7,16 +7,16 @@ use serde::Deserialize;
 use serde_json::Value;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    config::LegacyKey,
     internal_event::{CountByteSize, InternalEventHandle as _},
     json_size::JsonSize,
-    lookup::event_path,
+    lookup::{event_path, path},
 };
-use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
+use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
 use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, RequestHandler};
 use crate::{
     common::http::ErrorMessage,
-    config::log_schema,
     event::{Event, LogEvent},
     internal_events::DatadogAgentJsonParseError,
 };
@@ -26,7 +26,7 @@ pub(super) fn build_warp_filter(
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     let direct = warp::post()
-        .and(path!("api" / "v2" / "llmobs" / ..))
+        .and(warp_path!("api" / "v2" / "llmobs" / ..))
         .and(warp::path::full())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
@@ -58,7 +58,9 @@ pub(super) fn build_warp_filter(
         });
 
     let evp_proxy = warp::post()
-        .and(path!("evp_proxy" / "v2" / "api" / "v2" / "llmobs" / ..))
+        .and(warp_path!(
+            "evp_proxy" / "v2" / "api" / "v2" / "llmobs" / ..
+        ))
         .and(warp::path::full())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
@@ -147,52 +149,56 @@ pub(crate) fn decode_llmobs_body(
             let tracer_version = item.dd_tracer_version.clone();
             item.spans.into_iter().map(move |span| {
                 let mut log = LogEvent::default();
-                log.insert("span_id", span.span_id);
-                log.insert("trace_id", span.trace_id);
+                log.insert(event_path!("span_id"), span.span_id);
+                log.insert(event_path!("trace_id"), span.trace_id);
                 if let Some(v) = span.parent_id {
-                    log.insert("parent_id", v);
+                    log.insert(event_path!("parent_id"), v);
                 }
                 if let Some(v) = span.name {
-                    log.insert("name", v);
+                    log.insert(event_path!("name"), v);
                 }
                 if let Some(v) = span.session_id {
-                    log.insert("session_id", v);
+                    log.insert(event_path!("session_id"), v);
                 }
                 if let Some(v) = span.service {
-                    log.insert("service", v);
+                    log.insert(event_path!("service"), v);
                 }
                 if let Some(ns) = span.start_ns {
-                    log.insert("start_ns", ns);
-                    if let Some(ts_path) = log_schema().timestamp_key_target_path() {
-                        log.insert(ts_path, Utc.timestamp_nanos(ns));
-                    }
+                    log.insert(event_path!("start_ns"), ns);
+                    source.log_namespace.insert_source_metadata(
+                        DatadogAgentConfig::NAME,
+                        &mut log,
+                        Some(LegacyKey::InsertIfEmpty(path!("timestamp"))),
+                        path!("timestamp"),
+                        Utc.timestamp_nanos(ns),
+                    );
                 }
                 if let Some(v) = span.duration {
-                    log.insert("duration", v);
+                    log.insert(event_path!("duration"), v);
                 }
                 if let Some(v) = span.status {
-                    log.insert("status", v);
+                    log.insert(event_path!("status"), v);
                 }
                 if let Some(v) = span.status_message {
-                    log.insert("status_message", v);
+                    log.insert(event_path!("status_message"), v);
                 }
                 if let Some(v) = span.meta {
-                    log.insert("meta", v);
+                    log.insert(event_path!("meta"), v);
                 }
                 if let Some(v) = span.metrics {
-                    log.insert("metrics", v);
+                    log.insert(event_path!("metrics"), v);
                 }
                 if !span.tags.is_empty() {
-                    log.insert("tags", span.tags.clone());
+                    log.insert(event_path!("tags"), span.tags.clone());
                 }
                 if let Some(v) = span.span_links {
-                    log.insert("span_links", v);
+                    log.insert(event_path!("span_links"), v);
                 }
                 if let Some(v) = span.config {
-                    log.insert("config", v);
+                    log.insert(event_path!("config"), v);
                 }
                 if let Some(v) = span.collection_errors {
-                    log.insert("collection_errors", v);
+                    log.insert(event_path!("collection_errors"), v);
                 }
 
                 // Extract ml_app: first check span._dd.ml_app, then fall back to tags array.
@@ -208,7 +214,7 @@ pub(crate) fn decode_llmobs_body(
                             .find_map(|tag| tag.strip_prefix("ml_app:").map(str::to_owned))
                     });
                 if let Some(app) = ml_app {
-                    log.insert("ml_app", app);
+                    log.insert(event_path!("ml_app"), app);
                 }
 
                 if let Some(v) = tracer_version.clone() {
