@@ -16,7 +16,7 @@ use std::{
 use indexmap::IndexMap;
 use serde_with::serde_as;
 use vector_config::{
-    ConfigurableString, component::GenerateConfig, configurable_component,
+    Configurable, ConfigurableString, component::GenerateConfig, configurable_component,
     schema::generate_root_schema,
 };
 
@@ -701,4 +701,142 @@ fn tagged_enum_with_trailing_untagged_variant_schema() {
         untagged_schemas, 2,
         "expected two untagged variants in schema"
     );
+}
+
+fn generate_test_schema<T>() -> serde_json::Value
+where
+    T: Configurable + 'static,
+{
+    let root = generate_root_schema::<T>().expect("should generate root schema");
+    serde_json::to_value(root.schema).expect("serialize schema to JSON")
+}
+
+fn assert_enum_schema_uses(schema: &serde_json::Value, keyword: &str, variant_count: usize) {
+    let unexpected_keyword = match keyword {
+        "anyOf" => "oneOf",
+        "oneOf" => "anyOf",
+        _ => panic!("unsupported enum schema keyword: {keyword}"),
+    };
+
+    assert!(
+        schema
+            .get(keyword)
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|variants| variants.len() == variant_count),
+        "{keyword} should contain {variant_count} variants: {schema}"
+    );
+    assert!(
+        schema.get(unexpected_keyword).is_none(),
+        "{unexpected_keyword} should be absent: {schema}"
+    );
+}
+
+/// A tagged enum with overlapping trailing untagged numeric variants.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(tag = "type")]
+enum WithOverlappingTrailingUntaggedVariants {
+    /// Tagged struct variant.
+    Tagged {
+        /// Some numeric value.
+        value: u32,
+    },
+    #[serde(untagged)]
+    Integer(i64),
+    #[serde(untagged)]
+    Float(f64),
+}
+
+#[test]
+fn tagged_enum_with_overlapping_trailing_untagged_variants_uses_any_of() {
+    let schema = generate_test_schema::<WithOverlappingTrailingUntaggedVariants>();
+
+    assert_enum_schema_uses(&schema, "anyOf", 3);
+}
+
+/// Untagged struct variants whose required fields can coexist.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedStructVariants {
+    /// A variant requiring `a`.
+    A {
+        /// The `a` value.
+        a: String,
+    },
+    /// A variant requiring `b`.
+    B {
+        /// The `b` value.
+        b: String,
+    },
+}
+
+#[test]
+fn untagged_struct_variants_with_distinct_required_fields_use_any_of() {
+    let schema = generate_test_schema::<UntaggedStructVariants>();
+
+    assert_enum_schema_uses(&schema, "anyOf", 2);
+}
+
+/// Untagged numeric variants with overlapping JSON representations.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedIntegerOrFloat {
+    /// An integer value.
+    Integer(i64),
+    /// A floating-point value.
+    Float(f64),
+}
+
+#[test]
+fn untagged_integer_or_float_schema_uses_any_of() {
+    let schema = generate_test_schema::<UntaggedIntegerOrFloat>();
+
+    assert_enum_schema_uses(&schema, "anyOf", 2);
+}
+
+/// A fixed string value.
+#[derive(Clone, Debug)]
+#[configurable_component]
+enum FixedKind {
+    /// The only accepted kind.
+    #[serde(rename = "kind")]
+    Kind,
+}
+
+/// Untagged variants where a fixed string overlaps a free string.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedFixedOrFreeString {
+    Fixed(FixedKind),
+    Free(String),
+}
+
+#[test]
+fn untagged_fixed_or_free_string_schema_uses_any_of() {
+    let schema = generate_test_schema::<UntaggedFixedOrFreeString>();
+
+    assert_enum_schema_uses(&schema, "anyOf", 2);
+}
+
+/// Untagged variants with disjoint JSON representations.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedStringOrInteger {
+    /// A text value.
+    Text(String),
+    /// An integer value.
+    Number(i64),
+}
+
+#[test]
+fn untagged_disjoint_variants_schema_uses_one_of() {
+    // Disjoint variants can never match the same document, so the more precise `oneOf`
+    // must be preserved rather than widened to `anyOf`.
+    let schema = generate_test_schema::<UntaggedStringOrInteger>();
+
+    assert_enum_schema_uses(&schema, "oneOf", 2);
 }

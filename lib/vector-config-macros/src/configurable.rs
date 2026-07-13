@@ -190,21 +190,21 @@ fn is_enum_schema_potentially_ambiguous(container: &Container, variants: &[Varia
         .expect("enums must always have a tagging mode");
     match tagging {
         Tagging::None => {
-            // If we have fewer than two variants, then there's no ambiguity.
-            if variants.len() < 2 {
-                return false;
-            }
-
-            // All variants must be struct variants (i.e. named fields) otherwise we cannot
-            // reasonably determine if they're ambiguous or not.
-            variants.iter().all(|variant| {
-                let fields = variant.fields();
-                !fields.is_empty() && fields.iter().all(|field| field.ident().is_some())
-            })
+            // Named variants are distinguished by required fields, while scalar and newtype
+            // variants are distinguished by their generated schemas. `EnumDiscriminant` handles
+            // both forms, so every multi-variant untagged enum can be checked for overlap.
+            variants.len() >= 2
         }
-
-        // All other tagging modes have a discriminant, and so can never be ambiguous.
-        _ => false,
+        _ => {
+            // Tagged enums can contain trailing `#[serde(untagged)]` variants. If there are
+            // multiple such variants, collect their discriminants so overlapping fallbacks use
+            // `anyOf`.
+            variants
+                .iter()
+                .filter(|variant| variant.tagging() == &Tagging::None)
+                .count()
+                >= 2
+        }
     }
 }
 
@@ -732,7 +732,10 @@ fn generate_enum_struct_named_variant_schema(
     let maybe_fill_discriminant_map = is_potentially_ambiguous.then(|| {
         let variant_name = variant.ident().to_string();
         quote! {
-            discriminant_map.insert(#variant_name, required.clone());
+            discriminant_map.insert(
+                #variant_name,
+                ::vector_config::schema::EnumDiscriminant::object(),
+            );
         }
     });
 
@@ -764,17 +767,30 @@ fn generate_enum_struct_named_variant_schema(
     }
 }
 
-fn generate_enum_newtype_struct_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStream {
+fn generate_enum_newtype_struct_variant_schema(
+    variant: &Variant<'_>,
+    is_potentially_ambiguous: bool,
+) -> proc_macro2::TokenStream {
     // When we only have a single unnamed field, we basically just treat it as a
     // passthrough, and we generate the schema for that field directly, without any
     // metadata or anything, since things like defaults can't travel from the enum
     // container to a specific variant anyways.
     let field = variant.fields().first().expect("must exist");
     let field_schema = generate_struct_field(field);
+    let maybe_fill_discriminant_map = is_potentially_ambiguous.then(|| {
+        let variant_name = variant.ident().to_string();
+        quote! {
+            discriminant_map.insert(
+                #variant_name,
+                ::vector_config::schema::EnumDiscriminant::schema(subschema.clone()),
+            );
+        }
+    });
 
     quote! {
         {
             #field_schema
+            #maybe_fill_discriminant_map
             subschema
         }
     }
@@ -827,7 +843,10 @@ fn generate_enum_variant_schema(
                     generate_enum_struct_named_variant_schema(variant, None, false),
                 ),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
-                Style::Newtype => (true, generate_enum_newtype_struct_variant_schema(variant)),
+                Style::Newtype => (
+                    true,
+                    generate_enum_newtype_struct_variant_schema(variant, false),
+                ),
                 Style::Unit => (false, generate_enum_variant_tag_schema(variant)),
             };
 
@@ -887,7 +906,7 @@ fn generate_enum_variant_schema(
                 // schema of the wrapped field... and since it has to be a struct or map to be valid for `serde`, that
                 // means it will also be an object schema in both cases, which means our flattening logic will be
                 // correct if the caller is doing The Right Thing (tm).
-                let newtype_schema = generate_enum_newtype_struct_variant_schema(variant);
+                let newtype_schema = generate_enum_newtype_struct_variant_schema(variant, false);
                 let tag_schema = generate_enum_variant_tag_schema(variant);
 
                 quote! {
@@ -932,7 +951,7 @@ fn generate_enum_variant_schema(
                     variant, None, false,
                 )),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
-                Style::Newtype => Some(generate_enum_newtype_struct_variant_schema(variant)),
+                Style::Newtype => Some(generate_enum_newtype_struct_variant_schema(variant, false)),
                 Style::Unit => None,
             }
             .map(|content_schema| {
@@ -989,8 +1008,27 @@ fn generate_enum_variant_schema(
                     is_potentially_ambiguous,
                 ),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
-                Style::Newtype => generate_enum_newtype_struct_variant_schema(variant),
-                Style::Unit => quote! { ::vector_config::schema::generate_null_schema() },
+                Style::Newtype => {
+                    generate_enum_newtype_struct_variant_schema(variant, is_potentially_ambiguous)
+                }
+                Style::Unit => {
+                    let maybe_fill_discriminant_map = is_potentially_ambiguous.then(|| {
+                        let variant_name = variant.ident().to_string();
+                        quote! {
+                            discriminant_map.insert(
+                                #variant_name,
+                                ::vector_config::schema::EnumDiscriminant::schema(schema.clone()),
+                            );
+                        }
+                    });
+                    quote! {
+                        {
+                            let schema = ::vector_config::schema::generate_null_schema();
+                            #maybe_fill_discriminant_map
+                            schema
+                        }
+                    }
+                }
             }
         }
     };

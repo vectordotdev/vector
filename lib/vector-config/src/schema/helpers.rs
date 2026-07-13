@@ -675,32 +675,229 @@ pub(crate) fn assert_string_schema_for_map(
     }
 }
 
+/// A value that distinguishes a generated enum variant from its siblings.
+pub enum EnumDiscriminant {
+    /// A named struct variant.
+    Object,
+    /// The schema of a scalar or newtype variant.
+    Schema(Box<SchemaObject>),
+}
+
+impl EnumDiscriminant {
+    /// Creates a discriminant from a variant schema.
+    pub fn schema(schema: SchemaObject) -> Self {
+        Self::Schema(Box::new(schema))
+    }
+
+    /// Creates a discriminant for a named struct variant.
+    pub const fn object() -> Self {
+        Self::Object
+    }
+}
+
 /// Determines whether an enum schema is ambiguous based on discriminants of its variants.
-///
-/// A discriminant is the set of the named fields which are required, which may be an empty set.
 pub fn has_ambiguous_discriminants(
-    discriminants: &HashMap<&'static str, BTreeSet<String>>,
+    discriminants: &HashMap<&'static str, EnumDiscriminant>,
 ) -> bool {
     // Firstly, if there's less than two discriminants, then there can't be any ambiguity.
     if discriminants.len() < 2 {
         return false;
     }
 
-    // Any empty discriminant is considered ambiguous.
-    if discriminants
+    discriminants
         .values()
-        .any(|discriminant| discriminant.is_empty())
-    {
-        return true;
+        .enumerate()
+        .any(|(index, discriminant)| {
+            discriminants
+                .values()
+                .skip(index + 1)
+                .any(|other| discriminants_overlap(discriminant, other))
+        })
+}
+
+fn discriminants_overlap(left: &EnumDiscriminant, right: &EnumDiscriminant) -> bool {
+    match (left, right) {
+        (EnumDiscriminant::Object, EnumDiscriminant::Object) => true,
+        (EnumDiscriminant::Object, EnumDiscriminant::Schema(schema))
+        | (EnumDiscriminant::Schema(schema), EnumDiscriminant::Object) => {
+            schema_instance_types(schema).is_none_or(|types| types.contains(&InstanceType::Object))
+        }
+        (EnumDiscriminant::Schema(left), EnumDiscriminant::Schema(right)) => {
+            schemas_overlap(left, right)
+        }
+    }
+}
+
+fn schemas_overlap(left: &SchemaObject, right: &SchemaObject) -> bool {
+    match (&left.const_value, &right.const_value) {
+        (Some(left), Some(right)) => left == right,
+        (Some(value), None) => schema_accepts_instance_type(right, instance_type_for_value(value)),
+        (None, Some(value)) => schema_accepts_instance_type(left, instance_type_for_value(value)),
+        (None, None) => match (schema_instance_types(left), schema_instance_types(right)) {
+            (Some(left), Some(right)) => left.iter().any(|left| {
+                right.iter().any(|right| {
+                    left == right
+                        || matches!(
+                            (left, right),
+                            (InstanceType::Integer, InstanceType::Number)
+                                | (InstanceType::Number, InstanceType::Integer)
+                        )
+                })
+            }),
+            // Deliberately conservative: without direct instance types (for example, a nested
+            // const-string schema), we cannot prove the variants disjoint, so use `anyOf`.
+            _ => true,
+        },
+    }
+}
+
+fn schema_accepts_instance_type(schema: &SchemaObject, instance_type: InstanceType) -> bool {
+    schema_instance_types(schema).is_none_or(|types| {
+        types.contains(&instance_type)
+            || matches!(
+                (instance_type, types.as_slice()),
+                (InstanceType::Integer, types) if types.contains(&InstanceType::Number)
+            )
+    })
+}
+
+fn schema_instance_types(schema: &SchemaObject) -> Option<Vec<InstanceType>> {
+    if let Some(const_value) = schema.const_value.as_ref() {
+        return Some(vec![instance_type_for_value(const_value)]);
     }
 
-    // Now collapse the list of discriminants into another set, which will eliminate any duplicate
-    // sets. If there are any duplicate sets, this would also imply ambiguity, since there's not
-    // enough discrimination via required fields.
-    let deduplicated = discriminants.values().cloned().collect::<BTreeSet<_>>();
-    if deduplicated.len() != discriminants.len() {
-        return true;
+    schema.instance_type.as_ref().map(|types| match types {
+        SingleOrVec::Single(instance_type) => vec![**instance_type],
+        SingleOrVec::Vec(instance_types) => instance_types.clone(),
+    })
+}
+
+fn instance_type_for_value(value: &Value) -> InstanceType {
+    match value {
+        Value::Null => InstanceType::Null,
+        Value::Bool(_) => InstanceType::Boolean,
+        Value::Number(number) if number.is_i64() || number.is_u64() => InstanceType::Integer,
+        Value::Number(_) => InstanceType::Number,
+        Value::String(_) => InstanceType::String,
+        Value::Array(_) => InstanceType::Array,
+        Value::Object(_) => InstanceType::Object,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn single_discriminant_is_not_ambiguous() {
+        let discriminants =
+            HashMap::from([("only", EnumDiscriminant::schema(generate_string_schema()))]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
     }
 
-    false
+    #[test]
+    fn const_string_and_string_schema_are_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "fixed",
+                EnumDiscriminant::schema(generate_const_string_schema("kind".to_string())),
+            ),
+            ("free", EnumDiscriminant::schema(generate_string_schema())),
+        ]);
+
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn integer_and_number_schemas_are_ambiguous() {
+        // Every integer also validates as a number, so these variants overlap.
+        let discriminants = HashMap::from([
+            (
+                "int",
+                EnumDiscriminant::schema(generate_number_schema::<i64>()),
+            ),
+            (
+                "float",
+                EnumDiscriminant::schema(generate_number_schema::<f64>()),
+            ),
+        ]);
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn identical_const_strings_are_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "a",
+                EnumDiscriminant::schema(generate_const_string_schema("dup".to_string())),
+            ),
+            (
+                "b",
+                EnumDiscriminant::schema(generate_const_string_schema("dup".to_string())),
+            ),
+        ]);
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn disjoint_scalar_schemas_are_not_ambiguous() {
+        // A string and an integer accept disjoint documents, so `oneOf` is preserved.
+        let discriminants = HashMap::from([
+            ("text", EnumDiscriminant::schema(generate_string_schema())),
+            (
+                "number",
+                EnumDiscriminant::schema(generate_number_schema::<i64>()),
+            ),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn const_string_and_integer_schema_are_not_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "fixed",
+                EnumDiscriminant::schema(generate_const_string_schema("kind".to_string())),
+            ),
+            (
+                "number",
+                EnumDiscriminant::schema(generate_number_schema::<i64>()),
+            ),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn distinct_const_strings_are_not_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "a",
+                EnumDiscriminant::schema(generate_const_string_schema("a".to_string())),
+            ),
+            (
+                "b",
+                EnumDiscriminant::schema(generate_const_string_schema("b".to_string())),
+            ),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn object_discriminants_are_ambiguous() {
+        let discriminants = HashMap::from([
+            ("a", EnumDiscriminant::object()),
+            ("b", EnumDiscriminant::object()),
+        ]);
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn object_and_scalar_schema_are_not_ambiguous() {
+        // An object variant and a scalar variant accept disjoint documents.
+        let discriminants = HashMap::from([
+            ("obj", EnumDiscriminant::object()),
+            ("scalar", EnumDiscriminant::schema(generate_string_schema())),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
 }
