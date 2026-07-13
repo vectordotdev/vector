@@ -66,9 +66,14 @@ mod integration_test {
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config, Default::default())
-            .await
-            .unwrap();
+        self::sink::healthcheck(
+            config,
+            Default::default(),
+            #[cfg(feature = "aws-core")]
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -94,9 +99,14 @@ mod integration_test {
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config, Default::default())
-            .await
-            .unwrap();
+        self::sink::healthcheck(
+            config,
+            Default::default(),
+            #[cfg(feature = "aws-core")]
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -198,8 +208,18 @@ mod integration_test {
             acknowledgements: Default::default(),
         };
         config.clone().to_rdkafka()?;
-        self::sink::healthcheck(config.clone(), Default::default()).await?;
-        KafkaSink::new(config)
+        self::sink::healthcheck(
+            config.clone(),
+            Default::default(),
+            #[cfg(feature = "aws-core")]
+            None,
+        )
+        .await?;
+        KafkaSink::new(
+            config,
+            #[cfg(feature = "aws-core")]
+            None,
+        )
     }
 
     #[tokio::test]
@@ -304,6 +324,7 @@ mod integration_test {
                 username: Some("admin".to_string()),
                 password: Some("admin".to_string().into()),
                 mechanism: Some("PLAIN".to_owned()),
+                ..Default::default()
             }),
             None,
             KafkaCompression::None,
@@ -364,7 +385,12 @@ mod integration_test {
                 events.push(Event::Trace(trace.with_batch_notifier(&batch)));
             }
 
-            let sink = KafkaSink::new(config).unwrap();
+            let sink = KafkaSink::new(
+                config,
+                #[cfg(feature = "aws-core")]
+                None,
+            )
+            .unwrap();
             let sink = VectorSink::from_event_streamsink(sink);
             let stream = map_event_batch_stream(stream::iter(events), Some(batch));
             sink.run(stream).await.unwrap();
@@ -498,7 +524,12 @@ mod integration_test {
 
         if test_telemetry_tags {
             assert_data_volume_sink_compliance(&DATA_VOLUME_SINK_TAGS, async move {
-                let sink = KafkaSink::new(config).unwrap();
+                let sink = KafkaSink::new(
+                config,
+                #[cfg(feature = "aws-core")]
+                None,
+            )
+            .unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })
@@ -506,7 +537,12 @@ mod integration_test {
             .expect("Running sink failed");
         } else {
             assert_sink_compliance(&SINK_TAGS, async move {
-                let sink = KafkaSink::new(config).unwrap();
+                let sink = KafkaSink::new(
+                config,
+                #[cfg(feature = "aws-core")]
+                None,
+            )
+            .unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })

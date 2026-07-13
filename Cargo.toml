@@ -650,6 +650,7 @@ aws-core = [
   "dep:aws-smithy-runtime",
   "dep:aws-smithy-runtime-api",
   "dep:aws-sdk-sts",
+  "dep:base64",
 ]
 
 # Anything that requires Protocol Buffers.
