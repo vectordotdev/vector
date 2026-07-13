@@ -71,12 +71,36 @@ pub struct S3SinkConfig {
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
+    ///
+    /// Ignored when `key` is set.
     #[serde(default = "default_key_prefix")]
     #[configurable(metadata(docs::templateable))]
     #[configurable(metadata(docs::examples = "date=%F/hour=%H"))]
     #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d"))]
     #[configurable(metadata(docs::examples = "application_id={{ application_id }}/date=%F"))]
     pub key_prefix: String,
+
+    /// The full S3 object key template.
+    ///
+    /// When set, this template is rendered for each event and used as the complete object key —
+    /// no timestamp, UUID, or filename extension is appended. The template supports both event
+    /// field substitution (`{{ field }}`) and [`strftime`][chrono_strftime_specifiers] specifiers.
+    ///
+    /// This option takes precedence over `key_prefix`, `filename_time_format`,
+    /// `filename_append_uuid`, and `filename_extension`; those fields are ignored when `key` is
+    /// set. Because Vector does not append a uniqueness token, the user is responsible for
+    /// ensuring keys are unique enough for their workload — events that render to the same key
+    /// overwrite each other in S3.
+    ///
+    /// Events are partitioned across S3 requests by the rendered key, so high-cardinality
+    /// templates produce one S3 request per distinct key value.
+    ///
+    /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+    #[serde(default)]
+    #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(docs::examples = "logs/{{ host }}/%F-{{ message_id }}.json"))]
+    #[configurable(metadata(docs::examples = "{{ application_id }}/%Y/%m/%d/%H-%M-%S.json"))]
+    pub key: Option<String>,
 
     /// The timestamp format for the time component of the object key.
     ///
@@ -93,6 +117,8 @@ pub struct S3SinkConfig {
     ///
     /// When set to an empty string, no timestamp is appended to the key prefix.
     ///
+    /// Ignored when `key` is set.
+    ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_filename_time_format")]
     pub filename_time_format: String,
@@ -105,6 +131,8 @@ pub struct S3SinkConfig {
     ///
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
+    ///
+    /// Ignored when `key` is set.
     #[serde(default = "crate::serde::default_true")]
     #[configurable(metadata(docs::human_name = "Append UUID to Filename"))]
     pub filename_append_uuid: bool,
@@ -112,6 +140,8 @@ pub struct S3SinkConfig {
     /// The filename extension to use in the object key.
     ///
     /// This overrides setting the extension based on the configured `compression`.
+    ///
+    /// Ignored when `key` is set.
     #[configurable(metadata(docs::examples = "json"))]
     pub filename_extension: Option<String>,
 
@@ -199,6 +229,7 @@ impl GenerateConfig for S3SinkConfig {
         toml::Value::try_from(Self {
             bucket: "".to_owned(),
             key_prefix: default_key_prefix(),
+            key: None,
             filename_time_format: default_filename_time_format(),
             filename_append_uuid: true,
             filename_extension: None,
@@ -272,6 +303,16 @@ impl S3SinkConfig {
 
         let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
 
+        let key_template = self
+            .key
+            .as_ref()
+            .map(|k| Template::try_from(k.as_str()).map(|t| t.with_tz_offset(offset)))
+            .transpose()?;
+
+        if key_template.is_some() {
+            self.warn_on_key_field_conflicts();
+        }
+
         let ssekms_key_id = self
             .options
             .ssekms_key_id
@@ -280,7 +321,8 @@ impl S3SinkConfig {
             .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
             .transpose()?;
 
-        let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
+        let partitioner =
+            S3KeyPartitioner::new(key_prefix, ssekms_key_id, None).with_key_template(key_template);
 
         let transformer = self.encoding.transformer();
 
@@ -351,6 +393,28 @@ impl S3SinkConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
+    fn warn_on_key_field_conflicts(&self) {
+        let mut overridden = Vec::with_capacity(4);
+        if self.key_prefix != default_key_prefix() {
+            overridden.push("key_prefix");
+        }
+        if self.filename_time_format != default_filename_time_format() {
+            overridden.push("filename_time_format");
+        }
+        if !self.filename_append_uuid {
+            overridden.push("filename_append_uuid");
+        }
+        if self.filename_extension.is_some() {
+            overridden.push("filename_extension");
+        }
+        if !overridden.is_empty() {
+            warn!(
+                message = "`key` is set on the `aws_s3` sink, so the following fields are ignored.",
+                ignored_fields = ?overridden,
+            );
+        }
+    }
+
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
@@ -374,6 +438,37 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<S3SinkConfig>();
+    }
+
+    #[test]
+    fn parses_key_field() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+            key = "logs/{{ host }}/%F.log"
+
+            [encoding]
+            codec = "text"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.key.as_deref(), Some("logs/{{ host }}/%F.log"));
+    }
+
+    #[test]
+    fn key_defaults_to_none() {
+        let config: S3SinkConfig = toml::from_str(
+            r#"
+            bucket = "test-bucket"
+
+            [encoding]
+            codec = "text"
+            "#,
+        )
+        .unwrap();
+
+        assert!(config.key.is_none());
     }
 
     /// Correct TOML shape: `batch_encoding.codec = "parquet"` with `schema_mode = "auto_infer"`.
@@ -425,6 +520,7 @@ mod tests {
         let config = S3SinkConfig {
             bucket: "test".to_string(),
             key_prefix: super::default_key_prefix(),
+            key: None,
             filename_time_format: super::default_filename_time_format(),
             filename_append_uuid: true,
             filename_extension: None,

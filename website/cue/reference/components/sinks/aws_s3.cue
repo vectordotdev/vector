@@ -175,6 +175,25 @@ components: sinks: aws_s3: components._aws & {
 				filename_time_format = ""
 				filename_append_uuid = false
 				```
+
+				### Specifying the full object key
+
+				If you need full control over the object key — for example, when migrating from
+				Fluentd's `s3` output — use the [`key`](#key) option. When set, `key` is rendered as
+				the complete object key with no timestamp, UUID, or extension appended, and
+				[`key_prefix`](#key_prefix), [`filename_time_format`](#filename_time_format),
+				[`filename_append_uuid`](#filename_append_uuid), and
+				[`filename_extension`](#filename_extension) are ignored:
+
+				```text
+				key = "logs/{{ host }}/%F-{{ message_id }}.json"
+				```
+
+				The template supports both event field substitution (`{{ field }}`) and `strftime`
+				specifiers. Because Vector does not append a uniqueness token in this mode, the
+				template must produce a unique key per object that should not be overwritten — for
+				example, by including a high-cardinality event field such as `message_id` or a
+				timestamp at sub-second precision.
 				"""
 		}
 
