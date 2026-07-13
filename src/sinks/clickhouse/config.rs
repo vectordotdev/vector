@@ -4,8 +4,8 @@ use std::fmt;
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
+use vector_lib::codecs::encoding::{ArrowIpcCompression, ArrowStreamSerializerConfig};
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
@@ -57,6 +57,11 @@ pub enum ClickhouseBatchEncoding {
     ///
     /// This is the streaming variant of the Arrow IPC format, which writes
     /// a continuous stream of record batches.
+    ///
+    /// Note: enabling the `compression` option (any value other than `none`) requires ClickHouse
+    /// 23.11 or newer. Older servers accept the insert but cannot read compressed Arrow IPC, so the
+    /// sink rejects that combination at startup. When it is enabled, the sink also disables the
+    /// top-level HTTP `compression` to avoid double-compressing the payload.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
     ArrowStream(ArrowStreamSerializerConfig),
@@ -218,13 +223,15 @@ impl SinkConfig for ClickhouseConfig {
 
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
+        let compression = self.effective_http_compression();
+
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
             endpoint: endpoint.clone(),
             skip_unknown_fields: self.skip_unknown_fields,
             date_time_best_effort: self.date_time_best_effort,
             insert_random_shard: self.insert_random_shard,
-            compression: self.compression,
+            compression,
             query_settings: self.query_settings,
         };
 
@@ -251,7 +258,7 @@ impl SinkConfig for ClickhouseConfig {
             .await?;
 
         let request_builder = ClickhouseRequestBuilder {
-            compression: self.compression,
+            compression,
             encoder: (self.encoding.clone(), encoder_kind),
         };
 
@@ -279,6 +286,28 @@ impl SinkConfig for ClickhouseConfig {
 }
 
 impl ClickhouseConfig {
+    /// Resolves the HTTP `compression` to apply to requests.
+    ///
+    /// When the `arrow_stream` batch encoding already compresses the IPC buffers, HTTP compression
+    /// is forced off to avoid double-compressing the payload (the sink defaults to `gzip`).
+    fn effective_http_compression(&self) -> Compression {
+        let ipc_compression = match &self.batch_encoding {
+            Some(ClickhouseBatchEncoding::ArrowStream(config)) => config.compression,
+            None => ArrowIpcCompression::None,
+        };
+
+        if ipc_compression != ArrowIpcCompression::None && self.compression != Compression::None {
+            warn!(
+                message = "Arrow IPC buffer compression is enabled; disabling redundant HTTP \
+                    compression to avoid double-compressing the payload.",
+                disabled_http_compression = ?self.compression,
+            );
+            return Compression::None;
+        }
+
+        self.compression
+    }
+
     /// Resolves the encoding strategy (format + encoder) based on configuration.
     ///
     /// This method determines the appropriate ClickHouse format and Vector encoder
@@ -310,6 +339,16 @@ impl ClickhouseConfig {
 
             let ClickhouseBatchEncoding::ArrowStream(arrow_config) = batch_encoding;
             let mut arrow_config = arrow_config.clone();
+
+            // Older ClickHouse servers accept a compressed Arrow IPC insert but fail to read it,
+            // silently dropping the batch. Fail fast at startup instead.
+            super::arrow::ensure_arrow_compression_supported(
+                client,
+                &endpoint.to_string(),
+                auth,
+                arrow_config.compression,
+            )
+            .await?;
 
             self.resolve_arrow_schema(
                 client,

@@ -4,10 +4,12 @@ use std::str::FromStr;
 
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
+use bytes::Bytes;
 use http::{Request, StatusCode};
 use hyper::Body;
 use serde::Deserialize;
 use url::form_urlencoded;
+use vector_lib::codecs::encoding::ArrowIpcCompression;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
 use crate::http::{Auth, HttpClient};
@@ -17,6 +19,10 @@ use super::parser::ClickHouseType;
 /// String constants for ClickHouse column `default_kind` values.
 const COLUMN_KIND_REGULAR: &str = "";
 const COLUMN_KIND_DEFAULT: &str = "DEFAULT";
+
+/// Minimum ClickHouse `(major, minor)` that reliably decodes compressed Arrow IPC buffers
+/// (see <https://github.com/ClickHouse/ClickHouse/pull/47114>).
+pub const MIN_ARROW_IPC_COMPRESSION_VERSION: (u32, u32) = (23, 11);
 
 #[derive(Debug, Deserialize)]
 struct ColumnInfo {
@@ -40,6 +46,37 @@ impl TryFrom<ColumnInfo> for Field {
     }
 }
 
+/// Sends a GET query to the ClickHouse HTTP interface and returns the response body bytes.
+///
+/// `query_string` is the already URL-encoded query string (everything after `?`). Applies auth if
+/// present and errors on any non-`200` status, using `context` to describe the failed operation.
+async fn get_query_bytes(
+    client: &HttpClient,
+    endpoint: &str,
+    query_string: &str,
+    auth: Option<&Auth>,
+    context: &str,
+) -> crate::Result<Bytes> {
+    let uri = format!("{endpoint}?{query_string}");
+    let mut request = Request::get(&uri)
+        .body(Body::empty())
+        .map_err(|e| format!("Failed to build request: {e}"))?;
+
+    if let Some(auth) = auth {
+        auth.apply(&mut request);
+    }
+
+    let response = client.send(request).await?;
+
+    if response.status() != StatusCode::OK {
+        return Err(format!("{context}: HTTP {}", response.status()).into());
+    }
+
+    Ok(http_body::Body::collect(response.into_body())
+        .await?
+        .to_bytes())
+}
+
 /// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.
 pub async fn fetch_table_schema(
     client: &HttpClient,
@@ -57,37 +94,85 @@ pub async fn fetch_table_schema(
          FORMAT JSONEachRow"
     );
 
-    // Build URI with query and parameters
     let query_string = form_urlencoded::Serializer::new(String::new())
         .append_pair("query", &query)
         .append_pair("param_db", database)
         .append_pair("param_tbl", table)
         .finish();
-    let uri = format!("{endpoint}?{query_string}");
-    let mut request = Request::get(&uri)
-        .body(Body::empty())
-        .map_err(|e| format!("Failed to build request: {e}"))?;
 
-    if let Some(auth) = auth {
-        auth.apply(&mut request);
+    let body_bytes = get_query_bytes(
+        client,
+        endpoint,
+        &query_string,
+        auth,
+        "Failed to fetch schema from ClickHouse",
+    )
+    .await?;
+
+    // Pass bytes directly instead of converting to a UTF-8 String first
+    parse_schema_from_response(&body_bytes)
+}
+
+/// Returns an error if `compression` is requested but the ClickHouse server is too old to decode
+/// compressed Arrow IPC. Older servers accept the insert but fail to read it, so this is checked
+/// once at startup to fail fast rather than silently dropping data at runtime.
+pub async fn ensure_arrow_compression_supported(
+    client: &HttpClient,
+    endpoint: &str,
+    auth: Option<&Auth>,
+    compression: ArrowIpcCompression,
+) -> crate::Result<()> {
+    if compression == ArrowIpcCompression::None {
+        return Ok(());
     }
 
-    let response = client.send(request).await?;
-
-    if response.status() != StatusCode::OK {
+    let (major, minor) = fetch_server_version(client, endpoint, auth).await?;
+    let (min_major, min_minor) = MIN_ARROW_IPC_COMPRESSION_VERSION;
+    if (major, minor) < (min_major, min_minor) {
         return Err(format!(
-            "Failed to fetch schema from ClickHouse: HTTP {}",
-            response.status()
+            "Arrow IPC compression requires ClickHouse >= {min_major}.{min_minor}, but the server \
+             reported {major}.{minor}. Set the batch encoding 'compression' to 'none' or upgrade \
+             ClickHouse."
         )
         .into());
     }
 
-    let body_bytes = http_body::Body::collect(response.into_body())
-        .await?
-        .to_bytes();
+    Ok(())
+}
 
-    // Pass bytes directly instead of converting to a UTF-8 String first
-    parse_schema_from_response(&body_bytes)
+/// Fetches the ClickHouse server version, returning it as a `(major, minor)` tuple.
+async fn fetch_server_version(
+    client: &HttpClient,
+    endpoint: &str,
+    auth: Option<&Auth>,
+) -> crate::Result<(u32, u32)> {
+    let query_string = form_urlencoded::Serializer::new(String::new())
+        .append_pair("query", "SELECT version() FORMAT TabSeparated")
+        .finish();
+
+    let body_bytes = get_query_bytes(
+        client,
+        endpoint,
+        &query_string,
+        auth,
+        "Failed to query ClickHouse version",
+    )
+    .await?;
+
+    parse_version(std::str::from_utf8(&body_bytes)?)
+}
+
+/// Parses a ClickHouse version string (e.g. `24.3.1.2823`) into a `(major, minor)` tuple.
+pub(crate) fn parse_version(raw: &str) -> crate::Result<(u32, u32)> {
+    let trimmed = raw.trim();
+    let mut parts = trimmed.split('.');
+    match (
+        parts.next().and_then(|s| s.parse::<u32>().ok()),
+        parts.next().and_then(|s| s.parse::<u32>().ok()),
+    ) {
+        (Some(major), Some(minor)) => Ok((major, minor)),
+        _ => Err(format!("Could not parse ClickHouse version from '{trimmed}'").into()),
+    }
 }
 
 /// Parses the JSONEachRow response from ClickHouse and builds an Arrow schema.
@@ -155,6 +240,23 @@ mod tests {
     use super::*;
     use arrow::datatypes::{DataType, TimeUnit};
     use indoc::indoc;
+
+    #[test]
+    fn test_parse_version() {
+        assert_eq!(parse_version("24.3.1.2823").unwrap(), (24, 3));
+        assert_eq!(parse_version("23.8.16.16\n").unwrap(), (23, 8));
+        assert_eq!(parse_version("25.12.11.4").unwrap(), (25, 12));
+        assert!(parse_version("not-a-version").is_err());
+        assert!(parse_version("").is_err());
+    }
+
+    #[test]
+    fn test_min_version_boundary() {
+        // 23.10 must be rejected, 23.11 (the confirmed floor) must be accepted.
+        assert!((23, 10) < MIN_ARROW_IPC_COMPRESSION_VERSION);
+        assert!((23, 11) >= MIN_ARROW_IPC_COMPRESSION_VERSION);
+        assert!((24, 1) >= MIN_ARROW_IPC_COMPRESSION_VERSION);
+    }
 
     #[test]
     fn test_parse_schema() {

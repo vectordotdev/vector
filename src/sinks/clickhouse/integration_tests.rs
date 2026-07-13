@@ -18,7 +18,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::{Duration, timeout};
 use vector_lib::{
-    codecs::encoding::ArrowStreamSerializerConfig,
+    codecs::encoding::{ArrowIpcCompression, ArrowStreamSerializerConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
     lookup::PathPrefix,
 };
@@ -29,7 +29,10 @@ use crate::{
     codecs::{TimestampFormat, Transformer},
     config::{SinkConfig, SinkContext, log_schema},
     sinks::{
-        clickhouse::config::{ClickhouseBatchEncoding, ClickhouseConfig},
+        clickhouse::{
+            arrow::schema::parse_version,
+            config::{ClickhouseBatchEncoding, ClickhouseConfig},
+        },
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
@@ -41,6 +44,16 @@ use vector_lib::metrics::Controller;
 
 fn clickhouse_address() -> String {
     std::env::var("CLICKHOUSE_ADDRESS").unwrap_or_else(|_| "http://localhost:8123".into())
+}
+
+/// Asserts a value from a ClickHouse JSON response holds an integer. ClickHouse renders Int64 as a
+/// quoted string on older versions and as an unquoted JSON number on newer ones, so accept either.
+fn assert_is_integer(value: Option<&Value>, field: &str) {
+    let value = value.unwrap_or_else(|| panic!("{field} column should be present"));
+    assert!(
+        value.as_i64().is_some() || value.as_str().and_then(|s| s.parse::<i64>().ok()).is_some(),
+        "{field} should be an integer, got: {value:?}"
+    );
 }
 
 #[tokio::test]
@@ -457,6 +470,19 @@ impl ClickhouseClient {
         }
     }
 
+    /// Returns the server's `(major, minor)` version, e.g. `24.3.1.2823` -> `(24, 3)`.
+    async fn server_version(&self) -> (u32, u32) {
+        let response = self
+            .client
+            .post(&self.host)
+            .body("SELECT version()")
+            .send()
+            .await
+            .unwrap();
+        let text = response.text().await.unwrap();
+        parse_version(&text).unwrap()
+    }
+
     async fn select_all(&self, table: &str) -> QueryResponse {
         let response = self
             .client
@@ -547,13 +573,126 @@ async fn insert_events_arrow_format() {
     for row in output.data.iter() {
         assert!(row.get("host").and_then(|v| v.as_str()).is_some());
         assert!(row.get("message").and_then(|v| v.as_str()).is_some());
-        assert!(
-            row.get("count")
-                .and_then(|v| v.as_str())
-                .and_then(|s| s.parse::<i64>().ok())
-                .is_some()
-        );
+        assert_is_integer(row.get("count"), "count");
     }
+}
+
+// Verifies ClickHouse can decode an Arrow IPC stream whose record batch buffers were compressed
+// with the given codec. The HTTP `Content-Encoding` is left off (`Compression::None`) so this
+// exercises the IPC block compression in isolation.
+async fn assert_arrow_ipc_compression_round_trips(compression: ArrowIpcCompression) {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let client = ClickhouseClient::new(host.clone());
+
+    // Compressed Arrow IPC (any codec) needs ClickHouse >= 23.11; older servers reject typical
+    // small batches with CANNOT_READ_ALL_DATA. The sink guards against this at build time.
+    if client.server_version().await < (23, 11) {
+        return;
+    }
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(5);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig {
+                compression,
+                ..Default::default()
+            },
+        )),
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    client
+        .create_table(
+            &table,
+            "host String, timestamp DateTime64(3), message String, count Int64",
+        )
+        .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..5 {
+        let mut event = LogEvent::from(format!("log message {}", i));
+        event.insert("host", format!("host{}.example.com", i));
+        event.insert("count", i as i64);
+        events.push(event.into());
+    }
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    let output = client.select_all(&table).await;
+    assert_eq!(
+        5, output.rows,
+        "ClickHouse should decode all rows from the {compression:?}-compressed Arrow IPC stream"
+    );
+
+    for row in output.data.iter() {
+        assert!(row.get("host").and_then(|v| v.as_str()).is_some());
+        assert!(row.get("message").and_then(|v| v.as_str()).is_some());
+        assert_is_integer(row.get("count"), "count");
+    }
+}
+
+#[tokio::test]
+async fn insert_events_arrow_format_zstd_compression() {
+    assert_arrow_ipc_compression_round_trips(ArrowIpcCompression::Zstd).await;
+}
+
+#[tokio::test]
+async fn insert_events_arrow_format_lz4_compression() {
+    assert_arrow_ipc_compression_round_trips(ArrowIpcCompression::Lz4Frame).await;
+}
+
+// On ClickHouse older than 23.11, the sink must reject Arrow IPC compression at build time rather
+// than let it silently drop data at runtime. Trivially skips on newer servers.
+#[tokio::test]
+async fn arrow_compression_rejected_on_old_clickhouse() {
+    trace_init();
+
+    let host = clickhouse_address();
+    let client = ClickhouseClient::new(host.clone());
+    if client.server_version().await >= (23, 11) {
+        return;
+    }
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(5);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: random_table_name().try_into().unwrap(),
+        compression: Compression::None,
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig {
+                compression: ArrowIpcCompression::Zstd,
+                ..Default::default()
+            },
+        )),
+        batch,
+        ..Default::default()
+    };
+
+    let result = config.build(SinkContext::default()).await;
+    assert!(
+        result.is_err(),
+        "sink should reject Arrow IPC compression on ClickHouse older than 23.11"
+    );
 }
 
 #[tokio::test]
@@ -623,12 +762,7 @@ async fn insert_events_arrow_with_schema_fetching() {
         assert!(row.get("timestamp").is_some());
 
         // Check custom fields have correct types
-        assert!(
-            row.get("id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| s.parse::<i64>().ok())
-                .is_some()
-        );
+        assert_is_integer(row.get("id"), "id");
         assert!(row.get("name").and_then(|v| v.as_str()).is_some());
         assert!(row.get("score").and_then(|v| v.as_f64()).is_some());
         assert!(row.get("active").and_then(|v| v.as_bool()).is_some());

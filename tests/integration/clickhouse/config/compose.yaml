@@ -3,6 +3,9 @@ version: "3"
 services:
   clickhouse:
     image: docker.io/clickhouse/clickhouse-server:${CONFIG_VERSION}
+    environment:
+      # ClickHouse >= 25 requires a password for the default user unless user setup is skipped.
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
 
 networks:
   default:
