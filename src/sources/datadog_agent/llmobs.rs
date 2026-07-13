@@ -103,6 +103,25 @@ struct LLMObsEnvelopeItem {
     _dd_scope: Option<String>,
 }
 
+/// The Datadog Agent and SDK clients (e.g. dd-trace-py's `LLMObsSpanEncoder`) POST a single
+/// JSON object envelope. Some fixtures/tools may send a JSON array of envelopes instead.
+/// Accept both shapes.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LLMObsEnvelope {
+    Single(LLMObsEnvelopeItem),
+    Multiple(Vec<LLMObsEnvelopeItem>),
+}
+
+impl LLMObsEnvelope {
+    fn into_items(self) -> Vec<LLMObsEnvelopeItem> {
+        match self {
+            LLMObsEnvelope::Single(item) => vec![item],
+            LLMObsEnvelope::Multiple(items) => items,
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct LLMObsSpan {
     span_id: String,
@@ -132,13 +151,15 @@ pub(crate) fn decode_llmobs_body(
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let envelope: Vec<LLMObsEnvelopeItem> = serde_json::from_slice(&body).map_err(|error| {
-        emit!(DatadogAgentJsonParseError { error: &error });
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Error parsing JSON: {error:?}"),
-        )
-    })?;
+    let envelope: Vec<LLMObsEnvelopeItem> = serde_json::from_slice::<LLMObsEnvelope>(&body)
+        .map_err(|error| {
+            emit!(DatadogAgentJsonParseError { error: &error });
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Error parsing JSON: {error:?}"),
+            )
+        })?
+        .into_items();
 
     let now = Utc::now();
     let mut event_bytes_received = JsonSize::zero();

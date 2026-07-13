@@ -2911,6 +2911,46 @@ fn test_decode_llmobs_body() {
 }
 
 #[test]
+fn test_decode_llmobs_body_single_envelope() {
+    // Real SDK clients (e.g. dd-trace-py's `LLMObsSpanEncoder`) POST a single JSON object,
+    // not a JSON array of objects.
+    let body = Bytes::from(
+        r#"{
+            "_dd.stage": "raw",
+            "event_type": "span",
+            "_dd.tracer_version": "2.17.0",
+            "spans": [{
+                "span_id": "abc123",
+                "trace_id": "xyz789",
+                "name": "my.workflow",
+                "start_ns": 1707763310981223236,
+                "duration": 12345678900,
+                "status": "ok",
+                "meta": { "span": { "kind": "llm" }, "model_name": "gpt-4" },
+                "metrics": { "input_tokens": 64, "output_tokens": 128 },
+                "tags": ["env:prod", "service:myapp"],
+                "_dd": { "ml_app": "my-llm-app" }
+            }]
+        }"#,
+    );
+
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
+    assert_eq!(events.len(), 1);
+
+    let log = events[0].as_log();
+    assert_eq!(log["span_id"], "abc123".into());
+    assert_eq!(log["trace_id"], "xyz789".into());
+    assert_eq!(log["name"], "my.workflow".into());
+    assert_eq!(log["status"], "ok".into());
+    assert_eq!(log["ml_app"], "my-llm-app".into());
+    assert_eq!(
+        log["_dd"].as_object().unwrap()["tracer_version"],
+        "2.17.0".into()
+    );
+}
+
+#[test]
 fn test_decode_llmobs_body_empty_spans() {
     let body = Bytes::from(r#"[{"event_type": "span", "spans": []}]"#);
     let source = make_llmobs_source();
