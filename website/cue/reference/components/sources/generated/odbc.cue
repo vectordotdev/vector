@@ -28,9 +28,13 @@ generated: components: sources: odbc: configuration: {
 			If the file does not exist or the path is not specified, the initial values from
 			`statement_init_params` are used.
 
-			Tracking metadata is written only after all result batches are converted and sent.
-			If saving fails after events were already sent, the previous tracking values are kept
-			and the next scheduled run may emit duplicate rows.
+			When tracking is enabled, the full query result is buffered, the final-row checkpoint
+			is validated and written here, and only then are events emitted. A missing or
+			unbindable tracking value fails the poll before any emit (avoiding infinite replay).
+			A send failure after a successful checkpoint write may skip those rows on the next
+			run (at-most-once). The in-memory overlay is also advanced in that case so tracking
+			without `last_run_metadata_path` does not replay already-emitted rows. Prefer
+			incremental queries so the buffered result stays bounded.
 
 			Parent directories are created automatically if they do not exist.
 
@@ -39,7 +43,7 @@ generated: components: sources: odbc: configuration: {
 			If `tracking_columns = ["id", "name"]`, it is saved as the following JSON data.
 
 			```json
-			{"id":1, "name": "vector"}
+			{"id":"42","name":"vector"}
 			```
 			"""
 		required: false
@@ -97,8 +101,9 @@ generated: components: sources: odbc: configuration: {
 	}
 	odbc_max_str_limit: {
 		description: """
-			Maximum string length for ODBC driver operations.
-			Set to `0` to omit the upper bound and use driver-reported sizes instead.
+			Maximum bytes per cell when allocating ODBC text and binary fetch buffers.
+			Caps driver-reported sizes. Set to `0` to omit the upper bound and use
+			driver-reported sizes instead.
 			The default is 4096.
 			"""
 		required: false
@@ -236,12 +241,16 @@ generated: components: sources: odbc: configuration: {
 			Their values overlay matching entries in `statement_init_params` on later runs while
 			preserving the declared bind order.
 
-			Tracking metadata is saved only after all result batches are converted and sent.
-			If a run fails partway through, the previous tracking values are kept so rows are
-			not skipped on the next scheduled run.
+			When set, result batches are buffered until the query finishes; the final-row
+			checkpoint is validated (and persisted when `last_run_metadata_path` is set) before
+			any events are emitted. That avoids replaying the same rows when the last row is
+			missing a tracking column or has an unbindable value such as null.
+			Prefer incremental/`WHERE` bounded queries so buffering stays memory-safe.
 
 			Requires `statement_init_params` entries whose names cover every tracking column.
 			Optional `last_run_metadata_path` overlays checkpointed values onto those entries.
+			Prefer non-binary tracking columns: checkpoints bind text parameters, so raw
+			`BINARY`/`VARBINARY`/`BYTEA` values that are not valid UTF-8 fail validation.
 
 			# Examples
 

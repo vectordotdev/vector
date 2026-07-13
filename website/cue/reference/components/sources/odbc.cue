@@ -28,11 +28,12 @@ components: sources: odbc: {
 		requirements: []
 		warnings: [
 			"""
-				When `last_run_metadata_path` is set, tracking metadata is updated only after
-				all result batches are converted and sent. If saving the checkpoint then fails,
-				previous tracking values are kept and the next scheduled run may re-emit the
-				same rows. If Vector restarts after a successful checkpoint write but before
-				downstream delivery is fully acknowledged, rows can still be lost because this
+				When `last_run_metadata_path` is set, the query result is buffered and the
+				final-row tracking checkpoint is validated and saved before any batches are
+				sent. If the checkpoint save succeeds but downstream delivery then fails (or
+				Vector restarts before delivery is complete), those rows may be skipped on the
+				next run (at-most-once). If the checkpoint save itself fails, previous tracking
+				values are kept and the next scheduled run may re-emit the same rows. This
 				source does not provide acknowledgements.
 				""",
 			"""
