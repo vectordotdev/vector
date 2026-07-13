@@ -33,7 +33,7 @@ use crate::{
             TowerRequestConfig, timezone_to_offset,
         },
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -184,6 +184,9 @@ pub struct S3SinkConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -216,6 +219,7 @@ impl GenerateConfig for S3SinkConfig {
             timezone: Default::default(),
             force_path_style: Default::default(),
             retry_strategy: Default::default(),
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -271,6 +275,7 @@ impl S3SinkConfig {
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
+        let key_prefix = key_prefix.confine(&self.confinement, Self::NAME, "key_prefix")?;
 
         let ssekms_key_id = self
             .options
@@ -278,6 +283,8 @@ impl S3SinkConfig {
             .as_ref()
             .cloned()
             .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .transpose()?
+            .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
             .transpose()?;
 
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
@@ -370,6 +377,7 @@ impl S3SinkConfig {
 #[cfg(test)]
 mod tests {
     use super::S3SinkConfig;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
@@ -441,6 +449,7 @@ mod tests {
             timezone: Default::default(),
             force_path_style: true,
             retry_strategy: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
@@ -578,5 +587,43 @@ mod tests {
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
         assert_eq!(p.schema_mode, ParquetSchemaMode::Strict);
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_key_prefix() {
+        let template: Template = "{{ tenant }}".try_into().unwrap();
+        let err = template
+            .confine(&ConfinementConfig::default(), "aws_s3", "key_prefix")
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("no literal string prefix"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_key_prefix() {
+        let cfg = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let template: Template = "{{ tenant }}".try_into().unwrap();
+        assert!(template.confine(&cfg, "aws_s3", "key_prefix").is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::Event;
+        use vector_lib::event::LogEvent;
+        use vrl::event_path;
+
+        let template: Template = "safe/{{ tenant }}/".try_into().unwrap();
+        let template = template
+            .confine(&ConfinementConfig::default(), "aws_s3", "key_prefix")
+            .unwrap();
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../escape");
+        assert!(template.render_string(&event).is_err());
     }
 }

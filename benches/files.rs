@@ -56,7 +56,7 @@ fn build_file_benchmark_environment(
             internal_metrics: Default::default(),
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: Default::default(),
         },
     );
 
@@ -128,7 +128,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                         internal_metrics: Default::default(),
                         truncate: Default::default(),
                         base_dir: None,
-                        dangerously_allow_unconfined_path: false,
+                        confinement: Default::default(),
                     },
                 );
 

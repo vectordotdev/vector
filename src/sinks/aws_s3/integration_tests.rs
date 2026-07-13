@@ -736,6 +736,7 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
         timezone: Default::default(),
         force_path_style: true,
         retry_strategy: Default::default(),
+        confinement: Default::default(),
     }
 }
 

@@ -9,7 +9,9 @@ use vrl::path::OwnedTargetPath;
 
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
-    internal_events::{SplunkEventTimestampInvalidType, SplunkEventTimestampMissing},
+    internal_events::{
+        SplunkEventTimestampInvalidType, SplunkEventTimestampMissing, TemplateRenderingError,
+    },
     sinks::{
         prelude::*,
         splunk_hec::common::{
@@ -18,6 +20,7 @@ use crate::{
         },
         util::processed_event::ProcessedEvent,
     },
+    template::Template,
 };
 
 // NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
@@ -71,8 +74,36 @@ where
         };
         let batch_settings = self.batch_settings;
 
+        // Clones for the confined-event pre-filter below.  Templates are also
+        // cloned into the EventPartitioner further down; both clones are needed
+        // because `EventPartitioner::partition` has no way to signal "drop this
+        // event" — a `None` key still sends the event without metadata.
+        let source_check = self.source.clone();
+        let sourcetype_check = self.sourcetype.clone();
+        let index_check = self.index.clone();
+
         input
             .map(move |event| process_log(event, &data))
+            // Pre-check partition templates for confinement violations.
+            // For the Raw endpoint a None partition key still routes to Splunk
+            // (without metadata), so we must drop here rather than inside
+            // `partition`. For the Event endpoint the metadata is embedded in
+            // the event body; a Confined render would silently omit the field,
+            // so we drop here for both endpoint types.
+            .filter_map(move |event| {
+                future::ready(
+                    if has_confined_partition_error(
+                        &event,
+                        source_check.as_ref(),
+                        sourcetype_check.as_ref(),
+                        index_check.as_ref(),
+                    ) {
+                        None
+                    } else {
+                        Some(event)
+                    },
+                )
+            })
             .batched_partitioned(
                 if self.endpoint_target == EndpointTarget::Raw {
                     // We only need to partition by the metadata fields for the raw endpoint since those fields
@@ -119,6 +150,38 @@ where
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
+}
+
+/// Returns `true` if any of the given partition templates produce a
+/// `Confined` render error for this event, emitting the appropriate internal
+/// event for each violation.  Used to pre-filter events before batching so
+/// that confinement violations result in event drops rather than silent
+/// metadata omission.
+fn has_confined_partition_error(
+    event: &HecProcessedEvent,
+    source: Option<&Template>,
+    sourcetype: Option<&Template>,
+    index: Option<&Template>,
+) -> bool {
+    let mut confined = false;
+    for (tpl, field) in [
+        (source, SOURCE_FIELD),
+        (sourcetype, SOURCETYPE_FIELD),
+        (index, INDEX_FIELD),
+    ] {
+        if let Some(error) = tpl
+            .and_then(|t| t.render_string(&event.event).err())
+            .filter(|e| matches!(e, crate::template::TemplateRenderingError::Confined { .. }))
+        {
+            confined = true;
+            emit!(TemplateRenderingError {
+                error,
+                field: Some(field),
+                drop_event: true,
+            });
+        }
+    }
+    confined
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]

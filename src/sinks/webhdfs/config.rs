@@ -18,6 +18,7 @@ use crate::{
             partitioner::KeyPartitioner,
         },
     },
+    template::{ConfinementConfig, Template},
 };
 
 /// Configuration for the `webhdfs` sink.
@@ -73,6 +74,9 @@ pub struct WebHdfsConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl GenerateConfig for WebHdfsConfig {
@@ -91,6 +95,7 @@ impl GenerateConfig for WebHdfsConfig {
             batch: BatchConfig::default(),
 
             acknowledgements: Default::default(),
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -159,7 +164,81 @@ impl WebHdfsConfig {
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        let prefix = self.prefix.clone().try_into()?;
+        let prefix: Template = self.prefix.clone().try_into()?;
+        let prefix = prefix.confine(&self.confinement, Self::NAME, "prefix")?;
         Ok(KeyPartitioner::new(prefix, None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<WebHdfsConfig>();
+    }
+
+    fn base_config() -> WebHdfsConfig {
+        WebHdfsConfig {
+            root: "/tmp/test/".into(),
+            prefix: String::new(),
+            endpoint: "http://127.0.0.1:9870".into(),
+            encoding: (
+                None::<vector_lib::codecs::encoding::FramingConfig>,
+                vector_lib::codecs::TextSerializerConfig::default(),
+            )
+                .into(),
+            compression: crate::sinks::util::Compression::None,
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+            confinement: ConfinementConfig::default(),
+        }
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_prefix() {
+        let config = WebHdfsConfig {
+            prefix: "{{ tenant }}".into(),
+            ..base_config()
+        };
+        match config.key_partitioner() {
+            Err(err) => assert!(
+                err.to_string().contains("no literal string prefix"),
+                "unexpected error: {err}"
+            ),
+            Ok(_) => panic!("expected confinement error"),
+        }
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_prefix() {
+        let config = WebHdfsConfig {
+            prefix: "{{ tenant }}".into(),
+            confinement: ConfinementConfig {
+                dangerously_allow_unconfined_template_resolution: true,
+            },
+            ..base_config()
+        };
+        assert!(config.key_partitioner().is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::Event;
+        use vector_lib::event::LogEvent;
+        use vector_lib::partition::Partitioner;
+        use vrl::event_path;
+
+        let config = WebHdfsConfig {
+            prefix: "safe/{{ tenant }}/".into(),
+            ..base_config()
+        };
+        let partitioner = config.key_partitioner().unwrap();
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../escape");
+        assert!(partitioner.partition(&event).is_none());
     }
 }

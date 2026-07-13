@@ -57,6 +57,7 @@ impl Default for Protocol {
             tls: Default::default(),
             acknowledgements: Default::default(),
             retry_strategy: Default::default(),
+            confinement: Default::default(),
         })
     }
 }

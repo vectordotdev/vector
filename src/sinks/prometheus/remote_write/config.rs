@@ -21,6 +21,7 @@ use crate::{
             service::TowerRequestConfig,
         },
     },
+    template::ConfinementConfig,
 };
 
 /// The batch config for remote write.
@@ -133,6 +134,10 @@ pub struct RemoteWriteConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_compression() -> Compression {
@@ -190,6 +195,14 @@ impl SinkConfig for RemoteWriteConfig {
     }
 
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let tenant_id = self
+            .tenant_id
+            .clone()
+            .map(|template| {
+                template.confine(&self.confinement, RemoteWriteConfig::NAME, "tenant_id")
+            })
+            .transpose()?;
+
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let request_settings = self.request.tower.into_settings();
@@ -262,7 +275,7 @@ impl SinkConfig for RemoteWriteConfig {
             .service(service);
 
         let sink = RemoteWriteSink {
-            tenant_id: self.tenant_id.clone(),
+            tenant_id,
             compression: self.compression,
             aggregate: self.batch.aggregate,
             batch_settings: self
@@ -308,5 +321,55 @@ async fn healthcheck(
     match response.status() {
         http::StatusCode::OK => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoteWriteConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "prometheus_remote_write", "tenant_id");
+        assert!(
+            result.is_err(),
+            "bare tenant_id template with no literal prefix must be rejected"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "prometheus_remote_write", "tenant_id");
+        assert!(result.is_ok(), "opt-out must allow bare tenant_id template");
+    }
+
+    #[test]
+    fn confinement_prefixed_tenant_id_locks_org_prefix() {
+        use crate::event::{Event, LogEvent};
+        use vrl::event_path;
+        let template = Template::try_from("team-{{ org }}").unwrap();
+        let config = ConfinementConfig::default();
+        let confined = template
+            .confine(&config, "prometheus_remote_write", "tenant_id")
+            .unwrap();
+        let mut event = LogEvent::default();
+        event.insert(event_path!("org"), "other-tenant-entirely");
+        let rendered = confined.render_string(&Event::Log(event)).unwrap();
+        assert!(
+            rendered.starts_with("team-"),
+            "operator-controlled prefix must be preserved in rendered tenant_id"
+        );
     }
 }

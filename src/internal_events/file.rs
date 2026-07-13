@@ -109,13 +109,13 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct FilePathOutsideBaseDir<'a> {
+pub struct FilePathOutsideBaseDirError<'a> {
     pub path: &'a std::path::Path,
     pub base_dir: &'a std::path::Path,
     pub error: ConfineError,
 }
 
-impl InternalEvent for FilePathOutsideBaseDir<'_> {
+impl InternalEvent for FilePathOutsideBaseDirError<'_> {
     fn emit(self) {
         error!(
             message = "Rendered path is outside the configured base directory; dropping event.",

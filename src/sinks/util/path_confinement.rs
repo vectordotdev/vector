@@ -3,8 +3,7 @@
 //!
 //! Sinks that render templates into security-relevant identifiers (paths,
 //! keys, URIs, …) use the helpers in this module to ensure the rendered
-//! value cannot escape the literal portion the operator wrote. See the
-//! VEC-003 design notes for rationale.
+//! value cannot escape the literal portion the operator wrote.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -26,7 +25,7 @@ pub enum BuildError {
         "path template references event fields ({fields:?}) but has no \
          literal directory prefix to derive a base directory from. Set \
          `base_dir` explicitly, or set \
-         `dangerously_allow_unconfined_path: true` to opt out of path \
+         `dangerously_allow_unconfined_template_resolution: true` to opt out of path \
          confinement (not recommended)."
     ))]
     NoDerivableBase { fields: Vec<String> },
@@ -35,7 +34,7 @@ pub enum BuildError {
         "path template literal prefix {prefix:?} normalizes to a filesystem \
          root, which would permit writes anywhere on disk. Set `base_dir` \
          explicitly (for example `base_dir: /var/log/vector`), or set \
-         `dangerously_allow_unconfined_path: true` to opt out of path \
+         `dangerously_allow_unconfined_template_resolution: true` to opt out of path \
          confinement (not recommended)."
     ))]
     DerivedBaseIsRoot { prefix: String },
@@ -151,7 +150,7 @@ fn truncate_to_separator(prefix: &str) -> &str {
             cut = i + 1;
         }
     }
-    &prefix[..cut]
+    prefix.split_at(cut).0
 }
 
 /// Confines a rendered filesystem path to a base directory derived from a
@@ -309,12 +308,13 @@ impl PathConfinement {
         }
         let base_canonical = self.base_canonical.as_ref().expect("just set");
 
-        let parent_canonical = tokio_fs::canonicalize(parent)
-            .await
-            .map_err(|source| ConfineError::BaseIo {
-                path: parent.to_path_buf(),
-                source,
-            })?;
+        let parent_canonical =
+            tokio_fs::canonicalize(parent)
+                .await
+                .map_err(|source| ConfineError::BaseIo {
+                    path: parent.to_path_buf(),
+                    source,
+                })?;
 
         if !parent_canonical.starts_with(base_canonical) {
             return Err(ConfineError::SymlinkEscape {
@@ -386,6 +386,12 @@ mod tests {
         }
     }
 
+    // Path-shape cases hard-code Unix absolute paths (`/var/log/...`) so the
+    // absolute/root/derived-base semantics apply. On Windows `/foo` is not
+    // absolute and would surface `NoDerivableBase` for cases that expect
+    // `DerivedBaseIsRoot`. The confinement logic itself is platform-neutral;
+    // only the string fixtures are Unix-shaped.
+    #[cfg(unix)]
     #[test]
     fn for_template_cases() {
         enum Expected {
@@ -408,7 +414,11 @@ mod tests {
             // only `/` before first field
             ("/{{ tenant }}/app.log", None, ErrDerivedIsRoot),
             // explicit base overrides auto-derived
-            ("/var/log/{{ host }}/app.log", Some("/srv/tenants"), Base("/srv/tenants")),
+            (
+                "/var/log/{{ host }}/app.log",
+                Some("/srv/tenants"),
+                Base("/srv/tenants"),
+            ),
             // `%%` stops scan conservatively; base truncates to /tmp
             ("/tmp/100%%/{{ x }}.log", None, Base("/tmp")),
             // relative explicit base is always rejected
@@ -419,10 +429,7 @@ mod tests {
             let explicit_path = explicit.map(Path::new);
             let result = PathConfinement::for_template(&tpl, explicit_path);
             match expected {
-                Static => assert!(
-                    result.unwrap().is_none(),
-                    "expected None for {tpl_src:?}"
-                ),
+                Static => assert!(result.unwrap().is_none(), "expected None for {tpl_src:?}"),
                 Base(b) => assert_eq!(
                     result.unwrap().unwrap().base_dir(),
                     pb(b),
@@ -444,12 +451,18 @@ mod tests {
         }
     }
 
+    // Same reasoning as `for_template_cases` — Unix-shaped fixtures.
+    #[cfg(unix)]
     #[test]
     fn confine_cases() {
         // (template, rendered_path, expect_ok)
         let cases: &[(&str, &str, bool)] = &[
             // legitimate sub-path
-            ("/var/log/{{ host }}/app.log", "/var/log/host-a/app.log", true),
+            (
+                "/var/log/{{ host }}/app.log",
+                "/var/log/host-a/app.log",
+                true,
+            ),
             // `..` escape
             (
                 "/var/log/apps/{{ s }}/app.log",
@@ -466,9 +479,7 @@ mod tests {
         ];
         for (tpl_src, rendered, expect_ok) in cases {
             let tpl = Template::try_from(*tpl_src).unwrap();
-            let c = PathConfinement::for_template(&tpl, None)
-                .unwrap()
-                .unwrap();
+            let c = PathConfinement::for_template(&tpl, None).unwrap().unwrap();
             let result = c.confine(Path::new(rendered));
             assert_eq!(
                 result.is_ok(),

@@ -70,6 +70,7 @@ fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
         tls: Default::default(),
         acknowledgements: Default::default(),
         retry_strategy: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -829,11 +830,16 @@ async fn templateable_uri_auth() {
     let another_user = "another_user";
     let another_pass = "another_pass";
     let (_guard, in_addr) = next_addr();
+    // Event-controlled credentials have no static URI authority, so they
+    // require the opt-out flag. This is intentional: an attacker who controls
+    // the `user` or `pass` fields could inject `@evil.com` as the username and
+    // redirect the request. Operators using this pattern accept that risk.
     let config = format!(
         r#"
         uri: "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
         encoding:
           codec: json
+        dangerously_allow_unconfined_template_resolution: true
         "#
     );
 

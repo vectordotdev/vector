@@ -16,6 +16,7 @@ use crate::{
         kafka::sink::{KafkaSink, healthcheck},
         prelude::*,
     },
+    template::ConfinementConfig,
 };
 
 /// Configuration for the `kafka` sink.
@@ -137,6 +138,10 @@ pub struct KafkaSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_socket_timeout_ms() -> Duration {
@@ -271,6 +276,7 @@ impl GenerateConfig for KafkaSinkConfig {
             librdkafka_options: Default::default(),
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -280,8 +286,12 @@ impl GenerateConfig for KafkaSinkConfig {
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = KafkaSink::new(self.clone())?;
-        let hc = healthcheck(self.clone(), cx.healthcheck.clone()).boxed();
+        let mut config = self.clone();
+        config.topic = config
+            .topic
+            .confine(&self.confinement, Self::NAME, "topic")?;
+        let sink = KafkaSink::new(config.clone())?;
+        let hc = healthcheck(config, cx.healthcheck.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
@@ -299,9 +309,36 @@ impl SinkConfig for KafkaSinkConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
         KafkaSinkConfig::generate_config();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "kafka", "topic");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "kafka", "topic");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_topic() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "kafka", "topic");
+        assert!(result.is_ok());
     }
 }

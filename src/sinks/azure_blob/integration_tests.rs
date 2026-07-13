@@ -263,6 +263,7 @@ impl AzureBlobSinkConfig {
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
             tls: None,
+            confinement: Default::default(),
         };
 
         config.ensure_container().await;
@@ -289,6 +290,7 @@ impl AzureBlobSinkConfig {
             tls: Some(azure_common::config::AzureBlobTlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             }),
+            confinement: Default::default(),
         };
 
         config.ensure_container().await;

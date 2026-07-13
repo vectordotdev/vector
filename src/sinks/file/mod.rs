@@ -25,10 +25,7 @@ use vector_lib::{
         encoding::{Framer, FramingConfig},
     },
     configurable::configurable_component,
-    gauge,
-    internal_event::{
-        CountByteSize, EventsSent, GaugeName, InternalEventHandle as _, Output, Registered,
-    },
+    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
 };
 
 use crate::{
@@ -37,15 +34,15 @@ use crate::{
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{
-        FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, FilePathOutsideBaseDir,
-        TemplateRenderingError,
+        FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen,
+        FilePathOutsideBaseDirError, TemplateRenderingError,
     },
     sinks::util::{
         StreamSink,
         path_confinement::{BuildError, ConfineError, PathConfinement},
         timezone_to_offset,
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
 };
 
 mod bytes_path;
@@ -83,24 +80,8 @@ pub struct FileSinkConfig {
     #[serde(default)]
     pub base_dir: Option<PathBuf>,
 
-    /// Disable path confinement when no base directory can be derived.
-    ///
-    /// **DANGEROUS — disables a security control.**
-    ///
-    /// Suppresses the `NoDerivableBase` / `DerivedBaseIsRoot` build error
-    /// for `path` templates with no usable literal directory prefix. Has
-    /// **no effect** when a base directory can be derived from `path` or
-    /// set explicitly via `base_dir`. When effective, Vector logs a
-    /// `SECURITY:` startup warning and emits the
-    /// `vector_security_confinement_disabled` gauge for fleet alerting.
-    ///
-    /// A log producer that controls any field used in `path` can write to
-    /// any location the Vector process can access while this is enabled.
-    #[configurable(metadata(
-        docs::warnings = "Setting this option disables protection against templated path traversal. A log producer that controls any field used in `path` can write to any location the Vector process can access."
-    ))]
-    #[serde(default)]
-    pub dangerously_allow_unconfined_path: bool,
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 
     /// The amount of time that a file can be idle and stay open.
     ///
@@ -168,7 +149,7 @@ impl GenerateConfig for FileSinkConfig {
             internal_metrics: Default::default(),
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -316,11 +297,17 @@ impl FileSink {
             config.base_dir.as_deref(),
         ) {
             Ok(c) => {
-                if config.dangerously_allow_unconfined_path {
+                if config
+                    .confinement
+                    .dangerously_allow_unconfined_template_resolution
+                {
                     warn!(
-                        message = "`dangerously_allow_unconfined_path` ignored: a base directory is derivable from `path` or set via `base_dir`.",
+                        message = "`dangerously_allow_unconfined_template_resolution` ignored: a base directory is derivable from `path` or set via `base_dir`.",
                     );
                 }
+                config
+                    .confinement
+                    .emit_confinement_gauge(true, "sink", "file", "path");
                 c
             }
             Err(e) => {
@@ -333,18 +320,14 @@ impl FileSink {
                     e,
                     BuildError::NoDerivableBase { .. } | BuildError::DerivedBaseIsRoot { .. }
                 );
-                if config.dangerously_allow_unconfined_path && suppressible {
-                    warn!(
-                        message = "SECURITY: file sink has `dangerously_allow_unconfined_path` enabled \u{2014} templated path is NOT confined. A log producer that controls any field used in `path` can write to any location the Vector process can access.",
-                        error = %e,
-                    );
-                    gauge!(
-                        GaugeName::SecurityConfinementDisabled,
-                        "component_kind" => "sink",
-                        "component_type" => "file",
-                        "field" => "path",
-                    )
-                    .set(1.0);
+                if config
+                    .confinement
+                    .dangerously_allow_unconfined_template_resolution
+                    && suppressible
+                {
+                    config
+                        .confinement
+                        .emit_confinement_gauge(false, "sink", "file", "path");
                     None
                 } else {
                     return Err(Box::new(e));
@@ -386,7 +369,7 @@ impl FileSink {
             match confinement.confine(&rendered_path) {
                 Ok(normalized) => Some(path_to_bytes(&normalized)),
                 Err(error) => {
-                    emit!(FilePathOutsideBaseDir {
+                    emit!(FilePathOutsideBaseDirError {
                         path: &rendered_path,
                         base_dir: confinement.base_dir(),
                         error,
@@ -503,7 +486,7 @@ impl FileSink {
                         .as_ref()
                         .map(|c| c.base_dir().to_path_buf())
                         .unwrap_or_default();
-                    emit!(FilePathOutsideBaseDir {
+                    emit!(FilePathOutsideBaseDirError {
                         path: &rendered,
                         base_dir: &base,
                         error,
@@ -627,7 +610,7 @@ fn path_to_bytes(p: &Path) -> Bytes {
 }
 
 /// Errors produced by `open_file`. Routed at the call site so that
-/// confinement failures emit `FilePathOutsideBaseDir` (INTENTIONAL drop)
+/// confinement failures emit `FilePathOutsideBaseDirError` (INTENTIONAL drop)
 /// instead of the generic `FileIoError` (UNINTENTIONAL).
 #[derive(Debug)]
 enum OpenError {
@@ -822,7 +805,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -851,7 +834,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -880,7 +863,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -914,7 +897,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -1025,7 +1008,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -1084,7 +1067,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
@@ -1118,7 +1101,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let metric_count = 3;
@@ -1172,7 +1155,7 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -1196,10 +1179,14 @@ mod tests {
             internal_metrics: Default::default(),
             truncate: Default::default(),
             base_dir: None,
-            dangerously_allow_unconfined_path: false,
+            confinement: ConfinementConfig::default(),
         }
     }
 
+    // Uses Unix-shaped `/` absolute paths in test fixtures. On Windows those
+    // strings aren't recognised as absolute and the build-error taxonomy
+    // shifts (NoDerivableBase vs DerivedBaseIsRoot).
+    #[cfg(unix)]
     #[test]
     fn sink_build_cases() {
         enum Expected {
@@ -1216,9 +1203,19 @@ mod tests {
             // dynamic path → confinement auto-derived
             (&dynamic, None, false, Confined),
             // no derivable base → error
-            ("{{ key }}", None, false, ErrContaining("no literal directory prefix")),
+            (
+                "{{ key }}",
+                None,
+                false,
+                ErrContaining("no literal directory prefix"),
+            ),
             // derived base is root → error
-            ("/{{ x }}/a.log", None, false, ErrContaining("filesystem root")),
+            (
+                "/{{ x }}/a.log",
+                None,
+                false,
+                ErrContaining("filesystem root"),
+            ),
             // explicit root base_dir is allowed (operator opt-in)
             ("/{{ x }}", Some(PathBuf::from("/")), false, Confined),
             // escape hatch suppresses NoDerivableBase
@@ -1227,17 +1224,12 @@ mod tests {
         for (path, base_dir, hatch, expected) in cases {
             let mut cfg = base_config(path);
             cfg.base_dir = base_dir.clone();
-            cfg.dangerously_allow_unconfined_path = *hatch;
+            cfg.confinement
+                .dangerously_allow_unconfined_template_resolution = *hatch;
             let result = FileSink::new(&cfg, SinkContext::default());
             match expected {
-                NoConfinement => assert!(
-                    result.unwrap().confinement.is_none(),
-                    "path={path:?}"
-                ),
-                Confined => assert!(
-                    result.unwrap().confinement.is_some(),
-                    "path={path:?}"
-                ),
+                NoConfinement => assert!(result.unwrap().confinement.is_none(), "path={path:?}"),
+                Confined => assert!(result.unwrap().confinement.is_some(), "path={path:?}"),
                 ErrContaining(msg) => {
                     let err = match result {
                         Err(e) => e,
@@ -1259,7 +1251,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("payload"));
         event
             .as_mut_log()
-            .insert("service", "../../../etc/cron.d/vh-poc");
+            .insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
 
         let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
         assert!(sink.partition_event(&event).is_none());
@@ -1276,7 +1268,7 @@ mod tests {
         let cfg = base_config(&path);
 
         let mut event = Event::Log(LogEvent::from("payload"));
-        event.as_mut_log().insert("key", "/etc/passwd");
+        event.as_mut_log().insert(event_path!("key"), "/etc/passwd");
 
         let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
         let confined = sink.partition_event(&event).unwrap();
@@ -1288,6 +1280,9 @@ mod tests {
         );
     }
 
+    // The path template embeds a literal `/` before the field, which is
+    // Unix-shaped: on Windows the rendered separator flips to `\`.
+    #[cfg(unix)]
     #[tokio::test]
     async fn confine_allows_legit_partition() {
         let dir = temp_dir();
@@ -1295,7 +1290,7 @@ mod tests {
         let cfg = base_config(&path);
 
         let mut event = Event::Log(LogEvent::from("payload"));
-        event.as_mut_log().insert("key", "tenant-a");
+        event.as_mut_log().insert(event_path!("key"), "tenant-a");
 
         let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
         let rendered = sink.partition_event(&event).unwrap();
@@ -1308,7 +1303,8 @@ mod tests {
         // No base derivable, but the flag is set → build succeeds with
         // confinement disabled.
         let mut cfg = base_config("{{ key }}");
-        cfg.dangerously_allow_unconfined_path = true;
+        cfg.confinement
+            .dangerously_allow_unconfined_template_resolution = true;
         let sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
         assert!(sink.confinement.is_none());
     }
@@ -1320,13 +1316,16 @@ mod tests {
         let dir = temp_dir();
         let path = format!("{}/{{{{ key }}}}.log", dir.display());
         let mut cfg = base_config(&path);
-        cfg.dangerously_allow_unconfined_path = true;
+        cfg.confinement
+            .dangerously_allow_unconfined_template_resolution = true;
 
         let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
         assert!(sink.confinement.is_some());
 
         let mut event = Event::Log(LogEvent::from("payload"));
-        event.as_mut_log().insert("key", "../../../etc/cron.d/x");
+        event
+            .as_mut_log()
+            .insert(event_path!("key"), "../../../etc/cron.d/x");
         assert!(sink.partition_event(&event).is_none());
     }
 

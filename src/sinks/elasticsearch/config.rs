@@ -32,7 +32,7 @@ use crate::{
             service::HealthConfig,
         },
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
@@ -221,6 +221,10 @@ pub struct ElasticsearchConfig {
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 fn default_doc_type() -> String {
@@ -258,6 +262,7 @@ impl Default for ElasticsearchConfig {
             data_stream: None,
             metrics: None,
             acknowledgements: Default::default(),
+            confinement: ConfinementConfig::default(),
         }
     }
 }
@@ -541,21 +546,43 @@ impl DataStreamConfig {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
+        let mut confined_config = self.clone();
+        confined_config.bulk.index =
+            confined_config
+                .bulk
+                .index
+                .confine(&self.confinement, Self::NAME, "bulk.index")?;
+        confined_config.data_stream = confined_config
+            .data_stream
+            .map(|mut ds| -> crate::Result<DataStreamConfig> {
+                ds.dtype = ds
+                    .dtype
+                    .confine(&self.confinement, Self::NAME, "data_stream.type")?;
+                ds.dataset =
+                    ds.dataset
+                        .confine(&self.confinement, Self::NAME, "data_stream.dataset")?;
+                ds.namespace =
+                    ds.namespace
+                        .confine(&self.confinement, Self::NAME, "data_stream.namespace")?;
+                Ok(ds)
+            })
+            .transpose()?;
+        let this = &confined_config;
+        let commons = ElasticsearchCommon::parse_many(this, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
-        let request_limits = self.request.tower.into_settings();
+        let request_limits = this.request.tower.into_settings();
 
-        let health_config = self.endpoint_health.clone().unwrap_or_default();
+        let health_config = this.endpoint_health.clone().unwrap_or_default();
 
         let services = commons
             .iter()
             .map(|common| {
                 let endpoint = common.base_url.clone();
 
-                let http_request_builder = HttpRequestBuilder::new(common, self);
+                let http_request_builder = HttpRequestBuilder::new(common, this);
                 let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
                 (endpoint, service)
@@ -564,7 +591,7 @@ impl SinkConfig for ElasticsearchConfig {
 
         let service = request_limits.distributed_service(
             ElasticsearchRetryLogic {
-                retry_partial: self.request_retry_partial,
+                retry_partial: this.request_retry_partial,
             },
             services,
             health_config,
@@ -572,7 +599,7 @@ impl SinkConfig for ElasticsearchConfig {
             1,
         );
 
-        let sink = ElasticsearchSink::new(&common, self, service)?;
+        let sink = ElasticsearchSink::new(&common, this, service)?;
 
         let stream = VectorSink::from_event_streamsink(sink);
 
@@ -600,10 +627,37 @@ impl SinkConfig for ElasticsearchConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ElasticsearchConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "elasticsearch", "bulk.index");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "elasticsearch", "bulk.index");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_index() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "elasticsearch", "bulk.index");
+        assert!(result.is_ok());
     }
 
     #[test]

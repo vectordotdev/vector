@@ -36,6 +36,7 @@ use crate::{
             },
         },
     },
+    template::ConfinementConfig,
 };
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -107,6 +108,9 @@ pub struct HttpSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 /// HTTP method.
@@ -343,9 +347,14 @@ impl SinkConfig for HttpSinkConfig {
             )
             .service(service);
 
+        let uri = self
+            .uri
+            .clone()
+            .confine(&self.confinement, Self::NAME, "uri")?;
+
         let sink = HttpSink::new(
             service,
-            self.uri.clone(),
+            uri,
             template_headers,
             batch_settings,
             request_builder,
@@ -382,6 +391,7 @@ mod tests {
 
     use super::*;
     use crate::components::validation::prelude::*;
+    use crate::template::{ConfinementConfig, Template};
 
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
@@ -416,6 +426,7 @@ mod tests {
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),
                 retry_strategy: RetryStrategy::default(),
+                confinement: ConfinementConfig::default(),
             };
 
             let external_resource = ExternalResource::new(
@@ -437,4 +448,46 @@ mod tests {
     }
 
     register_validatable_component!(HttpSinkConfig);
+
+    #[test]
+    fn confinement_rejects_unconfined_uri() {
+        let template: Template = "{{ endpoint }}".try_into().unwrap();
+        let err = template
+            .confine(&ConfinementConfig::default(), "http", "uri")
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("no literal string prefix"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_uri() {
+        let cfg = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let template: Template = "{{ endpoint }}".try_into().unwrap();
+        assert!(template.confine(&cfg, "http", "uri").is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_host_redirect_at_render() {
+        use crate::event::Event;
+        use vector_lib::event::LogEvent;
+        use vrl::event_path;
+
+        let template: Template = "https://logs.example.com/ingest/{{ tenant }}"
+            .try_into()
+            .unwrap();
+        let template = template
+            .confine(&ConfinementConfig::default(), "http", "uri")
+            .unwrap();
+
+        // Attacker tries to redirect to a different host via the tenant field.
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../evil.com/steal?data=");
+        assert!(template.render_string(&event).is_err());
+    }
 }

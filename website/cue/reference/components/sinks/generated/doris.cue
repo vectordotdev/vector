@@ -273,6 +273,20 @@ generated: components: sinks: doris: configuration: {
 			}
 		}
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable template confinement when no static prefix can be derived.
+
+			**DANGEROUS — disables a security control.**
+
+			Suppresses the startup error when a template references event fields
+			but has no static literal prefix to derive a confinement base from.
+			When enabled, a log producer that controls any field used in the
+			template can write to arbitrary keys or paths.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	database: {
 		description: "The database that contains the table data will be inserted into."
 		required:    true

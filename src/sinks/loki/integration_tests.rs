@@ -441,7 +441,7 @@ async fn many_tenants() {
         + r#"
             labels = {test_name = "placeholder"}
             encoding.codec = "text"
-            tenant_id = "{{ tenant_id }}"
+            tenant_id = "tenant{{ tenant_id }}"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
@@ -466,10 +466,7 @@ async fn many_tenants() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
 
-        log.insert(
-            event_path!("tenant_id"),
-            if i % 2 == 0 { "tenant1" } else { "tenant2" },
-        );
+        log.insert(event_path!("tenant_id"), if i % 2 == 0 { "1" } else { "2" });
     }
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
