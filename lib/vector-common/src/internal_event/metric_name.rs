@@ -93,7 +93,7 @@ pub enum CounterName {
     SqsS3EventRecordIgnoredTotal,
     ComponentAllocatedBytesTotal,
     ComponentDeallocatedBytesTotal,
-     /// Deprecated: superseded by `MemoryEnrichmentTableFailedInsertionsTotal`. Retained
+    /// Deprecated: superseded by `MemoryEnrichmentTableFailedInsertionsTotal`. Retained
     /// temporarily so both names are emitted during a deprecation window.
     MemoryEnrichmentTableFailedInsertions,
     MemoryEnrichmentTableFailedInsertionsTotal,
