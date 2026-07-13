@@ -433,6 +433,7 @@ pub async fn create_service(
     force_path_style: impl Into<bool>,
 ) -> crate::Result<S3Service> {
     let endpoint = region.endpoint();
+    let use_fips_endpoint = region.use_fips_endpoint();
     let region = region.region();
     let force_path_style_value: bool = force_path_style.into();
     let client = create_client::<S3ClientBuilder>(
@@ -445,6 +446,7 @@ pub async fn create_service(
         proxy,
         tls_options,
         None,
+        use_fips_endpoint,
     )
     .await?;
     Ok(S3Service::new(client))

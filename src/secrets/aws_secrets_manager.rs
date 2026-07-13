@@ -66,6 +66,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
             &ProxyConfig::default(),
             self.tls.as_ref(),
             None,
+            self.region.use_fips_endpoint(),
         )
         .await?;
 

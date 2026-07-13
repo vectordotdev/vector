@@ -109,6 +109,7 @@ impl KinesisStreamsSinkConfig {
             proxy,
             self.base.tls.as_ref(),
             None,
+            self.base.region.use_fips_endpoint(),
         )
         .await
     }

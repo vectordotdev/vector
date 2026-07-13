@@ -8,7 +8,7 @@ use vrl::event_path;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{AwsAuthentication, ImdsAuthentication, RegionOrEndpoint, create_client},
+    aws::{AwsAuthRegion, AwsAuthentication, ImdsAuthentication, RegionOrEndpoint, create_client},
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         elasticsearch::{
@@ -88,7 +88,7 @@ async fn firehose_put_records_without_partition_key() {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()
         },
-        aws: Some(region),
+        aws: Some(AwsAuthRegion::with_region("us-east-1")),
         ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&config)
@@ -201,7 +201,7 @@ async fn firehose_put_records_with_partition_key() {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()
         },
-        aws: Some(region),
+        aws: Some(AwsAuthRegion::with_region("us-east-1")),
         ..Default::default()
     };
     let common = ElasticsearchCommon::parse_single(&config)
@@ -260,6 +260,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
         region_endpoint.region(),
         region_endpoint.endpoint(),
         &proxy,
+        None,
         None,
         None,
     )

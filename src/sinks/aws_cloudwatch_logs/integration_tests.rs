@@ -586,6 +586,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
         &proxy,
         None,
         None,
+        None,
     )
     .await
     .unwrap()
@@ -603,6 +604,7 @@ async fn create_kms_client_test() -> KMSClient {
         region,
         endpoint,
         &proxy,
+        None,
         None,
         None,
     )
