@@ -393,11 +393,11 @@ impl Context {
         }
 
         drop(rx);
-        let blocking_result = blocking.await.context(BlockingTaskSnafu)?;
+        let join_result = blocking.await.context(BlockingTaskSnafu);
 
         if let Some(error) = stream_error {
             // Prefer the stream conversion/send error over a later join outcome.
-            drop(blocking_result);
+            drop(join_result);
             return fail_with_received_metrics(
                 bytes_received,
                 events_received,
@@ -407,7 +407,20 @@ impl Context {
             );
         }
 
-        blocking_result?;
+        // Emit sent-rows metrics before surfacing a fetch/join failure so partial
+        // batches already handed to the pipeline are not under-counted.
+        match join_result {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) | Err(error) => {
+                return fail_with_received_metrics(
+                    bytes_received,
+                    events_received,
+                    total_payload_byte_size,
+                    total_events,
+                    error,
+                );
+            }
+        }
 
         // Tracking path: validate + overlay + persist the final-row checkpoint before any
         // emit so a missing/null tracking value cannot replay forever, and an overlay
