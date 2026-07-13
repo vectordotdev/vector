@@ -43,7 +43,7 @@ pub fn max_decompressed_size_bytes() -> usize {
 }
 
 /// Returns the maximum compressed frame wire size we are willing to buffer, derived from the
-/// decompressed cap plus zlib's worst-case expansion. See [`zlib_compressed_frame_limit`].
+/// decompressed cap plus zlib's worst-case expansion. See `zlib_compressed_frame_limit`.
 pub fn max_zlib_compressed_frame_size_bytes() -> usize {
     *MAX_ZLIB_COMPRESSED_FRAME_SIZE_BYTES
         .get()
