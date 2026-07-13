@@ -126,6 +126,7 @@ jobs:
           rust: true
           cargo-deb: true
           protoc: true
+          unixodbc: true
       - name: Build Vector
         run: make NATIVE=true package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
@@ -164,6 +165,7 @@ jobs:
           cargo-deb: true
           protoc: true
           libsasl2: true
+          unixodbc: true
       - name: Install cross-compilation tools
         run: timeout 30m sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
       - name: Install rpm
@@ -211,6 +213,7 @@ jobs:
         with:
           rust: true
           protoc: true
+          unixodbc: true
       - name: Build Vector
         env:
           TARGET: "${{ matrix.architecture }}-apple-darwin"
