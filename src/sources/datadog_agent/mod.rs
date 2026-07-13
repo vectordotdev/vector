@@ -352,7 +352,15 @@ impl SourceConfig for DatadogAgentConfig {
                     )
                     .with_known("span_links", Kind::any().or_undefined())
                     .with_known("config", Kind::any().or_undefined())
-                    .with_known("collection_errors", Kind::any().or_undefined()),
+                    .with_known("collection_errors", Kind::any().or_undefined())
+                    .with_known(
+                        "_dd",
+                        Kind::object(
+                            Collection::empty()
+                                .with_known("tracer_version", Kind::bytes().or_undefined()),
+                        )
+                        .or_undefined(),
+                    ),
             ),
             [log_namespace],
         )
