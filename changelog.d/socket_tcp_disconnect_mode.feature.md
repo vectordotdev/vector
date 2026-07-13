@@ -1,0 +1,3 @@
+Added a `disconnect_mode` configuration option to the `socket` (TCP mode), `logstash`, `fluent`, `syslog` (TCP mode), and `statsd` (TCP mode) sources. This controls how Vector closes TCP connections on shutdown or when `max_connection_duration_secs` elapses. The `drain` mode maintains the existing graceful shutdown behaviour while the `abort` mode closes connections immediately without waiting for the client to acknowledge the shutdown. This is useful for clients that never read from the socket and therefore cannot detect a graceful shutdown. The `logstash` and `fluent` sources default to `abort` to match the behaviour of Logstash's own Beats input plugin and Fluentd's `in_forward` plugin respectively.
+
+authors: tronboto
