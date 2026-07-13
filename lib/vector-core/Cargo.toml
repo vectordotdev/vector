@@ -9,6 +9,7 @@ publish = false
 workspace = true
 
 [dependencies]
+arc-swap = { workspace = true }
 async-trait.workspace = true
 bitmask-enum = { version = "2.2.5", default-features = false }
 bytes = { workspace = true, features = ["serde"] }
@@ -34,7 +35,7 @@ metrics-util.workspace = true
 mlua = { workspace = true, optional = true }
 no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float.workspace = true
-openssl = { version = "0.10.80", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.81", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.5", default-features = false }
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }

@@ -206,6 +206,7 @@ impl SourceConfig for SyslogConfig {
                     keepalive,
                     shutdown_secs,
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     receive_buffer_bytes,
                     None,

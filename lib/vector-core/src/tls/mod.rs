@@ -15,10 +15,12 @@ use crate::tcp::{self, TcpKeepaliveConfig};
 mod incoming;
 mod maybe_tls;
 mod outgoing;
+mod reload;
 mod settings;
 
 pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub use maybe_tls::MaybeTls;
+pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};
 pub use settings::{
     MaybeTlsSettings, PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
     TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
