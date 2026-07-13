@@ -10,12 +10,12 @@ use vector_lib::{
 
 use self::{
     sinks::{
-        BackpressureSinkConfig, BasicSinkConfig, ErrorSinkConfig, OneshotSinkConfig,
-        PanicSinkConfig,
+        BackpressureSinkConfig, BasicSinkConfig, ErrorSinkConfig, NoAckSinkConfig,
+        OneshotSinkConfig, PanicSinkConfig,
     },
     sources::{
-        BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig,
-        TripwireSourceConfig,
+        AckSourceConfig, BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig,
+        PanicSourceConfig, TripwireSourceConfig,
     },
     transforms::{BasicTransformConfig, ErrorDefinitionTransformConfig},
 };
@@ -28,6 +28,16 @@ pub fn backpressure_source(counter: &Arc<AtomicUsize>) -> BackpressureSourceConf
     BackpressureSourceConfig {
         counter: Arc::clone(counter),
     }
+}
+
+/// Create an ack-aware source (`can_acknowledge() -> true`).
+///
+/// The returned `SourceSender` is used to inject events into the source.
+/// Attach `BatchNotifier` to events before sending them to observe
+/// end-to-end acknowledgement behavior through the topology.
+pub fn ack_source() -> (SourceSender, AckSourceConfig) {
+    let (tx, rx) = SourceSender::new_test_sender_with_options(1, None);
+    (tx, AckSourceConfig::new(rx))
 }
 
 pub fn basic_source() -> (SourceSender, BasicSourceConfig) {
@@ -81,6 +91,17 @@ pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = SourceSenderItem>,
     (rx.into_stream(), sink)
 }
 
+/// Create a basic sink with a custom acknowledgements configuration.
+#[cfg(test)]
+pub fn basic_sink_with_acks(
+    channel_size: usize,
+    acks: vector_lib::config::AcknowledgementsConfig,
+) -> (impl Stream<Item = SourceSenderItem>, BasicSinkConfig) {
+    let (tx, rx) = SourceSender::new_test_sender_with_options(channel_size, None);
+    let sink = BasicSinkConfig::new(tx, true).with_acknowledgements(acks);
+    (rx.into_stream(), sink)
+}
+
 pub fn basic_sink_with_data(
     channel_size: usize,
     data: &str,
@@ -99,6 +120,21 @@ pub fn basic_sink_failing_healthcheck(
     let (tx, rx) = SourceSender::new_test_sender_with_options(channel_size, None);
     let sink = BasicSinkConfig::new(tx, false);
     (rx.into_stream(), sink)
+}
+
+/// Create a sink that holds finalizers indefinitely, preventing ack delivery.
+///
+/// Returns the config, a receiver that fires when the first event is received,
+/// and the shared held-finalizers storage (drop to release acks).
+#[cfg(test)]
+pub fn no_ack_sink(
+    acks: vector_lib::config::AcknowledgementsConfig,
+) -> (
+    NoAckSinkConfig,
+    tokio::sync::oneshot::Receiver<()>,
+    std::sync::Arc<std::sync::Mutex<Vec<vector_lib::finalization::EventFinalizers>>>,
+) {
+    NoAckSinkConfig::new(acks)
 }
 
 pub fn error_sink() -> ErrorSinkConfig {

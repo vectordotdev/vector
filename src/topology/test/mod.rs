@@ -32,6 +32,7 @@ use crate::{
     topology::{ReloadError::*, RunningTopology, builder::TopologyPiecesBuilder},
 };
 
+mod authoritative_acks;
 mod backpressure;
 mod compliance;
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
