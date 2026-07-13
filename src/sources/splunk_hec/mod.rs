@@ -65,6 +65,7 @@ use self::{
 use crate::{
     SourceSender,
     codecs::DecodingConfig,
+    common::http::ErrorMessage,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
@@ -2014,6 +2015,8 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::ACK_IS_DISABLED)
             }
         },))
+    } else if let Some(error) = rejection.find::<ErrorMessage>() {
+        Ok((response_json(error.status_code(), error),))
     } else {
         Err(rejection)
     }
@@ -2082,6 +2085,22 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SplunkConfig>();
+    }
+
+    #[tokio::test]
+    async fn finish_err_maps_capped_body_to_client_error() {
+        // `capped_body()` rejects oversized payloads with an `ErrorMessage` (e.g. 413). The
+        // recovery must surface that status instead of letting it fall through to a 500.
+        let rejection = warp::reject::custom(ErrorMessage::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Request body exceeds limit of 1024 bytes.".to_owned(),
+        ));
+
+        let (response,) = finish_err(rejection)
+            .await
+            .expect("capped-body rejection should be recovered");
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     /// Splunk token

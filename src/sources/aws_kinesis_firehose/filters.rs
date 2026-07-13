@@ -18,6 +18,7 @@ use super::{
 };
 use crate::{
     SourceSender, codecs,
+    common::http::ErrorMessage,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
     sources::http_server::HttpConfigParamKind,
     sources::util::{decompression::CappedDecoder, http::capped_body},
@@ -208,6 +209,10 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
         message = e.to_string();
         code = e.status();
         request_id = e.request_id();
+    } else if let Some(e) = err.find::<ErrorMessage>() {
+        code = e.status_code();
+        message = e.message().to_string();
+        request_id = None;
     } else if let Some(e) = err.find::<warp::reject::MissingHeader>() {
         code = StatusCode::BAD_REQUEST;
         message = format!("Required header missing: {}", e.name());
@@ -281,5 +286,24 @@ mod tests {
             .unwrap();
 
         assert_eq!(parsed.access_key, Some("secret123".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn capped_body_rejection_maps_to_client_error() {
+        use warp::Reply;
+
+        // `capped_body()` rejects oversized payloads with an `ErrorMessage` (e.g. 413). The
+        // recovery must surface that status instead of falling through to a 500.
+        let rejection = warp::reject::custom(ErrorMessage::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Request body exceeds limit of 1024 bytes.".to_owned(),
+        ));
+
+        let response = handle_firehose_rejection(rejection)
+            .await
+            .unwrap()
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 }
