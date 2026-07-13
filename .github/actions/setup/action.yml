@@ -31,7 +31,7 @@ inputs:
   unixodbc:
     required: false
     default: false
-    description: "Install unixODBC (unixodbc-dev / brew unixodbc). Required when sources-odbc is enabled."
+    description: "Install unixODBC headers/libs (apt unixodbc-dev, dnf unixODBC-devel, or brew unixodbc). Required when sources-odbc is enabled."
 
   # prepare.sh - rust
   rust: # rustup module
@@ -238,15 +238,25 @@ runs:
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
 
-    - name: Install apt system libraries
+    - name: Install system libraries (Linux)
       if: ${{ runner.os == 'Linux' && (inputs.libsasl2 == 'true' || inputs.unixodbc == 'true') }}
       shell: bash
       run: |
-        pkgs=()
-        [[ "${{ inputs.libsasl2 }}" == "true" ]] && pkgs+=(libsasl2-dev)
-        [[ "${{ inputs.unixodbc }}" == "true" ]] && pkgs+=(unixodbc-dev)
-        timeout 30m sudo apt-get update
-        timeout 30m sudo apt-get install -y "${pkgs[@]}"
+        if command -v apt-get >/dev/null 2>&1; then
+          pkgs=()
+          [[ "${{ inputs.libsasl2 }}" == "true" ]] && pkgs+=(libsasl2-dev)
+          [[ "${{ inputs.unixodbc }}" == "true" ]] && pkgs+=(unixodbc-dev)
+          timeout 30m sudo apt-get update
+          timeout 30m sudo apt-get install -y "${pkgs[@]}"
+        elif command -v dnf >/dev/null 2>&1; then
+          pkgs=()
+          [[ "${{ inputs.libsasl2 }}" == "true" ]] && pkgs+=(cyrus-sasl-devel)
+          [[ "${{ inputs.unixodbc }}" == "true" ]] && pkgs+=(unixODBC-devel)
+          timeout 30m sudo dnf install -y --setopt=install_weak_deps=False "${pkgs[@]}"
+        else
+          echo "No supported package manager (apt-get/dnf) found for system libraries" >&2
+          exit 1
+        fi
 
     - name: Install unixODBC (macOS)
       if: ${{ runner.os == 'macOS' && inputs.unixodbc == 'true' }}

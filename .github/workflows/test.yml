@@ -164,6 +164,9 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
+          # `docs` enables sources-dnstap and sources-odbc.
+          protoc: true
+          unixodbc: true
       - run: cd rust-doc && make ci-docs-build
 
   test-vrl:

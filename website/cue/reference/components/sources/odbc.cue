@@ -25,7 +25,19 @@ components: sources: odbc: {
 	}
 
 	support: {
-		requirements: []
+		requirements: [
+			"""
+				Not included in official musl builds (Alpine, distroless-static,
+				`*-unknown-linux-musl`). Use a glibc package/image, macOS, Windows,
+				or a custom build with `sources-odbc`.
+				""",
+			"""
+				Linux glibc builds link the unixODBC driver manager (`libodbc`).
+				Official Debian and distroless-libc images include it; `.deb`
+				packages depend on `libodbc2` or `libodbc1`. A database ODBC driver
+				must still be installed and configured separately.
+				""",
+		]
 		warnings: [
 			"""
 				When `last_run_metadata_path` is set, the query result is buffered and the
@@ -78,11 +90,12 @@ components: sources: odbc: {
 		requirement: {
 			title: "Requirement for unixODBC"
 			body: """
-				To connect to a database and execute queries via ODBC, you must have the unixODBC package installed.
-				First, use your package manager to install the `unixodbc` package.
-				Then, install and configure the appropriate ODBC driver.
+				To connect to a database and execute queries via ODBC, you must have the unixODBC
+				driver manager available, then install and configure the appropriate ODBC driver.
+				See Requirements above for which official Vector builds include this source and
+				the driver manager.
 
-				For example, on Debian-based Linux, you can install the `unixodbc` and `odbc-mariadb` packages as follows:
+				For example, on Debian-based Linux:
 				```bash
 				# apt-get install unixodbc odbcinst odbc-mariadb
 				```

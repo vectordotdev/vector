@@ -91,7 +91,7 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             gcc gcc-c++ make cmake perl perl-IPC-Cmd \
-            openssl-devel cyrus-sasl-devel zlib-devel \
+            openssl-devel cyrus-sasl-devel zlib-devel unixODBC-devel \
             pkgconfig clang \
             rpm-build sudo \
             git tar gzip xz which findutils \
@@ -165,7 +165,6 @@ jobs:
           cargo-deb: true
           protoc: true
           libsasl2: true
-          unixodbc: true
       - name: Install cross-compilation tools
         run: timeout 30m sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
       - name: Install rpm
