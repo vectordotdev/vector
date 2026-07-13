@@ -14,6 +14,7 @@ components: sinks: mqtt: {
 	features: {
 		auto_generated:   true
 		acknowledgements: true
+		buffer: enabled:      true
 		healthcheck: enabled: false
 		send: {
 			compression: enabled: false
@@ -63,9 +64,59 @@ components: sinks: mqtt: {
 	configuration: generated.components.sinks.mqtt.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: true
+	}
+
+	how_it_works: {
+		protocol_versions: {
+			title: "MQTT 3.1.1 and 5.0 support"
+			body: """
+				The sink supports both MQTT 3.1.1 (default) and MQTT 5.0, selected using the
+				`protocol_version` configuration option. MQTT 5.0 unlocks additional features
+				such as message expiry, topic aliases, response topics, correlation data,
+				content type, payload format indicators, and user properties.
+				"""
+		}
+		publish_properties: {
+			title: "MQTT v5 publish properties"
+			body: """
+				When `protocol_version` is set to `v5`, the sink can attach MQTT 5.0 publish
+				properties to outgoing messages through the `publish_properties` section. Supported
+				properties include the payload format indicator, message expiry interval, topic
+				alias, response topic, correlation data, content type, and user properties.
+				These properties are ignored when `protocol_version` is `v311`.
+				"""
+		}
+		data_transport: {
+			title: "Transporting logs, metrics, and traces"
+			body: """
+				The sink accepts logs, metrics, and traces. The set of event types actually
+				accepted is derived from the chosen encoding codec and validated at
+				configuration load time, so unsupported event types are rejected with a
+				clear error instead of silently dropped.
+
+				Codec compatibility:
+
+				- `json`, `native_json`, `native`: accept logs, metrics, and traces. Use
+				  `native` or `native_json` for lossless Vector-to-Vector pipelines where
+				  receivers should reconstruct the original event types.
+				- `text`: accepts logs and metrics; traces are rejected at config time.
+				- `gelf`, `logfmt`, `syslog`, `raw_message`: logs only.
+				- `avro`, `cef`, `csv`, `protobuf`: depend on the user-supplied schema.
+
+				The QoS, retain flag, and (for v5) `publish_properties` apply to every
+				outgoing message regardless of event type.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
