@@ -651,9 +651,11 @@ async fn validate_token_with_sar(
         }
     }
 
-    // Use the actual authenticated user's identity for SAR check
+    // Use the full authenticated user's identity for SAR check
     let check_user = user_info.username;
     let check_groups = user_info.groups;
+    let check_uid = user_info.uid;
+    let check_extra = user_info.extra;
 
     // Step 2: Create SubjectAccessReview with appropriate attributes
     let sar = match (params.path, params.resource) {
@@ -679,6 +681,8 @@ async fn validate_token_with_sar(
                     non_resource_attributes: Some(non_resource_attrs),
                     user: check_user.clone(),
                     groups: check_groups.clone(),
+                    uid: check_uid.clone(),
+                    extra: check_extra.clone(),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -711,6 +715,8 @@ async fn validate_token_with_sar(
                     resource_attributes: Some(resource_attrs),
                     user: check_user.clone(),
                     groups: check_groups.clone(),
+                    uid: check_uid.clone(),
+                    extra: check_extra.clone(),
                     ..Default::default()
                 },
                 ..Default::default()
