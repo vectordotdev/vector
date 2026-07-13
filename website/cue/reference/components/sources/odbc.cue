@@ -155,7 +155,7 @@ components: sources: odbc: {
 						  odbc:
 						    type: odbc
 						    connection_string: "driver={MariaDB Unicode};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
-						    statement: "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
+						    statement: "SELECT * FROM odbc_table WHERE id > ? ORDER BY id ASC LIMIT 1;"
 						    statement_init_params:
 						      - name: id
 						        value: "0"

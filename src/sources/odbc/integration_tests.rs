@@ -79,7 +79,7 @@ async fn parse_odbc_config() {
     let config_str = format!(
         r#"
             connection_string = "{conn_str}"
-            statement = "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
+            statement = "SELECT * FROM odbc_table WHERE id > ? ORDER BY id ASC LIMIT 1;"
             schedule = "*/5 * * * * *"
             schedule_timezone = "UTC"
             last_run_metadata_path = "odbc_tracking.json"
@@ -188,7 +188,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
         OdbcConfig {
             connection_string: SensitiveString::from(conn_str),
             schedule: "*/1 * * * * *".into(),
-            statement: Some("SELECT * FROM odbc_table WHERE id > ? LIMIT 1;".to_string()),
+            statement: Some("SELECT * FROM odbc_table WHERE id > ? ORDER BY id ASC LIMIT 1;".to_string()),
             statement_init_params: Some(params),
             tracking_columns: Some(vec!["id".to_string()]),
             last_run_metadata_path: Some(LAST_RUN_METADATA_PATH.to_string()),
@@ -285,7 +285,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
     fs::write(CONNECTION_STRING_FILE_PATH, conn_str).unwrap();
     fs::write(
         STATEMENT_FILE_PATH,
-        "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;",
+        "SELECT * FROM odbc_table WHERE id > ? ORDER BY id ASC LIMIT 1;",
     )
     .unwrap();
     let _ = fs::remove_file(LAST_RUN_METADATA_PATH);
