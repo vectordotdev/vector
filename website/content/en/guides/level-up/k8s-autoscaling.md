@@ -341,15 +341,14 @@ times might yield different results.
 | ---- | -------- | ------- | ----- |
 | t=0 s | **1** | 100% | load starts |
 | t=30 s | **2** | 100% | HPA scales 1→2 |
-| t=60 s | **3** | 98% | HPA scales 2→3 |
-| t=90 s | **5** | 99% | HPA scales 3→5 |
-| t=120 s | **7** | 71% | HPA scales 5→7 |
-| t=150 s | **7** | 52% |       —        |
-| t=180 s | **6** | 52% | HPA scales 7→6 |
-| t=300 s | **6** | **61%** | **Stable, equilibrium** |
+| t=61 s | **3** | 98% | HPA scales 2→3 |
+| t=91 s | **4** | 96% | HPA scales 3→4 |
+| t=122 s | **6** | 91% | HPA scales 4→6 |
+| t=137 s | **6** | 67% |       —        |
+| t=182 s | **6** | **60%** | **Stable, equilibrium** |
 
 But... Why? We are using the 70% CPU threshold and didn't alter the autoscaler's
-default 10% tolerance band. 61% is clearly outside the 63-77% band. This only
+default 10% tolerance band. 60% is clearly outside the 63-77% band. This only
 happened because the HPA overshot the pod count — and it's possible this occured
 due to a variety of reasons, with the likely explanation that some pods running slower than expected.
 However, according to the HPA algorithm both are valid resting points. After
@@ -365,7 +364,7 @@ This can lead to some very interesting results, just like the 6 pod stabilizatio
 even though the CPU load falls squarely out of bounds.
 
 ```text
-desired = ⌈ 6 × (61% / 70%) ⌉ = ⌈ 5.2285714286 ⌉ = 6
+desired = ⌈ 6 × (60% / 70%) ⌉ = ⌈ 5.1428571429 ⌉ = 6
 ```
 
 Given that past the saturation point the workload is no longer CPU-bound. So
