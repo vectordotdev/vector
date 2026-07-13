@@ -44,10 +44,6 @@ impl TlsAcceptorReloader {
     }
 
     /// Downgrade to a [`WeakTlsAcceptorReloader`] that does not keep the served acceptor alive.
-    ///
-    /// This is what a background reload task should hold: once the bound listener (the sole strong
-    /// owner) is dropped at source shutdown, the weak handle's
-    /// [`reload`](WeakTlsAcceptorReloader::reload) reports that it is gone, so the task can stop.
     pub fn downgrade(&self) -> WeakTlsAcceptorReloader {
         WeakTlsAcceptorReloader {
             acceptor: Arc::downgrade(&self.acceptor),
@@ -62,18 +58,11 @@ pub struct WeakTlsAcceptorReloader {
 }
 
 impl WeakTlsAcceptorReloader {
-    /// Swap in a freshly built acceptor if the listener is still alive.
-    ///
-    /// Returns `Ok(true)` on a successful swap, `Ok(false)` if the listener has been dropped (the
-    /// caller should stop reloading), and `Err` if the new settings failed to build an acceptor.
-    pub fn reload(&self, settings: &TlsSettings) -> crate::tls::Result<bool> {
-        match self.acceptor.upgrade() {
-            Some(acceptor) => {
-                acceptor.store(Arc::new(settings.acceptor()?));
-                Ok(true)
-            }
-            None => Ok(false),
-        }
+    /// Return the live [`TlsAcceptorReloader`], or `None` once the bound listener has been dropped.
+    pub fn upgrade(&self) -> Option<TlsAcceptorReloader> {
+        self.acceptor
+            .upgrade()
+            .map(|acceptor| TlsAcceptorReloader { acceptor })
     }
 }
 
@@ -141,18 +130,16 @@ mod test {
             .await
             .unwrap();
 
-        // While the listener is alive, a reload swaps in freshly built material.
-        assert!(
-            weak.reload(&tls).unwrap(),
-            "reload should apply while the listener is alive"
-        );
+        weak.upgrade()
+            .expect("listener alive, so the weak handle upgrades")
+            .reload(&tls)
+            .unwrap();
 
-        // Once the listener (the last strong owner) is dropped, the weak handle reports it is gone
-        // so the reload task can stop.
+        // Once the listener (the last strong owner) is dropped, the weak handle no longer upgrades.
         drop(listener);
         assert!(
-            !weak.reload(&tls).unwrap(),
-            "reload should report the listener is gone after shutdown"
+            weak.upgrade().is_none(),
+            "weak handle must not upgrade after the listener is dropped"
         );
     }
 
