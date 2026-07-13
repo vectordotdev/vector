@@ -225,6 +225,8 @@ impl SinkConfig for LokiConfig {
             }
         }
 
+        validate_endpoint(&self.endpoint)?;
+
         let client = self.build_client(cx)?;
 
         let config = LokiConfig {
@@ -277,11 +279,30 @@ pub fn valid_label_name(label: &Template) -> bool {
     }
 }
 
+/// Validates that the configured `endpoint` is a usable absolute URL.
+///
+/// `endpoint` is deserialized as a permissive `UriSerde`, so values without a
+/// scheme (for example a bare host name with a typo) are accepted at parse time
+/// but later fail with an opaque "invalid format" error when the request URI is
+/// built. Checking here lets us surface a clear, actionable message instead.
+fn validate_endpoint(endpoint: &UriSerde) -> crate::Result<()> {
+    let uri = &endpoint.uri;
+    if uri.scheme().is_none() || uri.authority().is_none() {
+        return Err(format!(
+            "Invalid `endpoint`: {endpoint:?} is not an absolute URL. \
+             Expected a value with a scheme and host, such as \"http://localhost:3100\"."
+        )
+        .into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
 
-    use super::valid_label_name;
+    use super::{valid_label_name, validate_endpoint};
+    use crate::sinks::util::UriSerde;
 
     #[test]
     fn valid_label_names() {
@@ -298,5 +319,23 @@ mod tests {
         assert!(!valid_label_name(&" ".try_into().unwrap()));
 
         assert!(valid_label_name(&"{{field}}".try_into().unwrap()));
+    }
+
+    #[test]
+    fn validates_endpoint() {
+        let parse = |s: &str| s.parse::<UriSerde>().unwrap();
+
+        // Valid absolute URLs.
+        assert!(validate_endpoint(&parse("http://localhost:3100")).is_ok());
+        assert!(validate_endpoint(&parse("https://loki.example.com/")).is_ok());
+
+        // Scheme-less values (such as a host name with a typo) are rejected with
+        // a clear error instead of failing later with "invalid format".
+        let error = validate_endpoint(&parse("typo-host-no-scheme"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("not an absolute URL"), "{error}");
+
+        assert!(validate_endpoint(&parse("/loki/api/v1/push")).is_err());
     }
 }
