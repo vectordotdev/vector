@@ -41,6 +41,13 @@ pub enum BuildError {
 
     #[snafu(display("`base_dir` must be an absolute path, got {path:?}"))]
     BaseNotAbsolute { path: PathBuf },
+
+    #[snafu(display(
+        "static path {path:?} is outside the configured `base_dir` {base:?}; \
+         this configuration would drop every event at runtime. \
+         Either align the path with `base_dir`, or remove `base_dir`."
+    ))]
+    StaticPathOutsideBase { path: PathBuf, base: PathBuf },
 }
 
 /// Errors raised while confining a rendered path against a base directory.
@@ -225,6 +232,25 @@ impl PathConfinement {
             );
         }
 
+        // Static template with an explicit base: the rendered path is known
+        // now, so validate it immediately rather than silently dropping every
+        // event at runtime.  Mirror the runtime join logic in `confine()`:
+        // relative paths are resolved against the base before comparison.
+        if fields.is_empty() {
+            let raw = Path::new(tpl.get_ref());
+            let resolved = if raw.is_absolute() {
+                normalize_lexically(raw)
+            } else {
+                normalize_lexically(&base_path.join(raw))
+            };
+            if !resolved.starts_with(&base_path) {
+                return Err(BuildError::StaticPathOutsideBase {
+                    path: resolved,
+                    base: base_path,
+                });
+            }
+        }
+
         Ok(Some(Self {
             base_lexical: base_path,
             base_canonical: None,
@@ -406,6 +432,7 @@ mod tests {
             ErrNoDerivable,
             ErrDerivedIsRoot,
             ErrNotAbsolute,
+            ErrStaticOutside,
         }
         use Expected::*;
         let cases: &[(&str, Option<&str>, Expected)] = &[
@@ -429,13 +456,29 @@ mod tests {
             ("/tmp/100%%/{{ x }}.log", None, Base("/tmp")),
             // relative explicit base is always rejected
             ("{{ x }}", Some("relative/dir"), ErrNotAbsolute),
-            // static path + explicit base_dir → confinement applies. The
-            // operator asked for the guarantee; a `path` with no field
-            // references shouldn't silently opt out of it.
+            // static path inside explicit base_dir → confinement applies
+            (
+                "/var/log/vector/out.log",
+                Some("/var/log/vector"),
+                Base("/var/log/vector"),
+            ),
+            // static path outside explicit base_dir → rejected at build time
             (
                 "/tmp/out.log",
                 Some("/var/log/vector"),
+                ErrStaticOutside,
+            ),
+            // relative static path + explicit base → resolved and accepted
+            (
+                "out.log",
+                Some("/var/log/vector"),
                 Base("/var/log/vector"),
+            ),
+            // relative static path that traverses outside base → rejected
+            (
+                "../../etc/passwd",
+                Some("/var/log/vector"),
+                ErrStaticOutside,
             ),
         ];
         for (tpl_src, explicit, expected) in cases {
@@ -459,6 +502,13 @@ mod tests {
                 ),
                 ErrNotAbsolute => assert!(
                     matches!(result.unwrap_err(), BuildError::BaseNotAbsolute { .. }),
+                    "tpl = {tpl_src:?}"
+                ),
+                ErrStaticOutside => assert!(
+                    matches!(
+                        result.unwrap_err(),
+                        BuildError::StaticPathOutsideBase { .. }
+                    ),
                     "tpl = {tpl_src:?}"
                 ),
             }
