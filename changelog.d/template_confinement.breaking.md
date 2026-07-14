@@ -19,9 +19,9 @@ query string are still accepted. Dynamic query segments (e.g.
 `https://api.internal/ingest?tenant={{ tenant }}`) are rejected at startup.
 
 **Opt-out:** set `dangerously_allow_unconfined_template_resolution: true` on
-the affected sink to restore the previous behaviour. Vector logs a warning on
-startup and sets `vector_security_confinement_disabled{component_type=...}` to
-`1` for that sink.
+the affected sink to disable all confinement checks for that sink — both at
+startup and at runtime. Vector logs a warning per template on startup and sets
+`vector_security_confinement_disabled{component_type=...}` to `1`.
 
 **Observability:**
 

@@ -20,12 +20,12 @@ impl InternalEvent for KeyOutsideBasePrefixError<'_> {
             message = "Rendered key is outside the configured base prefix; dropping event.",
             key = self.key,
             error = self.message,
-            error_type = error_type::CONDITION_FAILED,
+            error_type = error_type::CONFINEMENT_FAILED,
             stage = error_stage::PROCESSING,
         );
         counter!(
             CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONDITION_FAILED,
+            "error_type" => error_type::CONFINEMENT_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);

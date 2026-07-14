@@ -217,38 +217,33 @@ impl Template {
 
     /// Confine this template to its literal prefix.
     ///
-    /// Consumes `self` and returns it with a `PrefixChecker` attached that
-    /// fires on every render. Three outcomes:
+    /// Consumes `self` and returns it with a confinement checker attached (if
+    /// applicable). Three outcomes:
     ///
+    /// - `dangerously_allow_unconfined_template_resolution` is `true` — no
+    ///   checker attached; a SECURITY warning is emitted. Full opt-out: both
+    ///   startup validation and runtime checks are bypassed.
     /// - Static template (no event-field references) — returned unchanged.
     /// - Dynamic template with a non-empty literal prefix — checker attached.
-    /// - Dynamic template with no derivable prefix — error, unless
-    ///   `config.dangerously_allow_unconfined_template_resolution` is `true`,
-    ///   in which case a `SECURITY` warning is emitted and `self` is returned
-    ///   as-is.
+    /// - Dynamic template with no derivable prefix — error.
     pub fn confine(
         self,
         config: &ConfinementConfig,
         component_name: &'static str,
         field_name: &'static str,
     ) -> crate::Result<Self> {
+        // Full opt-out: bypass all confinement for this template (startup AND
+        // runtime). The per-sink gauge is emitted by each sink's build() on
+        // the success path — not here — so a failed reload cannot clobber the
+        // still-active sink's gauge.
+        if config.dangerously_allow_unconfined_template_resolution {
+            ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
+            return Ok(self);
+        }
         match ConfinementChecker::for_template(&self) {
-            // Checker attached — template IS confined regardless of the opt-out flag.
             Ok(Some(checker)) => Ok(self.with_confinement_checker(checker)),
             // Static template (no event-field references) — always safe.
             Ok(None) => Ok(self),
-            // No derivable base AND opt-out set — template is NOT confined.
-            // Log a per-template SECURITY warning so operators can pinpoint
-            // which specific template on the sink is unchecked. The
-            // per-sink `security_confinement_disabled` gauge is emitted
-            // by each sink's `SinkConfig::build` only on the success
-            // path (see `ConfinementConfig::set_confinement_gauge`) — a
-            // failed reload's write would otherwise clobber the
-            // still-active old sink's gauge value.
-            Err(_) if config.dangerously_allow_unconfined_template_resolution => {
-                ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
-                Ok(self)
-            }
             Err(e) => Err(e.into()),
         }
     }

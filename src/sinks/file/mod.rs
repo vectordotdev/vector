@@ -39,7 +39,7 @@ use crate::{
     },
     sinks::util::{
         StreamSink,
-        path_confinement::{BuildError, ConfineError, PathConfinement},
+        path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
     template::{ConfinementConfig, Template},
@@ -288,46 +288,20 @@ impl FileSink {
             .or(cx.globals.timezone)
             .and_then(timezone_to_offset);
 
-        // The escape hatch only suppresses the build-time error. If a
-        // base directory is derivable from `path` or set via `base_dir`, the
-        // flag is ignored — flipping it via a `conf.d` drop-in or env-var
-        // interpolation can never silently disable an already-working
-        // confinement.
-        let confinement = match PathConfinement::for_template(
-            &config.path,
-            config.base_dir.as_deref(),
-        ) {
-            Ok(c) => {
-                if config
-                    .confinement
-                    .dangerously_allow_unconfined_template_resolution
-                {
-                    warn!(
-                        message = "`dangerously_allow_unconfined_template_resolution` ignored: a base directory is derivable from `path` or set via `base_dir`.",
-                    );
-                }
-                c
-            }
-            Err(e) => {
-                // The escape hatch only suppresses errors caused by the absence
-                // of a derivable base. Configuration errors like `BaseNotAbsolute`
-                // (a relative `base_dir`) are always fatal — allowing them through
-                // would silently run unconfined when the operator clearly intended
-                // confinement.
-                let suppressible = matches!(
-                    e,
-                    BuildError::NoDerivableBase { .. } | BuildError::DerivedBaseIsRoot { .. }
-                );
-                if config
-                    .confinement
-                    .dangerously_allow_unconfined_template_resolution
-                    && suppressible
-                {
-                    ConfinementConfig::warn_unconfined_template("sink", "file", "path");
-                    None
-                } else {
-                    return Err(Box::new(e));
-                }
+        // Full opt-out: bypass both startup validation and runtime confinement.
+        // Configuration errors (e.g. a relative `base_dir`) are still fatal —
+        // the operator clearly intended confinement; disabling it would be
+        // silent data loss.
+        let confinement = if config
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            ConfinementConfig::warn_unconfined_template("sink", "file", "path");
+            None
+        } else {
+            match PathConfinement::for_template(&config.path, config.base_dir.as_deref()) {
+                Ok(c) => c,
+                Err(e) => return Err(Box::new(e)),
             }
         };
 
@@ -1306,9 +1280,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn escape_hatch_ignored_when_base_derivable() {
-        // With the flag set but a derivable base, confinement
-        // stays on and the PoC payload is still blocked.
+    async fn escape_hatch_bypasses_confinement_even_when_base_derivable() {
+        // With the flag set, confinement is fully disabled — even when a base
+        // would otherwise be derivable. The flag is a complete opt-out.
         let dir = temp_dir();
         let path = format!("{}/{{{{ key }}}}.log", dir.display());
         let mut cfg = base_config(&path);
@@ -1316,13 +1290,12 @@ mod tests {
             .dangerously_allow_unconfined_template_resolution = true;
 
         let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-        assert!(sink.confinement.is_some());
+        assert!(sink.confinement.is_none());
 
         let mut event = Event::Log(LogEvent::from("payload"));
-        event
-            .as_mut_log()
-            .insert(event_path!("key"), "../../../etc/cron.d/x");
-        assert!(sink.partition_event(&event).is_none());
+        event.as_mut_log().insert(event_path!("key"), "safe-value");
+        // Event routes through — no confinement check.
+        assert!(sink.partition_event(&event).is_some());
     }
 
     #[tokio::test]

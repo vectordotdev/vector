@@ -122,12 +122,12 @@ impl InternalEvent for FilePathOutsideBaseDirError<'_> {
             path = ?self.path,
             base_dir = ?self.base_dir,
             error = %self.error,
-            error_type = error_type::CONDITION_FAILED,
+            error_type = error_type::CONFINEMENT_FAILED,
             stage = error_stage::PROCESSING,
         );
         counter!(
             CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONDITION_FAILED,
+            "error_type" => error_type::CONFINEMENT_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
