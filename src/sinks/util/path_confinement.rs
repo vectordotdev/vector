@@ -168,9 +168,10 @@ pub struct PathConfinement {
 
 impl PathConfinement {
     /// Build a confinement for `tpl`. Returns:
-    /// - `Ok(None)` if the template has no field references (nothing to confine).
     /// - `Ok(Some(_))` with a base derived from `explicit` (if set) or from
     ///   the template's literal prefix.
+    /// - `Ok(None)` only when the template has no field references AND no
+    ///   explicit base was set — nothing to confine.
     /// - `Err(_)` if no usable base can be derived and `explicit` is unset.
     ///
     /// Performs no filesystem I/O.
@@ -178,9 +179,14 @@ impl PathConfinement {
         tpl: &Template,
         explicit: Option<&Path>,
     ) -> Result<Option<Self>, BuildError> {
+        // A static template with no explicit base has nothing to confine.
+        // But if `explicit` is set, the operator asked for confinement, so
+        // we still want to enforce `base_dir` + `O_NOFOLLOW` on the
+        // rendered path.
         let fields = match tpl.get_fields() {
             Some(f) => f,
-            None => return Ok(None),
+            None if explicit.is_none() => return Ok(None),
+            None => Vec::new(),
         };
 
         let base_path = match explicit {
@@ -423,6 +429,14 @@ mod tests {
             ("/tmp/100%%/{{ x }}.log", None, Base("/tmp")),
             // relative explicit base is always rejected
             ("{{ x }}", Some("relative/dir"), ErrNotAbsolute),
+            // static path + explicit base_dir → confinement applies. The
+            // operator asked for the guarantee; a `path` with no field
+            // references shouldn't silently opt out of it.
+            (
+                "/tmp/out.log",
+                Some("/var/log/vector"),
+                Base("/var/log/vector"),
+            ),
         ];
         for (tpl_src, explicit, expected) in cases {
             let tpl = Template::try_from(*tpl_src).unwrap();

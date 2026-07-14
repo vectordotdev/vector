@@ -352,6 +352,18 @@ impl SinkConfig for HttpSinkConfig {
             .clone()
             .confine(&self.confinement, Self::NAME, "uri")?;
 
+        // Confine every templated header value. Header-based routing
+        // (e.g. `X-Scope-OrgID: "{{ tenant }}"`) is as steerable as URI
+        // routing — an event that controls the header field picks the
+        // destination tenant unless we confine the header template too.
+        let template_headers = template_headers
+            .into_iter()
+            .map(|(name, tpl)| {
+                tpl.confine(&self.confinement, Self::NAME, "request.headers")
+                    .map(|tpl| (name, tpl))
+            })
+            .collect::<crate::Result<BTreeMap<_, _>>>()?;
+
         let sink = HttpSink::new(
             service,
             uri,
@@ -360,6 +372,7 @@ impl SinkConfig for HttpSinkConfig {
             request_builder,
         );
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 

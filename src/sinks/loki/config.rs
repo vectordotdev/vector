@@ -241,6 +241,7 @@ impl SinkConfig for LokiConfig {
 
         let healthcheck = healthcheck(config, client).boxed();
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 

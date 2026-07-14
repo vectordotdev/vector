@@ -188,10 +188,16 @@ impl GenerateConfig for HecLogsSinkConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec_logs")]
-impl SinkConfig for HecLogsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+impl HecLogsSinkConfig {
+    /// Confinement + sink construction without emitting the per-sink
+    /// confinement gauge. Called by [`SinkConfig::build`] (which emits
+    /// `splunk_hec_logs`) and by Humio's wrapper (which emits
+    /// `humio_logs` / `humio_metrics` under its own component name so
+    /// operators watching a gauge see the sink type they configured).
+    pub(crate) fn build_without_confinement_gauge(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
@@ -220,6 +226,16 @@ impl SinkConfig for HecLogsSinkConfig {
         let sink = confined_config.build_processor(client, cx)?;
 
         Ok((sink, healthcheck))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec_logs")]
+impl SinkConfig for HecLogsSinkConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let result = self.build_without_confinement_gauge(cx)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        Ok(result)
     }
 
     fn input(&self) -> Input {

@@ -233,25 +233,47 @@ impl Template {
         field_name: &'static str,
     ) -> crate::Result<Self> {
         match ConfinementChecker::for_template(&self) {
-            Ok(Some(checker)) => {
-                // Checker attached — template IS confined regardless of the opt-out flag.
-                config.emit_confinement_gauge(true, "sink", component_name, field_name);
-                Ok(self.with_confinement_checker(checker))
-            }
-            Ok(None) => {
-                // Static template (no event-field references) — always safe.
-                // Emit gauge=0 so a config reload from an unsafe dynamic template
-                // to a static one resets any previously-set gauge=1.
-                config.emit_confinement_gauge(true, "sink", component_name, field_name);
-                Ok(self)
-            }
+            // Checker attached — template IS confined regardless of the opt-out flag.
+            Ok(Some(checker)) => Ok(self.with_confinement_checker(checker)),
+            // Static template (no event-field references) — always safe.
+            Ok(None) => Ok(self),
+            // No derivable base AND opt-out set — template is NOT confined.
+            // Log a per-template SECURITY warning so operators can pinpoint
+            // which specific template on the sink is unchecked. The
+            // per-sink `security_confinement_disabled` gauge is emitted
+            // by each sink's `SinkConfig::build` only on the success
+            // path (see `ConfinementConfig::set_confinement_gauge`) — a
+            // failed reload's write would otherwise clobber the
+            // still-active old sink's gauge value.
             Err(_) if config.dangerously_allow_unconfined_template_resolution => {
-                // No derivable base AND opt-out set — template is NOT confined.
-                config.emit_confinement_gauge(false, "sink", component_name, field_name);
+                ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
                 Ok(self)
             }
             Err(e) => Err(e.into()),
         }
+    }
+
+    /// Run the confinement check attached to this template against a raw
+    /// string, without going through a normal render. Callers that bypass
+    /// template rendering entirely (for example the elasticsearch sink's
+    /// `auto_routing` path, which reads routing values directly off events)
+    /// must call this to keep the confinement contract intact for those
+    /// values.
+    ///
+    /// Returns `Ok(())` if no confinement checker is attached (static
+    /// templates and pure-dynamic templates with the opt-out set both fall
+    /// through this way), or if the checker accepts the value. Returns
+    /// [`TemplateRenderingError::Confined`] otherwise.
+    pub fn check_confinement(&self, rendered: &str) -> Result<(), TemplateRenderingError> {
+        if let Some(checker) = &self.confinement {
+            checker
+                .confine(rendered)
+                .map_err(|e| TemplateRenderingError::Confined {
+                    rendered: rendered.to_string(),
+                    message: e.to_string(),
+                })?;
+        }
+        Ok(())
     }
 
     /// Renders the given template with data from the event, returning raw bytes.
@@ -999,6 +1021,17 @@ impl UriChecker {
             .scheme_str()
             .expect("scheme present because prefix starts with http(s)://")
             .to_ascii_lowercase();
+        // Reject URI templates whose literal prefix has already crossed
+        // into the query. Composing a robust prefix pattern from operator-
+        // authored `?tenant={{ tenant }}` shapes is fragile — every
+        // starts_with/`&`-boundary combination has either a bypass or a
+        // false-positive on operator-authored static suffixes. Force
+        // dynamic routing into the path instead.
+        if uri.query().is_some() {
+            return Err(BuildError::NoStaticUriAuthority {
+                prefix: prefix.to_string(),
+            });
+        }
         match uri.authority() {
             Some(auth) if !auth.as_str().is_empty() => Ok(Self {
                 scheme,
@@ -1073,6 +1106,20 @@ impl UriChecker {
             });
         }
 
+        // 5. Reject any rendered query. `from_prefix` rejects URI templates
+        //    whose literal prefix crosses into the query, so a URI checker is
+        //    only ever built for pathful templates. A query at render time
+        //    means a field value smuggled `?...` into the path — for
+        //    example `.../ingest/{{ tenant }}` with a tenant value of
+        //    `ok?tenant=evil` renders to `.../ingest/ok` with query
+        //    `tenant=evil`; same authority + same path prefix, but the
+        //    destination now has an attacker-controlled routing parameter.
+        if uri.query().is_some() {
+            return Err(ConfineError::OutsideBase {
+                rendered: rendered.to_string(),
+                base: format!("{}://{}{}", self.scheme, self.authority, self.path_prefix),
+            });
+        }
         Ok(())
     }
 }
@@ -1098,29 +1145,42 @@ pub struct ConfinementConfig {
 }
 
 impl ConfinementConfig {
-    /// Emit the `vector_security_confinement_disabled` gauge.
-    ///
-    /// Call this on every confinement code-path (both confined and opt-out) for
-    /// templates that have dynamic fields, so that a config reload which removes
-    /// `dangerously_allow_unconfined_template_resolution` resets the gauge to 0.
-    ///
-    /// `actually_confined` must be `true` when a checker was successfully
-    /// attached (gauge → 0) and `false` when the opt-out suppressed an error
-    /// and no checker was attached (gauge → 1, warn emitted).
-    pub fn emit_confinement_gauge(
-        &self,
-        actually_confined: bool,
+    /// Called on the opt-out code-path (`dangerously_allow_unconfined_template_resolution: true`
+    /// AND the template had no derivable literal prefix). Logs a
+    /// per-template SECURITY warning so operators can see which specific
+    /// template on a sink is unconfined. Does NOT touch the gauge — the
+    /// gauge is emitted once per sink build by [`Self::set_confinement_gauge`].
+    pub fn warn_unconfined_template(
         component_kind: &'static str,
         component_type: &'static str,
         field: &'static str,
     ) {
-        let value = if !actually_confined {
-            warn!(
-                message = "SECURITY: component has `dangerously_allow_unconfined_template_resolution` \
-                           enabled — template is NOT confined. A log producer that controls any \
-                           field used in the template can write to arbitrary keys.",
-                component_kind, component_type, field,
-            );
+        warn!(
+            message = "SECURITY: component has `dangerously_allow_unconfined_template_resolution` \
+                       enabled — template is NOT confined. A log producer that controls any \
+                       field used in the template can write to arbitrary keys.",
+            component_kind, component_type, field,
+        );
+    }
+
+    /// Emit `vector_security_confinement_disabled{component_kind,component_type}`
+    /// reflecting whether this sink has the confinement policy disabled.
+    ///
+    /// Must be called at the END of `SinkConfig::build`, on the success
+    /// path only. Value = `1` when the flag is set (operator explicitly
+    /// disabled confinement policy for this sink), `0` otherwise.
+    ///
+    /// Emitting earlier means a build that later errors would still leave
+    /// its gauge write behind. On a reload where the new config fails to
+    /// build, the topology manager keeps the old sink active but the
+    /// failed replacement's write would silently misreport the live
+    /// sink's confinement state.
+    pub fn set_confinement_gauge(
+        &self,
+        component_kind: &'static str,
+        component_type: &'static str,
+    ) {
+        let value = if self.dangerously_allow_unconfined_template_resolution {
             1.0
         } else {
             0.0
@@ -1129,7 +1189,6 @@ impl ConfinementConfig {
             GaugeName::SecurityConfinementDisabled,
             "component_kind" => component_kind,
             "component_type" => component_type,
-            "field" => field,
         )
         .set(value);
     }
@@ -1635,18 +1694,6 @@ mod tests {
     }
 
     #[test]
-    fn uri_query_only_suffix_accepted() {
-        // `https://host{{ query }}` with `query = "?x=1"` should pass.
-        let tpl = Template::try_from("https://api.internal{{ query }}").unwrap();
-        let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
-        assert!(c.confine("https://api.internal?x=1").is_ok());
-        // http::Uri silently strips fragments per RFC 7230 (fragments are not sent
-        // to servers), so the fragment is invisible to the authority + path checks
-        // and the rendered value is accepted.
-        assert!(c.confine("https://api.internal#fragment").is_ok());
-    }
-
-    #[test]
     fn uri_percent_encoded_dotdot_rejected() {
         // Servers that decode percent-encoding before path resolution can be
         // tricked by `%2e%2e` instead of `..`.  All encoded variants must be
@@ -1746,6 +1793,51 @@ mod tests {
             c.confine("http://trusted.example.com/api/v1").unwrap_err(),
             ConfineError::UriAuthorityMismatch { .. }
         ));
+    }
+
+    #[test]
+    fn uri_path_field_cannot_smuggle_query() {
+        // The build-time check rejects URI templates that put a field in
+        // the query, so UriChecker only exists for pathful templates. If a
+        // rendered URI has any query at all, a field value must have
+        // smuggled it in through the path. Example: template
+        // `https://api.internal/ingest/{{ tenant }}` + tenant value
+        // `ok?tenant=evil` renders to `.../ingest/ok?tenant=evil` — same
+        // authority and path prefix, attacker-controlled query.
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+        assert!(matches!(
+            c.confine("https://api.internal/ingest/ok?tenant=evil")
+                .unwrap_err(),
+            ConfineError::OutsideBase { .. }
+        ));
+        // Fragments are stripped by `http::Uri` before reaching the server,
+        // so a rendered `#frag` doesn't count as a query and is accepted.
+        assert!(c.confine("https://api.internal/ingest/ok#frag").is_ok());
+    }
+
+    #[test]
+    fn uri_field_in_query_rejected_at_build() {
+        // URIs whose template puts a field in the query are fragile to
+        // confine: every attempt at reasoning about `&` boundaries, static
+        // suffixes, and multi-field patterns has been either bypassable
+        // (a value like `a&tenant=other` sneaking through a bare prefix
+        // check) or false-positive (a legitimate operator-authored
+        // `&source=vector` static suffix). Reject at build.
+        for template_str in &[
+            "https://api.internal/ingest?tenant={{ tenant }}",
+            "https://api.internal/ingest?tenant=team-{{ tenant }}",
+            "https://api.internal/ingest?apiVersion=1.0&tenant={{ tenant }}",
+        ] {
+            let tpl = Template::try_from(*template_str).unwrap();
+            assert!(
+                matches!(
+                    ConfinementChecker::for_template(&tpl).unwrap_err(),
+                    BuildError::NoStaticUriAuthority { .. }
+                ),
+                "expected NoStaticUriAuthority for {template_str}"
+            );
+        }
     }
 
     #[test]

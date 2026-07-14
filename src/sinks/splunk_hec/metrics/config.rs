@@ -172,6 +172,7 @@ impl SinkConfig for HecMetricsSinkConfig {
         )
         .boxed();
         let sink = config.build_processor(client, cx)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 

@@ -248,6 +248,7 @@ impl SinkConfig for FileSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(self, cx)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -305,9 +306,6 @@ impl FileSink {
                         message = "`dangerously_allow_unconfined_template_resolution` ignored: a base directory is derivable from `path` or set via `base_dir`.",
                     );
                 }
-                config
-                    .confinement
-                    .emit_confinement_gauge(true, "sink", "file", "path");
                 c
             }
             Err(e) => {
@@ -325,9 +323,7 @@ impl FileSink {
                     .dangerously_allow_unconfined_template_resolution
                     && suppressible
                 {
-                    config
-                        .confinement
-                        .emit_confinement_gauge(false, "sink", "file", "path");
+                    ConfinementConfig::warn_unconfined_template("sink", "file", "path");
                     None
                 } else {
                     return Err(Box::new(e));

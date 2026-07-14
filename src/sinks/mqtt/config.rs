@@ -123,6 +123,7 @@ impl SinkConfig for MqttSinkConfig {
         let connector = config.build_connector()?;
         let sink = MqttSink::new(&config, connector.clone())?;
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),

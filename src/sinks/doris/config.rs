@@ -242,6 +242,7 @@ impl SinkConfig for DorisConfig {
         .map_ok(|((), _)| ())
         .boxed();
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 

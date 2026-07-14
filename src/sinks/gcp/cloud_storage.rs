@@ -282,6 +282,7 @@ impl SinkConfig for GcsSinkConfig {
         auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth, cx)?;
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 

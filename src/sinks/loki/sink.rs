@@ -18,7 +18,26 @@ use crate::{
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
     sinks::{loki::event::LokiBatchEncoding, prelude::*},
+    template::ConfinementConfig,
 };
+
+/// Attach the sink's confinement config to every key and value template in a
+/// `label`-style HashMap. Fails if any template rejects confinement (used at
+/// sink build time so operators get the failure up front).
+fn confine_template_map(
+    map: HashMap<Template, Template>,
+    config: &ConfinementConfig,
+    component_name: &'static str,
+    field_name: &'static str,
+) -> crate::Result<HashMap<Template, Template>> {
+    map.into_iter()
+        .map(|(k, v)| {
+            let k = k.confine(config, component_name, field_name)?;
+            let v = v.confine(config, component_name, field_name)?;
+            Ok((k, v))
+        })
+        .collect()
+}
 
 #[derive(Clone)]
 pub struct KeyPartitioner(Option<Template>);
@@ -156,8 +175,19 @@ pub(super) struct EventEncoder {
     remove_timestamp: bool,
 }
 
+/// Returns `true` if a `TemplateRenderingError` is a confinement violation.
+const fn is_confined(err: &crate::template::TemplateRenderingError) -> bool {
+    matches!(
+        err,
+        crate::template::TemplateRenderingError::Confined { .. }
+    )
+}
+
 impl EventEncoder {
-    fn build_labels(&self, event: &Event) -> Vec<(String, String)> {
+    /// Renders each label pair. Returns `Err(())` if any template rendered a
+    /// confined value — the caller must drop the event as an intentional
+    /// security discard (matches the tenant_id contract).
+    fn build_labels(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
         let mut static_labels: HashMap<String, String> = HashMap::new();
         let mut dynamic_labels: HashMap<String, String> = HashMap::new();
 
@@ -166,6 +196,8 @@ impl EventEncoder {
             let value = value_template.render_string(event);
 
             if key.is_err() || value.is_err() {
+                let key_confined = key.as_ref().err().is_some_and(is_confined);
+                let value_confined = value.as_ref().err().is_some_and(is_confined);
                 if key.is_err() {
                     emit!(TemplateRenderingError {
                         field: Some(
@@ -174,7 +206,7 @@ impl EventEncoder {
                             )
                             .as_str()
                         ),
-                        drop_event: false,
+                        drop_event: key_confined,
                         error: key.err().unwrap(),
                     });
                 }
@@ -186,9 +218,12 @@ impl EventEncoder {
                             )
                             .as_str()
                         ),
-                        drop_event: false,
+                        drop_event: value_confined,
                         error: value.err().unwrap(),
                     });
+                }
+                if key_confined || value_confined {
+                    return Err(());
                 }
                 continue;
             }
@@ -215,7 +250,7 @@ impl EventEncoder {
             };
         }
 
-        Vec::from_iter(dynamic_labels)
+        Ok(Vec::from_iter(dynamic_labels))
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
@@ -232,7 +267,7 @@ impl EventEncoder {
         }
     }
 
-    fn build_structured_metadata(&self, event: &Event) -> Vec<(String, String)> {
+    fn build_structured_metadata(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
         let mut static_structured_metadata: HashMap<String, String> = HashMap::new();
         let mut dynamic_structured_metadata: HashMap<String, String> = HashMap::new();
 
@@ -241,6 +276,8 @@ impl EventEncoder {
             let value = value_template.render_string(event);
 
             if key.is_err() || value.is_err() {
+                let key_confined = key.as_ref().err().is_some_and(is_confined);
+                let value_confined = value.as_ref().err().is_some_and(is_confined);
                 if key.is_err() {
                     emit!(TemplateRenderingError {
                         field: Some(
@@ -249,7 +286,7 @@ impl EventEncoder {
                     )
                             .as_str()
                         ),
-                        drop_event: false,
+                        drop_event: key_confined,
                         error: key.err().unwrap(),
                     });
                 }
@@ -261,9 +298,12 @@ impl EventEncoder {
                     )
                             .as_str()
                         ),
-                        drop_event: false,
+                        drop_event: value_confined,
                         error: value.err().unwrap(),
                     });
+                }
+                if key_confined || value_confined {
+                    return Err(());
                 }
                 continue;
             }
@@ -295,7 +335,7 @@ impl EventEncoder {
             };
         }
 
-        Vec::from_iter(dynamic_structured_metadata)
+        Ok(Vec::from_iter(dynamic_structured_metadata))
     }
 
     fn remove_structured_metadata_fields(&self, event: &mut Event) {
@@ -319,9 +359,16 @@ impl EventEncoder {
         };
         let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
-        let mut labels: Vec<(String, String)> = self.build_labels(&event);
+        let mut labels: Vec<(String, String)> = match self.build_labels(&event) {
+            Ok(labels) => labels,
+            Err(()) => return None, // Confined label — intentional security drop
+        };
         self.remove_label_fields(&mut event);
-        let structured_metadata: Vec<(String, String)> = self.build_structured_metadata(&event);
+        let structured_metadata: Vec<(String, String)> =
+            match self.build_structured_metadata(&event) {
+                Ok(md) => md,
+                Err(()) => return None, // Confined structured_metadata — intentional security drop
+            };
         self.remove_structured_metadata_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
@@ -500,6 +547,19 @@ impl LokiSink {
             .map(|template| template.confine(&config.confinement, LokiConfig::NAME, "tenant_id"))
             .transpose()?;
 
+        let labels = confine_template_map(
+            config.labels,
+            &config.confinement,
+            LokiConfig::NAME,
+            "labels",
+        )?;
+        let structured_metadata = confine_template_map(
+            config.structured_metadata,
+            &config.confinement,
+            LokiConfig::NAME,
+            "structured_metadata",
+        )?;
+
         Ok(Self {
             request_builder: LokiRequestBuilder {
                 compression,
@@ -509,8 +569,8 @@ impl LokiSink {
                 key_partitioner: KeyPartitioner::new(tenant_id),
                 transformer,
                 encoder,
-                labels: config.labels,
-                structured_metadata: config.structured_metadata,
+                labels,
+                structured_metadata,
                 remove_label_fields: config.remove_label_fields,
                 remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,
