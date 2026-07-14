@@ -100,6 +100,20 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 		required: false
 		type: string: {}
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable template confinement when no static prefix can be derived.
+
+			**DANGEROUS — disables a security control.**
+
+			Suppresses the startup error when a template references event fields
+			but has no static literal prefix to derive a confinement base from.
+			When enabled, a log producer that controls any field used in the
+			template can write to arbitrary keys or paths.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false

@@ -205,8 +205,7 @@ impl Application {
     ) -> Result<(Runtime, Self), ExitCode> {
         opts.root.init_global();
 
-        #[cfg(feature = "sources-utils-http-encoding")]
-        crate::sources::util::http::set_max_decompressed_size_bytes(
+        crate::sources::util::set_max_decompressed_size_bytes(
             opts.root.max_decompressed_size_bytes,
         );
 

@@ -1,7 +1,8 @@
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+        error_stage, error_type,
     },
 };
 
@@ -21,6 +22,11 @@ impl InternalEvent for TemplateRenderingError<'_> {
         }
         msg.push('.');
 
+        let confined = matches!(
+            self.error,
+            crate::template::TemplateRenderingError::Confined { .. }
+        );
+
         if self.drop_event {
             error!(
                 message = %msg,
@@ -36,10 +42,19 @@ impl InternalEvent for TemplateRenderingError<'_> {
             )
             .increment(1);
 
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: 1,
-                reason: "Failed to render template.",
-            });
+            // Confinement violations are intentional security discards.
+            // All other template render failures are unintentional drops.
+            if confined {
+                emit!(ComponentEventsDropped::<INTENTIONAL> {
+                    count: 1,
+                    reason: "Template rendered a value outside the confined base.",
+                });
+            } else {
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: 1,
+                    reason: "Failed to render template.",
+                });
+            }
         } else {
             warn!(
                 message = %msg,

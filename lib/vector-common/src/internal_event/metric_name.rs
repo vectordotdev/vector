@@ -219,6 +219,7 @@ pub enum GaugeName {
     MemoryEnrichmentTableObjectsCount,
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
+    SecurityConfinementDisabled,
 }
 
 impl GaugeName {
@@ -262,6 +263,7 @@ impl GaugeName {
             Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
+            Self::SecurityConfinementDisabled => "security_confinement_disabled",
         }
     }
 }

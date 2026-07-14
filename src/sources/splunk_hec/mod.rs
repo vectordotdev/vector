@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     convert::Infallible,
-    io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
     time::Duration,
@@ -9,7 +8,6 @@ use std::{
 
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
-use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{Server, service::make_service_fn};
@@ -67,6 +65,7 @@ use self::{
 use crate::{
     SourceSender,
     codecs::DecodingConfig,
+    common::http::ErrorMessage,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
@@ -74,6 +73,7 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
     serde::bool_or_struct,
+    sources::util::{decompression::CappedDecoder, http::capped_body},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -523,7 +523,7 @@ impl SplunkSource {
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
-            .and(warp::body::bytes())
+            .and(capped_body())
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -544,10 +544,11 @@ impl SplunkSource {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
 
-                        let mut data = Vec::new();
+                        let data;
                         let (byte_size, body) = if gzip {
-                            MultiGzDecoder::new(body.reader())
-                                .read_to_end(&mut data)
+                            // Cap the decompressed output to mitigate gzip-bomb DoS.
+                            data = CappedDecoder::gzip(body.reader())
+                                .decompress()
                                 .map_err(|_| Rejection::from(ApiError::BadRequest))?;
                             (data.len(), String::from_utf8_lossy(data.as_slice()))
                         } else {
@@ -659,7 +660,7 @@ impl SplunkSource {
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
-            .and(warp::body::bytes())
+            .and(capped_body())
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -788,7 +789,7 @@ impl SplunkSource {
         T: Send + DeserializeOwned + 'static,
     {
         warp::header::optional::<HeaderValue>(CONTENT_TYPE.as_str())
-            .and(warp::body::bytes())
+            .and(capped_body())
             .and_then(
                 |ctype: Option<HeaderValue>, body: bytes::Bytes| async move {
                     let ok = ctype
@@ -1720,10 +1721,10 @@ fn raw_event(
 ) -> Result<(Vec<Event>, bool), Rejection> {
     // Process gzip
     let body_bytes: Bytes = if gzip {
-        let mut data = Vec::new();
-        match MultiGzDecoder::new(bytes.reader()).read_to_end(&mut data) {
-            Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => Bytes::from(data),
+        // Cap the decompressed output to mitigate gzip-bomb DoS.
+        match CappedDecoder::gzip(bytes.reader()).decompress() {
+            Ok(data) if data.is_empty() => return Err(ApiError::NoData.into()),
+            Ok(data) => Bytes::from(data),
             Err(error) => {
                 emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
@@ -2014,6 +2015,8 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::ACK_IS_DISABLED)
             }
         },))
+    } else if let Some(error) = rejection.find::<ErrorMessage>() {
+        Ok((response_json(error.status_code(), error),))
     } else {
         Err(rejection)
     }
@@ -2082,6 +2085,22 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SplunkConfig>();
+    }
+
+    #[tokio::test]
+    async fn finish_err_maps_capped_body_to_client_error() {
+        // `capped_body()` rejects oversized payloads with an `ErrorMessage` (e.g. 413). The
+        // recovery must surface that status instead of letting it fall through to a 500.
+        let rejection = warp::reject::custom(ErrorMessage::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Request body exceeds limit of 1024 bytes.".to_owned(),
+        ));
+
+        let (response,) = finish_err(rejection)
+            .await
+            .expect("capped-body rejection should be recovered");
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     /// Splunk token
@@ -2155,6 +2174,7 @@ mod tests {
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: Default::default(),
+            confinement: Default::default(),
         }
         .build(SinkContext::default())
         .await

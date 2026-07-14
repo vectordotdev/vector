@@ -7,10 +7,12 @@ use vector_lib::{
     configurable::configurable_component,
     counter, gauge,
     internal_event::{
-        ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
-        error_type,
+        ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+        error_stage, error_type,
     },
 };
+
+use crate::sinks::util::path_confinement::ConfineError;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
@@ -103,6 +105,36 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
                 reason: self.message,
             });
         }
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct FilePathOutsideBaseDirError<'a> {
+    pub path: &'a std::path::Path,
+    pub base_dir: &'a std::path::Path,
+    pub error: ConfineError,
+}
+
+impl InternalEvent for FilePathOutsideBaseDirError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Rendered path is outside the configured base directory; dropping event.",
+            path = ?self.path,
+            base_dir = ?self.base_dir,
+            error = %self.error,
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "Rendered path outside base_dir.",
+        });
     }
 }
 

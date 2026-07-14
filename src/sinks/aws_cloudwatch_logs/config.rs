@@ -24,7 +24,7 @@ use crate::{
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, http::RequestConfig,
         },
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -182,6 +182,10 @@ pub struct CloudwatchLogsSinkConfig {
         docs::additional_props_description = "A tag represented as a key-value pair"
     ))]
     pub tags: Option<HashMap<String, String>>,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl CloudwatchLogsSinkConfig {
@@ -203,6 +207,15 @@ impl CloudwatchLogsSinkConfig {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let group_template =
+            self.group_name
+                .clone()
+                .confine(&self.confinement, Self::NAME, "group_name")?;
+        let stream_template =
+            self.stream_name
+                .clone()
+                .confine(&self.confinement, Self::NAME, "stream_name")?;
+
         let batcher_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.tower.into_settings();
         let client = self.create_client(cx.proxy()).await?;
@@ -219,8 +232,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let sink = CloudwatchSink {
             batcher_settings,
             request_builder: CloudwatchRequestBuilder {
-                group_template: self.group_name.clone(),
-                stream_template: self.stream_name.clone(),
+                group_template,
+                stream_template,
                 transformer,
                 encoder,
             },
@@ -268,6 +281,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         acknowledgements: Default::default(),
         kms_key: Default::default(),
         tags: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -283,9 +297,36 @@ impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
 #[cfg(test)]
 mod tests {
     use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn test_generate_config() {
         crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_group_name() {
+        let template = Template::try_from("{{ group }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_group_name() {
+        let template = Template::try_from("{{ group }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_group_name() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
+        assert!(result.is_ok());
     }
 }

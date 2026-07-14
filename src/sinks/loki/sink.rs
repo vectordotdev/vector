@@ -27,6 +27,33 @@ impl KeyPartitioner {
     pub const fn new(template: Option<Template>) -> Self {
         Self(template)
     }
+
+    /// Render the tenant ID for an event.
+    ///
+    /// Returns:
+    /// - `Ok(Some(t))` — rendered successfully
+    /// - `Ok(None)` — no template configured
+    /// - `Err(())` — render failed with `Confined`; caller must drop the event
+    fn render_tenant_id(&self, event: &Event) -> Result<Option<String>, ()> {
+        match &self.0 {
+            None => Ok(None),
+            Some(t) => match t.render_string(event) {
+                Ok(s) => Ok(Some(s)),
+                Err(error) => {
+                    let confined = matches!(
+                        error,
+                        crate::template::TemplateRenderingError::Confined { .. }
+                    );
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("tenant_id"),
+                        drop_event: confined,
+                    });
+                    if confined { Err(()) } else { Ok(None) }
+                }
+            },
+        }
+    }
 }
 
 impl Partitioner for KeyPartitioner {
@@ -34,17 +61,9 @@ impl Partitioner for KeyPartitioner {
     type Key = Option<String>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        self.0.as_ref().and_then(|t| {
-            t.render_string(item)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("tenant_id"),
-                        drop_event: false,
-                    })
-                })
-                .ok()
-        })
+        // Non-confined render failures fall back to "no tenant"; Confined is
+        // handled via render_tenant_id in encode_event which actually drops.
+        self.render_tenant_id(item).unwrap_or(None)
     }
 }
 
@@ -294,7 +313,10 @@ impl EventEncoder {
     }
 
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
-        let tenant_id = self.key_partitioner.partition(&event);
+        let tenant_id = match self.key_partitioner.render_tenant_id(&event) {
+            Ok(t) => t,
+            Err(()) => return None, // Confined — intentional security drop
+        };
         let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels: Vec<(String, String)> = self.build_labels(&event);
@@ -473,13 +495,18 @@ impl LokiSink {
             _ => LokiBatchEncoder(LokiBatchEncoding::Json),
         };
 
+        let tenant_id = config
+            .tenant_id
+            .map(|template| template.confine(&config.confinement, LokiConfig::NAME, "tenant_id"))
+            .transpose()?;
+
         Ok(Self {
             request_builder: LokiRequestBuilder {
                 compression,
                 encoder: batch_encoder,
             },
             encoder: EventEncoder {
-                key_partitioner: KeyPartitioner::new(config.tenant_id),
+                key_partitioner: KeyPartitioner::new(tenant_id),
                 transformer,
                 encoder,
                 labels: config.labels,

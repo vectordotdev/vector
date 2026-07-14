@@ -43,7 +43,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -186,6 +186,9 @@ pub struct AzureBlobSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<AzureBlobTlsConfig>,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 pub fn default_blob_prefix() -> Template {
@@ -209,6 +212,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
             tls: None,
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -329,7 +333,60 @@ impl AzureBlobSinkConfig {
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        Ok(KeyPartitioner::new(self.blob_prefix.clone(), None))
+        let tpl = self
+            .blob_prefix
+            .clone()
+            .confine(&self.confinement, Self::NAME, "blob_prefix")?;
+        Ok(KeyPartitioner::new(tpl, None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::template::ConfinementConfig;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureBlobSinkConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_blob_prefix() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let err = template
+            .confine(&ConfinementConfig::default(), "azure_blob", "blob_prefix")
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("no literal string prefix"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_blob_prefix() {
+        let cfg = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        assert!(template.confine(&cfg, "azure_blob", "blob_prefix").is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::Event;
+        use vector_lib::event::LogEvent;
+        use vrl::event_path;
+
+        let template = Template::try_from("safe/{{ tenant }}/").unwrap();
+        let template = template
+            .confine(&ConfinementConfig::default(), "azure_blob", "blob_prefix")
+            .unwrap();
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../escape");
+        assert!(template.render_string(&event).is_err());
     }
 }
 
