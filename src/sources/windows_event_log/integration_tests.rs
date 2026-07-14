@@ -127,7 +127,7 @@ async fn test_basic_event_ingestion() {
         "level",
     ] {
         assert!(
-            log.contains(field),
+            log.contains(event_path!(field)),
             "Event is missing required field '{field}'. \
              Full event keys: {:?}",
             log.keys().into_iter().flatten().collect::<Vec<_>>()
