@@ -241,6 +241,38 @@ pub(super) fn validate_payload_wrapper(
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let result = self.build_without_confinement_gauge(cx).await?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        Ok(result)
+    }
+
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().1.input_type())
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let mut files = Vec::new();
+        if let Some(tls) = &self.tls {
+            if let Some(crt_file) = &tls.crt_file {
+                files.push(crt_file)
+            }
+            if let Some(key_file) = &tls.key_file {
+                files.push(key_file)
+            }
+        };
+        files
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+impl HttpSinkConfig {
+    pub(crate) async fn build_without_confinement_gauge(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let encoder = self.build_encoder()?;
@@ -372,29 +404,7 @@ impl SinkConfig for HttpSinkConfig {
             request_builder,
         );
 
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
-    }
-
-    fn files_to_watch(&self) -> Vec<&PathBuf> {
-        let mut files = Vec::new();
-        if let Some(tls) = &self.tls {
-            if let Some(crt_file) = &tls.crt_file {
-                files.push(crt_file)
-            }
-            if let Some(key_file) = &tls.key_file {
-                files.push(key_file)
-            }
-        };
-        files
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
