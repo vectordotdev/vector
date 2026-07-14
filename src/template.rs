@@ -832,9 +832,8 @@ pub(crate) enum BuildError {
     /// (`%2f` or `%5c`) or a raw backslash. These would cause every rendered
     /// event to be dropped at runtime; reject at build time instead.
     #[snafu(display(
-        "HTTP/HTTPS URI prefix {prefix:?} contains an encoded path separator (\
-         %2F, %5C, or \\\\) in the static portion. Use a literal `/` in the path \
-         instead."
+        "HTTP/HTTPS URI prefix {prefix:?} contains %2F, %5C, or a raw backslash \
+         in the static portion. Use a literal `/` in the path instead."
     ))]
     EncodedSeparatorInUriPrefix {
         /// The literal prefix that contained the encoded separator.

@@ -288,28 +288,27 @@ impl FileSink {
             .or(cx.globals.timezone)
             .and_then(timezone_to_offset);
 
-        // Full opt-out: bypass startup validation and runtime confinement.
-        // Configuration errors (a relative `base_dir`) are still fatal even
-        // with the flag — the operator clearly intended a base; silently
-        // ignoring it would be worse than the error.
+        // Config validation runs regardless of the opt-out: a relative
+        // `base_dir` is a syntactic error, not a confinement decision.
+        if let Some(base) = config.base_dir.as_ref()
+            && base.is_relative()
+        {
+            return Err(Box::new(
+                crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
+                    path: base.clone(),
+                },
+            ));
+        }
+
         let confinement = if config
             .confinement
             .dangerously_allow_unconfined_template_resolution
         {
-            if config.base_dir.as_deref().is_some_and(Path::is_relative) {
-                return Err(Box::new(
-                    crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
-                        path: config.base_dir.clone().unwrap(),
-                    },
-                ));
-            }
             ConfinementConfig::warn_unconfined_template("sink", "file", "path");
             None
         } else {
-            match PathConfinement::for_template(&config.path, config.base_dir.as_deref()) {
-                Ok(c) => c,
-                Err(e) => return Err(Box::new(e)),
-            }
+            PathConfinement::for_template(&config.path, config.base_dir.as_deref())
+                .map_err(Box::new)?
         };
 
         Ok(Self {
