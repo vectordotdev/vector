@@ -39,7 +39,7 @@ use crate::{
     },
     sinks::util::{
         StreamSink,
-        path_confinement::{BuildError, ConfineError, PathConfinement},
+        path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
     template::{ConfinementConfig, Template},
@@ -248,6 +248,7 @@ impl SinkConfig for FileSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(self, cx)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -287,52 +288,27 @@ impl FileSink {
             .or(cx.globals.timezone)
             .and_then(timezone_to_offset);
 
-        // The escape hatch only suppresses the build-time error. If a
-        // base directory is derivable from `path` or set via `base_dir`, the
-        // flag is ignored — flipping it via a `conf.d` drop-in or env-var
-        // interpolation can never silently disable an already-working
-        // confinement.
-        let confinement = match PathConfinement::for_template(
-            &config.path,
-            config.base_dir.as_deref(),
-        ) {
-            Ok(c) => {
-                if config
-                    .confinement
-                    .dangerously_allow_unconfined_template_resolution
-                {
-                    warn!(
-                        message = "`dangerously_allow_unconfined_template_resolution` ignored: a base directory is derivable from `path` or set via `base_dir`.",
-                    );
-                }
-                config
-                    .confinement
-                    .emit_confinement_gauge(true, "sink", "file", "path");
-                c
-            }
-            Err(e) => {
-                // The escape hatch only suppresses errors caused by the absence
-                // of a derivable base. Configuration errors like `BaseNotAbsolute`
-                // (a relative `base_dir`) are always fatal — allowing them through
-                // would silently run unconfined when the operator clearly intended
-                // confinement.
-                let suppressible = matches!(
-                    e,
-                    BuildError::NoDerivableBase { .. } | BuildError::DerivedBaseIsRoot { .. }
-                );
-                if config
-                    .confinement
-                    .dangerously_allow_unconfined_template_resolution
-                    && suppressible
-                {
-                    config
-                        .confinement
-                        .emit_confinement_gauge(false, "sink", "file", "path");
-                    None
-                } else {
-                    return Err(Box::new(e));
-                }
-            }
+        // Config validation runs regardless of the opt-out: a relative
+        // `base_dir` is a syntactic error, not a confinement decision.
+        if let Some(base) = config.base_dir.as_ref()
+            && base.is_relative()
+        {
+            return Err(Box::new(
+                crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
+                    path: base.clone(),
+                },
+            ));
+        }
+
+        let confinement = if config
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            ConfinementConfig::warn_unconfined_template("sink", "file", "path");
+            None
+        } else {
+            PathConfinement::for_template(&config.path, config.base_dir.as_deref())
+                .map_err(Box::new)?
         };
 
         Ok(Self {
@@ -1310,9 +1286,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn escape_hatch_ignored_when_base_derivable() {
-        // With the flag set but a derivable base, confinement
-        // stays on and the PoC payload is still blocked.
+    async fn escape_hatch_bypasses_confinement_even_when_base_derivable() {
+        // With the flag set, confinement is fully disabled — even when a base
+        // would otherwise be derivable. The flag is a complete opt-out.
         let dir = temp_dir();
         let path = format!("{}/{{{{ key }}}}.log", dir.display());
         let mut cfg = base_config(&path);
@@ -1320,13 +1296,12 @@ mod tests {
             .dangerously_allow_unconfined_template_resolution = true;
 
         let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-        assert!(sink.confinement.is_some());
+        assert!(sink.confinement.is_none());
 
         let mut event = Event::Log(LogEvent::from("payload"));
-        event
-            .as_mut_log()
-            .insert(event_path!("key"), "../../../etc/cron.d/x");
-        assert!(sink.partition_event(&event).is_none());
+        event.as_mut_log().insert(event_path!("key"), "safe-value");
+        // Event routes through — no confinement check.
+        assert!(sink.partition_event(&event).is_some());
     }
 
     #[tokio::test]

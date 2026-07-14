@@ -241,6 +241,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             service: svc,
         };
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 

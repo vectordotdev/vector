@@ -275,6 +275,7 @@ impl SinkConfig for AzureBlobSinkConfig {
 
         let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
         let sink = self.build_processor(client)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 

@@ -241,6 +241,44 @@ pub(super) fn validate_payload_wrapper(
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let result = self.build_without_confinement_gauge(cx, Self::NAME).await?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        Ok(result)
+    }
+
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().1.input_type())
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let mut files = Vec::new();
+        if let Some(tls) = &self.tls {
+            if let Some(crt_file) = &tls.crt_file {
+                files.push(crt_file)
+            }
+            if let Some(key_file) = &tls.key_file {
+                files.push(key_file)
+            }
+        };
+        files
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+impl HttpSinkConfig {
+    /// Confinement + sink construction without emitting the per-sink
+    /// confinement gauge. `component_name` is threaded through so both the
+    /// gauge (emitted by the caller) and per-template security warnings
+    /// carry the outer sink type — `http` when this is the top-level sink,
+    /// `opentelemetry` when [`OpenTelemetryConfig::build`] delegates here.
+    pub(crate) async fn build_without_confinement_gauge(
+        &self,
+        cx: SinkContext,
+        component_name: &'static str,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let encoder = self.build_encoder()?;
@@ -350,7 +388,19 @@ impl SinkConfig for HttpSinkConfig {
         let uri = self
             .uri
             .clone()
-            .confine(&self.confinement, Self::NAME, "uri")?;
+            .confine(&self.confinement, component_name, "uri")?;
+
+        // Confine every templated header value. Header-based routing
+        // (e.g. `X-Scope-OrgID: "{{ tenant }}"`) is as steerable as URI
+        // routing — an event that controls the header field picks the
+        // destination tenant unless we confine the header template too.
+        let template_headers = template_headers
+            .into_iter()
+            .map(|(name, tpl)| {
+                tpl.confine(&self.confinement, component_name, "request.headers")
+                    .map(|tpl| (name, tpl))
+            })
+            .collect::<crate::Result<BTreeMap<_, _>>>()?;
 
         let sink = HttpSink::new(
             service,
@@ -361,27 +411,6 @@ impl SinkConfig for HttpSinkConfig {
         );
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
-    }
-
-    fn files_to_watch(&self) -> Vec<&PathBuf> {
-        let mut files = Vec::new();
-        if let Some(tls) = &self.tls {
-            if let Some(crt_file) = &tls.crt_file {
-                files.push(crt_file)
-            }
-            if let Some(key_file) = &tls.key_file {
-                files.push(key_file)
-            }
-        };
-        files
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 

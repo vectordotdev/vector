@@ -232,6 +232,7 @@ impl SinkConfig for S3SinkConfig {
         let service = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
         let sink = self.build_processor(service, cx)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 

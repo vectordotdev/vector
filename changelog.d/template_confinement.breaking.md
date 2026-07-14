@@ -1,20 +1,33 @@
-Sinks that use `{{ field }}` references in routing templates now require a
-literal prefix in the template so Vector can enforce a routing boundary. For
-example, `key_prefix: "{{ host }}/"` is no longer accepted at startup because
-there is no fixed leading segment.
-
-The `file` sink additionally gains a `base_dir` config field to set the
-confinement root explicitly when the `path` template has no usable literal
-prefix.
+Sinks that accept `{{ field }}` references in routing templates now enforce a
+confinement boundary: the rendered value must stay within the literal prefix
+declared in the template. Templates with no literal prefix (e.g.
+`key_prefix: "{{ host }}/"`) are rejected at startup.
 
 Affected sinks: `aws_s3`, `azure_blob`, `gcp_cloud_storage`, `webhdfs`,
 `file`, `elasticsearch`, `kafka`, `http`, `splunk_hec_logs`,
-`splunk_hec_metrics`, `loki`, `clickhouse`, `redis`, `amqp`, `pulsar`,
-`mqtt`, `nats`, `greptimedb_logs`, `aws_cloudwatch_logs`,
-`gcp_stackdriver_logs`, `prometheus_remote_write`.
+`splunk_hec_metrics`, `humio_logs`, `humio_metrics`, `loki`, `clickhouse`,
+`redis`, `amqp`, `pulsar`, `mqtt`, `nats`, `greptimedb_logs`,
+`aws_cloudwatch_logs`, `gcp_stackdriver_logs`, `prometheus_remote_write`.
 
-**To migrate:** please add a fixed prefix to the template, e.g. `key_prefix: "logs-{{ host }}/"`.
+The `file` sink gains a `base_dir` config field to set the confinement root
+explicitly when the `path` template has no usable literal prefix.
 
-**To restore previous behavior:** set `dangerously_allow_unconfined_template_resolution: true` on the affected sink.
+**URI templates:** HTTP/HTTPS URI templates that use `{{ field }}` references
+must not contain `?`. A field-rendered value could smuggle additional query
+parameters into the request. Fully static URI templates (no `{{ }}`) with a
+query string are still accepted. Dynamic query segments (e.g.
+`https://api.internal/ingest?tenant={{ tenant }}`) are rejected at startup.
+
+**Opt-out:** set `dangerously_allow_unconfined_template_resolution: true` on
+the affected sink to disable all confinement checks for that sink — both at
+startup and at runtime. Vector logs a warning per template on startup and sets
+`vector_security_confinement_disabled{component_type=...}` to `1`.
+
+**Observability:**
+
+- `component_errors_total{error_type="confinement_failed"}` — increments on
+  each violation; events that trigger it are dropped.
+- `vector_security_confinement_disabled` — set to `1` while a sink is running
+  with confinement disabled.
 
 authors: pront

@@ -517,18 +517,24 @@ impl DataStreamConfig {
             let data_stream = log
                 .get(event_path!("data_stream"))
                 .and_then(|ds| ds.as_object());
-            let dtype = data_stream
-                .and_then(|ds| ds.get("type"))
-                .map(|value| value.to_string_lossy().into_owned())
-                .or_else(|| self.dtype(log))?;
-            let dataset = data_stream
-                .and_then(|ds| ds.get("dataset"))
-                .map(|value| value.to_string_lossy().into_owned())
-                .or_else(|| self.dataset(log))?;
-            let namespace = data_stream
-                .and_then(|ds| ds.get("namespace"))
-                .map(|value| value.to_string_lossy().into_owned())
-                .or_else(|| self.namespace(log))?;
+            let dtype =
+                auto_routed_value(data_stream, "type", &self.dtype, "data_stream.type", || {
+                    self.dtype(log)
+                })?;
+            let dataset = auto_routed_value(
+                data_stream,
+                "dataset",
+                &self.dataset,
+                "data_stream.dataset",
+                || self.dataset(log),
+            )?;
+            let namespace = auto_routed_value(
+                data_stream,
+                "namespace",
+                &self.namespace,
+                "data_stream.namespace",
+                || self.namespace(log),
+            )?;
             (dtype, dataset, namespace)
         };
 
@@ -542,31 +548,168 @@ impl DataStreamConfig {
     }
 }
 
+/// Auto-routed helper: prefer the event's `data_stream.<key>` field, but run
+/// that raw value through the confinement check attached to the
+/// corresponding template so `auto_routing` can't be used to bypass the
+/// build-time confinement on `data_stream.{type,dataset,namespace}`. Falls
+/// back to `fallback` (normal template rendering) when the event field is
+/// missing.
+fn auto_routed_value<F>(
+    data_stream: Option<&std::collections::BTreeMap<vector_lib::event::KeyString, Value>>,
+    key: &str,
+    template: &Template,
+    field: &'static str,
+    fallback: F,
+) -> Option<String>
+where
+    F: FnOnce() -> Option<String>,
+{
+    match data_stream.and_then(|ds| ds.get(key)) {
+        Some(value) => {
+            let s = value.to_string_lossy().into_owned();
+            // Two layers of validation:
+            //
+            // 1. If the operator-authored template has a confinement checker,
+            //    run it. That catches values that violate a `PrefixChecker`
+            //    base or contain `..` segments.
+            //
+            // 2. If the template is *static* (e.g. the default `type = "logs"`),
+            //    no checker is attached and `check_confinement` returns Ok
+            //    for anything. Data-stream names are simple identifiers per
+            //    Elasticsearch's naming rules, so anything containing a path
+            //    separator, `..`, NUL, or over 255 bytes is either an attack
+            //    or would be rejected by Elasticsearch on ingest anyway.
+            template
+                .check_confinement(&s)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some(field),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            if !is_valid_data_stream_component(&s, field) {
+                emit!(TemplateRenderingError {
+                    error: crate::template::TemplateRenderingError::Confined {
+                        rendered_preview: crate::template::confined_preview(&s),
+                        rendered_len: s.len(),
+                        message: format!(
+                            "auto-routed {field} value is not a valid data-stream identifier"
+                        ),
+                    },
+                    field: Some(field),
+                    drop_event: true,
+                });
+                return None;
+            }
+            Some(s)
+        }
+        None => fallback(),
+    }
+}
+
+/// Baseline sanity check for auto-routed `data_stream.*` values pulled off
+/// events. Rejects anything Elasticsearch itself would reject at ingest, so
+/// that attacker-controlled values can't slip past Vector's drop guard and
+/// blow up later in the request pipeline.
+///
+/// Rules (from the Elasticsearch data-stream / index naming spec):
+///
+/// - No control characters, NUL bytes, or the characters
+///   `\ / * ? " < > | , # : <space>` (forbidden in any index or
+///   data-stream name).
+/// - No exact `.` or `.._` path segments (traversal).
+/// - Cannot start with `- _ + .` (reserved leading characters).
+/// - Combined `type-dataset-namespace` is capped at 100 bytes by
+///   Elasticsearch, so each part must be well under that. We use 100
+///   here as a per-part cap — cheap and conservative.
+/// - `dataset` and `namespace` additionally forbid `-` because `-` is
+///   the separator between the three parts of a data-stream name.
+///
+/// Empty is legitimate — `DataStreamConfig::index` filters empty parts
+/// out of the joined name, so an event field explicitly overriding one
+/// part to `""` just skips it.
+fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
+    if s.is_empty() {
+        return true;
+    }
+    if s.len() > 100 {
+        return false;
+    }
+    // Forbidden anywhere in the string.
+    const FORBIDDEN: &[char] = &[
+        '\0', '/', '\\', '*', '?', '"', '<', '>', '|', ',', '#', ':', ' ',
+    ];
+    if s.contains(FORBIDDEN) {
+        return false;
+    }
+    // Reserved leading characters.
+    if let Some(first) = s.chars().next()
+        && matches!(first, '-' | '_' | '+' | '.')
+    {
+        return false;
+    }
+    // Path-traversal segments — belt-and-braces even though `/` and `\`
+    // are already forbidden.
+    if s == "." || s == ".." {
+        return false;
+    }
+    // Control characters have no place in a routing identifier.
+    if s.chars().any(|c| c.is_control()) {
+        return false;
+    }
+    // `-` is the separator inside the composed data-stream name
+    // (`{type}-{dataset}-{namespace}`), so `dataset` and `namespace`
+    // must not contain it. `type` values (`logs`, `metrics`, …) also
+    // conventionally don't contain `-`, but we accept it there for
+    // forward compatibility with custom types.
+    if (field == "data_stream.dataset" || field == "data_stream.namespace") && s.contains('-') {
+        return false;
+    }
+    true
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut confined_config = self.clone();
-        confined_config.bulk.index =
-            confined_config
-                .bulk
-                .index
-                .confine(&self.confinement, Self::NAME, "bulk.index")?;
-        confined_config.data_stream = confined_config
-            .data_stream
-            .map(|mut ds| -> crate::Result<DataStreamConfig> {
-                ds.dtype = ds
-                    .dtype
-                    .confine(&self.confinement, Self::NAME, "data_stream.type")?;
-                ds.dataset =
-                    ds.dataset
-                        .confine(&self.confinement, Self::NAME, "data_stream.dataset")?;
-                ds.namespace =
-                    ds.namespace
-                        .confine(&self.confinement, Self::NAME, "data_stream.namespace")?;
-                Ok(ds)
-            })
-            .transpose()?;
+        // Confine only the routing fields belonging to the active mode.
+        // `common_mode()` ignores the inactive branch, so confining unused
+        // templates would reject otherwise-valid configs (e.g. a leftover
+        // `bulk.index = "{{ index }}"` in a config that runs in
+        // `data_stream` mode).
+        match self.mode {
+            ElasticsearchMode::Bulk => {
+                confined_config.bulk.index = confined_config.bulk.index.confine(
+                    &self.confinement,
+                    Self::NAME,
+                    "bulk.index",
+                )?;
+            }
+            ElasticsearchMode::DataStream => {
+                confined_config.data_stream = confined_config
+                    .data_stream
+                    .map(|mut ds| -> crate::Result<DataStreamConfig> {
+                        ds.dtype =
+                            ds.dtype
+                                .confine(&self.confinement, Self::NAME, "data_stream.type")?;
+                        ds.dataset = ds.dataset.confine(
+                            &self.confinement,
+                            Self::NAME,
+                            "data_stream.dataset",
+                        )?;
+                        ds.namespace = ds.namespace.confine(
+                            &self.confinement,
+                            Self::NAME,
+                            "data_stream.namespace",
+                        )?;
+                        Ok(ds)
+                    })
+                    .transpose()?;
+            }
+        }
         let this = &confined_config;
         let commons = ElasticsearchCommon::parse_many(this, cx.proxy()).await?;
         let common = commons[0].clone();
@@ -610,6 +753,7 @@ impl SinkConfig for ElasticsearchConfig {
         )
         .map_ok(|((), _)| ())
         .boxed();
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((stream, healthcheck))
     }
 
@@ -632,6 +776,96 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ElasticsearchConfig>();
+    }
+
+    #[test]
+    fn is_valid_data_stream_component_accepts_normal_identifiers() {
+        // `-` allowed for `type` (custom types), forbidden for
+        // dataset/namespace where it collides with the separator.
+        assert!(is_valid_data_stream_component("logs", "data_stream.type"));
+        assert!(is_valid_data_stream_component(
+            "metrics-prod",
+            "data_stream.type"
+        ));
+        assert!(is_valid_data_stream_component(
+            "app.errors",
+            "data_stream.dataset"
+        ));
+        assert!(is_valid_data_stream_component(
+            "tenant_42",
+            "data_stream.namespace"
+        ));
+        // Empty is accepted — filtered out of the joined name downstream.
+        assert!(is_valid_data_stream_component("", "data_stream.dataset"));
+    }
+
+    #[test]
+    fn is_valid_data_stream_component_rejects_traversal_and_injection() {
+        // Path traversal / separators.
+        assert!(!is_valid_data_stream_component("..", "data_stream.dataset"));
+        assert!(!is_valid_data_stream_component(".", "data_stream.dataset"));
+        assert!(!is_valid_data_stream_component(
+            "../evil",
+            "data_stream.dataset"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "logs/tenant",
+            "data_stream.type"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "logs\\tenant",
+            "data_stream.type"
+        ));
+        // Elasticsearch-forbidden characters.
+        for bad in [
+            "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b", "a,b", "a#b", "a:b", "a b",
+        ] {
+            assert!(
+                !is_valid_data_stream_component(bad, "data_stream.type"),
+                "should reject {bad:?}"
+            );
+        }
+        // Reserved leading characters.
+        for bad in ["-logs", "_logs", "+logs", ".logs"] {
+            assert!(
+                !is_valid_data_stream_component(bad, "data_stream.type"),
+                "should reject {bad:?}"
+            );
+        }
+        // Length cap (Elasticsearch caps the joined name at 100 bytes; we
+        // apply per-part to stay safely under).
+        assert!(!is_valid_data_stream_component(
+            &"x".repeat(101),
+            "data_stream.type"
+        ));
+        // NUL + control chars.
+        assert!(!is_valid_data_stream_component(
+            "logs\0",
+            "data_stream.type"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "logs\n",
+            "data_stream.type"
+        ));
+    }
+
+    #[test]
+    fn is_valid_data_stream_component_rejects_hyphen_in_dataset_and_namespace() {
+        // `-` separates the three parts of a data-stream name, so it
+        // must not appear inside dataset or namespace.
+        assert!(!is_valid_data_stream_component(
+            "app-errors",
+            "data_stream.dataset"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "prod-us",
+            "data_stream.namespace"
+        ));
+        // Same string is accepted for `type` (custom types may contain `-`).
+        assert!(is_valid_data_stream_component(
+            "app-errors",
+            "data_stream.type"
+        ));
     }
 
     #[test]

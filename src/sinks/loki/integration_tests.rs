@@ -333,6 +333,7 @@ async fn many_streams() {
             labels = {test_name = "{{ stream_id }}"}
             encoding.codec = "text"
             tenant_id = "default"
+            dangerously_allow_unconfined_template_resolution = true
         "#;
     let (config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
@@ -393,6 +394,7 @@ async fn interpolate_stream_key() {
             labels = {"{{ stream_key }}" = "placeholder"}
             encoding.codec = "text"
             tenant_id = "default"
+            dangerously_allow_unconfined_template_resolution = true
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.labels.insert(

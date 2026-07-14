@@ -209,6 +209,7 @@ impl SinkConfig for RedisSinkConfig {
         let conn = config.build_connection().await?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
         let sink = RedisSink::new(&config, conn)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 

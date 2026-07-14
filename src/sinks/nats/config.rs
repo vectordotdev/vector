@@ -191,6 +191,7 @@ impl SinkConfig for NatsSinkConfig {
             .confine(&self.confinement, Self::NAME, "subject")?;
         let sink = NatsSink::new(config.clone()).await?;
         let healthcheck = healthcheck(config).boxed();
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 

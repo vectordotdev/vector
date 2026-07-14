@@ -249,6 +249,31 @@ impl SinkConfig for StackdriverConfig {
             .clone()
             .confine(&self.confinement, Self::NAME, "log_id")?;
 
+        // Confine every label value template. Stackdriver identifies
+        // destinations by `resource.type + resource.labels`, so an event-
+        // controlled label like `resource.labels.zone: "{{ zone }}"` is as
+        // steerable as `log_id` unless we confine it too. Same for arbitrary
+        // log-entry labels in `label_config.labels`.
+        let mut resource = self.resource.clone();
+        resource.labels = resource
+            .labels
+            .into_iter()
+            .map(|(k, v)| {
+                v.confine(&self.confinement, Self::NAME, "resource.labels")
+                    .map(|v| (k, v))
+            })
+            .collect::<crate::Result<_>>()?;
+
+        let mut label_config = self.label_config.clone();
+        label_config.labels = label_config
+            .labels
+            .into_iter()
+            .map(|(k, v)| {
+                v.confine(&self.confinement, Self::NAME, "label_config.labels")
+                    .map(|v| (k, v))
+            })
+            .collect::<crate::Result<_>>()?;
+
         let auth = self.auth.build(Scope::LoggingWrite).await?;
 
         let request_builder = StackdriverLogsRequestBuilder {
@@ -256,8 +281,8 @@ impl SinkConfig for StackdriverConfig {
                 self.encoding.clone(),
                 log_id,
                 self.log_name.clone(),
-                self.label_config.clone(),
-                self.resource.clone(),
+                label_config,
+                resource,
                 self.severity_key.clone(),
             ),
         };
@@ -295,6 +320,7 @@ impl SinkConfig for StackdriverConfig {
 
         auth.spawn_regenerate_token();
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
