@@ -12,8 +12,11 @@ Affected sinks: `aws_s3`, `azure_blob`, `gcp_cloud_storage`, `webhdfs`,
 The `file` sink gains a `base_dir` config field to set the confinement root
 explicitly when the `path` template has no usable literal prefix.
 
-**URI templates:** templates for HTTP/HTTPS endpoints must not contain `?`.
-Any query string in the template — static or dynamic — is rejected at startup.
+**URI templates:** HTTP/HTTPS URI templates that use `{{ field }}` references
+must not contain `?`. A field-rendered value could smuggle additional query
+parameters into the request. Fully static URI templates (no `{{ }}`) with a
+query string are still accepted. Dynamic query segments (e.g.
+`https://api.internal/ingest?tenant={{ tenant }}`) are rejected at startup.
 
 **Opt-out:** set `dangerously_allow_unconfined_template_resolution: true` on
 the affected sink to restore the previous behaviour. Vector logs a warning on

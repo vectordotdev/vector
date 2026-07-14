@@ -941,10 +941,10 @@ impl ConfinementChecker {
         // templates like `http_{{tenant}}` whose prefix is `http_`.
         let lp = prefix.to_ascii_lowercase();
         if lp.starts_with("http://") || lp.starts_with("https://") {
-            // Reject any URI template that contains `?`. Query parameters cannot
-            // be safely confined: the boundary is the path, not the query string.
-            // Operators who need static query params should move them into the
-            // service configuration or use the opt-out flag.
+            // Reject any URI template that has BOTH field references and `?`.
+            // A static query is safe (the value is fixed, not event-controlled).
+            // But once a `{{ field }}` is present, the rendered path segment
+            // could smuggle additional query parameters via a `?` in the value.
             if tpl.get_ref().contains('?') {
                 return Err(BuildError::DynamicUriQuery {
                     template: tpl.get_ref().to_string(),
@@ -1830,8 +1830,9 @@ mod tests {
 
     #[test]
     fn uri_template_with_query_rejected_at_build() {
-        // Any URI template containing `?` is rejected at build with
-        // DynamicUriQuery, regardless of where `?` appears.
+        // URI templates with field references AND `?` are rejected: a
+        // field-rendered value could smuggle `?extra=...` into the query.
+        // Static URI templates (no `{{ }}`) are exempt — their query is fixed.
         for template_str in &[
             "https://api.internal/ingest?tenant={{ tenant }}",
             "https://api.internal/ingest?tenant=team-{{ tenant }}",
@@ -1848,6 +1849,15 @@ mod tests {
                 "expected DynamicUriQuery for {template_str}"
             );
         }
+    }
+
+    #[test]
+    fn static_uri_with_query_allowed() {
+        // A fully static URI (no `{{ }}`) with a query string is safe: the
+        // rendered value is fixed and cannot be influenced by event data.
+        // No checker is installed; `Ok(None)` is the expected result.
+        let tpl = Template::try_from("https://api.internal/ingest?source=vector").unwrap();
+        assert!(ConfinementChecker::for_template(&tpl).unwrap().is_none());
     }
 
     #[test]
