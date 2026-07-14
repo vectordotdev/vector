@@ -97,13 +97,11 @@ impl SecretBackendLoader {
 }
 
 impl Default for SecretBackendLoader {
-    /// Creates a new SecretBackendLoader with default settings.
-    /// By default, environment variable interpolation is enabled.
     fn default() -> Self {
         Self {
             backends: IndexMap::new(),
             secret_keys: HashMap::new(),
-            interpolate_env: true,
+            interpolate_env: super::env_var_interpolation_enabled(),
         }
     }
 }
