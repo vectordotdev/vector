@@ -145,13 +145,14 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
@@ -479,6 +480,22 @@ pub enum SubCommand {
 }
 
 impl SubCommand {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "the #[cfg(windows)] arm calls a non-const method"
+    )]
+    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+        match self {
+            Self::Config(c) => c.dangerously_allow_env_var_interpolation,
+            Self::Graph(g) => g.dangerously_allow_env_var_interpolation,
+            Self::Test(t) => t.dangerously_allow_env_var_interpolation,
+            Self::Validate(v) => v.dangerously_allow_env_var_interpolation,
+            #[cfg(windows)]
+            Self::Service(s) => s.dangerously_allow_env_var_interpolation(),
+            _ => false,
+        }
+    }
+
     pub async fn execute(
         &self,
         mut signals: signal::SignalPair,
