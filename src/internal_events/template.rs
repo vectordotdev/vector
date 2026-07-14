@@ -47,8 +47,7 @@ impl InternalEvent for TemplateRenderingError<'_> {
         // drop the event (e.g. a partitioner falling back to a dead-letter
         // key), but the confinement fire itself must still surface in logs
         // and `component_errors_total` regardless of the caller's
-        // drop_event decision, or alerts on `error_type=condition_failed`
-        // will miss the dead-letter path entirely.
+        // drop_event decision.
         //
         // `check-events` requires `error_type` counter tag values to be
         // constants, so the two error-class branches are split
@@ -60,12 +59,12 @@ impl InternalEvent for TemplateRenderingError<'_> {
             error!(
                 message = %msg,
                 error = %self.error,
-                error_type = error_type::CONDITION_FAILED,
+                error_type = error_type::CONFINEMENT_FAILED,
                 stage = error_stage::PROCESSING,
             );
             counter!(
                 CounterName::ComponentErrorsTotal,
-                "error_type" => error_type::CONDITION_FAILED,
+                "error_type" => error_type::CONFINEMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             )
             .increment(1);
