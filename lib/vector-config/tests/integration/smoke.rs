@@ -14,6 +14,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use serde_json::json;
 use serde_with::serde_as;
 use vector_config::{
     Configurable, ConfigurableString, component::GenerateConfig, configurable_component,
@@ -663,43 +664,29 @@ enum WithTrailingUntaggedVariant {
 
 #[test]
 fn tagged_enum_with_trailing_untagged_variant_schema() {
-    let root =
-        generate_root_schema::<WithTrailingUntaggedVariant>().expect("should generate root schema");
-    let schema = serde_json::to_value(root.schema).expect("serialize schema to JSON");
-
-    let one_of = schema
-        .get("oneOf")
-        .and_then(|v| v.as_array())
-        .expect("enum schema should use oneOf");
-
-    let mut tagged_schemas = 0usize;
-    let mut untagged_schemas = 0usize;
-
-    for subschema in one_of {
-        let properties = subschema.get("properties");
-        let required = subschema.get("required");
-
-        let has_type_property = properties.and_then(|p| p.get("type")).is_some();
-        let requires_type = required
-            .and_then(|r| r.as_array())
-            .map(|arr| arr.iter().any(|v| v == "type"))
-            .unwrap_or(false);
-
-        if has_type_property || requires_type {
-            tagged_schemas += 1;
-        } else {
-            untagged_schemas += 1;
-
-            // The untagged variants in this test are newtypes: one string and one integer.
-            let instance_type = subschema.get("type").and_then(|t| t.as_str());
-            assert!(matches!(instance_type, Some("string") | Some("integer")));
-        }
-    }
-
-    assert_eq!(tagged_schemas, 2, "expected two tagged variants in schema");
     assert_eq!(
-        untagged_schemas, 2,
-        "expected two untagged variants in schema"
+        generate_test_schema::<WithTrailingUntaggedVariant>(),
+        json!({
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["type", "value"],
+                    "properties": {
+                        "type": { "const": "Foo" },
+                        "value": { "type": "integer" },
+                    },
+                },
+                {
+                    "type": "object",
+                    "required": ["type"],
+                    "properties": {
+                        "type": { "const": "Bar" },
+                    },
+                },
+                { "type": "string" },
+                { "type": "integer" },
+            ],
+        })
     );
 }
 
@@ -708,27 +695,34 @@ where
     T: Configurable + 'static,
 {
     let root = generate_root_schema::<T>().expect("should generate root schema");
-    serde_json::to_value(root.schema).expect("serialize schema to JSON")
+    let schema = serde_json::to_value(root.schema).expect("serialize schema to JSON");
+    prune_schema_for_test(schema)
 }
 
-fn assert_enum_schema_uses(schema: &serde_json::Value, keyword: &str, variant_count: usize) {
-    let unexpected_keyword = match keyword {
-        "anyOf" => "oneOf",
-        "oneOf" => "anyOf",
-        _ => panic!("unsupported enum schema keyword: {keyword}"),
-    };
+fn prune_schema_for_test(mut schema: serde_json::Value) -> serde_json::Value {
+    fn prune(value: &mut serde_json::Value) {
+        match value {
+            serde_json::Value::Array(values) => values.iter_mut().for_each(prune),
+            serde_json::Value::Object(values) => {
+                values.retain(|key, _| {
+                    !matches!(
+                        key.as_str(),
+                        "title"
+                            | "description"
+                            | "_metadata"
+                            | "maximum"
+                            | "minimum"
+                            | "unevaluatedProperties"
+                    )
+                });
+                values.values_mut().for_each(prune);
+            }
+            _ => {}
+        }
+    }
 
-    assert!(
-        schema
-            .get(keyword)
-            .and_then(serde_json::Value::as_array)
-            .is_some_and(|variants| variants.len() == variant_count),
-        "{keyword} should contain {variant_count} variants: {schema}"
-    );
-    assert!(
-        schema.get(unexpected_keyword).is_none(),
-        "{unexpected_keyword} should be absent: {schema}"
-    );
+    prune(&mut schema);
+    schema
 }
 
 /// A tagged enum with overlapping trailing untagged numeric variants.
@@ -749,9 +743,23 @@ enum WithOverlappingTrailingUntaggedVariants {
 
 #[test]
 fn tagged_enum_with_overlapping_trailing_untagged_variants_uses_any_of() {
-    let schema = generate_test_schema::<WithOverlappingTrailingUntaggedVariants>();
-
-    assert_enum_schema_uses(&schema, "anyOf", 3);
+    assert_eq!(
+        generate_test_schema::<WithOverlappingTrailingUntaggedVariants>(),
+        json!({
+            "anyOf": [
+                {
+                    "type": "object",
+                    "required": ["type", "value"],
+                    "properties": {
+                        "type": { "const": "Tagged" },
+                        "value": { "type": "integer" },
+                    },
+                },
+                { "type": "integer" },
+                { "type": "number" },
+            ],
+        })
+    );
 }
 
 /// Untagged struct variants whose required fields can coexist.
@@ -773,9 +781,27 @@ enum UntaggedStructVariants {
 
 #[test]
 fn untagged_struct_variants_with_distinct_required_fields_use_any_of() {
-    let schema = generate_test_schema::<UntaggedStructVariants>();
-
-    assert_enum_schema_uses(&schema, "anyOf", 2);
+    assert_eq!(
+        generate_test_schema::<UntaggedStructVariants>(),
+        json!({
+            "anyOf": [
+                {
+                    "type": "object",
+                    "required": ["a"],
+                    "properties": {
+                        "a": { "type": "string" },
+                    },
+                },
+                {
+                    "type": "object",
+                    "required": ["b"],
+                    "properties": {
+                        "b": { "type": "string" },
+                    },
+                },
+            ],
+        })
+    );
 }
 
 /// Untagged numeric variants with overlapping JSON representations.
@@ -791,9 +817,15 @@ enum UntaggedIntegerOrFloat {
 
 #[test]
 fn untagged_integer_or_float_schema_uses_any_of() {
-    let schema = generate_test_schema::<UntaggedIntegerOrFloat>();
-
-    assert_enum_schema_uses(&schema, "anyOf", 2);
+    assert_eq!(
+        generate_test_schema::<UntaggedIntegerOrFloat>(),
+        json!({
+            "anyOf": [
+                { "type": "integer" },
+                { "type": "number" },
+            ],
+        })
+    );
 }
 
 /// A fixed string value.
@@ -816,9 +848,19 @@ enum UntaggedFixedOrFreeString {
 
 #[test]
 fn untagged_fixed_or_free_string_schema_uses_any_of() {
-    let schema = generate_test_schema::<UntaggedFixedOrFreeString>();
-
-    assert_enum_schema_uses(&schema, "anyOf", 2);
+    assert_eq!(
+        generate_test_schema::<UntaggedFixedOrFreeString>(),
+        json!({
+            "anyOf": [
+                {
+                    "oneOf": [
+                        { "const": "kind" },
+                    ],
+                },
+                { "type": "string" },
+            ],
+        })
+    );
 }
 
 /// Untagged variants with disjoint JSON representations.
@@ -836,7 +878,13 @@ enum UntaggedStringOrInteger {
 fn untagged_disjoint_variants_schema_uses_one_of() {
     // Disjoint variants can never match the same document, so the more precise `oneOf`
     // must be preserved rather than widened to `anyOf`.
-    let schema = generate_test_schema::<UntaggedStringOrInteger>();
-
-    assert_enum_schema_uses(&schema, "oneOf", 2);
+    assert_eq!(
+        generate_test_schema::<UntaggedStringOrInteger>(),
+        json!({
+            "oneOf": [
+                { "type": "string" },
+                { "type": "integer" },
+            ],
+        })
+    );
 }
