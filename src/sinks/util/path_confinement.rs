@@ -463,17 +463,9 @@ mod tests {
                 Base("/var/log/vector"),
             ),
             // static path outside explicit base_dir → rejected at build time
-            (
-                "/tmp/out.log",
-                Some("/var/log/vector"),
-                ErrStaticOutside,
-            ),
+            ("/tmp/out.log", Some("/var/log/vector"), ErrStaticOutside),
             // relative static path + explicit base → resolved and accepted
-            (
-                "out.log",
-                Some("/var/log/vector"),
-                Base("/var/log/vector"),
-            ),
+            ("out.log", Some("/var/log/vector"), Base("/var/log/vector")),
             // relative static path that traverses outside base → rejected
             (
                 "../../etc/passwd",
