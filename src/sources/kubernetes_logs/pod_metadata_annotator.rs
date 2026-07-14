@@ -197,14 +197,30 @@ impl PodMetadataAnnotator {
 
 impl PodMetadataAnnotator {
     /// Annotates an event with the information from the [`Pod::metadata`].
+    ///
+    /// When the pod is not found in the API store (e.g. already deleted), falls back
+    /// to populating basic metadata (namespace, pod name, pod UID, container name)
+    /// from the log file path, which is always available.
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
         let obj = ObjectRef::<Pod>::new(file_info.pod_name).within(file_info.pod_namespace);
-        let resource = self.pods_state_reader.get(&obj)?;
-        let pod: &Pod = resource.as_ref();
+        let resource = self.pods_state_reader.get(&obj);
 
         annotate_from_file_info(log, &self.fields_spec, &file_info, self.log_namespace);
+
+        let Some(resource) = resource else {
+            warn!(
+                message = "Pod not found in API store, annotating from file path only.",
+                pod_namespace = file_info.pod_namespace,
+                pod_name = file_info.pod_name,
+                internal_log_rate_limit = true,
+            );
+            annotate_from_file_path(log, &self.fields_spec, &file_info, self.log_namespace);
+            return Some(file_info);
+        };
+        let pod: &Pod = resource.as_ref();
+
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata, self.log_namespace);
 
         let container;
@@ -260,6 +276,39 @@ fn annotate_from_file_info(
         path!("container_name"),
         file_info.container_name.to_owned(),
     );
+}
+
+/// Fallback annotation from file path when pod is not in the API store.
+/// Sets pod_name, pod_namespace, and pod_uid from the parsed log file path.
+fn annotate_from_file_path(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    file_info: &LogFileInfo<'_>,
+    log_namespace: LogNamespace,
+) {
+    for (field_spec, metadata_key, value) in [
+        (&fields_spec.pod_name, path!("pod_name"), file_info.pod_name),
+        (
+            &fields_spec.pod_namespace,
+            path!("pod_namespace"),
+            file_info.pod_namespace,
+        ),
+        (&fields_spec.pod_uid, path!("pod_uid"), file_info.pod_uid),
+    ] {
+        let legacy_key = field_spec
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            metadata_key,
+            value.to_owned(),
+        );
+    }
 }
 
 fn annotate_from_metadata(
@@ -808,6 +857,39 @@ mod tests {
             annotate_from_file_info(&mut log, &fields_spec, &file_info, log_namespace);
             assert_eq!(log, expected);
         }
+    }
+
+    #[test]
+    fn test_annotate_from_file_path() {
+        let path = &format!(
+            "{}{}",
+            std::path::MAIN_SEPARATOR,
+            [
+                "var",
+                "log",
+                "pods",
+                "sandbox0-ns_sandbox0-name_sandbox0-uid",
+                "sandbox0-container0-name",
+                "1.log",
+            ]
+            .iter()
+            .collect::<PathBuf>()
+            .into_os_string()
+            .into_string()
+            .unwrap()
+        );
+        let fields_spec = FieldsSpec::default();
+        let file_info = parse_log_file_path(path).unwrap();
+
+        let mut log = LogEvent::default();
+        annotate_from_file_path(&mut log, &fields_spec, &file_info, LogNamespace::Legacy);
+
+        let mut expected = LogEvent::default();
+        expected.insert(event_path!("kubernetes", "pod_name"), "sandbox0-name");
+        expected.insert(event_path!("kubernetes", "pod_namespace"), "sandbox0-ns");
+        expected.insert(event_path!("kubernetes", "pod_uid"), "sandbox0-uid");
+
+        assert_eq!(log, expected);
     }
 
     #[test]
