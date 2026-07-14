@@ -1059,11 +1059,15 @@ impl UriChecker {
             .expect("scheme present because prefix starts with http(s)://")
             .to_ascii_lowercase();
         let path = uri.path().to_ascii_lowercase();
-        // Reject encoded path separators in the operator-authored prefix.
-        // A static prefix containing %2f, %5c, or \ would cause every rendered
-        // URI to fail the render-time check, silently dropping all events.
-        // Detecting it at build time surfaces a clear config error instead.
-        if path.contains("%2f") || path.contains("%5c") || uri.path().contains('\\') {
+        // Reject encoded path separators, encoded percents, and raw
+        // backslashes in the operator-authored prefix. Any of these would
+        // cause every rendered URI to fail the render-time check, silently
+        // dropping all events; detect at build time instead.
+        if path.contains("%2f")
+            || path.contains("%5c")
+            || path.contains("%25")
+            || uri.path().contains('\\')
+        {
             return Err(BuildError::EncodedSeparatorInUriPrefix {
                 prefix: prefix.to_string(),
             });
@@ -1130,14 +1134,23 @@ impl UriChecker {
             }
         }
 
-        // 4. Reject encoded path separators and raw backslashes.
+        // 4. Reject encoded path separators, raw backslashes, and encoded
+        //    percent signs.
         //    `%2f` (encoded `/`) and `%5c` (encoded `\`) are decoded by many
         //    servers before path normalization, turning an otherwise-safe
         //    segment into a traversal vector.  Raw `\` is accepted by
         //    `http::Uri` but treated as a path separator by Windows/IIS,
         //    allowing `/ingest/..\admin` to escape the prefix on those hosts.
+        //    `%25` is the encoded form of `%`; a proxy that decodes once
+        //    turns `%252e%252e%252fadmin` into `%2e%2e%2fadmin`, which a
+        //    second decoder resolves to `../admin`. Rejecting `%25` closes
+        //    the double-encoding bypass.
         let path_lc = path.to_ascii_lowercase();
-        if path_lc.contains("%2f") || path_lc.contains("%5c") || path.contains('\\') {
+        if path_lc.contains("%2f")
+            || path_lc.contains("%5c")
+            || path_lc.contains("%25")
+            || path.contains('\\')
+        {
             return Err(ConfineError::DotDotSegment {
                 rendered: rendered.to_string(),
             });
@@ -1843,6 +1856,20 @@ mod tests {
         ));
         assert!(matches!(
             c.confine("https://api.internal/ingest/foo\\..\\admin")
+                .unwrap_err(),
+            ConfineError::DotDotSegment { .. }
+        ));
+    }
+
+    #[test]
+    fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
+        // `%25` is the encoded form of `%`. A proxy that decodes once turns
+        // `%252e%252e%252fadmin` into `%2e%2e%2fadmin`; a second decoder
+        // resolves it to `../admin`. Reject at render time.
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+        assert!(matches!(
+            c.confine("https://api.internal/ingest/%252e%252e%252fadmin")
                 .unwrap_err(),
             ConfineError::DotDotSegment { .. }
         ));
