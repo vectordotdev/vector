@@ -181,12 +181,14 @@ fn has_confined_partition_error(
             .and_then(|t| t.render_string(event).err())
             .filter(|e| matches!(e, crate::template::TemplateRenderingError::Confined { .. }))
         {
-            confined = true;
             emit!(TemplateRenderingError {
                 error,
                 field: Some(field),
-                drop_event: true,
+                // Count the drop once — subsequent violations on the same event
+                // should not increment ComponentEventsDropped again.
+                drop_event: !confined,
             });
+            confined = true;
         }
     }
     confined
