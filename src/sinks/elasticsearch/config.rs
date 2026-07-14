@@ -592,7 +592,8 @@ where
             if !is_valid_data_stream_component(&s, field) {
                 emit!(TemplateRenderingError {
                     error: crate::template::TemplateRenderingError::Confined {
-                        rendered: s.clone(),
+                        rendered_preview: crate::template::confined_preview(&s),
+                        rendered_len: s.len(),
                         message: format!(
                             "auto-routed {field} value is not a valid data-stream identifier"
                         ),

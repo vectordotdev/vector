@@ -49,8 +49,38 @@ pub enum TemplateRenderingError {
     NotNumeric { input: String },
     /// The rendered value was rejected by the confinement check attached to
     /// this template — the event should be dropped as an intentional discard.
-    #[snafu(display("rendered value {rendered:?} confined: {message}"))]
-    Confined { rendered: String, message: String },
+    ///
+    /// `rendered_preview` is bounded to [`CONFINED_PREVIEW_BYTES`] bytes to
+    /// avoid two problems: leaking secrets in fields that carry credentials
+    /// (e.g. `Authorization: Bearer ...` header templates), and amplifying
+    /// attacker-controlled oversized field values into logs.
+    #[snafu(display(
+        "rendered value ({rendered_len} bytes, preview {rendered_preview:?}) \
+         confined: {message}"
+    ))]
+    Confined {
+        rendered_preview: String,
+        rendered_len: usize,
+        message: String,
+    },
+}
+
+/// Maximum number of bytes of a rejected rendered value to include in a
+/// [`TemplateRenderingError::Confined`] error. Kept small so log lines
+/// remain bounded even under attacker-controlled input.
+pub const CONFINED_PREVIEW_BYTES: usize = 32;
+
+/// Build a bounded preview of a rendered value for inclusion in
+/// [`TemplateRenderingError::Confined`]. Truncates on a UTF-8 char boundary.
+pub fn confined_preview(rendered: &str) -> String {
+    if rendered.len() <= CONFINED_PREVIEW_BYTES {
+        return rendered.to_string();
+    }
+    let mut end = CONFINED_PREVIEW_BYTES;
+    while end > 0 && !rendered.is_char_boundary(end) {
+        end -= 1;
+    }
+    rendered.get(..end).unwrap_or("").to_string()
 }
 
 /// A templated field.
@@ -264,7 +294,8 @@ impl Template {
             checker
                 .confine(rendered)
                 .map_err(|e| TemplateRenderingError::Confined {
-                    rendered: rendered.to_string(),
+                    rendered_preview: confined_preview(rendered),
+                    rendered_len: rendered.len(),
                     message: e.to_string(),
                 })?;
         }
@@ -300,7 +331,8 @@ impl Template {
             checker
                 .confine(&rendered)
                 .map_err(|e| TemplateRenderingError::Confined {
-                    rendered: rendered.clone(),
+                    rendered_preview: confined_preview(&rendered),
+                    rendered_len: rendered.len(),
                     message: e.to_string(),
                 })?;
         }
@@ -840,20 +872,20 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
-    /// The template is an HTTP/HTTPS URI with a dynamic query component.
+    /// The template is an HTTP/HTTPS URI containing `?` or `#` in combination
+    /// with `{{ field }}` references.
     ///
-    /// A query containing `{{ field }}` or strftime references cannot be pinned
-    /// to a static value, so confinement cannot guarantee the rendered query
-    /// won't be attacker-controlled. Move routing into the path, or set
-    /// `dangerously_allow_unconfined_template_resolution: true` to opt out.
+    /// A field-rendered value can inject a `?query` or a `#fragment` that
+    /// steers routing or (for `#`) silently drops any operator-authored
+    /// suffix through `http::Uri`'s fragment truncation.
     #[snafu(display(
-        "HTTP/HTTPS template {template:?} has a dynamic query component: \
-         query parameters containing `{{{{ field }}}}` or strftime specifiers \
-         cannot be confined. Move event-driven routing into the URL path, or set \
+        "HTTP/HTTPS template {template:?} mixes `{{{{ field }}}}` references \
+         with `?` or `#`, which cannot be confined. Move event-driven routing \
+         into the URL path, or set \
          `dangerously_allow_unconfined_template_resolution: true` to opt out."
     ))]
-    DynamicUriQuery {
-        /// The full template source that contained the dynamic query.
+    DynamicUriQueryOrFragment {
+        /// The full template source that mixed dynamic fields with `?` or `#`.
         template: String,
     },
 }
@@ -948,13 +980,18 @@ impl ConfinementChecker {
         // templates like `http_{{tenant}}` whose prefix is `http_`.
         let lp = prefix.to_ascii_lowercase();
         if lp.starts_with("http://") || lp.starts_with("https://") {
-            // Reject any URI template that has BOTH field references and `?`.
-            // A static query is safe (the value is fixed, not event-controlled).
-            // But once a `{{ field }}` is present, the rendered path segment
-            // could smuggle additional query parameters via a `?` in the value.
-            if tpl.get_ref().contains('?') {
-                return Err(BuildError::DynamicUriQuery {
-                    template: tpl.get_ref().to_string(),
+            // Reject URI templates that have field references AND `?` or `#`.
+            // A static query/fragment is safe (fixed value, not
+            // event-controlled). But once a `{{ field }}` is present, the
+            // rendered path segment can smuggle either:
+            //   - a `?extra=...` query string, or
+            //   - a `#frag` that `http::Uri` truncates before our checker
+            //     sees the path, silently dropping any operator-authored
+            //     suffix like `/ingest`.
+            let src = tpl.get_ref();
+            if src.contains('?') || src.contains('#') {
+                return Err(BuildError::DynamicUriQueryOrFragment {
+                    template: src.to_string(),
                 });
             }
             UriChecker::from_prefix(prefix).map(|c| Some(Self::Uri(c)))
@@ -1893,24 +1930,29 @@ mod tests {
     }
 
     #[test]
-    fn uri_template_with_query_rejected_at_build() {
-        // URI templates with field references AND `?` are rejected: a
-        // field-rendered value could smuggle `?extra=...` into the query.
-        // Static URI templates (no `{{ }}`) are exempt — their query is fixed.
+    fn uri_template_with_query_or_fragment_rejected_at_build() {
+        // URI templates with field references AND `?` / `#` are rejected. A
+        // field-rendered value could smuggle a query segment, or a `#frag`
+        // that `http::Uri` truncates before the checker can see the path
+        // (silently dropping any operator-authored suffix).
+        // Static URI templates (no `{{ }}`) are exempt — their query/fragment
+        // is fixed.
         for template_str in &[
             "https://api.internal/ingest?tenant={{ tenant }}",
             "https://api.internal/ingest?tenant=team-{{ tenant }}",
             "https://api.internal/{{ path }}?tenant={{ tenant }}",
             "https://api.internal/ingest/{{ path }}?time=%Y",
             "https://api.internal/ingest/{{ tenant }}?source=vector",
+            "https://api.internal/base/{{ tenant }}/ingest#frag",
+            "https://api.internal/base/{{ tenant }}#frag",
         ] {
             let tpl = Template::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
-                    BuildError::DynamicUriQuery { .. }
+                    BuildError::DynamicUriQueryOrFragment { .. }
                 ),
-                "expected DynamicUriQuery for {template_str}"
+                "expected DynamicUriQueryOrFragment for {template_str}"
             );
         }
     }
