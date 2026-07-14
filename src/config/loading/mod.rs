@@ -32,8 +32,9 @@ static ALLOW_ENV_VAR_INTERPOLATION: OnceLock<bool> = OnceLock::new();
 /// Sets whether environment variable interpolation is enabled for the process.
 /// Must be called exactly once at startup before any config loading.
 pub fn set_env_var_interpolation(allow: bool) {
-    #[allow(clippy::let_underscore_must_use)]
-    let _ = ALLOW_ENV_VAR_INTERPOLATION.set(allow);
+    ALLOW_ENV_VAR_INTERPOLATION
+        .set(allow)
+        .expect("set_env_var_interpolation must only be called once");
 }
 
 /// Returns whether environment variable interpolation is currently enabled.
