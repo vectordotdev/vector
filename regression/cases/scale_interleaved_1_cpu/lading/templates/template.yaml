@@ -1,0 +1,37 @@
+# Payload for the 6-processor alternating sync/async chain.
+# Shapes (shared with scale_sync_only and scale_async_only for direct comparison):
+#   - .raw_message: JSON string decoded by parse_json; reduce merges upstream_latency_ms (max) and retry_count (sum).
+#   - .correlation_id: unique so dedupe always takes the cache-miss path.
+#   - .service x .host = 4x4 = 16 reduce buckets.
+generator: !with
+  bind:
+    id: !range { min: 1, max: 10000000 }
+  in: !object
+    id: !var id
+    message:
+      !choose ["user transaction processed", "deprecated endpoint called", "cache entry updated", "request completed"]
+    status: !const "ok"
+    timestamp: !timestamp
+    source: !choose ["load-test", "kafka-consumer", "scheduler-job", "web-frontend"]
+    env: !choose ["production", "production", "staging", "development"]
+    service: !choose ["api-service", "auth-service", "internal-metrics-agent", "billing-service"]
+    level: !const "info"
+    host: !choose ["host-01", "host-02", "canary-node-01", "host-03"]
+    region: !const "us-east-1"
+    correlation_id: !format
+      template: "corr-{}-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      args:
+        - !var id
+    trace_id: !format
+      template: "trace-{}-00000000000000000000000000000000"
+      args:
+        - !var id
+    span_id: !format
+      template: "span-{}-aaaaaaaaaaaaaaaa"
+      args:
+        - !var id
+    raw_message: !const '{"api_version":"v2","upstream_latency_ms":12.3,"upstream_status":200,"feature_flags":["checkout_v3","recs_v2"],"retry_count":0}'
+    log_count: !const 1
+    latency_ms: !const 12.34
+    error_count: !const 0
+    tags: !const ["load-test", "synthetic", "batch"]

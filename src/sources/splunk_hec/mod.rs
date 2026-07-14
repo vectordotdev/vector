@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     convert::Infallible,
-    io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
     time::Duration,
@@ -9,7 +8,6 @@ use std::{
 
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
-use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{Server, service::make_service_fn};
@@ -67,6 +65,7 @@ use self::{
 use crate::{
     SourceSender,
     codecs::DecodingConfig,
+    common::http::ErrorMessage,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
@@ -74,6 +73,7 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
     serde::bool_or_struct,
+    sources::util::{decompression::CappedDecoder, http::capped_body},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -523,7 +523,7 @@ impl SplunkSource {
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
-            .and(warp::body::bytes())
+            .and(capped_body())
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -544,10 +544,11 @@ impl SplunkSource {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
 
-                        let mut data = Vec::new();
+                        let data;
                         let (byte_size, body) = if gzip {
-                            MultiGzDecoder::new(body.reader())
-                                .read_to_end(&mut data)
+                            // Cap the decompressed output to mitigate gzip-bomb DoS.
+                            data = CappedDecoder::gzip(body.reader())
+                                .decompress()
                                 .map_err(|_| Rejection::from(ApiError::BadRequest))?;
                             (data.len(), String::from_utf8_lossy(data.as_slice()))
                         } else {
@@ -659,7 +660,7 @@ impl SplunkSource {
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
-            .and(warp::body::bytes())
+            .and(capped_body())
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -788,7 +789,7 @@ impl SplunkSource {
         T: Send + DeserializeOwned + 'static,
     {
         warp::header::optional::<HeaderValue>(CONTENT_TYPE.as_str())
-            .and(warp::body::bytes())
+            .and(capped_body())
             .and_then(
                 |ctype: Option<HeaderValue>, body: bytes::Bytes| async move {
                     let ok = ctype
@@ -1159,7 +1160,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                         .and_then(|e| e.value.clone())
                 });
             if let Some(v) = val {
-                metadata.value_mut().insert(*meta_path, v);
+                metadata.value_mut().insert(
+                    &vrl::path::parse_value_path(meta_path)
+                        .expect("hardcoded splunk_hec metadata path is a valid VRL path"),
+                    v,
+                );
             }
         }
 
@@ -1170,7 +1175,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             .map(|s| Value::from(s.to_string()))
             .or_else(|| self.channel.clone());
         if let Some(ch) = channel {
-            metadata.value_mut().insert("splunk_hec.channel", ch);
+            metadata.value_mut().insert(
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
+                ch,
+            );
         }
 
         metadata
@@ -1712,10 +1721,10 @@ fn raw_event(
 ) -> Result<(Vec<Event>, bool), Rejection> {
     // Process gzip
     let body_bytes: Bytes = if gzip {
-        let mut data = Vec::new();
-        match MultiGzDecoder::new(bytes.reader()).read_to_end(&mut data) {
-            Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => Bytes::from(data),
+        // Cap the decompressed output to mitigate gzip-bomb DoS.
+        match CappedDecoder::gzip(bytes.reader()).decompress() {
+            Ok(data) if data.is_empty() => return Err(ApiError::NoData.into()),
+            Ok(data) => Bytes::from(data),
             Err(error) => {
                 emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
@@ -1745,10 +1754,17 @@ fn raw_event(
                 meta.set_splunk_hec_token(Arc::clone(token));
             }
             if let Some(ref h) = host {
-                meta.value_mut().insert("splunk_hec.host", h.clone());
+                meta.value_mut().insert(
+                    &vrl::path::parse_value_path("splunk_hec.host")
+                        .expect("splunk_hec.host is a valid VRL path"),
+                    h.clone(),
+                );
             }
-            meta.value_mut()
-                .insert("splunk_hec.channel", channel.clone());
+            meta.value_mut().insert(
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
+                channel.clone(),
+            );
             decoder.with_metadata_template(meta)
         };
 
@@ -1999,6 +2015,8 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::ACK_IS_DISABLED)
             }
         },))
+    } else if let Some(error) = rejection.find::<ErrorMessage>() {
+        Ok((response_json(error.status_code(), error),))
     } else {
         Err(rejection)
     }
@@ -2067,6 +2085,22 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SplunkConfig>();
+    }
+
+    #[tokio::test]
+    async fn finish_err_maps_capped_body_to_client_error() {
+        // `capped_body()` rejects oversized payloads with an `ErrorMessage` (e.g. 413). The
+        // recovery must surface that status instead of letting it fall through to a 500.
+        let rejection = warp::reject::custom(ErrorMessage::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Request body exceeds limit of 1024 bytes.".to_owned(),
+        ));
+
+        let (response,) = finish_err(rejection)
+            .await
+            .expect("capped-body rejection should be recovered");
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     /// Splunk token
@@ -2140,6 +2174,7 @@ mod tests {
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: Default::default(),
+            confinement: Default::default(),
         }
         .build(SinkContext::default())
         .await
@@ -2390,8 +2425,8 @@ mod tests {
         .await;
 
         let mut log = LogEvent::default();
-        log.insert("greeting", "hello");
-        log.insert("name", "bob");
+        log.insert(event_path!("greeting"), "hello");
+        log.insert(event_path!("name"), "bob");
         sink.run_events(vec![log.into()]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0).into_log();
@@ -2437,7 +2472,7 @@ mod tests {
         .await;
 
         let mut event = LogEvent::default();
-        event.insert("line", "hello");
+        event.insert(event_path!("line"), "hello");
         sink.run_events(vec![event.into()]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
@@ -3447,7 +3482,7 @@ mod tests {
             let event = collect_n(source, 1).await.remove(0);
             let log = event.as_log();
             assert_eq!(log["foo"], "bar".into());
-            assert_eq!(*log.get("nested.k").unwrap(), 1.into());
+            assert_eq!(*log.get(event_path!("nested", "k")).unwrap(), 1.into());
             assert_eq!(
                 log[log_schema().host_key().unwrap().to_string().as_str()],
                 "h".into()
@@ -3634,14 +3669,14 @@ mod tests {
             // The /event request produces one log with `foo=bar`.
             let event_log = events
                 .iter()
-                .find(|e| e.as_log().contains("foo"))
+                .find(|e| e.as_log().contains(event_path!("foo")))
                 .expect("expected /event request to produce a log with `foo` set");
             assert_eq!(event_log.as_log()["foo"], "bar".into());
 
             // The /raw request produces three logs whose messages are the lines.
             let raw_messages: Vec<String> = events
                 .iter()
-                .filter(|e| !e.as_log().contains("foo"))
+                .filter(|e| !e.as_log().contains(event_path!("foo")))
                 .map(|e| {
                     e.as_log()[log_schema().message_key().unwrap().to_string()]
                         .to_string_lossy()

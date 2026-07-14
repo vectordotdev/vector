@@ -10,6 +10,7 @@ use vector_lib::{
     config::LogNamespace,
     event::Event,
 };
+use vrl::event_path;
 use warp::{Filter, http::HeaderMap};
 
 use super::HttpClientConfig;
@@ -17,7 +18,7 @@ use crate::{
     components::validation::prelude::*,
     http::{ParamType, ParameterValue, QueryParameterValue},
     serde::{default_decoding, default_framing_message_based},
-    sources::util::http::HttpMethod,
+    sources::util::http::{HttpMethod, capped_body},
     test_util::{
         addr::next_addr,
         components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
@@ -226,7 +227,9 @@ async fn request_query_applied() {
     ]);
 
     for log in logs {
-        let query = log.get("data").expect("data must be available");
+        let query = log
+            .get(event_path!("data"))
+            .expect("data must be available");
         let mut got: HashMap<String, Vec<String>> = HashMap::new();
         for (k, v) in
             url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
@@ -356,7 +359,9 @@ async fn request_query_vrl_applied() {
     }
 
     for log in logs {
-        let query = log.get("data").expect("data must be available");
+        let query = log
+            .get(event_path!("data"))
+            .expect("data must be available");
         let mut got: HashMap<String, Vec<String>> = HashMap::new();
         for (k, v) in
             url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
@@ -417,7 +422,9 @@ async fn request_query_vrl_dynamic_updates() {
 
     let mut timestamps = Vec::new();
     for log in logs {
-        let query = log.get("data").expect("data must be available");
+        let query = log
+            .get(event_path!("data"))
+            .expect("data must be available");
         let query_bytes = query.as_bytes().expect("byte conversion should succeed");
 
         // Parse the timestamp value
@@ -514,7 +521,7 @@ async fn post_with_body() {
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
         .and(warp::header::exact("Content-Type", "application/json"))
-        .and(warp::body::bytes())
+        .and(capped_body())
         .map(|body: bytes::Bytes| {
             // Echo the body back as a string
             String::from_utf8_lossy(&body).to_string()
@@ -545,8 +552,11 @@ async fn post_with_body() {
 
     // Verify the body was echoed back correctly
     for log in logs {
-        assert_eq!(log.get("key").unwrap().as_str().unwrap(), "value");
-        let number = log.get("number").unwrap();
+        assert_eq!(
+            log.get(event_path!("key")).unwrap().as_str().unwrap(),
+            "value"
+        );
+        let number = log.get(event_path!("number")).unwrap();
         match number {
             vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
             _ => panic!("Expected integer value"),
@@ -621,7 +631,7 @@ async fn post_with_vrl_body() {
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
         .and(warp::header::exact("Content-Type", "application/json"))
-        .and(warp::body::bytes())
+        .and(capped_body())
         .map(|body: bytes::Bytes| {
             // Echo back the body as a string
             String::from_utf8_lossy(&body).to_string()
@@ -653,8 +663,11 @@ async fn post_with_vrl_body() {
 
     // Verify VRL was evaluated correctly
     for log in logs {
-        assert_eq!(log.get("message").unwrap().as_str().unwrap(), "HELLO");
-        let value = log.get("value").unwrap();
+        assert_eq!(
+            log.get(event_path!("message")).unwrap().as_str().unwrap(),
+            "HELLO"
+        );
+        let value = log.get(event_path!("value")).unwrap();
         match value {
             vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
             _ => panic!("Expected integer value"),

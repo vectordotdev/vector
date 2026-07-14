@@ -211,6 +211,7 @@ impl HumioLogsConfig {
             timestamp_key: Some(config_timestamp_key_target_path()),
             endpoint_target: EndpointTarget::Event,
             auto_extract_timestamp: None,
+            confinement: Default::default(),
         }
     }
 }
@@ -236,6 +237,8 @@ mod integration_tests {
     use serde::Deserialize;
     use serde_json::{Value as JsonValue, json};
     use tokio::time::Duration;
+
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -342,7 +345,7 @@ mod integration_tests {
             let mut event = LogEvent::from(message.clone());
             // Humio expects to find an @timestamp field for JSON lines
             // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
-            event.insert("@timestamp", Utc::now().to_rfc3339());
+            event.insert(event_path!("@timestamp"), Utc::now().to_rfc3339());
 
             run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 

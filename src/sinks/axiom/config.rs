@@ -186,6 +186,7 @@ impl SinkConfig for AxiomConfig {
             payload_prefix: "".into(), // Always newline delimited JSON
             payload_suffix: "".into(), // Always newline delimited JSON
             retry_strategy: self.retry_strategy.clone(),
+            confinement: Default::default(),
         };
 
         http_sink_config.build(cx).await

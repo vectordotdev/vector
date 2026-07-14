@@ -19,6 +19,7 @@ use crate::{
         },
         util::http::HttpRetryLogic,
     },
+    template::ConfinementConfig,
 };
 
 /// Configuration for the `splunk_hec_logs` sink.
@@ -151,6 +152,10 @@ pub struct HecLogsSinkConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_endpoint_target() -> EndpointTarget {
@@ -177,6 +182,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -190,6 +196,20 @@ impl SinkConfig for HecLogsSinkConfig {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
 
+        let mut confined_config = self.clone();
+        confined_config.index = confined_config
+            .index
+            .map(|t| t.confine(&self.confinement, Self::NAME, "index"))
+            .transpose()?;
+        confined_config.source = confined_config
+            .source
+            .map(|t| t.confine(&self.confinement, Self::NAME, "source"))
+            .transpose()?;
+        confined_config.sourcetype = confined_config
+            .sourcetype
+            .map(|t| t.confine(&self.confinement, Self::NAME, "sourcetype"))
+            .transpose()?;
+
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
@@ -197,7 +217,7 @@ impl SinkConfig for HecLogsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = self.build_processor(client, cx)?;
+        let sink = confined_config.build_processor(client, cx)?;
 
         Ok((sink, healthcheck))
     }
@@ -289,10 +309,37 @@ mod tests {
 
     use super::*;
     use crate::components::validation::prelude::*;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HecLogsSinkConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "splunk_hec_logs", "index");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "splunk_hec_logs", "index");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_index() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "splunk_hec_logs", "index");
+        assert!(result.is_ok());
     }
 
     impl ValidatableComponent for HecLogsSinkConfig {
@@ -334,6 +381,7 @@ mod tests {
                 timestamp_key: None,
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
+                confinement: ConfinementConfig::default(),
             };
 
             let endpoint = format!("{endpoint}/services/collector/raw");

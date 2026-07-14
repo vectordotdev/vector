@@ -1,14 +1,13 @@
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
-    io::{self, Read},
+    io,
     net::SocketAddr,
     num::NonZeroUsize,
     time::Duration,
 };
 
 use bytes::{Buf, Bytes, BytesMut};
-use flate2::read::ZlibDecoder;
 use smallvec::{SmallVec, smallvec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
@@ -22,6 +21,9 @@ use vector_lib::{
 };
 use vrl::value::{KeyString, Kind, kind::Collection};
 
+use super::util::decompression::{
+    CappedDecoder, max_decompressed_size_bytes, max_zlib_compressed_frame_size_bytes,
+};
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
@@ -161,6 +163,7 @@ impl SourceConfig for LogstashConfig {
             self.keepalive,
             shutdown_secs,
             tls,
+            None, // tls_reloader: not wired for this source
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
@@ -265,18 +268,24 @@ impl TcpSource for LogstashSource {
 }
 
 struct LogstashAcker {
-    // Batched reads can contain multiple writer windows. Preserve a separate
-    // ACK point for each completed window so Filebeat never sees an ACK that
-    // advances past the current window it is waiting on. If the batch ends in
-    // the middle of a window, ACK the last received event in that final ACK
-    // domain so clients are not forced to wait for the advertised window size.
-    // Lumberjack defines WindowSize as a maximum unacked count, so a sender can
-    // legitimately advertise a fresh window after a previously ACKed partial
-    // tail. Within a single ReadyFrames batch, the only incomplete ACK domain
-    // we can represent independently is the final tail we have actually seen.
-    // We expect most batches to need only one ACK point, either for a single
-    // completed window or for one partial tail. Multiple ACKs are only needed
-    // when ReadyFrames coalesces multiple logical windows into one batch.
+    // One cumulative ACK per *completed* writer window in the batch, in wire
+    // order. We ACK only frames that complete a window (`window_end`); we never
+    // emit a partial ACK for a window that is only partially present in this
+    // batch.
+    //
+    // A partial ACK would put a sequence number on the wire that falls inside a
+    // window the client is still filling, rather than on the window boundary the
+    // client waits for. (Real clients always send exactly `window_size` events
+    // per window and wait for an ACK of that count; see the decoder's
+    // `WindowSize` handling and logstash.md.) The upstream Logstash server never
+    // emits such partial ACKs, and an intermediary (load balancer, service mesh)
+    // that buffers and later misdelivers one onto a different connection causes
+    // the client to reject it as `invalid sequence number received
+    // (seq=N, expected=M)`. A window split across batches is ACKed only once its
+    // final event arrives in a later batch. (A window can never be closed early
+    // by a new `WindowSize`: the decoder rejects a premature `WindowSize` as a
+    // fatal error, so every window the acker sees is either complete or a genuine
+    // trailing tail.)
     acknowledgements: SmallVec<[(LogstashProtocolVersion, u32); 1]>,
 }
 
@@ -284,11 +293,9 @@ impl LogstashAcker {
     fn new(frames: &[LogstashEventFrame]) -> Self {
         let acknowledgements = frames
             .iter()
-            .enumerate()
-            // ACK each completed writer window and the last frame in a partial batch if ReadyFrames
-            // flushes before the current window is complete.
-            .filter(|(index, frame)| frame.window_end || index + 1 == frames.len())
-            .map(|(_, frame)| (frame.protocol, frame.sequence_number))
+            // ACK only completed writer windows; never a partial trailing tail.
+            .filter(|frame| frame.window_end)
+            .map(|frame| (frame.protocol, frame.sequence_number))
             .collect();
 
         Self { acknowledgements }
@@ -328,6 +335,13 @@ struct LogstashDecoder {
     // preserve sender window boundaries even if ReadyFrames later batches
     // multiple decoded windows together before ACKing.
     window_events_remaining: Option<NonZeroUsize>,
+    // Set for the decoder used to parse a decompressed payload. No known
+    // Lumberjack/Beats client emits a compressed frame nested inside another,
+    // so a nested `C` frame here is rejected rather than recursed into.
+    // Without this, an attacker could nest compressed frames arbitrarily deep
+    // and drive unbounded recursion in `decode_compressed_frame`, exhausting
+    // the stack (CWE-674).
+    nested: bool,
 }
 
 impl LogstashDecoder {
@@ -341,6 +355,15 @@ impl LogstashDecoder {
         Self {
             state: LogstashDecoderReadState::ReadProtocol,
             window_events_remaining,
+            nested: false,
+        }
+    }
+
+    const fn new_nested(window_events_remaining: Option<NonZeroUsize>) -> Self {
+        Self {
+            state: LogstashDecoderReadState::ReadProtocol,
+            window_events_remaining,
+            nested: true,
         }
     }
 
@@ -385,6 +408,12 @@ pub enum DecodeError {
     JsonFrameFailedDecode { source: serde_json::Error },
     #[snafu(display("Failed to decompress compressed frame: {}", source))]
     DecompressionFailed { source: io::Error },
+    #[snafu(display(
+        "Received a WindowSize frame before the current window completed ({remaining} events still expected)"
+    ))]
+    PrematureWindowSize { remaining: usize },
+    #[snafu(display("Compressed frame contains a nested compressed frame"))]
+    NestedCompressedFrame,
 }
 
 impl StreamDecodingError for DecodeError {
@@ -485,6 +514,8 @@ struct LogstashEventFrame {
     protocol: LogstashProtocolVersion,
     sequence_number: u32,
     fields: BTreeMap<KeyString, serde_json::Value>,
+    // True when this frame completes its window (fills it to the advertised
+    // size). The acker emits one ACK per frame so marked.
     window_end: bool,
 }
 
@@ -542,19 +573,43 @@ impl Decoder for LogstashDecoder {
                         Ack => LogstashDecoderReadState::ReadFrame(protocol, Ack),
                     }
                 }
-                // The window size indicates how many events the writer will send before waiting
-                // for acks. We preserve this boundary so the acker can emit one ACK per
-                // completed window, even if multiple windows are batched together later.
-                // Filebeat accepts cumulative ACKs, but not ACKs that advance past the
-                // current writer window it is waiting on. WindowSize is a maximum unacked
-                // count, not necessarily an exact count of immediately following frames, so a
-                // sender can legitimately advertise a new window after a previously ACKed
-                // partial tail. If a malformed sender does this before that earlier tail has
-                // actually been ACKed, we tolerate the reset here even though it can collapse
-                // the older incomplete domain into the new one.
+                // The window size tells us how many events the writer will send
+                // in this window before waiting for an ACK. We count those events
+                // down (in `annotate_frame`) so the acker can mark the window's
+                // boundary, even when ReadyFrames batches several windows together.
+                //
+                // The protocol spec defines window size as a *maximum* unacked
+                // count, which read literally would let a writer underfill a
+                // window and then open a new one. In practice every real client
+                // (go-lumber, beats) sets the window size to the exact number of
+                // events it then sends, and the reference go-lumber server treats
+                // it as exact: its `readEvents` loop reads exactly `window_size`
+                // frames and accepts only `J`/`D`/`C` frame bytes inside that loop,
+                // so any other byte — including a premature `W` — hits the
+                // `default` branch and returns `ErrProtocolError`, closing the
+                // connection (`go-lumber/server/v2/reader.go:121-124`, v1:
+                // `go-lumber/server/v1/reader.go:117-120`). We rely on that
+                // observed behavior, not the looser spec wording. See the
+                // "Window size" section of logstash.md for the client/server
+                // references.
                 //
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#window-size-frame-type
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::WindowSize) => {
+                    // A new window must not open until the current one has received
+                    // all advertised events. Because real clients always fill a
+                    // window exactly (see above), a `WindowSize` arriving mid-window
+                    // means the sender has desynced from the window contract; reject
+                    // it as a fatal decode error (matching the reference server)
+                    // rather than guess an ACK boundary for the abandoned window.
+                    // Only a `WindowSize` can open a window, so it is the only frame
+                    // that can prematurely close one. This guarantees every window
+                    // the acker sees is either complete or a genuine trailing tail.
+                    if let Some(remaining) = self.window_events_remaining {
+                        return Err(DecodeError::PrematureWindowSize {
+                            remaining: remaining.get(),
+                        });
+                    }
+
                     if src.remaining() < 4 {
                         return Ok(None);
                     }
@@ -602,6 +657,10 @@ impl Decoder for LogstashDecoder {
                 // overwrite any WindowSize boundaries that were established inside the compressed
                 // payload and can also lose progress from a partially consumed outer window.
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Compressed) => {
+                    if self.nested {
+                        return Err(DecodeError::NestedCompressedFrame);
+                    }
+
                     let Some(decoded) = decode_compressed_frame(src, self.window_events_remaining)?
                     else {
                         return Ok(None);
@@ -725,28 +784,39 @@ fn decode_compressed_frame(
         return Ok(None);
     }
     let payload_size = rest.get_u32() as usize;
+    let limit = max_decompressed_size_bytes();
+
+    // Reject an oversized declared payload before buffering it, so a peer cannot force multi-GB
+    // buffering by advertising a huge length and slow-streaming its bytes. The bound includes
+    // zlib's worst-case expansion so a valid frame whose decompressed content is within `limit`
+    // is never rejected here; the decompressed cap itself is still enforced below.
+    let compressed_limit = max_zlib_compressed_frame_size_bytes();
+    if payload_size > compressed_limit {
+        return Err(DecodeError::DecompressionFailed {
+            source: io::Error::other(format!(
+                "compressed frame payload size {payload_size} exceeds limit of {compressed_limit} bytes"
+            )),
+        });
+    }
 
     if rest.remaining() < payload_size {
-        src.reserve(payload_size);
         return Ok(None);
     }
 
     let (slice, right) = rest.split_at(payload_size);
     rest = right;
 
-    let mut buf = Vec::new();
-
-    let res = ZlibDecoder::new(io::Cursor::new(slice))
-        .read_to_end(&mut buf)
-        .context(DecompressionFailedSnafu)
-        .map(|_| BytesMut::from(&buf[..]));
+    let res = CappedDecoder::zlib_with_limit(io::Cursor::new(slice), limit)
+        .decompress()
+        .map(|v| BytesMut::from(v.as_slice()))
+        .context(DecompressionFailedSnafu);
 
     let byte_size = bytes_remaining(src, rest);
     src.advance(byte_size);
 
     let mut buf = res?;
 
-    let mut decoder = LogstashDecoder::new_with_window_events_remaining(window_events_remaining);
+    let mut decoder = LogstashDecoder::new_nested(window_events_remaining);
 
     let mut frames = VecDeque::new();
 
@@ -793,6 +863,7 @@ mod test {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use vector_lib::codecs::ReadyFrames;
     use vector_lib::lookup::OwnedTargetPath;
+    use vrl::event_path;
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -859,15 +930,17 @@ mod test {
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
         assert_eq!(
-            log.get("message").unwrap().to_string_lossy(),
+            log.get(event_path!("message")).unwrap().to_string_lossy(),
             "Hello, world!".to_string()
         );
         assert_eq!(
-            log.get("source_type").unwrap().to_string_lossy(),
+            log.get(event_path!("source_type"))
+                .unwrap()
+                .to_string_lossy(),
             "logstash".to_string()
         );
-        assert!(log.get("host").is_some());
-        assert!(log.get("timestamp").is_some());
+        assert!(log.get(event_path!("host")).is_some());
+        assert!(log.get(event_path!("timestamp")).is_some());
     }
 
     fn push_req(req: &mut BytesMut, seq: u32, pairs: &[(&str, &str)]) {
@@ -960,10 +1033,12 @@ mod test {
         let mut ready = ReadyFrames::with_capacity(stream, 16);
         let (frames, _) = ready.next().await.unwrap().unwrap();
 
-        let ack = LogstashAcker::new(&frames)
+        // An incomplete window produces no ACK at all (`build_ack` returns
+        // `None`); treat that as an empty acknowledgement list so callers can
+        // assert it with `&[]`.
+        let acknowledgements = LogstashAcker::new(&frames)
             .build_ack(TcpSourceAck::Ack)
-            .unwrap();
-        let acknowledgements = decode_acknowledgements(ack);
+            .map_or_else(Vec::new, decode_acknowledgements);
 
         assert!(ready.next().await.is_none());
         assert_eq!(acknowledgements, expected_acknowledgements);
@@ -1054,6 +1129,79 @@ mod test {
         assert!(!err.can_continue());
     }
 
+    #[test]
+    fn premature_window_size_frame_is_a_fatal_decode_error() {
+        // A WindowSize frame that arrives before the current window has received
+        // all its advertised events is a protocol violation, matching the
+        // upstream Logstash/go-lumber server. The reference server's `readEvents`
+        // loop reads exactly `window_size` frames and only accepts `J`/`D`/`C`
+        // frame bytes inside that loop; any other byte — including a premature
+        // `W` — hits its `default` branch and returns `ErrProtocolError`, closing
+        // the connection (`go-lumber/server/v2/reader.go:121-124`). Every real
+        // client (go-lumber, beats) sends exactly `window_size` events per window,
+        // so a mid-window `WindowSize` means the sender has desynced; see the
+        // "Window size" section of logstash.md. Rejecting it here means an
+        // under-filled window can never reach the acker, so the acker never has to
+        // invent a boundary for a window the sender closed early.
+        let mut decoder = LogstashDecoder::new();
+        let mut src = BytesMut::new();
+        push_window_size(&mut src, 2);
+        push_req(&mut src, 1, &[("message", "only one of two")]);
+        push_window_size(&mut src, 5); // premature: window 1 still expects another event
+
+        // The first decode yields the single data frame of the incomplete window.
+        assert!(decoder.decode(&mut src).unwrap().is_some());
+
+        // The next decode reaches the premature WindowSize and fails fatally so
+        // the connection is closed rather than silently re-framed.
+        let err = decoder.decode(&mut src).unwrap_err();
+        assert!(matches!(err, DecodeError::PrematureWindowSize { .. }));
+        assert!(
+            !err.can_continue(),
+            "a premature WindowSize must be fatal so the connection closes",
+        );
+    }
+
+    #[test]
+    fn premature_window_size_inside_compressed_payload_is_fatal() {
+        // The premature-WindowSize guard also fires inside a compressed payload:
+        // the nested decoder run by `decode_compressed_frame` hits the guard, and
+        // the error propagates out through the `?` on the nested decode loop so
+        // the outer decode returns it. This locks in that error propagation.
+        let mut inner = BytesMut::new();
+        push_window_size(&mut inner, 2);
+        push_req(&mut inner, 1, &[("message", "only one of two")]);
+        push_window_size(&mut inner, 5); // premature, inside the compressed payload
+
+        let mut req = BytesMut::new();
+        push_compressed(&mut req, &inner);
+
+        let mut decoder = LogstashDecoder::new();
+        let err = decoder.decode(&mut req).unwrap_err();
+        assert!(matches!(err, DecodeError::PrematureWindowSize { .. }));
+        assert!(
+            !err.can_continue(),
+            "a premature WindowSize inside a compressed frame must be fatal",
+        );
+    }
+
+    #[test]
+    fn nested_compressed_frame_is_a_fatal_decode_error() {
+        let mut inner = BytesMut::new();
+        push_req(&mut inner, 1, &[("message", "should never be reached")]);
+
+        let mut middle = BytesMut::new();
+        push_compressed(&mut middle, &inner);
+
+        let mut req = BytesMut::new();
+        push_compressed(&mut req, &middle);
+
+        let mut decoder = LogstashDecoder::new();
+        let err = decoder.decode(&mut req).unwrap_err();
+        assert!(matches!(err, DecodeError::NestedCompressedFrame));
+        assert!(!err.can_continue());
+    }
+
     #[tokio::test]
     async fn malformed_frame_closes_connection_without_ack() {
         let (address, _recv) = start_logstash(EventStatus::Delivered).await;
@@ -1112,13 +1260,136 @@ mod test {
     }
 
     #[tokio::test]
-    async fn incomplete_final_window_is_acked_to_the_last_received_event() {
+    async fn incomplete_window_is_not_acked() {
+        // A window that has not yet received all its events must not be ACKed.
+        // Emitting a partial ACK here puts a sequence number on the wire that
+        // does not correspond to any window boundary the client declared; if
+        // that ACK is later misattributed to a different (smaller) window by an
+        // intermediary, the client rejects it as `invalid sequence number
+        // received`. Matching the upstream Logstash server, we only ACK once
+        // the window's final event arrives.
         let mut req = BytesMut::new();
         push_window_size(&mut req, 4);
         push_req(&mut req, 1, &[("message", "only event in partial window")]);
 
         let decoded = decode_frames_and_assert_sequences(req, &[1]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
+        assert_acknowledgements_for_ready_frames(decoded, &[1], &[]).await;
+    }
+
+    #[tokio::test]
+    async fn window_split_across_compressed_frames_acks_once_on_completion() {
+        // A single window whose advertised size exceeds the number of events in
+        // any one compressed frame is split across several compressed frames. The
+        // decoder must thread `window_events_remaining` out of each
+        // `decode_compressed_frame` so the countdown continues across the
+        // compression boundary: only the window's true final event is marked
+        // `window_end`, yielding exactly one ACK. A threading bug would either
+        // mark a spurious boundary inside an earlier compressed frame (two
+        // window_ends -> two ACKs) or never complete the window at all.
+        let mut first = BytesMut::new();
+        push_req(&mut first, 1, &[("message", "w4 first")]);
+        push_req(&mut first, 2, &[("message", "w4 second")]);
+
+        let mut second = BytesMut::new();
+        push_req(&mut second, 3, &[("message", "w4 third")]);
+        push_req(&mut second, 4, &[("message", "w4 fourth")]);
+
+        // WindowSize(4) is sent uncompressed (as beats does), then the four
+        // events arrive two-per-compressed-frame, so each compressed frame
+        // carries fewer events than the window size.
+        let mut req = BytesMut::new();
+        push_window_size(&mut req, 4);
+        push_compressed(&mut req, &first);
+        push_compressed(&mut req, &second);
+
+        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
+        assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 3, 4], &[4]).await;
+    }
+
+    #[tokio::test]
+    async fn window_larger_than_ready_frames_capacity_in_one_compressed_frame_acks_once() {
+        const WINDOW: u32 = 5;
+        const CAPACITY: usize = 2;
+
+        let mut inner = BytesMut::new();
+        for seq in 1..=WINDOW {
+            push_req(&mut inner, seq, &[("message", "event in oversized window")]);
+        }
+
+        // A following small window. Its sequence numbers restart at 1 (per the
+        // protocol), and crucially its first event will share a ReadyFrames batch
+        // with the oversized window's completing event (seq 5). That batch must
+        // ACK only the oversized window (seq 5); the small window's retained first
+        // event must NOT produce a second ACK until the small window's own final
+        // event arrives.
+        const SMALL_WINDOW: u32 = 2;
+        let mut small_inner = BytesMut::new();
+        for seq in 1..=SMALL_WINDOW {
+            push_req(
+                &mut small_inner,
+                seq,
+                &[("message", "event in small window")],
+            );
+        }
+
+        // WindowSize is sent uncompressed (as beats does), then each whole window
+        // arrives in a single compressed frame, exactly as in the report.
+        let mut req = BytesMut::new();
+        push_window_size(&mut req, WINDOW);
+        push_compressed(&mut req, &inner);
+        push_window_size(&mut req, SMALL_WINDOW);
+        push_compressed(&mut req, &small_inner);
+
+        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4, 5, 1, 2]);
+
+        let stream = stream::iter(decoded.into_iter().map(Ok::<_, DecodeError>));
+        let mut ready = ReadyFrames::with_capacity(stream, CAPACITY);
+        let mut acknowledgements = Vec::new();
+
+        while let Some(result) = ready.next().await {
+            let (frames, _byte_size) = result.unwrap();
+            let acks = LogstashAcker::new(&frames)
+                .build_ack(TcpSourceAck::Ack)
+                .map_or_else(Vec::new, decode_acknowledgements);
+            acknowledgements.push(acks);
+        }
+
+        // Batches: [1, 2] [3, 4] [5, 1] [2].
+        // - The oversized window completes in the [5, 1] batch -> ACK(5) only; the
+        //   retained small-window seq 1 in that same batch is NOT a window end, so
+        //   it produces no ACK.
+        // - The small window completes in the [2] batch -> ACK(2).
+        // Each window is therefore ACKed exactly once; the oversized window's
+        // sequence number (5) never reappears in a later batch.
+        assert_eq!(acknowledgements, vec![vec![], vec![], vec![5], vec![2]]);
+
+        // Each window is ACKed exactly once: seq 5 (oversized) and seq 2 (small).
+        let all_acks: Vec<u32> = acknowledgements.into_iter().flatten().collect();
+        assert_eq!(
+            all_acks,
+            vec![5, 2],
+            "each window must be ACKed exactly once"
+        );
+    }
+
+    #[tokio::test]
+    async fn complete_window_then_incomplete_window_acks_only_the_complete_one() {
+        // The customer-reported failure: a small complete window followed by a
+        // larger window that is only partially present in the same batch. The
+        // acker must emit only the completed window's ACK and must not emit a
+        // partial ACK for the incomplete trailing window, whose sequence number
+        // would otherwise exceed the smaller window the client awaits.
+        let mut req = BytesMut::new();
+        push_window_size(&mut req, 2);
+        push_req(&mut req, 1, &[("message", "complete window first")]);
+        push_req(&mut req, 2, &[("message", "complete window second")]);
+        push_window_size(&mut req, 1000);
+        push_req(&mut req, 1, &[("message", "partial window first")]);
+        push_req(&mut req, 2, &[("message", "partial window second")]);
+        push_req(&mut req, 3, &[("message", "partial window third")]);
+
+        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 1, 2, 3]);
+        assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 1, 2, 3], &[2]).await;
     }
 
     #[tokio::test]
@@ -1136,7 +1407,11 @@ mod test {
     }
 
     #[tokio::test]
-    async fn single_window_split_across_ready_frames_keeps_progressive_acks() {
+    async fn single_window_split_across_ready_frames_acks_only_on_completion() {
+        // When one writer window is split across multiple `ReadyFrames` batches,
+        // only the batch containing the window's final event (its `window_end`)
+        // produces an ACK. Earlier batches hold no window boundary, so they emit
+        // nothing rather than a partial ACK for a mid-window sequence number.
         let mut req = BytesMut::new();
         push_window_size(&mut req, 4);
         push_req(&mut req, 1, &[("message", "first")]);
@@ -1152,22 +1427,31 @@ mod test {
 
         while let Some(result) = ready.next().await {
             let (frames, _byte_size) = result.unwrap();
-            let ack = LogstashAcker::new(&frames)
+            let acks = LogstashAcker::new(&frames)
                 .build_ack(TcpSourceAck::Ack)
-                .unwrap();
-            acknowledgements.push(decode_acknowledgements(ack));
+                .map_or_else(Vec::new, decode_acknowledgements);
+            acknowledgements.push(acks);
         }
 
-        assert_eq!(acknowledgements, vec![vec![2], vec![4]]);
+        // First batch (seq 1, 2) holds no window boundary -> no ACK.
+        // Second batch (seq 3, 4) completes the window -> ACK(4).
+        assert_eq!(acknowledgements, vec![vec![], vec![4]]);
     }
 
     #[tokio::test]
-    async fn fresh_window_after_acked_partial_tail_is_accepted() {
+    async fn fresh_window_after_completed_window_is_accepted() {
+        // A decoder reused across reads accepts a fresh window once the previous
+        // window has completed. This is the legitimate counterpart to the
+        // premature-WindowSize error: a `WindowSize` is only rejected when it
+        // arrives mid-window, so opening a new window after the prior one has
+        // received all its advertised events is always allowed. (A `WindowSize`
+        // after a still-partial window would now be a fatal protocol error; see
+        // `premature_window_size_frame_is_a_fatal_decode_error`.)
         let mut decoder = LogstashDecoder::new();
 
         let mut first_batch = BytesMut::new();
-        push_window_size(&mut first_batch, 2);
-        push_req(&mut first_batch, 1, &[("message", "first partial tail")]);
+        push_window_size(&mut first_batch, 1);
+        push_req(&mut first_batch, 1, &[("message", "first window")]);
         let decoded =
             decode_frames_with_decoder_and_assert_sequences(&mut decoder, first_batch, &[1]);
         assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
@@ -1177,7 +1461,7 @@ mod test {
         push_req(
             &mut second_batch,
             1,
-            &[("message", "fresh window after ack")],
+            &[("message", "fresh window after completion")],
         );
         let decoded =
             decode_frames_with_decoder_and_assert_sequences(&mut decoder, second_batch, &[1]);
@@ -1278,6 +1562,7 @@ mod integration_tests {
 
     use futures::Stream;
     use tokio::time::timeout;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -1312,12 +1597,15 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(
-            log.get("@metadata.beat"),
+            log.get(event_path!("@metadata", "beat")),
             Some(String::from("heartbeat").into()).as_ref()
         );
-        assert_eq!(log.get("summary.up"), Some(1.into()).as_ref());
-        assert!(log.get("timestamp").is_some());
-        assert!(log.get("host").is_some());
+        assert_eq!(
+            log.get(event_path!("summary", "up")),
+            Some(1.into()).as_ref()
+        );
+        assert!(log.get(event_path!("timestamp")).is_some());
+        assert!(log.get(event_path!("host")).is_some());
     }
 
     fn logstash_address() -> String {
@@ -1355,12 +1643,12 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert!(
-            log.get("line")
+            log.get(event_path!("line"))
                 .unwrap()
                 .to_string_lossy()
                 .contains("Hello World")
         );
-        assert!(log.get("host").is_some());
+        assert!(log.get(event_path!("host")).is_some());
     }
 
     async fn source(

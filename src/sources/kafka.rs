@@ -1721,8 +1721,8 @@ mod integration_test {
                     now.trunc_subsecs(3).into()
                 );
                 assert_eq!(event.as_log()["topic"], topic.clone().into());
-                assert!(event.as_log().contains("partition"));
-                assert!(event.as_log().contains("offset"));
+                assert!(event.as_log().contains(event_path!("partition")));
+                assert!(event.as_log().contains(event_path!("offset")));
                 let mut expected_headers = ObjectMap::new();
                 expected_headers.insert(HEADER_KEY.into(), Value::from(HEADER_VALUE));
                 assert_eq!(event.as_log()["headers"], Value::from(expected_headers));

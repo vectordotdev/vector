@@ -980,17 +980,17 @@ fn write_payload_footer(
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, Write as _};
+    use std::io::Write as _;
     use std::{num::NonZeroU32, sync::Arc};
 
-    use bytes::{BufMut, Bytes, BytesMut};
+    use bytes::{BufMut, Bytes};
     use chrono::{DateTime, TimeZone, Timelike, Utc};
-    use flate2::read::ZlibDecoder;
     use proptest::{
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
         proptest, strategy::Strategy, string::string_regex,
     };
     use prost::Message;
+    use vector_common::decompression::CappedDecoder;
     use vector_lib::{
         config::{LogSchema, log_schema},
         event::{
@@ -1082,18 +1082,6 @@ mod tests {
             .finish()
             .expect("should not fail")
             .freeze()
-    }
-
-    fn decompress_zlib_payload(payload: Bytes) -> io::Result<Bytes> {
-        let mut decompressor = ZlibDecoder::new(&payload[..]);
-        let mut decompressed = BytesMut::new().writer();
-        io::copy(&mut decompressor, &mut decompressed)?;
-        Ok(decompressed.into_inner().freeze())
-    }
-
-    fn decompress_zstd_payload(payload: Bytes) -> io::Result<Bytes> {
-        let decompressed = zstd::decode_all(&payload[..])?;
-        Ok(Bytes::from(decompressed))
     }
 
     /// Returns the number of bytes added to the compressor's output buffer after writing `n`
@@ -2142,7 +2130,7 @@ mod tests {
                 prop_assert!(payload.len() <= compressed_limit);
 
                 // V1 uses zlib/deflate.
-                let result = decompress_zlib_payload(payload);
+                let result = CappedDecoder::zlib(&payload[..]).decompress().map(Bytes::from);
                 prop_assert!(result.is_ok());
 
                 let decompressed = result.unwrap();
@@ -2169,7 +2157,9 @@ mod tests {
                 prop_assert!(payload.len() <= compressed_limit);
 
                 // V2 uses zstd.
-                let result = decompress_zstd_payload(payload);
+                let result = CappedDecoder::zstd(&payload[..])
+                    .and_then(|decoder| decoder.decompress())
+                    .map(Bytes::from);
                 prop_assert!(result.is_ok());
 
                 let decompressed = result.unwrap();
