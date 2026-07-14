@@ -180,7 +180,7 @@ impl GenerateConfig for HumioLogsConfig {
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let result = self.build_without_confinement_gauge(cx)?;
+        let result = self.build_without_confinement_gauge(cx, Self::NAME)?;
         self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok(result)
     }
@@ -196,14 +196,18 @@ impl SinkConfig for HumioLogsConfig {
 
 impl HumioLogsConfig {
     /// Confinement + sink construction without emitting the per-sink
-    /// confinement gauge. Called by [`SinkConfig::build`] (which emits
-    /// `humio_logs`) and by [`HumioMetricsConfig::build`] (which emits
-    /// `humio_metrics`) so operators see the sink type they configured.
+    /// confinement gauge. `component_name` is threaded through so both the
+    /// gauge (emitted by the caller) and per-template security warnings
+    /// carry the outer sink type — `humio_logs` when this is the top-level
+    /// sink, `humio_metrics` when [`HumioMetricsConfig::build`] delegates
+    /// here.
     pub(super) fn build_without_confinement_gauge(
         &self,
         cx: SinkContext,
+        component_name: &'static str,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.build_hec_config().build_without_confinement_gauge(cx)
+        self.build_hec_config()
+            .build_without_confinement_gauge(cx, component_name)
     }
 
     fn build_hec_config(&self) -> HecLogsSinkConfig {

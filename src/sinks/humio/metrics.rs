@@ -195,7 +195,7 @@ impl SinkConfig for HumioMetricsConfig {
         // `humio_logs` sink's gauge isn't emitted alongside our own —
         // operators watching `security_confinement_disabled` for a
         // `humio_metrics` sink should only see one series.
-        let (sink, healthcheck) = sink.build_without_confinement_gauge(cx)?;
+        let (sink, healthcheck) = sink.build_without_confinement_gauge(cx, Self::NAME)?;
 
         let sink = HumioMetricsSink {
             inner: sink,
