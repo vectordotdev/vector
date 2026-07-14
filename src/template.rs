@@ -832,6 +832,23 @@ pub(crate) enum BuildError {
         /// The literal prefix that contained no host.
         prefix: String,
     },
+
+    /// The template is an HTTP/HTTPS URI with a dynamic query component.
+    ///
+    /// A query containing `{{ field }}` or strftime references cannot be pinned
+    /// to a static value, so confinement cannot guarantee the rendered query
+    /// won't be attacker-controlled. Move routing into the path, or set
+    /// `dangerously_allow_unconfined_template_resolution: true` to opt out.
+    #[snafu(display(
+        "HTTP/HTTPS template {template:?} has a dynamic query component: \
+         query parameters containing `{{{{ field }}}}` or strftime specifiers \
+         cannot be confined. Move event-driven routing into the URL path, or set \
+         `dangerously_allow_unconfined_template_resolution: true` to opt out."
+    ))]
+    DynamicUriQuery {
+        /// The full template source that contained the dynamic query.
+        template: String,
+    },
 }
 
 #[derive(Debug, Snafu)]
@@ -924,6 +941,15 @@ impl ConfinementChecker {
         // templates like `http_{{tenant}}` whose prefix is `http_`.
         let lp = prefix.to_ascii_lowercase();
         if lp.starts_with("http://") || lp.starts_with("https://") {
+            // Reject any URI template that contains `?`. Query parameters cannot
+            // be safely confined: the boundary is the path, not the query string.
+            // Operators who need static query params should move them into the
+            // service configuration or use the opt-out flag.
+            if tpl.get_ref().contains('?') {
+                return Err(BuildError::DynamicUriQuery {
+                    template: tpl.get_ref().to_string(),
+                });
+            }
             UriChecker::from_prefix(prefix).map(|c| Some(Self::Uri(c)))
         } else {
             Ok(Some(Self::Prefix(PrefixChecker {
@@ -1000,6 +1026,10 @@ impl PrefixChecker {
 /// 3. **Dot-dot segment check** — no path segment may be `..`, `.%2e`,
 ///    `%2e.`, or `%2e%2e` (case-insensitive). This catches path traversal
 ///    within the same host even when the prefix check passes.
+///
+/// URI templates containing `?` are rejected at build time — query parameters
+/// cannot be safely confined to a static boundary and must not appear in
+/// dynamic URI templates.
 #[derive(Clone, Debug)]
 pub(crate) struct UriChecker {
     /// Lowercased scheme, e.g. `"https"`.
@@ -1021,17 +1051,6 @@ impl UriChecker {
             .scheme_str()
             .expect("scheme present because prefix starts with http(s)://")
             .to_ascii_lowercase();
-        // Reject URI templates whose literal prefix has already crossed
-        // into the query. Composing a robust prefix pattern from operator-
-        // authored `?tenant={{ tenant }}` shapes is fragile — every
-        // starts_with/`&`-boundary combination has either a bypass or a
-        // false-positive on operator-authored static suffixes. Force
-        // dynamic routing into the path instead.
-        if uri.query().is_some() {
-            return Err(BuildError::NoStaticUriAuthority {
-                prefix: prefix.to_string(),
-            });
-        }
         match uri.authority() {
             Some(auth) if !auth.as_str().is_empty() => Ok(Self {
                 scheme,
@@ -1106,14 +1125,11 @@ impl UriChecker {
             });
         }
 
-        // 5. Reject any rendered query. `from_prefix` rejects URI templates
-        //    whose literal prefix crosses into the query, so a URI checker is
-        //    only ever built for pathful templates. A query at render time
-        //    means a field value smuggled `?...` into the path — for
-        //    example `.../ingest/{{ tenant }}` with a tenant value of
-        //    `ok?tenant=evil` renders to `.../ingest/ok` with query
-        //    `tenant=evil`; same authority + same path prefix, but the
-        //    destination now has an attacker-controlled routing parameter.
+        // 4. Reject any rendered query. URI templates containing `?` are
+        //    rejected at build time, so a query at render time means a field
+        //    value smuggled `?...` into the path — e.g. tenant value
+        //    `ok?tenant=evil` renders `.../ingest/ok?tenant=evil`: same
+        //    authority and path prefix but an attacker-controlled query.
         if uri.query().is_some() {
             return Err(ConfineError::OutsideBase {
                 rendered: rendered.to_string(),
@@ -1797,13 +1813,9 @@ mod tests {
 
     #[test]
     fn uri_path_field_cannot_smuggle_query() {
-        // The build-time check rejects URI templates that put a field in
-        // the query, so UriChecker only exists for pathful templates. If a
-        // rendered URI has any query at all, a field value must have
-        // smuggled it in through the path. Example: template
-        // `https://api.internal/ingest/{{ tenant }}` + tenant value
-        // `ok?tenant=evil` renders to `.../ingest/ok?tenant=evil` — same
-        // authority and path prefix, attacker-controlled query.
+        // Templates with no `?` build successfully. A field value that smuggles
+        // `?...` into the path (e.g. tenant=`ok?tenant=evil`) is caught at
+        // render time via the query-rejection check.
         let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
@@ -1817,25 +1829,23 @@ mod tests {
     }
 
     #[test]
-    fn uri_field_in_query_rejected_at_build() {
-        // URIs whose template puts a field in the query are fragile to
-        // confine: every attempt at reasoning about `&` boundaries, static
-        // suffixes, and multi-field patterns has been either bypassable
-        // (a value like `a&tenant=other` sneaking through a bare prefix
-        // check) or false-positive (a legitimate operator-authored
-        // `&source=vector` static suffix). Reject at build.
+    fn uri_template_with_query_rejected_at_build() {
+        // Any URI template containing `?` is rejected at build with
+        // DynamicUriQuery, regardless of where `?` appears.
         for template_str in &[
             "https://api.internal/ingest?tenant={{ tenant }}",
             "https://api.internal/ingest?tenant=team-{{ tenant }}",
-            "https://api.internal/ingest?apiVersion=1.0&tenant={{ tenant }}",
+            "https://api.internal/{{ path }}?tenant={{ tenant }}",
+            "https://api.internal/ingest/{{ path }}?time=%Y",
+            "https://api.internal/ingest/{{ tenant }}?source=vector",
         ] {
             let tpl = Template::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
-                    BuildError::NoStaticUriAuthority { .. }
+                    BuildError::DynamicUriQuery { .. }
                 ),
-                "expected NoStaticUriAuthority for {template_str}"
+                "expected DynamicUriQuery for {template_str}"
             );
         }
     }
