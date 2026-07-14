@@ -19,6 +19,7 @@ use crate::{
             http::{RequestConfig, RetryStrategy},
         },
     },
+    template::ConfinementConfig,
     tls::TlsConfig,
 };
 
@@ -129,6 +130,9 @@ pub struct AxiomConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl GenerateConfig for AxiomConfig {
@@ -186,10 +190,17 @@ impl SinkConfig for AxiomConfig {
             payload_prefix: "".into(), // Always newline delimited JSON
             payload_suffix: "".into(), // Always newline delimited JSON
             retry_strategy: self.retry_strategy.clone(),
-            confinement: Default::default(),
+            confinement: self.confinement.clone(),
         };
 
-        http_sink_config.build(cx).await
+        // Route through the HTTP builder that doesn't emit the gauge, so
+        // per-template warnings and the sink-level gauge both carry
+        // `component_type=axiom` — not `http`.
+        let result = http_sink_config
+            .build_without_confinement_gauge(cx, Self::NAME)
+            .await?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        Ok(result)
     }
 
     fn input(&self) -> Input {
