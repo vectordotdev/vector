@@ -24,6 +24,11 @@
       "what": "`encoding` field on HTTP server sources",
       "deprecated_since": "0.50.0",
       "description": "The `encoding` field will be removed. Use `decoding` and `framing` instead."
+    },
+    {
+      "what": "Legacy memory enrichment table counter metric names",
+      "deprecated_since": "0.57.0",
+      "description": "The following memory enrichment table counter metric names are deprecated:\n\n- `memory_enrichment_table_failed_insertions`\n- `memory_enrichment_table_failed_reads`\n- `memory_enrichment_table_ttl_expirations`\n\nThe replacement metrics use the `_total` suffix:\n\n- `memory_enrichment_table_failed_insertions_total`\n- `memory_enrichment_table_failed_reads_total`\n- `memory_enrichment_table_ttl_expirations_total`\n\nMigrate dashboards, alerts, and other consumers to use the `_total` suffixed metric names.\n\nThe deprecated metric names will be removed in a future release."
     }
   ],
   "deprecations_enacted": [
