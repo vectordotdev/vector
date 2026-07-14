@@ -828,6 +828,19 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
+    /// The operator-authored URI prefix contains a percent-encoded path separator
+    /// (`%2f` or `%5c`) or a raw backslash. These would cause every rendered
+    /// event to be dropped at runtime; reject at build time instead.
+    #[snafu(display(
+        "HTTP/HTTPS URI prefix {prefix:?} contains an encoded path separator (\
+         %2F, %5C, or \\\\) in the static portion. Use a literal `/` in the path \
+         instead."
+    ))]
+    EncodedSeparatorInUriPrefix {
+        /// The literal prefix that contained the encoded separator.
+        prefix: String,
+    },
+
     /// The template is an HTTP/HTTPS URI with a dynamic query component.
     ///
     /// A query containing `{{ field }}` or strftime references cannot be pinned
@@ -1046,6 +1059,16 @@ impl UriChecker {
             .scheme_str()
             .expect("scheme present because prefix starts with http(s)://")
             .to_ascii_lowercase();
+        let path = uri.path().to_ascii_lowercase();
+        // Reject encoded path separators in the operator-authored prefix.
+        // A static prefix containing %2f, %5c, or \ would cause every rendered
+        // URI to fail the render-time check, silently dropping all events.
+        // Detecting it at build time surfaces a clear config error instead.
+        if path.contains("%2f") || path.contains("%5c") || uri.path().contains('\\') {
+            return Err(BuildError::EncodedSeparatorInUriPrefix {
+                prefix: prefix.to_string(),
+            });
+        }
         match uri.authority() {
             Some(auth) if !auth.as_str().is_empty() => Ok(Self {
                 scheme,
