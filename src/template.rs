@@ -1108,13 +1108,14 @@ impl UriChecker {
             }
         }
 
-        // 4. Reject percent-encoded path separators: `%2f` is a literal `/` per
-        //    RFC 3986, but many servers decode it before path normalization.
-        //    `%5c` (backslash) is similarly decoded on Windows-backed services.
-        //    Either can turn an otherwise-safe segment into a traversal vector,
-        //    e.g. `%2e%2e%2fadmin` is one raw segment but resolves as `../admin`.
+        // 4. Reject encoded path separators and raw backslashes.
+        //    `%2f` (encoded `/`) and `%5c` (encoded `\`) are decoded by many
+        //    servers before path normalization, turning an otherwise-safe
+        //    segment into a traversal vector.  Raw `\` is accepted by
+        //    `http::Uri` but treated as a path separator by Windows/IIS,
+        //    allowing `/ingest/..\admin` to escape the prefix on those hosts.
         let path_lc = path.to_ascii_lowercase();
-        if path_lc.contains("%2f") || path_lc.contains("%5c") {
+        if path_lc.contains("%2f") || path_lc.contains("%5c") || path.contains('\\') {
             return Err(ConfineError::DotDotSegment {
                 rendered: rendered.to_string(),
             });
@@ -1143,24 +1144,24 @@ impl UriChecker {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct ConfinementConfig {
-    /// Disable template confinement when no static prefix can be derived.
+    /// Disable all template confinement checks for this sink.
     ///
     /// **DANGEROUS — disables a security control.**
     ///
-    /// Suppresses the startup error when a template references event fields
-    /// but has no static literal prefix to derive a confinement base from.
-    /// When enabled, a log producer that controls any field used in the
-    /// template can write to arbitrary keys or paths.
+    /// Bypasses both startup validation and runtime confinement for every
+    /// templated field on this sink. When enabled, a log producer that
+    /// controls any field used in a template can write to arbitrary keys,
+    /// paths, or routing destinations. This flag is a full opt-out: it
+    /// disables confinement even for templates that have a usable static
+    /// prefix.
     #[serde(default)]
     pub dangerously_allow_unconfined_template_resolution: bool,
 }
 
 impl ConfinementConfig {
-    /// Called on the opt-out code-path (`dangerously_allow_unconfined_template_resolution: true`
-    /// AND the template had no derivable literal prefix). Logs a
-    /// per-template SECURITY warning so operators can see which specific
-    /// template on a sink is unconfined. Does NOT touch the gauge — the
-    /// gauge is emitted once per sink build by [`Self::set_confinement_gauge`].
+    /// Logs a per-template SECURITY warning on the opt-out path. Does NOT
+    /// touch the gauge — the gauge is emitted once per sink build by
+    /// [`Self::set_confinement_gauge`].
     pub fn warn_unconfined_template(
         component_kind: &'static str,
         component_type: &'static str,
@@ -1803,6 +1804,25 @@ mod tests {
         assert!(matches!(
             c.confine("http://trusted.example.com/api/v1").unwrap_err(),
             ConfineError::UriAuthorityMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn uri_path_field_cannot_smuggle_backslash() {
+        // Raw `\` is accepted by `http::Uri` but Windows/IIS servers treat it
+        // as a path separator — `/ingest/..\admin` escapes the prefix on those
+        // hosts. Reject at render time.
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+        assert!(matches!(
+            c.confine("https://api.internal/ingest/..\\admin")
+                .unwrap_err(),
+            ConfineError::DotDotSegment { .. }
+        ));
+        assert!(matches!(
+            c.confine("https://api.internal/ingest/foo\\..\\admin")
+                .unwrap_err(),
+            ConfineError::DotDotSegment { .. }
         ));
     }
 
