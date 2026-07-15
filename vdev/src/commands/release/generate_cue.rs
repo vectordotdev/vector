@@ -409,7 +409,7 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
     let fragment_type = parts[1];
     let breaking = fragment_type == "breaking";
     let cue_type = match fragment_type {
-        "breaking" | "deprecation" => "chore",
+        "breaking" => "chore",
         "security" | "fix" => "fix",
         "feature" => "feat",
         "enhancement" => "enhancement",
