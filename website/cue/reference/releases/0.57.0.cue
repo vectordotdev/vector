@@ -21,7 +21,7 @@ releases: "0.57.0": {
 		"""
 
 	known_issues: [
-		"`vector validate --no-environment` doesn't catch unconfined routing templates (see the template confinement breaking change above); run `vector validate` without that flag to catch confinement issues before startup.",
+		"`vector validate --no-environment` doesn't catch unconfined routing templates (see the template confinement breaking change above) ([#25840](https://github.com/vectordotdev/vector/issues/25840)); run `vector validate` without that flag to catch confinement issues before startup.",
 	]
 
 	changelog: [
