@@ -1,69 +1,20 @@
 use std::task::{Context, Poll};
 
+use super::compression::VectorCompression;
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use prost::Message;
-use tonic::{IntoRequest, body::BoxBody};
-use tower::Service;
-use vector_lib::{
-    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
-    stream::DriverResponse,
-};
-
-use super::{VectorSinkError, compression::VectorCompression};
+use tonic::{body::BoxBody};
 use crate::{
     Error,
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
-    sinks::util::uri,
 };
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
     pub client: proto_vector::Client<HyperSvc>,
-    pub protocol: String,
-    pub endpoint: String,
-}
-
-pub struct VectorResponse {
-    events_byte_size: GroupedCountByteSize,
-}
-
-impl DriverResponse for VectorResponse {
-    fn event_status(&self) -> EventStatus {
-        EventStatus::Delivered
-    }
-
-    fn events_sent(&self) -> &GroupedCountByteSize {
-        &self.events_byte_size
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct VectorRequest {
-    pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
-    pub request: proto_vector::PushEventsRequest,
-}
-
-impl Finalizable for VectorRequest {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.finalizers.take_finalizers()
-    }
-}
-
-impl MetaDescriptive for VectorRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
-    }
-
-    fn metadata_mut(&mut self) -> &mut RequestMetadata {
-        &mut self.metadata
-    }
 }
 
 impl VectorService {
@@ -72,26 +23,39 @@ impl VectorService {
         uri: Uri,
         compression: VectorCompression,
     ) -> Self {
-        let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
         let mut proto_client = proto_vector::Client::new(HyperSvc {
             uri,
             client: hyper_client,
         });
 
         if let Some(encoding) = compression.as_tonic_encoding() {
-            proto_client = proto_client.send_compressed(encoding);
+            proto_client = proto_client.send_compressed(encoding)
+                .accept_compressed(encoding);
         }
 
         Self {
             client: proto_client,
-            protocol,
-            endpoint,
         }
     }
 }
 
-impl Service<VectorRequest> for VectorService {
-    type Response = VectorResponse;
+#[derive(Debug)]
+pub struct PullEventsRequestError {
+    pub status: tonic::Status
+}
+
+impl std::fmt::Display for PullEventsRequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Failed pull_events grpc request: ")?;
+        f.write_str(&format!("{}", self.status))?;
+        Ok(())
+    }
+}
+
+impl std::error::Error for PullEventsRequestError {}
+
+impl tower::Service<proto_vector::PullEventsRequest> for VectorService {
+    type Response = tonic::Streaming<proto_vector::PullEventsResponse>;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -106,26 +70,19 @@ impl Service<VectorRequest> for VectorService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, mut list: VectorRequest) -> Self::Future {
+    fn call(&mut self, list: proto_vector::PullEventsRequest) -> Self::Future {
         let mut service = self.clone();
-        let byte_size = list.request.encoded_len();
-        let metadata = std::mem::take(list.metadata_mut());
-        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let future = async move {
             service
                 .client
-                .push_events(list.request.into_request())
-                .map_ok(|_response| {
-                    emit!(EndpointBytesSent {
-                        byte_size,
-                        protocol: &service.protocol,
-                        endpoint: &service.endpoint,
-                    });
-
-                    VectorResponse { events_byte_size }
+                .pull_events(list)
+                .map_ok(|response| {
+                    response.into_inner()
                 })
-                .map_err(|source| VectorSinkError::Request { source }.into())
+                .map_err(|status| -> Self::Error {
+                    Box::new(PullEventsRequestError{ status })
+                })
                 .await
         };
 
@@ -139,7 +96,7 @@ pub struct HyperSvc {
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
 }
 
-impl Service<hyper::Request<BoxBody>> for HyperSvc {
+impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;

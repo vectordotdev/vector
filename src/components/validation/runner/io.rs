@@ -20,7 +20,7 @@ use crate::{
     },
     proto::vector::{
         Client as VectorClient, HealthCheckRequest, HealthCheckResponse, PushEventsRequest,
-        PushEventsResponse, Server as VectorServer, Service as VectorService, ServingStatus,
+        PushEventsResponse, PullEventsRequest, PullEventsResponse, Server as VectorServer, Service as VectorService, ServingStatus,
     },
     sources::util::grpc::{GrpcKeepaliveConfig, run_grpc_server},
 };
@@ -38,6 +38,25 @@ impl From<mpsc::Sender<Vec<Event>>> for EventForwardService {
 
 #[tonic::async_trait]
 impl VectorService for EventForwardService {
+    type PullEventsStream = std::pin::Pin<
+        Box<
+            dyn tonic::codegen::tokio_stream::Stream<
+                    Item = std::result::Result<PullEventsResponse, tonic::Status>,
+                > + Send
+                + 'static,
+        >,
+    >;
+
+    async fn pull_events(
+        &self,
+        _: tonic::Request<PullEventsRequest>,
+    ) -> Result<tonic::Response<Self::PullEventsStream>, Status> {
+        Err(Status::new(
+            tonic::Code::Unimplemented,
+            "Source vector does not support PullEventsRequest",
+        ))
+    }
+
     async fn push_events(
         &self,
         request: tonic::Request<PushEventsRequest>,

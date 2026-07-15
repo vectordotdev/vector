@@ -1,34 +1,9 @@
-use snafu::Snafu;
-use vector_lib::configurable::configurable_component;
-
-mod compression;
 mod config;
-mod service;
-mod sink;
+mod serve;
+mod push;
 
-pub use config::VectorConfig;
+pub use config::{VectorConfig, VectorConfigVersion};
 
-/// Marker type for the version two of the configuration for the `vector` sink.
-#[configurable_component]
-#[derive(Clone, Debug)]
-enum VectorConfigVersion {
-    /// Marker value for version two.
-    #[serde(rename = "2")]
-    V2,
-}
-
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum VectorSinkError {
-    #[snafu(display("Request failed: {}", source))]
-    Request { source: tonic::Status },
-
-    #[snafu(display("Vector source unhealthy: {:?}", status))]
-    Health { status: Option<&'static str> },
-
-    #[snafu(display("URL has no host."))]
-    NoHost,
-}
 
 #[cfg(test)]
 mod test {

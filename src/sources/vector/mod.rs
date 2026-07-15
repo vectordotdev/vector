@@ -1,35 +1,20 @@
 //! The `vector` source. See [VectorConfig].
 use std::net::SocketAddr;
 
-use chrono::Utc;
-use futures::TryFutureExt;
-use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
-use tonic_health::server::health_reporter;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    codecs::NativeDeserializerConfig,
-    config::LogNamespace,
-    configurable::configurable_component,
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    codecs::NativeDeserializerConfig, config::LogNamespace, configurable::configurable_component,
 };
+mod fetch;
+mod receive;
 
 use crate::{
-    SourceSender,
     config::{
-        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        DataType, GenerateConfig, Resource, SinkHealthcheckOptions, SourceAcknowledgementsConfig,
+        SourceConfig, SourceContext, SourceOutput,
     },
-    internal_events::{EventsReceived, StreamClosedError},
-    proto::vector as proto,
     serde::bool_or_struct,
-    sources::{
-        Source,
-        util::{
-            decompression::max_decompressed_size_bytes,
-            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
-        },
-    },
+    sinks::util::TowerRequestConfig,
+    sources::{Source, util::grpc::GrpcKeepaliveConfig},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -42,81 +27,21 @@ enum VectorConfigVersion {
     V2,
 }
 
-#[derive(Debug, Clone)]
-struct Service {
-    pipeline: SourceSender,
-    acknowledgements: bool,
-    log_namespace: LogNamespace,
+#[configurable_component()]
+#[configurable(description = "vector mode")]
+#[derive(Clone, Debug)]
+pub enum VectorMode {
+    #[serde(rename = "fetch")]
+    #[configurable(description = "fetch mode")]
+    Fetch,
+    #[serde(rename = "receive")]
+    #[configurable(description = "receive mode")]
+    Receive,
 }
 
-#[tonic::async_trait]
-impl proto::Service for Service {
-    async fn push_events(
-        &self,
-        request: Request<proto::PushEventsRequest>,
-    ) -> Result<Response<proto::PushEventsResponse>, Status> {
-        let mut events: Vec<Event> = request
-            .into_inner()
-            .events
-            .into_iter()
-            .map(Event::from)
-            .collect();
-
-        let now = Utc::now();
-        for event in &mut events {
-            if let Event::Log(log) = event {
-                self.log_namespace.insert_standard_vector_source_metadata(
-                    log,
-                    VectorConfig::NAME,
-                    now,
-                );
-            }
-        }
-
-        let count = events.len();
-        let byte_size = events.estimated_json_encoded_size_of();
-        let events_received = register!(EventsReceived);
-        events_received.emit(CountByteSize(count, byte_size));
-
-        let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
-
-        self.pipeline
-            .clone()
-            .send_batch(events)
-            .map_err(|error| {
-                let message = error.to_string();
-                emit!(StreamClosedError { count });
-                Status::unavailable(message)
-            })
-            .and_then(|_| handle_batch_status(receiver))
-            .await?;
-
-        Ok(Response::new(proto::PushEventsResponse {}))
-    }
-
-    // TODO: figure out a way to determine if the current Vector instance is "healthy".
-    async fn health_check(
-        &self,
-        _: Request<proto::HealthCheckRequest>,
-    ) -> Result<Response<proto::HealthCheckResponse>, Status> {
-        let message = proto::HealthCheckResponse {
-            status: proto::ServingStatus::Serving.into(),
-        };
-
-        Ok(Response::new(message))
-    }
-}
-
-async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<(), Status> {
-    let status = match receiver {
-        Some(receiver) => receiver.await,
-        None => BatchStatus::Delivered,
-    };
-
-    match status {
-        BatchStatus::Errored => Err(Status::internal("Delivery error")),
-        BatchStatus::Rejected => Err(Status::data_loss("Delivery failed")),
-        BatchStatus::Delivered => Ok(()),
+impl Default for VectorMode {
+    fn default() -> Self {
+        VectorMode::Receive
     }
 }
 
@@ -133,6 +58,21 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
+    /// The mode of vector source
+    ///
+    /// push or pull
+    #[serde(default)]
+    pub mode: VectorMode,
+
+    /// Vector compression mode in pull mode
+    #[serde(default)]
+    pub compression: fetch::compression::VectorCompression,
+
+    /// Vector request config in pull mode
+    #[configurable(derived)]
+    #[serde(default)]
+    pub request: TowerRequestConfig,
+
     #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
@@ -144,6 +84,10 @@ pub struct VectorConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: GrpcKeepaliveConfig,
+
+    /// Somrething something
+    #[serde(default)]
+    pub healthcheck: SinkHealthcheckOptions,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
@@ -167,9 +111,13 @@ impl Default for VectorConfig {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
+            mode: VectorMode::Receive,
+            compression: fetch::compression::VectorCompression::default(),
+            request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
             keepalive: Default::default(),
             log_namespace: None,
+            healthcheck: Default::default(),
         }
     }
 }
@@ -185,50 +133,11 @@ impl GenerateConfig for VectorConfig {
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
-        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
-        let log_namespace = cx.log_namespace(self.log_namespace);
 
-        // Create the custom Vector service (existing).
-        //
-        // Compression negotiation (gzip, zstd) is handled centrally by
-        // `DecompressionAndMetricsLayer` in `sources::util::grpc`, so we
-        // deliberately do not call `.accept_compressed(..)` here.
-        let vector_service = proto::Server::new(Service {
-            pipeline: cx.out,
-            acknowledgements,
-            log_namespace,
-        })
-        // Tonic added a default of 4MB in 0.9. Bound this by the global decompressed-size
-        // cap rather than `usize::MAX` so a single oversized message cannot drive unbounded
-        // allocation on this unauthenticated listener.
-        .max_decoding_message_size(max_decompressed_size_bytes());
-
-        // Create the standard gRPC health service
-        let (mut health_reporter, health_service) = health_reporter();
-
-        // Register the Vector service as serving in the health reporter
-        health_reporter
-            .set_service_status("vector.Vector", tonic_health::ServingStatus::Serving)
-            .await;
-
-        // Combine both services using RoutesBuilder
-        let mut builder = RoutesBuilder::default();
-        builder
-            .add_service(health_service)
-            .add_service(vector_service);
-
-        let source = run_grpc_server_with_routes(
-            self.address,
-            tls_settings,
-            builder.routes(),
-            self.keepalive.clone(),
-            cx.shutdown,
-        )
-        .map_err(|error| {
-            error!(message = "Source future failed.", %error);
-        });
-
-        Ok(Box::pin(source))
+        match self.mode {
+            VectorMode::Receive => receive::config_to_receive_source(self, tls_settings, cx).await,
+            VectorMode::Fetch => fetch::config_to_fetch_source(self, &tls_settings, cx, 5),
+        }
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -245,7 +154,12 @@ impl SourceConfig for VectorConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![Resource::tcp(self.address)]
+        match self.mode {
+            VectorMode::Receive => {
+                vec![Resource::tcp(self.address)]
+            }
+            VectorMode::Fetch => vec![],
+        }
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -448,6 +362,7 @@ mod tests {
 
     #[tokio::test]
     async fn custom_health_check_works() {
+        use crate::proto::vector as proto;
         use tonic::transport::Channel;
 
         let (_guard, addr) = test_util::addr::next_addr();
@@ -485,6 +400,7 @@ mod tests {
 
     #[tokio::test]
     async fn max_connection_age_allows_client_reconnect() {
+        use crate::proto::vector as proto;
         use tokio::time::{Duration, sleep};
         use tonic::transport::Channel;
 
