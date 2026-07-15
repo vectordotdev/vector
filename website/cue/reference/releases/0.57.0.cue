@@ -143,7 +143,7 @@ releases: "0.57.0": {
 				Fixed the `logstash` source to ACK only completed writer windows rather than
 				sometimes emitting a partial ACK before the window is complete. While partial
 				ACKs are permitted by the official protocol spec and cause no problems for the
-				reference `go-lumber` client in Beats, they appears to confuse proxies that
+				reference `go-lumber` client in Beats, they appear to confuse proxies that
 				assume there will only be one ACK per window, causing errors on subsequent
 				batches.
 				"""#
@@ -257,7 +257,7 @@ releases: "0.57.0": {
 		{
 			type: "fix"
 			description: #"""
-				The `logstash` source now caps the size of compressed frame payloads. Previously, the 32-bit payload size field of a compressed (`C`) frame was read straight from the wire and used to reserve a buffer, so a 6-byte malformed frame advertising a multi-gigabyte size could trigger an allocation large enough to abort the process. The size of the decompressed output is now 100MiB by default and can be configured by `--max-decompressed-size-bytes` or `VECTOR_MAX_DECOMPRESSED_SIZE_BYTES`. Oversized frames are rejected as a decode error.
+				The `logstash` source now caps the size of compressed frame payloads. Previously, the 32-bit payload size field of a compressed (`C`) frame was read straight from the wire and used to reserve a buffer, so a 6-byte malformed frame advertising a multi-gigabyte size could trigger an allocation large enough to abort the process. The size of the decompressed output is now 100 MiB by default and can be configured by `--max-decompressed-size-bytes` or `VECTOR_MAX_DECOMPRESSED_SIZE_BYTES`. Oversized frames are rejected as a decode error.
 				"""#
 			contributors: ["thomasqueirozb"]
 		},
@@ -303,7 +303,7 @@ releases: "0.57.0": {
 		{
 			type: "fix"
 			description: #"""
-				Sources that can decompress potentially untrusted input now cap compressed and decompressed payload sizes, preventing a small compressed payload (e.g. a gzip/zlib/zstd bomb) from allocating unbounded memory and OOM-killing the Vector process. The decompressed-output cap defaults to 100MiB and can be configured via `--max-decompressed-size-bytes` or `VECTOR_MAX_DECOMPRESSED_SIZE_BYTES`. Affected sources: `http_server`, `heroku_logs`, `prometheus_pushgateway`, `prometheus_remote_write`, `datadog_agent`, `splunk_hec`, `aws_kinesis_firehose`, `fluent`, `logstash`, `vector`, and `opentelemetry` (both its HTTP and gRPC modes). The `datadog_agent`, `splunk_hec`, and `aws_kinesis_firehose` sources additionally now cap the size of the raw (compressed) request body they buffer in memory before decompression, matching `http_server` and `opentelemetry`; oversized requests are rejected with `413 Payload Too Large` instead of being read into memory unbounded. Relatedly, zstd decoders across all affected sources now also bound the decoder's internal window allocation, derived from the decompressed-size cap (and for HTTP-based sources, additionally clamped to the 8 MB ceiling suggested by RFC 9659), so a crafted frame can no longer declare a large `Window_Size` and drive a big allocation before the cap has a chance to trip.
+				Sources that can decompress potentially untrusted input now cap compressed and decompressed payload sizes, preventing a small compressed payload (e.g. a gzip/zlib/zstd bomb) from allocating unbounded memory and OOM-killing the Vector process. The decompressed-output cap defaults to 100 MiB and can be configured via `--max-decompressed-size-bytes` or `VECTOR_MAX_DECOMPRESSED_SIZE_BYTES`. Affected sources: `http_server`, `heroku_logs`, `prometheus_pushgateway`, `prometheus_remote_write`, `datadog_agent`, `splunk_hec`, `aws_kinesis_firehose`, `fluent`, `logstash`, `vector`, and `opentelemetry` (both its HTTP and gRPC modes). The `datadog_agent`, `splunk_hec`, and `aws_kinesis_firehose` sources additionally now cap the size of the raw (compressed) request body they buffer in memory before decompression, matching `http_server` and `opentelemetry`; oversized requests are rejected with `413 Payload Too Large` instead of being read into memory unbounded. Relatedly, zstd decoders across all affected sources now also bound the decoder's internal window allocation, derived from the decompressed-size cap (and for HTTP-based sources, additionally clamped to the 8 MB ceiling suggested by RFC 9659), so a crafted frame can no longer declare a large `Window_Size` and drive a big allocation before the cap has a chance to trip.
 				"""#
 			contributors: ["thomasqueirozb"]
 		},
@@ -337,7 +337,7 @@ releases: "0.57.0": {
 				mode that can reduce memory usage for high-cardinality tag values compared to
 				`mode: exact`. Instead of storing the full tag-value strings, only a 64 bit fingerprint hash of
 				each value is kept. The trade-off is that throughput is slightly impacted due to extra hashing
-				operations, and there is technically a (unlikely) chance of collisions at very high cardinalities
+				operations, and there is a small (unlikely) chance of collisions at very high cardinalities.
 				"""#
 			contributors: ["ArunPiduguDD"]
 		},
