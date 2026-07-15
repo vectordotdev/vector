@@ -360,7 +360,7 @@ impl GcpAuthenticator {
     /// `gcp_pubsub` source (which uses it to break/recycle the gRPC stream).
     pub fn subscribe_token_rotation(&self) -> watch::Receiver<()> {
         let (sender, receiver) = watch::channel(());
-        tokio::spawn(self.clone().token_regenerator(sender));
+        crate::spawn_in_current_span(self.clone().token_regenerator(sender));
         receiver
     }
 
@@ -618,7 +618,7 @@ mod tests {
     async fn fails_missing_credentials_file() {
         let error = build_auth(
             r#"
-                credentials_path = "/nonexistent/path/that/should/not/exist"
+                credentials_path: "/nonexistent/path/that/should/not/exist"
             "#,
         )
         .await
@@ -635,7 +635,7 @@ mod tests {
             .expect("write temp file");
         let path = file.path().to_str().expect("path utf8");
 
-        let error = build_auth(&format!(r#"credentials_path = "{path}""#))
+        let error = build_auth(&format!(r#"credentials_path: "{path}""#))
             .await
             .expect_err("build failed to error");
         assert_downcast_matches!(error, GcpError, GcpError::ParseCredentialsJson { .. });
@@ -650,7 +650,7 @@ mod tests {
             .expect("write temp file");
         let path = file.path().to_str().expect("path utf8");
 
-        let error = build_auth(&format!(r#"credentials_path = "{path}""#))
+        let error = build_auth(&format!(r#"credentials_path: "{path}""#))
             .await
             .expect_err("build failed to error");
         let err = error.downcast::<GcpError>().expect("not a GcpError");
@@ -669,7 +669,7 @@ mod tests {
             .expect("write temp file");
         let path = file.path().to_str().expect("path utf8");
 
-        let error = build_auth(&format!(r#"credentials_path = "{path}""#))
+        let error = build_auth(&format!(r#"credentials_path: "{path}""#))
             .await
             .expect_err("build failed to error");
         let err = error.downcast::<GcpError>().expect("not a GcpError");
@@ -681,12 +681,10 @@ mod tests {
 
     #[tokio::test]
     async fn skip_authentication() {
-        let auth = build_auth(
-            r#"
-                skip_authentication = true
-                api_key = "testing"
-            "#,
-        )
+        let auth = build_auth(indoc::indoc! {r#"
+            skip_authentication: true
+            api_key: "testing"
+        "#})
         .await
         .expect("build_auth failed");
         assert!(matches!(auth, GcpAuthenticator::None));
@@ -696,7 +694,7 @@ mod tests {
     async fn uses_api_key() {
         let key = crate::test_util::random_string(16);
 
-        let auth = build_auth(&format!(r#"api_key = "{key}""#))
+        let auth = build_auth(&format!("api_key: \"{key}\""))
             .await
             .expect("build_auth failed");
         assert!(matches!(auth, GcpAuthenticator::ApiKey(..)));
@@ -721,7 +719,7 @@ mod tests {
 
     #[tokio::test]
     async fn fails_bad_api_key() {
-        let error = build_auth(r#"api_key = "abc%xyz""#)
+        let error = build_auth(r#"api_key: "abc%xyz""#)
             .await
             .expect_err("build failed to error");
         assert_downcast_matches!(error, GcpError, GcpError::InvalidApiKey { .. });
@@ -733,8 +731,8 @@ mod tests {
         uri.to_string()
     }
 
-    async fn build_auth(toml: &str) -> crate::Result<GcpAuthenticator> {
-        let config: GcpAuthConfig = toml::from_str(toml).expect("Invalid TOML");
+    async fn build_auth(yaml: &str) -> crate::Result<GcpAuthenticator> {
+        let config: GcpAuthConfig = serde_yaml::from_str(yaml).expect("Invalid YAML");
         config.build(Scope::COMPUTE).await
     }
 }

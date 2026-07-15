@@ -5,10 +5,8 @@ One paragraph description of the change.
 ## Context
 
 - Link to any previous issues, RFCs, or briefs (do not repeat that context in this RFC).
-
-## Cross cutting concerns
-
 - Link to any ongoing or future work relevant to this change.
+- List any prior art (from other projects or the broader ecosystem), the good and the bad.
 
 ## Scope
 
@@ -20,10 +18,12 @@ One paragraph description of the change.
 
 - List work that is completely out of scope. Use this to keep discussions focused. Please note the "future changes" section at the bottom.
 
-## Pain
+## Motivation
 
 - What internal or external *pain* are we solving?
-- Do not cover benefits of your change, this is covered in the "Rationale" section.
+- Why is this change worth it?
+- What is the impact of not doing this?
+- How does this position us for success in the future?
 
 ## Proposal
 
@@ -38,25 +38,10 @@ One paragraph description of the change.
 - When possible, demonstrate with pseudo code not text.
 - Be specific. Be opinionated. Avoid ambiguity.
 
-## Rationale
-
-- Why is this change worth it?
-- What is the impact of not doing this?
-- How does this position us for success in the future?
-
-## Drawbacks
-
-- Why should we not do this?
-- What kind on ongoing burden does this place on the team?
-
-## Prior Art
-
-- List prior art, the good and bad.
-- Why can't we simply use or copy them?
-
 ## Alternatives
 
 - What other approaches have been considered and why did you not choose them?
+- What are the drawbacks of the chosen approach?
 - How about not doing this at all?
 
 ## Outstanding Questions

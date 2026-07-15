@@ -106,7 +106,9 @@ impl Parser {
                 {
                     parts[0].parse()?
                 } else {
-                    parts[0][1..].parse()?
+                    let mut chars = parts[0].chars();
+                    chars.next();
+                    chars.as_str().parse()?
                 };
 
                 match parse_direction(parts[0])? {
@@ -137,13 +139,14 @@ impl Parser {
 }
 
 fn parse_sampling(input: &str) -> Result<f64, ParseError> {
-    if !input.starts_with('@') || input.len() < 2 {
-        return Err(ParseError::Malformed(
+    let rest = input
+        .strip_prefix('@')
+        .filter(|s| !s.is_empty())
+        .ok_or(ParseError::Malformed(
             "expected non empty '@'-prefixed sampling component",
-        ));
-    }
+        ))?;
 
-    let num: f64 = input[1..].parse()?;
+    let num: f64 = rest.parse()?;
     if num.is_sign_positive() {
         Ok(num)
     } else {
@@ -153,16 +156,14 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
 
 /// Statsd (and dogstatsd) support bare, single and multi-value tags.
 fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
-    if !input.starts_with('#') || input.len() < 2 {
-        return Err(ParseError::Malformed(
+    let rest = input
+        .strip_prefix('#')
+        .filter(|s| !s.is_empty())
+        .ok_or(ParseError::Malformed(
             "expected non empty '#'-prefixed tags component",
-        ));
-    }
+        ))?;
 
-    Ok(input[1..]
-        .split(',')
-        .map(extract_tag_key_and_value)
-        .collect())
+    Ok(rest.split(',').map(extract_tag_key_and_value).collect())
 }
 
 fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
@@ -444,6 +445,15 @@ mod test {
                 MetricValue::Gauge { value: 10.0 },
             )),
         );
+    }
+
+    #[test]
+    fn gauge_multibyte_utf8_prefix_is_error_not_panic() {
+        // A multi-byte UTF-8 character as the value prefix must return a parse
+        // error, not panic with "byte index 1 is not a char boundary".
+        let input = std::str::from_utf8(b"m:\xc3\xa9|g").unwrap();
+        assert!(parse(input).is_err());
+        assert!(parse("m:é|g").is_err());
     }
 
     #[test]

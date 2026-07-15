@@ -4,7 +4,6 @@ components: sinks: postgres: {
 	title: "PostgreSQL"
 
 	classes: {
-		commonly_used: false
 		delivery:      "exactly_once"
 		development:   "beta"
 		egress_method: "batch"

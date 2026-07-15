@@ -223,18 +223,27 @@ fn make_remote_write_event(
     tenant_id: Option<&Template>,
     metric: Metric,
 ) -> Option<RemoteWriteMetric> {
-    let tenant_id = tenant_id.and_then(|template| {
-        template
-            .render_string(&metric)
-            .map_err(|error| {
+    let tenant_id = match tenant_id {
+        None => None,
+        Some(template) => match template.render_string(&metric) {
+            Ok(s) => Some(s),
+            Err(error) => {
+                let confined = matches!(
+                    error,
+                    crate::template::TemplateRenderingError::Confined { .. }
+                );
                 emit!(TemplateRenderingError {
                     error,
                     field: Some("tenant_id"),
-                    drop_event: true,
-                })
-            })
-            .ok()
-    });
+                    drop_event: confined,
+                });
+                if confined {
+                    return None; // Confined — intentional security drop
+                }
+                None
+            }
+        },
+    };
 
     Some(RemoteWriteMetric { metric, tenant_id })
 }

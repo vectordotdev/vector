@@ -4,7 +4,6 @@ components: sinks: amqp: {
 	title: "AMQP"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "dynamic"

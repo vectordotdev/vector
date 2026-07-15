@@ -14,7 +14,10 @@ use crate::{
             grpc::Service,
             http::{build_warp_filter, run_http_server},
         },
-        util::grpc::run_grpc_server_with_routes,
+        util::{
+            decompression::max_decompressed_size_bytes,
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        },
     },
 };
 use futures::FutureExt;
@@ -173,12 +176,17 @@ pub struct GrpcConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub keepalive: GrpcKeepaliveConfig,
 }
 
 fn example_grpc_config() -> GrpcConfig {
     GrpcConfig {
         address: "0.0.0.0:4317".parse().unwrap(),
         tls: None,
+        keepalive: GrpcKeepaliveConfig::default(),
     }
 }
 
@@ -295,7 +303,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: logs_deserializer.clone(),
         })
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -304,7 +312,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: metrics_deserializer.clone(),
         })
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -313,7 +321,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: traces_deserializer.clone(),
         })
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let mut builder = RoutesBuilder::default();
         builder
@@ -325,6 +333,7 @@ impl SourceConfig for OpentelemetryConfig {
             self.grpc.address,
             grpc_tls_settings,
             builder.routes(),
+            self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
         )
         .map_err(|error| {

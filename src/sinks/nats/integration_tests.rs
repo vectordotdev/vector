@@ -38,6 +38,7 @@ fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
         auth: None,
         request: Default::default(),
         jetstream: false.into(),
+        confinement: Default::default(),
     }
 }
 

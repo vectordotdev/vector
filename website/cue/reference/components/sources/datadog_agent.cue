@@ -10,8 +10,7 @@ components: sources: datadog_agent: {
 		"""
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"

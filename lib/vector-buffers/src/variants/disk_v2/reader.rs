@@ -479,6 +479,21 @@ where
         {
             match me {
                 MarkerError::MonotonicityViolation => {
+                    // Reaching here means the reader saw a record id that did not
+                    // advance past the last acked id, which crashes the process and
+                    // can wedge it in a restart loop. The assertion files the state
+                    // before the panic discards it.
+                    #[cfg(feature = "antithesis-disk-asserts")]
+                    {
+                        #![allow(clippy::disallowed_types)] // once_cell::Lazy
+                        antithesis_sdk::assert_unreachable!(
+                            "reader never sees a record id that breaks monotonicity",
+                            &serde_json::json!({
+                                "record_id": record_id,
+                                "last_reader_record_id": self.last_reader_record_id,
+                            })
+                        );
+                    }
                     panic!("record ID monotonicity violation detected; this is a serious bug")
                 }
             }
@@ -521,6 +536,17 @@ where
         let decrease_amount = bytes_read.map_or_else(
             || metadata.len(),
             |bytes_read| {
+                // A file shorter than bytes_read makes the delta below underflow
+                // and feed a wrapped value into decrement_total_buffer_size.
+                #[cfg(feature = "antithesis-disk-asserts")]
+                {
+                    #![allow(clippy::disallowed_types)] // once_cell::Lazy
+                    antithesis_sdk::assert_always_greater_than_or_equal_to!(
+                        metadata.len(),
+                        bytes_read,
+                        "reader data-file size delta never underflows"
+                    );
+                }
                 let size_delta = metadata.len() - bytes_read;
                 if size_delta > 0 {
                     debug!(
@@ -957,6 +983,9 @@ where
     /// If an error occurred while reading a record, an error variant will be returned describing
     /// the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    // The inline antithesis assertion blocks push this over the line limit. Their
+    // source lines count even when the feature is off, so the allow is unconditional.
+    #[allow(clippy::too_many_lines)]
     pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
         let mut force_check_pending_data_files = false;
 
@@ -1033,6 +1062,20 @@ where
                     // the caller, but they might be expecting a read-after-write behavior, so we
                     // return the error to them after ensuring that we roll to the next file first.
                     if e.is_bad_read() {
+                        // The reader hit a corrupted, torn, or partially-written
+                        // record and is abandoning the rest of this file, the
+                        // recovery path that drives the skip-accounting hazards.
+                        #[cfg(feature = "antithesis-disk-asserts")]
+                        {
+                            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+                            antithesis_sdk::assert_sometimes!(
+                                true,
+                                "the reader skips a torn or corrupted record and rolls the file",
+                                &serde_json::json!({
+                                    "last_reader_record_id": self.last_reader_record_id,
+                                })
+                            );
+                        }
                         self.roll_to_next_data_file();
                     }
 
@@ -1104,6 +1147,24 @@ where
             .as_mut()
             .expect("reader should exist after `ensure_ready_for_read`");
         let mut record = reader.read_record(token)?;
+
+        // A record only reaches delivery after `try_next_record` accepted it on the
+        // `Valid` arm, which rejects a zero-length record and issues a token whose
+        // byte count is the eight-byte length delimiter plus the validated payload.
+        // A delivered record whose consumed span is at most the bare delimiter means
+        // a corrupted or empty record slipped past validation.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always_or_unreachable!(
+                record_bytes > 8,
+                "no corrupted or empty record is delivered to the reader",
+                &serde_json::json!({
+                    "record_id": record_id,
+                    "record_bytes": record_bytes,
+                })
+            );
+        }
 
         let record_events: u64 = record
             .event_count()

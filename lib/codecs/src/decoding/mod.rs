@@ -311,7 +311,7 @@ pub enum DeserializerConfig {
     /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
     Influxdb(InfluxdbDeserializerConfig),
 
-    /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+    /// Decodes the raw bytes as an [Apache Avro][apache_avro] message.
     ///
     /// [apache_avro]: https://avro.apache.org/
     Avro {
