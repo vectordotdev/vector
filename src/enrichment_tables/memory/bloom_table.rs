@@ -1,4 +1,6 @@
 use std::{
+    num::NonZeroU64,
+    pin::Pin,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -6,8 +8,11 @@ use std::{
 use async_trait::async_trait;
 use bloomy::BloomFilter;
 use bytes::Bytes;
-use futures::{StreamExt, stream::BoxStream};
-use tokio::time::interval;
+use futures::{
+    Stream, StreamExt,
+    stream::{self, BoxStream},
+};
+use tokio::time::{Instant, interval};
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
 use vector_lib::{
@@ -34,6 +39,7 @@ use crate::enrichment_tables::memory::{
 pub(super) struct BloomMemoryTable {
     filter: Arc<RwLock<BloomFilter<String>>>,
     pub(super) config: MemoryConfig,
+    bloom_config: BloomMemoryConfig,
 }
 
 /// Configuration of bloom filter for memory table.
@@ -53,7 +59,32 @@ impl BloomMemoryTable {
     ) -> crate::Result<Self> {
         let filter = Arc::new(RwLock::new(BloomFilter::new(bloom_config.max_entries)));
 
-        Ok(Self { config, filter })
+        Ok(Self {
+            config,
+            filter,
+            bloom_config,
+        })
+    }
+
+    /// Creates a new [BloomMemoryTable] based on the provided config and previous state.
+    pub(super) fn from_previous_state(
+        config: MemoryConfig,
+        bloom_config: BloomMemoryConfig,
+        prev_state: Box<dyn std::any::Any + Send + Sync>,
+    ) -> crate::Result<Self> {
+        if let Ok(prev_memory) = prev_state.downcast::<BloomMemoryTable>() {
+            if prev_memory.bloom_config == bloom_config {
+                Ok(Self {
+                    filter: prev_memory.filter,
+                    config,
+                    bloom_config,
+                })
+            } else {
+                Self::new(config, bloom_config)
+            }
+        } else {
+            Self::new(config, bloom_config)
+        }
     }
 
     fn handle_value(&self, value: ObjectMap) {
@@ -140,6 +171,10 @@ impl Table for BloomMemoryTable {
     fn needs_reload(&self) -> bool {
         false
     }
+
+    fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        Some(Box::new(self.clone()))
+    }
 }
 
 impl std::fmt::Debug for BloomMemoryTable {
@@ -153,12 +188,15 @@ impl StreamSink<Event> for BloomMemoryTable {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
-        let mut flush_interval = IntervalStream::new(interval(
-            self.config
-                .flush_interval
-                .map(Duration::from_secs)
-                .unwrap_or(Duration::MAX),
-        ));
+        let mut flush_interval: Pin<Box<dyn Stream<Item = Instant> + Send>> = self
+            .config
+            .flush_interval
+            .map(NonZeroU64::get)
+            .map(Duration::from_secs)
+            .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
+                Box::pin(IntervalStream::new(interval(d)))
+            })
+            .unwrap_or(Box::pin(stream::empty()));
 
         loop {
             tokio::select! {

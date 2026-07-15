@@ -231,7 +231,10 @@ impl MemoryConfig {
         }
     }
 
-    pub(super) async fn get_or_build_bloom(&self) -> crate::Result<BloomMemoryTable> {
+    pub(super) async fn get_or_build_bloom(
+        &self,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
+    ) -> crate::Result<BloomMemoryTable> {
         let mut boxed_bloom = self.bloom.lock().await;
         let Some(TableFilter::Bloom(bloom)) = &self.filter else {
             panic!("No bloom");
@@ -240,10 +243,15 @@ impl MemoryConfig {
             Ok(*boxed_bloom.clone())
         } else {
             Ok(*boxed_bloom
-                .insert(Box::new(BloomMemoryTable::new(
-                    self.clone(),
-                    bloom.clone(),
-                )?))
+                .insert(if let Some(prev) = prev_state {
+                    Box::new(BloomMemoryTable::from_previous_state(
+                        self.clone(),
+                        bloom.clone(),
+                        prev,
+                    )?)
+                } else {
+                    Box::new(BloomMemoryTable::new(self.clone(), bloom.clone())?)
+                })
                 .clone())
         }
     }
@@ -262,7 +270,12 @@ impl EnrichmentTableConfig for MemoryConfig {
                 }
                 Ok(Box::new(self.get_or_build_cuckoo(prev_state).await?))
             }
-            Some(TableFilter::Bloom(_)) => Ok(Box::new(self.get_or_build_bloom().await?)),
+            Some(TableFilter::Bloom(_)) => {
+                if self.source_config.is_some() {
+                    return Err("Source functionality is not supported for bloom filter".into());
+                }
+                Ok(Box::new(self.get_or_build_bloom(prev_state).await?))
+            }
             None => Ok(Box::new(self.get_or_build_memory(prev_state).await)),
         }
     }
@@ -305,7 +318,7 @@ impl SinkConfig for MemoryConfig {
                 VectorSink::from_event_streamsink(self.get_or_build_cuckoo(None).await?)
             }
             Some(TableFilter::Bloom(_)) => {
-                VectorSink::from_event_streamsink(self.get_or_build_bloom().await?)
+                VectorSink::from_event_streamsink(self.get_or_build_bloom(None).await?)
             }
             None => VectorSink::from_event_streamsink(self.get_or_build_memory(None).await),
         };
