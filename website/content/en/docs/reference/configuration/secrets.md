@@ -33,8 +33,8 @@ sources:
 
 Here, `auth.access_key_id` and `auth.secret_access_key` are resolved using secrets named `aws_access_key_id` and `aws_secret_access_key`, retrieved from the `backend_1` secret backend. You can reference the same backend from multiple places in your configuration, and you can configure multiple backends if you need to pull secrets from more than one source.
 
-The secret name portion supports `.`, `-`, and `/` characters, so backends that key secrets hierarchically (such as the `directory` backend, below) can be referenced like `SECRET[backend_1.nested/secret_name]`.
+The backend name portion only supports letters, digits, and `_`; backend names containing `-` aren't addressable from a `SECRET[...]` reference ([known issue](https://github.com/vectordotdev/vector/issues/25849)), even though `-` is otherwise a valid character in a backend's component ID. The secret name portion is more permissive and supports `.`, `-`, and `/` characters, so backends that key secrets hierarchically (such as the `directory` backend, below) can be referenced like `SECRET[backend_1.nested/secret_name]`.
 
-If a `SECRET[...]` reference can't be resolved, for example because the backend doesn't recognize the requested name, returns an error, or returns an empty value, Vector logs the error and exits during configuration loading. Secrets are never partially applied.
+Text that matches the `SECRET[<backend name>.<secret name>]` grammar but can't be resolved, for example because the backend doesn't recognize the requested secret name, returns an error, or returns an empty value, causes Vector to log the error and exit during configuration loading; secrets are never partially applied. Text that doesn't match the grammar at all, for example a backend name containing `-`, is left in the configuration as a literal string instead, with no resolution error.
 
 {{< config/group group="secrets" >}}
