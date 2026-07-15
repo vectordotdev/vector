@@ -9,6 +9,13 @@ By default, environment variable interpolation is disabled (the default changed 
 `--dangerously-allow-env-var-interpolation` to the `vector` CLI, or set the environment variable
 `VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true`.
 
+{{< warning >}}
+Environment variables can be read by any user that is able to read `/proc/<PID>/environ` (or similar
+in other operating systems) of
+the running Vector process, regardless of whether interpolation is enabled. Operators are
+advised not to include sensitive data in environment variables and are encouraged to use the
+[secrets backend](/docs/reference/configuration/secrets/) instead.
+{{< /warning >}}
 
 ## Usage
 
@@ -89,7 +96,9 @@ environment variable example.
 ## Security Restrictions
 
 Environment variable interpolation is disabled by default. Only enable it
-with `--dangerously-allow-env-var-interpolation` if you fully control every environment variable accessible to the Vector process.
+with `--dangerously-allow-env-var-interpolation` if you fully control every environment variable accessible
+to the Vector process and accept that environment variables may leak to users that have access to
+the Vector process.
 
 Even when enabled, Vector prevents some security issues related to environment variable interpolation by rejecting environment variables that contain newline
 characters. This also prevents injection of multi-line configuration blocks.
@@ -99,7 +108,9 @@ Vector does not validate or escape other characters in interpolated values. Valu
 Operators are responsible for controlling the content of interpolated environment variables.
 
 If you need to inject multi-line configuration blocks, use a config pre-processing step with a tool like `envsubst`.
-This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector:
+This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector.
+Note that `envsubst` only expands plain `$VAR` and `${VAR}` references; it does not understand Vector's extended syntax
+such as `${VAR:-default}` or `${VAR:?err}`, which are passed through unchanged.
 
 ```shell
 # config_template.yaml
