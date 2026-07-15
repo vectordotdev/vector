@@ -110,8 +110,7 @@ Operators are responsible for controlling the content of interpolated environmen
 If you need to inject multi-line configuration blocks, use a config pre-processing step with a tool like `envsubst`.
 This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector.
 Note that `envsubst` only expands plain `$VAR` and `${VAR}` references; it does not understand Vector's extended syntax
-such as `${VAR:-default}` or `${VAR:?err}`, which are passed through unchanged. If your config relies on those forms,
-use a preprocessor that implements Vector's interpolation grammar instead.
+such as `${VAR:-default}` or `${VAR:?err}`, which are passed through unchanged.
 
 ```shell
 # config_template.yaml
