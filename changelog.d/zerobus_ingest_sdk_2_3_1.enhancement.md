@@ -1,3 +1,3 @@
-Updated the Databricks Zerobus Ingest SDK dependency to version 2.3.1.
+The `databricks_zerobus` sink now has OTel v2 compatibility.
 
 authors: yorickvanzweeden
