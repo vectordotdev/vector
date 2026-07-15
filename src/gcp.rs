@@ -329,9 +329,8 @@ impl GcpAuthenticator {
     /// Returns `None` for the `ApiKey` and `None` variants — those callers
     /// either don't need a header or attach the key via the URI.
     ///
-    /// This intentionally returns only the bearer; callers on this path don't
-    /// forward the `x-goog-user-project` quota header today. Sinks that go
-    /// through `apply()` get the full header set.
+    /// Returns only the bearer; callers that also need the
+    /// `x-goog-user-project` quota header should use [`Self::auth_headers`].
     pub fn auth_header(&self) -> Option<HeaderValue> {
         match self {
             Self::Credentials(inner) => inner
@@ -343,6 +342,25 @@ impl GcpAuthenticator {
                 .cloned(),
             Self::ApiKey(_) | Self::None => None,
         }
+    }
+
+    /// Full cached header set (bearer + any `x-goog-user-project`) for callers
+    /// that build their own request types and want every SDK-supplied header,
+    /// not just the bearer — e.g. the pubsub source's tonic interceptor.
+    /// Returns `None` for the `ApiKey` and `None` variants.
+    pub fn auth_headers(&self) -> Option<HeaderMap> {
+        match self {
+            Self::Credentials(inner) => Some(inner.state.read().unwrap().auth_headers.clone()),
+            Self::ApiKey(_) | Self::None => None,
+        }
+    }
+
+    /// Whether a 401 can be self-healed by refreshing credentials. Only the
+    /// `Credentials` variant fetches tokens; for `ApiKey` / `None`,
+    /// `force_refresh` is a no-op, so retrying their 401s just burns the retry
+    /// budget rather than recovering.
+    pub const fn is_refreshable(&self) -> bool {
+        matches!(self, Self::Credentials(_))
     }
 
     pub fn apply_uri(&self, uri: &mut Uri) {
@@ -628,19 +646,46 @@ fn build_credentials_from_json(
         .to_string();
     let scopes = [scope.to_string()];
     let json_owned = json.clone();
+    // Honor GOOGLE_CLOUD_QUOTA_PROJECT on the explicit-file path. Unlike the
+    // implicit ADC builder, the per-type builders below don't consult this env
+    // var themselves; setting it via `with_quota_project_id` overrides any
+    // `quota_project_id` in the file (env-over-file, matching ADC precedence)
+    // so `fetch_auth_headers` emits `x-goog-user-project`. Absent the var, the
+    // file's own `quota_project_id` (if any) still flows through.
+    let quota_project = std::env::var("GOOGLE_CLOUD_QUOTA_PROJECT")
+        .ok()
+        .filter(|s| !s.is_empty());
+    let quota_project = quota_project.as_deref();
     let creds = match ty.as_str() {
-        "service_account" => ServiceAccountBuilder::new(json_owned)
-            .with_access_specifier(AccessSpecifier::from_scopes(scopes))
-            .build_access_token_credentials(),
-        "external_account" => ExternalAccountBuilder::new(json_owned)
-            .with_scopes(scopes)
-            .build_access_token_credentials(),
-        "authorized_user" => UserAccountBuilder::new(json_owned)
-            .with_scopes(scopes)
-            .build_access_token_credentials(),
-        "impersonated_service_account" => ImpersonatedBuilder::new(json_owned)
-            .with_scopes(scopes)
-            .build_access_token_credentials(),
+        "service_account" => {
+            let mut builder = ServiceAccountBuilder::new(json_owned)
+                .with_access_specifier(AccessSpecifier::from_scopes(scopes));
+            if let Some(qp) = quota_project {
+                builder = builder.with_quota_project_id(qp);
+            }
+            builder.build_access_token_credentials()
+        }
+        "external_account" => {
+            let mut builder = ExternalAccountBuilder::new(json_owned).with_scopes(scopes);
+            if let Some(qp) = quota_project {
+                builder = builder.with_quota_project_id(qp);
+            }
+            builder.build_access_token_credentials()
+        }
+        "authorized_user" => {
+            let mut builder = UserAccountBuilder::new(json_owned).with_scopes(scopes);
+            if let Some(qp) = quota_project {
+                builder = builder.with_quota_project_id(qp);
+            }
+            builder.build_access_token_credentials()
+        }
+        "impersonated_service_account" => {
+            let mut builder = ImpersonatedBuilder::new(json_owned).with_scopes(scopes);
+            if let Some(qp) = quota_project {
+                builder = builder.with_quota_project_id(qp);
+            }
+            builder.build_access_token_credentials()
+        }
         other => {
             return Err(GcpError::UnsupportedCredentialsType {
                 ty: other.to_string(),
@@ -649,6 +694,30 @@ fn build_credentials_from_json(
         }
     };
     creds.context(InvalidCredentialsSnafu).map_err(Into::into)
+}
+
+#[cfg(test)]
+impl GcpAuthenticator {
+    /// A `Credentials` authenticator for tests. `is_refreshable()` is `true`,
+    /// but `force_refresh` is a throttled no-op (its `last_refresh_success` is
+    /// recent), so it never performs a network token fetch. Lets tests exercise
+    /// the 401 self-heal retry path without reaching STS.
+    pub(crate) fn test_refreshable() -> Self {
+        let mut auth_headers = HeaderMap::new();
+        auth_headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer test-token"));
+        Self::Credentials(Arc::new(InnerCreds {
+            source: CredSource::Implicit {
+                scope: String::from("test"),
+            },
+            state: RwLock::new(CredState {
+                auth_headers,
+                cred_type: String::from("test"),
+                project_id: None,
+            }),
+            last_refresh_success: Mutex::new(Some(Instant::now())),
+            refresh_lock: AsyncMutex::new(()),
+        }))
+    }
 }
 
 #[cfg(test)]

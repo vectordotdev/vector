@@ -6,7 +6,7 @@ use std::{collections::HashMap, io};
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use http::{
-    Request, StatusCode, Uri,
+    Request, Uri,
     header::{self, HeaderName, HeaderValue},
 };
 use hyper::Body;
@@ -622,8 +622,6 @@ impl ChronicleService {
 
 #[derive(Debug, Snafu)]
 pub enum ChronicleResponseError {
-    #[snafu(display("Server responded with an error: {}", code))]
-    ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
     HttpError { error: crate::http::HttpError },
 }
@@ -652,17 +650,17 @@ impl Service<ChronicleRequest> for ChronicleService {
         let mut client = self.client.clone();
         Box::pin(async move {
             match client.call(http_request).await {
-                Ok(response) => {
-                    let status = response.status();
-                    if status.is_success() {
-                        Ok(GcsResponse {
-                            inner: response,
-                            metadata,
-                        })
-                    } else {
-                        Err(ChronicleResponseError::ServerError { code: status })
-                    }
-                }
+                // Return every HTTP response (success or not) so the retry
+                // logic's `should_retry_response` decides based on status — in
+                // particular so a 401 triggers the credential self-heal rather
+                // than being surfaced as a terminal error the retry layer never
+                // inspects. `GcsResponse` maps the status to the right event
+                // disposition (2xx=Delivered, 5xx=Errored, else Rejected).
+                // Only a transport failure is a hard error.
+                Ok(response) => Ok(GcsResponse {
+                    inner: response,
+                    metadata,
+                }),
                 Err(error) => Err(ChronicleResponseError::HttpError { error }),
             }
         })

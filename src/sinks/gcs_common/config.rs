@@ -195,7 +195,10 @@ impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Reques
                 // fresh token instead of burning a retry slot on the stale
                 // one. See `GcpAuthRetryLogic::should_retry_response` for
                 // the full rationale (block_in_place + in-flight coalescing).
-                if let Some(auth) = &self.auth {
+                // Skip the refresh for non-refreshable creds (api_key / none),
+                // where it would be a no-op — the 401 still retries here, which
+                // is the historical GCS behavior.
+                if let Some(auth) = self.auth.as_ref().filter(|a| a.is_refreshable()) {
                     let auth = auth.clone();
                     tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on(async move {
@@ -323,13 +326,19 @@ where
             // — honor it. `None` means "do not retry any errors" — honor it,
             // and skip the refresh since the failed request will not be
             // re-issued.
-            let self_heal = match &self.retry_strategy {
-                RetryStrategy::None => false,
-                RetryStrategy::Default | RetryStrategy::All => true,
-                RetryStrategy::Custom { status_codes } => {
-                    status_codes.contains(&StatusCode::UNAUTHORIZED)
-                }
-            };
+            // Only self-heal when the credentials can actually be refreshed.
+            // For `api_key` / `skip_authentication`, `force_refresh` is a
+            // no-op, so retrying a 401 would just burn the retry budget on the
+            // same doomed request; fall through to `retry_action` instead
+            // (which is `DontRetry` for a 401 under `Default`).
+            let self_heal = self.auth.is_refreshable()
+                && match &self.retry_strategy {
+                    RetryStrategy::None => false,
+                    RetryStrategy::Default | RetryStrategy::All => true,
+                    RetryStrategy::Custom { status_codes } => {
+                        status_codes.contains(&StatusCode::UNAUTHORIZED)
+                    }
+                };
             if self_heal {
                 // Synchronously wait for the refresh so the retry uses a
                 // fresh token rather than burning a retry slot on the same
@@ -386,16 +395,17 @@ mod tests {
     }
 
     // Verifies the (HTTP status × RetryStrategy) decision matrix in
-    // `GcpAuthRetryLogic::should_retry_response`. The auth handle is
-    // `GcpAuthenticator::None`, which makes `force_refresh` a no-op — the
-    // matrix only asserts which `RetryAction` variant fires, not the side
-    // effect.
+    // `GcpAuthRetryLogic::should_retry_response`. The auth handle is a
+    // refreshable (`Credentials`) test authenticator whose `force_refresh` is
+    // a throttled no-op — so the 401 self-heal path is exercised (and
+    // classifies as `Retry`) without an STS round-trip. The matrix only
+    // asserts which `RetryAction` variant fires, not the side effect.
     //
     // `multi_thread` flavor: the self-heal path uses `block_in_place`, which
     // panics on a current-thread runtime.
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn retry_logic_matrix() {
-        let auth = GcpAuthenticator::None;
+        let auth = GcpAuthenticator::test_refreshable();
         let custom_401 = RetryStrategy::Custom {
             status_codes: vec![StatusCode::UNAUTHORIZED],
         };
@@ -479,6 +489,27 @@ mod tests {
                 classify(&action),
                 expected,
                 "status={status}, strategy={strategy:?}",
+            );
+        }
+    }
+
+    // With non-refreshable auth (`api_key` / `skip_authentication`),
+    // `force_refresh` can't recover a 401, so a `Default`-strategy 401 must NOT
+    // self-heal into a retry — otherwise an invalid key burns the whole retry
+    // budget on a doomed request. `All`/`Custom{401}` still retry (explicit
+    // user choice), just without the pointless refresh.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn non_refreshable_401_does_not_retry_under_default() {
+        for auth in [
+            GcpAuthenticator::None,
+            GcpAuthenticator::ApiKey("key".into()),
+        ] {
+            let logic = gcp_hyper_response_retry_logic::<Bytes>(RetryStrategy::Default, auth);
+            let action = logic.should_retry_response(&response(StatusCode::UNAUTHORIZED));
+            assert_eq!(
+                classify(&action),
+                Action::DontRetry,
+                "non-refreshable Default 401 should not retry",
             );
         }
     }
