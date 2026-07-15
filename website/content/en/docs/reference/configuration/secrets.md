@@ -9,7 +9,7 @@ show_toc: true
 
 Secrets management lets you keep sensitive configuration values like API keys, passwords, and tokens out of your Vector configuration files. Instead of writing a secret's plaintext value directly into a config option, you configure a secret backend and reference the secret with `SECRET[<backend name>.<secret name>]`. Vector resolves these references by querying the backend when it loads the configuration, before any other config processing happens.
 
-This is the recommended way to supply secrets to Vector, in preference to [environment variable interpolation](/docs/reference/environment_variables/), which can potentially leak variables, lead to template injection, and other security issues. Secret backends never write the resolved value to the environment and are not susceptible to such issues.
+This is the recommended way to supply secrets to Vector, in preference to [environment variable interpolation](/docs/reference/environment_variables/). Unlike environment variables, secret values are never written to the Vector process's environment, so they can't leak to anyone with access to `/proc/<PID>/environ` or similar. Note that, like environment variable interpolation, secret resolution substitutes the retrieved value directly into the configuration text before it's parsed, so a secret value containing YAML/TOML syntax can still alter the parsed configuration; only pull secrets from backends and paths you trust.
 
 ## Usage
 
