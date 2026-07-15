@@ -26,5 +26,16 @@ runs:
         REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ inputs.commit_sha }}"
         LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
 
-        docker pull "${REMOTE_IMAGE}"
+        for attempt in 1 2 3; do
+          if docker pull "${REMOTE_IMAGE}"; then
+            break
+          fi
+          if [[ "${attempt}" == 3 ]]; then
+            echo "::error::Failed to pull ${REMOTE_IMAGE} after ${attempt} attempts"
+            exit 1
+          fi
+          echo "Pull failed (attempt ${attempt}/3), retrying in 10s..."
+          sleep 10
+        done
+
         docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"
