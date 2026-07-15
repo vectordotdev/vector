@@ -299,6 +299,37 @@ fn publish_supports_end_to_end_acknowledgements(qos: QoS) -> bool {
     qos != QoS::AtMostOnce
 }
 
+/// Whether a packet rumqttc had buffered (in `state.events`) when the
+/// connection died should survive into the next connection instead of being
+/// scrubbed by `handle_connection_lost`.
+///
+/// The rule is: keep exactly the publishes that would be lost outright if
+/// dropped, scrub everything that either gets redelivered or would corrupt
+/// the new connection's state.
+///
+/// - A QoS 0 publish is fire-and-forget: it has no acknowledgement and no
+///   session redelivery in either ack mode, so dropping it loses it
+///   permanently. Kept. (It also never enters the finalizer or ack path, so
+///   keeping it can't leak a stale packet id anywhere.)
+/// - A QoS 1/2 publish in auto-ack mode may already have had its ack queued
+///   or sent by rumqttc the moment it was buffered, in which case the broker
+///   never redelivers it. Kept.
+/// - A QoS 1/2 publish in manual-ack mode has not been acked (acks are only
+///   sent after end-to-end finalization, and this publish was never even
+///   yielded), so the resumed session redelivers it. Dropped: keeping it
+///   would tag it with the new connection's generation and eventually ack a
+///   packet id from the dead connection on the new one.
+/// - Everything else is stale control traffic; most importantly a SubAck,
+///   which would falsely confirm the new connection's (re)subscribe. Dropped.
+fn keep_buffered_event_after_disconnect(event: &MqttEvent, acknowledgements: bool) -> bool {
+    match event {
+        MqttEvent::Incoming(Incoming::Publish(publish)) => {
+            !acknowledgements || publish.qos == QoS::AtMostOnce
+        }
+        _ => false,
+    }
+}
+
 fn publish_ack_decision(acknowledgements: bool, qos: QoS) -> PublishAckDecision {
     let defer_ack = acknowledgements && publish_supports_end_to_end_acknowledgements(qos);
 
@@ -703,31 +734,13 @@ impl MqttSource {
             // yielded *after* the next ConnAck and be indistinguishable from
             // new-connection traffic. Everything buffered here belongs to the
             // dead connection (the reconnect ConnAck is returned directly by
-            // `poll()`, never through this buffer), but what's safe to drop
-            // depends on the ack mode:
-            if self.acknowledgements {
-                // Manual-ack mode: nothing buffered has been acked (acks are
-                // only sent after end-to-end finalization, and these publishes
-                // were never even yielded), so the broker redelivers all of
-                // it. Dropping everything prevents a stale Publish from being
-                // tagged with the new generation (its stale packet id then
-                // acked on the new connection) and a stale SubAck from
-                // falsely confirming the new connection's subscribe.
-                connection.state.events.clear();
-            } else {
-                // Auto-ack mode: rumqttc queues the PUBACK the moment it
-                // buffers a publish, so it may already be on the wire and the
-                // broker is then allowed to never redeliver -- dropping a
-                // buffered publish here would lose it outright. Keep the
-                // publishes for processing (there's no generation-sensitive
-                // ack machinery in this mode to confuse); drop only the
-                // stale non-publish events, so e.g. a stale SubAck can't
-                // falsely confirm the new connection's subscribe.
-                connection
-                    .state
-                    .events
-                    .retain(|event| matches!(event, MqttEvent::Incoming(Incoming::Publish(_))));
-            }
+            // `poll()`, never through this buffer); keep only what would be
+            // lost outright if dropped -- see
+            // `keep_buffered_event_after_disconnect`.
+            connection
+                .state
+                .events
+                .retain(|event| keep_buffered_event_after_disconnect(event, self.acknowledgements));
         }
         // The reconnect any scheduled forced-disconnect was asking for has
         // now happened; no need to send another once reconnected.
@@ -883,6 +896,50 @@ mod tests {
         let mut publish = Publish::new("topic", QoS::AtLeastOnce, vec![1, 2, 3]);
         publish.pkid = pkid;
         publish
+    }
+
+    // What survives the `state.events` scrub on disconnect: exactly the
+    // publishes that would be lost outright if dropped. QoS 0 has no
+    // redelivery in either mode; QoS 1/2 may already be acked in auto-ack
+    // mode (broker never redelivers) but is guaranteed unacked in manual-ack
+    // mode (broker redelivers, and keeping it would leak a stale packet id
+    // into the new connection). Non-publish events are always stale --
+    // keeping a SubAck would falsely confirm the new connection's subscribe.
+    #[test]
+    fn buffered_event_scrub_matrix_for_disconnect() {
+        let publish_with_qos = |qos| {
+            let mut publish = publish(7);
+            publish.qos = qos;
+            MqttEvent::Incoming(Incoming::Publish(publish))
+        };
+        let suback = MqttEvent::Incoming(Incoming::SubAck(rumqttc::SubAck::new(
+            7,
+            vec![rumqttc::SubscribeReasonCode::Success(QoS::AtLeastOnce)],
+        )));
+        let outgoing = MqttEvent::Outgoing(rumqttc::Outgoing::PingReq);
+
+        for (event, acknowledgements, keep) in [
+            // QoS 0 is never redelivered: kept in both modes.
+            (publish_with_qos(QoS::AtMostOnce), true, true),
+            (publish_with_qos(QoS::AtMostOnce), false, true),
+            // QoS 1/2 in manual-ack mode: unacked, redelivered -- dropped.
+            (publish_with_qos(QoS::AtLeastOnce), true, false),
+            (publish_with_qos(QoS::ExactlyOnce), true, false),
+            // QoS 1/2 in auto-ack mode: possibly already acked -- kept.
+            (publish_with_qos(QoS::AtLeastOnce), false, true),
+            (publish_with_qos(QoS::ExactlyOnce), false, true),
+            // Stale control traffic: dropped in both modes.
+            (suback.clone(), true, false),
+            (suback, false, false),
+            (outgoing.clone(), true, false),
+            (outgoing, false, false),
+        ] {
+            assert_eq!(
+                keep_buffered_event_after_disconnect(&event, acknowledgements),
+                keep,
+                "event {event:?} with acknowledgements={acknowledgements}"
+            );
+        }
     }
 
     #[test]
