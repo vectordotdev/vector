@@ -20,6 +20,10 @@ releases: "0.57.0": {
 		  `dangerously_allow_unconfined_template_resolution: true` to opt out.
 		"""
 
+	known_issues: [
+		"`vector validate --no-environment` doesn't catch unconfined routing templates (see the template confinement breaking change above); run `vector validate` without that flag to catch confinement issues before startup.",
+	]
+
 	changelog: [
 		{
 			type: "fix"

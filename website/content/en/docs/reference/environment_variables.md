@@ -9,6 +9,13 @@ By default, environment variable interpolation is disabled (the default changed 
 `--dangerously-allow-env-var-interpolation` to the `vector` CLI, or set the environment variable
 `VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true`.
 
+{{< warning >}}
+Environment variables can be read by any user that is able to read `/proc/<PID>/environ` (or similar
+in other operating systems) of
+the running Vector process, regardless of whether interpolation is enabled. Operators are
+advised not to include sensitive data in environment variables and are encouraged to use the
+[secrets backend](/docs/reference/configuration/secrets/) instead.
+{{< /warning >}}
 
 ## Usage
 
@@ -89,7 +96,9 @@ environment variable example.
 ## Security Restrictions
 
 Environment variable interpolation is disabled by default. Only enable it
-with `--dangerously-allow-env-var-interpolation` if you fully control every environment variable accessible to the Vector process.
+with `--dangerously-allow-env-var-interpolation` if you fully control every environment variable accessible
+to the Vector process and accept that environment variables may leak to users that have access to
+the Vector process.
 
 Even when enabled, Vector prevents some security issues related to environment variable interpolation by rejecting environment variables that contain newline
 characters. This also prevents injection of multi-line configuration blocks.
