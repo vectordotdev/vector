@@ -50,9 +50,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install vdev
+      - uses: ./.github/actions/setup
         if: env.SHOULD_RUN == 'true'
-        run: bash scripts/environment/prepare.sh --modules=vdev
+        with:
+          vdev: true
+          mold: false
+          cargo-cache: false
 
       - name: Run changelog fragment checker
         if: env.SHOULD_RUN == 'true'
