@@ -53,12 +53,19 @@ impl Cli {
             );
         }
 
+        let expected_parent = std::path::Path::new(CHANGELOG_DIR);
         for path in &fragments {
             let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
                 bail!("Unexpected fragment path: {}", path.display());
             };
             if name == "README.md" {
                 continue;
+            }
+            if path.parent() != Some(expected_parent) {
+                bail!(
+                    "invalid fragment path '{}': fragments must live directly under {CHANGELOG_DIR}/, not in a subdirectory.",
+                    path.display()
+                );
             }
             info!("Validating '{name}'");
             validate_filename(name)?;
@@ -109,15 +116,13 @@ fn validate_filename(filename: &str) -> Result<()> {
 
 fn validate_contents(path: &std::path::Path, filename: &str) -> Result<()> {
     let content = std::fs::read_to_string(path)?;
-    let last_line = content
-        .lines()
-        .rev()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or("");
+    // Match generate_cue.rs, which reads `lines().last()` verbatim: the authors
+    // line must be the last line, no trailing blank lines allowed.
+    let last_line = content.lines().last().unwrap_or("");
 
     let Some(names) = last_line.strip_prefix("authors: ") else {
         bail!(
-            "invalid fragment contents for '{filename}': last non-empty line must be 'authors: <name> [<name> ...]'."
+            "invalid fragment contents for '{filename}': last line must be 'authors: <name> [<name> ...]' (no trailing blank lines)."
         );
     };
     let names = names.trim();
