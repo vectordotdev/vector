@@ -12942,7 +12942,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.57.0"
+version = "0.58.0"
 dependencies = [
  "antithesis-instrumentation",
  "approx",
@@ -13591,8 +13591,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.33.1"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#33fec9bddb7e75db90187f686ac3a69063882ced"
+version = "0.34.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#3158cbafb4ffed840dbced6a0dec906c31aeb864"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",

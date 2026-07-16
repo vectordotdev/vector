@@ -74,7 +74,7 @@ use crate::{
     },
     serde::bool_or_struct,
     sources::util::{decompression::CappedDecoder, http::capped_body},
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
 
 mod acknowledgements;
@@ -231,10 +231,19 @@ fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8088)
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec")]
-impl SourceConfig for SplunkConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+impl SplunkConfig {
+    /// The source's TLS configuration, if any. Exposed so a wrapping source can build a
+    /// [`TlsAcceptorReloader`] and watch the certificate files for rotation.
+    pub const fn tls_config(&self) -> Option<&TlsEnableableConfig> {
+        self.tls.as_ref()
+    }
+
+    /// Build the source serving a runtime-swappable TLS acceptor when `tls_reloader` is set.
+    pub async fn build_with_tls_reloader(
+        &self,
+        cx: SourceContext,
+        tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
@@ -269,7 +278,7 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls.bind_reloadable(&self.address, tls_reloader).await?;
 
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
@@ -298,6 +307,14 @@ impl SourceConfig for SplunkConfig {
 
             Ok(())
         }))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec")]
+impl SourceConfig for SplunkConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.build_with_tls_reloader(cx, None).await
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

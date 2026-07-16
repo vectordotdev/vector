@@ -140,7 +140,7 @@ impl ArchivedLedgerState {
 
     pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
         let previous = self.writer_next_record.fetch_add(amount, Ordering::AcqRel);
-        previous.wrapping_add(amount)
+        previous + amount
     }
 
     fn get_current_reader_file_id(&self) -> u16 {
@@ -184,22 +184,6 @@ impl ArchivedLedgerState {
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
         self.writer_next_record.store(id, Ordering::Release);
-    }
-
-    #[cfg(test)]
-    pub unsafe fn unsafe_set_reader_last_record_id(&self, id: u64) {
-        // UNSAFETY:
-        // The atomic operation itself is inherently safe, but adjusting the record IDs manually is
-        // _unsafe_ because it messes with the continuity of record IDs from the perspective of the
-        // reader.
-        //
-        // This is exclusively used under test to make it possible to check certain edge cases, as
-        // writing enough records to actually increment it to the maximum value would take longer
-        // than any of us will be alive.
-        //
-        // Despite it being test-only, we're really amping up the "this is only for testing!" factor
-        // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        self.reader_last_record.store(id, Ordering::Release);
     }
 }
 
@@ -263,14 +247,13 @@ where
         let next_writer_id = self.state().get_next_writer_record_id();
         let last_reader_id = self.state().get_last_reader_record_id();
 
-        // The wrapped id difference is always >= 1. A 0 makes the `- 1` below
-        // underflow to ~2^64 and report a bogus record count.
+        // The writer is always ahead of the reader by at least one ID. Record ID exhaustion is
+        // not supported, so this ordinary difference cannot underflow.
         #[cfg(feature = "antithesis-disk-asserts")]
         {
             #![allow(clippy::disallowed_types)] // once_cell::Lazy
-            antithesis_sdk::assert_always_greater_than_or_equal_to!(
-                next_writer_id.wrapping_sub(last_reader_id),
-                1u64,
+            antithesis_sdk::assert_always!(
+                next_writer_id > last_reader_id,
                 "ledger get_total_records never underflows on a drained buffer",
                 &serde_json::json!({
                     "next_writer_id": next_writer_id,
@@ -278,7 +261,7 @@ where
                 })
             );
         }
-        next_writer_id.wrapping_sub(last_reader_id) - 1
+        next_writer_id - last_reader_id - 1
     }
 
     /// Gets the total number of bytes for all unread records in the buffer.
