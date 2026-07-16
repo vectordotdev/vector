@@ -18,7 +18,7 @@ use crate::{
     components::validation::prelude::*,
     http::{ParamType, ParameterValue, QueryParameterValue},
     serde::{default_decoding, default_framing_message_based},
-    sources::util::http::HttpMethod,
+    sources::util::http::{HttpMethod, capped_body},
     test_util::{
         addr::next_addr,
         components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
@@ -521,7 +521,7 @@ async fn post_with_body() {
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
         .and(warp::header::exact("Content-Type", "application/json"))
-        .and(warp::body::bytes())
+        .and(capped_body())
         .map(|body: bytes::Bytes| {
             // Echo the body back as a string
             String::from_utf8_lossy(&body).to_string()
@@ -631,7 +631,7 @@ async fn post_with_vrl_body() {
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
         .and(warp::header::exact("Content-Type", "application/json"))
-        .and(warp::body::bytes())
+        .and(capped_body())
         .map(|body: bytes::Bytes| {
             // Echo back the body as a string
             String::from_utf8_lossy(&body).to_string()

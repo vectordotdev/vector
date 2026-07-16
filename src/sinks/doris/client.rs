@@ -3,6 +3,14 @@ use crate::{
     internal_events::EndpointBytesSent,
     sinks::util::Compression,
 };
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+
+/// Percent-encoding set for URL path segments (RFC 3986 unreserved chars are left unencoded).
+const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
 use bytes::Bytes;
 use http::{
     Method, Response, StatusCode, Uri,
@@ -133,9 +141,11 @@ impl DorisSinkClient {
             // Build original URL using Uri components to avoid trailing slash issues
             let scheme = self.base_url.scheme_str().unwrap_or("http");
             let authority = self.base_url.authority().map(|a| a.as_str()).unwrap_or("");
+            let encoded_database = utf8_percent_encode(database, PATH_SEGMENT);
+            let encoded_table = utf8_percent_encode(table, PATH_SEGMENT);
             let stream_load_url = format!(
                 "{}://{}/api/{}/{}/_stream_load",
-                scheme, authority, database, table
+                scheme, authority, encoded_database, encoded_table
             );
 
             stream_load_url.parse::<Uri>().map_err(|source| {

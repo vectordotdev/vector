@@ -772,7 +772,7 @@ where
     }
 
     fn get_next_record_id(&mut self) -> u64 {
-        self.next_record_id.wrapping_add(self.unflushed_events)
+        self.next_record_id + self.unflushed_events
     }
 
     fn track_write(&mut self, event_count: usize, record_size: u64) {
@@ -913,7 +913,7 @@ where
                 let ledger_next = self.ledger.state().get_next_writer_record_id();
                 let record_events =
                     u64::try_from(item.event_count()).expect("event count should never exceed u64");
-                let record_next = last_record_id.wrapping_add(record_events);
+                let record_next = last_record_id + record_events;
 
                 match ledger_next.cmp(&record_next) {
                     Ordering::Equal => {

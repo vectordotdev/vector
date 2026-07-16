@@ -43,6 +43,22 @@ generated: components: sinks: amqp: configuration: {
 		required: true
 		type: string: examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	encoding: {
 		description: """
 			Encoding configuration.

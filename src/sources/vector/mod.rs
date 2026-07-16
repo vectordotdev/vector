@@ -25,7 +25,10 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         Source,
-        util::grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        util::{
+            decompression::max_decompressed_size_bytes,
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -195,8 +198,10 @@ impl SourceConfig for VectorConfig {
             acknowledgements,
             log_namespace,
         })
-        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
-        .max_decoding_message_size(usize::MAX);
+        // Tonic added a default of 4MB in 0.9. Bound this by the global decompressed-size
+        // cap rather than `usize::MAX` so a single oversized message cannot drive unbounded
+        // allocation on this unauthenticated listener.
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         // Create the standard gRPC health service
         let (mut health_reporter, health_service) = health_reporter();
@@ -215,6 +220,7 @@ impl SourceConfig for VectorConfig {
         let source = run_grpc_server_with_routes(
             self.address,
             tls_settings,
+            None,
             builder.routes(),
             self.keepalive.clone(),
             cx.shutdown,

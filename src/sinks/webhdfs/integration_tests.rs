@@ -51,7 +51,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     let mut config = config(&webhdfs_endpoint(), 10);
     // Include event batch id in prefix to make sure the generated files are
     // in order.
-    config.prefix = "%F-{{ .i }}-".to_string();
+    config.prefix = "logs/%F-{{ .i }}-".to_string();
 
     let op = config.build_operator().unwrap();
     let sink = config.build_processor(op.clone()).unwrap();
@@ -122,5 +122,6 @@ fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
         compression: Compression::None,
         batch,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     }
 }
