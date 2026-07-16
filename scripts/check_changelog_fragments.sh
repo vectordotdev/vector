@@ -9,7 +9,7 @@ CHANGELOG_DIR="changelog.d"
 
 # NOTE: If these are altered, update both the 'changelog.d/README.md' and
 #       'vdev/src/commands/release/generate_cue.rs' accordingly.
-FRAGMENT_TYPES="breaking|security|deprecation|feature|enhancement|fix"
+FRAGMENT_TYPES="breaking|security|feature|enhancement|fix"
 
 if [ ! -d "${CHANGELOG_DIR}" ]; then
   echo "No ./${CHANGELOG_DIR} found. This tool must be invoked from the root of the repo."
