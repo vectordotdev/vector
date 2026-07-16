@@ -21,7 +21,7 @@ releases: "0.57.0": {
 		"""
 
 	known_issues: [
-		"`vector validate --no-environment` doesn't catch unconfined routing templates (see the template confinement breaking change above) ([#25840](https://github.com/vectordotdev/vector/issues/25840)); run `vector validate` without that flag to catch confinement issues before startup.",
+		"`vector validate --no-environment` doesn't catch unconfined routing templates (see the template confinement breaking change) ([#25840](https://github.com/vectordotdev/vector/issues/25840)); run `vector validate` without that flag to catch confinement issues before startup.",
 	]
 
 	changelog: [
@@ -39,7 +39,7 @@ releases: "0.57.0": {
 				new `temperature` collector. When enabled, it emits `temperature_celsius`,
 				`temperature_max_celsius`, and `temperature_critical_celsius` gauges, each
 				tagged with the `component` label of the sensor it was read from.
-				
+
 				The collector is opt-in: add `temperature` to the `collectors` list to enable
 				it. Components that do not report a given value (for example a missing critical
 				threshold) are skipped, and environments without temperature sensors simply
@@ -169,7 +169,7 @@ releases: "0.57.0": {
 			description: #"""
 				Added a new counter metric `component_cpu_usage_ns_total` counting the CPU
 				time consumed by a transform in nanoseconds.
-				
+
 				The metric is opt-in: set `measure_cpu_usage: true` on individual transform
 				configurations to enable it. When disabled (the default), no counter is
 				registered and no per-poll clock sampling takes place.
@@ -415,7 +415,7 @@ releases: "0.57.0": {
 			type: "enhancement"
 			description: #"""
 				Improved the VRL playground UX:
-				
+
 				- Added resizable panels via draggable gutters.
 				- Added a dark/light/system theme toggle that syncs with the OS preference.
 				- Added run history persisted in localStorage, with a clear button.
@@ -436,37 +436,37 @@ releases: "0.57.0": {
 
 	vrl_changelog: #"""
 		### [0.34.0 (2026-07-13)](https://github.com/vectordotdev/vrl/releases/tag/v0.34.0)
-		
+
 		#### New Features
-		
+
 		- Added support for dynamic regex patterns in `parse_regex`, allowing variables and runtime expressions to be passed as the `pattern` argument.
-		
+
 		[PR #1809](https://github.com/vectordotdev/vrl/pull/1809) by [@thomasqueirozb](https://github.com/thomasqueirozb)
 		- Add `strict` parameter to `parse_cef` (default: `true`). When set to `false`, the function performs best-effort parsing of non-compliant CEF input, treating unescaped `=` characters within field values as literals rather than field delimiters. This improves compatibility with vendors such as Infoblox and Palo Alto Networks whose CEF output does not fully conform to the spec.
-		
+
 		[PR #1821](https://github.com/vectordotdev/vrl/pull/1821) by [@jacklongsd](https://github.com/jacklongsd)
-		
+
 		#### Enhancements
-		
+
 		- Improved performance of `parse_regex` and `parse_regex_all` by pre-computing capture group names and indices at compile time, replacing name-based hash lookups with direct index-based access at runtime.
-		
+
 		[PR #1811](https://github.com/vectordotdev/vrl/pull/1811) by [@thomasqueirozb](https://github.com/thomasqueirozb)
 		- Improved performance of `truncate` function if suffix parameter is provided.
-		
+
 		[PR #1784](https://github.com/vectordotdev/vrl/pull/1784) by [@JakubOnderka](https://github.com/JakubOnderka)
 		- Improved performance of `parse_regex_all` when using a literal regex pattern in concurrent workloads.
-		
+
 		[PR #1798](https://github.com/vectordotdev/vrl/pull/1798) by [@thomasqueirozb](https://github.com/thomasqueirozb)
-		
+
 		#### Fixes
-		
+
 		- Fixed a panic in `parse_key_value`, `parse_cef`, `decode_mime_q`, and `parse_ruby_hash` on inputs with lines ≥ 65,535 bytes. This is a workaround until [rust-bakery/nom#1867](https://github.com/rust-bakery/nom/issues/1867) is fixed.
-		
+
 		[PR #1848](https://github.com/vectordotdev/vrl/pull/1848) by [@pront](https://github.com/pront)
 		- Fixed `find`’s type definition and documentation. Previously, the function advertised its return type as an integer, but never as nullable. Now it correctly states that the function returns `null` when `value` doesn’t match `pattern`.
-		
+
 		[PR #1812](https://github.com/vectordotdev/vrl/pull/1812) by [@JakubOnderka](https://github.com/JakubOnderka)
-		
+
 		"""#
 
 	commits: [
