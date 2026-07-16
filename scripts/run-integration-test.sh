@@ -12,10 +12,21 @@ fi
 
 vdev_cmd="${VDEV:-cargo vdev}"
 
+# Reconstruct the docker compose project name that `cargo vdev` uses to start
+# the environment. It must match `ComposeTest::project_name` in
+# vdev/src/testing/integration.rs:
+#   vector-{int|e2e}-{test_name}-{sanitized_env}
+# where the environment has its dots replaced by hyphens.
+compose_project_name() {
+  local env="$1"
+  echo "vector-${TEST_TYPE}-${TEST_NAME}-${env//./-}"
+}
+
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
+  local env="$2"
   if [[ "$LAST_RETURN_CODE" -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
-    (docker compose --project-name "${TEST_NAME}" logs) || echo "Failed to collect logs"
+    (docker compose --project-name "$(compose_project_name "$env")" logs) || echo "Failed to collect logs"
   fi
 }
 
@@ -140,7 +151,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
 
   $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" start "${TEST_NAME}" "${TEST_ENV}"
   START_RET=$?
-  print_compose_logs_on_failure "$START_RET"
+  print_compose_logs_on_failure "$START_RET" "$TEST_ENV"
 
   if [[ "$START_RET" -eq 0 ]]; then
     COVERAGE_FLAG=""
@@ -148,7 +159,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
 
     $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" ${COVERAGE_FLAG} "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
-    print_compose_logs_on_failure "$RET"
+    print_compose_logs_on_failure "$RET" "$TEST_ENV"
 
     # Normalize source paths in coverage report so they are relative to the repo root.
     # The test runner container mounts source at /home/vector; strip that prefix so
