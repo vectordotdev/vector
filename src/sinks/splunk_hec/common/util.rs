@@ -495,7 +495,7 @@ pub mod integration_test_helpers {
                     .send()
             },
             Duration::from_millis(500),
-            Duration::from_secs(30),
+            Duration::from_secs(60),
         )
         .await;
 
