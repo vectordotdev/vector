@@ -94,6 +94,9 @@ message Metadata {
   OutputId upstream_id = 5;
   Secrets secrets = 6;
   bytes source_event_id = 7;
+  // For aggregated-histogram metrics, marks that the value's `sum` is a placeholder rather than
+  // an authoritative value reported by the source. Defaults to false (authoritative).
+  bool aggregated_histogram_sum_missing = 8;
 }
 
 message Metric {

@@ -326,7 +326,12 @@ impl HistogramMetric {
             MetricKind::Absolute
         };
 
-        MetricEvent::new(
+        // The OTLP `sum` field is optional. When absent we substitute `0.0` for the value, but
+        // flag it on the metadata so consumers that treat the sum as exact (the `datadog_metrics`
+        // sink's sketch conversion) can fall back to approximating it from the bucket counts,
+        // while other sinks keep observing the same placeholder as before.
+        let sum_is_missing = self.point.sum.is_none();
+        let mut metric = MetricEvent::new(
             metric_name,
             kind,
             MetricValue::AggregatedHistogram {
@@ -336,8 +341,13 @@ impl HistogramMetric {
             },
         )
         .with_timestamp(timestamp)
-        .with_tags(Some(attributes))
-        .into()
+        .with_tags(Some(attributes));
+        if sum_is_missing {
+            metric
+                .metadata_mut()
+                .set_aggregated_histogram_sum_missing(true);
+        }
+        metric.into()
     }
 }
 
@@ -382,7 +392,10 @@ impl ExpHistogramMetric {
             MetricKind::Absolute
         };
 
-        MetricEvent::new(
+        // See the note in `HistogramMetric::into_metric`: a missing OTLP sum is substituted with
+        // `0.0` and flagged on the metadata so the exact-sum optimization is skipped downstream.
+        let sum_is_missing = self.point.sum.is_none();
+        let mut metric = MetricEvent::new(
             metric_name,
             kind,
             MetricValue::AggregatedHistogram {
@@ -392,8 +405,13 @@ impl ExpHistogramMetric {
             },
         )
         .with_timestamp(timestamp)
-        .with_tags(Some(attributes))
-        .into()
+        .with_tags(Some(attributes));
+        if sum_is_missing {
+            metric
+                .metadata_mut()
+                .set_aggregated_histogram_sum_missing(true);
+        }
+        metric.into()
     }
 }
 

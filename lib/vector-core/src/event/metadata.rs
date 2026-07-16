@@ -33,6 +33,20 @@ pub struct EventMetadata {
     #[derivative(PartialEq = "ignore")]
     #[serde(default, skip)]
     pub(crate) last_transform_timestamp: Option<Instant>,
+
+    /// For aggregated-histogram metrics, marks that the value's `sum` is a placeholder
+    /// substituted because the source did not report one (e.g. an OpenTelemetry histogram that
+    /// omits the optional `sum` field), rather than an authoritative value. Consumers that treat
+    /// the sum as exact -- currently only the `datadog_metrics` sink's sketch conversion -- fall
+    /// back to approximating it from the bucket counts when this is set. Defaults to `false`
+    /// (authoritative), and is only meaningful for aggregated histograms.
+    ///
+    /// Preserved across the protobuf boundary (disk buffers, Vector-to-Vector) via the `Metadata`
+    /// proto message. Not carried in the JSON (`serde`) representation, which is used for
+    /// human-facing encodings rather than internal event transport.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(default, skip)]
+    pub(crate) aggregated_histogram_sum_missing: bool,
 }
 
 /// The actual metadata structure contained by both `struct Metric`
@@ -144,6 +158,7 @@ impl EventMetadata {
                 ..Default::default()
             }),
             last_transform_timestamp: None,
+            aggregated_histogram_sum_missing: false,
         }
     }
 
@@ -262,6 +277,19 @@ impl EventMetadata {
     pub fn set_last_transform_timestamp(&mut self, timestamp: Instant) {
         self.last_transform_timestamp = Some(timestamp);
     }
+
+    /// Whether the `sum` of an aggregated-histogram metric is a placeholder rather than an
+    /// authoritative value reported by the source. See the field docs for details.
+    #[must_use]
+    pub fn aggregated_histogram_sum_missing(&self) -> bool {
+        self.aggregated_histogram_sum_missing
+    }
+
+    /// Marks whether the `sum` of an aggregated-histogram metric is a placeholder rather than an
+    /// authoritative value reported by the source.
+    pub fn set_aggregated_histogram_sum_missing(&mut self, missing: bool) {
+        self.aggregated_histogram_sum_missing = missing;
+    }
 }
 
 impl Default for Inner {
@@ -286,6 +314,7 @@ impl Default for EventMetadata {
         Self {
             inner: Arc::new(Inner::default()),
             last_transform_timestamp: None,
+            aggregated_histogram_sum_missing: false,
         }
     }
 }
@@ -369,6 +398,7 @@ impl EventMetadata {
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
         let other_timestamp = other.last_transform_timestamp;
+        let other_sum_missing = other.aggregated_histogram_sum_missing;
         let inner = self.get_mut();
         let other = other.into_owned();
         inner.finalizers.merge(other.finalizers);
@@ -389,6 +419,9 @@ impl EventMetadata {
             }
             _ => {}
         }
+
+        // If either side's histogram sum is a placeholder, the merged sum is not authoritative.
+        self.aggregated_histogram_sum_missing |= other_sum_missing;
     }
 
     /// Update the finalizer(s) status.
