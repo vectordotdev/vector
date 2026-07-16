@@ -36,7 +36,7 @@ jobs:
           protoc: true
           libsasl2: true
           cargo-cache: true
-          cache-save: "true"
+          cache-save: true
 
       # cargo build (not check) so cached deps include .rlib for cargo test consumers.
       # --all-features to match `vdev check rust` used by check-clippy, so
