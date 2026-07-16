@@ -22,71 +22,136 @@ updates:
       amq:
         patterns:
           - "amq-*"
+        update-types:
+          - "patch"
+          - "minor"
       aws:
         patterns:
           - "aws-*"
+        update-types:
+          - "patch"
+          - "minor"
       azure:
         patterns:
           - "azure_*"
+        update-types:
+          - "patch"
+          - "minor"
       clap:
         patterns:
           - "clap*"
+        update-types:
+          - "patch"
+          - "minor"
       crossbeam:
         patterns:
           - "crossbeam*"
+        update-types:
+          - "patch"
+          - "minor"
       csv:
         patterns:
           - "csv*"
+        update-types:
+          - "patch"
+          - "minor"
       futures:
         patterns:
           - "futures"
           - "futures-util"
+        update-types:
+          - "patch"
+          - "minor"
       metrics:
         patterns:
           - "metrics"
           - "metrics-tracing-context"
           - "metrics-util"
+        update-types:
+          - "patch"
+          - "minor"
       netlink:
         patterns:
           - "netlink-*"
+        update-types:
+          - "patch"
+          - "minor"
       phf:
         patterns:
           - "phf*"
+        update-types:
+          - "patch"
+          - "minor"
       prost:
         patterns:
           - "prost"
           - "prost-*"
+        update-types:
+          - "patch"
+          - "minor"
       serde:
         patterns:
           - "serde"
           - "serde_*"
+        update-types:
+          - "patch"
+          - "minor"
       tokio:
         patterns:
           - "tokio"
           - "tokio-*"
+        update-types:
+          - "patch"
+          - "minor"
       tonic:
         patterns:
           - "tonic"
           - "tonic-*"
+        update-types:
+          - "patch"
+          - "minor"
       tower:
         patterns:
           - "tower"
           - "tower-*"
+        update-types:
+          - "patch"
+          - "minor"
       tracing:
         patterns:
           - "tracing"
           - "tracing-*"
+        update-types:
+          - "patch"
+          - "minor"
       wasm-bindgen:
         patterns:
           - "wasm-bindgen-*"
+        update-types:
+          - "patch"
+          - "minor"
       zstd:
         patterns:
           - "zstd*"
+        update-types:
+          - "patch"
+          - "minor"
 
       cargo-other:
         applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - "patch"
+          - "minor"
+      # Without this group, major bumps matching any group pattern are silently
+      # dropped instead of falling through to individual PRs (dependabot-core#14202).
+      cargo-major:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "major"
       cargo-security:
         applies-to: security-updates
         patterns:
