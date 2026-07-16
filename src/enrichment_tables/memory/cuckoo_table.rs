@@ -9,6 +9,7 @@ use std::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
+    thread::JoinHandle,
     time::Duration,
 };
 
@@ -713,6 +714,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
             .unwrap_or(Box::pin(stream::empty()));
 
         let scans_in_progress = Arc::new(AtomicUsize::new(0));
+        let mut export_handle: Option<JoinHandle<()>> = None;
 
         loop {
             tokio::select! {
@@ -753,7 +755,18 @@ impl StreamSink<Event> for CuckooMemoryTable {
                 }
 
                 Some(_) = export_interval.next() => {
-                    self.export();
+                    if export_handle.as_ref().is_some_and(|h| !h.is_finished()) {
+
+                        warn!("Previous export still in progress for cuckoo enrichment table. New export will be skipped until previous one is complete. Consider increasing export interval.");
+                        continue;
+                    } else if let Some(handle) = export_handle
+                        && let Err(join_error) = handle.join() {
+                        warn!("Cuckoo enrichment table export failed: {:?}", join_error);
+                    }
+                    let exporting_instance = self.clone();
+                    export_handle = Some(std::thread::spawn(move || {
+                        exporting_instance.export();
+                    }));
                 }
 
                 Some(_) = scan_interval.next() => {
@@ -764,6 +777,12 @@ impl StreamSink<Event> for CuckooMemoryTable {
                     self.scan(&scans_in_progress).await;
                 }
             }
+        }
+
+        if let Some(handle) = export_handle
+            && let Err(join_error) = handle.join()
+        {
+            warn!("Cuckoo enrichment table export failed: {:?}", join_error);
         }
 
         // Final export before exiting
