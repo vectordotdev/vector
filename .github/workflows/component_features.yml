@@ -50,5 +50,6 @@ jobs:
           protoc: true
           libsasl2: true
           cargo-hack: true
+          cargo-cache: true
 
       - run: make check-component-features

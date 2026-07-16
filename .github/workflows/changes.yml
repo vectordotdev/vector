@@ -290,21 +290,29 @@ jobs:
               - ".github/workflows/test.yml"
               - ".github/workflows/unit-tests.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             integration-yml:
               - ".github/workflows/integration.yml"
               - ".github/workflows/changes.yml"
             test-make-command-yml:
               - ".github/workflows/test-make-command.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             msrv-yml:
               - ".github/workflows/msrv.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             cross-yml:
               - ".github/workflows/cross.yml"
               - ".github/workflows/changes.yml"
             unit_mac-yml:
               - ".github/workflows/unit_mac.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             unit_windows-yml:
               - ".github/workflows/unit_windows.yml"
               - ".github/workflows/changes.yml"
@@ -361,7 +369,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -455,7 +462,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
