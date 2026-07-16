@@ -736,6 +736,13 @@ impl StreamSink<Event> for CuckooMemoryTable {
                     finalizers.update_status(EventStatus::Delivered);
                     events_sent.emit(CountByteSize(1, event_byte_size));
                     bytes_sent.emit(ByteSize(event_byte_size.get()));
+
+                    if self.config.flush_interval.is_none() {
+                        emit!(MemoryEnrichmentTableFlushed {
+                            new_objects_count: self.filter.get_item_count(),
+                            new_byte_size: self.filter.get_memory_usage()
+                        });
+                    }
                 },
 
                 Some(_) = flush_interval.next() => {
