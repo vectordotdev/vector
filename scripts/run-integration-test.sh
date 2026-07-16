@@ -15,11 +15,15 @@ vdev_cmd="${VDEV:-cargo vdev}"
 # Reconstruct the docker compose project name that `cargo vdev` uses to start
 # the environment. It must match `ComposeTest::project_name` in
 # vdev/src/testing/integration.rs:
-#   vector-{int|e2e}-{test_name}-{sanitized_env}
-# where the environment has its dots replaced by hyphens.
+#   vector-{integration|e2e}-{test_name}-{sanitized_env}
+# The project name uses the tests directory name ("integration" or "e2e"), not
+# the TEST_TYPE arg ("int" or "e2e"), and the environment has its dots replaced
+# by hyphens.
 compose_project_name() {
   local env="$1"
-  echo "vector-${TEST_TYPE}-${TEST_NAME}-${env//./-}"
+  local dir="$TEST_TYPE"
+  [[ "$dir" == "int" ]] && dir="integration"
+  echo "vector-${dir}-${TEST_NAME}-${env//./-}"
 }
 
 print_compose_logs_on_failure() {
