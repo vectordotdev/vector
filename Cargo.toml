@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.57.0"
+version = "0.58.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -235,6 +235,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false, features = ["v
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
+zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.4" }
 strum = { version = "0.28", features = ["derive"] }
@@ -465,7 +466,7 @@ thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
 warp = { version = "0.3.7", default-features = false }
-zstd = { version = "0.13.0", default-features = false }
+zstd.workspace = true
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
@@ -528,7 +529,7 @@ vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
-zstd = { version = "0.13.0", default-features = false }
+zstd.workspace = true
 
 [patch.crates-io]
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
@@ -731,7 +732,7 @@ sources-metrics = [
 sources-amqp = ["lapin", "async-rs"]
 sources-apache_metrics = ["sources-utils-http-client"]
 sources-aws_ecs_metrics = ["sources-utils-http-client"]
-sources-aws_kinesis_firehose = ["dep:base64"]
+sources-aws_kinesis_firehose = ["dep:base64", "sources-http_server", "sources-utils-http-encoding"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
@@ -779,7 +780,7 @@ sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vec
 sources-pulsar = ["dep:pulsar"]
 sources-redis = ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
-sources-splunk_hec = ["dep:roaring"]
+sources-splunk_hec = ["dep:roaring", "sources-utils-http-encoding"]
 sources-statsd = ["sources-utils-net", "tokio-util/net"]
 sources-stdin = ["tokio-util/io"]
 sources-syslog = ["codecs-syslog", "sources-utils-net", "tokio-util/net"]

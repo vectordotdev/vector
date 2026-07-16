@@ -146,9 +146,8 @@ cbc,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Devel
 cesu8,https://github.com/emk/cesu8-rs,Apache-2.0 OR MIT,Eric Kidd <git@randomhacks.net>
 cfb-mode,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 cfg-if,https://github.com/rust-lang/cfg-if,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
-chacha20,https://github.com/RustCrypto/stream-ciphers,Apache-2.0 OR MIT,RustCrypto Developers
 chacha20,https://github.com/RustCrypto/stream-ciphers,MIT OR Apache-2.0,RustCrypto Developers
-chacha20poly1305,https://github.com/RustCrypto/AEADs/tree/master/chacha20poly1305,Apache-2.0 OR MIT,RustCrypto Developers
+chacha20poly1305,https://github.com/RustCrypto/AEADs,Apache-2.0 OR MIT,RustCrypto Developers
 charset,https://github.com/hsivonen/charset,MIT OR Apache-2.0,Henri Sivonen <hsivonen@hsivonen.fi>
 chrono,https://github.com/chronotope/chrono,MIT OR Apache-2.0,The chrono Authors
 chrono-tz,https://github.com/chronotope/chrono-tz,MIT OR Apache-2.0,The chrono-tz Authors
@@ -189,6 +188,7 @@ cookie_store,https://github.com/pfernie/cookie_store,MIT OR Apache-2.0,Patrick F
 core-foundation,https://github.com/servo/core-foundation-rs,MIT  OR  Apache-2.0,The Servo Project Developers
 core-foundation,https://github.com/servo/core-foundation-rs,MIT OR Apache-2.0,The Servo Project Developers
 core-foundation-sys,https://github.com/servo/core-foundation-rs,MIT OR Apache-2.0,The Servo Project Developers
+cpubits,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 cpufeatures,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 crc,https://github.com/mrhooray/crc-rs,MIT OR Apache-2.0,"Rui Hu <code@mrhooray.com>, Akhil Velagapudi <4@4khil.com>"
 crc-catalog,https://github.com/akhilles/crc-catalog,MIT OR Apache-2.0,Akhil Velagapudi <akhilvelagapudi@gmail.com>
@@ -415,7 +415,7 @@ jsonptr,https://github.com/chanced/jsonptr,MIT OR Apache-2.0,"chance dinkins, An
 jsonschema,https://github.com/Stranger6667/jsonschema,MIT,Dmitry Dygalo <dmitry@dygalo.dev>
 k8s-openapi,https://github.com/Arnavion/k8s-openapi,Apache-2.0,Arnav Singh <me@arnavion.dev>
 kasuari,https://github.com/ratatui/kasuari,MIT OR Apache-2.0,"Dylan Ede <dylanede@googlemail.com>, The Ratatui Developers"
-keccak,https://github.com/RustCrypto/sponges/tree/master/keccak,Apache-2.0 OR MIT,RustCrypto Developers
+keccak,https://github.com/RustCrypto/sponges,Apache-2.0 OR MIT,RustCrypto Developers
 kqueue,https://gitlab.com/rust-kqueue/rust-kqueue,MIT,William Orr <will@worrbase.com>
 kqueue-sys,https://gitlab.com/rust-kqueue/rust-kqueue-sys,MIT,"William Orr <will@worrbase.com>, Daniel (dmilith) Dettlaff <dmilith@me.com>"
 krb5-src,https://github.com/MaterializeInc/rust-krb5-src,Apache-2.0,"Materialize, Inc."
@@ -738,6 +738,7 @@ spin,https://github.com/mvdnes/spin-rs,MIT,"Mathijs van de Nes <git@mathijs.vd-n
 spin,https://github.com/mvdnes/spin-rs,MIT,"Mathijs van de Nes <git@mathijs.vd-nes.nl>, John Ericson <git@JohnEricson.me>, Joshua Barretto <joshua.s.barretto@gmail.com>"
 spinning_top,https://github.com/rust-osdev/spinning_top,MIT OR Apache-2.0,Philipp Oppermann <dev@phil-opp.com>
 spki,https://github.com/RustCrypto/formats/tree/master/spki,Apache-2.0 OR MIT,RustCrypto Developers
+sponge-cursor,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 sqlx,https://github.com/launchbadge/sqlx,MIT OR Apache-2.0,"Ryan Leckey <leckey.ryan@gmail.com>, Austin Bonander <austin.bonander@gmail.com>, Chloe Ross <orangesnowfox@gmail.com>, Daniel Akhterov <akhterovd@gmail.com>"
 sqlx-core,https://github.com/launchbadge/sqlx,MIT OR Apache-2.0,"Ryan Leckey <leckey.ryan@gmail.com>, Austin Bonander <austin.bonander@gmail.com>, Chloe Ross <orangesnowfox@gmail.com>, Daniel Akhterov <akhterovd@gmail.com>"
 sqlx-macros,https://github.com/launchbadge/sqlx,MIT OR Apache-2.0,"Ryan Leckey <leckey.ryan@gmail.com>, Austin Bonander <austin.bonander@gmail.com>, Chloe Ross <orangesnowfox@gmail.com>, Daniel Akhterov <akhterovd@gmail.com>"

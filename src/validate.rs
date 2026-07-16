@@ -128,13 +128,14 @@ pub struct Opts {
     )]
     pub config_dirs: Vec<PathBuf>,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -203,7 +204,6 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.sub_error(errors);
     };
     let builder = ConfigBuilderLoader::default()
-        .interpolate_env(!opts.disable_env_var_interpolation)
         .load_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;

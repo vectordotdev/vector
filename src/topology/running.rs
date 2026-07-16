@@ -1418,33 +1418,36 @@ impl RunningTopology {
     }
 }
 
+/// Returns the subset of `output_ids` whose upstream fanout was replaced during this reload and so
+/// must be reattached to the still-running downstream consumer.
+///
+/// A producer's fanout is replaced when its key was respawned in place (`to_change`) or when it
+/// disappeared as one kind of producer and reappeared as another (e.g. an enrichment-table-derived
+/// source removed while a regular source with the same key was added, or a transform removed while
+/// a source with the same key was added).
 fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
-    let mut changed_outputs = Vec::new();
+    let producer_destroyed = |key: &ComponentKey| {
+        diff.sources.to_change.contains(key)
+            || diff.sources.to_remove.contains(key)
+            || diff.transforms.to_change.contains(key)
+            || diff.transforms.to_remove.contains(key)
+            || diff.enrichment_tables.sources.to_change.contains(key)
+            || diff.enrichment_tables.sources.to_remove.contains(key)
+    };
+    let producer_recreated = |key: &ComponentKey| {
+        diff.sources.to_change.contains(key)
+            || diff.sources.to_add.contains(key)
+            || diff.transforms.to_change.contains(key)
+            || diff.transforms.to_add.contains(key)
+            || diff.enrichment_tables.sources.to_change.contains(key)
+            || diff.enrichment_tables.sources.to_add.contains(key)
+    };
 
-    for source_key in diff
-        .sources
-        .to_change
+    output_ids
         .iter()
-        .chain(diff.enrichment_tables.sources.to_change.iter())
-    {
-        changed_outputs.extend(
-            output_ids
-                .iter()
-                .filter(|id| &id.component == source_key)
-                .cloned(),
-        );
-    }
-
-    for transform_key in &diff.transforms.to_change {
-        changed_outputs.extend(
-            output_ids
-                .iter()
-                .filter(|id| &id.component == transform_key)
-                .cloned(),
-        );
-    }
-
-    changed_outputs
+        .filter(|id| producer_destroyed(&id.component) && producer_recreated(&id.component))
+        .cloned()
+        .collect()
 }
 
 fn enrichment_table_sink_resources(config: &Config, sink_key: &ComponentKey) -> Vec<Resource> {

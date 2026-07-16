@@ -27,7 +27,7 @@ use crate::{
     },
     internal_events::EventsReceived,
     schema,
-    sources::util::extract_tag_key_and_value,
+    sources::util::{extract_tag_key_and_value, http::capped_body},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -60,7 +60,7 @@ fn sketches_service(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
@@ -97,7 +97,7 @@ fn series_v1_service(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
@@ -137,7 +137,7 @@ fn series_v2_service(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,

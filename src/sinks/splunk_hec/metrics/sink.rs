@@ -6,10 +6,10 @@ use vrl::path::OwnedValuePath;
 
 use super::request_builder::HecMetricsRequestBuilder;
 use crate::{
-    internal_events::SplunkInvalidMetricReceivedError,
+    internal_events::{SplunkInvalidMetricReceivedError, TemplateRenderingError},
     sinks::{
         prelude::*,
-        splunk_hec::common::{render_template_string, request::HecRequest},
+        splunk_hec::common::request::HecRequest,
         util::{encode_namespace, processed_event::ProcessedEvent},
     },
 };
@@ -166,10 +166,35 @@ pub fn process_metric(
         HecMetricsProcessedEventMetadata::extract_metric_name(&metric, default_namespace);
     let metric_value = HecMetricsProcessedEventMetadata::extract_metric_value(&metric)?;
 
-    let sourcetype =
-        sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &metric, "sourcetype"));
-    let source = source.and_then(|source| render_template_string(source, &metric, "source"));
-    let index = index.and_then(|index| render_template_string(index, &metric, "index"));
+    // Render routing templates; Confined errors are intentional security drops.
+    // Returns Some(Some(value)) on success, Some(None) on non-fatal error
+    // (field omitted), or None to signal the whole event must be dropped.
+    let render = |tpl: Option<&Template>, field: &'static str| -> Option<Option<String>> {
+        let Some(t) = tpl else { return Some(None) };
+        match t.render_string(&metric) {
+            Ok(s) => Some(Some(s)),
+            Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some(field),
+                    drop_event: true,
+                });
+                None
+            }
+            Err(error) => {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some(field),
+                    drop_event: false,
+                });
+                Some(None)
+            }
+        }
+    };
+
+    let sourcetype = render(sourcetype, "sourcetype")?;
+    let source = render(source, "source")?;
+    let index = render(index, "index")?;
     let host = host_key.and_then(|key| metric.tag_value(key.to_string().as_str()));
 
     let metadata = HecMetricsProcessedEventMetadata {

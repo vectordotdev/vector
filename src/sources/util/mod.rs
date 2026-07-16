@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 #[cfg(feature = "sources-http_server")]
 mod body_decoding;
+pub mod decompression;
 #[cfg(feature = "sources-file")]
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
@@ -41,6 +42,7 @@ mod unix_datagram;
 mod unix_stream;
 mod wrappers;
 
+pub use decompression::{max_decompressed_size_bytes, set_max_decompressed_size_bytes};
 #[cfg(feature = "sources-file")]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;

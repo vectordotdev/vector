@@ -6,7 +6,7 @@ use vector_lib::{
 };
 
 use super::{channel::AmqpSinkChannels, sink::AmqpSink};
-use crate::{amqp::AmqpConfig, sinks::prelude::*};
+use crate::{amqp::AmqpConfig, sinks::prelude::*, template::ConfinementConfig};
 
 /// AMQP properties configuration.
 #[configurable_component]
@@ -93,6 +93,10 @@ pub struct AmqpSinkConfig {
     /// Maximum number of AMQP channels to keep active (channels are created as needed).
     #[serde(default = "default_max_channels")]
     pub(crate) max_channels: u32,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_max_channels() -> u32 {
@@ -109,6 +113,7 @@ impl Default for AmqpSinkConfig {
             connection: AmqpConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
             max_channels: default_max_channels(),
+            confinement: ConfinementConfig::default(),
         }
     }
 }
@@ -130,8 +135,17 @@ impl GenerateConfig for AmqpSinkConfig {
 #[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = AmqpSink::new(self.clone()).await?;
+        let mut config = self.clone();
+        config.exchange = config
+            .exchange
+            .confine(&self.confinement, Self::NAME, "exchange")?;
+        config.routing_key = config
+            .routing_key
+            .map(|t| t.confine(&self.confinement, Self::NAME, "routing_key"))
+            .transpose()?;
+        let sink = AmqpSink::new(config).await?;
         let hc = healthcheck(sink.channels.clone()).boxed();
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
@@ -164,10 +178,38 @@ pub(super) async fn healthcheck(channels: AmqpSinkChannels) -> crate::Result<()>
 mod tests {
     use super::*;
     use crate::config::format::{Format, deserialize};
+    use crate::template::{ConfinementConfig, Template};
+    use vrl::event_path;
 
     #[test]
     pub fn generate_config() {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_exchange() {
+        let template = Template::try_from("{{ exchange }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "amqp", "exchange");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_exchange() {
+        let template = Template::try_from("{{ exchange }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "amqp", "exchange");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_exchange() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "amqp", "exchange");
+        assert!(result.is_ok());
     }
 
     fn assert_config_priority_eq(config: AmqpSinkConfig, event: &LogEvent, priority: u8) {
@@ -276,7 +318,7 @@ mod tests {
             let config: AmqpSinkConfig = deserialize(config, format).unwrap();
             let event = {
                 let mut event = LogEvent::from_str_legacy("message");
-                event.insert("priority", 2);
+                event.insert(event_path!("priority"), 2);
                 event
             };
             assert_config_priority_eq(config, &event, 2);

@@ -22,7 +22,7 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::{decompress_body, limited_body, max_decompressed_size_bytes};
+use super::encoding::{capped_body, decompress_body};
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
@@ -112,7 +112,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
-            let body_filter = limited_body(max_decompressed_size_bytes());
+            let body_filter = capped_body();
 
             let svc = filter
                 .and(warp::path::tail())

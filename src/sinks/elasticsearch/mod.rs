@@ -205,6 +205,19 @@ impl ElasticsearchCommonMode {
             } => index
                 .render_string(log)
                 .or_else(|error| {
+                    // Confined errors are intentional security drops — never fall back
+                    // to the default index, as that would silently accept an attack event.
+                    if matches!(
+                        error,
+                        crate::template::TemplateRenderingError::Confined { .. }
+                    ) {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("index"),
+                            drop_event: true,
+                        });
+                        return Err(());
+                    }
                     if let Some(fallback) = template_fallback_index {
                         emit!(TemplateRenderingError {
                             error,

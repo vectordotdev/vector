@@ -93,10 +93,9 @@
 //! ```
 //!
 //! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves
-//! around the writer and reader being able to quickly figure out where they left off. Record and
-//! data file IDs are simply rolled over when they reach the maximum of their data type, and are
-//! incremented monotonically as new data files are created, rather than trying to always allocate
-//! from the lowest available ID.
+//! around the writer and reader being able to quickly figure out where they left off. Data file
+//! IDs roll over when they reach the maximum of their data type. Record IDs are strictly
+//! monotonic and must not reach `u64::MAX`; record-ID exhaustion is not supported.
 //!
 //! ## Buffer operation
 //!
