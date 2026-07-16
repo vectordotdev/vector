@@ -164,7 +164,7 @@ impl VrlDeserializer {
 mod tests {
     use chrono::{DateTime, Utc};
     use indoc::indoc;
-    use vrl::{btreemap, path::OwnedTargetPath, value::Value};
+    use vrl::{btreemap, event_path, path::OwnedTargetPath, value::Value};
 
     use super::*;
 
@@ -369,7 +369,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         assert_eq!(
-            *events[0].as_log().get("secret_value").unwrap(),
+            *events[0].as_log().get(event_path!("secret_value")).unwrap(),
             Value::from("super-secret")
         );
     }

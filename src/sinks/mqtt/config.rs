@@ -13,7 +13,7 @@ use crate::{
     },
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
-    template::Template,
+    template::{ConfinementConfig, Template},
     tls::MaybeTlsSettings,
 };
 
@@ -49,6 +49,10 @@ pub struct MqttSinkConfig {
     #[configurable(derived)]
     #[serde(default = "default_qos")]
     pub quality_of_service: MqttQoS,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 /// Supported Quality of Service types for MQTT.
@@ -101,6 +105,7 @@ impl Default for MqttSinkConfig {
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
             quality_of_service: MqttQoS::default(),
+            confinement: ConfinementConfig::default(),
         }
     }
 }
@@ -111,9 +116,14 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let connector = self.build_connector()?;
-        let sink = MqttSink::new(self, connector.clone())?;
+        let mut config = self.clone();
+        config.topic = config
+            .topic
+            .confine(&self.confinement, Self::NAME, "topic")?;
+        let connector = config.build_connector()?;
+        let sink = MqttSink::new(&config, connector.clone())?;
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
@@ -177,9 +187,36 @@ impl MqttSinkConfig {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MqttSinkConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "mqtt", "topic");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "mqtt", "topic");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_topic() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "mqtt", "topic");
+        assert!(result.is_ok());
     }
 }

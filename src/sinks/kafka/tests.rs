@@ -18,6 +18,7 @@ mod integration_test {
         event::{BatchNotifier, BatchStatus},
         lookup::lookup_v2::ConfigTargetPath,
     };
+    use vrl::event_path;
 
     use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
     use crate::{
@@ -64,6 +65,7 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         self::sink::healthcheck(config, Default::default())
             .await
@@ -92,6 +94,7 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         self::sink::healthcheck(config, Default::default())
             .await
@@ -195,6 +198,7 @@ mod integration_test {
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         config.clone().to_rdkafka()?;
         self::sink::healthcheck(config.clone(), Default::default()).await?;
@@ -340,6 +344,7 @@ mod integration_test {
                 librdkafka_options: HashMap::new(),
                 headers_key: Some(headers_key.clone()),
                 acknowledgements: Default::default(),
+                confinement: Default::default(),
             };
 
             let num_events = 100;
@@ -352,9 +357,9 @@ mod integration_test {
                 expected_messages.push(message.clone());
 
                 let mut trace = TraceEvent::default();
-                trace.insert("message", message);
-                trace.insert("trace_key", trace_key);
-                trace.insert("timestamp", chrono::Utc::now());
+                trace.insert(event_path!("message"), message);
+                trace.insert(event_path!("trace_key"), trace_key);
+                trace.insert(event_path!("timestamp"), chrono::Utc::now());
 
                 let mut trace_headers = ObjectMap::new();
                 trace_headers.insert(header_key.into(), Value::Bytes(Bytes::from(header_value)));
@@ -472,6 +477,7 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {topic:?}");

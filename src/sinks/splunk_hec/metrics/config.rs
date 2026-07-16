@@ -119,6 +119,10 @@ pub struct HecMetricsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: crate::template::ConfinementConfig,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
@@ -136,6 +140,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             request: TowerRequestConfig::default(),
             tls: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         })
         .unwrap()
     }
@@ -145,6 +150,20 @@ impl GenerateConfig for HecMetricsSinkConfig {
 #[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let mut config = self.clone();
+        config.sourcetype = config
+            .sourcetype
+            .map(|t| t.confine(&self.confinement, Self::NAME, "sourcetype"))
+            .transpose()?;
+        config.source = config
+            .source
+            .map(|t| t.confine(&self.confinement, Self::NAME, "source"))
+            .transpose()?;
+        config.index = config
+            .index
+            .map(|t| t.confine(&self.confinement, Self::NAME, "index"))
+            .transpose()?;
+
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
@@ -152,7 +171,8 @@ impl SinkConfig for HecMetricsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = self.build_processor(client, cx)?;
+        let sink = config.build_processor(client, cx)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 

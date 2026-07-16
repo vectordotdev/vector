@@ -431,16 +431,16 @@ mod tests {
         let mut encoder = config.build_encoder();
 
         let mut event1 = Event::Log(LogEvent::from("hello world"));
-        event1.as_mut_log().insert("app", "notvector");
-        event1.as_mut_log().insert("magic", "vector");
+        event1.as_mut_log().insert(event_path!("app"), "notvector");
+        event1.as_mut_log().insert(event_path!("magic"), "vector");
 
         let mut event2 = Event::Log(LogEvent::from("hello world"));
-        event2.as_mut_log().insert("file", "log.txt");
+        event2.as_mut_log().insert(event_path!("file"), "log.txt");
 
         let event3 = Event::Log(LogEvent::from("hello world"));
 
         let mut event4 = Event::Log(LogEvent::from("hello world"));
-        event4.as_mut_log().insert("env", "staging");
+        event4.as_mut_log().insert(event_path!("env"), "staging");
 
         let event1_out = encoder.encode_event(event1).unwrap().into_parts().0;
         let event1_out = event1_out.as_object().unwrap();
@@ -505,7 +505,7 @@ mod tests {
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.as_str()).with_batch_notifier(&batch);
             let p = i % 2;
-            event.insert("hostname", hosts[p]);
+            event.insert(event_path!("hostname"), hosts[p]);
 
             partitions[p].push(line.into());
             events.push(Event::Log(event));

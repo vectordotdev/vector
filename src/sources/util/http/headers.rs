@@ -220,7 +220,7 @@ mod tests {
             "Checking log contains Content-Type header"
         );
         assert!(
-            !log.contains("user-agent"),
+            !log.contains(vrl::event_path!("user-agent")),
             "Checking log does not contain User-Agent header"
         );
         assert_eq!(
@@ -254,16 +254,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            metric_headers.get("content-type").unwrap(),
+            metric_headers.get(path!("content-type")).unwrap(),
             &value!("application/x-protobuf"),
             "Checking metric contains Content-Type header"
         );
         assert!(
-            !metric_headers.contains("user-agent"),
+            !metric_headers.contains(path!("user-agent")),
             "Checking metric does not contain User-Agent header"
         );
         assert_eq!(
-            metric_headers.get("content-encoding").unwrap(),
+            metric_headers.get(path!("content-encoding")).unwrap(),
             &value!("gzip"),
             "Checking metric contains Content-Encoding header"
         );
@@ -291,16 +291,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            trace_headers.get("content-type").unwrap(),
+            trace_headers.get(path!("content-type")).unwrap(),
             &value!("application/x-protobuf"),
             "Checking trace contains Content-Type header"
         );
         assert!(
-            !trace_headers.contains("user-agent"),
+            !trace_headers.contains(path!("user-agent")),
             "Checking trace does not contain User-Agent header"
         );
         assert_eq!(
-            trace_headers.get("content-encoding").unwrap(),
+            trace_headers.get(path!("content-encoding")).unwrap(),
             &value!("gzip"),
             "Checking trace contains Content-Encoding header"
         );
