@@ -6,8 +6,8 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
-{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations" "chore" "chore"}}
-{{ $orderedGroups := slice "feat" "enhancement" "fix" "deprecation" "chore" }}
+{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "security" "security fixes" "deprecation" "deprecations" "chore" "chore"}}
+{{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
 <div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
   <main id="page-content" aria-label="Release notes" class="lg:col-span-4 md:px-0 pb-32">
