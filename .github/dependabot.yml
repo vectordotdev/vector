@@ -144,6 +144,12 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      cargo-major:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "major"
       cargo-security:
         applies-to: security-updates
         patterns:
