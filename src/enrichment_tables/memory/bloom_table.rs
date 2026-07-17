@@ -147,10 +147,13 @@ impl Table for BloomMemoryTable {
                         key: &key,
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
                     });
-                    let result = ObjectMap::from([(
-                        KeyString::from("key"),
-                        Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
-                    )]);
+                    let result = ObjectMap::from([
+                        (
+                            KeyString::from("key"),
+                            Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
+                        ),
+                        (KeyString::from("value"), Value::Null),
+                    ]);
                     Ok(vec![result])
                 } else {
                     emit!(MemoryEnrichmentTableReadFailed {
