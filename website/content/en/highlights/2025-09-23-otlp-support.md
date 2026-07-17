@@ -16,7 +16,7 @@ badges:
 We are excited to announce that the `opentelemetry` source now supports
 [OpenTelemetry protocol](https://opentelemetry.io/docs/specs/otel/protocol) decoding.
 
-This now possible by using the `use_otlp_decoding` option. This setup allows shipping OTLP formatted logs to an OTEL collector without the
+This is now possible by using the `use_otlp_decoding` option. This setup allows shipping OTLP formatted logs to an OTEL collector without the
 use of a `remap` transform. The same can be done for metrics and traces. However, OTLP formatted metrics cannot be converted to Vector's
 metrics format. As a workaround, the OTLP metrics are converted to Vector log events while preserving the OTLP format. **This prohibits the use of metric
 transforms like `aggregate` but it enables easy shipping to OTEL collectors.**
@@ -72,6 +72,8 @@ otel_sink:
     headers:
       content-type: 'application/x-protobuf'
 ```
+
+The above configuration will only work with Vector versions >= `0.51`.
 
 The `desc` file was generated with the following command:
 
