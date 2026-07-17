@@ -63,6 +63,14 @@ components: sources: host_metrics: {
 				examples: ["/mnt/host/sys"]
 			}
 		}
+
+		ROOTFS_ROOT: {
+			description: "Sets an arbitrary path to the host root filesystem. The filesystem collector resolves mount points relative to this path for capacity and inode metrics while preserving logical mount point labels. Can be used to expose host filesystem metrics from within a container. Unset or empty uses the process mount points directly. Only supported on Unix."
+			type: string: {
+				default: null
+				examples: ["/mnt/host"]
+			}
+		}
 	}
 
 	configuration: generated.components.sources.host_metrics.configuration
