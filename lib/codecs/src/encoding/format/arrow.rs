@@ -13,6 +13,8 @@ use arrow::{
 };
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
+use parquet_variant::VariantBuilder;
+use parquet_variant_json::JsonToVariant;
 use snafu::{ResultExt, Snafu, ensure};
 use vector_config::configurable_component;
 use vector_core::event::Event;
@@ -198,6 +200,15 @@ pub enum ArrowEncodingError {
         source: arrow::error::ArrowError,
     },
 
+    /// Failed to encode a value using the Parquet Variant binary format
+    #[snafu(display("Failed to encode VARIANT field '{field_name}': {source}"))]
+    VariantEncoding {
+        /// The field containing the invalid Variant JSON
+        field_name: String,
+        /// The underlying Variant encoding error
+        source: arrow::error::ArrowError,
+    },
+
     /// Invalid Map schema structure
     #[snafu(display("Invalid Map schema for field '{field_name}': {reason}"))]
     InvalidMapSchema {
@@ -236,6 +247,10 @@ pub fn encode_events_to_arrow_ipc_stream(
 
 /// Recursively makes a Field and all its nested fields nullable
 fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
+    if is_variant_data_type(field.data_type()) {
+        return Ok(field.clone().with_nullable(true));
+    }
+
     let new_data_type = match field.data_type() {
         DataType::List(inner_field) => DataType::List(make_field_nullable(inner_field)?.into()),
         DataType::Struct(fields) => DataType::Struct(
@@ -328,6 +343,18 @@ pub(crate) fn build_record_batch(
         return Err(ArrowEncodingError::NoEvents);
     }
 
+    let mut encoded_values = None;
+    if schema
+        .fields()
+        .iter()
+        .any(|field| data_type_contains_variant(field.data_type()))
+    {
+        let mut values = values.to_vec();
+        encode_variant_fields(&schema, &mut values)?;
+        encoded_values = Some(values);
+    }
+    let values = encoded_values.as_deref().unwrap_or(values);
+
     let missing = find_null_non_nullable_fields(&schema, values);
     if !missing.is_empty() {
         let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
@@ -373,6 +400,132 @@ pub(crate) fn build_record_batch(
         .ok_or(ArrowEncodingError::NoEvents)
 }
 
+fn is_variant_data_type(data_type: &DataType) -> bool {
+    let DataType::Struct(fields) = data_type else {
+        return false;
+    };
+
+    fields.len() == 2
+        && fields[0].name() == "metadata"
+        && fields[0].data_type() == &DataType::LargeBinary
+        && !fields[0].is_nullable()
+        && fields[1].name() == "value"
+        && fields[1].data_type() == &DataType::LargeBinary
+        && !fields[1].is_nullable()
+}
+
+fn data_type_contains_variant(data_type: &DataType) -> bool {
+    if is_variant_data_type(data_type) {
+        return true;
+    }
+
+    match data_type {
+        DataType::Struct(fields) => fields
+            .iter()
+            .any(|field| data_type_contains_variant(field.data_type())),
+        DataType::List(field) | DataType::LargeList(field) | DataType::FixedSizeList(field, _) => {
+            data_type_contains_variant(field.data_type())
+        }
+        DataType::Map(entries, _) => data_type_contains_variant(entries.data_type()),
+        _ => false,
+    }
+}
+
+fn encode_variant_fields(
+    schema: &Schema,
+    values: &mut [serde_json::Value],
+) -> Result<(), ArrowEncodingError> {
+    for value in values {
+        let Some(object) = value.as_object_mut() else {
+            continue;
+        };
+
+        for field in schema.fields() {
+            if let Some(value) = object.get_mut(field.name()) {
+                encode_variant_value(field.data_type(), value, field.name())?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn encode_variant_value(
+    data_type: &DataType,
+    value: &mut serde_json::Value,
+    field_name: &str,
+) -> Result<(), ArrowEncodingError> {
+    if value.is_null() {
+        return Ok(());
+    }
+
+    if is_variant_data_type(data_type) {
+        let owned_json;
+        let json = if let Some(json) = value.as_str() {
+            json
+        } else {
+            owned_json = value.to_string();
+            &owned_json
+        };
+
+        let mut builder = VariantBuilder::new();
+        builder
+            .append_json(json)
+            .map_err(|source| ArrowEncodingError::VariantEncoding {
+                field_name: field_name.to_owned(),
+                source,
+            })?;
+        let (metadata, encoded_value) = builder.finish();
+        *value = serde_json::json!({
+            "metadata": hex::encode(metadata),
+            "value": hex::encode(encoded_value),
+        });
+        return Ok(());
+    }
+
+    match data_type {
+        DataType::Struct(fields) => {
+            if let Some(object) = value.as_object_mut() {
+                for field in fields {
+                    if let Some(value) = object.get_mut(field.name()) {
+                        encode_variant_value(field.data_type(), value, field.name())?;
+                    }
+                }
+            }
+        }
+        DataType::List(field) | DataType::LargeList(field) => {
+            if let Some(values) = value.as_array_mut() {
+                for value in values {
+                    encode_variant_value(field.data_type(), value, field.name())?;
+                }
+            }
+        }
+        DataType::FixedSizeList(field, _) => {
+            if let Some(values) = value.as_array_mut() {
+                for value in values {
+                    encode_variant_value(field.data_type(), value, field.name())?;
+                }
+            }
+        }
+        DataType::Map(entries, _) => {
+            let DataType::Struct(fields) = entries.data_type() else {
+                return Ok(());
+            };
+            let Some(value_field) = fields.get(1) else {
+                return Ok(());
+            };
+            if let Some(object) = value.as_object_mut() {
+                for value in object.values_mut() {
+                    encode_variant_value(value_field.data_type(), value, value_field.name())?;
+                }
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,6 +560,83 @@ mod tests {
             log.insert(&vrl::path::parse_target_path(key).unwrap(), value.into());
         }
         Event::Log(log)
+    }
+
+    fn variant_data_type() -> DataType {
+        DataType::Struct(Fields::from(vec![
+            Field::new("metadata", DataType::LargeBinary, false),
+            Field::new("value", DataType::LargeBinary, false),
+        ]))
+    }
+
+    mod variant {
+        use super::*;
+        use parquet_variant::Variant;
+        use vrl::value::ObjectMap;
+
+        #[test]
+        fn encodes_json_text_as_variant_binary() {
+            let schema =
+                Schema::new(vec![Field::new("attributes", variant_data_type(), false)]).into();
+            let event = create_event(vec![("attributes", r#"{"name":"Alice","age":30}"#)]);
+
+            let batch = encode_and_decode(vec![event], schema).unwrap();
+            let array = batch.column(0).as_struct();
+            let metadata = array.column(0).as_binary::<i64>().value(0);
+            let value = array.column(1).as_binary::<i64>().value(0);
+            let variant = Variant::try_new(metadata, value).unwrap();
+
+            assert!(matches!(variant, Variant::Object(_)));
+        }
+
+        #[test]
+        fn encodes_native_values_in_nested_variant_fields() {
+            let variant = variant_data_type();
+            let map_entries = Field::new(
+                "entries",
+                DataType::Struct(Fields::from(vec![
+                    Field::new("keys", DataType::LargeUtf8, false),
+                    Field::new("values", variant.clone(), true),
+                ])),
+                false,
+            );
+            let payload_type = DataType::Struct(Fields::from(vec![
+                Field::new("nested", variant.clone(), true),
+                Field::new(
+                    "items",
+                    DataType::List(Field::new("item", variant, true).into()),
+                    true,
+                ),
+                Field::new("properties", DataType::Map(map_entries.into(), false), true),
+            ]));
+            let schema = Schema::new(vec![Field::new("payload", payload_type, true)]).into();
+
+            let mut nested = ObjectMap::new();
+            nested.insert("enabled".into(), Value::Boolean(true));
+            let mut properties = ObjectMap::new();
+            properties.insert("first".into(), Value::Integer(42));
+            let mut payload = ObjectMap::new();
+            payload.insert("nested".into(), Value::Object(nested));
+            payload.insert(
+                "items".into(),
+                Value::Array(vec![Value::Integer(1), Value::Boolean(false)]),
+            );
+            payload.insert("properties".into(), Value::Object(properties));
+            let event = create_event(vec![("payload", Value::Object(payload))]);
+
+            let batch = encode_and_decode(vec![event], schema).unwrap();
+            assert_eq!(batch.num_rows(), 1);
+        }
+
+        #[test]
+        fn rejects_invalid_variant_json_text() {
+            let schema =
+                Schema::new(vec![Field::new("attributes", variant_data_type(), true)]).into();
+            let event = create_event(vec![("attributes", "not valid JSON")]);
+
+            let error = encode_and_decode(vec![event], schema).unwrap_err();
+            assert!(error.to_string().contains("attributes"));
+        }
     }
 
     mod comprehensive {
@@ -830,6 +1060,19 @@ mod tests {
             } else {
                 panic!("Expected Struct type for root field");
             }
+        }
+
+        #[test]
+        fn test_make_field_nullable_preserves_variant_children() {
+            let original_field = Field::new("variant", variant_data_type(), false);
+            let nullable_field = make_field_nullable(&original_field).unwrap();
+
+            assert!(nullable_field.is_nullable());
+            let DataType::Struct(fields) = nullable_field.data_type() else {
+                panic!("Expected Struct type for Variant field");
+            };
+            assert!(!fields[0].is_nullable());
+            assert!(!fields[1].is_nullable());
         }
 
         #[test]
