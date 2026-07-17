@@ -846,41 +846,93 @@ mod test {
         // Actual error is an ASN parse, doesn't really matter
     }
 
-    #[test]
-    fn apply_connect_configuration_uses_server_name_for_verification() {
+    // End-to-end regression test for the OpenSSL hostname-mismatch bug: the server presents a
+    // certificate for `localhost` (CN=localhost, no SAN) while the client connects by IP, so the
+    // connection URL host (`127.0.0.1`) does not match the certificate. Verification must instead
+    // use the configured `server_name`.
+    #[tokio::test]
+    async fn server_name_is_used_for_hostname_verification() {
+        use std::{net::SocketAddr, pin::Pin};
+
         use openssl::ssl::{SslConnector, SslMethod};
 
-        let connect_config = || {
-            SslConnector::builder(SslMethod::tls())
-                .unwrap()
-                .build()
-                .configure()
-                .unwrap()
-        };
+        // Connects to `addr` by IP, driving `into_ssl` with `url_host` exactly as
+        // `hyper-openssl` does (it passes the connection URL host).
+        async fn connect(
+            server_name: Option<&str>,
+            url_host: &str,
+            addr: SocketAddr,
+        ) -> std::result::Result<(), String> {
+            let settings = TlsSettings::from_options(Some(&TlsConfig {
+                ca_file: Some("tests/data/ca/intermediate_server/certs/ca-chain.cert.pem".into()),
+                server_name: server_name.map(Into::into),
+                ..Default::default()
+            }))
+            .unwrap();
 
-        // A DNS `server_name` must apply for both SNI and hostname verification
-        // without erroring (regression for the openssl hostname-mismatch bug).
-        let settings = TlsSettings::from_options(Some(&TlsConfig {
-            server_name: Some("www.example.com".into()),
-            ..Default::default()
-        }))
+            let tcp = tokio::net::TcpStream::connect(addr)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+            settings.apply_context(&mut builder).map_err(|e| e.to_string())?;
+            let mut config = builder.build().configure().unwrap();
+            settings
+                .apply_connect_configuration(&mut config)
+                .map_err(|e| e.to_string())?;
+            let ssl = config.into_ssl(url_host).map_err(|e| e.to_string())?;
+            let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
+            Pin::new(&mut stream)
+                .connect()
+                .await
+                .map_err(|e| e.to_string())
+        }
+
+        let server_settings = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
         .unwrap();
-        let mut config = connect_config();
-        settings.apply_connect_configuration(&mut config).unwrap();
+        let reloader = server_settings
+            .reloadable_acceptor()
+            .unwrap()
+            .expect("tls enabled, so an acceptor should exist");
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = server_settings
+            .bind_reloadable(&addr, Some(reloader))
+            .await
+            .unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
 
-        // An IP literal `server_name` must go through the IP verify path.
-        let settings = TlsSettings::from_options(Some(&TlsConfig {
-            server_name: Some("127.0.0.1".into()),
-            ..Default::default()
-        }))
-        .unwrap();
-        let mut config = connect_config();
-        settings.apply_connect_configuration(&mut config).unwrap();
+        // With `server_name` set to the certificate's name, verification uses it and succeeds even
+        // though the connection host is the IP. This passes only because `server_name` is applied
+        // to hostname verification (the bug this fixes).
+        connect(Some("localhost"), "127.0.0.1", local_addr)
+            .await
+            .expect("handshake should succeed when server_name matches the certificate");
 
-        // No `server_name` is still valid.
-        let settings = TlsSettings::from_options(None).unwrap();
-        let mut config = connect_config();
-        settings.apply_connect_configuration(&mut config).unwrap();
+        // Control: without `server_name`, verification falls back to the connection host (the IP),
+        // which the certificate does not cover, so it fails. This proves verification is active.
+        let error = connect(None, "127.0.0.1", local_addr)
+            .await
+            .expect_err("handshake should fail when verifying against the IP");
+        assert!(
+            error.contains("certificate verify failed"),
+            "expected a certificate verification failure, got: {error}"
+        );
+
+        server.abort();
     }
 
     #[test]
