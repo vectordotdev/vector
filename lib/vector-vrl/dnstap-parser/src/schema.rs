@@ -184,6 +184,7 @@ impl DnstapEventSchema {
                 Kind::integer(),
                 None,
             )
+            .optional_field(&DNSTAP_VALUE_PATHS.http_protocol, Kind::bytes(), None)
     }
 
     /// The schema definition for a dns tap message.
