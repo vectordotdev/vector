@@ -533,7 +533,7 @@ impl CuckooMemoryTable {
                     .and_then(|v| u64::try_from(v).ok())
                     .or(Some(self.config.ttl))
                     .map(|v| (v.div_ceil(self.config.scan_interval.get())).max(1))
-                    .and_then(|v| u32::try_from(v).ok());
+                    .map(|v| u32::try_from(v).unwrap_or(u32::MAX));
                 if let Some(ttl) = &mut ttl {
                     let needed_bits = ttl.checked_ilog2().unwrap_or(0) + 1;
                     if needed_bits as usize > self.cuckoo_config.ttl_bits.get() {
