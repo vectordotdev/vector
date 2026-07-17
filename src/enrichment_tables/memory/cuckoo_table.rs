@@ -305,6 +305,19 @@ impl CuckooMemoryTable {
         prev_state: Box<dyn std::any::Any + Send + Sync>,
     ) -> crate::Result<Self> {
         if let Ok(prev_memory) = prev_state.downcast::<CuckooMemoryTable>() {
+            if let Some(path) = &cuckoo_config.persistence_path
+                && let Err(err) = File::open(path)
+                && err.kind() == std::io::ErrorKind::NotFound
+                && let Some(parent) = path.parent()
+                && parent != ""
+                && !fs::metadata(parent).is_ok_and(|m| m.is_dir())
+            {
+                return Err(format!(
+                    "Cuckoo filter persistence path directory ({}) doesn't exist. This will prevent exporting the cuckoo filter state. Fix the `persistence_path` to ensure export works.",
+                    parent.to_str().unwrap_or(""),
+                )
+                    .into());
+            }
             let built_config = Self::build_config(&config, &cuckoo_config)?;
             let built_ttl = built_config.ttl_config().clone();
             if built_config.compatible_layout(&prev_memory.filter.get_configuration())
