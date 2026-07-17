@@ -85,6 +85,16 @@ impl BloomMemoryTable {
     ) -> crate::Result<Self> {
         if let Ok(prev_memory) = prev_state.downcast::<BloomMemoryTable>() {
             if prev_memory.bloom_config == bloom_config {
+                let filter_size = bloom::optimal_bits(
+                    bloom_config.max_entries.get(),
+                    bloom::DEFAULT_FALSE_POSITIVE_RATE,
+                )
+                .div_ceil(8);
+                if let Some(max_byte_size) = config.max_byte_size
+                    && filter_size as u64 > max_byte_size
+                {
+                    return Err(format!("Configured bloom filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of bloom filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+                }
                 Ok(Self {
                     filter: prev_memory.filter,
                     config,
