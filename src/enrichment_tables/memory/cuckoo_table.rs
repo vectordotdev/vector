@@ -571,7 +571,11 @@ impl CuckooMemoryTable {
                     .as_ref()
                     .and_then(|p| value.get(p))
                     .and_then(|v| v.as_integer())
-                    .and_then(|v| i32::try_from(v).ok())
+                    .map(|v| {
+                        i32::try_from(v)
+                            .ok()
+                            .unwrap_or_else(|| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32)
+                    })
                     .unwrap_or(self.cuckoo_config.counter_insertion_increment);
                 self.filter.insert_if_not_present_with_update(
                     k,
