@@ -357,15 +357,17 @@ impl TlsSettings {
             connection.set_use_server_name_indication(false);
             connection.set_verify_hostname(false);
 
+            let server_ip = server_name.parse::<std::net::IpAddr>();
+
             // SNI must be a hostname, not an IP literal.
-            if server_name.parse::<std::net::IpAddr>().is_err() {
+            if server_ip.is_err() {
                 connection.set_hostname(server_name)?;
             }
 
             if self.verify_hostname {
                 let param = connection.param_mut();
                 param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
-                match server_name.parse::<std::net::IpAddr>() {
+                match server_ip {
                     Ok(ip) => param.set_ip(ip)?,
                     Err(_) => param.set_host(server_name)?,
                 }
