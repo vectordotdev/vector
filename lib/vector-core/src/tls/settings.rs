@@ -20,7 +20,7 @@ use openssl::{
     pkey::{PKey, Private},
     ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
     stack::Stack,
-    x509::{X509, store::X509StoreBuilder},
+    x509::{X509, store::X509StoreBuilder, verify::X509CheckFlags},
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -348,11 +348,30 @@ impl TlsSettings {
         &self,
         connection: &mut ConnectConfiguration,
     ) -> std::result::Result<(), openssl::error::ErrorStack> {
-        connection.set_verify_hostname(self.verify_hostname);
         if let Some(server_name) = &self.server_name {
-            // Prevent native TLS lib from inferring default SNI using domain name from url.
+            // Use the configured server name for both SNI and certificate hostname
+            // verification. `ConnectConfiguration::into_ssl` (called by the connector
+            // after this callback) would otherwise apply the URL host to SNI and the
+            // verify parameter, overriding the configured server name and causing a
+            // hostname mismatch. Disabling both here prevents that override.
             connection.set_use_server_name_indication(false);
-            connection.set_hostname(server_name)?;
+            connection.set_verify_hostname(false);
+
+            // SNI must be a hostname, not an IP literal.
+            if server_name.parse::<std::net::IpAddr>().is_err() {
+                connection.set_hostname(server_name)?;
+            }
+
+            if self.verify_hostname {
+                let param = connection.param_mut();
+                param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
+                match server_name.parse::<std::net::IpAddr>() {
+                    Ok(ip) => param.set_ip(ip)?,
+                    Err(_) => param.set_host(server_name)?,
+                }
+            }
+        } else {
+            connection.set_verify_hostname(self.verify_hostname);
         }
         Ok(())
     }
@@ -813,6 +832,43 @@ mod test {
         let _error = TlsSettings::from_options(Some(&options))
             .expect_err("from_options failed to check certificate");
         // Actual error is an ASN parse, doesn't really matter
+    }
+
+    #[test]
+    fn apply_connect_configuration_uses_server_name_for_verification() {
+        use openssl::ssl::{SslConnector, SslMethod};
+
+        let connect_config = || {
+            SslConnector::builder(SslMethod::tls())
+                .unwrap()
+                .build()
+                .configure()
+                .unwrap()
+        };
+
+        // A DNS `server_name` must apply for both SNI and hostname verification
+        // without erroring (regression for the openssl hostname-mismatch bug).
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            server_name: Some("www.example.com".into()),
+            ..Default::default()
+        }))
+        .unwrap();
+        let mut config = connect_config();
+        settings.apply_connect_configuration(&mut config).unwrap();
+
+        // An IP literal `server_name` must go through the IP verify path.
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            server_name: Some("127.0.0.1".into()),
+            ..Default::default()
+        }))
+        .unwrap();
+        let mut config = connect_config();
+        settings.apply_connect_configuration(&mut config).unwrap();
+
+        // No `server_name` is still valid.
+        let settings = TlsSettings::from_options(None).unwrap();
+        let mut config = connect_config();
+        settings.apply_connect_configuration(&mut config).unwrap();
     }
 
     #[test]
