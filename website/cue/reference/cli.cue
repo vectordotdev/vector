@@ -565,8 +565,11 @@ cli: {
 			description: """
 				Sets an arbitrary path to the host root filesystem. The `host_metrics` filesystem
 				collector resolves mount points relative to this path for capacity and inode metrics
-				while preserving logical mount point labels. Unset or empty uses the process mount
-				points directly. Only supported on Unix.
+				while preserving logical host mount point labels. A mount entry equal to this root is
+				labeled `/`, and entries beneath it have the root prefix removed. When a container
+				mount and a root-prefixed mount resolve to the same logical mount point, only the
+				root-prefixed entry is reported. Unset or empty uses the process mount points directly.
+				Only supported on Unix.
 				"""
 			type: string: {
 				default: null
