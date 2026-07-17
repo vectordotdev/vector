@@ -872,6 +872,23 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
+    /// The literal prefix ends before the authority (host + optional port) is
+    /// closed off by a `/`, meaning a `{{ field }}` reference sits inside (or
+    /// directly extends) the host. The static prefix alone is not a complete,
+    /// closed host, so `http::Uri` cannot tell where the operator-authored
+    /// host ends and the event-controlled portion begins.
+    #[snafu(display(
+        "HTTP/HTTPS template {prefix:?} has a `{{{{ field }}}}` reference inside \
+         the authority (host) component: the static prefix does not contain a \
+         `/` after the host, so the rendered host is partly event-controlled. \
+         Add a `/` after the static host in your URI template, or set \
+         `dangerously_allow_unconfined_template_resolution: true` to opt out."
+    ))]
+    PartialUriAuthority {
+        /// The literal prefix whose authority was left unterminated.
+        prefix: String,
+    },
+
     /// The template is an HTTP/HTTPS URI containing `?` or `#` in combination
     /// with `{{ field }}` references.
     ///
@@ -1109,16 +1126,35 @@ impl UriChecker {
                 prefix: prefix.to_string(),
             });
         }
-        match uri.authority() {
-            Some(auth) if !auth.as_str().is_empty() => Ok(Self {
-                scheme,
-                authority: auth.as_str().to_ascii_lowercase(),
-                path_prefix: uri.path().to_string(),
-            }),
-            _ => Err(BuildError::NoStaticUriAuthority {
+        let authority = match uri.authority() {
+            Some(auth) if !auth.as_str().is_empty() => auth.as_str().to_ascii_lowercase(),
+            _ => {
+                return Err(BuildError::NoStaticUriAuthority {
+                    prefix: prefix.to_string(),
+                });
+            }
+        };
+        // `http::Uri` always normalises a missing path to `"/"`, so it can't
+        // tell us whether the literal prefix actually contained a `/` after
+        // the host. Check the raw prefix instead: if there's no `/` after
+        // `://`, the `{{ field }}` reference sits inside (or directly
+        // extends) the authority, so the host we just parsed is not
+        // actually closed off — the rendered host would be partly
+        // event-controlled.
+        let after_scheme = prefix
+            .split_once("://")
+            .map(|(_, rest)| rest)
+            .expect("\"://\" present because prefix starts with http(s)://");
+        if !after_scheme.contains('/') {
+            return Err(BuildError::PartialUriAuthority {
                 prefix: prefix.to_string(),
-            }),
+            });
         }
+        Ok(Self {
+            scheme,
+            authority,
+            path_prefix: uri.path().to_string(),
+        })
     }
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {
@@ -1843,7 +1879,7 @@ mod tests {
 
     #[test]
     fn uri_authority_mismatch_rejected() {
-        let tpl = Template::try_from("https://trusted.example.com{{ path }}").unwrap();
+        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         // Normal path extension is fine.
@@ -1980,9 +2016,36 @@ mod tests {
                 "expected NoStaticUriAuthority for {template_str}"
             );
         }
-        // A template with a static host is accepted.
-        let tpl = Template::try_from("https://trusted.example.com{{ path }}").unwrap();
+        // A template with a static host followed by a `/` is accepted.
+        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_some());
+    }
+
+    #[test]
+    fn partial_uri_authority_rejected() {
+        // `https://tenant.{{ env }}.example.com/` has literal prefix
+        // `https://tenant.` — the `{{ env }}` reference sits inside the
+        // authority (host) component, so the parsed baseline authority
+        // (`tenant.`) never matches any real render (`tenant.prod.example.com`).
+        // Every event would be silently dropped at render time; reject at
+        // build time instead.
+        //
+        // `https://api.internal{{ path }}` has no separator at all between
+        // the static host and the dynamic reference — same vulnerability
+        // class (the "path" directly extends the host).
+        for template_str in &[
+            "https://tenant.{{ env }}.example.com/",
+            "https://api.internal{{ path }}",
+        ] {
+            let tpl = Template::try_from(*template_str).unwrap();
+            assert!(
+                matches!(
+                    ConfinementChecker::for_template(&tpl).unwrap_err(),
+                    BuildError::PartialUriAuthority { .. }
+                ),
+                "expected PartialUriAuthority for {template_str}"
+            );
+        }
     }
 
     #[test]
