@@ -375,10 +375,14 @@ impl TlsSettings {
             }
 
             if self.verify_hostname {
+                // Mirror `ConnectConfiguration::into_ssl`'s `setup_verify_hostname` so that
+                // verification against `server_name` behaves exactly as it would against the
+                // URL host, just with our name instead:
+                // https://github.com/rust-openssl/rust-openssl/blob/db9c9e2f5db2ad7b45fd894e8d297ee15bfd0c7c/openssl/src/ssl/connector.rs#L380-L389
                 let param = connection.param_mut();
-                // Match OpenSSL's own connector defaults: disallow partial-wildcard
-                // matches such as `w*.example.com` matching `www.example.com`, so a
-                // wildcard label must be the entire leftmost label (`*.example.com`).
+                // Disallow partial-wildcard matches such as `w*.example.com` matching
+                // `www.example.com`, so a wildcard label must be the entire leftmost label
+                // (`*.example.com`).
                 param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
                 match server_ip {
                     Ok(ip) => param.set_ip(ip)?,
