@@ -45,6 +45,7 @@ pub(super) struct BloomMemoryTable {
 /// Configuration of bloom filter for memory table.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BloomMemoryConfig {
     /// Maximum number of entries that can be stored in the filter
     pub max_entries: NonZeroUsize,
