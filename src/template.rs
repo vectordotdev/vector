@@ -872,11 +872,6 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
-    /// The literal prefix ends before the authority (host + optional port) is
-    /// closed off by a `/`, meaning a `{{ field }}` reference sits inside (or
-    /// directly extends) the host. The static prefix alone is not a complete,
-    /// closed host, so `http::Uri` cannot tell where the operator-authored
-    /// host ends and the event-controlled portion begins.
     #[snafu(display(
         "HTTP/HTTPS template {prefix:?} has a `{{{{ field }}}}` reference inside \
          the authority (host) component: the static prefix does not contain a \
@@ -1134,13 +1129,10 @@ impl UriChecker {
                 });
             }
         };
-        // `http::Uri` always normalises a missing path to `"/"`, so it can't
-        // tell us whether the literal prefix actually contained a `/` after
-        // the host. Check the raw prefix instead: if there's no `/` after
-        // `://`, the `{{ field }}` reference sits inside (or directly
-        // extends) the authority, so the host we just parsed is not
-        // actually closed off — the rendered host would be partly
-        // event-controlled.
+        // `http::Uri` normalises a missing path to `"/"`, so `uri.path()` can't
+        // tell us whether the prefix actually had a `/` closing off the host. Check
+        // the raw prefix instead: no `/` after `://` means the `{{ field }}`
+        // reference sits inside (or extends) the authority we just parsed.
         let after_scheme = prefix
             .split_once("://")
             .map(|(_, rest)| rest)
@@ -2023,16 +2015,7 @@ mod tests {
 
     #[test]
     fn partial_uri_authority_rejected() {
-        // `https://tenant.{{ env }}.example.com/` has literal prefix
-        // `https://tenant.` — the `{{ env }}` reference sits inside the
-        // authority (host) component, so the parsed baseline authority
-        // (`tenant.`) never matches any real render (`tenant.prod.example.com`).
-        // Every event would be silently dropped at render time; reject at
-        // build time instead.
-        //
-        // `https://api.internal{{ path }}` has no separator at all between
-        // the static host and the dynamic reference — same vulnerability
-        // class (the "path" directly extends the host).
+        // A `{{ field }}` reference inside or directly extending the host.
         for template_str in &[
             "https://tenant.{{ env }}.example.com/",
             "https://api.internal{{ path }}",
