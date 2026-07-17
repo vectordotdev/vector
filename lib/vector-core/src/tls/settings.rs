@@ -877,7 +877,9 @@ mod test {
                 .await
                 .map_err(|e| e.to_string())?;
             let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
-            settings.apply_context(&mut builder).map_err(|e| e.to_string())?;
+            settings
+                .apply_context(&mut builder)
+                .map_err(|e| e.to_string())?;
             let mut config = builder.build().configure().unwrap();
             settings
                 .apply_connect_configuration(&mut config)
