@@ -10,7 +10,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vec_stream::VecStreamExt;
 
-use super::{OutputBuffer, TaskTransform};
+use super::{OutputBuffer, TaskTransform, TaskTransformOutput};
 use crate::event::Event;
 
 /// A structure representing user-defined timer.
@@ -76,7 +76,7 @@ where
     fn transform(
         mut self: Box<Self>,
         input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
@@ -138,6 +138,7 @@ where
                     stream::iter(acc).boxed()
                 })
                 .flatten()
+                .map(TaskTransformOutput::default)
                 .boxed(),
         )
     }

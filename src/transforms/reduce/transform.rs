@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
 use vector_vrl_metrics::MetricsStorage;
@@ -18,7 +18,7 @@ use crate::{
     event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
-        TaskTransform,
+        TaskTransform, TaskTransformOutput,
         reduce::{
             config::ReduceConfig,
             merge_strategy::{MergeStrategy, ReduceValueMerger, get_value_merger},
@@ -316,7 +316,7 @@ impl TaskTransform<Event> for Reduce {
     fn transform(
         self: Box<Self>,
         input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
@@ -332,25 +332,28 @@ pub fn construct_output_stream(
     reduce: Box<Reduce>,
     input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
     mut transform_fn: impl FnMut(&mut Box<Reduce>, Event, &mut Emitter<Event>) + Send + Sync + 'static,
-) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
 where
     Reduce: 'static,
 {
     let flush_period = reduce.flush_period;
-    Box::pin(map_with_expiration(
-        reduce,
-        input_rx,
-        flush_period,
-        move |me, event, emitter| {
-            transform_fn(me, event, emitter);
-        },
-        |me, emitter| {
-            me.flush_into(emitter);
-        },
-        |me, emitter| {
-            me.flush_all_into(emitter);
-        },
-    ))
+    Box::pin(
+        map_with_expiration(
+            reduce,
+            input_rx,
+            flush_period,
+            move |me, event, emitter| {
+                transform_fn(me, event, emitter);
+            },
+            |me, emitter| {
+                me.flush_into(emitter);
+            },
+            |me, emitter| {
+                me.flush_all_into(emitter);
+            },
+        )
+        .map(TaskTransformOutput::default),
+    )
 }
 
 #[cfg(test)]

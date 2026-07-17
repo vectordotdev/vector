@@ -16,7 +16,7 @@ use crate::{
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     template::Template,
-    transforms::TaskTransform,
+    transforms::{TaskTransform, TaskTransformOutput},
 };
 
 #[derive(Clone)]
@@ -94,7 +94,7 @@ where
     fn transform(
         self: Box<Self>,
         mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
@@ -132,7 +132,7 @@ where
                     Some(event)
                 };
                 if let Some(event) = output {
-                    yield event;
+                    yield TaskTransformOutput::default(event);
                 }
             }
         })

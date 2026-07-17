@@ -5,9 +5,9 @@ use futures_util::{Stream, StreamExt as _};
 use vector_lib::{
     config::{DataType, Input, TransformOutput},
     configurable::configurable_component,
-    event::{Event, EventContainer},
+    event::{Event, EventArray, EventContainer},
     schema::Definition,
-    transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
+    transform::{FunctionTransform, OutputBuffer, TaskTransform, TaskTransformOutput, Transform},
 };
 
 use super::TransformType;
@@ -86,13 +86,18 @@ impl TransformConfig for NoopTransformConfig {
         _: &TransformContext,
         definitions: &[(OutputId, Definition)],
     ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
+        let output = TransformOutput::new(
             DataType::all_bits(),
             definitions
                 .iter()
                 .map(|(output, definition)| (output.clone(), definition.clone()))
                 .collect(),
-        )]
+        );
+        if matches!(self.transform_type, TransformType::MultiOutputTask) {
+            vec![output.clone(), output.with_port("named")]
+        } else {
+            vec![output]
+        }
     }
 
     async fn build(&self, _: &TransformContext) -> crate::Result<Transform> {
@@ -108,6 +113,7 @@ impl TransformConfig for NoopTransformConfig {
                 cpu_burn,
             }))),
             TransformType::Task => Ok(Transform::Task(Box::new(NoopTransform { delay, cpu_burn }))),
+            TransformType::MultiOutputTask => Ok(Transform::Task(Box::new(MultiOutputTask))),
         }
     }
 
@@ -156,6 +162,22 @@ impl FunctionTransform for NoopTransform {
     }
 }
 
+struct MultiOutputTask;
+
+impl TaskTransform<EventArray> for MultiOutputTask {
+    fn transform(
+        self: Box<Self>,
+        task: Pin<Box<dyn futures_util::Stream<Item = EventArray> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<EventArray>> + Send>> {
+        Box::pin(task.flat_map(|events| {
+            futures_util::stream::iter([
+                TaskTransformOutput::default(events.clone()),
+                TaskTransformOutput::named("named", events),
+            ])
+        }))
+    }
+}
+
 impl<T> TaskTransform<T> for NoopTransform
 where
     T: EventContainer + Send + 'static,
@@ -163,7 +185,7 @@ where
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn futures_util::Stream<Item = T> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = T> + Send>> {
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<T>> + Send>> {
         let delay = self.delay;
         let cpu_burn = self.cpu_burn;
         if delay.is_some() || cpu_burn.is_some() {
@@ -174,10 +196,10 @@ where
                 if let Some(delay) = delay {
                     tokio::time::sleep(delay).await;
                 }
-                item
+                TaskTransformOutput::default(item)
             }))
         } else {
-            Box::pin(task)
+            Box::pin(task.map(TaskTransformOutput::default))
         }
     }
 }

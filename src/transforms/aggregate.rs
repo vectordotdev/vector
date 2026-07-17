@@ -19,7 +19,7 @@ use crate::{
     event::{Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::{TaskTransform, TaskTransformOutput, Transform},
 };
 
 /// Configuration for the `aggregate` transform.
@@ -380,7 +380,7 @@ impl TaskTransform<Event> for Aggregate {
     fn transform(
         mut self: Box<Self>,
         mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
@@ -409,7 +409,7 @@ impl TaskTransform<Event> for Aggregate {
                     }
                 };
                 for event in output.drain(..) {
-                    yield event;
+                    yield TaskTransformOutput::default(event);
                 }
             }
         })
@@ -1154,7 +1154,7 @@ mod tests {
         // Queue up some events to be consumed & recorded
         let in_stream = Box::pin(stream::iter(inputs));
         // Kick off the transform process which should consume & record them
-        let mut out_stream = agg.transform_events(in_stream);
+        let mut out_stream = agg.transform_events(in_stream).map(|output| output.events);
 
         // B/c the input stream has ended we will have gone through the `input_rx.next() => None`
         // part of the loop and do the shutting down final flush immediately. We'll already be able

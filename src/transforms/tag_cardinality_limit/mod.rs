@@ -2,7 +2,10 @@ use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
-use vector_lib::{event::Event, transform::TaskTransform};
+use vector_lib::{
+    event::Event,
+    transform::{TaskTransform, TaskTransformOutput},
+};
 
 use crate::internal_events::{
     TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
@@ -414,11 +417,15 @@ impl TaskTransform<Event> for TagCardinalityLimit {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+        Box::pin(
+            task.filter_map(move |v| {
+                ready(inner.transform_one(v).map(TaskTransformOutput::default))
+            }),
+        )
     }
 }

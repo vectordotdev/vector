@@ -483,17 +483,17 @@ mod tests {
     }
 
     use crate::event::EventArray;
-    use crate::transforms::TaskTransform;
+    use crate::transforms::{TaskTransform, TaskTransformOutput};
 
     impl TaskTransform<EventArray> for MockTaskTransform {
         fn transform(
             self: Box<Self>,
             task: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
-        ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
+        ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<EventArray>> + Send>> {
             let processing_time = self.processing_time;
             task.map(move |events| {
                 MockClock::advance(processing_time);
-                events
+                TaskTransformOutput::default(events)
             })
             .boxed()
         }

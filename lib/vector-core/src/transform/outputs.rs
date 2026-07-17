@@ -98,12 +98,45 @@ impl TransformOutputs {
         TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity)
     }
 
+    /// Sends one event array to the specified output port.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected output fanout cannot send the event array.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the port was not declared by the transform configuration.
+    pub async fn send_event_array(
+        &mut self,
+        port: Option<&str>,
+        mut events: EventArray,
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        let output = match port {
+            Some(port) => self.named_outputs.get_mut(port),
+            None => self.primary_output.as_mut(),
+        }
+        .expect("unknown output");
+
+        for event in events.iter_events_mut() {
+            super::update_runtime_schema_definition(
+                event,
+                &output.output_id,
+                &output.log_schema_definitions,
+            );
+        }
+        let count = events.len();
+        let byte_size = events.estimated_json_encoded_size_of();
+        output.fanout.send(events, Some(Instant::now())).await?;
+        output.events_sent.emit(CountByteSize(count, byte_size));
+        Ok(())
+    }
+
     /// Sends the events in the buffer to their respective outputs.
     ///
     /// # Errors
     ///
-    /// If an error occurs while sending events to their respective output, an error variant will be
-    /// returned detailing the cause.
+    /// Returns an error if a configured output fanout cannot send its buffered events.
     pub async fn send(
         &mut self,
         buf: &mut TransformOutputsBuf,

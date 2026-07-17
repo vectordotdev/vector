@@ -22,4 +22,8 @@ pub enum TransformType {
 
     /// Transforms events in an asynchronous iterator.
     Task,
+
+    /// Transforms events in an asynchronous iterator and emits them to the default and named
+    /// outputs. Used to exercise task-transform output routing.
+    MultiOutputTask,
 }

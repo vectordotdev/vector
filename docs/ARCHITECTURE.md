@@ -108,9 +108,16 @@ basically just passing the input channel into the `transform` method.
 
 To build the full task, the transform itself is built, some common filtering and
 telemetry are added by wrapping the input stream, and then the input stream is
-passed to the `transform` method. This results in an output stream, which is
-then forwarded to the transform's `Fanout` instance (task transforms do not
-support multiple outputs).
+passed to the `transform` method. This results in a stream of port-tagged output
+batches. The topology applies the selected output's schema metadata and telemetry,
+then forwards the batch to that output's `Fanout` instance. As with synchronous
+transforms, task-transform output ports must be declared ahead of time by the
+transform configuration.
+
+Synchronous transforms receive a borrowed `TransformOutputsBuf` for each call.
+Task transforms instead yield tagged batches because they may emit asynchronously,
+including after a timer fires without new input. Both paths share topology-owned
+routing and backpressure handling.
 
 ![image](https://user-images.githubusercontent.com/333505/156249430-5f82a1e0-8caa-49fe-88b8-290b6ed06ad7.png)
 

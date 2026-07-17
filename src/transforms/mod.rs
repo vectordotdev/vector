@@ -39,8 +39,8 @@ pub mod trace_to_log;
 pub mod window;
 
 pub use vector_lib::transform::{
-    FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
-    TransformOutputsBuf,
+    FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, TaskTransformOutput, Transform,
+    TransformOutputs, TransformOutputsBuf,
 };
 
 #[cfg(test)]

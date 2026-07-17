@@ -100,32 +100,67 @@ pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
 
 dyn_clone::clone_trait_object!(FunctionTransform);
 
+/// An item emitted by a [`TaskTransform`].
+///
+/// The port must correspond to an output declared by the transform's
+/// [`TransformConfig::outputs`](crate::config::TransformConfig::outputs) implementation. `None`
+/// selects the default output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskTransformOutput<T> {
+    pub port: Option<Arc<str>>,
+    pub events: T,
+}
+
+impl<T> TaskTransformOutput<T> {
+    /// Creates output for the default transform port.
+    pub fn default(events: T) -> Self {
+        Self { port: None, events }
+    }
+
+    /// Creates output for a named transform port.
+    pub fn named(port: impl Into<Arc<str>>, events: T) -> Self {
+        Self {
+            port: Some(port.into()),
+            events,
+        }
+    }
+}
+
 /// Transforms that tend to be more complicated runtime style components.
 ///
-/// These require coordination and map a stream of some `T` to some `U`.
+/// These require coordination and map a stream of some `T` to port-tagged output items. The
+/// topology owns routing, schema metadata, telemetry, and backpressure handling for the selected
+/// output port.
 ///
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
 ///   `TaskTransform` or vice versa.
+/// * Output ports must be declared by `TransformConfig::outputs` before the transform is built.
 pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = T> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = T> + Send>>;
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<T>> + Send>>;
 
-    /// Wrap the transform task to process and emit individual
-    /// events. This is used to simplify testing task transforms.
+    /// Wrap the transform task to process and emit individual events. This is used to simplify
+    /// testing task transforms while preserving their selected output ports.
     fn transform_events(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         T: From<Event>,
         T::IntoIter: Send,
     {
         self.transform(task.map(Into::into).boxed())
-            .flat_map(into_event_stream)
+            .flat_map(|output| {
+                let port = output.port;
+                into_event_stream(output.events).map(move |event| TaskTransformOutput {
+                    port: port.clone(),
+                    events: event,
+                })
+            })
             .boxed()
     }
 }
@@ -202,10 +237,16 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
     fn transform(
         self: Box<Self>,
         stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
-        // This is an awful lot of boxes
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<EventArray>> + Send>> {
+        // This is an awful lot of boxes.
         let stream = stream.flat_map(into_event_stream).boxed();
-        Box::new(self.0).transform(stream).map(Into::into).boxed()
+        Box::new(self.0)
+            .transform(stream)
+            .map(|output| TaskTransformOutput {
+                port: output.port,
+                events: output.events.into(),
+            })
+            .boxed()
     }
 }
 

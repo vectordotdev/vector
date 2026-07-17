@@ -8,7 +8,7 @@ use crate::{
     event::Event,
     schema,
     sinks::util::buffer::metrics::{MetricSet, NormalizerConfig, NormalizerSettings},
-    transforms::{TaskTransform, Transform},
+    transforms::{TaskTransform, TaskTransformOutput, Transform},
 };
 
 /// Configuration for the `incremental_to_absolute` transform.
@@ -86,12 +86,16 @@ impl TaskTransform<Event> for IncrementalToAbsolute {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+        Box::pin(
+            task.filter_map(move |v| {
+                ready(inner.transform_one(v).map(TaskTransformOutput::default))
+            }),
+        )
     }
 }
 
@@ -147,7 +151,9 @@ mod tests {
             .unwrap();
         let incremental_to_absolute = incremental_to_absolute.into_task();
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = incremental_to_absolute.transform_events(Box::pin(rx));
+        let mut out_stream = incremental_to_absolute
+            .transform_events(Box::pin(rx))
+            .map(|output| output.events);
 
         let inc_counter_1 = make_metric(
             "incremental_counter",

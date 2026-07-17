@@ -119,3 +119,57 @@ async fn test_task_transform_single_event() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn test_task_transform_routes_to_default_and_named_outputs() {
+    assert_transform_compliance(async {
+        let event = Event::Log(LogEvent::from("multi-output task transform"));
+        let (default_tx, default_rx) = channel();
+        let (named_tx, named_rx) = channel();
+        let mut builder = ConfigBuilder::default();
+
+        builder.add_source(
+            "in",
+            UnitTestSourceConfig {
+                events: vec![event],
+            },
+        );
+        builder.add_transform(
+            "transform",
+            &["in"],
+            NoopTransformConfig::from(TransformType::MultiOutputTask),
+        );
+        builder.add_sink("default", &["transform"], oneshot_sink(default_tx));
+        builder.add_sink("named", &["transform.named"], oneshot_sink(named_tx));
+
+        let config = builder.build().expect("building config should not fail");
+        let (topology, _) = start_topology(config, false).await;
+        topology.stop().await;
+
+        let default_events = default_rx
+            .await
+            .expect("default output must receive an event")
+            .into_events()
+            .collect::<Vec<_>>();
+        let named_events = named_rx
+            .await
+            .expect("named output must receive an event")
+            .into_events()
+            .collect::<Vec<_>>();
+
+        assert_eq!(default_events.len(), 1);
+        assert_eq!(named_events.len(), 1);
+        assert_eq!(
+            default_events[0].metadata().upstream_id(),
+            Some(&OutputId::from("transform"))
+        );
+        assert_eq!(
+            named_events[0].metadata().upstream_id(),
+            Some(&OutputId::from((
+                "transform".to_owned(),
+                Some("named".to_owned()),
+            )))
+        );
+    })
+    .await;
+}

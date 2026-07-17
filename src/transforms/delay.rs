@@ -14,7 +14,7 @@ use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::{TaskTransform, TaskTransformOutput, Transform},
 };
 
 /// Configuration for the `delay` transform.
@@ -164,7 +164,7 @@ impl TaskTransform<Event> for Delay {
     fn transform(
         mut self: Box<Self>,
         mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
@@ -181,7 +181,7 @@ impl TaskTransform<Event> for Delay {
                         let event = res.into_inner();
                         let (result, event) = self.check_condition(event, false);
                         if result {
-                            yield event;
+                            yield TaskTransformOutput::default(event);
                         } else {
                             self.queue.insert(event, self.delay);
                         }
@@ -198,7 +198,7 @@ impl TaskTransform<Event> for Delay {
                             Some(event) => {
                                 let (result, event) = self.check_condition(event, true);
                                 if result {
-                                    yield event
+                                    yield TaskTransformOutput::default(event)
                                 } else {
                                     if self.queue_capacity.get() <= self.queue.len() {
                                         match self.overflow_strategy {
@@ -207,7 +207,7 @@ impl TaskTransform<Event> for Delay {
                                                     let event = next.into_inner();
                                                     let (result, event) = self.check_condition(event, false);
                                                     if result {
-                                                        yield event;
+                                                        yield TaskTransformOutput::default(event);
                                                     } else {
                                                         self.queue.insert(event, self.delay);
                                                     }
@@ -221,7 +221,7 @@ impl TaskTransform<Event> for Delay {
                                                 continue;
                                             }
                                             OverflowStrategy::Forward => {
-                                                yield event;
+                                                yield TaskTransformOutput::default(event);
                                                 continue;
                                             }
                                         }
@@ -316,7 +316,7 @@ mod tests {
         let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
             panic!("Unexpectedly received None or Pending in output stream");
         };
-        assert!(event.try_into_log().is_some());
+        assert!(event.events.try_into_log().is_some());
 
         // We should be pending, because trace event should have been dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
@@ -346,7 +346,7 @@ mod tests {
         let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
             panic!("Unexpectedly received None or Pending in output stream");
         };
-        assert!(event.try_into_trace().is_some());
+        assert!(event.events.try_into_trace().is_some());
 
         // We should be pending, because we are now waiting for the delay
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
@@ -357,6 +357,6 @@ mod tests {
         let Poll::Ready(Some(event)) = futures::poll!(out_stream.next()) else {
             panic!("Unexpectedly received None or Pending in output stream");
         };
-        assert!(event.try_into_log().is_some());
+        assert!(event.events.try_into_log().is_some());
     }
 }

@@ -16,7 +16,7 @@ use crate::{
     internal_events::{LuaGcTriggered, LuaScriptError},
     schema,
     schema::Definition,
-    transforms::{TaskTransform, Transform},
+    transforms::{TaskTransform, TaskTransformOutput, Transform},
 };
 
 #[derive(Debug, Snafu)]
@@ -196,7 +196,7 @@ impl TaskTransform<Event> for Lua {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
@@ -215,7 +215,8 @@ impl TaskTransform<Event> for Lua {
                     }
                 })
             })
-            .flatten(),
+            .flatten()
+            .map(TaskTransformOutput::default),
         )
     }
 }

@@ -35,7 +35,7 @@ use crate::{
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::{TaskTransform, TaskTransformOutput, Transform},
 };
 
 const ACCOUNT_ID_KEY: &str = "account-id";
@@ -312,12 +312,16 @@ impl TaskTransform<Event> for Ec2MetadataTransform {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |event| ready(Some(inner.transform_one(event)))))
+        Box::pin(task.filter_map(move |event| {
+            ready(Some(TaskTransformOutput::default(
+                inner.transform_one(event),
+            )))
+        }))
     }
 }
 

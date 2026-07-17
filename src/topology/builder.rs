@@ -32,11 +32,10 @@ use vector_lib::{
         },
     },
     enrichment::Table,
-    internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
-    transform::update_runtime_schema_definition,
 };
 use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
@@ -924,7 +923,7 @@ impl<'a> Builder<'a> {
         } = node;
         let input_type = input_details.data_type();
 
-        let (mut fanout, control) = Fanout::new(key.clone());
+        let (mut outputs, controls) = TransformOutputs::new(outputs, &key);
 
         let sender = self
             .utilization_registry
@@ -941,54 +940,24 @@ impl<'a> Builder<'a> {
                     events.estimated_json_encoded_size_of(),
                 ))
             });
-        let events_sent = register!(EventsSent::from(internal_event::Output(None)));
-        let output_id = Arc::new(OutputId {
-            component: key.clone(),
-            port: None,
-        });
         let latency_recorder = LatencyRecorder::new(self.config.global.latency_ewma_alpha);
-
-        // Task transforms can only write to the default output, so only a single schema def map is needed
-        let schema_definition_map = outputs
-            .iter()
-            .find(|x| x.port.is_none())
-            .expect("output for default port required for task transforms")
-            .log_schema_definitions
-            .clone()
-            .into_iter()
-            .map(|(key, value)| (key, Arc::new(value)))
-            .collect();
-
-        let stream = t
-            .transform(Box::pin(filtered))
-            .map(move |mut events| {
-                for event in events.iter_events_mut() {
-                    update_runtime_schema_definition(event, &output_id, &schema_definition_map);
-                }
-                let now = Instant::now();
-                latency_recorder.on_send(&mut events, now);
-                (events, now)
-            })
-            .inspect(move |(events, _): &(EventArray, Instant)| {
-                events_sent.emit(CountByteSize(
-                    events.len(),
-                    events.estimated_json_encoded_size_of(),
-                ));
-            });
-        let stream = OutputUtilization::new(output_sender, stream);
+        let stream = t.transform(Box::pin(filtered)).map(move |mut output| {
+            latency_recorder.on_send(&mut output.events, Instant::now());
+            output
+        });
+        let mut stream = OutputUtilization::new(output_sender, stream);
         let transform = async move {
             debug!("Task transform starting.");
 
-            match fanout.send_stream(stream).await {
-                Ok(()) => {
-                    debug!("Task transform finished normally.");
-                    Ok(TaskOutput::Transform)
-                }
-                Err(e) => {
-                    debug!("Task transform finished with an error.");
-                    Err(TaskError::wrapped(e))
-                }
+            while let Some(output) = stream.next().await {
+                outputs
+                    .send_event_array(output.port.as_deref(), output.events)
+                    .await
+                    .map_err(TaskError::wrapped)?;
             }
+
+            debug!("Task transform finished normally.");
+            Ok(TaskOutput::Transform)
         };
 
         let transform = if let Some(cpu_ns) = cpu_ns {
@@ -997,12 +966,17 @@ impl<'a> Builder<'a> {
             transform.boxed()
         };
 
-        let mut outputs = HashMap::new();
-        outputs.insert(OutputId::from(&key), control);
+        let mut output_controls = HashMap::new();
+        for (name, control) in controls {
+            let id = name
+                .map(|name| OutputId::from((&key, name)))
+                .unwrap_or_else(|| OutputId::from(&key));
+            output_controls.insert(id, control);
+        }
 
         let task = Task::new(key, typetag, transform);
 
-        (task, outputs)
+        (task, output_controls)
     }
 }
 

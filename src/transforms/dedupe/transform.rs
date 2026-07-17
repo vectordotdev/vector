@@ -10,7 +10,7 @@ use super::common::FieldMatchConfig;
 use crate::{
     event::{Event, Value},
     internal_events::DedupeEventsDropped,
-    transforms::TaskTransform,
+    transforms::{TaskTransform, TaskTransformOutput},
 };
 
 #[derive(Clone)]
@@ -124,11 +124,15 @@ impl TaskTransform<Event> for Dedupe {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+        Box::pin(
+            task.filter_map(move |v| {
+                ready(inner.transform_one(v).map(TaskTransformOutput::default))
+            }),
+        )
     }
 }

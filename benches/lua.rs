@@ -64,7 +64,7 @@ fn bench_add_fields(c: &mut Criterion) {
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
-            Transform::Task(t) => t.transform_events(Box::pin(rx)),
+            Transform::Task(t) => t.transform_events(Box::pin(rx)).map(|output| output.events),
         };
 
         group.bench_function(name.to_owned(), |b| {
@@ -141,7 +141,7 @@ fn bench_field_filter(c: &mut Criterion) {
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
-            Transform::Task(t) => t.transform_events(Box::pin(rx)),
+            Transform::Task(t) => t.transform_events(Box::pin(rx)).map(|output| output.events),
         };
 
         group.bench_function(name.to_owned(), |b| {

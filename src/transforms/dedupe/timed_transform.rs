@@ -7,7 +7,11 @@ use super::{
     common::{FieldMatchConfig, TimedCacheConfig},
     transform::{CacheEntry, build_cache_entry},
 };
-use crate::{event::Event, internal_events::DedupeEventsDropped, transforms::TaskTransform};
+use crate::{
+    event::Event,
+    internal_events::DedupeEventsDropped,
+    transforms::{TaskTransform, TaskTransformOutput},
+};
 
 #[derive(Clone)]
 pub struct TimedDedupe {
@@ -58,11 +62,15 @@ impl TaskTransform<Event> for TimedDedupe {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    ) -> Pin<Box<dyn Stream<Item = TaskTransformOutput<Event>> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+        Box::pin(
+            task.filter_map(move |v| {
+                ready(inner.transform_one(v).map(TaskTransformOutput::default))
+            }),
+        )
     }
 }
