@@ -1,5 +1,5 @@
 use std::{
-    num::NonZeroU64,
+    num::{NonZeroU64, NonZeroUsize},
     pin::Pin,
     sync::{Arc, RwLock},
     time::Duration,
@@ -48,7 +48,7 @@ pub(super) struct BloomMemoryTable {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
 pub struct BloomMemoryConfig {
     /// Maximum number of entries that can be stored in the filter
-    pub max_entries: usize,
+    pub max_entries: NonZeroUsize,
 }
 
 impl BloomMemoryTable {
@@ -57,15 +57,19 @@ impl BloomMemoryTable {
         config: MemoryConfig,
         bloom_config: BloomMemoryConfig,
     ) -> crate::Result<Self> {
-        let filter_size =
-            bloom::optimal_bits(bloom_config.max_entries, bloom::DEFAULT_FALSE_POSITIVE_RATE)
-                .div_ceil(8);
+        let filter_size = bloom::optimal_bits(
+            bloom_config.max_entries.get(),
+            bloom::DEFAULT_FALSE_POSITIVE_RATE,
+        )
+        .div_ceil(8);
         if let Some(max_byte_size) = config.max_byte_size
             && filter_size as u64 > max_byte_size
         {
             return Err(format!("Configured bloom filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of bloom filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
         }
-        let filter = Arc::new(RwLock::new(BloomFilter::new(bloom_config.max_entries)));
+        let filter = Arc::new(RwLock::new(BloomFilter::new(
+            bloom_config.max_entries.get(),
+        )));
 
         Ok(Self {
             config,
@@ -254,7 +258,9 @@ mod tests {
     use super::*;
 
     fn build_bloom_config(modfn: impl Fn(&mut BloomMemoryConfig)) -> BloomMemoryConfig {
-        let mut config = BloomMemoryConfig { max_entries: 1000 };
+        let mut config = BloomMemoryConfig {
+            max_entries: NonZeroUsize::new(1000).unwrap(),
+        };
         modfn(&mut config);
         config
     }
