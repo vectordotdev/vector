@@ -376,6 +376,9 @@ impl TlsSettings {
 
             if self.verify_hostname {
                 let param = connection.param_mut();
+                // Match OpenSSL's own connector defaults: disallow partial-wildcard
+                // matches such as `w*.example.com` matching `www.example.com`, so a
+                // wildcard label must be the entire leftmost label (`*.example.com`).
                 param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
                 match server_ip {
                     Ok(ip) => param.set_ip(ip)?,
