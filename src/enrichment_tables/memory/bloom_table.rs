@@ -238,6 +238,11 @@ impl StreamSink<Event> for BloomMemoryTable {
 
 #[cfg(test)]
 mod tests {
+    use futures::future::ready;
+    use vector_lib::{event::LogEvent, sink::VectorSink};
+
+    use crate::test_util::components::{SINK_TAGS, run_and_assert_sink_compliance};
+
     use super::*;
 
     fn build_bloom_config(modfn: impl Fn(&mut BloomMemoryConfig)) -> BloomMemoryConfig {
@@ -258,6 +263,81 @@ mod tests {
         };
 
         let result = memory.find_table_row(Case::Sensitive, &[condition], None, None, None);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
+    }
+
+    #[tokio::test]
+    async fn sink_spec_compliance() {
+        let event = Event::Log(LogEvent::from(ObjectMap::from([(
+            "test_key".into(),
+            Value::from(5),
+        )])));
+
+        let memory = BloomMemoryTable::new(Default::default(), build_bloom_config(|_| {}))
+            .expect("default bloom memory table should build correctly");
+
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(memory),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
+    }
+
+    #[test]
+    fn missing_key() {
+        let memory = BloomMemoryTable::new(Default::default(), build_bloom_config(|_| {}))
+            .expect("default bloom memory table should build correctly");
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        assert!(
+            memory
+                .find_table_rows(Case::Sensitive, &[condition], None, None, None)
+                .unwrap()
+                .pop()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn restores_state() {
+        let memory = BloomMemoryTable::new(Default::default(), build_bloom_config(|_| {}))
+            .expect("default bloom memory table should build correctly");
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        let result = memory.find_table_row(
+            Case::Sensitive,
+            std::slice::from_ref(&condition),
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
+
+        let restored_memory = BloomMemoryTable::from_previous_state(
+            Default::default(),
+            build_bloom_config(|_| {}),
+            memory
+                .extract_state()
+                .expect("bloom memory table should allow state extraction"),
+        )
+        .expect("bloom memory table build from previous state should succeed");
+
+        let result =
+            restored_memory.find_table_row(Case::Sensitive, &[condition], None, None, None);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
