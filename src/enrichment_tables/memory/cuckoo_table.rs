@@ -558,7 +558,10 @@ impl CuckooMemoryTable {
                             self.config.scan_interval.get()
                         );
                         // Unchecked conversion to u32, because ttl_bits can't be higher than 32 anyways
-                        *ttl = 2_u32.pow(self.cuckoo_config.ttl_bits.get() as u32) - 1;
+                        *ttl = 2_u32
+                            .checked_pow(self.cuckoo_config.ttl_bits.get() as u32)
+                            .map(|ttl| ttl - 1)
+                            .unwrap_or(u32::MAX);
                     }
                 }
                 let counter = self
