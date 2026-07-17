@@ -225,6 +225,16 @@ impl TlsSettings {
         })
     }
 
+    /// The configured SNI server name override, if any.
+    pub fn server_name(&self) -> Option<&str> {
+        self.server_name.as_deref()
+    }
+
+    /// Whether certificate hostname verification is enabled.
+    pub fn verify_hostname(&self) -> bool {
+        self.verify_hostname
+    }
+
     /// Returns the identity as PEM encoded byte arrays
     ///
     /// # Panics
