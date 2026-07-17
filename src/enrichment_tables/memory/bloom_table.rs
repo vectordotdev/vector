@@ -6,7 +6,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bloomy::BloomFilter;
+use bloomy::{BloomFilter, bloom};
 use bytes::Bytes;
 use futures::{
     Stream, StreamExt,
@@ -57,6 +57,14 @@ impl BloomMemoryTable {
         config: MemoryConfig,
         bloom_config: BloomMemoryConfig,
     ) -> crate::Result<Self> {
+        let filter_size =
+            bloom::optimal_bits(bloom_config.max_entries, bloom::DEFAULT_FALSE_POSITIVE_RATE)
+                .div_ceil(8);
+        if let Some(max_byte_size) = config.max_byte_size
+            && filter_size as u64 > max_byte_size
+        {
+            return Err(format!("Configured bloom filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of bloom filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+        }
         let filter = Arc::new(RwLock::new(BloomFilter::new(bloom_config.max_entries)));
 
         Ok(Self {
