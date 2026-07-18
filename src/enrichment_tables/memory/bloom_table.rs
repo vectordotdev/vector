@@ -245,14 +245,6 @@ impl StreamSink<Event> for BloomMemoryTable {
                     finalizers.update_status(EventStatus::Delivered);
                     events_sent.emit(CountByteSize(1, event_byte_size));
                     bytes_sent.emit(ByteSize(event_byte_size.get()));
-
-                    if self.config.flush_interval.is_none() {
-                        let filter = self.filter.read().expect("rwlock poisoned");
-                        emit!(MemoryEnrichmentTableFlushed {
-                            new_objects_count: filter.count(),
-                            new_byte_size: filter.bits() / 8
-                        });
-                    }
                 },
 
                 Some(_) = flush_interval.next() => {
