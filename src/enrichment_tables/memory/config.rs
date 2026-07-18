@@ -274,6 +274,12 @@ impl EnrichmentTableConfig for MemoryConfig {
                 if self.source_config.is_some() {
                     return Err("Source functionality is not supported for bloom filter".into());
                 }
+                if self.ttl_field.path.is_some() || self.ttl != default_ttl() {
+                    return Err("TTL functionality is not supported for bloom filter.".into());
+                }
+                if self.scan_interval != default_scan_interval() {
+                    return Err("`scan_interval` has no effect for bloom filter.".into());
+                }
                 Ok(Box::new(self.get_or_build_bloom(prev_state).await?))
             }
             None => Ok(Box::new(self.get_or_build_memory(prev_state).await)),
