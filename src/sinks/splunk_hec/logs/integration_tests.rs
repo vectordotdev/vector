@@ -133,6 +133,7 @@ async fn config(
         timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
+        confinement: Default::default(),
     }
 }
 
@@ -309,13 +310,13 @@ async fn splunk_index_is_interpolated() {
 
     let indexed_fields = vec!["asdf".into()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
-    config.index = Template::try_from("{{ index_name }}".to_string()).ok();
+    config.index = Template::try_from("custom_{{ index_name }}".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
     let mut event = LogEvent::from(message.clone());
-    event.insert(event_path!("index_name"), "custom_index");
+    event.insert(event_path!("index_name"), "index");
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;

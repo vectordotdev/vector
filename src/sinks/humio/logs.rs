@@ -139,6 +139,9 @@ pub struct HumioLogsConfig {
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[serde(default = "config_timestamp_key_target_path")]
     pub timestamp_key: OptionalTargetPath,
+
+    #[serde(flatten)]
+    pub confinement: crate::template::ConfinementConfig,
 }
 
 fn default_endpoint() -> String {
@@ -167,6 +170,7 @@ impl GenerateConfig for HumioLogsConfig {
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
             timestamp_key: config_timestamp_key_target_path(),
+            confinement: Default::default(),
         })
         .unwrap()
     }
@@ -176,7 +180,9 @@ impl GenerateConfig for HumioLogsConfig {
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.build_hec_config().build(cx).await
+        let result = self.build_without_confinement_gauge(cx, Self::NAME)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        Ok(result)
     }
 
     fn input(&self) -> Input {
@@ -189,6 +195,21 @@ impl SinkConfig for HumioLogsConfig {
 }
 
 impl HumioLogsConfig {
+    /// Confinement + sink construction without emitting the per-sink
+    /// confinement gauge. `component_name` is threaded through so both the
+    /// gauge (emitted by the caller) and per-template security warnings
+    /// carry the outer sink type — `humio_logs` when this is the top-level
+    /// sink, `humio_metrics` when [`HumioMetricsConfig::build`] delegates
+    /// here.
+    pub(super) fn build_without_confinement_gauge(
+        &self,
+        cx: SinkContext,
+        component_name: &'static str,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_hec_config()
+            .build_without_confinement_gauge(cx, component_name)
+    }
+
     fn build_hec_config(&self) -> HecLogsSinkConfig {
         HecLogsSinkConfig {
             default_token: self.token.clone(),
@@ -211,6 +232,7 @@ impl HumioLogsConfig {
             timestamp_key: Some(config_timestamp_key_target_path()),
             endpoint_target: EndpointTarget::Event,
             auto_extract_timestamp: None,
+            confinement: self.confinement.clone(),
         }
     }
 }
@@ -400,6 +422,7 @@ mod integration_tests {
             timestamp_nanos_key: timestamp_nanos_key(),
             acknowledgements: Default::default(),
             timestamp_key: Default::default(),
+            confinement: Default::default(),
         }
     }
 

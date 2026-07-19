@@ -55,6 +55,7 @@ jobs:
           unixodbc: true
           cargo-nextest: ${{ inputs.cargo_nextest }}
           datadog-ci: ${{ inputs.upload_test_results }}
+          cargo-cache: true
       - run: make ${{ inputs.command }}
       - name: Upload test results
         run: scripts/upload-test-results.sh

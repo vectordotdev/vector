@@ -1,0 +1,45 @@
+name: Warm Cache
+
+# Producer for the shared Rust build cache consumed by test.yml jobs.
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".cargo/config.toml"
+      - "**/Cargo.toml"
+      - ".github/actions/setup/**"
+      - ".github/workflows/warm-cache.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warm-cache
+  cancel-in-progress: false
+
+jobs:
+  warm:
+    name: Warm shared workspace cache
+    runs-on: ubuntu-24.04-8core
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          libsasl2: true
+          cargo-cache: true
+          cache-save: true
+
+      # cargo build (not check) so cached deps include .rlib for cargo test consumers.
+      # --all-features to match `vdev check rust` used by check-clippy, so
+      # optional deps (rdkafka, ...) are in the cache.
+      - name: Seed build
+        run: cargo build --workspace --tests --all-features --locked

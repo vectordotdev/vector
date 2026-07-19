@@ -177,7 +177,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
           datadog-ci: true
 
       - name: Pull test runner image
@@ -259,7 +258,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
           datadog-ci: true
 
       - name: Pull test runner image

@@ -245,6 +245,7 @@ async fn splunk_passthrough_token() {
         timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
+        confinement: Default::default(),
     };
     let cx = SinkContext::default();
 

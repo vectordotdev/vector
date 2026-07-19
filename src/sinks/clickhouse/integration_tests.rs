@@ -363,7 +363,7 @@ async fn templated_table() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: "{{ .table }}".try_into().unwrap(),
+        table: "vec_{{ .table }}".try_into().unwrap(),
         batch,
         ..Default::default()
     };
@@ -372,7 +372,7 @@ async fn templated_table() {
     for (table, _, _) in &table_events {
         client
             .create_table(
-                table,
+                &format!("vec_{table}"),
                 "host String, timestamp String, message String, table String",
             )
             .await;
@@ -387,19 +387,20 @@ async fn templated_table() {
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     for (table, event, mut receiver) in table_events {
-        let output = client.select_all(&table).await;
-        assert_eq!(1, output.rows, "table {table} should have 1 row");
+        let prefixed = format!("vec_{table}");
+        let output = client.select_all(&prefixed).await;
+        assert_eq!(1, output.rows, "table {prefixed} should have 1 row");
 
         let expected = serde_json::to_value(event.into_log()).unwrap();
         assert_eq!(
             expected, output.data[0],
-            "table \"{table}\"'s one row should have the correct data"
+            "table \"{prefixed}\"'s one row should have the correct data"
         );
 
         assert_eq!(
             receiver.try_recv(),
             Ok(BatchStatus::Delivered),
-            "table \"{table}\"'s event should have been delivered"
+            "table \"{prefixed}\"'s event should have been delivered"
         );
     }
 }

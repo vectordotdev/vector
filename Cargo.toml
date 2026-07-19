@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.57.0"
+version = "0.58.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -167,6 +167,7 @@ const-str = { version = "1.1.0", default-features = false }
 convert_case = { version = "0.8", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
+cuckoo-clock = { version = "0.2.7" , default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -236,6 +237,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false, features = ["v
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
+zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.4" }
 strum = { version = "0.28", features = ["derive"] }
@@ -351,7 +353,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { version = "2.3.0", optional = true, features = ["arrow-flight"] }
+databricks-zerobus-ingest-sdk = { version = "2.3.1", optional = true, features = ["arrow-flight"] }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
@@ -395,6 +397,7 @@ chrono.workspace = true
 chrono-tz.workspace = true
 colored.workspace = true
 csv = { version = "1.3", default-features = false }
+cuckoo-clock = { workspace = true, optional = true }
 databend-client = { version = "0.28.0", default-features = false, features = ["rustls"], optional = true }
 derivative.workspace = true
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
@@ -460,6 +463,7 @@ sqlx = { version = "0.8.6", default-features = false, features = ["derive", "pos
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
+tempfile = { workspace = true, optional = true }
 tokio-postgres = { version = "0.7.18", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
@@ -470,7 +474,7 @@ thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
 warp = { version = "0.3.7", default-features = false }
-zstd = { version = "0.13.0", default-features = false }
+zstd.workspace = true
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
@@ -533,7 +537,7 @@ vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
-zstd = { version = "0.13.0", default-features = false }
+zstd.workspace = true
 
 [patch.crates-io]
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
@@ -670,7 +674,7 @@ gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 enrichment-tables-mmdb = ["dep:maxminddb"]
-enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
+enrichment-tables-memory = ["dep:cuckoo-clock", "dep:evmap", "dep:evmap-derive", "dep:thread_local", "dep:tempfile"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
@@ -740,7 +744,7 @@ sources-metrics = [
 sources-amqp = ["lapin", "async-rs"]
 sources-apache_metrics = ["sources-utils-http-client"]
 sources-aws_ecs_metrics = ["sources-utils-http-client"]
-sources-aws_kinesis_firehose = ["dep:base64"]
+sources-aws_kinesis_firehose = ["dep:base64", "sources-http_server", "sources-utils-http-encoding"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
@@ -789,7 +793,7 @@ sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vec
 sources-pulsar = ["dep:pulsar"]
 sources-redis = ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
-sources-splunk_hec = ["dep:roaring"]
+sources-splunk_hec = ["dep:roaring", "sources-utils-http-encoding"]
 sources-statsd = ["sources-utils-net", "tokio-util/net"]
 sources-stdin = ["tokio-util/io"]
 sources-syslog = ["codecs-syslog", "sources-utils-net", "tokio-util/net"]

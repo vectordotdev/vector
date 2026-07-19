@@ -65,6 +65,7 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         self::sink::healthcheck(config, Default::default())
             .await
@@ -93,6 +94,7 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         self::sink::healthcheck(config, Default::default())
             .await
@@ -196,6 +198,7 @@ mod integration_test {
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         config.clone().to_rdkafka()?;
         self::sink::healthcheck(config.clone(), Default::default()).await?;
@@ -341,6 +344,7 @@ mod integration_test {
                 librdkafka_options: HashMap::new(),
                 headers_key: Some(headers_key.clone()),
                 acknowledgements: Default::default(),
+                confinement: Default::default(),
             };
 
             let num_events = 100;
@@ -473,6 +477,7 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {topic:?}");

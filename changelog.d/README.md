@@ -23,7 +23,7 @@ This is enforced during CI.
 To mark a PR as not requiring user-facing changelog notes, add the label 'no-changelog'.
 
 To run the same check that is run in CI to validate that your changelog fragments have
-the correct syntax, commit the fragment additions and then run ./scripts/check_changelog_fragments.sh
+the correct syntax, commit the fragment additions and then run `make check-changelog-fragments`.
 
 The format for fragments is: `<unique_name>.<fragment_type>.md`
 
@@ -47,7 +47,6 @@ Filename rules:
 
 - `breaking`: A change that is incompatible with prior versions which requires users to make adjustments.
 - `security`: A change that is has implications for security.
-- `deprecation`: A change that is introducing a deprecation.
 - `feature`: A change that is introducing a new feature.
 - `enhancement`: A change that is enhancing existing functionality in a user perceivable way.
 - `fix`: A change that is fixing a bug.

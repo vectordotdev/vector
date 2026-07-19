@@ -51,5 +51,6 @@ jobs:
           libsasl2: true
           unixodbc: true
           cargo-hack: true
+          cargo-cache: true
 
       - run: make check-component-features

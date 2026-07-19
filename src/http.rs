@@ -212,6 +212,22 @@ pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    // `server_name` is not applied to proxied (tunneled) TLS connections, because
+    // `hyper-proxy` offers no per-connection callback and verifies against the URL
+    // host. Warn when the combination that would silently misbehave is configured.
+    if proxy_config.enabled
+        && (proxy_config.http.is_some() || proxy_config.https.is_some())
+        && let Some(tls) = tls_settings.tls()
+        && tls.server_name().is_some()
+        && tls.verify_hostname()
+    {
+        warn!(
+            message = "`tls.server_name` is set with hostname verification enabled, but a proxy is configured. \
+                       `server_name` is not applied to proxied (tunneled) TLS connections, so certificate \
+                       verification may fail with a hostname mismatch."
+        );
+    }
+
     // Create dedicated TLS connector for the proxied connection with user TLS settings.
     let tls = tls_connector_builder(&tls_settings)
         .context(BuildTlsConnectorSnafu)?
