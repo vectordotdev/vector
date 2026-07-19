@@ -32,12 +32,14 @@ impl BuildError {
 
 /// Whether a Redis error is transient (worth reconnecting) rather than non-recoverable.
 ///
-/// I/O errors — unreachable server, connection reset, timeout, TLS failures — are treated
-/// as transient. Anything else (e.g. authentication/permission/config rejections of
-/// `SUBSCRIBE`) is treated as permanent, so an invalid configuration fails fast instead of
-/// silently retrying forever.
+/// Uses redis-rs's own retry classification: only `RetryMethod::NoRetry` — e.g.
+/// authentication/permission/config rejections of `SUBSCRIBE` — is treated as permanent, so
+/// an invalid configuration fails fast instead of retrying forever. Everything else is
+/// transient: I/O failures (unreachable/reset/timeout) and server-side retryable states such
+/// as `LOADING`/`BUSYLOADING`/`TRYAGAIN` reported while a Redis node is restarting — exactly
+/// the recovery scenario this source is meant to survive.
 fn is_transient(error: &redis::RedisError) -> bool {
-    error.kind() == redis::ErrorKind::IoError
+    !matches!(error.retry_method(), redis::RetryMethod::NoRetry)
 }
 
 /// Defines how a pub/sub "session" ended.
