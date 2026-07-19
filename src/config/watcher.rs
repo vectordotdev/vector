@@ -9,7 +9,8 @@ use std::{
 
 use crate::{
     Error,
-    config::{ComponentConfig, ComponentType, Format},
+    config::{ComponentConfig, ComponentKey, ComponentType, Format},
+    signal::SignalTo,
 };
 
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
@@ -93,7 +94,46 @@ fn has_vector_config_change(
     false
 }
 
-/// Sends a ReloadFromDisk or ReloadEnrichmentTables on config_path changes.
+/// Chooses the reload signal for one debounce batch of watched file changes.
+///
+/// When Vector config files changed, emit [`SignalTo::ReloadFromDisk`] so the
+/// config update is not dropped (#24541). Topology reload then reloads changed
+/// enrichment tables via `needs_reload`. If non-enrichment component files
+/// (e.g. sink TLS material) also changed in the same batch, emit
+/// [`SignalTo::ReloadComponents`] instead: that path still reloads config (and
+/// enrichment tables via `needs_reload`) while also force-restarting those
+/// components.
+fn reload_signal(
+    vector_config_changed: bool,
+    changed_components: &HashMap<ComponentKey, ComponentType>,
+) -> SignalTo {
+    if vector_config_changed {
+        let components_to_force: HashSet<_> = changed_components
+            .iter()
+            .filter(|(_, component_type)| **component_type != ComponentType::EnrichmentTable)
+            .map(|(key, _)| key.clone())
+            .collect();
+
+        if components_to_force.is_empty() {
+            SignalTo::ReloadFromDisk
+        } else {
+            SignalTo::ReloadComponents(components_to_force)
+        }
+    } else if !changed_components.is_empty() {
+        if changed_components
+            .values()
+            .all(|component_type| *component_type == ComponentType::EnrichmentTable)
+        {
+            SignalTo::ReloadEnrichmentTables
+        } else {
+            SignalTo::ReloadComponents(changed_components.keys().cloned().collect())
+        }
+    } else {
+        SignalTo::ReloadFromDisk
+    }
+}
+
+/// Sends reload signals on config and component file changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
@@ -105,7 +145,7 @@ pub fn spawn_thread<'a>(
     delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {
     // Keep Vector config paths separate from component-referenced files so signal
-    // selection can prefer ReloadFromDisk when the main config changes, even if
+    // selection can reload config when the main config changes, even if
     // enrichment tables (or other component files) changed in the same batch.
     let vector_config_paths: Vec<_> = config_paths.into_iter().cloned().collect();
     let mut watch_paths = vector_config_paths.clone();
@@ -170,61 +210,43 @@ pub fn spawn_thread<'a>(
                         debug!(message = "Reloaded paths.");
 
                         info!("Configuration file changed.");
-                        // Prefer a full config reload whenever Vector config files changed.
-                        // Otherwise a concurrent enrichment-table file change would narrow the
-                        // signal to ReloadEnrichmentTables and drop the config update (#24541).
-                        if has_vector_config_change(&changed_paths, &vector_config_paths) {
-                            _ = signal_tx
-                                .send(crate::signal::SignalTo::ReloadFromDisk)
-                                .map_err(|error| {
-                                    error!(
-                                        message = "Unable to reload configuration file. Restart Vector to reload it.",
-                                        cause = %error,
-                                        internal_log_rate_limit = false,
-                                    )
-                                });
-                        } else if !changed_components.is_empty() {
-                            if changed_components
-                                .iter()
-                                .all(|(_, t)| *t == ComponentType::EnrichmentTable)
-                            {
+                        let signal = reload_signal(
+                            has_vector_config_change(&changed_paths, &vector_config_paths),
+                            &changed_components,
+                        );
+                        match signal {
+                            signal @ SignalTo::ReloadEnrichmentTables => {
                                 info!(
                                     "Component {:?} configuration changed.",
                                     changed_components.keys()
                                 );
                                 info!("Only enrichment tables have changed.");
-                                _ = signal_tx
-                                    .send(crate::signal::SignalTo::ReloadEnrichmentTables)
-                                    .map_err(|error| {
-                                        error!(
-                                            message = "Unable to reload enrichment tables.",
-                                            cause = %error,
-                                            internal_log_rate_limit = false,
-                                        )
-                                    });
-                            } else {
-                                _ = signal_tx
-                                    .send(crate::signal::SignalTo::ReloadComponents(
-                                        changed_components.into_keys().collect(),
-                                    ))
-                                    .map_err(|error| {
-                                        error!(
-                                            message = "Unable to reload component configuration. Restart Vector to reload it.",
-                                            cause = %error,
-                                            internal_log_rate_limit = false,
-                                        )
-                                    });
+                                _ = signal_tx.send(signal).map_err(|error| {
+                                    error!(
+                                        message = "Unable to reload enrichment tables.",
+                                        cause = %error,
+                                        internal_log_rate_limit = false,
+                                    )
+                                });
                             }
-                        } else {
-                            _ = signal_tx
-                                .send(crate::signal::SignalTo::ReloadFromDisk)
-                                .map_err(|error| {
+                            signal @ SignalTo::ReloadComponents(_) => {
+                                _ = signal_tx.send(signal).map_err(|error| {
+                                    error!(
+                                        message = "Unable to reload component configuration. Restart Vector to reload it.",
+                                        cause = %error,
+                                        internal_log_rate_limit = false,
+                                    )
+                                });
+                            }
+                            signal => {
+                                _ = signal_tx.send(signal).map_err(|error| {
                                     error!(
                                         message = "Unable to reload configuration file. Restart Vector to reload it.",
                                         cause = %error,
                                         internal_log_rate_limit = false,
                                     )
                                 });
+                            }
                         }
                     } else {
                         debug!(message = "Ignoring event.", event = ?event)
@@ -278,9 +300,12 @@ fn create_watcher(
 
 #[cfg(test)]
 mod unit_tests {
-    use std::{collections::HashSet, path::PathBuf};
+    use std::collections::{HashMap, HashSet};
+    use std::path::PathBuf;
 
-    use super::has_vector_config_change;
+    use super::{has_vector_config_change, reload_signal};
+    use crate::config::{ComponentKey, ComponentType};
+    use crate::signal::SignalTo;
 
     #[test]
     fn detects_exact_vector_config_file_change() {
@@ -315,6 +340,73 @@ mod unit_tests {
         let changed = HashSet::from([PathBuf::from("/etc/vector/tls.crt")]);
 
         assert!(!has_vector_config_change(&changed, &[config]));
+    }
+
+    #[test]
+    fn config_only_reload_from_disk() {
+        assert_eq!(
+            reload_signal(true, &HashMap::new()),
+            SignalTo::ReloadFromDisk
+        );
+    }
+
+    #[test]
+    fn config_with_enrichment_reload_from_disk() {
+        // Prefer ReloadFromDisk so the config update is not dropped (#24541).
+        // Enrichment CSV content is still reloaded via needs_reload on topology rebuild.
+        let changed =
+            HashMap::from([(ComponentKey::from("geoip"), ComponentType::EnrichmentTable)]);
+
+        assert_eq!(reload_signal(true, &changed), SignalTo::ReloadFromDisk);
+    }
+
+    #[test]
+    fn config_with_sink_file_reload_components() {
+        // Concurrent sink external-file changes must not be dropped.
+        let sink = ComponentKey::from("http");
+        let changed = HashMap::from([(sink.clone(), ComponentType::Sink)]);
+
+        assert_eq!(
+            reload_signal(true, &changed),
+            SignalTo::ReloadComponents(HashSet::from([sink]))
+        );
+    }
+
+    #[test]
+    fn config_with_sink_and_enrichment_reload_components_for_sink() {
+        // Force-restart the sink; config and enrichment still reload via topology rebuild.
+        let sink = ComponentKey::from("http");
+        let changed = HashMap::from([
+            (sink.clone(), ComponentType::Sink),
+            (ComponentKey::from("geoip"), ComponentType::EnrichmentTable),
+        ]);
+
+        assert_eq!(
+            reload_signal(true, &changed),
+            SignalTo::ReloadComponents(HashSet::from([sink]))
+        );
+    }
+
+    #[test]
+    fn enrichment_only_reload_enrichment_tables() {
+        let changed =
+            HashMap::from([(ComponentKey::from("geoip"), ComponentType::EnrichmentTable)]);
+
+        assert_eq!(
+            reload_signal(false, &changed),
+            SignalTo::ReloadEnrichmentTables
+        );
+    }
+
+    #[test]
+    fn sink_only_reload_components() {
+        let sink = ComponentKey::from("http");
+        let changed = HashMap::from([(sink.clone(), ComponentType::Sink)]);
+
+        assert_eq!(
+            reload_signal(false, &changed),
+            SignalTo::ReloadComponents(HashSet::from([sink]))
+        );
     }
 }
 
