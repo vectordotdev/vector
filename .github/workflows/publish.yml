@@ -212,7 +212,6 @@ jobs:
         with:
           rust: true
           protoc: true
-          unixodbc: true
       - name: Build Vector
         env:
           TARGET: "${{ matrix.architecture }}-apple-darwin"
