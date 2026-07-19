@@ -25,12 +25,13 @@ impl InputHandler {
         Ok(Box::pin(async move {
             let mut shutdown = self.cx.shutdown.clone();
 
-            // Exponential backoff between retries after an I/O error: 500ms, 1s, 2s, 4s,
-            // ... capped at 30s. Shares the strategy used by the `channel` source and
-            // `aws_s3`/`sqs`. Reset once a value is successfully received.
+            // Exponential backoff between retries after an I/O error: 500ms, then capped at
+            // 1s. Uses the shared `ExponentialBackoff` helper (as the `channel` source does)
+            // but keeps this source's prior 1s cap so recovery latency after a Redis outage
+            // is unchanged. Reset once a value is successfully received.
             let mut backoff = ExponentialBackoff::from_millis(2)
                 .factor(250)
-                .max_delay(Duration::from_secs(30));
+                .max_delay(Duration::from_secs(1));
 
             loop {
                 let res = match method {

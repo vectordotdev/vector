@@ -166,32 +166,36 @@ impl InputHandler {
             let mut reconnecting = false;
 
             loop {
-                // connect + SUBSCRIBE
-                let mut pubsub_conn =
-                    match connect_and_subscribe(&client, &endpoint, &channel).await {
-                        Ok(conn) => {
-                            emit!(RedisConnectionEstablished {
-                                reconnect: reconnecting
-                            });
-                            conn
-                        }
-                        Err(err) => {
-                            // failed to connect or SUBSCRIBE
-                            emit!(RedisConnectionError::from(err.into_source()));
-                            reconnecting = true;
+                // Connect + SUBSCRIBE, raced with shutdown. A connect against a black-holed
+                // endpoint can stall for a long time, so we must still observe shutdown
+                // promptly instead of waiting for the force-shutdown deadline. `biased`
+                // checks shutdown first so it always wins when both are ready.
+                let connect_result = tokio::select! {
+                    biased;
+                    _ = &mut shutdown => break,
+                    res = connect_and_subscribe(&client, &endpoint, &channel) => res,
+                };
 
-                            // back off before retrying, unless we're shutting down
-                            let delay = backoff.next().expect("backoff never ends");
-                            tokio::select! {
-                                _ = tokio::time::sleep(delay) => {
-                                    continue;
-                                }
-                                _ = &mut shutdown => {
-                                    break;
-                                }
-                            }
+                let mut pubsub_conn = match connect_result {
+                    Ok(conn) => {
+                        emit!(RedisConnectionEstablished {
+                            reconnect: reconnecting
+                        });
+                        conn
+                    }
+                    Err(err) => {
+                        // failed to connect or SUBSCRIBE
+                        emit!(RedisConnectionError::from(err.into_source()));
+                        reconnecting = true;
+
+                        // back off before retrying, unless we're shutting down
+                        let delay = backoff.next().expect("backoff never ends");
+                        tokio::select! {
+                            _ = tokio::time::sleep(delay) => continue,
+                            _ = &mut shutdown => break,
                         }
-                    };
+                    }
+                };
 
                 // Connected: reset backoff so the next outage starts from the shortest delay.
                 backoff.reset();
@@ -207,27 +211,26 @@ impl InputHandler {
                 )
                 .await;
 
+                // We deliberately do not `UNSUBSCRIBE` here: on shutdown or a dropped
+                // connection, awaiting that network round trip could block graceful shutdown
+                // if Redis is slow or the socket is half-open. Dropping `pubsub_conn` closes
+                // the connection and Redis releases the subscription automatically.
                 match end_reason {
                     SessionEnd::Shutdown | SessionEnd::DownstreamClosed => {
                         // shutting down cleanly, or downstream closed: stop for good.
-                        let _ = pubsub_conn.unsubscribe(&channel).await;
                         break;
                     }
 
                     SessionEnd::Disconnected => {
-                        // Redis dropped us. We'll try to reconnect after a backoff,
-                        // unless shutdown fires during that backoff.
+                        // Redis dropped us. Reconnect after a backoff, unless shutdown fires
+                        // during that backoff. The dead `pubsub_conn` is dropped when this
+                        // iteration ends.
                         reconnecting = true;
-                        let _ = pubsub_conn.unsubscribe(&channel).await;
 
                         let delay = backoff.next().expect("backoff never ends");
                         tokio::select! {
-                            _ = tokio::time::sleep(delay) => {
-                                continue;
-                            }
-                            _ = &mut shutdown => {
-                                break;
-                            }
+                            _ = tokio::time::sleep(delay) => continue,
+                            _ = &mut shutdown => break,
                         }
                     }
                 }
