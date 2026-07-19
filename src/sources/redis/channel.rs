@@ -1,10 +1,12 @@
+use std::time::Duration;
+
 use futures_util::StreamExt;
 use snafu::Snafu;
-use std::time::Duration;
-use tracing::{trace, warn, info};
+use tracing::{trace, warn};
 
 use crate::{
-    internal_events::RedisReceiveEventError,
+    common::backoff::ExponentialBackoff,
+    internal_events::{RedisConnectionError, RedisConnectionEstablished, RedisReceiveEventError},
     sources::{
         Source,
         redis::{ConnectionInfo, InputHandler},
@@ -17,6 +19,15 @@ enum BuildError {
     Connection { source: redis::RedisError },
     #[snafu(display("Failed to subscribe to channel: {}", source))]
     Subscribe { source: redis::RedisError },
+}
+
+impl BuildError {
+    /// The underlying Redis error, regardless of which stage (connect or subscribe) failed.
+    fn into_source(self) -> redis::RedisError {
+        match self {
+            BuildError::Connection { source } | BuildError::Subscribe { source } => source,
+        }
+    }
 }
 
 /// Defines how a pub/sub "session" ended.
@@ -32,14 +43,13 @@ enum SessionEnd {
     DownstreamClosed,
 }
 
-/// Exponential backoff used between reconnect attempts.
-async fn backoff_exponential(exp: u32) {
-    let ms = if exp <= 4 { 2_u64.pow(exp + 5) } else { 1000 };
-    tokio::time::sleep(Duration::from_millis(ms)).await;
-}
-
 impl InputHandler {
     /// Build the Redis `channel` source.
+    ///
+    /// The source runs a reconnect loop: it connects, SUBSCRIBEs, and streams messages
+    /// until either shutdown fires, downstream closes, or the Redis connection drops. On a
+    /// drop it reconnects with exponential backoff instead of stopping, so a Redis restart
+    /// or transient network blip no longer requires a manual Vector restart.
     pub(super) async fn subscribe(
         mut self,
         connection_info: ConnectionInfo,
@@ -127,8 +137,7 @@ impl InputHandler {
                         // We'll reconnect in the outer loop.
                         warn!(
                             endpoint,
-                            channel,
-                            "Redis pubsub stream ended; will reconnect"
+                            channel, "Redis pubsub stream ended; will reconnect."
                         );
                         return SessionEnd::Disconnected;
                     }
@@ -145,48 +154,36 @@ impl InputHandler {
             // `shutdown` is a signal that resolves when Vector is stopping.
             let mut shutdown = self.cx.shutdown.clone();
 
-            // retry counter for exponential backoff between reconnects
-            let mut retry: u32 = 0;
+            // Exponential backoff between reconnect attempts: 500ms, 1s, 2s, 4s, ...
+            // capped at 30s. Matches the strategy used by other reconnecting sources
+            // (e.g. `aws_s3`/`sqs`). Reset once a connection is successfully established.
+            let mut backoff = ExponentialBackoff::from_millis(2)
+                .factor(250)
+                .max_delay(Duration::from_secs(30));
+
+            // Whether we're recovering from a dropped/failed connection. Drives the
+            // log/metric emitted on a successful (re)connect.
+            let mut reconnecting = false;
 
             loop {
                 // connect + SUBSCRIBE
                 let mut pubsub_conn =
                     match connect_and_subscribe(&client, &endpoint, &channel).await {
                         Ok(conn) => {
-                            let was_reconnecting = retry > 0;
-
-                            if was_reconnecting {
-                                // we previously failed but now we're back
-                                info!(
-                                    endpoint = %endpoint,
-                                    channel  = %channel,
-                                    "Redis pubsub connection re-established and resubscribed"
-                                );
-                            } else {
-                                trace!(
-                                    endpoint = %endpoint,
-                                    channel  = %channel,
-                                    "Redis pubsub connection established"
-                                );
-                            }
-
-                            retry = 0;
+                            emit!(RedisConnectionEstablished {
+                                reconnect: reconnecting
+                            });
                             conn
                         }
                         Err(err) => {
                             // failed to connect or SUBSCRIBE
-                            warn!(
-                                %err,
-                                endpoint = %endpoint,
-                                channel  = %channel,
-                                "Failed to establish subscription; will retry"
-                            );
-
-                            retry += 1;
+                            emit!(RedisConnectionError::from(err.into_source()));
+                            reconnecting = true;
 
                             // back off before retrying, unless we're shutting down
+                            let delay = backoff.next().expect("backoff never ends");
                             tokio::select! {
-                                _ = backoff_exponential(retry) => {
+                                _ = tokio::time::sleep(delay) => {
                                     continue;
                                 }
                                 _ = &mut shutdown => {
@@ -196,6 +193,10 @@ impl InputHandler {
                         }
                     };
 
+                // Connected: reset backoff so the next outage starts from the shortest delay.
+                backoff.reset();
+                reconnecting = false;
+
                 // run that session (receive messages, forward them, etc.)
                 let end_reason = run_subscription_session(
                     &mut pubsub_conn,
@@ -204,17 +205,11 @@ impl InputHandler {
                     &mut self,
                     &endpoint,
                 )
-                    .await;
+                .await;
 
                 match end_reason {
-                    SessionEnd::Shutdown => {
-                        // shutting down cleanly
-                        let _ = pubsub_conn.unsubscribe(&channel).await;
-                        break;
-                    }
-
-                    SessionEnd::DownstreamClosed => {
-                        // downstream closed, no point continuing
+                    SessionEnd::Shutdown | SessionEnd::DownstreamClosed => {
+                        // shutting down cleanly, or downstream closed: stop for good.
                         let _ = pubsub_conn.unsubscribe(&channel).await;
                         break;
                     }
@@ -222,15 +217,15 @@ impl InputHandler {
                     SessionEnd::Disconnected => {
                         // Redis dropped us. We'll try to reconnect after a backoff,
                         // unless shutdown fires during that backoff.
-                        retry += 1;
+                        reconnecting = true;
+                        let _ = pubsub_conn.unsubscribe(&channel).await;
 
+                        let delay = backoff.next().expect("backoff never ends");
                         tokio::select! {
-                            _ = backoff_exponential(retry) => {
-                                let _ = pubsub_conn.unsubscribe(&channel).await;
+                            _ = tokio::time::sleep(delay) => {
                                 continue;
                             }
                             _ = &mut shutdown => {
-                                let _ = pubsub_conn.unsubscribe(&channel).await;
                                 break;
                             }
                         }
