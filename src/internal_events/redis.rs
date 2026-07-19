@@ -70,6 +70,31 @@ impl InternalEvent for RedisConnectionError {
     }
 }
 
+/// Emitted when an established `redis` channel pub/sub connection drops unexpectedly. The
+/// source reconnects automatically, but this records the drop as a component error so that
+/// metric-based alerts still fire even when the following reconnect succeeds immediately.
+#[derive(Debug, NamedInternalEvent)]
+pub struct RedisConnectionDropped;
+
+impl InternalEvent for RedisConnectionDropped {
+    fn emit(self) {
+        error!(
+            message = "Redis pub/sub connection dropped; will reconnect.",
+            error = "connection closed by server",
+            error_code = "connection_dropped",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "connection_dropped",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
+
 /// Emitted when the `redis` channel source (re)establishes its pub/sub subscription.
 /// `reconnect` distinguishes the first successful connect from a recovery after a drop.
 #[derive(Debug, NamedInternalEvent)]

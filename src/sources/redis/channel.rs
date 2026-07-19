@@ -2,11 +2,14 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use snafu::Snafu;
-use tracing::{trace, warn};
+use tracing::trace;
 
 use crate::{
     common::backoff::ExponentialBackoff,
-    internal_events::{RedisConnectionError, RedisConnectionEstablished, RedisReceiveEventError},
+    internal_events::{
+        RedisConnectionDropped, RedisConnectionError, RedisConnectionEstablished,
+        RedisReceiveEventError,
+    },
     sources::{
         Source,
         redis::{ConnectionInfo, InputHandler},
@@ -30,27 +33,11 @@ impl BuildError {
     }
 }
 
-/// How long a pub/sub session must stay connected before we consider it healthy and reset
-/// the reconnect backoff, even if it hasn't delivered any messages. This keeps a flapping
+/// How long a pub/sub session must stay connected before we consider it healthy and reset the
+/// reconnect backoff, even if it hasn't delivered any messages. This keeps a flapping
 /// connection backing off while ensuring a stable-but-quiet low-volume channel doesn't retain
 /// a backoff that a previous flapping period drove up to the cap.
 const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_secs(60);
-
-/// Whether a Redis error is transient (worth reconnecting) rather than non-recoverable.
-///
-/// Uses redis-rs's own retry classification (`RetryMethod::NoRetry` => permanent) with one
-/// override: redis-rs maps `ErrorKind::AuthenticationFailed` to `RetryMethod::Reconnect`, but
-/// bad credentials/permissions are never fixed by reconnecting, so we treat them as permanent
-/// too. This makes an invalid configuration (auth/ACL/config) fail fast instead of retrying
-/// forever, while everything else — I/O failures (unreachable/reset/timeout) and server-side
-/// retryable states such as `LOADING`/`BUSYLOADING`/`TRYAGAIN` during a Redis restart — is
-/// transient and reconnected.
-fn is_transient(error: &redis::RedisError) -> bool {
-    if error.kind() == redis::ErrorKind::AuthenticationFailed {
-        return false;
-    }
-    !matches!(error.retry_method(), redis::RetryMethod::NoRetry)
-}
 
 /// Defines how a pub/sub "session" ended.
 ///
@@ -68,10 +55,11 @@ enum SessionEnd {
 impl InputHandler {
     /// Build the Redis `channel` source.
     ///
-    /// The initial connect + SUBSCRIBE happens here so a non-recoverable error (bad auth,
-    /// ACLs, invalid config) fails the source build immediately. Once started, the source
-    /// runs a reconnect loop: on a dropped connection it reconnects with exponential
-    /// backoff instead of stopping, so a Redis restart or transient network blip no longer
+    /// The initial connect + SUBSCRIBE happens at build time (as the source did before this
+    /// change), so any failure — including a permanent misconfiguration such as bad auth, TLS,
+    /// or ACLs — fails the source build immediately instead of appearing to start and only
+    /// erroring at runtime. Once running, a dropped connection is handled by a reconnect loop
+    /// with exponential backoff, so a Redis restart or transient network blip no longer
     /// requires a manual Vector restart.
     pub(super) async fn subscribe(
         mut self,
@@ -109,10 +97,8 @@ impl InputHandler {
 
         async fn run_subscription_session<S>(
             pubsub_conn: &mut redis::aio::PubSub,
-            channel: &str,
             shutdown: &mut S,
             handler: &mut InputHandler,
-            endpoint: &str,
             backoff: &mut ExponentialBackoff,
         ) -> SessionEnd
         where
@@ -183,12 +169,10 @@ impl InputHandler {
                     }
 
                     RecvEvent::Disconnected => {
-                        // Redis connection ended (e.g. server restart).
-                        // We'll reconnect in the outer loop.
-                        warn!(
-                            endpoint,
-                            channel, "Redis pubsub stream ended; will reconnect."
-                        );
+                        // Redis closed an established connection (e.g. server restart). Record
+                        // it as a component error — so alerts fire even if the reconnect
+                        // succeeds immediately — and reconnect in the outer loop.
+                        emit!(RedisConnectionDropped);
                         return SessionEnd::Disconnected;
                     }
 
@@ -200,25 +184,12 @@ impl InputHandler {
             }
         }
 
-        // Initial connect + SUBSCRIBE, performed here (not inside the source future) so a
-        // non-recoverable error fails the source build immediately rather than silently
-        // entering a retry loop that makes an invalid config look like it started. A
-        // transient error (Redis unreachable/restarting) is tolerated and handled by the
-        // reconnect loop once the source starts.
-        let initial_conn = match connect_and_subscribe(&client, &endpoint, &channel).await {
-            Ok(conn) => {
-                emit!(RedisConnectionEstablished { reconnect: false });
-                Some(conn)
-            }
-            Err(err) => {
-                let source = err.into_source();
-                if !is_transient(&source) {
-                    return Err(source.into());
-                }
-                emit!(RedisConnectionError::from(source));
-                None
-            }
-        };
+        // Initial connect + SUBSCRIBE. Fail fast on *any* error, matching the source's
+        // behavior before reconnect support was added: this surfaces a permanent
+        // misconfiguration (bad auth, TLS, ACLs) — and connectivity problems — at startup
+        // rather than masking them behind a silent retry loop. Drops that occur once the
+        // source is running are handled by the reconnect loop below.
+        let initial_conn = connect_and_subscribe(&client, &endpoint, &channel).await?;
 
         Ok(Box::pin(async move {
             // `shutdown` is a signal that resolves when Vector is stopping.
@@ -226,20 +197,22 @@ impl InputHandler {
 
             // Exponential backoff between reconnect attempts: 500ms, 1s, 2s, 4s, ...
             // capped at 30s. Matches the strategy used by other reconnecting sources
-            // (e.g. `aws_s3`/`sqs`). Only reset once a session delivers data (see
+            // (e.g. `aws_s3`/`sqs`). Reset once a session is healthy (see
             // `run_subscription_session`), so a flapping connection still backs off.
             let mut backoff = ExponentialBackoff::from_millis(2)
                 .factor(250)
                 .max_delay(Duration::from_secs(30));
 
-            // A connection to run next: the one established at startup, or `None` to
-            // (re)connect via the loop below.
-            let mut next_conn = initial_conn;
+            // The live connection from startup; subsequent iterations reconnect via the loop.
+            let mut next_conn = Some(initial_conn);
 
             loop {
                 // Obtain a live connection: reuse the pending one, or reconnect with backoff.
                 let mut pubsub_conn = match next_conn.take() {
-                    Some(conn) => conn,
+                    Some(conn) => {
+                        emit!(RedisConnectionEstablished { reconnect: false });
+                        conn
+                    }
                     None => 'reconnect: loop {
                         let delay = backoff.next().expect("backoff never ends");
                         tokio::select! {
@@ -263,15 +236,13 @@ impl InputHandler {
                                 break 'reconnect conn;
                             }
                             Err(err) => {
-                                let source = err.into_source();
-                                let permanent = !is_transient(&source);
-                                emit!(RedisConnectionError::from(source));
-                                if permanent {
-                                    // Non-recoverable (auth/ACL/config): stop the source
-                                    // rather than retry forever.
-                                    return Err(());
-                                }
-                                // transient: keep retrying; backoff advances next iteration.
+                                // Once the source has started, every reconnect failure is
+                                // treated as retryable: a permanent misconfiguration was
+                                // already ruled out by the successful build-time connect, and
+                                // stopping here would drop the resilience this adds. The error
+                                // is recorded so metric-based alerts still fire.
+                                emit!(RedisConnectionError::from(err.into_source()));
+                                // keep retrying; backoff advances on the next iteration.
                             }
                         }
                     },
@@ -280,10 +251,8 @@ impl InputHandler {
                 // run that session (receive messages, forward them, etc.)
                 let end_reason = run_subscription_session(
                     &mut pubsub_conn,
-                    &channel,
                     &mut shutdown,
                     &mut self,
-                    &endpoint,
                     &mut backoff,
                 )
                 .await;
