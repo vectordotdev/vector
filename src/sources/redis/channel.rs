@@ -30,15 +30,25 @@ impl BuildError {
     }
 }
 
+/// How long a pub/sub session must stay connected before we consider it healthy and reset
+/// the reconnect backoff, even if it hasn't delivered any messages. This keeps a flapping
+/// connection backing off while ensuring a stable-but-quiet low-volume channel doesn't retain
+/// a backoff that a previous flapping period drove up to the cap.
+const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_secs(60);
+
 /// Whether a Redis error is transient (worth reconnecting) rather than non-recoverable.
 ///
-/// Uses redis-rs's own retry classification: only `RetryMethod::NoRetry` — e.g.
-/// authentication/permission/config rejections of `SUBSCRIBE` — is treated as permanent, so
-/// an invalid configuration fails fast instead of retrying forever. Everything else is
-/// transient: I/O failures (unreachable/reset/timeout) and server-side retryable states such
-/// as `LOADING`/`BUSYLOADING`/`TRYAGAIN` reported while a Redis node is restarting — exactly
-/// the recovery scenario this source is meant to survive.
+/// Uses redis-rs's own retry classification (`RetryMethod::NoRetry` => permanent) with one
+/// override: redis-rs maps `ErrorKind::AuthenticationFailed` to `RetryMethod::Reconnect`, but
+/// bad credentials/permissions are never fixed by reconnecting, so we treat them as permanent
+/// too. This makes an invalid configuration (auth/ACL/config) fail fast instead of retrying
+/// forever, while everything else — I/O failures (unreachable/reset/timeout) and server-side
+/// retryable states such as `LOADING`/`BUSYLOADING`/`TRYAGAIN` during a Redis restart — is
+/// transient and reconnected.
 fn is_transient(error: &redis::RedisError) -> bool {
+    if error.kind() == redis::ErrorKind::AuthenticationFailed {
+        return false;
+    }
     !matches!(error.retry_method(), redis::RetryMethod::NoRetry)
 }
 
@@ -110,11 +120,21 @@ impl InputHandler {
         {
             let mut stream = pubsub_conn.on_message();
 
+            // Once the connection has either delivered a message or simply stayed up for
+            // `HEALTHY_SESSION_THRESHOLD`, we consider it healthy and reset the backoff. The
+            // timer covers low-volume channels that stay connected a long time without
+            // publishing, so a stable-but-quiet session doesn't keep a backoff a prior
+            // flapping period drove up to the cap.
+            let healthy = tokio::time::sleep(HEALTHY_SESSION_THRESHOLD);
+            tokio::pin!(healthy);
+            let mut backoff_reset = false;
+
             loop {
-                // One "step" in the session: either we got a message,
-                // Redis dropped us, or shutdown fired.
+                // One "step" in the session: either we got a message, the connection became
+                // healthy, Redis dropped us, or shutdown fired.
                 enum RecvEvent {
                     Msg(redis::Msg),
+                    Healthy,
                     Shutdown,
                     Disconnected,
                 }
@@ -126,6 +146,7 @@ impl InputHandler {
                             None => RecvEvent::Disconnected,
                         }
                     }
+                    _ = &mut healthy, if !backoff_reset => RecvEvent::Healthy,
                     _ = &mut *shutdown => {
                         RecvEvent::Shutdown
                     }
@@ -139,17 +160,27 @@ impl InputHandler {
                             if let Err(()) = handler.handle_line(line).await {
                                 return SessionEnd::DownstreamClosed;
                             }
-                            // A message was delivered downstream, so the connection is
-                            // healthy: reset the reconnect backoff. Resetting only here
-                            // (not on connect) means a connection that drops before
-                            // delivering anything keeps backing off exponentially.
-                            backoff.reset();
+                            // A message was delivered downstream: the connection is healthy,
+                            // so reset the reconnect backoff. Resetting only on a health signal
+                            // (data, or the timer below) — never on a bare connect — means a
+                            // connection that drops before becoming healthy keeps backing off.
+                            if !backoff_reset {
+                                backoff.reset();
+                                backoff_reset = true;
+                            }
                         }
                         Err(error) => {
                             // Bad payload. We just log and keep going.
                             emit!(RedisReceiveEventError::from(error));
                         }
                     },
+
+                    RecvEvent::Healthy => {
+                        // Stayed connected long enough to be considered stable even without
+                        // delivering data (low-volume channel): reset the backoff.
+                        backoff.reset();
+                        backoff_reset = true;
+                    }
 
                     RecvEvent::Disconnected => {
                         // Redis connection ended (e.g. server restart).
