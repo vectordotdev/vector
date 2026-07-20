@@ -8,6 +8,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use tokio::io::{AsyncRead, AsyncReadExt};
+use vrl::value::{ObjectMap, Value};
 
 /// The 12-byte signature that begins every PROXY protocol v2 header.
 pub const V2_SIGNATURE: [u8; 12] = [
@@ -57,6 +58,29 @@ impl ProxyHeader {
             .iter()
             .find(|t| t.kind == kind)
             .map(|t| t.value.as_slice())
+    }
+
+    /// Convert the parsed header into an event metadata object of the shape
+    /// `{ version: 2, tlvs: { "0xe0": "<value>", .. } }`.
+    ///
+    /// TLV keys are the lowercase hex type byte (e.g. `0xe0`) since the wire
+    /// format identifies fields by numeric type, not name. Values are exposed
+    /// as UTF-8 strings when valid, otherwise as raw bytes.
+    pub fn into_metadata(self) -> ObjectMap {
+        let mut tlvs = ObjectMap::new();
+        for tlv in self.tlvs {
+            let key = format!("0x{:02x}", tlv.kind);
+            let value = match String::from_utf8(tlv.value.clone()) {
+                Ok(s) => Value::from(s),
+                Err(_) => Value::from(tlv.value),
+            };
+            tlvs.insert(key.into(), value);
+        }
+
+        let mut map = ObjectMap::new();
+        map.insert("version".into(), Value::from(2));
+        map.insert("tlvs".into(), Value::from(tlvs));
+        map
     }
 }
 
@@ -341,6 +365,24 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rest, b"HELLO-PAYLOAD\n");
+    }
+
+    #[test]
+    fn into_metadata_exposes_hex_keyed_tlvs() {
+        let value = b"rajesh.com";
+        let mut tlv = vec![0xE0];
+        tlv.extend_from_slice(&(value.len() as u16).to_be_bytes());
+        tlv.extend_from_slice(value);
+        let buf = v4_header(&tlv);
+        let (_, header) = parse_v2(&buf).expect("valid header");
+
+        let meta = header.into_metadata();
+        assert_eq!(meta.get("version"), Some(&Value::from(2)));
+        let tlvs = match meta.get("tlvs") {
+            Some(Value::Object(o)) => o,
+            other => panic!("expected tlvs object, got {other:?}"),
+        };
+        assert_eq!(tlvs.get("0xe0"), Some(&Value::from("rajesh.com")));
     }
 
     #[tokio::test]

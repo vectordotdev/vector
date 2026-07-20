@@ -303,12 +303,13 @@ async fn handle_stream<T>(
     // after the TLS handshake so a plaintext hop and a re-encrypted hop share
     // one code path, and before wrapping the socket so only header bytes are
     // consumed and the payload reaches the decoder untouched.
-    if source.proxy_protocol() {
+    let proxy_metadata = if source.proxy_protocol() {
         match super::proxy_protocol::read_v2_header(&mut socket).await {
             Ok(header) => {
                 if let Some(source_addr) = header.source {
                     peer_addr = source_addr;
                 }
+                Some(header.into_metadata())
             }
             Err(error) => {
                 warn!(
@@ -319,7 +320,9 @@ async fn handle_stream<T>(
                 return;
             }
         }
-    }
+    } else {
+        None
+    };
 
     let socket = socket.after_read(move |byte_size| {
         emit!(TcpBytesReceived {
@@ -423,6 +426,19 @@ async fn handle_stream<T>(
                                     tls_client_metadata_key.as_ref().map(LegacyKey::Overwrite),
                                     path!("tls_client_metadata"),
                                     metadata.clone()
+                                );
+                            }
+                        }
+
+                        if let Some(proxy_metadata) = &proxy_metadata {
+                            for event in &mut events {
+                                let log = event.as_mut_log();
+                                log_namespace.insert_source_metadata(
+                                    source_name,
+                                    log,
+                                    Some(LegacyKey::Overwrite(path!("proxy_protocol"))),
+                                    path!("proxy_protocol"),
+                                    proxy_metadata.clone(),
                                 );
                             }
                         }
