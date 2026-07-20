@@ -1,6 +1,20 @@
-Fixed a bug where a URI template's `{{ field }}` reference landing inside the host would silently drop every event instead of failing to build.
+# URI template field references inside the authority are rejected {#uri-template-partial-authority}
 
-Before, this built successfully but dropped every event at render time:
+## Summary
+
+Vector now refuses to build configs where a `{{ field }}` reference lands inside
+the hostname (or immediately adjacent to it without a path separator). Previously,
+such templates built successfully but silently dropped every event at render time.
+
+## Migration
+
+If `{{ field }}` appears inside the host or directly after the host with no leading
+`/`, add a static `/` before the dynamic segment or move the dynamic part into the
+path with a static hostname.
+
+#### Old (silently dropped events)
+
+This built successfully but dropped every event at render time:
 
 ```yaml
 sinks:
@@ -16,7 +30,7 @@ sinks:
     uri: "https://api.internal{{ path }}"
 ```
 
-Now, Vector refuses to build these configs, since the dynamic part of the URL sits inside (or right up against) the hostname rather than after a `/`. This is a breaking change for any config relying on the second pattern above, even if `path` always rendered with a leading `/`.
+#### New
 
 To fix, either add a static `/` before the dynamic part:
 
