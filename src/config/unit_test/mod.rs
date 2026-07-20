@@ -38,7 +38,7 @@ use crate::{
     conditions::Condition,
     config::{
         self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
+        TestDefinition, TestInput, TestOutput, loading,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
@@ -93,7 +93,7 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
+    let builder = config::loading::load_builder_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
@@ -103,16 +103,16 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let secrets_backends_loader =
-        loading::loader_from_paths(loading::SecretBackendLoader::default(), paths)?;
-    let secrets = secrets_backends_loader
-        .retrieve_secrets(signal_handler)
-        .await
-        .map_err(|e| vec![e])?;
-
-    let config_builder = ConfigBuilderLoader::default()
-        .secrets(secrets)
-        .load_from_paths(paths)?;
+    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths)?;
+    let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
+        let resolved_secrets = secrets_backends_loader
+            .retrieve(&mut signal_handler.subscribe())
+            .await
+            .map_err(|e| vec![e])?;
+        loading::load_builder_from_paths_with_secrets(paths, resolved_secrets)?
+    } else {
+        loading::load_builder_from_paths(paths)?
+    };
 
     build_unit_tests(config_builder).await
 }

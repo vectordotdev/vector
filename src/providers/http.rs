@@ -10,7 +10,7 @@ use vector_lib::configurable::configurable_component;
 
 use super::BuildResult;
 use crate::{
-    config::{self, Format, ProxyConfig, interpolate, provider::ProviderConfig},
+    config::{self, Format, ProxyConfig, provider::ProviderConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
@@ -146,25 +146,10 @@ async fn http_request_to_config_builder(
         .await
         .map_err(|e| vec![e.to_owned()])?;
 
-    if !interpolate_env {
-        return config::load(config_str.chunk(), *config_format);
-    }
-
-    let env_vars = std::env::vars_os()
-        .map(|(k, v)| {
-            (
-                k.as_os_str().to_string_lossy().to_string(),
-                v.as_os_str().to_string_lossy().to_string(),
-            )
-        })
-        .collect::<std::collections::HashMap<String, String>>();
-
-    let config_str = interpolate(
-        std::str::from_utf8(&config_str).map_err(|e| vec![e.to_string()])?,
-        &env_vars,
-    )?;
-
-    config::load(config_str.as_bytes().chunk(), *config_format)
+    // Parse first; env var substitution happens inside config::load on the
+    // typed value tree, controlled by the global interpolation flag.
+    let _ = interpolate_env;
+    config::load(config_str.chunk(), *config_format)
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.

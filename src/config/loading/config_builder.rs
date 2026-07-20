@@ -3,8 +3,8 @@ use std::{collections::HashMap, io::Read};
 use indexmap::IndexMap;
 
 use super::{
-    ComponentHint, Process, deserialize_config_map, loader, prepare_input,
-    representation::ConfigMap, secret,
+    ComponentHint, Process, deserialize_config_map, deserialize_config_map_wrapped,
+    interpolate_config_map_with_secrets, loader, representation::ConfigMap,
 };
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
@@ -66,14 +66,16 @@ impl Default for ConfigBuilderLoader {
 }
 
 impl Process for ConfigBuilderLoader {
-    /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let prepared_input = prepare_input(input, self.interpolate_env)?;
-        Ok(if self.secrets.is_empty() {
-            prepared_input
+    fn should_interpolate_env(&self) -> bool {
+        self.interpolate_env
+    }
+
+    fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+        if self.secrets.is_empty() {
+            Ok(map)
         } else {
-            secret::interpolate(&prepared_input, &self.secrets)?
-        })
+            interpolate_config_map_with_secrets(&map, &self.secrets)
+        }
     }
 
     /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
@@ -82,24 +84,28 @@ impl Process for ConfigBuilderLoader {
             Some(ComponentHint::Source) => {
                 self.builder
                     .sources
-                    .extend(deserialize_config_map::<IndexMap<ComponentKey, SourceOuter>>(map)?);
+                    .extend(deserialize_config_map_wrapped::<
+                        IndexMap<ComponentKey, SourceOuter>,
+                    >(map, "sources")?);
             }
             Some(ComponentHint::Sink) => {
-                self.builder.sinks.extend(deserialize_config_map::<
+                self.builder.sinks.extend(deserialize_config_map_wrapped::<
                     IndexMap<ComponentKey, SinkOuter<_>>,
-                >(map)?);
+                >(map, "sinks")?);
             }
             Some(ComponentHint::Transform) => {
-                self.builder.transforms.extend(deserialize_config_map::<
-                    IndexMap<ComponentKey, TransformOuter<_>>,
-                >(map)?);
+                self.builder
+                    .transforms
+                    .extend(deserialize_config_map_wrapped::<
+                        IndexMap<ComponentKey, TransformOuter<_>>,
+                    >(map, "transforms")?);
             }
             Some(ComponentHint::EnrichmentTable) => {
                 self.builder
                     .enrichment_tables
-                    .extend(deserialize_config_map::<
+                    .extend(deserialize_config_map_wrapped::<
                         IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
-                    >(map)?);
+                    >(map, "enrichment_tables")?);
             }
             Some(ComponentHint::Test) => {
                 // This serializes to a `Vec<TestDefinition<_>>`, so we need to first expand
