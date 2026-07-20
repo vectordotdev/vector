@@ -1,10 +1,14 @@
 use std::time::Duration;
 
-use proptest::{arbitrary::any, strategy::Strategy};
+use proptest::strategy::{Just, Strategy};
 
-use super::{filesystem::TestFilesystem, record::Record};
+use super::{
+    filesystem::{TestFilesystem, arb_fs_atomicity},
+    record::Record,
+};
 use crate::variants::disk_v2::{
-    BufferReader, BufferWriter, DiskBufferConfig, DiskBufferConfigBuilder, ReaderError, WriterError,
+    BufferReader, BufferWriter, DiskBufferConfigBuilder, ReaderError, WriterError,
+    common::MINIMUM_MAX_RECORD_SIZE, ledger::LEDGER_LEN,
 };
 
 pub type TestReader = BufferReader<Record, TestFilesystem>;
@@ -17,6 +21,10 @@ pub type WriterResult<T> = Result<T, WriterError<Record>>;
 // buffer overall, which exercises the "write this record directly to the wrapped writer" logic that
 // exists in `tokio::io::BufWriter` itself.
 pub const TEST_WRITE_BUFFER_SIZE: usize = 60 * 1024;
+const MODEL_MAX_RAW_BUFFER_SIZE: u64 = 4_194_240;
+const MODEL_MAX_DATA_FILE_SIZE: u64 = 131_070;
+const MODEL_MAX_RECORD_SIZE: usize = 65_535;
+const MIN_VALID_MAX_RECORD_SIZE: usize = MINIMUM_MAX_RECORD_SIZE + 1;
 
 /// Result of applying an action to the model.
 ///
@@ -32,57 +40,73 @@ pub enum Progress {
     Blocked,
 }
 
-pub fn arb_buffer_config() -> impl Strategy<Value = DiskBufferConfig<TestFilesystem>> {
-    any::<(u16, u16, u16)>()
-        .prop_map(|(n1, n2, n3)| {
-            let max_buffer_size = u64::from(n1) * 64;
-            let max_data_file_size = u64::from(n2) * 2;
-            let max_record_size = n3.into();
+pub fn arb_buffer_config() -> impl Strategy<Value = DiskBufferConfigBuilder<TestFilesystem>> {
+    // Generate dependent limits directly as minimum + slack, rather than generating invalid
+    // triples and rejecting them, so each max_* field has a clean path toward its lower bound.
+    (
+        MIN_VALID_MAX_RECORD_SIZE..=MODEL_MAX_RECORD_SIZE,
+        1u64..=60,
+        arb_fs_atomicity(),
+    )
+        .prop_flat_map(|(max_record_size, flush_interval_secs, atomicity)| {
+            let min_data_file_size =
+                u64::try_from(max_record_size).expect("model max record size must fit in u64");
+            let max_data_file_size_slack = MODEL_MAX_DATA_FILE_SIZE - min_data_file_size;
 
-            let mut path = std::env::temp_dir();
-            path.push("vector-disk-v2-model");
-
-            DiskBufferConfigBuilder::from_path(path)
-                .max_buffer_size(max_buffer_size)
-                .max_data_file_size(max_data_file_size)
-                .max_record_size(max_record_size)
-                .write_buffer_size(TEST_WRITE_BUFFER_SIZE)
-                // This really only affects how often we flush the ledger, because we always `flush`
-                // after writes to ensure our buffered writes make it to the data files for the
-                // readers to make progress, and we're not testing anything about whether or not the
-                // ledger makes it to disk durably.
-                .flush_interval(Duration::from_secs(10))
-                .filesystem(TestFilesystem::default())
+            (
+                Just((max_record_size, flush_interval_secs, atomicity)),
+                0u64..=max_data_file_size_slack,
+            )
         })
-        .prop_filter_map(
-            "maximum size limits were too high, or zero",
-            validate_buffer_config,
+        .prop_flat_map(
+            |((max_record_size, flush_interval_secs, atomicity), max_data_file_size_slack)| {
+                let min_data_file_size =
+                    u64::try_from(max_record_size).expect("model max record size must fit in u64");
+                let max_data_file_size = min_data_file_size + max_data_file_size_slack;
+                let min_buffer_size = minimum_raw_buffer_size(max_data_file_size);
+                let max_buffer_size_slack = MODEL_MAX_RAW_BUFFER_SIZE - min_buffer_size;
+
+                (
+                    Just((
+                        max_record_size,
+                        max_data_file_size,
+                        flush_interval_secs,
+                        atomicity,
+                    )),
+                    0u64..=max_buffer_size_slack,
+                )
+            },
+        )
+        .prop_map(
+            |(
+                (max_record_size, max_data_file_size, flush_interval_secs, atomicity),
+                max_buffer_size_slack,
+            )| {
+                let max_buffer_size =
+                    minimum_raw_buffer_size(max_data_file_size) + max_buffer_size_slack;
+                let mut path = std::env::temp_dir();
+                path.push("vector-disk-v2-model");
+
+                DiskBufferConfigBuilder::from_path(path)
+                    .max_buffer_size(max_buffer_size)
+                    .max_data_file_size(max_data_file_size)
+                    .max_record_size(max_record_size)
+                    .write_buffer_size(TEST_WRITE_BUFFER_SIZE)
+                    // This really only affects how often we flush the ledger, because we always `flush`
+                    // after writes to ensure our buffered writes make it to the data files for the
+                    // readers to make progress, and we're not testing anything about whether or not the
+                    // ledger makes it to disk durably.
+                    .flush_interval(Duration::from_secs(flush_interval_secs))
+                    .filesystem(TestFilesystem::with_atomicity(atomicity))
+            },
         )
 }
 
-/// Validates the given buffer config builder and generates a resulting configuration.
-///
-/// If the builder has been configured incorrectly (i.e. zero values), or if the configuration is
-/// valid but has values that are not appropriate for being used under test (i.e. values are way too
-/// large and would balloon the run-time of the test) then `None` is returned.
-///
-/// Otherwise, `Some(DiskBufferConfig)` is returned.
-pub fn validate_buffer_config(
-    builder: DiskBufferConfigBuilder<TestFilesystem>,
-) -> Option<DiskBufferConfig<TestFilesystem>> {
-    builder
-        .build()
-        // If building the configuration failed, just return `None`.
-        .ok()
-        .filter(|config| {
-            // Limit our buffer config to the following:
-            // - max buffer size of 64MB
-            // - max data file size of 2MB
-            // - max record size of 1MB
-            //
-            // Otherwise, the model just runs uselessly slow.
-            config.max_buffer_size <= 64_000_000
-                && config.max_data_file_size <= 2_000_000
-                && config.max_record_size <= 1_000_000
-        })
+fn minimum_raw_buffer_size(max_data_file_size: u64) -> u64 {
+    let ledger_len = u64::try_from(LEDGER_LEN).expect("ledger length must fit in u64");
+
+    max_data_file_size
+        .checked_mul(2)
+        .and_then(|doubled| doubled.checked_add(ledger_len))
+        .expect("model max data file size must leave room for the minimum buffer size")
 }

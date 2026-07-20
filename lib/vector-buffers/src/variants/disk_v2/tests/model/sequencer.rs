@@ -235,6 +235,13 @@ impl ActionSequencer {
             Action::WriteRecord(_) | Action::FlushWrites => allow_write,
             Action::ReadRecord => allow_read,
             Action::AcknowledgeRead => !self.unacked_events.is_empty(),
+            Action::AdvanceTime(_) => true,
+            // A writeback and a crash both act on the filesystem outside the
+            // reader/writer. They run only when neither has an operation in
+            // flight, keeping the model in lockstep.
+            Action::Writeback(_) | Action::Crash => {
+                allow_read && (allow_write || self.write_state.is_closed())
+            }
         })
     }
 
@@ -253,9 +260,11 @@ impl ActionSequencer {
     /// Likewise, we can't execute another read if there's an in-flight read.  Acknowledgements
     /// always happen out-of-band, though, and so are always eligible.
     pub fn trigger_next_runnable_action(&mut self) -> Option<Action> {
-        let pos = self.get_next_runnable_action();
+        loop {
+            let action = self
+                .get_next_runnable_action()
+                .map(|i| self.actions.remove(i))?;
 
-        if let Some(action) = pos.map(|i| self.actions.remove(i)) {
             match action {
                 Action::WriteRecord(record) => {
                     assert!(
@@ -264,7 +273,7 @@ impl ActionSequencer {
                     );
 
                     self.write_state.transition_to_write(record.clone());
-                    Some(Action::WriteRecord(record))
+                    return Some(Action::WriteRecord(record));
                 }
                 a @ Action::FlushWrites => {
                     assert!(
@@ -273,7 +282,7 @@ impl ActionSequencer {
                     );
 
                     self.write_state.transition_to_flush();
-                    Some(a)
+                    return Some(a);
                 }
                 a @ Action::ReadRecord => {
                     assert!(
@@ -282,16 +291,30 @@ impl ActionSequencer {
                     );
 
                     self.read_state.transition_to_read();
-                    Some(a)
+                    return Some(a);
                 }
                 Action::AcknowledgeRead => {
                     drop(self.unacked_events.pop_front().expect("FIXME"));
-                    Some(Action::AcknowledgeRead)
+                    return Some(Action::AcknowledgeRead);
                 }
+                Action::AdvanceTime(duration) if duration == tokio::time::Duration::ZERO => {
+                    // Zero-time advances are valid no-ops. Returning them would still create a
+                    // scheduler step in the outer harness, making them sticky during shrinking.
+                }
+                Action::AdvanceTime(duration) => return Some(Action::AdvanceTime(duration)),
+                // Applied to the filesystem only, reader and writer are idle,
+                // no in-flight state to transition to.
+                a @ (Action::Writeback(_) | Action::Crash) => return Some(a),
             }
-        } else {
-            None
         }
+    }
+
+    /// Consumes the sequencer, returning the actions it has not yet triggered.
+    ///
+    /// Used to hand the remaining work to a freshly reopened sequencer after a crash, dropping
+    /// the old reader and writer so the buffer lock is released.
+    pub fn into_remaining_actions(self) -> Vec<Action> {
+        self.actions
     }
 
     /// Gets the result of pending write action, if one is in-flight.

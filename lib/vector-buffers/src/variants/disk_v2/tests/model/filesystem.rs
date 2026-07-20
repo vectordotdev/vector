@@ -1,6 +1,6 @@
 use std::{
     cmp,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt, io,
     path::{Path, PathBuf},
     pin::Pin,
@@ -10,10 +10,52 @@ use std::{
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
+use proptest::{
+    prop_oneof,
+    strategy::{Just, Strategy},
+};
+
+use super::action::TailPersistence;
 use crate::variants::disk_v2::{
     Filesystem,
     io::{AsyncFile, Metadata, ReadableMemoryMap, WritableMemoryMap},
 };
+
+/// Byte written into a garbage boundary unit. Arbitrary value chosen to
+/// distinguish from bytes already written by the model.
+const GARBAGE_BYTE: u8 = 0xFF;
+
+/// The largest write a filesystem persists atomically, setting the granularity at which a torn
+/// writeback tears.
+#[derive(Clone, Copy, Debug, Default)]
+pub enum FsAtomicity {
+    /// Writes are atomic per 512-byte sector. Torn writes lands on a 512-byte
+    /// boundary.
+    #[default]
+    Sector,
+    /// Writes are atomic per 4096-byte block. Torn write lands on a 4096-byte
+    /// boundary.
+    Block,
+}
+
+impl FsAtomicity {
+    fn tear_granularity(self) -> usize {
+        match self {
+            FsAtomicity::Sector => 512,
+            FsAtomicity::Block => 4096,
+        }
+    }
+}
+
+pub fn arb_fs_atomicity() -> impl Strategy<Value = FsAtomicity> {
+    prop_oneof![Just(FsAtomicity::Sector), Just(FsAtomicity::Block)]
+}
+
+/// The largest `unit` boundary strictly below `len` — i.e. the offset that drops the trailing
+/// (possibly partial) unit.
+fn unit_floor_below(len: usize, unit: usize) -> usize {
+    (len.saturating_sub(1) / unit) * unit
+}
 
 fn io_err_already_exists() -> io::Error {
     io::Error::new(io::ErrorKind::AlreadyExists, "file already exists")
@@ -28,7 +70,10 @@ fn io_err_permission_denied() -> io::Error {
 }
 
 struct FileInner {
+    // The live contents, as seen by the running reader and writer.
     buf: Option<Vec<u8>>,
+    // The contents known to have reached disk via a barrier.
+    durable: Vec<u8>,
 }
 
 impl FileInner {
@@ -40,12 +85,17 @@ impl FileInner {
         let previous = self.buf.replace(buf);
         assert!(previous.is_none());
     }
+
+    fn persist(&mut self) {
+        self.durable = self.buf.as_ref().expect("file buf consumed").clone();
+    }
 }
 
 impl Default for FileInner {
     fn default() -> Self {
         Self {
             buf: Some(Vec::new()),
+            durable: Vec::new(),
         }
     }
 }
@@ -74,6 +124,19 @@ impl TestFile {
     fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(FileInner::default())),
+            is_writable: false,
+            read_pos: 0,
+        }
+    }
+
+    // Rebuilds a file from its durable snapshot after a crash. The live contents equal the
+    // durable contents, since that is all that reached disk.
+    fn from_durable(durable: Vec<u8>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(FileInner {
+                buf: Some(durable.clone()),
+                durable,
+            })),
             is_writable: false,
             read_pos: 0,
         }
@@ -141,6 +204,8 @@ impl ReadableMemoryMap for TestMmap {}
 
 impl WritableMemoryMap for TestMmap {
     fn flush(&self) -> io::Result<()> {
+        let buf = self.buf.as_ref().expect("mmap buf consumed");
+        self.inner.lock().expect("poisoned").durable = buf.clone();
         Ok(())
     }
 }
@@ -217,6 +282,7 @@ impl AsyncFile for TestFile {
     }
 
     async fn sync_all(&self) -> io::Result<()> {
+        self.inner.lock().expect("poisoned").persist();
         Ok(())
     }
 }
@@ -224,7 +290,10 @@ impl AsyncFile for TestFile {
 // Inner state of the test filesystem.
 #[derive(Debug, Default)]
 struct FilesystemInner {
+    atomicity: FsAtomicity,
     files: HashMap<PathBuf, TestFile>,
+    // Paths whose directory entry has reached disk and so survive a crash.
+    durable_names: HashSet<PathBuf>,
 }
 
 impl FilesystemInner {
@@ -272,6 +341,51 @@ impl FilesystemInner {
     fn delete_file(&mut self, path: &Path) -> bool {
         self.files.remove(path).is_some()
     }
+
+    // Models the OS flushing a data file's dirty tail to disk ahead of an
+    // explicit `sync_all`.
+    fn writeback_data(&mut self, path: &Path, tail: TailPersistence) {
+        let Some(file) = self.files.get(path) else {
+            return;
+        };
+        let unit = self.atomicity.tear_granularity();
+        let mut inner = file.inner.lock().expect("poisoned");
+        let live = inner.buf.as_ref().expect("data file buf consumed").clone();
+        let durable_len = inner.durable.len();
+        if live.len() <= durable_len {
+            return;
+        }
+        let boundary = unit_floor_below(live.len(), unit).max(durable_len);
+        inner.durable = match tail {
+            TailPersistence::AllDirty => live,
+            TailPersistence::TornAtBoundary => live[..boundary].to_vec(),
+            TailPersistence::GarbageBoundary => {
+                let mut durable = live[..boundary].to_vec();
+                durable.resize(live.len(), GARBAGE_BYTE);
+                durable
+            }
+        };
+    }
+
+    // Models the OS flushing one file's directory entry to disk.
+    fn writeback_dir_entry(&mut self, path: &Path) {
+        if self.files.contains_key(path) {
+            self.durable_names.insert(path.to_owned());
+        } else {
+            self.durable_names.remove(path);
+        }
+    }
+
+    // Discards everything that has not been forced durable by a barrier.
+    fn crash(&mut self) {
+        let live = std::mem::take(&mut self.files);
+        for (path, file) in live {
+            if self.durable_names.contains(&path) {
+                let durable = file.inner.lock().expect("poisoned").durable.clone();
+                self.files.insert(path, TestFile::from_durable(durable));
+            }
+        }
+    }
 }
 
 /// A `Filesystem` that tracks files in memory and allows introspection from the outside.
@@ -279,10 +393,47 @@ pub struct TestFilesystem {
     inner: Arc<Mutex<FilesystemInner>>,
 }
 
+impl TestFilesystem {
+    /// A filesystem with the given append atomicity.
+    pub fn with_atomicity(atomicity: FsAtomicity) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(FilesystemInner {
+                atomicity,
+                ..Default::default()
+            })),
+        }
+    }
+
+    /// Models a hard crash, Discarding everything not forced durable by a
+    /// barrier.
+    pub fn crash(&self) {
+        self.inner.lock().expect("poisoned").crash();
+    }
+
+    /// Models the OS flushing a data file's dirty tail ahead of an explicit
+    /// `sync_all`.
+    pub fn writeback_data(&self, path: &Path, tail: TailPersistence) {
+        self.inner
+            .lock()
+            .expect("poisoned")
+            .writeback_data(path, tail);
+    }
+
+    /// Models the OS flushing one file's directory entry ahead of a directory
+    /// fsync.
+    pub fn writeback_dir_entry(&self, path: &Path) {
+        self.inner
+            .lock()
+            .expect("poisoned")
+            .writeback_dir_entry(path);
+    }
+}
+
 impl fmt::Debug for TestFilesystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let inner = self.inner.lock().expect("poisoned");
         f.debug_struct("TestFilesystem")
+            .field("atomicity", &inner.atomicity)
             .field("files", &inner.files)
             .finish()
     }
@@ -290,7 +441,9 @@ impl fmt::Debug for TestFilesystem {
 
 impl Clone for TestFilesystem {
     fn clone(&self) -> Self {
-        Self::default()
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
     }
 }
 

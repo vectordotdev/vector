@@ -2,6 +2,9 @@
 //! `scenarios/vector_to_vector_e2e_disk`) owns its own test-command bins. When two
 //! scenarios need the same HTTP or oracle helpers, factor them into modules here.
 
+use std::time::Duration;
+
+use serde_json::json;
 use vector_buffers::WRITE_BUFFER_SIZE_V2;
 
 /// Payload lengths in bytes, one per id class. Sized around the disk_v2 write
@@ -50,30 +53,56 @@ pub fn payload_for(id: u64) -> Vec<u8> {
 /// without escaping concerns, and a corruption of the bytes shows up as a hex
 /// mismatch.
 pub fn payload_field(id: u64) -> String {
-    let bytes = payload_for(id);
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push(char::from_digit((b >> 4) as u32, 16).unwrap());
-        s.push(char::from_digit((b & 0x0f) as u32, 16).unwrap());
-    }
-    s
+    hex::encode(payload_for(id))
 }
 
 /// Decode the hex produced by [`payload_field`] back to bytes. Returns `None` on
 /// any non-hex or odd-length input so the oracle can tell a mangled field from a
 /// content mismatch.
 pub fn decode_payload_field(field: &str) -> Option<Vec<u8>> {
-    if !field.len().is_multiple_of(2) {
-        return None;
-    }
-    let mut out = Vec::with_capacity(field.len() / 2);
-    let mut bytes = field.bytes();
-    while let (Some(hi), Some(lo)) = (bytes.next(), bytes.next()) {
-        let hi = (hi as char).to_digit(16)?;
-        let lo = (lo as char).to_digit(16)?;
-        out.push(((hi << 4) | lo) as u8);
-    }
-    Some(out)
+    hex::decode(field).ok()
+}
+
+/// Claim one fresh id from the oracle. `None` if the oracle is unreachable.
+pub async fn claim(client: &reqwest::Client, oracle_url: &str) -> Option<u64> {
+    let resp = client
+        .post(format!("{oracle_url}/claim"))
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+        .ok()?;
+    resp.text().await.ok()?.trim().parse().ok()
+}
+
+/// POST one event to the source. `true` on a 2xx, meaning the pipeline took
+/// end-to-end responsibility for the event. The payload is a deterministic
+/// function of the id, so every retry re-sends the exact same record and the
+/// oracle can recompute the expected bytes.
+pub async fn post_event(
+    client: &reqwest::Client,
+    source_url: &str,
+    id: u64,
+    timeout: Duration,
+) -> bool {
+    let event = json!([{ "id": id, "data": payload_field(id) }]);
+    matches!(
+        client.post(source_url).timeout(timeout).json(&event).send().await,
+        Ok(resp) if resp.status().is_success()
+    )
+}
+
+/// Tell the oracle the pipeline acked this id, so it must come back. `true` if
+/// the oracle recorded the obligation.
+pub async fn report_acked(client: &reqwest::Client, oracle_url: &str, id: u64) -> bool {
+    matches!(
+        client
+            .post(format!("{oracle_url}/acked"))
+            .timeout(Duration::from_secs(10))
+            .body(id.to_string())
+            .send()
+            .await,
+        Ok(resp) if resp.status().is_success()
+    )
 }
 
 #[cfg(test)]

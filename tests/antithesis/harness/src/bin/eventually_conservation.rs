@@ -10,7 +10,7 @@
 #[cfg(target_os = "linux")]
 extern crate antithesis_instrumentation;
 
-use antithesis_harness::payload_field;
+use antithesis_harness::{claim, post_event};
 use antithesis_sdk::{
     antithesis_init, assert_always, assert_always_less_than_or_equal_to,
     assert_sometimes_greater_than, assert_unreachable,
@@ -96,26 +96,6 @@ async fn all_healthy(client: &reqwest::Client, metrics_urls: &[String]) -> bool 
         }
     }
     true
-}
-
-async fn claim(client: &reqwest::Client, oracle_url: &str) -> Option<u64> {
-    let resp = client
-        .post(format!("{oracle_url}/claim"))
-        .timeout(time::Duration::from_secs(10))
-        .send()
-        .await
-        .ok()?;
-    resp.text().await.ok()?.trim().parse().ok()
-}
-
-async fn post_probe(client: &reqwest::Client, source_url: &str, id: u64) -> bool {
-    // Same deterministic payload as the producer, so the probe's delivery passes
-    // the oracle's content check instead of counting as corruption.
-    let event = json!([{ "id": id, "data": payload_field(id) }]);
-    matches!(
-        client.post(source_url).timeout(time::Duration::from_secs(10)).json(&event).send().await,
-        Ok(resp) if resp.status().is_success()
-    )
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -239,7 +219,7 @@ async fn main() {
     while !progressed && time::Instant::now() < deadline {
         if probe.is_none() {
             if let Some(id) = claim(&client, &oracle_url).await {
-                if post_probe(&client, &source_url, id).await {
+                if post_event(&client, &source_url, id, time::Duration::from_secs(10)).await {
                     probe = Some(id);
                 }
             }

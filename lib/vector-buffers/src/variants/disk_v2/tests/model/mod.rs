@@ -26,7 +26,7 @@ use crate::{
 
 mod action;
 use self::{
-    action::{Action, arb_actions},
+    action::{Action, DirTarget, Writeback, arb_actions},
     record::EncodeError,
 };
 
@@ -807,27 +807,20 @@ impl BufferModel {
 
 proptest! {
     #[test]
-    fn model_check(mut config in arb_buffer_config(), actions in arb_actions(0..64)) {
+    fn model_check(mut builder in arb_buffer_config(), actions in arb_actions(0..64)) {
         let rt = Builder::new_current_thread()
             .enable_all()
+            .start_paused(true)
             .build()
             .expect("should not fail to build runtime");
 
         let _a = install_tracing_helpers();
-        info!(
-            actions = actions.len(),
-            max_buffer_size = config.max_buffer_size,
-            max_data_file_size = config.max_data_file_size,
-            max_record_size = config.max_record_size,
-            "Starting model.",
-        );
 
-        // We generate a new temporary directory and overwrite the data directory in the buffer
-        // configuration. This allows us to use a utility that will generate a random directory each
-        // time -- parallel runs of this test can't clobber each other anymore -- but also ensure
-        // that the directory is cleaned up when the test run is over.
+        // We generate a new temporary directory and overwrite the data directory in the builder.
+        // This gives each run a unique directory -- parallel runs can't clobber each other -- that
+        // is cleaned up when the run ends.
         let buf_dir = TempDir::with_prefix("vector-buffers-disk-v2-model").expect("creating temp dir should never fail");
-        config.data_dir = buf_dir.path().to_path_buf();
+        builder.data_dir = buf_dir.path().to_path_buf();
 
         rt.block_on(async move {
             // This model tries to encapsulate all of the behavior of the disk buffer v2
@@ -836,7 +829,7 @@ proptest! {
             //
             // At the very top, we have our input actions, which are mapped one-to-one with the
             // possible actions that can influence the disk buffer: reading records, writing
-            // records, flushing writes, and acknowledging reads.
+            // records, flushing writes, acknowledging reads, and advancing time.
             //
             // After that, we have the model itself, which essentially a barebones re-implementation
             // of the disk buffer itself without any asynchrony, rich error handling, etc.  We scope
@@ -868,10 +861,21 @@ proptest! {
             // should be tried again before pulling a new action from the remaining actions in the
             // input sequence, and so on.  Effectively, we can deterministically drive asynchronous
             // actions that are coupled to one another, in a lockstep fashion, with the model.
+            // Each buffer open rebuilds the config from the builder, the same path a restarting
+            // process takes. The model borrows this first one before it is handed to the open.
+            let config = builder.clone().build().expect("validated builder should build");
+            info!(
+                actions = actions.len(),
+                max_buffer_size = config.max_buffer_size,
+                max_data_file_size = config.max_data_file_size,
+                max_record_size = config.max_record_size,
+                "Starting model.",
+            );
             let mut model = BufferModel::from_config(&config);
 
+            let fs = builder.filesystem.clone();
             let usage_handle = BufferUsageHandle::noop();
-            let (writer, reader, ledger) =
+            let (writer, reader, mut ledger, mut finalizer_handle) =
                 Buffer::<Record>::from_config_inner(config, usage_handle)
                     .await
                     .expect("should not fail to build buffer");
@@ -905,9 +909,66 @@ proptest! {
                 // run against the model.  If it's an action that may be asynchronous/blocked on
                 // progress of another component, we try it later on, which lets us deduplicate some code.
                 if let Some(action) = sequencer.trigger_next_runnable_action() {
-                    if let Action::AcknowledgeRead = action {
+                    match action {
                         // Acknowledgements are based on atomics, so they never wait asynchronously.
-                        model.acknowledge_read();
+                        Action::AcknowledgeRead => model.acknowledge_read(),
+                        Action::AdvanceTime(duration) if duration > tokio::time::Duration::ZERO => {
+                            // `advance(0)` still yields internally, which makes zero-time advances
+                            // affect scheduling and prevents them from shrinking out as no-ops.
+                            tokio::time::advance(duration).await;
+                            tokio::task::yield_now().await;
+                        }
+                        // The OS flushes a stream to disk ahead of any explicit flush.
+                        Action::Writeback(writeback) => match writeback {
+                            Writeback::LedgerContents => {
+                                ledger.flush().expect("ledger flush should not fail in the model");
+                            }
+                            Writeback::DataContents { file, tail } => {
+                                fs.writeback_data(&ledger.get_data_file_path(file), tail);
+                            }
+                            Writeback::DirEntry(target) => {
+                                let path = match target {
+                                    DirTarget::Ledger => ledger.ledger_path(),
+                                    DirTarget::DataFile(file) => ledger.get_data_file_path(file),
+                                };
+                                fs.writeback_dir_entry(&path);
+                            }
+                        },
+                        Action::Crash => {
+                            fs.crash();
+                            // Tear the SUT down before reopening.
+                            let remaining = sequencer.into_remaining_actions();
+                            drop(ledger);
+                            finalizer_handle.await.expect("finalizer task panicked");
+                            // Reopen the buffer the way a restarting process
+                            // would. Rebuild the config from the builder,
+                            // reopening the buffer the way a restarting process
+                            // would.
+                            let config = builder.clone().build().expect("validated builder should build");
+                            let (writer, reader, new_ledger, new_handle) =
+                                match Buffer::<Record>::from_config_inner(
+                                    config,
+                                    BufferUsageHandle::noop(),
+                                )
+                                .await
+                                {
+                                    Ok(parts) => parts,
+                                    Err(e) => {
+                                        prop_assert!(
+                                            false,
+                                            "buffer failed to reopen after crash: {:?}",
+                                            e
+                                        );
+                                        unreachable!()
+                                    }
+                                };
+
+                            ledger = new_ledger;
+                            finalizer_handle = new_handle;
+                            sequencer = ActionSequencer::new(remaining, reader, writer);
+                            closed_writers = false;
+                        }
+                        _ => {}
                     }
                 } else {
                     let mut made_progress = false;
