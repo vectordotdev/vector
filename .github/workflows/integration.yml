@@ -96,8 +96,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
-        # If you modify this list, please also update the `int_tests` job in changes.yml.
         service:
           [
             "amqp",
@@ -124,8 +122,8 @@ jobs:
             "kafka",
             "logstash",
             "loki",
-            "mqtt",
             "mongodb",
+            "mqtt",
             "nats",
             "nginx",
             "opentelemetry",
@@ -133,6 +131,7 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
+            "splunk",
             "webhdfs"
           ]
     timeout-minutes: 90
