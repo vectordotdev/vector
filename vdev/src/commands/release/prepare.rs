@@ -226,6 +226,7 @@ impl Prepare {
     fn generate_release_cue(&self) -> Result<()> {
         debug!("generate_release_cue");
         generate_cue::run(&self.new_vector_version)?;
+        generate_cue::retire_all_fragments()?;
 
         self.append_vrl_changelog_to_release_cue()?;
         git::add_files_in_current_dir()?;
