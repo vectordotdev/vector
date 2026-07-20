@@ -66,6 +66,11 @@ const MAX_ACK_DEADLINE_SECS: u64 = 600;
 // processing.
 const ACK_QUEUE_SIZE: usize = 8;
 
+// Time to wait for an HTTP/2 keepalive ping response before closing the
+// connection, and the upper bound on a single connection attempt.
+const HTTP2_KEEPALIVE_TIMEOUT: Duration = Duration::from_secs(20);
+const HTTP2_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 // prost emits some generated code that includes clones on `Arc`
@@ -116,6 +121,15 @@ pub(crate) enum PubsubError {
         MAX_ACK_DEADLINE_SECS
     ))]
     InvalidAckDeadline,
+    #[snafu(display(
+        "`idle_timeout_secs` ({}) must be larger than `keepalive_secs` ({})",
+        idle_timeout_secs,
+        keepalive_secs
+    ))]
+    InvalidIdleTimeout {
+        idle_timeout_secs: f64,
+        keepalive_secs: f64,
+    },
 }
 
 static CLIENT_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
@@ -205,6 +219,31 @@ pub struct PubsubConfig {
     #[configurable(metadata(docs::human_name = "Keepalive"))]
     pub keepalive_secs: Duration,
 
+    /// The maximum amount of time, in seconds, to wait for a response on an
+    /// active stream before assuming the connection has stalled and
+    /// reconnecting.
+    ///
+    /// GCP Pub/Sub can leave a streaming pull in a state where the
+    /// connection looks healthy but no further responses are delivered and
+    /// the stream never errors. This bounds that inactivity. It must be
+    /// larger than `keepalive_secs`.
+    #[serde(default = "default_idle_timeout")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Idle Timeout"))]
+    pub idle_timeout_secs: Duration,
+
+    /// The number of consecutive stream failures, with no successful fetch in
+    /// between, before a fetch error is reported as a component error.
+    ///
+    /// GCP Pub/Sub routinely ends a streaming pull with a transient error
+    /// (for example, an `Unavailable` status when an idle subscription has no
+    /// messages). These are retried automatically and logged at `debug`
+    /// until this threshold is reached. A successful fetch resets the count.
+    /// Set to `1` to report every failure as an error.
+    #[serde(default = "default_max_retry_errors")]
+    #[configurable(metadata(docs::human_name = "Max Retry Errors Before Alerting"))]
+    pub max_retry_errors: usize,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
@@ -241,6 +280,14 @@ const fn default_keepalive() -> Duration {
     Duration::from_secs(60)
 }
 
+const fn default_idle_timeout() -> Duration {
+    Duration::from_secs(900)
+}
+
+const fn default_max_retry_errors() -> usize {
+    5
+}
+
 const fn default_max_concurrency() -> usize {
     10
 }
@@ -269,6 +316,14 @@ impl SourceConfig for PubsubConfig {
         };
         if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs.as_secs()) {
             return Err(PubsubError::InvalidAckDeadline.into());
+        }
+
+        if self.idle_timeout_secs <= self.keepalive_secs {
+            return Err(PubsubError::InvalidIdleTimeout {
+                idle_timeout_secs: self.idle_timeout_secs.as_secs_f64(),
+                keepalive_secs: self.keepalive_secs.as_secs_f64(),
+            }
+            .into());
         }
 
         let retry_delay_secs = match self.retry_delay_seconds {
@@ -301,6 +356,16 @@ impl SourceConfig for PubsubConfig {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
 
+        // Detect a silently broken connection (for example, GCP dropping
+        // the stream but leaving the socket open) via HTTP/2 keepalive
+        // pings, and bound the initial dial, so a reconnect can't wedge
+        // with no error ever surfacing.
+        endpoint = endpoint
+            .http2_keep_alive_interval(self.keepalive_secs)
+            .keep_alive_timeout(HTTP2_KEEPALIVE_TIMEOUT)
+            .keep_alive_while_idle(true)
+            .connect_timeout(HTTP2_CONNECT_TIMEOUT);
+
         let token_generator = auth.spawn_regenerate_token();
 
         let protocol = uri
@@ -328,6 +393,9 @@ impl SourceConfig for PubsubConfig {
             ack_deadline_secs,
             retry_delay: retry_delay_secs,
             keepalive: self.keepalive_secs,
+            idle_timeout: self.idle_timeout_secs,
+            max_retry_errors: self.max_retry_errors.max(1),
+            consecutive_failures: 0,
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
@@ -393,6 +461,10 @@ struct PubsubSource {
     out: SourceSender,
     retry_delay: Duration,
     keepalive: Duration,
+    idle_timeout: Duration,
+    max_retry_errors: usize,
+    // Consecutive stream failures since the last successful fetch.
+    consecutive_failures: usize,
     // The current concurrency is shared across all tasks. It is used
     // by the streams to avoid shutting down the last stream, which
     // would result in repeatedly re-opening the stream on idle.
@@ -522,6 +594,12 @@ impl PubsubSource {
             Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
         let mut pending_acks = 0;
 
+        // Reconnect if no response arrives within the idle timeout, to
+        // recover from a stream that stalls without ever erroring. Reset
+        // whenever a response arrives.
+        let idle_deadline = tokio::time::sleep(self.idle_timeout);
+        tokio::pin!(idle_deadline);
+
         loop {
             tokio::select! {
                 biased;
@@ -536,6 +614,10 @@ impl PubsubSource {
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
+                        self.consecutive_failures = 0;
+                        idle_deadline
+                            .as_mut()
+                            .reset(tokio::time::Instant::now() + self.idle_timeout);
                         self.handle_response(
                             response,
                             &finalizer,
@@ -544,13 +626,20 @@ impl PubsubSource {
                             busy_flag,
                         ).await;
                     }
-                    Some(Err(error)) => break translate_error(error),
+                    Some(Err(error)) => break self.handle_stream_error(error),
                     None => break State::RetryNow,
                 },
                 _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
                 _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
+                },
+                _ = &mut idle_deadline => {
+                    debug!(
+                        message = "No activity on the stream within the idle timeout, restarting stream.",
+                        timeout_secs = self.idle_timeout.as_secs_f64(),
+                    );
+                    break State::RetryDelay;
                 },
                 _ = tokio::time::sleep(self.keepalive) => {
                     if pending_acks == 0 {
@@ -571,10 +660,20 @@ impl PubsubSource {
                     // other activity has happened. This will result
                     // in a new request with empty fields, effectively
                     // a keepalive.
-                    ack_ids_sender
-                        .send(Vec::new())
-                        .await
-                        .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                    //
+                    // Send without blocking: a full channel means the
+                    // request stream stalled, so reconnect rather than
+                    // deadlock.
+                    match ack_ids_sender.try_send(Vec::new()) {
+                        Ok(()) => {}
+                        Err(mpsc::error::TrySendError::Full(_)) => {
+                            debug!("Keepalive request stream stalled, restarting stream.");
+                            break State::RetryDelay;
+                        }
+                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                            unreachable!("request stream never closes")
+                        }
+                    }
                 }
             }
         }
@@ -647,6 +746,32 @@ impl PubsubSource {
         }
     }
 
+    // GCP frequently ends a streaming pull with a transient, auto-retried
+    // error (a reset, or `Unavailable` when an idle subscription has no
+    // messages). Only escalate to a component error once failures persist,
+    // to avoid flooding the logs on quiet subscriptions.
+    fn handle_stream_error(&mut self, error: tonic::Status) -> State {
+        // A server-side reset is not really an error, so retry immediately
+        // without counting it.
+        if is_reset(&error) {
+            debug!("Stream reset by server.");
+            return State::RetryNow;
+        }
+
+        self.consecutive_failures += 1;
+        if should_alert(self.consecutive_failures, self.max_retry_errors) {
+            emit!(GcpPubsubReceiveError { error });
+        } else {
+            debug!(
+                message = "Transient error fetching events, retrying.",
+                %error,
+                consecutive_failures = self.consecutive_failures,
+                max_retry_errors = self.max_retry_errors,
+            );
+        }
+        State::RetryDelay
+    }
+
     async fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
@@ -712,20 +837,9 @@ impl PubsubSource {
     }
 }
 
-fn translate_error(error: tonic::Status) -> State {
-    // GCP occasionally issues a connection reset
-    // in the middle of the streaming pull. This
-    // reset is not technically an error, so we
-    // want to retry immediately, but it is
-    // reported to us as an error from the
-    // underlying library (`tonic`).
-    if is_reset(&error) {
-        debug!("Stream reset by server.");
-        State::RetryNow
-    } else {
-        emit!(GcpPubsubReceiveError { error });
-        State::RetryDelay
-    }
+// Escalate to a component error once failures reach the threshold.
+const fn should_alert(consecutive_failures: usize, max_retry_errors: usize) -> bool {
+    consecutive_failures >= max_retry_errors
 }
 
 fn is_reset(error: &Status) -> bool {
@@ -760,6 +874,59 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PubsubConfig>();
+    }
+
+    #[test]
+    fn alerts_only_once_failures_reach_threshold() {
+        let max = default_max_retry_errors();
+        assert!((1..max).all(|n| !should_alert(n, max)));
+        assert!(should_alert(max, max));
+        assert!(should_alert(max + 1, max));
+        // A threshold of 1 reports every failure (the previous behavior).
+        assert!(should_alert(1, 1));
+    }
+
+    #[test]
+    fn default_idle_timeout_is_larger_than_keepalive() {
+        // Defaults come from serde, not `Default::default()`.
+        let config: PubsubConfig = serde_yaml::from_str(
+            r#"
+            project: my-project
+            subscription: my-subscription
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.idle_timeout_secs > config.keepalive_secs,
+            "the default idle timeout must be larger than the default keepalive"
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_idle_timeout_not_larger_than_keepalive() {
+        let config: PubsubConfig = serde_yaml::from_str(
+            r#"
+            project: my-project
+            subscription: my-subscription
+            skip_authentication: true
+            keepalive_secs: 60
+            idle_timeout_secs: 60
+            "#,
+        )
+        .unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let context = SourceContext::new_test(tx, None);
+        let error = match config.build(context).await {
+            Ok(_) => {
+                panic!("build should reject an idle timeout that is not larger than keepalive")
+            }
+            Err(error) => error.to_string(),
+        };
+        assert!(
+            error.contains("idle_timeout_secs"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

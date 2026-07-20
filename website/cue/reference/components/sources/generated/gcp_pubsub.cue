@@ -597,6 +597,30 @@ generated: components: sources: gcp_pubsub: configuration: {
 		required: false
 		type: uint: default: 100
 	}
+	idle_timeout_secs: {
+		description: """
+			The maximum amount of time, in seconds, to wait for any response
+			on an active stream before assuming the connection has stalled
+			and reconnecting.
+
+			The GCP Pub/Sub servers occasionally leave a streaming pull in a
+			state where the connection appears healthy but no further
+			responses (not even keepalive echoes) are ever delivered, and the
+			stream never errors or closes on its own. When no response is
+			received within this window, the stream is torn down and
+			re-established to recover.
+
+			A healthy but idle stream still receives periodic keepalive
+			responses and is recycled by the server on its own, so this only
+			needs to be larger than that activity. It must be larger than
+			`keepalive_secs`.
+			"""
+		required: false
+		type: float: {
+			default: 900.0
+			unit:    "seconds"
+		}
+	}
 	keepalive_secs: {
 		description: """
 			The amount of time, in seconds, with no received activity
@@ -613,6 +637,26 @@ generated: components: sources: gcp_pubsub: configuration: {
 		description: "The maximum number of concurrent stream connections to open at once."
 		required:    false
 		type: uint: default: 10
+	}
+	max_retry_errors: {
+		description: """
+			The number of consecutive stream failures that must occur before a
+			fetch error is reported as a component error.
+
+			The GCP Pub/Sub servers routinely end a streaming pull with a
+			transient error (for example, an `Unavailable` status when there
+			are no messages to deliver on an idle or low-volume subscription).
+			These are retried automatically and are not actionable on their
+			own, so the first failures after a successful fetch are logged at
+			the `debug` level. Only once this many failures happen in a row
+			without any successful fetch in between is a `failed_fetching_events`
+			component error emitted, indicating the stream is genuinely stuck.
+
+			A successful fetch resets the counter. Set to `1` to report every
+			failure as an error (the previous behavior).
+			"""
+		required: false
+		type: uint: default: 5
 	}
 	poll_time_seconds: {
 		description: """
