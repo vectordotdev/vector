@@ -79,6 +79,17 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     pub connection_limit: Option<u32>,
 
+    /// Whether to parse a PROXY protocol v2 header prepended by a trusted
+    /// upstream proxy (for example HAProxy `send-proxy-v2`) at the start of
+    /// each connection.
+    ///
+    /// When enabled, the original client address from the header replaces the
+    /// peer address recorded on each event. Enable this only when a trusted
+    /// proxy sits in front of this source, since the header is otherwise
+    /// spoofable.
+    #[serde(default)]
+    pub proxy_protocol: bool,
+
     #[configurable(derived)]
     pub(super) framing: Option<FramingConfig>,
 
@@ -115,8 +126,13 @@ impl TcpConfig {
             framing: None,
             decoding: default_decoding(),
             connection_limit: None,
+            proxy_protocol: false,
             log_namespace: None,
         }
+    }
+
+    pub const fn proxy_protocol(&self) -> bool {
+        self.proxy_protocol
     }
 
     pub(super) fn host_key(&self) -> OptionalValuePath {
@@ -212,6 +228,10 @@ impl TcpSource for RawTcpSource {
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;
+
+    fn proxy_protocol(&self) -> bool {
+        self.config.proxy_protocol()
+    }
 
     fn decoder(&self) -> Self::Decoder {
         self.decoder.clone()

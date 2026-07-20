@@ -462,6 +462,37 @@ mod test {
         crate::test_util::test_generate_config::<SocketConfig>();
     }
 
+    #[test]
+    fn tcp_proxy_protocol_defaults_off() {
+        let config: SocketConfig = toml::from_str(
+            r#"
+                mode = "tcp"
+                address = "127.0.0.1:9000"
+            "#,
+        )
+        .unwrap();
+        match config.mode {
+            Mode::Tcp(tcp) => assert!(!tcp.proxy_protocol()),
+            _ => panic!("expected tcp mode"),
+        }
+    }
+
+    #[test]
+    fn tcp_proxy_protocol_can_be_enabled() {
+        let config: SocketConfig = toml::from_str(
+            r#"
+                mode = "tcp"
+                address = "127.0.0.1:9000"
+                proxy_protocol = true
+            "#,
+        )
+        .unwrap();
+        match config.mode {
+            Mode::Tcp(tcp) => assert!(tcp.proxy_protocol()),
+            _ => panic!("expected tcp mode"),
+        }
+    }
+
     //////// TCP TESTS ////////
     #[tokio::test]
     async fn tcp_it_includes_host() {

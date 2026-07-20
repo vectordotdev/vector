@@ -7,6 +7,8 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
+use tokio::io::{AsyncRead, AsyncReadExt};
+
 /// The 12-byte signature that begins every PROXY protocol v2 header.
 pub const V2_SIGNATURE: [u8; 12] = [
     0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A,
@@ -149,6 +151,36 @@ pub fn parse_v2(buf: &[u8]) -> Result<(usize, ProxyHeader), ParseError> {
     ))
 }
 
+/// Read and consume exactly one PROXY protocol v2 header from `reader`,
+/// leaving the reader positioned at the first payload byte.
+///
+/// Reads the fixed 16-byte prefix, derives the declared length, then reads
+/// exactly that many further bytes before parsing. Because it reads only the
+/// header bytes, whatever follows on the stream is untouched and available to
+/// the decoder.
+pub async fn read_v2_header<R>(reader: &mut R) -> std::io::Result<ProxyHeader>
+where
+    R: AsyncRead + Unpin,
+{
+    let mut prefix = [0u8; V2_PREFIX_LEN];
+    reader.read_exact(&mut prefix).await?;
+
+    let total = v2_total_len(&prefix).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "expected PROXY protocol v2 signature",
+        )
+    })?;
+
+    let mut buf = vec![0u8; total];
+    buf[..V2_PREFIX_LEN].copy_from_slice(&prefix);
+    reader.read_exact(&mut buf[V2_PREFIX_LEN..]).await?;
+
+    let (_, header) = parse_v2(&buf)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{e:?}")))?;
+    Ok(header)
+}
+
 /// Walk a TLV vector, skipping any entry whose declared length overruns the
 /// buffer. Unknown types are retained as-is so callers can decide what to do.
 fn parse_tlvs(mut buf: &[u8]) -> Vec<Tlv> {
@@ -287,6 +319,36 @@ mod tests {
     /// `send-proxy-v2 set-proxy-v2-tlv-fmt(0xE0) rajesh.com`, followed by a
     /// "HELLO-PAYLOAD\n" payload. Guards against a spec misreading shared by
     /// the hand-built fixtures above.
+    /// The exact 55 bytes captured from haproxy:2.9 (header + payload).
+    fn real_capture() -> [u8; 55] {
+        [
+            0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x11,
+            0x00, 0x19, 0xc0, 0xa8, 0x9b, 0x01, 0xc0, 0xa8, 0x9b, 0x03, 0xb4, 0x26, 0x1b, 0x58,
+            0xe0, 0x00, 0x0a, 0x72, 0x61, 0x6a, 0x65, 0x73, 0x68, 0x2e, 0x63, 0x6f, 0x6d, 0x48,
+            0x45, 0x4c, 0x4c, 0x4f, 0x2d, 0x50, 0x41, 0x59, 0x4c, 0x4f, 0x41, 0x44, 0x0a,
+        ]
+    }
+
+    #[tokio::test]
+    async fn read_v2_header_consumes_only_the_header() {
+        let wire = real_capture();
+        let mut cursor = std::io::Cursor::new(wire.to_vec());
+        let header = read_v2_header(&mut cursor).await.expect("header");
+        assert_eq!(header.tlv(0xE0), Some(&b"rajesh.com"[..]));
+        // Remaining bytes on the stream are exactly the payload.
+        let mut rest = Vec::new();
+        tokio::io::AsyncReadExt::read_to_end(&mut cursor, &mut rest)
+            .await
+            .unwrap();
+        assert_eq!(rest, b"HELLO-PAYLOAD\n");
+    }
+
+    #[tokio::test]
+    async fn read_v2_header_errors_on_non_pp2_stream() {
+        let mut cursor = std::io::Cursor::new(b"not a proxy header at all........".to_vec());
+        assert!(read_v2_header(&mut cursor).await.is_err());
+    }
+
     #[test]
     fn parses_real_haproxy_capture() {
         let wire: [u8; 55] = [
@@ -304,7 +366,10 @@ mod tests {
         let (consumed, header) = parse_v2(&wire).expect("real haproxy header");
         assert_eq!(consumed, 41, "header is 16 prefix + 25 declared");
         assert_eq!(header.source, Some("192.168.155.1:46118".parse().unwrap()));
-        assert_eq!(header.destination, Some("192.168.155.3:7000".parse().unwrap()));
+        assert_eq!(
+            header.destination,
+            Some("192.168.155.3:7000".parse().unwrap())
+        );
         assert_eq!(header.tlv(0xE0), Some(&b"rajesh.com"[..]));
         // Payload survives untouched after the header.
         assert_eq!(&wire[consumed..], b"HELLO-PAYLOAD\n");

@@ -113,6 +113,13 @@ where
 
     fn handle_events(&self, _events: &mut [Event], _host: std::net::SocketAddr) {}
 
+    /// Whether to parse and strip a PROXY protocol v2 header at the start of
+    /// each connection. Sources that support a trusted upstream proxy override
+    /// this; the default is off so behavior is unchanged for everyone else.
+    fn proxy_protocol(&self) -> bool {
+        false
+    }
+
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
     #[allow(clippy::too_many_arguments)]
@@ -257,7 +264,7 @@ async fn handle_stream<T>(
     max_connection_duration_secs: Option<u64>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
-    peer_addr: SocketAddr,
+    mut peer_addr: SocketAddr,
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
@@ -290,6 +297,28 @@ async fn handle_stream<T>(
         && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes)
     {
         warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
+    }
+
+    // Parse and strip a PROXY protocol v2 header, if the source opts in. Done
+    // after the TLS handshake so a plaintext hop and a re-encrypted hop share
+    // one code path, and before wrapping the socket so only header bytes are
+    // consumed and the payload reaches the decoder untouched.
+    if source.proxy_protocol() {
+        match super::proxy_protocol::read_v2_header(&mut socket).await {
+            Ok(header) => {
+                if let Some(source_addr) = header.source {
+                    peer_addr = source_addr;
+                }
+            }
+            Err(error) => {
+                warn!(
+                    message = "Failed to read PROXY protocol v2 header; closing connection.",
+                    %error,
+                    %peer_addr,
+                );
+                return;
+            }
+        }
     }
 
     let socket = socket.after_read(move |byte_size| {
