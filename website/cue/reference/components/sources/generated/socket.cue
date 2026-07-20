@@ -644,6 +644,21 @@ generated: components: sources: socket: configuration: {
 		required:      false
 		type: string: default: "port"
 	}
+	proxy_protocol: {
+		description: """
+			Whether to parse a PROXY protocol v2 header prepended by a trusted
+			upstream proxy (for example HAProxy `send-proxy-v2`) at the start of
+			each connection.
+
+			When enabled, the original client address from the header replaces the
+			peer address recorded on each event. Enable this only when a trusted
+			proxy sits in front of this source, since the header is otherwise
+			spoofable.
+			"""
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: bool: default: false
+	}
 	receive_buffer_bytes: {
 		description:   "The size of the receive buffer used for each connection."
 		relevant_when: "mode = \"tcp\" or mode = \"udp\""
