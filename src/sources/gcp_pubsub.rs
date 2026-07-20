@@ -759,7 +759,7 @@ impl PubsubSource {
         }
 
         self.consecutive_failures += 1;
-        if should_alert(self.consecutive_failures, self.max_retry_errors) {
+        if self.consecutive_failures >= self.max_retry_errors {
             emit!(GcpPubsubReceiveError { error });
         } else {
             debug!(
@@ -837,11 +837,6 @@ impl PubsubSource {
     }
 }
 
-// Escalate to a component error once failures reach the threshold.
-const fn should_alert(consecutive_failures: usize, max_retry_errors: usize) -> bool {
-    consecutive_failures >= max_retry_errors
-}
-
 fn is_reset(error: &Status) -> bool {
     error
         .source()
@@ -874,16 +869,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PubsubConfig>();
-    }
-
-    #[test]
-    fn alerts_only_once_failures_reach_threshold() {
-        let max = default_max_retry_errors();
-        assert!((1..max).all(|n| !should_alert(n, max)));
-        assert!(should_alert(max, max));
-        assert!(should_alert(max + 1, max));
-        // A threshold of 1 reports every failure (the previous behavior).
-        assert!(should_alert(1, 1));
     }
 
     #[test]
