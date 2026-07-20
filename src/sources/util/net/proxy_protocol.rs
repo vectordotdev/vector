@@ -282,4 +282,31 @@ mod tests {
         let buf = [0u8; 16];
         assert_eq!(v2_total_len(&buf), None);
     }
+
+    /// Real bytes captured from `haproxy:2.9` configured with
+    /// `send-proxy-v2 set-proxy-v2-tlv-fmt(0xE0) rajesh.com`, followed by a
+    /// "HELLO-PAYLOAD\n" payload. Guards against a spec misreading shared by
+    /// the hand-built fixtures above.
+    #[test]
+    fn parses_real_haproxy_capture() {
+        let wire: [u8; 55] = [
+            0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, // sig
+            0x21, 0x11, 0x00, 0x19, // v2/PROXY, INET/STREAM, len 25
+            0xc0, 0xa8, 0x9b, 0x01, // src 192.168.155.1
+            0xc0, 0xa8, 0x9b, 0x03, // dst 192.168.155.3
+            0xb4, 0x26, // src port 46118
+            0x1b, 0x58, // dst port 7000
+            0xe0, 0x00, 0x0a, // TLV 0xE0, len 10
+            0x72, 0x61, 0x6a, 0x65, 0x73, 0x68, 0x2e, 0x63, 0x6f, 0x6d, // "rajesh.com"
+            0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x2d, 0x50, 0x41, 0x59, 0x4c, 0x4f, 0x41, 0x44,
+            0x0a, // "HELLO-PAYLOAD\n" payload
+        ];
+        let (consumed, header) = parse_v2(&wire).expect("real haproxy header");
+        assert_eq!(consumed, 41, "header is 16 prefix + 25 declared");
+        assert_eq!(header.source, Some("192.168.155.1:46118".parse().unwrap()));
+        assert_eq!(header.destination, Some("192.168.155.3:7000".parse().unwrap()));
+        assert_eq!(header.tlv(0xE0), Some(&b"rajesh.com"[..]));
+        // Payload survives untouched after the header.
+        assert_eq!(&wire[consumed..], b"HELLO-PAYLOAD\n");
+    }
 }
