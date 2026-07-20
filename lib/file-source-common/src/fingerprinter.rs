@@ -202,9 +202,12 @@ impl Fingerprinter {
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
+        let mut file_size = None;
+
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if !metadata.is_dir() {
+                    file_size = Some(metadata.len());
                     self.fingerprint(path).await.map(Some)
                 } else {
                     Ok(None)
@@ -221,7 +224,7 @@ impl Fingerprinter {
             .map_err(|error| {
                 match error.kind() {
                     ErrorKind::UnexpectedEof => {
-                        if !known_small_files.contains_key(path) {
+                        if file_size != Some(0) && !known_small_files.contains_key(path) {
                             emitter.emit_file_checksum_failed(path);
                             known_small_files.insert(path.to_path_buf(), time::Instant::now());
                         }
@@ -636,6 +639,31 @@ mod test {
                 .await
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn no_error_on_empty_file() {
+        let target_dir = tempdir().unwrap();
+        let empty_path = target_dir.path().join("empty.log");
+        fs::write(&empty_path, []).unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+
+        let mut small_files = HashMap::new();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&empty_path, &mut small_files, &NoErrors)
+                .await
+                .is_none()
+        );
+        assert!(!small_files.contains_key(&empty_path));
     }
 
     #[test]
