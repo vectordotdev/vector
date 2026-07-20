@@ -1,6 +1,7 @@
 use std::{
     error::Error as _,
     future::Future,
+    num::NonZeroU64,
     pin::Pin,
     sync::{
         Arc, LazyLock,
@@ -66,11 +67,6 @@ const MAX_ACK_DEADLINE_SECS: u64 = 600;
 // processing.
 const ACK_QUEUE_SIZE: usize = 8;
 
-// Time to wait for an HTTP/2 keepalive ping response before closing the
-// connection, and the upper bound on a single connection attempt.
-const HTTP2_KEEPALIVE_TIMEOUT: Duration = Duration::from_secs(20);
-const HTTP2_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 // prost emits some generated code that includes clones on `Arc`
@@ -133,6 +129,47 @@ pub(crate) enum PubsubError {
 }
 
 static CLIENT_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
+
+/// HTTP/2 keepalive configuration for the `gcp_pubsub` source's gRPC connection.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct PubsubKeepaliveConfig {
+    /// How often, in seconds, to send a keepalive PING on the connection.
+    ///
+    /// Shorter intervals detect dead connections faster at the cost of additional traffic.
+    /// gRPC guidance recommends no less than 60 seconds to avoid tripping `too_many_pings`
+    /// policies on servers or proxies between the source and Pub/Sub.
+    #[serde(default = "default_keepalive_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Keepalive Interval"))]
+    pub interval_secs: NonZeroU64,
+
+    /// How long, in seconds, to wait for a keepalive PING acknowledgement before treating
+    /// the connection as dead and closing it.
+    #[serde(default = "default_keepalive_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Keepalive Timeout"))]
+    pub timeout_secs: NonZeroU64,
+}
+
+const fn default_keepalive_interval_secs() -> NonZeroU64 {
+    // Aligned with gRPC keepalive guidance, which recommends no less than one minute to avoid
+    // tripping `too_many_pings` policies on proxies between the source and Pub/Sub.
+    NonZeroU64::new(60).expect("keepalive interval default must be nonzero")
+}
+
+const fn default_keepalive_timeout_secs() -> NonZeroU64 {
+    // Matches hyper's default keepalive timeout.
+    NonZeroU64::new(20).expect("keepalive timeout default must be nonzero")
+}
+
+impl Default for PubsubKeepaliveConfig {
+    fn default() -> Self {
+        Self {
+            interval_secs: default_keepalive_interval_secs(),
+            timeout_secs: default_keepalive_timeout_secs(),
+        }
+    }
+}
 
 /// Configuration for the `gcp_pubsub` source.
 #[serde_as]
@@ -243,6 +280,16 @@ pub struct PubsubConfig {
     #[serde(default = "default_max_retry_errors")]
     #[configurable(metadata(docs::human_name = "Max Retry Errors Before Alerting"))]
     pub max_retry_errors: usize,
+
+    /// HTTP/2 keepalive settings for the source's gRPC connection.
+    ///
+    /// The source sends HTTP/2 PING frames on the connection so that one which has gone away
+    /// (for example, dropped by Pub/Sub or cut off by a network partition) is detected and
+    /// torn down instead of silently delivering no further messages.
+    #[configurable(derived)]
+    #[serde(default)]
+    #[derivative(Default(value = "PubsubKeepaliveConfig::default()"))]
+    pub keepalive: PubsubKeepaliveConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -356,15 +403,13 @@ impl SourceConfig for PubsubConfig {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
 
-        // Detect a silently broken connection (for example, GCP dropping
-        // the stream but leaving the socket open) via HTTP/2 keepalive
-        // pings, and bound the initial dial, so a reconnect can't wedge
-        // with no error ever surfacing.
+        // Send HTTP/2 keepalive PINGs so a silently broken connection (for
+        // example, one dropped by Pub/Sub but left open) is detected and
+        // torn down instead of delivering no further messages.
         endpoint = endpoint
-            .http2_keep_alive_interval(self.keepalive_secs)
-            .keep_alive_timeout(HTTP2_KEEPALIVE_TIMEOUT)
-            .keep_alive_while_idle(true)
-            .connect_timeout(HTTP2_CONNECT_TIMEOUT);
+            .http2_keep_alive_interval(Duration::from_secs(self.keepalive.interval_secs.get()))
+            .keep_alive_timeout(Duration::from_secs(self.keepalive.timeout_secs.get()))
+            .keep_alive_while_idle(true);
 
         let token_generator = auth.spawn_regenerate_token();
 

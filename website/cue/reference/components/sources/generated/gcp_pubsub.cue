@@ -599,26 +599,50 @@ generated: components: sources: gcp_pubsub: configuration: {
 	}
 	idle_timeout_secs: {
 		description: """
-			The maximum amount of time, in seconds, to wait for any response
-			on an active stream before assuming the connection has stalled
-			and reconnecting.
+			The maximum amount of time, in seconds, to wait for a response on an
+			active stream before assuming the connection has stalled and
+			reconnecting.
 
-			The GCP Pub/Sub servers occasionally leave a streaming pull in a
-			state where the connection appears healthy but no further
-			responses (not even keepalive echoes) are ever delivered, and the
-			stream never errors or closes on its own. When no response is
-			received within this window, the stream is torn down and
-			re-established to recover.
-
-			A healthy but idle stream still receives periodic keepalive
-			responses and is recycled by the server on its own, so this only
-			needs to be larger than that activity. It must be larger than
-			`keepalive_secs`.
+			GCP Pub/Sub can leave a streaming pull in a state where the
+			connection looks healthy but no further responses are delivered and
+			the stream never errors. This bounds that inactivity. It must be
+			larger than `keepalive_secs`.
 			"""
 		required: false
 		type: float: {
 			default: 900.0
 			unit:    "seconds"
+		}
+	}
+	keepalive: {
+		description: """
+			HTTP/2 keepalive settings for the source's gRPC connection.
+
+			The source sends HTTP/2 PING frames on the connection so that one which has gone away
+			(for example, dropped by Pub/Sub or cut off by a network partition) is detected and
+			torn down instead of silently delivering no further messages.
+			"""
+		required: false
+		type: object: options: {
+			interval_secs: {
+				description: """
+					How often, in seconds, to send a keepalive PING on the connection.
+
+					Shorter intervals detect dead connections faster at the cost of additional traffic.
+					gRPC guidance recommends no less than 60 seconds to avoid tripping `too_many_pings`
+					policies on servers or proxies between the source and Pub/Sub.
+					"""
+				required: false
+				type: uint: default: 60
+			}
+			timeout_secs: {
+				description: """
+					How long, in seconds, to wait for a keepalive PING acknowledgement before treating
+					the connection as dead and closing it.
+					"""
+				required: false
+				type: uint: default: 20
+			}
 		}
 	}
 	keepalive_secs: {
@@ -640,20 +664,14 @@ generated: components: sources: gcp_pubsub: configuration: {
 	}
 	max_retry_errors: {
 		description: """
-			The number of consecutive stream failures that must occur before a
-			fetch error is reported as a component error.
+			The number of consecutive stream failures, with no successful fetch in
+			between, before a fetch error is reported as a component error.
 
-			The GCP Pub/Sub servers routinely end a streaming pull with a
-			transient error (for example, an `Unavailable` status when there
-			are no messages to deliver on an idle or low-volume subscription).
-			These are retried automatically and are not actionable on their
-			own, so the first failures after a successful fetch are logged at
-			the `debug` level. Only once this many failures happen in a row
-			without any successful fetch in between is a `failed_fetching_events`
-			component error emitted, indicating the stream is genuinely stuck.
-
-			A successful fetch resets the counter. Set to `1` to report every
-			failure as an error (the previous behavior).
+			GCP Pub/Sub routinely ends a streaming pull with a transient error
+			(for example, an `Unavailable` status when an idle subscription has no
+			messages). These are retried automatically and logged at `debug`
+			until this threshold is reached. A successful fetch resets the count.
+			Set to `1` to report every failure as an error.
 			"""
 		required: false
 		type: uint: default: 5
