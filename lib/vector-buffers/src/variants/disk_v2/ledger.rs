@@ -375,6 +375,8 @@ where
     /// Waits for a signal from the writer that progress has been made.
     ///
     /// This will occur when a record is written, or when a new data file is created.
+    ///
+    /// Writer progress is published before this notification is sent.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
@@ -387,16 +389,21 @@ where
     }
 
     /// Notifies all tasks waiting on progress by the writer.
+    ///
+    /// Callers must publish their shared state before notifying.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_writer_waiters(&self) {
         self.writer_notify.notify_one();
     }
 
-    /// Tracks the statistics of a successful write.
-    pub fn track_write(&self, event_count: u64, record_size: u64) {
+    /// Publishes flushed writer progress and then wakes the reader.
+    pub fn publish_writer_progress(&self, event_count: u64, record_size: u64) -> u64 {
+        let next_record_id = self.state().increment_next_writer_record_id(event_count);
         self.increment_total_buffer_size(record_size);
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
+        self.notify_writer_waiters();
+        next_record_id
     }
 
     /// Tracks the statistics of multiple successful reads.

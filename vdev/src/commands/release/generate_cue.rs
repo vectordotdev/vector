@@ -16,6 +16,7 @@ use crate::utils::{git, paths};
 
 const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
+const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
 
 /// Allowed conventional-commit types.
 const ALLOWED_TYPES: &[&str] = &[
@@ -29,7 +30,31 @@ const ALLOWED_TYPES: &[&str] = &[
     "security",
 ];
 
+/// Generate the release CUE file (and, if there are breaking fragments, the upgrade guide)
+/// for the given version. Handy for testing the changelog pipeline without running the
+/// full `release prepare` flow.
+///
+/// This subcommand is generation-only: it never mutates `changelog.d/`. `release prepare`
+/// invokes `retire_changelog_fragments` as a separate follow-up step.
+#[derive(clap::Args, Debug)]
+#[command()]
+pub struct Cli {
+    /// The version being released (e.g. `0.58.0`).
+    #[arg(long)]
+    version: Version,
+}
+
+impl Cli {
+    pub fn exec(self) -> Result<()> {
+        run(&self.version)?;
+        Ok(())
+    }
+}
+
 /// Generate the release CUE file for the given new version. Returns the path that was written.
+///
+/// Pure generation: does not touch `changelog.d/`. Callers that want the fragments retired
+/// after a successful release run should call [`retire_all_fragments`] afterward.
 pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
     env::set_current_dir(&repo_root)?;
@@ -42,15 +67,26 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     validate_single_bump(&last_version, new_version)?;
     let new_version = new_version.clone();
 
+    // Capture today's date ONCE so the highlights filename and its frontmatter can never
+    // disagree if the run crosses UTC midnight.
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+
     let cue_path = repo_root
         .join(RELEASES_DIR)
         .join(format!("{new_version}.cue"));
+    let highlights_path = repo_root
+        .join(HIGHLIGHTS_DIR)
+        .join(upgrade_guide_filename(&today, &new_version));
+
     if cue_path.exists() {
         bail!(
             "{} already exists. Delete it (or move it aside) and re-run.",
             cue_path.display()
         );
     }
+    // Note: the highlights collision is checked later, only if we're actually going to
+    // write it — so a manually-authored upgrade guide doesn't block a release with no
+    // breaking fragments.
 
     // Drop any commits that have already been recorded in a previous
     // release CUE file. `--cherry-pick --right-only` only catches
@@ -78,12 +114,45 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     let changelog_dir = repo_root.join(CHANGELOG_DIR);
     let changelog_entries = read_changelog_fragments(&changelog_dir)?;
 
+    // Validate + render everything IN MEMORY before touching disk, so a validation
+    // failure doesn't leave a partial CUE file behind (which would then trip the
+    // "file already exists" guard on the next run).
     let cue_text = render_release_cue(&new_version, &changelog_entries, &commits);
-    fs::write(&cue_path, cue_text)
-        .with_context(|| format!("Failed to write {}", cue_path.display()))?;
+    let breaking: Vec<&BreakingDetails> = changelog_entries
+        .iter()
+        .filter_map(|e| e.breaking_details.as_ref())
+        .collect();
+    let highlights_md = if breaking.is_empty() {
+        None
+    } else {
+        // Guard against clobbering an existing upgrade guide for this release. We match on
+        // the version-suffix rather than the exact `today`-prefixed filename so a partial
+        // run from a previous UTC day (or a maintainer-authored guide dated earlier) is
+        // still detected. The single-page release layout would otherwise render two
+        // "upgrade guide" cards for the same release.
+        if let Some(existing) =
+            find_existing_upgrade_guide(&repo_root.join(HIGHLIGHTS_DIR), &new_version)?
+        {
+            bail!(
+                "{} already exists for release {new_version}. Delete it (or move it aside) and re-run.",
+                existing.display()
+            );
+        }
+        validate_breaking_anchors(&breaking)?;
+        Some(render_upgrade_guide(&today, &new_version, &breaking))
+    };
 
-    // Retire the changelog fragments via `git rm` (preserves README.md).
-    retire_changelog_fragments(&changelog_dir)?;
+    // Everything valid — commit the writes atomically via .tmp + rename.
+    atomic_write(&cue_path, &cue_text)?;
+    if let Some(md) = highlights_md {
+        if let Err(e) = atomic_write(&highlights_path, &md) {
+            // Highlights write failed after CUE succeeded — roll the CUE back so the next
+            // attempt doesn't hit the "file already exists" guard.
+            drop(fs::remove_file(&cue_path));
+            return Err(e);
+        }
+        success!("Wrote {}", highlights_path.display());
+    }
 
     // Format with `cue fmt` (best-effort: warn but do not fail if cue is missing).
     if let Err(e) = run_cue_fmt(&cue_path) {
@@ -375,6 +444,19 @@ struct ChangelogEntry {
     breaking: bool,
     description: String,
     contributors: Vec<String>,
+    /// For `*.breaking.md` fragments, the structured upgrade-guide details.
+    breaking_details: Option<BreakingDetails>,
+}
+
+#[derive(Debug, Clone)]
+struct BreakingDetails {
+    title: String,
+    anchor: String,
+    /// Content of the fragment's `## Summary` section — reused in the guide so each
+    /// breaking change stands on its own without the reader hunting for the release notes.
+    summary: String,
+    /// Content of the fragment's `## Migration` section (headers, code fences, etc.).
+    migration: String,
 }
 
 fn read_changelog_fragments(dir: &Path) -> Result<Vec<ChangelogEntry>> {
@@ -425,22 +507,76 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
     let raw =
         fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
-    let mut lines: Vec<&str> = raw.lines().collect();
-    let mut contributors: Vec<String> = Vec::new();
-    if let Some(last) = lines.last()
-        && let Some(rest) = last.strip_prefix("authors: ")
-    {
-        contributors = rest.split_whitespace().map(String::from).collect();
-        lines.pop();
+    // Strip the `authors:` trailer first — used by every fragment type.
+    let (body, contributors) = split_authors(&raw);
+
+    if breaking {
+        let (summary, details) = parse_breaking_body(body)
+            .with_context(|| format!("Failed to parse breaking fragment {}", path.display()))?;
+        return Ok(ChangelogEntry {
+            cue_type: cue_type.to_string(),
+            breaking,
+            description: summary,
+            contributors,
+            breaking_details: Some(details),
+        });
     }
-    let description = lines.join("\n").trim().to_string();
 
     Ok(ChangelogEntry {
         cue_type: cue_type.to_string(),
         breaking,
-        description,
+        description: body.trim().to_string(),
         contributors,
+        breaking_details: None,
     })
+}
+
+/// Split off the trailing `authors: <handles...>` line, returning the body preceding it
+/// (as a slice into `raw`) plus the parsed handle list. Works with both LF and CRLF line
+/// endings — we locate the marker directly in the original byte stream rather than
+/// reconstructing offsets from `str::lines()`.
+fn split_authors(raw: &str) -> (&str, Vec<String>) {
+    let trimmed = raw.trim_end_matches(['\n', '\r']);
+    let (body_end, handles_start) = match trimmed.rfind("\nauthors: ") {
+        Some(nl) => (nl, nl + 1),
+        None if trimmed.starts_with("authors: ") => (0, 0),
+        None => return (raw, Vec::new()),
+    };
+    let body = raw.get(..body_end).unwrap_or("");
+    let tail = raw.get(handles_start..).unwrap_or("");
+    let handles_line = tail.split(['\n', '\r']).next().unwrap_or(tail);
+    let rest = handles_line
+        .strip_prefix("authors: ")
+        .unwrap_or(handles_line);
+    let contributors = rest.split_whitespace().map(String::from).collect();
+    (body, contributors)
+}
+
+/// Parse the body of a `*.breaking.md` fragment (H1 title + `## Summary` + `## Migration`).
+/// Returns `(summary_markdown, breaking_details)`.
+fn parse_breaking_body(body: &str) -> Result<(String, BreakingDetails)> {
+    let sections = crate::commands::changelog::parse_breaking_sections(body)?;
+    let anchor = sections
+        .anchor
+        .unwrap_or_else(|| crate::commands::changelog::slugify(&sections.title));
+
+    Ok((
+        sections.summary.clone(),
+        BreakingDetails {
+            title: sections.title,
+            anchor,
+            summary: sections.summary,
+            migration: sections.migration,
+        },
+    ))
+}
+
+/// `git rm` every `*.md` under `changelog.d/` except `README.md`. Called by
+/// `release prepare` after a successful `run()` — never by the standalone
+/// `release generate-cue` subcommand.
+pub(super) fn retire_all_fragments() -> Result<()> {
+    let repo_root = paths::find_repo_root()?;
+    retire_changelog_fragments(&repo_root.join(CHANGELOG_DIR))
 }
 
 fn retire_changelog_fragments(dir: &Path) -> Result<()> {
@@ -477,21 +613,23 @@ fn render_release_cue(
         .collect::<Vec<_>>()
         .join(",\n    ");
 
-    format!(
-        "package metadata\n\
-         \n\
-         releases: \"{version}\": {{\n\
-         \tdate:     \"{date}\"\n\
-         \n\
-         \twhats_next: []\n\
-         \n\
-         \tchangelog: [\n\
-         {changelog_block}\n\
-         \t]\n\
-         \n\
-         \tcommits: [\n    {commits_block}\n\t]\n\
-         }}\n"
-    )
+    indoc::formatdoc! {"
+        package metadata
+
+        releases: \"{version}\": {{
+        \tdate:     \"{date}\"
+
+        \twhats_next: []
+
+        \tchangelog: [
+        {changelog_block}
+        \t]
+
+        \tcommits: [
+            {commits_block}
+        \t]
+        }}
+    "}
 }
 
 fn render_changelog(entries: &[ChangelogEntry]) -> String {
@@ -526,6 +664,113 @@ fn run_cue_fmt(path: &Path) -> Result<()> {
         bail!("cue fmt exited with {status}");
     }
     Ok(())
+}
+
+// ---------- Upgrade-guide (highlights) rendering ----------
+
+/// Return the first file in `highlights_dir` whose name ends in the version-suffix used
+/// by upgrade guides (e.g. `-0-58-0-upgrade-guide.md`), regardless of the date prefix.
+fn find_existing_upgrade_guide(
+    highlights_dir: &Path,
+    version: &Version,
+) -> Result<Option<PathBuf>> {
+    if !highlights_dir.is_dir() {
+        return Ok(None);
+    }
+    let suffix = format!(
+        "-{}-{}-{}-upgrade-guide.md",
+        version.major, version.minor, version.patch
+    );
+    for entry in fs::read_dir(highlights_dir)? {
+        let path = entry?.path();
+        if path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.ends_with(&suffix))
+        {
+            return Ok(Some(path));
+        }
+    }
+    Ok(None)
+}
+
+fn upgrade_guide_filename(date: &str, version: &Version) -> String {
+    let version_slug = format!("{}-{}-{}", version.major, version.minor, version.patch);
+    format!("{date}-{version_slug}-upgrade-guide.md")
+}
+
+/// Fail the release if any breaking fragment produced an invalid, empty, or duplicate
+/// anchor. Uses the same anchor rules as `vdev check changelog-fragments` (shared through
+/// `commands::changelog::is_valid_anchor`) so a fragment that passes CI can't fail here.
+fn validate_breaking_anchors(breaking: &[&BreakingDetails]) -> Result<()> {
+    let mut seen = std::collections::HashMap::<&str, &str>::new();
+    for b in breaking {
+        if !crate::commands::changelog::is_valid_anchor(&b.anchor) {
+            bail!(
+                "breaking fragment '{}' has an invalid anchor '{}'. Add `{{#some-valid-slug}}` after the title.",
+                b.title,
+                b.anchor,
+            );
+        }
+        if let Some(other) = seen.insert(b.anchor.as_str(), b.title.as_str()) {
+            bail!(
+                "duplicate upgrade-guide anchor '#{}' shared by breaking fragments '{other}' and '{}'. Override one with `{{#unique-slug}}`.",
+                b.anchor,
+                b.title,
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Write `content` to `path` via a `.tmp` sibling then atomic rename. Prevents leaving a
+/// partial output behind if the process is killed mid-write.
+fn atomic_write(path: &Path, content: &str) -> Result<()> {
+    let tmp = path.with_extension(format!(
+        "{}.tmp",
+        path.extension().and_then(|e| e.to_str()).unwrap_or("")
+    ));
+    fs::write(&tmp, content).with_context(|| format!("Failed to write {}", tmp.display()))?;
+    fs::rename(&tmp, path)
+        .with_context(|| format!("Failed to rename {} -> {}", tmp.display(), path.display()))?;
+    Ok(())
+}
+
+fn render_upgrade_guide(date: &str, version: &Version, breaking: &[&BreakingDetails]) -> String {
+    let title = format!("{}.{} Upgrade Guide", version.major, version.minor);
+    let description = format!("An upgrade guide that addresses breaking changes in {version}");
+
+    // No `authors:` in the frontmatter — this file is auto-generated; a "byline" would
+    // misattribute a multi-author guide to a single contributor.
+    let mut out = String::new();
+    out.push_str("---\n");
+    writeln!(out, "date: \"{date}\"").unwrap();
+    writeln!(out, "title: \"{title}\"").unwrap();
+    writeln!(out, "description: \"{description}\"").unwrap();
+    writeln!(out, "release: \"{version}\"").unwrap();
+    out.push_str("hide_on_release_notes: false\n");
+    out.push_str("badges:\n  type: breaking change\n");
+    out.push_str("---\n\n");
+
+    // Each fragment becomes an H2 (`## Title`), with Summary/Migration under it at H3.
+    // Fragment authors write sub-headings at H4+ (`#### Old` / `#### New`) per the
+    // scaffolder's template so nothing needs to be bumped here — Migration content
+    // passes through verbatim.
+    //
+    // Heading levels matter for the highlights page's Tocbot config
+    // (`website/assets/js/below.js`, which indexes h2-h5): fragment titles at H2 show up
+    // in the TOC as the top-level entries for the guide.
+    for b in breaking {
+        writeln!(out, "## {} {{#{}}}\n", b.title, b.anchor).unwrap();
+        writeln!(out, "### Summary\n\n{}\n", b.summary).unwrap();
+        if b.migration.is_empty() {
+            writeln!(out, "### Migration\n").unwrap();
+        } else {
+            writeln!(out, "### Migration\n\n{}\n", b.migration).unwrap();
+        }
+    }
+
+    out
 }
 
 #[cfg(test)]
@@ -621,12 +866,30 @@ mod tests {
         fs::write(dir.join("README.md"), "ignored").unwrap();
         fs::write(
             dir.join("123_my_change.feature.md"),
-            "Adds a thing.\n\nIssue: https://example/123\n\nauthors: alice bob\n",
+            indoc::indoc! {"
+                Adds a thing.
+
+                Issue: https://example/123
+
+                authors: alice bob
+            "},
         )
         .unwrap();
         fs::write(
             dir.join("legacy_break.breaking.md"),
-            "Removed legacy thing.\n",
+            indoc::indoc! {"
+                # Legacy thing removed
+
+                ## Summary
+
+                Removed legacy thing.
+
+                ## Migration
+
+                N/A
+
+                authors: dave
+            "},
         )
         .unwrap();
         fs::write(dir.join("sec.security.md"), "Patched a CVE.\n").unwrap();
@@ -646,10 +909,17 @@ mod tests {
         assert!(feat.description.starts_with("Adds a thing."));
         assert!(!feat.description.contains("authors:"));
 
-        // No-author entries get empty contributor list.
-        assert!(entries[1].contributors.is_empty());
-        // Breaking fragments must be marked as such.
-        assert!(entries[1].breaking);
+        // Breaking fragments must be marked as such and carry structured details.
+        let breaking = &entries[1];
+        assert!(breaking.breaking);
+        assert!(breaking.breaking_details.is_some());
+        let details = breaking.breaking_details.as_ref().unwrap();
+        assert_eq!(details.title, "Legacy thing removed");
+        assert_eq!(details.anchor, "legacy-thing-removed");
+        assert_eq!(details.migration.trim(), "N/A");
+        // Breaking description in the CUE is the Summary, not the whole body.
+        assert_eq!(breaking.description, "Removed legacy thing.");
+        assert_eq!(breaking.contributors, vec!["dave".to_string()]);
         assert!(!entries[0].breaking);
     }
 
@@ -668,12 +938,14 @@ mod tests {
                 breaking: false,
                 description: "Adds a thing.\nMulti-line.".into(),
                 contributors: vec!["alice".into()],
+                breaking_details: None,
             },
             ChangelogEntry {
                 cue_type: "fix".into(),
                 breaking: false,
                 description: "Fixed it.".into(),
                 contributors: vec![],
+                breaking_details: None,
             },
         ];
         let commits = vec![Commit {
@@ -800,5 +1072,288 @@ releases: "0.55.0": {
         let ids = collect_released_identifiers(Path::new("/nonexistent")).unwrap();
         assert!(ids.shas.is_empty());
         assert!(ids.pr_numbers.is_empty());
+    }
+
+    #[test]
+    fn split_authors_lf() {
+        let raw = "line one\nline two\n\nauthors: alice bob\n";
+        let (body, authors) = split_authors(raw);
+        assert_eq!(body, "line one\nline two\n");
+        assert_eq!(authors, vec!["alice".to_string(), "bob".to_string()]);
+    }
+
+    #[test]
+    fn split_authors_crlf() {
+        // Windows checkouts commit fragments with CRLF endings — the previous impl
+        // used `str::lines()` (strips \r) plus a `+1` byte-per-line accumulator,
+        // which truncated the body by one byte per line. Verify the whole body
+        // survives now.
+        let raw = "line one\r\nline two\r\n\r\nauthors: alice bob\r\n";
+        let (body, authors) = split_authors(raw);
+        assert!(body.contains("line one"));
+        assert!(body.contains("line two"));
+        assert!(!body.contains("authors:"));
+        assert_eq!(authors, vec!["alice".to_string(), "bob".to_string()]);
+    }
+
+    #[test]
+    fn split_authors_no_authors_line() {
+        let raw = "just body text\nmore body\n";
+        let (body, authors) = split_authors(raw);
+        assert_eq!(body, raw);
+        assert!(authors.is_empty());
+    }
+
+    #[test]
+    fn parse_breaking_body_extracts_summary_and_migration() {
+        let body = indoc::indoc! {"
+            # Env var interpolation off {#env-var}
+
+            ## Summary
+
+            Off by default now.
+
+            ## Migration
+
+            Pass the flag.
+
+            ```bash
+            vector --config vector.yaml
+            ```
+        "};
+        let (summary, details) = parse_breaking_body(body).unwrap();
+        assert_eq!(summary, "Off by default now.");
+        assert_eq!(details.title, "Env var interpolation off");
+        assert_eq!(details.anchor, "env-var");
+        assert!(details.migration.starts_with("Pass the flag."));
+        assert!(details.migration.contains("```bash"));
+    }
+
+    #[test]
+    fn parse_breaking_body_derives_anchor_from_title() {
+        let body = indoc::indoc! {"
+            # A Big Change!
+
+            ## Summary
+
+            x
+
+            ## Migration
+
+            N/A
+        "};
+        let (_, details) = parse_breaking_body(body).unwrap();
+        assert_eq!(details.anchor, "a-big-change");
+    }
+
+    #[test]
+    fn slugify_examples() {
+        assert_eq!(
+            crate::commands::changelog::slugify("A Big Change!"),
+            "a-big-change"
+        );
+        assert_eq!(
+            crate::commands::changelog::slugify("  --Foo/Bar--  "),
+            "foo-bar"
+        );
+        assert_eq!(
+            crate::commands::changelog::slugify("already-good"),
+            "already-good"
+        );
+        assert_eq!(
+            crate::commands::changelog::slugify("Numbers 123 OK"),
+            "numbers-123-ok"
+        );
+    }
+
+    #[test]
+    fn upgrade_guide_filename_uses_version() {
+        let name = upgrade_guide_filename("2026-07-17", &Version::parse("0.58.0").unwrap());
+        assert!(name.ends_with("-0-58-0-upgrade-guide.md"), "{name}");
+    }
+
+    #[test]
+    fn find_existing_upgrade_guide_matches_any_date() {
+        let tmp = tempfile::tempdir().unwrap();
+        // A guide dated on some past day (simulating a failed run yesterday, or a
+        // maintainer-authored guide dated earlier than today).
+        fs::write(
+            tmp.path().join("2026-07-19-0-58-0-upgrade-guide.md"),
+            "---\nrelease: 0.58.0\n---",
+        )
+        .unwrap();
+        // An unrelated highlight for a different release must NOT match.
+        fs::write(
+            tmp.path().join("2026-07-19-0-57-0-upgrade-guide.md"),
+            "---\nrelease: 0.57.0\n---",
+        )
+        .unwrap();
+
+        let hit =
+            find_existing_upgrade_guide(tmp.path(), &Version::parse("0.58.0").unwrap()).unwrap();
+        assert!(
+            hit.as_ref()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
+                == Some("2026-07-19-0-58-0-upgrade-guide.md"),
+            "{hit:?}"
+        );
+
+        let miss =
+            find_existing_upgrade_guide(tmp.path(), &Version::parse("0.59.0").unwrap()).unwrap();
+        assert!(miss.is_none(), "{miss:?}");
+    }
+
+    #[test]
+    fn find_existing_upgrade_guide_handles_missing_dir() {
+        let hit = find_existing_upgrade_guide(
+            std::path::Path::new("/nonexistent-dir-for-test"),
+            &Version::parse("0.58.0").unwrap(),
+        )
+        .unwrap();
+        assert!(hit.is_none());
+    }
+
+    fn bd(title: &str, anchor: &str, summary: &str, migration: &str) -> BreakingDetails {
+        BreakingDetails {
+            title: title.into(),
+            anchor: anchor.into(),
+            summary: summary.into(),
+            migration: migration.into(),
+        }
+    }
+
+    #[test]
+    fn validate_breaking_anchors_rejects_duplicates() {
+        let a = bd("First", "same", "", "");
+        let b = bd("Second", "same", "", "");
+        let err = validate_breaking_anchors(&[&a, &b]).unwrap_err();
+        assert!(err.to_string().contains("duplicate"), "{err}");
+    }
+
+    #[test]
+    fn validate_breaking_anchors_rejects_empty() {
+        let a = bd("非ASCII", "", "", "");
+        let err = validate_breaking_anchors(&[&a]).unwrap_err();
+        assert!(err.to_string().contains("invalid anchor"), "{err}");
+    }
+
+    #[test]
+    fn validate_breaking_anchors_accepts_uniques() {
+        let a = bd("First", "first", "", "");
+        let b = bd("Second", "second", "", "");
+        validate_breaking_anchors(&[&a, &b]).unwrap();
+    }
+
+    #[test]
+    fn render_upgrade_guide_shape() {
+        let version = Version::parse("0.58.0").unwrap();
+        // First fragment models the scaffolder's default template: prose plus
+        // `### Old` / `### New` fenced code examples. These sub-headings must pass
+        // through into the guide verbatim (no bumping, no rewriting). Uses generic
+        // placeholders instead of real Vector flags so the test doesn't churn on
+        // unrelated CLI renames.
+        let d1 = bd(
+            "First breaking change",
+            "first",
+            "Something changed.",
+            // Fragment authors write H4 sub-sections so no bumping is needed in the
+            // generator — Migration content passes through verbatim.
+            indoc::indoc! {"
+                Pass `--new-flag` on startup to restore the previous behavior.
+
+                #### Old
+
+                ```bash
+                vector --config vector.yaml
+                ```
+
+                #### New
+
+                ```bash
+                vector --config vector.yaml --new-flag
+                ```"}
+            .trim_end(),
+        );
+        let d2 = bd(
+            "Second breaking change",
+            "second",
+            "A deprecated label is gone.",
+            "N/A",
+        );
+        let md = render_upgrade_guide("2026-07-17", &version, &[&d1, &d2]);
+        let expected = indoc::indoc! {r#"
+            ---
+            date: "2026-07-17"
+            title: "0.58 Upgrade Guide"
+            description: "An upgrade guide that addresses breaking changes in 0.58.0"
+            release: "0.58.0"
+            hide_on_release_notes: false
+            badges:
+              type: breaking change
+            ---
+
+            ## First breaking change {#first}
+
+            ### Summary
+
+            Something changed.
+
+            ### Migration
+
+            Pass `--new-flag` on startup to restore the previous behavior.
+
+            #### Old
+
+            ```bash
+            vector --config vector.yaml
+            ```
+
+            #### New
+
+            ```bash
+            vector --config vector.yaml --new-flag
+            ```
+
+            ## Second breaking change {#second}
+
+            ### Summary
+
+            A deprecated label is gone.
+
+            ### Migration
+
+            N/A
+
+        "#};
+        assert_eq!(md, expected);
+    }
+
+    #[test]
+    fn render_upgrade_guide_empty_migration() {
+        let version = Version::parse("0.58.0").unwrap();
+        let d = bd("A change", "a-change", "Something changed.", "");
+        let md = render_upgrade_guide("2026-07-17", &version, &[&d]);
+        let expected = indoc::indoc! {r#"
+            ---
+            date: "2026-07-17"
+            title: "0.58 Upgrade Guide"
+            description: "An upgrade guide that addresses breaking changes in 0.58.0"
+            release: "0.58.0"
+            hide_on_release_notes: false
+            badges:
+              type: breaking change
+            ---
+
+            ## A change {#a-change}
+
+            ### Summary
+
+            Something changed.
+
+            ### Migration
+
+        "#};
+        assert_eq!(md, expected);
     }
 }
