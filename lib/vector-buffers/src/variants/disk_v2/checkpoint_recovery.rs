@@ -54,6 +54,22 @@ impl CheckpointRecord {
 struct CheckpointBoundaryScanResult {
     logical_file_size: u64,
     acknowledged_prefix_bytes: u64,
+    last_checkpoint_record_id: Option<u64>,
+    last_checkpoint_record_next_id: Option<u64>,
+    has_trailing_corrupt_records: bool,
+}
+
+#[derive(Clone, Copy)]
+struct CheckpointBoundaryFile<'a> {
+    id: u16,
+    path: &'a Path,
+}
+
+struct CheckpointBoundaryScan<'a> {
+    file: CheckpointBoundaryFile<'a>,
+    acknowledged_through_record_id: Option<u64>,
+    writer_next_record_id: Option<u64>,
+    result: CheckpointBoundaryScanResult,
 }
 
 enum DataFileClassification {
@@ -75,12 +91,127 @@ impl CheckpointBoundaryScanResult {
             self.acknowledged_prefix_bytes = record_end_offset;
         }
         self.logical_file_size = record_end_offset;
+        self.last_checkpoint_record_id = Some(record.checkpoint_last_id());
+        self.last_checkpoint_record_next_id = record.next_id;
+        self.has_trailing_corrupt_records = false;
+    }
+
+    /// Includes a complete corrupt record whose physical byte span is still part of the file.
+    fn include_corrupt_record(&mut self, record_bytes: u64) {
+        self.logical_file_size += record_bytes;
+        self.has_trailing_corrupt_records = true;
+    }
+
+    /// Returns whether the validated prefix proves that the next frame starts at or beyond the
+    /// durable writer checkpoint.
+    fn corrupt_record_is_provably_post_checkpoint(&self, writer_next_record_id: u64) -> bool {
+        writer_next_record_id == 1
+            || self.last_checkpoint_record_next_id == Some(writer_next_record_id)
+    }
+
+    /// Extends the acknowledged prefix through corrupt records that the durable reader checkpoint
+    /// proves were already traversed.
+    fn reconcile_corrupt_acknowledged_prefix(
+        &mut self,
+        skip_through_record_id: u64,
+        next_record_id: Option<u64>,
+    ) {
+        if !self.has_trailing_corrupt_records {
+            return;
+        }
+
+        let checkpoint_is_after_last_valid_record = self
+            .last_checkpoint_record_id
+            .is_some_and(|last_record_id| last_record_id < skip_through_record_id);
+        let checkpoint_is_before_next_valid_record =
+            next_record_id.is_none_or(|record_id| skip_through_record_id < record_id);
+
+        if checkpoint_is_after_last_valid_record && checkpoint_is_before_next_valid_record {
+            self.acknowledged_prefix_bytes = self.logical_file_size;
+        }
+    }
+
+    fn include_reader_record(&mut self, record: &CheckpointRecord, skip_through_record_id: u64) {
+        self.reconcile_corrupt_acknowledged_prefix(skip_through_record_id, Some(record.id));
+        self.include_record(
+            record,
+            record.checkpoint_last_id() <= skip_through_record_id,
+        );
     }
 
     /// Returns the checkpoint-live bytes after excluding the acknowledged prefix.
-    fn unread_bytes(&self) -> u64 {
+    fn unread_bytes(mut self, skip_through_record_id: u64) -> u64 {
+        self.reconcile_corrupt_acknowledged_prefix(skip_through_record_id, None);
         debug_assert!(self.logical_file_size >= self.acknowledged_prefix_bytes);
         self.logical_file_size - self.acknowledged_prefix_bytes
+    }
+}
+
+impl<'a> CheckpointBoundaryScan<'a> {
+    fn reader(file: CheckpointBoundaryFile<'a>, acknowledged_through_record_id: u64) -> Self {
+        Self::new(file, Some(acknowledged_through_record_id), None)
+    }
+
+    fn writer(file: CheckpointBoundaryFile<'a>, writer_next_record_id: u64) -> Self {
+        Self::new(file, None, Some(writer_next_record_id))
+    }
+
+    fn reader_writer(
+        file: CheckpointBoundaryFile<'a>,
+        acknowledged_through_record_id: u64,
+        writer_next_record_id: u64,
+    ) -> Self {
+        Self::new(
+            file,
+            Some(acknowledged_through_record_id),
+            Some(writer_next_record_id),
+        )
+    }
+
+    fn new(
+        file: CheckpointBoundaryFile<'a>,
+        acknowledged_through_record_id: Option<u64>,
+        writer_next_record_id: Option<u64>,
+    ) -> Self {
+        Self {
+            file,
+            acknowledged_through_record_id,
+            writer_next_record_id,
+            result: CheckpointBoundaryScanResult::default(),
+        }
+    }
+
+    fn current_offset(&self) -> u64 {
+        self.result.current_offset()
+    }
+
+    fn corrupt_record_is_provably_post_checkpoint(&self) -> bool {
+        self.writer_next_record_id
+            .is_some_and(|writer_next_record_id| {
+                self.result
+                    .corrupt_record_is_provably_post_checkpoint(writer_next_record_id)
+            })
+    }
+
+    fn include_corrupt_record(&mut self, record_bytes: u64) {
+        self.result.include_corrupt_record(record_bytes);
+    }
+
+    fn include_record(&mut self, record: &CheckpointRecord) {
+        if let Some(acknowledged_through_record_id) = self.acknowledged_through_record_id {
+            self.result
+                .include_reader_record(record, acknowledged_through_record_id);
+        } else {
+            self.result.include_record(record, false);
+        }
+    }
+
+    fn recovered_bytes(self) -> u64 {
+        if let Some(acknowledged_through_record_id) = self.acknowledged_through_record_id {
+            self.result.unread_bytes(acknowledged_through_record_id)
+        } else {
+            self.result.logical_file_size
+        }
     }
 }
 
@@ -107,7 +238,6 @@ where
         let effective_reader_file_id = self
             .find_checkpoint_reader_file_id(
                 &checkpoint_data_file_ids,
-                reader_file_id,
                 writer_file_id,
                 reader_last_record_id,
             )
@@ -120,34 +250,26 @@ where
 
         for &data_file_id in &checkpoint_data_file_ids[effective_reader_position..] {
             let data_file_path = self.ledger().get_data_file_path(data_file_id);
+            let boundary_file = CheckpointBoundaryFile {
+                id: data_file_id,
+                path: &data_file_path,
+            };
             unread_buffer_size += if effective_reader_file_id == writer_file_id {
-                self.reconcile_checkpoint_reader_writer_boundary_data_file(
-                    data_file_id,
-                    &data_file_path,
-                    effective_reader_file_id,
-                    writer_file_id,
+                let scan = CheckpointBoundaryScan::reader_writer(
+                    boundary_file,
                     reader_last_record_id,
                     writer_next_record_id,
-                )
-                .await?
+                );
+                let scan = self.reconcile_checkpoint_boundary_data_file(scan).await?;
+                scan.recovered_bytes()
             } else if data_file_id == effective_reader_file_id {
-                self.reconcile_checkpoint_reader_boundary_data_file(
-                    data_file_id,
-                    &data_file_path,
-                    effective_reader_file_id,
-                    writer_file_id,
-                    reader_last_record_id,
-                )
-                .await?
+                let scan = CheckpointBoundaryScan::reader(boundary_file, reader_last_record_id);
+                let scan = self.reconcile_checkpoint_boundary_data_file(scan).await?;
+                scan.recovered_bytes()
             } else if data_file_id == writer_file_id {
-                self.reconcile_checkpoint_writer_boundary_data_file(
-                    data_file_id,
-                    &data_file_path,
-                    effective_reader_file_id,
-                    writer_file_id,
-                    writer_next_record_id,
-                )
-                .await?
+                let scan = CheckpointBoundaryScan::writer(boundary_file, writer_next_record_id);
+                let scan = self.reconcile_checkpoint_boundary_data_file(scan).await?;
+                scan.recovered_bytes()
             } else if let Some(data_file_size) = self.data_file_size(&data_file_path).await? {
                 // Middle files sit strictly inside the effective checkpointed live window, so every
                 // byte in them is unread and checkpoint-live. They do not need boundary record
@@ -156,10 +278,7 @@ where
             } else {
                 error!(
                     data_file_id,
-                    reader_file_id = effective_reader_file_id,
-                    writer_file_id,
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
-                    "Checkpointed middle data file is missing; treating its records as lost."
+                    "Missing checkpointed middle data file; treating records as lost."
                 );
                 0
             };
@@ -210,7 +329,6 @@ where
     async fn find_checkpoint_reader_file_id(
         &self,
         checkpoint_data_file_ids: &[u16],
-        reader_file_id: u16,
         writer_file_id: u16,
         reader_last_record_id: u64,
     ) -> Result<u16, ReaderError<T>> {
@@ -228,12 +346,7 @@ where
 
             let data_file_path = self.ledger().get_data_file_path(data_file_id);
             match self
-                .classify_checkpoint_data_file(
-                    data_file_id,
-                    &data_file_path,
-                    reader_file_id,
-                    writer_file_id,
-                )
+                .classify_checkpoint_data_file(data_file_id, &data_file_path)
                 .await?
             {
                 DataFileClassification::Missing | DataFileClassification::Empty => {}
@@ -242,25 +355,20 @@ where
                 {
                     debug!(
                         data_file_id,
-                        reader_file_id,
-                        writer_file_id,
                         reader_last_record_id,
                         last_record_id,
-                        data_file_path = data_file_path.to_string_lossy().as_ref(),
-                        "Data file is fully acknowledged by the reader checkpoint; excluding it from recovered buffer size."
+                        "Data file is fully acknowledged; excluding it from recovered buffer size."
                     );
                 }
                 DataFileClassification::KnownLastRecord { .. } => return Ok(data_file_id),
                 DataFileClassification::NeedsBoundaryScan => {
-                    let unread_bytes = self
-                        .reconcile_checkpoint_reader_boundary_data_file(
-                            data_file_id,
-                            &data_file_path,
-                            reader_file_id,
-                            writer_file_id,
-                            reader_last_record_id,
-                        )
-                        .await?;
+                    let boundary_file = CheckpointBoundaryFile {
+                        id: data_file_id,
+                        path: &data_file_path,
+                    };
+                    let scan = CheckpointBoundaryScan::reader(boundary_file, reader_last_record_id);
+                    let scan = self.reconcile_checkpoint_boundary_data_file(scan).await?;
+                    let unread_bytes = scan.recovered_bytes();
                     if unread_bytes > 0 {
                         return Ok(data_file_id);
                     }
@@ -277,8 +385,6 @@ where
         &self,
         data_file_id: u16,
         data_file_path: &Path,
-        reader_file_id: u16,
-        writer_file_id: u16,
     ) -> Result<DataFileClassification, ReaderError<T>> {
         let data_file_mmap = match self
             .ledger()
@@ -290,10 +396,7 @@ where
             Err(e) if e.kind() == ErrorKind::NotFound => {
                 error!(
                     data_file_id,
-                    reader_file_id,
-                    writer_file_id,
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
-                    "Checkpointed data file is missing before the first unread record; treating its records as lost."
+                    "Missing checkpointed data file before unread boundary; treating records as lost."
                 );
                 return Ok(DataFileClassification::Missing);
             }
@@ -311,13 +414,10 @@ where
                 let item = match decode_record_payload::<T>(record) {
                     Ok(item) => item,
                     Err(error) => {
-                        debug!(
+                        warn!(
                             data_file_id,
-                            reader_file_id,
-                            writer_file_id,
-                            data_file_path = data_file_path.to_string_lossy().as_ref(),
                             %error,
-                            "Could not decode final checkpointed data file record; falling back to boundary scan."
+                            "Final checkpoint record could not be decoded; scanning file boundary."
                         );
                         return Ok(DataFileClassification::NeedsBoundaryScan);
                     }
@@ -328,250 +428,71 @@ where
                     last_record_id: last_record_id + record_events.saturating_sub(1),
                 })
             }
-            RecordStatus::Corrupted { calculated, actual } => {
-                debug!(
+            RecordStatus::Corrupted { .. } => {
+                warn!(
                     data_file_id,
-                    reader_file_id,
-                    writer_file_id,
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
-                    calculated,
-                    actual,
-                    "Final checkpointed data file record has invalid checksum; falling back to boundary scan."
+                    "Final checkpoint record has an invalid checksum; scanning file boundary."
                 );
                 Ok(DataFileClassification::NeedsBoundaryScan)
             }
             RecordStatus::FailedDeserialization(error) => {
-                debug!(
+                warn!(
                     data_file_id,
-                    reader_file_id,
-                    writer_file_id,
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
                     ?error,
-                    "Could not deserialize final checkpointed data file record; falling back to boundary scan."
+                    "Final checkpoint record could not be deserialized; scanning file boundary."
                 );
                 Ok(DataFileClassification::NeedsBoundaryScan)
             }
         }
     }
 
-    /// Scans the reader boundary and excludes its checkpoint-acknowledged prefix from byte
-    /// accounting.
-    async fn reconcile_checkpoint_reader_boundary_data_file(
+    /// Scans a checkpoint boundary, applying whichever reader and writer bounds it carries.
+    async fn reconcile_checkpoint_boundary_data_file<'a>(
         &self,
-        data_file_id: u16,
-        data_file_path: &Path,
-        reader_file_id: u16,
-        writer_file_id: u16,
-        skip_through_record_id: u64,
-    ) -> Result<u64, ReaderError<T>> {
-        let Some(data_file) = self
-            .open_checkpoint_boundary_data_file(
-                data_file_id,
-                data_file_path,
-                reader_file_id,
-                writer_file_id,
-            )
-            .await?
-        else {
-            return Ok(0);
+        mut scan: CheckpointBoundaryScan<'a>,
+    ) -> Result<CheckpointBoundaryScan<'a>, ReaderError<T>> {
+        let Some(data_file) = self.open_checkpoint_boundary_data_file(scan.file).await? else {
+            return Ok(scan);
         };
 
-        let mut scan_result = CheckpointBoundaryScanResult::default();
         let mut record_reader = RecordReader::new(data_file);
 
         while let Some(token) = self
-            .try_next_checkpoint_record(
-                &mut record_reader,
-                data_file_id,
-                data_file_path,
-                scan_result.current_offset(),
-            )
+            .try_next_checkpoint_record(&mut record_reader, &mut scan)
             .await?
         {
-            let record = Self::decode_checkpoint_record(
-                &mut record_reader,
-                token,
-                data_file_id,
-                data_file_path,
-            );
-            scan_result.include_record(
-                &record,
-                record.checkpoint_last_id() <= skip_through_record_id,
-            );
+            let record_id = token.record_id();
+            if self.truncate_if_post_checkpoint(&scan, record_id).await? {
+                break;
+            }
+
+            let record = Self::decode_checkpoint_record(&mut record_reader, token, &scan);
+            if self.truncate_if_checkpoint_crossing(&scan, &record).await? {
+                break;
+            }
+
+            scan.include_record(&record);
         }
 
-        Ok(scan_result.unread_bytes())
-    }
-
-    /// Scans the writer boundary, truncating data beyond the durable writer checkpoint.
-    async fn reconcile_checkpoint_writer_boundary_data_file(
-        &self,
-        data_file_id: u16,
-        data_file_path: &Path,
-        reader_file_id: u16,
-        writer_file_id: u16,
-        stop_before_record_id: u64,
-    ) -> Result<u64, ReaderError<T>> {
-        let Some(data_file) = self
-            .open_checkpoint_boundary_data_file(
-                data_file_id,
-                data_file_path,
-                reader_file_id,
-                writer_file_id,
-            )
-            .await?
-        else {
-            return Ok(0);
-        };
-
-        let mut scan_result = CheckpointBoundaryScanResult::default();
-        let mut record_reader = RecordReader::new(data_file);
-
-        while let Some(token) = self
-            .try_next_checkpoint_record(
-                &mut record_reader,
-                data_file_id,
-                data_file_path,
-                scan_result.current_offset(),
-            )
-            .await?
-        {
-            if self
-                .truncate_if_post_checkpoint_record(
-                    data_file_id,
-                    data_file_path,
-                    stop_before_record_id,
-                    token.record_id(),
-                    scan_result.current_offset(),
-                )
-                .await?
-            {
-                break;
-            }
-
-            let record = Self::decode_checkpoint_record(
-                &mut record_reader,
-                token,
-                data_file_id,
-                data_file_path,
-            );
-            if self
-                .truncate_if_checkpoint_crossing_record(
-                    data_file_id,
-                    data_file_path,
-                    stop_before_record_id,
-                    &record,
-                    scan_result.current_offset(),
-                )
-                .await?
-            {
-                break;
-            }
-
-            scan_result.include_record(&record, false);
-        }
-
-        Ok(scan_result.logical_file_size)
-    }
-
-    /// Reconciles acknowledged prefixes and post-checkpoint tails when both boundaries share a
-    /// file.
-    async fn reconcile_checkpoint_reader_writer_boundary_data_file(
-        &self,
-        data_file_id: u16,
-        data_file_path: &Path,
-        reader_file_id: u16,
-        writer_file_id: u16,
-        skip_through_record_id: u64,
-        stop_before_record_id: u64,
-    ) -> Result<u64, ReaderError<T>> {
-        let Some(data_file) = self
-            .open_checkpoint_boundary_data_file(
-                data_file_id,
-                data_file_path,
-                reader_file_id,
-                writer_file_id,
-            )
-            .await?
-        else {
-            return Ok(0);
-        };
-
-        let mut scan_result = CheckpointBoundaryScanResult::default();
-        let mut record_reader = RecordReader::new(data_file);
-
-        while let Some(token) = self
-            .try_next_checkpoint_record(
-                &mut record_reader,
-                data_file_id,
-                data_file_path,
-                scan_result.current_offset(),
-            )
-            .await?
-        {
-            if self
-                .truncate_if_post_checkpoint_record(
-                    data_file_id,
-                    data_file_path,
-                    stop_before_record_id,
-                    token.record_id(),
-                    scan_result.current_offset(),
-                )
-                .await?
-            {
-                break;
-            }
-
-            let record = Self::decode_checkpoint_record(
-                &mut record_reader,
-                token,
-                data_file_id,
-                data_file_path,
-            );
-            if self
-                .truncate_if_checkpoint_crossing_record(
-                    data_file_id,
-                    data_file_path,
-                    stop_before_record_id,
-                    &record,
-                    scan_result.current_offset(),
-                )
-                .await?
-            {
-                break;
-            }
-
-            scan_result.include_record(
-                &record,
-                record.checkpoint_last_id() <= skip_through_record_id,
-            );
-        }
-
-        Ok(scan_result.unread_bytes())
+        Ok(scan)
     }
 
     /// Opens a boundary file while treating a missing checkpointed file as lost rather than fatal.
     async fn open_checkpoint_boundary_data_file(
         &self,
-        data_file_id: u16,
-        data_file_path: &Path,
-        reader_file_id: u16,
-        writer_file_id: u16,
+        file: CheckpointBoundaryFile<'_>,
     ) -> Result<Option<FS::File>, ReaderError<T>> {
         match self
             .ledger()
             .filesystem()
-            .open_file_readable(data_file_path)
+            .open_file_readable(file.path)
             .await
         {
             Ok(data_file) => Ok(Some(data_file)),
             Err(e) if e.kind() == ErrorKind::NotFound => {
                 error!(
-                    data_file_id,
-                    reader_file_id,
-                    writer_file_id,
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
-                    "Checkpointed boundary data file is missing; treating its unread records as lost."
+                    data_file_id = file.id,
+                    "Missing checkpointed boundary data file; treating records as lost."
                 );
                 Ok(None)
             }
@@ -579,31 +500,62 @@ where
         }
     }
 
-    /// Reads the next checkpoint record and truncates torn tails at the last valid record boundary.
+    /// Reads the next checkpoint record, preserving complete corrupt frames while truncating torn
+    /// tails at the last complete record boundary.
     async fn try_next_checkpoint_record(
         &self,
         record_reader: &mut RecordReader<FS::File, T>,
-        data_file_id: u16,
-        data_file_path: &Path,
-        record_start_offset: u64,
+        scan: &mut CheckpointBoundaryScan<'_>,
     ) -> Result<Option<ReadToken>, ReaderError<T>> {
-        match record_reader.try_next_record(true).await {
-            Ok(Some(token)) => Ok(Some(token)),
-            Ok(None) => Ok(None),
-            Err(e) if e.is_bad_read() => {
-                warn!(
-                    data_file_id,
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
-                    truncate_at = record_start_offset,
-                    error = %e,
-                    "Truncating torn data file tail at last valid record boundary."
-                );
-                self.truncate_data_file(data_file_path, record_start_offset)
-                    .await
-                    .map_err(|source| ReaderError::Io { source })?;
-                Ok(None)
+        loop {
+            match record_reader.try_next_record(true).await {
+                Ok(Some(token)) => return Ok(Some(token)),
+                Ok(None) => return Ok(None),
+                Err(e) => {
+                    if let Some(record_bytes) = e.consumed_record_bytes() {
+                        if scan.corrupt_record_is_provably_post_checkpoint() {
+                            let record_start_offset = scan.current_offset();
+                            warn!(
+                                data_file_id = scan.file.id,
+                                truncate_at = record_start_offset,
+                                record_bytes,
+                                error = %e,
+                                "Corrupt record is beyond writer checkpoint; truncating file."
+                            );
+                            self.truncate_data_file(scan.file.path, record_start_offset)
+                                .await
+                                .map_err(|source| ReaderError::Io { source })?;
+                            return Ok(None);
+                        }
+
+                        warn!(
+                            data_file_id = scan.file.id,
+                            record_start_offset = scan.current_offset(),
+                            record_bytes,
+                            error = %e,
+                            "Preserving complete corrupt checkpoint record."
+                        );
+                        scan.include_corrupt_record(record_bytes);
+                        continue;
+                    }
+
+                    if e.is_bad_read() {
+                        let record_start_offset = scan.current_offset();
+                        warn!(
+                            data_file_id = scan.file.id,
+                            truncate_at = record_start_offset,
+                            error = %e,
+                            "Torn checkpoint tail; truncating file."
+                        );
+                        self.truncate_data_file(scan.file.path, record_start_offset)
+                            .await
+                            .map_err(|source| ReaderError::Io { source })?;
+                        return Ok(None);
+                    }
+
+                    return Err(e);
+                }
             }
-            Err(e) => Err(e),
         }
     }
 
@@ -611,8 +563,7 @@ where
     fn decode_checkpoint_record(
         record_reader: &mut RecordReader<FS::File, T>,
         token: ReadToken,
-        data_file_id: u16,
-        data_file_path: &Path,
+        scan: &CheckpointBoundaryScan<'_>,
     ) -> CheckpointRecord {
         let id = token.record_id();
         let bytes = token.record_bytes() as u64;
@@ -620,12 +571,11 @@ where
             Ok(record) => record,
             Err(error) => {
                 warn!(
-                    data_file_id,
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
+                    data_file_id = scan.file.id,
                     record_id = id,
                     record_bytes = bytes,
                     %error,
-                    "Counting validated checkpoint record bytes despite undecodable payload."
+                    "Checkpoint record payload is undecodable; counting its bytes."
                 );
                 return CheckpointRecord::undecodable(id, bytes);
             }
@@ -636,11 +586,10 @@ where
             .expect("Event count for a record cannot exceed 2^64 events.");
         if events == 0 {
             warn!(
-                data_file_id,
-                data_file_path = data_file_path.to_string_lossy().as_ref(),
+                data_file_id = scan.file.id,
                 record_id = id,
                 record_bytes = bytes,
-                "Counting validated checkpoint record bytes despite empty payload."
+                "Checkpoint record payload is empty; counting its bytes."
             );
             return CheckpointRecord::undecodable(id, bytes);
         }
@@ -658,60 +607,58 @@ where
     }
 
     /// Truncates before a record whose starting ID is outside the durable writer checkpoint.
-    async fn truncate_if_post_checkpoint_record(
+    async fn truncate_if_post_checkpoint(
         &self,
-        data_file_id: u16,
-        data_file_path: &Path,
-        stop_before_record_id: u64,
+        scan: &CheckpointBoundaryScan<'_>,
         record_id: u64,
-        record_start_offset: u64,
     ) -> Result<bool, ReaderError<T>> {
-        if record_id < stop_before_record_id {
+        let Some(writer_next_record_id) = scan.writer_next_record_id else {
+            return Ok(false);
+        };
+        if record_id < writer_next_record_id {
             return Ok(false);
         }
 
         debug!(
-            data_file_id,
-            data_file_path = data_file_path.to_string_lossy().as_ref(),
-            stop_before_record_id,
+            data_file_id = scan.file.id,
+            writer_next_record_id,
             record_id,
-            truncate_at = record_start_offset,
-            "Truncating data file tail beyond durable writer checkpoint."
+            truncate_at = scan.current_offset(),
+            "Record starts beyond writer checkpoint; truncating file."
         );
-        self.truncate_data_file(data_file_path, record_start_offset)
+        self.truncate_data_file(scan.file.path, scan.current_offset())
             .await
             .map_err(|source| ReaderError::Io { source })?;
         Ok(true)
     }
 
     /// Truncates before a multi-event record that straddles the durable writer checkpoint.
-    async fn truncate_if_checkpoint_crossing_record(
+    async fn truncate_if_checkpoint_crossing(
         &self,
-        data_file_id: u16,
-        data_file_path: &Path,
-        stop_before_record_id: u64,
+        scan: &CheckpointBoundaryScan<'_>,
         record: &CheckpointRecord,
-        record_start_offset: u64,
     ) -> Result<bool, ReaderError<T>> {
+        let Some(writer_next_record_id) = scan.writer_next_record_id else {
+            return Ok(false);
+        };
         let Some(next_id) = record.next_id else {
             return Ok(false);
         };
-        if next_id <= stop_before_record_id {
+        if next_id <= writer_next_record_id {
             return Ok(false);
         }
 
         warn!(
-            data_file_id,
-            data_file_path = data_file_path.to_string_lossy().as_ref(),
-            stop_before_record_id,
+            data_file_id = scan.file.id,
+            writer_next_record_id,
             record_id = record.id,
             record_events = record
                 .events
                 .expect("a record with a next ID must have an event count"),
-            truncate_at = record_start_offset,
-            "Truncating data file at record that crosses durable writer checkpoint."
+            truncate_at = scan.current_offset(),
+            "Record crosses writer checkpoint; truncating file."
         );
-        self.truncate_data_file(data_file_path, record_start_offset)
+        self.truncate_data_file(scan.file.path, scan.current_offset())
             .await
             .map_err(|source| ReaderError::Io { source })?;
         Ok(true)

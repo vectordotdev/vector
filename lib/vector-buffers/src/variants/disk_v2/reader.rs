@@ -68,27 +68,26 @@ where
 
     /// The reader failed to deserialize the record.
     ///
-    /// In most cases, this indicates that the data file being read was corrupted or truncated in
-    /// some fashion.  Callers of [`BufferReader::next`] will not actually receive this error, as it is
-    /// handled internally by moving to the next data file, as corruption may have affected other
-    /// records in a way that is not easily detectable and could lead to records which
-    /// deserialize/decode but contain invalid data.
+    /// This indicates that a complete length-delimited record was read, but its archive was not
+    /// valid. The record's byte span is consumed and removed from buffer occupancy before the
+    /// recoverable error is returned, so a later call can continue with the next record.
     #[snafu(display("failed to deserialize encoded record from buffer: {}", reason))]
-    Deserialization { reason: String },
+    Deserialization { reason: String, record_bytes: usize },
 
     /// The record's checksum did not match.
     ///
-    /// In most cases, this indicates that the data file being read was corrupted or truncated in
-    /// some fashion.  Callers of [`BufferReader::next`] will not actually receive this error, as it is
-    /// handled internally by moving to the next data file, as corruption may have affected other
-    /// records in a way that is not easily detectable and could lead to records which
-    /// deserialize/decode but contain invalid data.
+    /// The complete length-delimited record is consumed and removed from buffer occupancy before
+    /// the recoverable error is returned, so a later call can continue with the next record.
     #[snafu(display(
         "calculated checksum did not match the actual checksum: ({} vs {})",
         calculated,
         actual
     ))]
-    Checksum { calculated: u32, actual: u32 },
+    Checksum {
+        calculated: u32,
+        actual: u32,
+        record_bytes: usize,
+    },
 
     /// The decoder encountered an issue during decoding.
     ///
@@ -137,6 +136,17 @@ where
         )
     }
 
+    pub(super) fn consumed_record_bytes(&self) -> Option<u64> {
+        match self {
+            ReaderError::Checksum { record_bytes, .. }
+            | ReaderError::Deserialization { record_bytes, .. } => Some(
+                u64::try_from(*record_bytes)
+                    .expect("Vector only supports record sizes that fit in u64"),
+            ),
+            _ => None,
+        }
+    }
+
     fn as_error_code(&self) -> &'static str {
         match self {
             ReaderError::Io { .. } => "io_error",
@@ -171,19 +181,31 @@ impl<T: Bufferable> PartialEq for ReaderError<T> {
                 l_source.kind() == r_source.kind()
             }
             (
-                Self::Deserialization { reason: l_reason },
-                Self::Deserialization { reason: r_reason },
-            ) => l_reason == r_reason,
+                Self::Deserialization {
+                    reason: l_reason,
+                    record_bytes: l_record_bytes,
+                },
+                Self::Deserialization {
+                    reason: r_reason,
+                    record_bytes: r_record_bytes,
+                },
+            ) => l_reason == r_reason && l_record_bytes == r_record_bytes,
             (
                 Self::Checksum {
                     calculated: l_calculated,
                     actual: l_actual,
+                    record_bytes: l_record_bytes,
                 },
                 Self::Checksum {
                     calculated: r_calculated,
                     actual: r_actual,
+                    record_bytes: r_record_bytes,
                 },
-            ) => l_calculated == r_calculated && l_actual == r_actual,
+            ) => {
+                l_calculated == r_calculated
+                    && l_actual == r_actual
+                    && l_record_bytes == r_record_bytes
+            }
             (Self::Decode { .. }, Self::Decode { .. }) => true,
             (Self::Incompatible { reason: l_reason }, Self::Incompatible { reason: r_reason }) => {
                 l_reason == r_reason
@@ -313,6 +335,7 @@ where
         if record_len == 0 {
             return Err(ReaderError::Deserialization {
                 reason: "record length was zero".to_string(),
+                record_bytes: 8,
             });
         }
 
@@ -334,17 +357,21 @@ where
 
         // Now see if we can deserialize our archived record from this.
         let buf = self.aligned_buf.as_slice();
+        // TODO: Another spot where our hardcoding of the length delimiter size in bytes is fragile.
+        let record_bytes = 8 + buf.len();
         match validate_record_archive(buf, &self.checksummer) {
             RecordStatus::FailedDeserialization(de) => Err(ReaderError::Deserialization {
                 reason: de.into_inner(),
+                record_bytes,
             }),
-            RecordStatus::Corrupted { calculated, actual } => {
-                Err(ReaderError::Checksum { calculated, actual })
-            }
+            RecordStatus::Corrupted { calculated, actual } => Err(ReaderError::Checksum {
+                calculated,
+                actual,
+                record_bytes,
+            }),
             RecordStatus::Valid { id, .. } => {
                 self.current_record_id = id;
-                // TODO: Another spot where our hardcoding of the length delimiter size in bytes is fragile.
-                Ok(Some(ReadToken::new(id, 8 + buf.len())))
+                Ok(Some(ReadToken::new(id, record_bytes)))
             }
         }
     }
@@ -519,8 +546,9 @@ where
         }
 
         // Dropped records never enter the acknowledgement path. Remove their bytes immediately
-        // and wake a writer that may be waiting for buffer capacity.
-        self.ledger.decrement_total_buffer_size(record_bytes);
+        // from both backpressure and usage accounting, then wake a writer that may be waiting for
+        // buffer capacity.
+        self.ledger.track_dropped_record_bytes(record_bytes);
         self.ledger.notify_reader_waiters();
     }
 
@@ -1026,27 +1054,14 @@ where
                 Ok(None) => {}
                 // We got a valid record, so keep the token.
                 Ok(Some(token)) => break token,
-                // A length-delimited payload was read, but we failed to deserialize it as a valid
-                // record, or we deserialized it and the checksum was invalid.  Either way, we're not
-                // sure the rest of the data file is even valid, so roll to the next file.
-                //
-                // TODO: Explore the concept of putting a data file into a "one more attempt to read
-                // a valid record" state, almost like a semi-open circuit breaker.  There's a
-                // possibility that the length delimiter we got is valid, and all the data was
-                // written for the record, but the data was invalid... and that if we just kept
-                // reading, we might actually encounter a valid record.
-                //
-                // Theoretically, based on both the validation done by `rkyv` and the checksum, it
-                // should be incredibly unlikely to read a valid record after getting a
-                // corrupted record if there was missing data or more invalid data.  We use
-                // checksumming to assert errors within a given chunk of the payload, so one payload
-                // being corrupted doesn't always, in fact, mean that other records after it are
-                // corrupted too.
+                // A complete length-delimited payload that fails archive or checksum validation
+                // still has a trustworthy consumed byte span. Drop and account for that record,
+                // then leave the reader positioned at the next frame. Only an incomplete frame
+                // requires abandoning the remaining file tail.
                 Err(e) => {
-                    // Invalid checksums and deserialization failures can't really be acted upon by
-                    // the caller, but they might be expecting a read-after-write behavior, so we
-                    // return the error to them after ensuring that we roll to the next file first.
-                    if e.is_bad_read() {
+                    if let Some(record_bytes) = e.consumed_record_bytes() {
+                        self.track_dropped_read(record_bytes);
+                    } else if e.is_bad_read() {
                         // The reader hit a corrupted, torn, or partially-written
                         // record and is abandoning the rest of this file, the
                         // recovery path that drives the skip-accounting hazards.
@@ -1122,6 +1137,13 @@ where
                     // we're caught up.
                     return Ok(None);
                 }
+
+                // The durable record checkpoint can be ahead of its file checkpoint. If startup
+                // had to scan this finalized file -- for example, because its last complete frame
+                // was corrupt -- reaching EOF proves that the reader can advance to the next file
+                // and continue seeking toward that record checkpoint.
+                self.roll_to_next_data_file();
+                force_check_pending_data_files = true;
             }
         };
 

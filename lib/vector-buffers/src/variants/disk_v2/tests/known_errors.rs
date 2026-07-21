@@ -19,7 +19,10 @@ use vector_common::{
     },
 };
 
-use super::{create_buffer_v2_with_max_data_file_size, create_default_buffer_v2};
+use super::{
+    create_buffer_v2_with_max_data_file_size, create_default_buffer_v2,
+    create_default_buffer_v2_with_usage,
+};
 use crate::{
     EventCount, assert_buffer_size, assert_enough_bytes_written, assert_file_does_not_exist_async,
     assert_file_exists_async, assert_reader_writer_v2_file_positions, await_timeout,
@@ -38,8 +41,32 @@ impl AsMetadata for u32 {
     }
 }
 
+async fn corrupt_record_checksum(data_file_path: &PathBuf, record_start: usize, record_end: usize) {
+    let data_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(data_file_path)
+        .await
+        .expect("open should not fail");
+    let std_data_file = data_file.into_std().await;
+    let mut data_file_mmap =
+        unsafe { MmapMut::map_mut(&std_data_file).expect("mmap should not fail") };
+    drop(std_data_file);
+
+    {
+        let mut backed_record =
+            BackedArchive::<_, Record>::from_backing(&mut data_file_mmap[record_start..record_end])
+                .expect("archive should not fail");
+        let record = backed_record.get_archive_mut();
+        let projected_checksum = unsafe { record.map_unchecked_mut(|record| &mut record.checksum) };
+        *projected_checksum.get_mut() ^= 1 << 15;
+    }
+
+    data_file_mmap.flush().expect("flush should not fail");
+}
+
 #[tokio::test]
-async fn startup_truncates_record_length_delimiter_that_is_zero() {
+async fn startup_preserves_zero_length_record_for_reader_accounting() {
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -90,9 +117,11 @@ async fn startup_truncates_record_length_delimiter_that_is_zero() {
             data_file.sync_all().await.expect("sync should not fail");
             drop(data_file);
 
-            // Now reopen the buffer. Startup recovery treats the durable ledger checkpoint as
-            // authoritative, so the corrupted record is truncated before the reader is handed out.
-            let (_, mut reader, _) = create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            // Now reopen the buffer. The complete zero-length frame remains part of occupancy until
+            // the reader consumes it. The original payload no longer has a framing delimiter, so it
+            // is still truncated as an unusable partial tail.
+            let (mut writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
             let data_file = OpenOptions::new()
                 .read(true)
                 .open(&data_file_path)
@@ -102,10 +131,17 @@ async fn startup_truncates_record_length_delimiter_that_is_zero() {
                 .metadata()
                 .await
                 .expect("metadata should not fail");
-            assert_eq!(0, metadata.len());
+            let zero_length_frame_bytes = 8;
+            assert_eq!(zero_length_frame_bytes, metadata.len());
+            assert_eq!(zero_length_frame_bytes, ledger.get_total_buffer_size());
 
-            let read_result = reader.next().await.expect("read should not fail");
-            assert_eq!(read_result, None);
+            let read_error = reader.next().await.expect_err("read should fail");
+            assert!(matches!(read_error, ReaderError::Deserialization { .. }));
+            assert_eq!(0, ledger.get_total_buffer_size());
+
+            writer.close();
+            let final_read = reader.next().await.expect("read should not fail");
+            assert_eq!(final_read, None);
         }
     })
     .await;
@@ -249,13 +285,146 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
 }
 
 #[tokio::test]
-async fn reader_accounts_abandoned_tail_when_runtime_bad_read_rolls_file() {
+async fn restart_advances_past_acknowledged_file_ending_in_complete_corrupt_record() {
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
         async move {
-            let (mut writer, mut reader, ledger) =
+            let (mut writer, reader, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
+
+            let first_bytes = writer
+                .write_record(SizedRecord::new(32))
+                .await
+                .expect("first write should not fail");
+            let corrupt_bytes = writer
+                .write_record(SizedRecord::new(33))
+                .await
+                .expect("second write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            let acknowledged_data_file_path = ledger.get_current_writer_data_file_path();
+
+            writer
+                .write_record(SizedRecord::new(34))
+                .await
+                .expect("third write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            assert_reader_writer_v2_file_positions!(ledger, 0, 1);
+
+            // Model a crash after the record checkpoint reached the second file but before the
+            // corresponding reader file checkpoint was flushed.
+            ledger.state().increment_last_reader_record_id(3);
+            ledger.flush().expect("ledger flush should not fail");
+
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            corrupt_record_checksum(
+                &acknowledged_data_file_path,
+                first_bytes,
+                first_bytes + corrupt_bytes,
+            )
+            .await;
+
+            let (_, _, ledger) = timeout(
+                Duration::from_millis(500),
+                create_default_buffer_v2::<_, SizedRecord>(data_dir),
+            )
+            .await
+            .expect("buffer should reopen after traversing the acknowledged corrupt frame");
+
+            assert_reader_writer_v2_file_positions!(ledger, 1, 1);
+            assert_eq!(0, ledger.get_total_buffer_size());
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn restart_counts_unread_leading_corrupt_record_in_reader_boundary_file() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, reader, ledger) =
+                create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
+
+            writer
+                .write_record(SizedRecord::new(32))
+                .await
+                .expect("first write should not fail");
+            writer
+                .write_record(SizedRecord::new(33))
+                .await
+                .expect("second write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let corrupt_bytes = writer
+                .write_record(SizedRecord::new(34))
+                .await
+                .expect("corrupt write should not fail");
+            let valid_record = SizedRecord::new(16);
+            let valid_bytes = writer
+                .write_record(valid_record.clone())
+                .await
+                .expect("valid write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            assert_reader_writer_v2_file_positions!(ledger, 0, 1);
+
+            let reader_boundary_path = ledger.get_current_writer_data_file_path();
+
+            // The records in file 0 are acknowledged, while file 1 is entirely unread. Leaving
+            // the durable reader file checkpoint on file 0 models the supported file-checkpoint
+            // lag that startup recovery must reconcile.
+            ledger.state().increment_last_reader_record_id(2);
+            ledger.flush().expect("ledger flush should not fail");
+
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            corrupt_record_checksum(&reader_boundary_path, 0, corrupt_bytes).await;
+
+            let (mut writer, mut reader, ledger) =
+                create_buffer_v2_with_max_data_file_size(data_dir, 172).await;
+            assert_eq!(
+                (corrupt_bytes + valid_bytes) as u64,
+                ledger.get_total_buffer_size(),
+                "recovery must count an unread leading corrupt frame"
+            );
+
+            writer.close();
+            let corrupt_read = reader.next().await.expect_err("corrupt read should fail");
+            assert!(matches!(corrupt_read, ReaderError::Checksum { .. }));
+            assert_eq!(valid_bytes as u64, ledger.get_total_buffer_size());
+
+            let valid_read = reader
+                .next()
+                .await
+                .expect("valid read should not fail")
+                .expect("valid record should remain readable");
+            assert_eq!(valid_record, valid_read);
+            acknowledge(valid_read).await;
+
+            assert_eq!(
+                None,
+                reader.next().await.expect("final read should not fail")
+            );
+            assert_eq!(0, ledger.get_total_buffer_size());
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn reader_skips_corrupted_record_and_continues_current_data_file() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, mut reader, ledger, usage) =
+                create_default_buffer_v2_with_usage(data_dir.clone()).await;
 
             let first_record_size = 32;
             let first_bytes_written = writer
@@ -267,13 +436,6 @@ async fn reader_accounts_abandoned_tail_when_runtime_bad_read_rolls_file() {
                 .write_record(SizedRecord::new(second_record_size))
                 .await
                 .expect("write should not fail");
-            writer.flush().await.expect("flush should not fail");
-
-            let first_data_file_len = first_bytes_written + second_bytes_written;
-            let first_data_file_path = ledger.get_current_writer_data_file_path();
-            assert_buffer_size!(ledger, 2, first_data_file_len);
-            assert_reader_writer_v2_file_positions!(ledger, 0, 0);
-
             let third_record_size = 34;
             let third_bytes_written = writer
                 .write_record(SizedRecord::new(third_record_size))
@@ -281,72 +443,166 @@ async fn reader_accounts_abandoned_tail_when_runtime_bad_read_rolls_file() {
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
 
-            assert_buffer_size!(ledger, 3, first_data_file_len + third_bytes_written);
-            assert_reader_writer_v2_file_positions!(ledger, 0, 1);
+            let initial_data_file_len =
+                first_bytes_written + second_bytes_written + third_bytes_written;
+            let data_file_path = ledger.get_current_writer_data_file_path();
+            assert_buffer_size!(ledger, 3, initial_data_file_len);
+            assert_reader_writer_v2_file_positions!(ledger, 0, 0);
 
-            // Corrupt the already-open reader file after startup while preserving its length, so
-            // the runtime bad-read path accounts for the whole abandoned unread tail rather than
-            // startup recovery truncating it first.
-            let mut data_file = OpenOptions::new()
-                .write(true)
-                .open(&first_data_file_path)
-                .await
-                .expect("open should not fail");
-            assert_eq!(
-                first_data_file_len as u64,
-                data_file
-                    .metadata()
-                    .await
-                    .expect("metadata should not fail")
-                    .len()
-            );
-            let corrupt_offset = u64::try_from(first_bytes_written)
-                .expect("record size should fit in u64")
-                + 8;
-            data_file
-                .seek(SeekFrom::Start(corrupt_offset))
-                .await
-                .expect("seek should not fail");
-            data_file
-                .write_all(&[0xFF; 8])
-                .await
-                .expect("write should not fail");
-            data_file.flush().await.expect("flush should not fail");
-            data_file.sync_all().await.expect("sync should not fail");
-            drop(data_file);
-            writer.close();
+            // Flip only the checksum of the middle record. Its length delimiter and archive remain
+            // valid, so the reader can consume exactly this frame and continue with the next one.
+            let second_record_end = first_bytes_written + second_bytes_written;
+            corrupt_record_checksum(&data_file_path, first_bytes_written, second_record_end).await;
 
             let first_read = await_timeout!(reader.next(), 2).expect("read should not fail");
             assert_eq!(first_read, Some(SizedRecord::new(first_record_size)));
             acknowledge(first_read.unwrap()).await;
 
-            let expected_after_ack = second_bytes_written + third_bytes_written;
-            let expected_after_bad_read = third_bytes_written;
             let bad_read = await_timeout!(reader.next(), 2).expect_err("read should fail");
-            assert!(matches!(
-                bad_read,
-                ReaderError::Checksum { .. }
-                    | ReaderError::Deserialization { .. }
-                    | ReaderError::PartialWrite
-            ));
+            assert!(matches!(bad_read, ReaderError::Checksum { .. }));
             assert_eq!(
-                expected_after_bad_read as u64,
+                third_bytes_written as u64,
                 ledger.get_total_buffer_size(),
-                "runtime bad-read recovery should subtract the unread abandoned tail from the buffer size"
+                "the acknowledged first record and corrupted second record should both be removed from byte occupancy"
             );
-            assert!(
-                ledger.get_total_buffer_size() < expected_after_ack as u64,
-                "test should prove the abandoned-tail accounting changed the buffer size"
+            let usage_snapshot = usage.snapshot();
+            assert_eq!(0, usage_snapshot.dropped_event_count);
+            assert_eq!(
+                second_bytes_written as u64,
+                usage_snapshot.dropped_event_byte_size,
+                "the corrupt frame should leave usage byte occupancy when the reader drops it"
             );
-            assert_reader_writer_v2_file_positions!(ledger, 1, 1);
+            assert_reader_writer_v2_file_positions!(ledger, 0, 0);
+
+            // The checksum error must not retire the file. Append another record to the same file
+            // after the reader has skipped the corrupt frame.
+            let fourth_record_size = 35;
+            let fourth_bytes_written = writer
+                .write_record(SizedRecord::new(fourth_record_size))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            assert_eq!(
+                (third_bytes_written + fourth_bytes_written) as u64,
+                ledger.get_total_buffer_size()
+            );
+            assert_reader_writer_v2_file_positions!(ledger, 0, 0);
 
             let third_read = await_timeout!(reader.next(), 2).expect("read should not fail");
             assert_eq!(third_read, Some(SizedRecord::new(third_record_size)));
             acknowledge(third_read.unwrap()).await;
 
+            let fourth_read = await_timeout!(reader.next(), 2).expect("read should not fail");
+            assert_eq!(fourth_read, Some(SizedRecord::new(fourth_record_size)));
+            assert_eq!(
+                fourth_bytes_written as u64,
+                ledger.get_total_buffer_size(),
+                "acknowledging the third record should leave only the fourth record occupied"
+            );
+            acknowledge(fourth_read.unwrap()).await;
+
+            writer.close();
             let final_read = await_timeout!(reader.next(), 2).expect("read should not fail");
             assert_eq!(final_read, None);
-            assert_reader_writer_v2_file_positions!(ledger, 1, 1);
+            assert_eq!(0, ledger.get_total_buffer_size());
+            assert_reader_writer_v2_file_positions!(ledger, 0, 0);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn restart_preserves_valid_records_after_complete_corrupt_record() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let first_bytes = writer
+                .write_record(SizedRecord::new(32))
+                .await
+                .expect("write should not fail");
+            let corrupt_bytes = writer
+                .write_record(SizedRecord::new(33))
+                .await
+                .expect("write should not fail");
+            let third_bytes = writer
+                .write_record(SizedRecord::new(34))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let data_file_path = ledger.get_current_writer_data_file_path();
+            corrupt_record_checksum(&data_file_path, first_bytes, first_bytes + corrupt_bytes)
+                .await;
+
+            let first = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("first record should exist");
+            acknowledge(first).await;
+            assert!(matches!(
+                reader.next().await,
+                Err(ReaderError::Checksum { .. })
+            ));
+
+            let fourth_bytes = writer
+                .write_record(SizedRecord::new(35))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            ledger.flush().expect("ledger flush should not fail");
+            drop(writer);
+            drop(reader);
+            drop(ledger);
+
+            let (mut writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let expected_file_size = first_bytes + corrupt_bytes + third_bytes + fourth_bytes;
+            assert_eq!(
+                expected_file_size as u64,
+                OpenOptions::new()
+                    .read(true)
+                    .open(data_file_path)
+                    .await
+                    .expect("open should not fail")
+                    .metadata()
+                    .await
+                    .expect("metadata should not fail")
+                    .len()
+            );
+            assert_eq!(
+                (corrupt_bytes + third_bytes + fourth_bytes) as u64,
+                ledger.get_total_buffer_size()
+            );
+
+            assert!(matches!(
+                reader.next().await,
+                Err(ReaderError::Checksum { .. })
+            ));
+            assert_eq!(
+                (third_bytes + fourth_bytes) as u64,
+                ledger.get_total_buffer_size()
+            );
+            let third = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("third record should survive restart");
+            assert_eq!(SizedRecord::new(34), third);
+            acknowledge(third).await;
+            let fourth = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("fourth record should survive restart");
+            assert_eq!(SizedRecord::new(35), fourth);
+            acknowledge(fourth).await;
+
+            writer.close();
+            assert_eq!(None, reader.next().await.expect("read should not fail"));
+            assert_eq!(0, ledger.get_total_buffer_size());
         }
     })
     .await;
@@ -358,7 +614,7 @@ async fn reader_accounts_abandoned_tail_when_runtime_bad_read_rolls_file() {
 // one more read to trigger it) that we've deleted all three data files.
 
 #[tokio::test]
-async fn startup_truncates_file_when_record_has_scrambled_archive_data() {
+async fn startup_preserves_complete_corrupt_record_and_later_valid_record() {
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -366,11 +622,9 @@ async fn startup_truncates_file_when_record_has_scrambled_archive_data() {
             // Create a regular buffer, no customizations required.
             let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
 
-            // Write two `SizedRecord` records just so we can generate enough data.  We need two
-            // records because the writer, on start up, will specifically check the last record and
-            // validate it.  If it's not valid, the data file is skipped entirely.  So we'll write
-            // two records, and only scramble the first... which will let the reader be the one to
-            // discover the error.
+            // Write two records and corrupt only the first one's archive. The second record proves
+            // startup recovery can scan beyond a complete corrupt frame without deleting later
+            // valid data.
             let first_bytes_written = writer
                 .write_record(SizedRecord::new(64))
                 .await
@@ -421,13 +675,11 @@ async fn startup_truncates_file_when_record_has_scrambled_archive_data() {
             data_file.sync_all().await.expect("sync should not fail");
             drop(data_file);
 
-            // Now reopen the buffer. Startup recovery discovers the corrupted first record and
-            // truncates the file at offset zero, because records after a corrupted record are not
-            // reachable through the normal sequential reader.
+            // Startup recovery preserves both complete frames and counts both byte spans. The
+            // runtime reader then drops exactly the corrupt span and continues with the valid one.
             let (mut writer, mut reader, ledger) =
                 create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
-            writer.close();
-            assert_eq!(0, ledger.get_total_buffer_size());
+            assert_eq!(expected_data_file_len, ledger.get_total_buffer_size());
 
             let data_file = OpenOptions::new()
                 .read(true)
@@ -438,10 +690,23 @@ async fn startup_truncates_file_when_record_has_scrambled_archive_data() {
                 .metadata()
                 .await
                 .expect("metadata should not fail");
-            assert_eq!(0, metadata.len());
+            assert_eq!(expected_data_file_len, metadata.len());
 
-            let read_result = reader.next().await.expect("read should not fail");
-            assert_eq!(read_result, None);
+            let read_error = reader.next().await.expect_err("read should fail");
+            assert!(matches!(read_error, ReaderError::Deserialization { .. }));
+            assert_eq!(second_bytes_written as u64, ledger.get_total_buffer_size());
+
+            let valid_record = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("valid record after corruption should remain readable");
+            assert_eq!(SizedRecord::new(65), valid_record);
+            acknowledge(valid_record).await;
+
+            writer.close();
+            assert_eq!(None, reader.next().await.expect("read should not fail"));
+            assert_eq!(0, ledger.get_total_buffer_size());
         }
     })
     .await;
@@ -482,7 +747,7 @@ async fn reader_throws_error_when_record_has_decoding_error() {
 }
 
 #[tokio::test]
-async fn writer_detects_when_last_record_has_scrambled_archive_data() {
+async fn writer_preserves_complete_scrambled_last_record() {
     let assertion_registry = install_tracing_helpers();
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
@@ -491,7 +756,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
             let writer_did_not_mark_for_skip = assertion_registry
                 .build()
                 .with_name("mark_for_skip")
-                .with_parent_name("writer_detects_when_last_record_has_scrambled_archive_data")
+                .with_parent_name("writer_preserves_complete_scrambled_last_record")
                 .was_not_entered()
                 .finalize();
 
@@ -553,14 +818,14 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
             data_file.sync_all().await.expect("sync should not fail");
             drop(data_file);
 
-            // Now reopen the buffer. The durable checkpoint is authoritative, so startup truncates
-            // the corrupted tail and keeps writing in the current data file instead of marking the
-            // writer to skip to the next one.
-            let (mut writer, _, ledger) =
+            // Reopen without truncating the complete corrupt frame. The writer appends in the same
+            // file, and the reader accounts for the corrupt bytes before returning the new record.
+            let (mut writer, mut reader, ledger) =
                 create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
             writer_did_not_mark_for_skip.assert();
             assert_reader_writer_v2_file_positions!(ledger, 0, starting_writer_file_id);
             assert_file_does_not_exist_async!(&expected_final_write_data_file);
+            assert_eq!(expected_data_file_len, ledger.get_total_buffer_size());
 
             let data_file = OpenOptions::new()
                 .read(true)
@@ -571,25 +836,45 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
                 .metadata()
                 .await
                 .expect("metadata should not fail");
-            assert_eq!(0, metadata.len());
+            assert_eq!(expected_data_file_len, metadata.len());
 
             // Do a simple write to ensure it continues in the current data file.
-            let _bytes_written = writer
+            let appended_bytes = writer
                 .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
             assert_reader_writer_v2_file_positions!(ledger, 0, starting_writer_file_id);
             assert_file_does_not_exist_async!(&expected_final_write_data_file);
+            assert_eq!(
+                expected_data_file_len + appended_bytes as u64,
+                ledger.get_total_buffer_size()
+            );
+
+            let read_error = reader.next().await.expect_err("read should fail");
+            assert!(matches!(read_error, ReaderError::Deserialization { .. }));
+            assert_eq!(appended_bytes as u64, ledger.get_total_buffer_size());
+
+            let appended_record = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("appended record should remain readable");
+            assert_eq!(SizedRecord::new(64), appended_record);
+            acknowledge(appended_record).await;
+
+            writer.close();
+            assert_eq!(None, reader.next().await.expect("read should not fail"));
+            assert_eq!(0, ledger.get_total_buffer_size());
         }
     });
 
-    let parent = trace_span!("writer_detects_when_last_record_has_scrambled_archive_data");
+    let parent = trace_span!("writer_preserves_complete_scrambled_last_record");
     fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
-async fn writer_detects_when_last_record_has_invalid_checksum() {
+async fn writer_preserves_complete_last_record_with_invalid_checksum() {
     let assertion_registry = install_tracing_helpers();
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
@@ -598,7 +883,7 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
             let writer_did_not_mark_for_skip = assertion_registry
                 .build()
                 .with_name("mark_for_skip")
-                .with_parent_name("writer_detects_when_last_record_has_invalid_checksum")
+                .with_parent_name("writer_preserves_complete_last_record_with_invalid_checksum")
                 .was_not_entered()
                 .finalize();
 
@@ -672,14 +957,14 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
                 .expect("flush should not fail");
             drop(backed_record);
 
-            // Now reopen the buffer. The durable checkpoint is authoritative, so startup truncates
-            // the corrupted tail and keeps writing in the current data file instead of marking the
-            // writer to skip to the next one.
-            let (mut writer, _, ledger) =
+            // Reopen without truncating the complete corrupt frame. The writer appends in the same
+            // file, and the reader accounts for the corrupt bytes before returning the new record.
+            let (mut writer, mut reader, ledger) =
                 create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
             writer_did_not_mark_for_skip.assert();
             assert_reader_writer_v2_file_positions!(ledger, 0, starting_writer_file_id);
             assert_file_does_not_exist_async!(&expected_final_write_data_file);
+            assert_eq!(expected_data_file_len, ledger.get_total_buffer_size());
 
             let data_file = OpenOptions::new()
                 .read(true)
@@ -690,20 +975,40 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
                 .metadata()
                 .await
                 .expect("metadata should not fail");
-            assert_eq!(0, metadata.len());
+            assert_eq!(expected_data_file_len, metadata.len());
 
             // Do a simple write to ensure it continues in the current data file.
-            let _bytes_written = writer
+            let appended_bytes = writer
                 .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
             assert_reader_writer_v2_file_positions!(ledger, 0, starting_writer_file_id);
             assert_file_does_not_exist_async!(&expected_final_write_data_file);
+            assert_eq!(
+                expected_data_file_len + appended_bytes as u64,
+                ledger.get_total_buffer_size()
+            );
+
+            let read_error = reader.next().await.expect_err("read should fail");
+            assert!(matches!(read_error, ReaderError::Checksum { .. }));
+            assert_eq!(appended_bytes as u64, ledger.get_total_buffer_size());
+
+            let appended_record = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("appended record should remain readable");
+            assert_eq!(SizedRecord::new(64), appended_record);
+            acknowledge(appended_record).await;
+
+            writer.close();
+            assert_eq!(None, reader.next().await.expect("read should not fail"));
+            assert_eq!(0, ledger.get_total_buffer_size());
         }
     });
 
-    let parent = trace_span!("writer_detects_when_last_record_has_invalid_checksum");
+    let parent = trace_span!("writer_preserves_complete_last_record_with_invalid_checksum");
     fut.instrument(parent.or_current()).await;
 }
 
@@ -857,6 +1162,109 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
     let parent =
         trace_span!("writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented");
     fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn writer_truncates_complete_corrupt_record_proven_post_checkpoint() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let checkpoint_next_record_id = ledger.state().get_next_writer_record_id();
+            let bytes_written = writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            let data_file_path = ledger.get_current_writer_data_file_path();
+
+            // Model a crash after the frame reached disk but before its writer checkpoint advanced,
+            // then corrupt the otherwise complete post-checkpoint frame.
+            unsafe {
+                ledger
+                    .state()
+                    .unsafe_set_writer_next_record_id(checkpoint_next_record_id);
+            }
+            corrupt_record_checksum(&data_file_path, 0, bytes_written).await;
+            drop(writer);
+            drop(ledger);
+
+            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            assert_eq!(
+                checkpoint_next_record_id,
+                ledger.state().get_next_writer_record_id()
+            );
+            assert_eq!(0, ledger.get_total_buffer_size());
+            assert_eq!(
+                0,
+                OpenOptions::new()
+                    .read(true)
+                    .open(data_file_path)
+                    .await
+                    .expect("open should not fail")
+                    .metadata()
+                    .await
+                    .expect("metadata should not fail")
+                    .len()
+            );
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writer_truncates_complete_corrupt_record_after_checkpointed_prefix() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let initial_next_record_id = ledger.state().get_next_writer_record_id();
+            let checkpointed_bytes = writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write should not fail");
+            let post_checkpoint_bytes = writer
+                .write_record(SizedRecord::new(65))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            let data_file_path = ledger.get_current_writer_data_file_path();
+
+            // Keep only the first record in the durable checkpoint, then corrupt the complete
+            // second frame. The first record's validated end ID proves where truncation belongs.
+            unsafe {
+                ledger
+                    .state()
+                    .unsafe_set_writer_next_record_id(initial_next_record_id + 1);
+            }
+            corrupt_record_checksum(
+                &data_file_path,
+                checkpointed_bytes,
+                checkpointed_bytes + post_checkpoint_bytes,
+            )
+            .await;
+            drop(writer);
+            drop(ledger);
+
+            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            assert_eq!(checkpointed_bytes as u64, ledger.get_total_buffer_size());
+            assert_eq!(
+                checkpointed_bytes as u64,
+                OpenOptions::new()
+                    .read(true)
+                    .open(data_file_path)
+                    .await
+                    .expect("open should not fail")
+                    .metadata()
+                    .await
+                    .expect("metadata should not fail")
+                    .len()
+            );
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -1110,8 +1518,9 @@ async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() 
             data_file.sync_all().await.expect("sync should not fail");
             drop(data_file);
 
-            // Now reopen the buffer. Startup recovery truncates the corrupted writer tail to the
-            // last valid record boundary and keeps the writer on the current file.
+            // Reopen after corrupting an already acknowledged record. The complete frame remains
+            // on disk, but recovery excludes it from unread occupancy because the durable reader
+            // checkpoint proves that the frame was already traversed.
             let (mut writer, mut reader, ledger) =
                 create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
             writer_did_not_mark_for_skip.assert();
@@ -1121,6 +1530,21 @@ async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() 
                 starting_writer_file_id
             );
             assert_file_does_not_exist_async!(&expected_final_write_data_file);
+            assert_eq!(0, ledger.get_total_buffer_size());
+
+            let data_file = OpenOptions::new()
+                .read(true)
+                .open(&data_file_path)
+                .await
+                .expect("open should not fail");
+            assert_eq!(
+                expected_data_file_len,
+                data_file
+                    .metadata()
+                    .await
+                    .expect("metadata should not fail")
+                    .len()
+            );
 
             // At this point there are no unread bytes, so reader.next() should still wait.
             let result = timeout(Duration::from_millis(100), reader.next()).await;

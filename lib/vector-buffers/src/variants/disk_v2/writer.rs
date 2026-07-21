@@ -943,7 +943,7 @@ where
         should_skip
     }
 
-    async fn truncate_current_data_file_to_checkpoint(&mut self) -> Result<(), WriterError<T>> {
+    async fn reconcile_current_data_file_with_checkpoint(&mut self) -> Result<(), WriterError<T>> {
         let checkpoint_next_record_id = self.ledger.state().get_next_writer_record_id();
         let data_file_path = self.ledger.get_current_writer_data_file_path();
         let data_file = self
@@ -954,21 +954,48 @@ where
             .context(IoSnafu)?;
         let mut reader = RecordReader::new(data_file);
         let mut record_start_offset = 0;
+        let mut last_valid_record_next_id = None;
 
         loop {
             let token = match reader.try_next_record(true).await {
                 Ok(Some(token)) => token,
                 Ok(None) => break,
-                Err(e) if e.is_bad_read() => {
-                    warn!(
-                        data_file_path = data_file_path.to_string_lossy().as_ref(),
-                        truncate_at = record_start_offset,
-                        error = %e,
-                        "Truncating torn writer data file tail at last checkpointed record boundary."
-                    );
-                    break;
-                }
                 Err(e) => {
+                    if let Some(record_bytes) = e.consumed_record_bytes() {
+                        if checkpoint_next_record_id == 1
+                            || last_valid_record_next_id == Some(checkpoint_next_record_id)
+                        {
+                            warn!(
+                                data_file_path = data_file_path.to_string_lossy().as_ref(),
+                                truncate_at = record_start_offset,
+                                record_bytes,
+                                error = %e,
+                                "Truncating complete corrupt record proven to be beyond the durable writer checkpoint."
+                            );
+                            break;
+                        }
+
+                        warn!(
+                            data_file_path = data_file_path.to_string_lossy().as_ref(),
+                            record_start_offset,
+                            record_bytes,
+                            error = %e,
+                            "Preserving complete corrupt writer record while reconciling the durable checkpoint."
+                        );
+                        record_start_offset += record_bytes;
+                        continue;
+                    }
+
+                    if e.is_bad_read() {
+                        warn!(
+                            data_file_path = data_file_path.to_string_lossy().as_ref(),
+                            truncate_at = record_start_offset,
+                            error = %e,
+                            "Truncating torn writer data file tail at last complete record boundary."
+                        );
+                        break;
+                    }
+
                     return Err(WriterError::FailedToValidate {
                         reason: e.to_string(),
                     });
@@ -1009,10 +1036,13 @@ where
                 break;
             }
 
+            last_valid_record_next_id = Some(record_next);
             record_start_offset += record_bytes;
         }
 
-        self.truncate_current_data_file(record_start_offset).await?;
+        if record_start_offset < self.data_file_size {
+            self.truncate_current_data_file(record_start_offset).await?;
+        }
         Ok(())
     }
 
@@ -1069,9 +1099,9 @@ where
             .await
             .context(IoSnafu)?;
 
-        // We have bytes, so we should have an archived record... hopefully!  Go through the motions
-        // of verifying it.  If we hit any invalid states, then we should bump to the next data file
-        // since the reader will have to stop once it hits the first error in a given file.
+        // We have bytes, so we should have an archived record... hopefully! Validate the last frame
+        // so post-checkpoint or torn bytes can be removed without discarding complete corrupt spans
+        // that the reader can traverse and account for.
         let should_skip_to_next_file = match validate_record_archive(
             data_file_mmap.as_ref(),
             &Hasher::new(),
@@ -1134,36 +1164,32 @@ where
                             record_next,
                             "Writer data file is ahead of durable checkpoint."
                         );
-                        self.truncate_current_data_file_to_checkpoint().await?;
+                        self.reconcile_current_data_file_with_checkpoint().await?;
                         self.unflushed_events = 0;
 
                         false
                     }
                 }
             }
-            // The record payload was corrupted, somehow: we know the checksum failed to match on
-            // both sides, but we do not know whether the damage is limited to the last record or
-            // extends farther back. Treat the durable checkpoint as authoritative and truncate the
-            // current file to the last checkpointed boundary we can validate.
+            // The record payload was corrupted, but its complete length-delimited span remains
+            // usable for positioning. Reconcile against the durable checkpoint without deleting
+            // that span so the reader can account for and skip it normally.
             RecordStatus::Corrupted { .. } => {
                 error!(
                     "Last written record did not match the expected checksum. Corruption likely."
                 );
-                self.truncate_current_data_file_to_checkpoint().await?;
+                self.reconcile_current_data_file_with_checkpoint().await?;
                 false
             }
-            // The record itself was corrupted, somehow: it was sufficiently different that `rkyv`
-            // couldn't even validate it, which likely means missing bytes but could also be certain
-            // bytes being invalid for the struct fields they represent. Like invalid checksums,
-            // truncate the current file back to the durable checkpoint instead of rolling forward
-            // onto a new data file.
+            // The archive cannot be validated, but the outer length delimiter still gives the
+            // record a complete byte span. Preserve that span while reconciling the checkpoint.
             RecordStatus::FailedDeserialization(de) => {
                 let reason = de.into_inner();
                 error!(
                     ?reason,
                     "Last written record was unable to be deserialized. Corruption likely."
                 );
-                self.truncate_current_data_file_to_checkpoint().await?;
+                self.reconcile_current_data_file_with_checkpoint().await?;
                 false
             }
         };

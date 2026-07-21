@@ -541,6 +541,15 @@ where
             .increment_sent_event_count_and_byte_size(event_count, total_record_size);
     }
 
+    /// Tracks the known byte size of a record that the reader consumed but could not decode.
+    pub fn track_dropped_record_bytes(&self, total_record_size: u64) {
+        self.decrement_total_buffer_size(total_record_size);
+        // The corrupt payload cannot provide a trustworthy event count, but its framing still
+        // provides the exact byte span that has left the buffer.
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(0, total_record_size, false);
+    }
+
     /// Marks the writer as finished.
     ///
     /// If the writer was not yet marked done, `false` is returned.  Otherwise, `true` is returned,

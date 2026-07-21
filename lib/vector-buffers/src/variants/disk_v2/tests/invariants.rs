@@ -352,7 +352,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 }
 
 #[tokio::test]
-async fn writer_truncates_corrupt_current_file_instead_of_waiting_on_next_file() {
+async fn writer_truncates_torn_current_file_instead_of_waiting_on_next_file() {
     // When the writer's current file has a torn tail on restart, the durable checkpoint is
     // authoritative. Startup should truncate the current file to the last valid checkpoint
     // boundary and keep writing there, rather than skipping to the next file and potentially
@@ -448,7 +448,7 @@ async fn writer_truncates_corrupt_current_file_instead_of_waiting_on_next_file()
                 .build()
                 .with_name("mark_for_skip")
                 .with_parent_name(
-                    "writer_truncates_corrupt_current_file_instead_of_waiting_on_next_file",
+                    "writer_truncates_torn_current_file_instead_of_waiting_on_next_file",
                 )
                 .was_not_entered()
                 .finalize();
@@ -456,7 +456,7 @@ async fn writer_truncates_corrupt_current_file_instead_of_waiting_on_next_file()
                 .build()
                 .with_name("wait_for_reader")
                 .with_parent_name(
-                    "writer_truncates_corrupt_current_file_instead_of_waiting_on_next_file",
+                    "writer_truncates_torn_current_file_instead_of_waiting_on_next_file",
                 )
                 .was_not_entered()
                 .finalize();
@@ -479,8 +479,7 @@ async fn writer_truncates_corrupt_current_file_instead_of_waiting_on_next_file()
         }
     });
 
-    let parent =
-        trace_span!("writer_truncates_corrupt_current_file_instead_of_waiting_on_next_file");
+    let parent = trace_span!("writer_truncates_torn_current_file_instead_of_waiting_on_next_file");
     fut.instrument(parent.or_current()).await;
 }
 
