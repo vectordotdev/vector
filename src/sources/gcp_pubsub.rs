@@ -262,12 +262,13 @@ pub struct PubsubConfig {
     ///
     /// GCP Pub/Sub can leave a streaming pull in a state where the
     /// connection looks healthy but no further responses are delivered and
-    /// the stream never errors. This bounds that inactivity. It must be
-    /// larger than `keepalive_secs`.
-    #[serde(default = "default_idle_timeout")]
-    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    /// the stream never errors. This bounds that inactivity. When set, it
+    /// must be larger than `keepalive_secs`; when unset, it defaults to `900`
+    /// or just above `keepalive_secs`, whichever is larger.
+    #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
+    #[derivative(Default(value = "Option::None"))]
     #[configurable(metadata(docs::human_name = "Idle Timeout"))]
-    pub idle_timeout_secs: Duration,
+    pub idle_timeout_secs: Option<Duration>,
 
     /// The number of consecutive stream failures, with no successful fetch in
     /// between, before a fetch error is reported as a component error.
@@ -331,6 +332,10 @@ const fn default_idle_timeout() -> Duration {
     Duration::from_secs(900)
 }
 
+/// Margin over `keepalive_secs` for the derived default idle timeout, keeping it
+/// strictly larger when `keepalive_secs` is at or above `default_idle_timeout`.
+const IDLE_TIMEOUT_KEEPALIVE_MARGIN: Duration = Duration::from_secs(60);
+
 const fn default_max_retry_errors() -> usize {
     5
 }
@@ -365,13 +370,20 @@ impl SourceConfig for PubsubConfig {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
 
-        if self.idle_timeout_secs <= self.keepalive_secs {
-            return Err(PubsubError::InvalidIdleTimeout {
-                idle_timeout_secs: self.idle_timeout_secs.as_secs_f64(),
-                keepalive_secs: self.keepalive_secs.as_secs_f64(),
+        // Only an explicitly set idle timeout is validated; when unset, derive
+        // one that is always larger than the keepalive so upgrades with a long
+        // `keepalive_secs` keep starting.
+        let idle_timeout = match self.idle_timeout_secs {
+            Some(idle_timeout) if idle_timeout <= self.keepalive_secs => {
+                return Err(PubsubError::InvalidIdleTimeout {
+                    idle_timeout_secs: idle_timeout.as_secs_f64(),
+                    keepalive_secs: self.keepalive_secs.as_secs_f64(),
+                }
+                .into());
             }
-            .into());
-        }
+            Some(idle_timeout) => idle_timeout,
+            None => default_idle_timeout().max(self.keepalive_secs + IDLE_TIMEOUT_KEEPALIVE_MARGIN),
+        };
 
         let retry_delay_secs = match self.retry_delay_seconds {
             None => self.retry_delay_secs,
@@ -438,7 +450,7 @@ impl SourceConfig for PubsubConfig {
             ack_deadline_secs,
             retry_delay: retry_delay_secs,
             keepalive: self.keepalive_secs,
-            idle_timeout: self.idle_timeout_secs,
+            idle_timeout,
             max_retry_errors: self.max_retry_errors.max(1),
             consecutive_failures: 0,
             concurrency: Default::default(),
@@ -679,7 +691,11 @@ impl PubsubSource {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                _ = &mut idle_deadline => {
+                // Restart on idle only once acks drain: dropping the stream also
+                // drops the request stream, losing finalized-but-unsent ack IDs
+                // and risking redelivery. The elapsed timer refires once acks
+                // reach zero.
+                _ = &mut idle_deadline, if pending_acks == 0 => {
                     debug!(
                         message = "No activity on the stream within the idle timeout, restarting stream.",
                         timeout_secs = self.idle_timeout.as_secs_f64(),
@@ -706,14 +722,14 @@ impl PubsubSource {
                     // in a new request with empty fields, effectively
                     // a keepalive.
                     //
-                    // Send without blocking: a full channel means the
-                    // request stream stalled, so reconnect rather than
-                    // deadlock.
+                    // Send without blocking to avoid deadlocking the task. A
+                    // full channel already has acks queued, so the keepalive is
+                    // redundant and skipped; the idle timeout handles a genuine
+                    // stall.
                     match ack_ids_sender.try_send(Vec::new()) {
                         Ok(()) => {}
                         Err(mpsc::error::TrySendError::Full(_)) => {
-                            debug!("Keepalive request stream stalled, restarting stream.");
-                            break State::RetryDelay;
+                            debug!("Keepalive skipped: request stream has acks queued.");
                         }
                         Err(mpsc::error::TrySendError::Closed(_)) => {
                             unreachable!("request stream never closes")
@@ -918,17 +934,31 @@ mod tests {
 
     #[test]
     fn default_idle_timeout_is_larger_than_keepalive() {
-        // Defaults come from serde, not `Default::default()`.
+        assert!(
+            default_idle_timeout() > default_keepalive(),
+            "the default idle timeout must be larger than the default keepalive"
+        );
+    }
+
+    #[tokio::test]
+    async fn accepts_long_keepalive_without_explicit_idle_timeout() {
+        // A large `keepalive_secs` with no `idle_timeout_secs` must still build:
+        // the derived default stays larger than the keepalive.
         let config: PubsubConfig = serde_yaml::from_str(
             r#"
             project: my-project
             subscription: my-subscription
+            skip_authentication: true
+            keepalive_secs: 900
             "#,
         )
         .unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let context = SourceContext::new_test(tx, None);
         assert!(
-            config.idle_timeout_secs > config.keepalive_secs,
-            "the default idle timeout must be larger than the default keepalive"
+            config.build(context).await.is_ok(),
+            "build should accept a long keepalive when idle_timeout_secs is unset"
         );
     }
 

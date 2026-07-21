@@ -605,14 +605,15 @@ generated: components: sources: gcp_pubsub: configuration: {
 
 			GCP Pub/Sub can leave a streaming pull in a state where the
 			connection looks healthy but no further responses are delivered and
-			the stream never errors. This bounds that inactivity. It must be
-			larger than `keepalive_secs`.
+			the stream never errors. This bounds that inactivity. When set, it
+			must be larger than `keepalive_secs`.
+
+			When unset, it defaults to `900`, or `keepalive_secs` plus a small
+			margin when `keepalive_secs` is configured at or above that value, so
+			that the idle timeout is always larger than the keepalive interval.
 			"""
 		required: false
-		type: float: {
-			default: 900.0
-			unit:    "seconds"
-		}
+		type: float: {}
 	}
 	keepalive: {
 		description: """
