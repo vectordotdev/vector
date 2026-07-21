@@ -280,6 +280,7 @@ pub struct PubsubConfig {
     /// until this threshold is reached. A successful fetch resets the count.
     /// Set to `1` to report every failure as an error.
     #[serde(default = "default_max_retry_errors")]
+    #[derivative(Default(value = "default_max_retry_errors()"))]
     #[configurable(metadata(docs::human_name = "Max Retry Errors Before Alerting"))]
     pub max_retry_errors: usize,
 
@@ -693,14 +694,12 @@ impl PubsubSource {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                // Restart on idle only once acks are finalized and flushed from
-                // the request channel: dropping the stream drops that channel,
-                // and any queued ack IDs would be lost, risking redelivery.
-                // Delivery is at-least-once, so a small residual window remains
-                // (IDs buffered inside the request stream), but this avoids the
-                // common case. The elapsed timer refires as the conditions clear.
-                _ = &mut idle_deadline, if pending_acks == 0
-                    && ack_ids_sender.capacity() == ack_ids_sender.max_capacity() => {
+                // Always restart on idle, even with acks pending or queued: this
+                // is the recovery path for a stalled request stream, so it must
+                // not be gated on the very channel that has stopped draining.
+                // Any unsent ack IDs are dropped and their messages redelivered,
+                // which is acceptable under Pub/Sub's at-least-once semantics.
+                _ = &mut idle_deadline => {
                     debug!(
                         message = "No activity on the stream within the idle timeout, restarting stream.",
                         timeout_secs = self.idle_timeout.as_secs_f64(),
@@ -824,8 +823,12 @@ impl PubsubSource {
             return State::RetryNow;
         }
 
+        // Escalate to a component error only when the streak first reaches the
+        // threshold, not on every subsequent failure, so a persistently idle
+        // subscription does not resume the error flood. A successful fetch resets
+        // the counter and re-arms escalation for the next streak.
         let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
-        if consecutive_failures >= self.max_retry_errors {
+        if consecutive_failures == self.max_retry_errors {
             emit!(GcpPubsubReceiveError { error });
         } else {
             debug!(
@@ -942,6 +945,16 @@ mod tests {
         assert!(
             default_idle_timeout() > default_keepalive(),
             "the default idle timeout must be larger than the default keepalive"
+        );
+    }
+
+    #[test]
+    fn programmatic_default_preserves_max_retry_errors() {
+        // `Default` must match the serde default so generated/programmatic
+        // configs keep the retry threshold instead of collapsing to 0.
+        assert_eq!(
+            PubsubConfig::default().max_retry_errors,
+            default_max_retry_errors()
         );
     }
 
