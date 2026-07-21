@@ -243,6 +243,16 @@ impl SourceConfig for SocketConfig {
                             .or_undefined(),
                         None,
                     )
+                    .with_source_metadata(
+                        Self::NAME,
+                        config
+                            .proxy_protocol()
+                            .then(|| LegacyKey::Overwrite(owned_value_path!("proxy_protocol"))),
+                        &owned_value_path!("proxy_protocol"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None,
+                    )
             }
             Mode::Udp(config) => {
                 let legacy_host_key = config.host_key().path.map(LegacyKey::InsertIfEmpty);

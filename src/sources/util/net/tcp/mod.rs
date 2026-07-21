@@ -48,6 +48,12 @@ use crate::{
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
+/// Fallback deadline for reading a PROXY protocol header when no explicit
+/// `max_connection_duration_secs` is configured. A valid header is sent
+/// immediately after connect, so a peer that has not produced one within this
+/// window is treated as a stalled/misbehaving connection and dropped.
+const PROXY_HEADER_READ_TIMEOUT_SECS: u64 = 10;
+
 pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
@@ -304,21 +310,40 @@ async fn handle_stream<T>(
     // one code path, and before wrapping the socket so only header bytes are
     // consumed and the payload reaches the decoder untouched.
     let proxy_metadata = if source.proxy_protocol() {
-        match super::proxy_protocol::read_v2_header(&mut socket).await {
-            Ok(header) => {
-                if let Some(source_addr) = header.source {
-                    peer_addr = source_addr;
+        // Bound the header read so a peer that connects but stalls before
+        // sending the header cannot pin this task (and its connection-limit
+        // permit) indefinitely. Honor shutdown, the connection tripwire, and
+        // the configured max connection duration (falling back to a short
+        // default, since a valid header arrives immediately after connect).
+        let header_deadline = tokio::time::sleep(Duration::from_secs(
+            max_connection_duration_secs.unwrap_or(PROXY_HEADER_READ_TIMEOUT_SECS),
+        ));
+        tokio::select! {
+            result = super::proxy_protocol::read_v2_header(&mut socket) => match result {
+                Ok(header) => {
+                    if let Some(source_addr) = header.source {
+                        peer_addr = source_addr;
+                    }
+                    Some(header.into_metadata())
                 }
-                Some(header.into_metadata())
-            }
-            Err(error) => {
+                Err(error) => {
+                    warn!(
+                        message = "Failed to read PROXY protocol v2 header; closing connection.",
+                        %error,
+                        %peer_addr,
+                    );
+                    return;
+                }
+            },
+            _ = header_deadline => {
                 warn!(
-                    message = "Failed to read PROXY protocol v2 header; closing connection.",
-                    %error,
+                    message = "Timed out reading PROXY protocol v2 header; closing connection.",
                     %peer_addr,
                 );
                 return;
             }
+            _ = &mut shutdown_signal => return,
+            _ = &mut tripwire => return,
         }
     } else {
         None
@@ -431,16 +456,12 @@ async fn handle_stream<T>(
                         }
 
                         if let Some(proxy_metadata) = &proxy_metadata {
-                            for event in &mut events {
-                                let log = event.as_mut_log();
-                                log_namespace.insert_source_metadata(
-                                    source_name,
-                                    log,
-                                    Some(LegacyKey::Overwrite(path!("proxy_protocol"))),
-                                    path!("proxy_protocol"),
-                                    proxy_metadata.clone(),
-                                );
-                            }
+                            super::proxy_protocol::inject_metadata(
+                                &mut events,
+                                proxy_metadata,
+                                log_namespace,
+                                source_name,
+                            );
                         }
 
                         source.handle_events(&mut events, peer_addr);

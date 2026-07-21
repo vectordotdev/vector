@@ -8,6 +8,11 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use tokio::io::{AsyncRead, AsyncReadExt};
+use vector_lib::config::LogNamespace;
+use vector_lib::event::Event;
+use vector_lib::lookup::PathPrefix;
+use vrl::owned_value_path;
+use vrl::path::OwnedValuePath;
 use vrl::value::{ObjectMap, Value};
 
 /// The 12-byte signature that begins every PROXY protocol v2 header.
@@ -174,6 +179,41 @@ pub fn parse_v2(buf: &[u8]) -> Result<(usize, ProxyHeader), ParseError> {
         },
     ))
 }
+
+/// Inject parsed PROXY protocol metadata onto each log event in `events`.
+///
+/// Non-log events (metrics, traces produced by native codecs) are skipped
+/// rather than coerced, since `Event::as_mut_log` panics on them.
+pub fn inject_metadata(
+    events: &mut [Event],
+    metadata: &ObjectMap,
+    log_namespace: LogNamespace,
+    source_name: &'static str,
+) {
+    use vector_lib::config::LegacyKey;
+    use vrl::path;
+
+    for event in events {
+        if let Event::Log(log) = event {
+            log_namespace.insert_source_metadata(
+                source_name,
+                log,
+                Some(LegacyKey::Overwrite(path!("proxy_protocol"))),
+                path!("proxy_protocol"),
+                metadata.clone(),
+            );
+        }
+    }
+}
+
+/// The metadata path where PROXY protocol fields are inserted, for declaring
+/// the source's output schema.
+pub fn metadata_path() -> OwnedValuePath {
+    owned_value_path!("proxy_protocol")
+}
+
+/// The legacy-namespace insertion prefix, exposed for schema declaration.
+pub const LEGACY_PREFIX: PathPrefix = PathPrefix::Event;
 
 /// Read and consume exactly one PROXY protocol v2 header from `reader`,
 /// leaving the reader positioned at the first payload byte.
@@ -351,6 +391,44 @@ mod tests {
             0xe0, 0x00, 0x0a, 0x72, 0x61, 0x6a, 0x65, 0x73, 0x68, 0x2e, 0x63, 0x6f, 0x6d, 0x48,
             0x45, 0x4c, 0x4c, 0x4f, 0x2d, 0x50, 0x41, 0x59, 0x4c, 0x4f, 0x41, 0x44, 0x0a,
         ]
+    }
+
+    #[test]
+    fn inject_metadata_skips_non_log_events() {
+        use vector_lib::event::{Event, Metric, MetricKind, MetricValue};
+
+        let value = b"rajesh.com";
+        let mut tlv = vec![0xE0];
+        tlv.extend_from_slice(&(value.len() as u16).to_be_bytes());
+        tlv.extend_from_slice(value);
+        let buf = v4_header(&tlv);
+        let meta = parse_v2(&buf).unwrap().1.into_metadata();
+
+        let mut events = vec![
+            Event::Log(Default::default()),
+            Event::Metric(Metric::new(
+                "m",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )),
+        ];
+
+        // Must not panic on the metric event.
+        inject_metadata(&mut events, &meta, LogNamespace::Legacy, "socket");
+
+        // Log event carries the metadata.
+        use vrl::event_path;
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get(event_path!("proxy_protocol"))
+                .and_then(|v| v.as_object())
+                .and_then(|o| o.get("tlvs"))
+                .and_then(|v| v.as_object())
+                .and_then(|o| o.get("0xe0")),
+            Some(&Value::from("rajesh.com"))
+        );
+        // Metric event is untouched (still a metric).
+        assert!(matches!(events[1], Event::Metric(_)));
     }
 
     #[tokio::test]
