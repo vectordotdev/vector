@@ -53,6 +53,7 @@ pub struct S3Metadata {
 #[derive(Debug)]
 pub struct S3Response {
     events_byte_size: GroupedCountByteSize,
+    byte_size: usize,
 }
 
 impl DriverResponse for S3Response {
@@ -62,6 +63,10 @@ impl DriverResponse for S3Response {
 
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }
 
@@ -118,6 +123,7 @@ impl Service<S3Request> for S3Service {
             tagging.finish()
         });
 
+        let byte_size = request.request_metadata.request_encoded_size();
         let events_byte_size = request
             .request_metadata
             .into_events_estimated_json_encoded_byte_size();
@@ -153,7 +159,10 @@ impl Service<S3Request> for S3Service {
                     key = request.metadata.s3_key
                 );
 
-                S3Response { events_byte_size }
+                S3Response {
+                    events_byte_size,
+                    byte_size,
+                }
             })
         })
     }

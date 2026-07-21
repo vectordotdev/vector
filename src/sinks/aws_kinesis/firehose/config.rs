@@ -12,7 +12,7 @@ use super::{
     sink::BatchKinesisRequest,
 };
 use crate::{
-    aws::{ClientBuilder, create_client, is_retriable_error},
+    aws::{ClientBuilder, create_client_without_transport_metrics, is_retriable_error},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         Healthcheck, VectorSink,
@@ -102,7 +102,7 @@ impl KinesisFirehoseSinkConfig {
     }
 
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
-        create_client::<KinesisFirehoseClientBuilder>(
+        create_client_without_transport_metrics::<KinesisFirehoseClientBuilder>(
             &KinesisFirehoseClientBuilder {},
             &self.base.auth,
             self.base.region.region(),
@@ -129,6 +129,11 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
 
+        let region = self
+            .base
+            .region
+            .region()
+            .map_or_else(String::new, |r| r.to_string());
         let sink = build_sink::<
             KinesisFirehoseClient,
             KinesisRecord,
@@ -143,6 +148,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             KinesisRetryLogic {
                 retry_partial: self.base.request_retry_partial,
             },
+            region,
         )?;
 
         Ok((sink, healthcheck))

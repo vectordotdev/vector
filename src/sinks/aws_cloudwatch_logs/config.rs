@@ -8,7 +8,9 @@ use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_compon
 use vrl::value::Kind;
 
 use crate::{
-    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
+    aws::{
+        AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client_without_transport_metrics,
+    },
     codecs::{Encoder, EncodingConfig},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
@@ -190,7 +192,7 @@ pub struct CloudwatchLogsSinkConfig {
 
 impl CloudwatchLogsSinkConfig {
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
-        create_client::<CloudwatchLogsClientBuilder>(
+        create_client_without_transport_metrics::<CloudwatchLogsClientBuilder>(
             &CloudwatchLogsClientBuilder {},
             &self.auth,
             self.region.region(),
@@ -237,7 +239,10 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 transformer,
                 encoder,
             },
-
+            region: self
+                .region
+                .region()
+                .map_or_else(String::new, |r| r.to_string()),
             service: svc,
         };
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))

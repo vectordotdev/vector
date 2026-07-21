@@ -229,9 +229,10 @@ impl GenerateConfig for S3SinkConfig {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = self.create_service(&cx.proxy).await?;
+        let (service, region) = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
-        let sink = self.build_processor(service, cx)?;
+        let sink = self.build_processor(service, cx, region)?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 
@@ -259,6 +260,7 @@ impl S3SinkConfig {
         &self,
         service: S3Service,
         cx: SinkContext,
+        region: String,
     ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
@@ -339,7 +341,13 @@ impl S3SinkConfig {
                 filename_tz_offset: offset,
             };
 
-            let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
+            let sink = S3Sink::new(
+                service,
+                request_options,
+                partitioner,
+                batch_settings,
+                region,
+            );
             return Ok(VectorSink::from_event_streamsink(sink));
         }
 
@@ -357,7 +365,13 @@ impl S3SinkConfig {
             filename_tz_offset: offset,
         };
 
-        let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
+        let sink = S3Sink::new(
+            service,
+            request_options,
+            partitioner,
+            batch_settings,
+            region,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -366,7 +380,7 @@ impl S3SinkConfig {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
-    pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
+    pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<(S3Service, String)> {
         s3_common::config::create_service(
             &self.region,
             &self.auth,

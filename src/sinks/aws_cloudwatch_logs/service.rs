@@ -111,6 +111,7 @@ impl From<SdkError<DescribeLogStreamsError, HttpResponse>> for CloudwatchError {
 #[derive(Debug)]
 pub struct CloudwatchResponse {
     events_byte_size: GroupedCountByteSize,
+    byte_size: usize,
 }
 
 impl crate::sinks::util::sink::Response for CloudwatchResponse {
@@ -130,6 +131,10 @@ impl DriverResponse for CloudwatchResponse {
 
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }
 
@@ -181,6 +186,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 
     fn call(&mut self, mut req: BatchCloudwatchRequest) -> Self::Future {
         let metadata = std::mem::take(req.metadata_mut());
+        let byte_size = metadata.request_encoded_size();
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
         let key = req.key;
@@ -225,7 +231,10 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
         };
 
         svc.oneshot(events)
-            .map_ok(move |_x| CloudwatchResponse { events_byte_size })
+            .map_ok(move |_x| CloudwatchResponse {
+                events_byte_size,
+                byte_size,
+            })
             .map_err(Into::into)
             .boxed()
     }

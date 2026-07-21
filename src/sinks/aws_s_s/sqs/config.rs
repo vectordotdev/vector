@@ -6,7 +6,7 @@ use super::{
     message_deduplication_id, message_group_id,
 };
 use crate::{
-    aws::{RegionOrEndpoint, create_client},
+    aws::{RegionOrEndpoint, create_client_without_transport_metrics},
     common::sqs::SqsClientBuilder,
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
@@ -49,7 +49,7 @@ impl GenerateConfig for SqsSinkConfig {
 
 impl SqsSinkConfig {
     pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
-        create_client::<SqsClientBuilder>(
+        create_client_without_transport_metrics::<SqsClientBuilder>(
             &SqsClientBuilder {},
             &self.base_config.auth,
             self.region.region(),
@@ -81,6 +81,10 @@ impl SinkConfig for SqsSinkConfig {
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone());
 
+        let region = self
+            .region
+            .region()
+            .map_or_else(String::new, |r| r.to_string());
         let sink = SSSink::new(
             SSRequestBuilder::new(
                 message_group_id?,
@@ -89,6 +93,7 @@ impl SinkConfig for SqsSinkConfig {
             )?,
             self.base_config.request,
             publisher,
+            region,
         )?;
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
