@@ -113,6 +113,18 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
+                // The PROXY protocol header is sent unencrypted before any TLS
+                // handshake (as HAProxy and AWS NLB do), but this source reads
+                // it from the post-handshake stream. Feeding the plaintext
+                // header into the TLS acceptor would fail the handshake, so
+                // reject the combination explicitly rather than break at
+                // runtime.
+                if config.proxy_protocol() && config.tls().is_some() {
+                    return Err(
+                        "The `proxy_protocol` option is not supported together with `tls` on the `socket` source; terminate TLS upstream and forward plaintext to this source.".into(),
+                    );
+                }
+
                 let log_namespace = cx.log_namespace(config.log_namespace);
 
                 let decoding = config.decoding().clone();
@@ -504,6 +516,40 @@ mod test {
     }
 
     //////// TCP TESTS ////////
+    #[tokio::test]
+    async fn tcp_proxy_protocol_with_tls_is_rejected() {
+        use vector_lib::tls::{TlsConfig, TlsEnableableConfig, TlsSourceConfig};
+
+        let (guard, addr) = next_addr();
+        drop(guard);
+
+        let mut tcp = TcpConfig::from_address(addr.into());
+        tcp.proxy_protocol = true;
+        tcp.set_tls(Some(TlsSourceConfig {
+            client_metadata_key: None,
+            tls_config: TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig::default(),
+            },
+        }));
+
+        let (tx, _rx) = SourceSender::new_test();
+        let result = SocketConfig::from(tcp)
+            .build(SourceContext::new_test(tx, None))
+            .await;
+
+        match result {
+            Ok(_) => panic!("tls + proxy_protocol must be rejected"),
+            Err(err) => {
+                let msg = err.to_string();
+                assert!(
+                    msg.contains("proxy_protocol") && msg.contains("tls"),
+                    "unexpected error: {msg}"
+                );
+            }
+        }
+    }
+
     #[tokio::test]
     async fn tcp_it_includes_host() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {

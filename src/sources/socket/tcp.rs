@@ -87,6 +87,10 @@ pub struct TcpConfig {
     /// peer address recorded on each event. Enable this only when a trusted
     /// proxy sits in front of this source, since the header is otherwise
     /// spoofable.
+    ///
+    /// This option cannot be combined with `tls`. Proxies send the PROXY
+    /// protocol header unencrypted before the TLS handshake, so TLS must be
+    /// terminated upstream and plaintext forwarded to this source.
     #[serde(default)]
     pub proxy_protocol: bool,
 
