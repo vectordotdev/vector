@@ -731,7 +731,9 @@ mod tests {
 
     #[test]
     fn normalizer_does_not_hold_finalizer_references() {
-        use vector_common::finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventStatus};
+        use vector_common::finalization::{
+            BatchNotifier, BatchStatus, EventFinalizer, EventStatus,
+        };
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
