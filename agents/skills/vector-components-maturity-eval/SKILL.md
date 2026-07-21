@@ -1,6 +1,6 @@
 ---
 name: vector-components-maturity-eval
-description: Evaluates all Vector component maturity levels and writes a monthly markdown report to .claude/skill-reports/maturity-YYYY-MM.md. Use when asked to evaluate component maturity or generate the monthly maturity report.
+description: Evaluates all Vector component maturity levels and writes a monthly markdown report to agents/reports/maturity-YYYY-MM.md. Use when asked to evaluate component maturity or generate the monthly maturity report.
 ---
 
 You are the Vector Component Maturity Evaluator. Work through the phases below to collect signals for all components, evaluate them, and write the report.
@@ -246,10 +246,10 @@ Use judgment for borderline cases. A component with 2 bugs but a long stable his
 Create the output directory and write the report:
 
 ```bash
-mkdir -p .claude/skill-reports
+mkdir -p agents/reports
 ```
 
-Write to `.claude/skill-reports/maturity-YYYY-MM.md` using the actual current year and month.
+Write to `agents/reports/maturity-YYYY-MM.md` using the actual current year and month.
 
 ---
 

@@ -26,7 +26,7 @@ jobs:
   warm:
     name: Warm shared workspace cache
     runs-on: ubuntu-24.04-8core
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -35,11 +35,22 @@ jobs:
           rust: true
           protoc: true
           libsasl2: true
+          vdev: true
           cargo-cache: true
           cache-save: true
 
-      # cargo build (not check) so cached deps include .rlib for cargo test consumers.
-      # --all-features to match `vdev check rust` used by check-clippy, so
-      # optional deps (rdkafka, ...) are in the cache.
-      - name: Seed build
+      # Warm BOTH cargo profiles. cargo's fingerprint differs between build-mode
+      # (.rlib, emitted by `cargo build`/`cargo test`) and check-mode (.rmeta,
+      # emitted by `cargo clippy`/`cargo check`), so a build-only cache does not
+      # accelerate clippy at all: it re-checks the whole dep graph. We therefore
+      # seed both so every consumer gets a real cache hit.
+
+      # build-mode: serves `test` (cargo nextest) consumers.
+      - name: Seed build-mode (.rlib)
         run: cargo build --workspace --tests --all-features --locked
+
+      # check-mode: serves check-clippy / check-generated-docs / check-rust-docs.
+      # Runs the exact command those jobs use (`vdev check rust` ->
+      # `cargo clippy --workspace --all-targets --all-features`) so fingerprints match.
+      - name: Seed check-mode (.rmeta)
+        run: make check-clippy
