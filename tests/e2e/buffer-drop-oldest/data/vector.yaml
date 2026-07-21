@@ -1,0 +1,23 @@
+sources:
+  in:
+    type: http_server
+    address: 0.0.0.0:8080
+    decoding:
+      codec: json
+
+sinks:
+  out:
+    type: http
+    inputs:
+      - in
+    uri: http://collector:8081/events
+    method: post
+    encoding:
+      codec: json
+    batch:
+      max_events: 1
+      timeout_secs: 1
+    buffer:
+      type: memory
+      max_events: 3
+      when_full: drop_oldest

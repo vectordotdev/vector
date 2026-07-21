@@ -28,6 +28,11 @@ pub trait IntoBuffer<T: Bufferable>: Send {
         false
     }
 
+    /// Gets whether this stage supports `WhenFull::DropOldest`.
+    fn supports_drop_oldest(&self) -> bool {
+        true
+    }
+
     /// Converts this value into a sender and receiver pair suitable for use in a buffer topology.
     async fn into_buffer_parts(
         self: Box<Self>,
@@ -40,12 +45,14 @@ pub enum TopologyError {
     #[snafu(display("buffer topology cannot be empty"))]
     EmptyTopology,
     #[snafu(display(
-        "stage {} configured with block/drop newest behavior in front of subsequent stage",
+        "stage {} configured with block/drop behavior in front of subsequent stage",
         stage_idx
     ))]
     NextStageNotUsed { stage_idx: usize },
     #[snafu(display("last stage in buffer topology cannot be set to overflow mode"))]
     OverflowWhenLast,
+    #[snafu(display("stage {} does not support drop_oldest mode", stage_idx))]
+    DropOldestNotSupported { stage_idx: usize },
     #[snafu(display("failed to build individual stage {}: {}", stage_idx, source))]
     FailedToBuildStage {
         stage_idx: usize,
@@ -76,15 +83,15 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// an overflow buffer is added to the topology after this, then the specified "when full"
     /// behavior will be ignored and will be set to "overflow" mode.
     ///
-    /// Callers can configure what to do when a buffer is full by setting `when_full`.  Three modes
-    /// are available -- block, drop newest, and overflow -- which are documented in more detail by
-    /// [`BufferSender`].
+    /// Callers can configure what to do when a buffer is full by setting `when_full`.  Four modes
+    /// are available -- block, drop newest, drop oldest, and overflow -- which are documented in
+    /// more detail by [`BufferSender`].
     ///
     /// Two notes about what modes are not valid in certain scenarios:
     /// - the innermost stage (the last stage given to the builder) cannot be set to "overflow" mode,
     ///   as there is no other stage to overflow to
-    /// - a stage cannot use the "block" or "drop newest" mode when there is a subsequent stage, and
-    ///   must user the "overflow" mode
+    /// - a stage cannot use the "block", "drop newest", or "drop oldest" mode when there is a
+    ///   subsequent stage, and must user the "overflow" mode
     ///
     /// Any occurrence of either of these scenarios will result in an error during build.
     pub fn stage<S>(&mut self, stage: S, when_full: WhenFull) -> &mut Self
@@ -122,11 +129,16 @@ impl<T: Bufferable> TopologyBuilder<T> {
                         return Err(TopologyError::OverflowWhenLast);
                     }
                 }
-                // If there's already an inner stage, then blocking or dropping the newest events
+                // If there's already an inner stage, then blocking or dropping events
                 // doesn't no sense.  Overflowing is the only valid transition to another stage.
-                WhenFull::Block | WhenFull::DropNewest => {
+                WhenFull::Block | WhenFull::DropNewest | WhenFull::DropOldest => {
                     if current_stage.is_some() {
                         return Err(TopologyError::NextStageNotUsed { stage_idx });
+                    }
+                    if stage.when_full == WhenFull::DropOldest
+                        && !stage.untransformed.supports_drop_oldest()
+                    {
+                        return Err(TopologyError::DropOldestNotSupported { stage_idx });
                     }
                 }
             }
@@ -177,9 +189,9 @@ impl<T: Bufferable> TopologyBuilder<T> {
 impl<T: Bufferable> TopologyBuilder<T> {
     /// Creates a memory-only buffer topology.
     ///
-    /// The overflow mode (i.e. `WhenFull`) can be configured to either block or drop the newest
-    /// values, but cannot be configured to use overflow mode.  If overflow mode is selected, it
-    /// will be changed to blocking mode.
+    /// The overflow mode (i.e. `WhenFull`) can be configured to block, drop the newest values, or
+    /// drop the oldest values, but cannot be configured to use overflow mode. If overflow mode is
+    /// selected, it will be changed to blocking mode.
     ///
     /// This is a convenience method for `vector` as it is used for inter-transform channels, and we
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
@@ -216,9 +228,9 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// like channel capacity left, which cannot be done on in-memory v1 buffers as they use the
     /// more abstract `Sink`-based adapters.
     ///
-    /// The overflow mode (i.e. `WhenFull`) can be configured to either block or drop the newest
-    /// values, but cannot be configured to use overflow mode.  If overflow mode is selected, it
-    /// will be changed to blocking mode.
+    /// The overflow mode (i.e. `WhenFull`) can be configured to block, drop the newest values, or
+    /// drop the oldest values, but cannot be configured to use overflow mode. If overflow mode is
+    /// selected, it will be changed to blocking mode.
     ///
     /// This is a convenience method for `vector` as it is used for inter-transform channels, and we
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
@@ -257,7 +269,10 @@ impl<T: Bufferable> Default for TopologyBuilder<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroUsize;
+    use std::{
+        num::{NonZeroU64, NonZeroUsize},
+        path::PathBuf,
+    };
 
     use tracing::Span;
 
@@ -268,7 +283,7 @@ mod tests {
             builder::TopologyError,
             test_util::{Sample, assert_current_send_capacity},
         },
-        variants::MemoryBuffer,
+        variants::{DiskV2Buffer, MemoryBuffer},
     };
 
     #[tokio::test]
@@ -297,6 +312,38 @@ mod tests {
 
         let (mut sender, _) = result.unwrap();
         assert_current_send_capacity(&mut sender, Some(1), None);
+    }
+
+    #[tokio::test]
+    async fn single_stage_topology_drop_oldest() {
+        let mut builder = TopologyBuilder::<Sample>::default();
+        builder.stage(
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
+            WhenFull::DropOldest,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
+        assert!(result.is_ok());
+
+        let (mut sender, _) = result.unwrap();
+        assert_current_send_capacity(&mut sender, Some(1), None);
+    }
+
+    #[tokio::test]
+    async fn single_stage_topology_disk_drop_oldest() {
+        let mut builder = TopologyBuilder::<Sample>::default();
+        builder.stage(
+            DiskV2Buffer::new(
+                String::from("test"),
+                PathBuf::from("/tmp/vector-drop-oldest-test"),
+                NonZeroU64::new(1).unwrap(),
+            ),
+            WhenFull::DropOldest,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
+        match result {
+            Err(TopologyError::DropOldestNotSupported { stage_idx }) => assert_eq!(stage_idx, 0),
+            r => panic!("unexpected build result: {r:?}"),
+        }
     }
 
     #[tokio::test]
@@ -337,6 +384,24 @@ mod tests {
         builder.stage(
             MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
+        );
+        builder.stage(
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
+        match result {
+            Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
+            r => panic!("unexpected build result: {r:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn two_stage_topology_drop_oldest() {
+        let mut builder = TopologyBuilder::<Sample>::default();
+        builder.stage(
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
+            WhenFull::DropOldest,
         );
         builder.stage(
             MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),

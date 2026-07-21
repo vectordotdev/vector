@@ -186,6 +186,18 @@ continually) or is generally not high-value, such as trace or debug logging. It 
 effectively shed load, by lowering the number of events in-flight for a topology, while
 simultaneously avoiding the blocking of upstream components.
 
+### Drop the oldest buffered event (`drop_oldest`)
+
+When configured to "drop oldest", Vector will drop the oldest buffered event as needed to make room
+for new events. This mode is supported for in-memory buffers.
+
+This behavior can be useful for streams where retaining the most recent events is more important
+than preserving older buffered events. For example, high-volume telemetry streams may prefer recent
+state over stale data when the destination is temporarily slower than the source.
+
+When a new event is larger than the available buffer capacity, Vector may drop multiple old events
+until enough capacity is available for the new event.
+
 ### Overflow to another buffer (`overflow`)
 
 {{< danger >}}

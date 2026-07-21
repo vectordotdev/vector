@@ -204,6 +204,13 @@ impl BufferUsageHandle {
             }
         }
     }
+
+    /// Increment the number of events dropped by `drop_oldest` for this buffer component.
+    pub fn increment_dropped_oldest_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
+        if count > 0 || byte_size > 0 {
+            self.state.dropped_oldest.increment(count, byte_size);
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -213,6 +220,7 @@ struct BufferUsageData {
     sent: CategoryMetrics,
     dropped: CategoryMetrics,
     dropped_intentional: CategoryMetrics,
+    dropped_oldest: CategoryMetrics,
     max_size: CategoryMetrics,
 }
 
@@ -229,6 +237,7 @@ impl BufferUsageData {
         let sent = self.sent.get();
         let dropped = self.dropped.get();
         let dropped_intentional = self.dropped_intentional.get();
+        let dropped_oldest = self.dropped_oldest.get();
         let max_size = self.max_size.get();
 
         BufferUsageSnapshot {
@@ -238,8 +247,12 @@ impl BufferUsageData {
             sent_byte_size: sent.event_byte_size,
             dropped_event_count: dropped.event_count,
             dropped_event_byte_size: dropped.event_byte_size,
-            dropped_event_count_intentional: dropped_intentional.event_count,
-            dropped_event_byte_size_intentional: dropped_intentional.event_byte_size,
+            dropped_event_count_intentional: dropped_intentional
+                .event_count
+                .saturating_add(dropped_oldest.event_count),
+            dropped_event_byte_size_intentional: dropped_intentional
+                .event_byte_size
+                .saturating_add(dropped_oldest.event_byte_size),
             max_size_bytes: max_size.event_byte_size,
             max_size_events: max_size
                 .event_count
@@ -275,6 +288,9 @@ impl BufferUsageData {
 
         let dropped_intentional = self.dropped_intentional.consume();
         current_metrics.add_left(dropped_intentional);
+
+        let dropped_oldest = self.dropped_oldest.consume();
+        current_metrics.add_left(dropped_oldest);
 
         let current = current_metrics.current();
 
@@ -321,6 +337,19 @@ impl BufferUsageData {
                 reason: "drop_newest",
                 count: dropped_intentional.event_count,
                 byte_size: dropped_intentional.event_byte_size,
+                total_count: current.event_count,
+                total_byte_size: current.event_byte_size,
+            });
+        }
+
+        if dropped_oldest.has_updates() {
+            emit(BufferEventsDropped {
+                buffer_id: buffer_id.to_string(),
+                idx: self.idx,
+                intentional: true,
+                reason: "drop_oldest",
+                count: dropped_oldest.event_count,
+                byte_size: dropped_oldest.event_byte_size,
                 total_count: current.event_count,
                 total_byte_size: current.event_byte_size,
             });

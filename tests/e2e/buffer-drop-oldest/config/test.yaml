@@ -1,0 +1,22 @@
+features:
+  - e2e-tests-buffer-drop-oldest
+
+test: "e2e"
+
+test_filter: "buffer_drop_oldest::"
+
+runner:
+  env:
+    VECTOR_ENDPOINT: "http://vector:8080"
+    COLLECTOR_ENDPOINT: "http://collector:8081"
+    EVENT_COUNT: "50"
+    RETAINED_TAIL: "3"
+
+matrix: {}
+
+# changes to these files/paths will invoke the e2e test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "lib/vector-buffers/**"
+  - "tests/e2e/buffer-drop-oldest/**"
+  - "tests/e2e/buffer_drop_oldest/**"
