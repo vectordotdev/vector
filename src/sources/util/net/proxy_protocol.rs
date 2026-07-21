@@ -34,6 +34,8 @@ pub enum ParseError {
     UnsupportedVersion(u8),
     /// The address family/transport byte was not understood.
     UnsupportedFamily(u8),
+    /// The command nibble was neither LOCAL (`0x0`) nor PROXY (`0x1`).
+    UnsupportedCommand(u8),
 }
 
 /// A single Type-Length-Value entry from the v2 TLV vector.
@@ -119,14 +121,24 @@ pub fn parse_v2(buf: &[u8]) -> Result<(usize, ProxyHeader), ParseError> {
     if ver != 2 {
         return Err(ParseError::UnsupportedVersion(ver));
     }
-    // Lower nibble of byte 12 is the command (LOCAL/PROXY); not needed for the
-    // minimal slice.
-
     let family = buf[13] >> 4;
     let declared = u16::from_be_bytes([buf[14], buf[15]]) as usize;
     let header_end = V2_PREFIX_LEN + declared;
     if buf.len() < header_end {
         return Err(ParseError::Truncated);
+    }
+
+    // Lower nibble of byte 12 is the command.
+    match buf[12] & 0x0f {
+        // LOCAL: the connection is the proxy's own (for example a health
+        // check), not proxied on behalf of a client. Per the spec the
+        // receiver must ignore the header addresses and use the real
+        // connection endpoints, so return an empty header while still
+        // consuming the declared bytes so the payload is left intact.
+        0x0 => return Ok((header_end, ProxyHeader::default())),
+        // PROXY: addresses belong to the real client; parse them below.
+        0x1 => {}
+        other => return Err(ParseError::UnsupportedCommand(other)),
     }
 
     let addr_bytes = &buf[V2_PREFIX_LEN..header_end];
@@ -273,6 +285,10 @@ mod tests {
 
     /// Build a v2 IPv4 header with the given TLV bytes appended.
     fn v4_header(tlvs: &[u8]) -> Vec<u8> {
+        v4_header_with_ver_cmd(0x21, tlvs) // ver 2, cmd PROXY
+    }
+
+    fn v4_header_with_ver_cmd(ver_cmd: u8, tlvs: &[u8]) -> Vec<u8> {
         let addr: [u8; 12] = [
             1, 2, 3, 4, // src 1.2.3.4
             10, 0, 0, 1, // dst 10.0.0.1
@@ -282,7 +298,7 @@ mod tests {
         let len = (addr.len() + tlvs.len()) as u16;
         let mut buf = Vec::new();
         buf.extend_from_slice(&V2_SIGNATURE);
-        buf.push(0x21); // ver 2, cmd PROXY
+        buf.push(ver_cmd);
         buf.push(0x11); // AF_INET, STREAM
         buf.extend_from_slice(&len.to_be_bytes());
         buf.extend_from_slice(&addr);
@@ -358,6 +374,24 @@ mod tests {
         let (_, header) = parse_v2(&buf).expect("valid header");
         assert_eq!(header.tlv(0x20).map(<[u8]>::to_vec), Some(inner.to_vec()));
         assert_eq!(header.tlv(0xE0), Some(&b"acme"[..]));
+    }
+
+    #[test]
+    fn local_command_ignores_header_addresses() {
+        // ver 2, cmd LOCAL (0x20), but with real-looking IPv4 address bytes.
+        let buf = v4_header_with_ver_cmd(0x20, &[]);
+        let (consumed, header) = parse_v2(&buf).expect("local header parses");
+        assert_eq!(consumed, buf.len(), "header bytes still consumed");
+        assert_eq!(header.source, None, "LOCAL must not expose addresses");
+        assert_eq!(header.destination, None);
+        assert!(header.tlvs.is_empty());
+    }
+
+    #[test]
+    fn unsupported_command_is_rejected() {
+        // ver 2, cmd 0x2 (unassigned).
+        let buf = v4_header_with_ver_cmd(0x22, &[]);
+        assert_eq!(parse_v2(&buf), Err(ParseError::UnsupportedCommand(2)));
     }
 
     #[test]
