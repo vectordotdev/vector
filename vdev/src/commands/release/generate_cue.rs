@@ -1457,11 +1457,8 @@ releases: "0.55.0": {
 
         refresh_versions_cue(tmp.path()).unwrap();
 
-        let out = fs::read_to_string(
-            tmp.path()
-                .join("website/cue/reference/versions.cue"),
-        )
-        .unwrap();
+        let out =
+            fs::read_to_string(tmp.path().join("website/cue/reference/versions.cue")).unwrap();
 
         let expected = indoc::indoc! {r#"
             package metadata
