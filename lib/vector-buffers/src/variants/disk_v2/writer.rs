@@ -629,6 +629,25 @@ where
         self.current_data_file_size += u64::try_from(serialized_len)
             .expect("Serialized length of record should never exceed 2^64 bytes.");
 
+        // `archive_record` only hands back a flushable token after `can_write`
+        // confirmed this record fits the remaining room in the file, so the file
+        // never grows past its limit and a record never spans two files. A size
+        // counter that drifted past the limit here means the gate was fed a wrong
+        // on-disk size and a record was written across the boundary.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always_or_unreachable!(
+                self.current_data_file_size <= self.max_data_file_size,
+                "a record never spans two data files",
+                &serde_json::json!({
+                    "current_data_file_size": self.current_data_file_size,
+                    "max_data_file_size": self.max_data_file_size,
+                    "serialized_len": serialized_len,
+                })
+            );
+        }
+
         Ok((serialized_len, flush_result))
     }
 
@@ -753,7 +772,7 @@ where
     }
 
     fn get_next_record_id(&mut self) -> u64 {
-        self.next_record_id.wrapping_add(self.unflushed_events)
+        self.next_record_id + self.unflushed_events
     }
 
     fn track_write(&mut self, event_count: usize, record_size: u64) {
@@ -762,11 +781,7 @@ where
         self.unflushed_bytes += record_size;
     }
 
-    fn flush_write_state(&mut self) {
-        self.flush_write_state_partial(self.unflushed_events, self.unflushed_bytes);
-    }
-
-    fn flush_write_state_partial(&mut self, flushed_events: u64, flushed_bytes: u64) {
+    fn publish_flushed_progress(&mut self, flushed_events: u64, flushed_bytes: u64) {
         debug_assert!(
             flushed_events <= self.unflushed_events,
             "tried to flush more events than are currently unflushed"
@@ -776,14 +791,11 @@ where
             "tried to flush more bytes than are currently unflushed"
         );
 
-        self.next_record_id = self
-            .ledger
-            .state()
-            .increment_next_writer_record_id(flushed_events);
         self.unflushed_events -= flushed_events;
         self.unflushed_bytes -= flushed_bytes;
-
-        self.ledger.track_write(flushed_events, flushed_bytes);
+        self.next_record_id = self
+            .ledger
+            .publish_writer_progress(flushed_events, flushed_bytes);
     }
 
     fn can_write(&self) -> bool {
@@ -894,7 +906,7 @@ where
                 let ledger_next = self.ledger.state().get_next_writer_record_id();
                 let record_events =
                     u64::try_from(item.event_count()).expect("event count should never exceed u64");
-                let record_next = last_record_id.wrapping_add(record_events);
+                let record_next = last_record_id + record_events;
 
                 match ledger_next.cmp(&record_next) {
                     Ordering::Equal => {
@@ -998,6 +1010,9 @@ where
 
     /// Ensures this writer is ready to attempt writer the next record.
     #[instrument(skip(self), level = "debug")]
+    // The inline antithesis assertion block pushes this over the line limit. Its
+    // source lines count even when the feature is off, so the allow is unconditional.
+    #[allow(clippy::too_many_lines)]
     async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
@@ -1015,6 +1030,21 @@ where
                 max_buffer_size = self.config.max_buffer_size,
                 "Buffer size limit reached. Waiting for reader progress."
             );
+
+            // The writer is now blocked on a full buffer, the precondition for the
+            // backpressure path and for the underflow that can wedge it forever.
+            #[cfg(feature = "antithesis-disk-asserts")]
+            {
+                #![allow(clippy::disallowed_types)] // once_cell::Lazy
+                antithesis_sdk::assert_sometimes!(
+                    true,
+                    "the writer blocks on a full buffer",
+                    &serde_json::json!({
+                        "total_buffer_size": self.ledger.get_total_buffer_size() + self.unflushed_bytes,
+                        "max_buffer_size": self.config.max_buffer_size,
+                    })
+                );
+            }
 
             self.ledger.wait_for_reader().await;
         }
@@ -1039,7 +1069,6 @@ where
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
             self.flush_inner(true).await?;
-            self.flush_write_state();
 
             self.reset();
         }
@@ -1137,6 +1166,20 @@ where
                 if should_open_next {
                     self.ledger.state().increment_writer_file_id();
                     self.ledger.notify_writer_waiters();
+
+                    // The writer just rolled to a fresh data file, the boundary the
+                    // crash, partial-write, and file-id-rollover faults act on.
+                    #[cfg(feature = "antithesis-disk-asserts")]
+                    {
+                        #![allow(clippy::disallowed_types)] // once_cell::Lazy
+                        antithesis_sdk::assert_sometimes!(
+                            true,
+                            "the writer rolls to a new data file",
+                            &serde_json::json!({
+                                "new_writer_file_id": self.ledger.get_current_writer_file_id(),
+                            })
+                        );
+                    }
 
                     debug!(
                         new_writer_file_id = self.ledger.get_current_writer_file_id(),
@@ -1255,11 +1298,26 @@ where
         self.track_write(record_events.get(), bytes_written as u64);
 
         // If we did flush some buffered writes during this write, however, we now compensate for
-        // that after updating our internal state.  We'll also notify the reader, too, since the
-        // data should be available to read:
+        // that after updating our internal state. Publishing the flushed state also notifies the
+        // reader, after all shared state reflects the readable bytes.
         if let Some(flush_result) = flush_result {
-            self.flush_write_state_partial(flush_result.events_flushed, flush_result.bytes_flushed);
-            self.ledger.notify_writer_waiters();
+            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
+        }
+
+        // A record at or above the write-buffer size forces the buffered writer to
+        // flush mid-record, exercising the large-record path that splits a single
+        // record across multiple underlying writes.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_sometimes!(
+                bytes_written >= self.config.write_buffer_size,
+                "a record at or over the write-buffer size is written",
+                &serde_json::json!({
+                    "bytes_written": bytes_written,
+                    "write_buffer_size": self.config.write_buffer_size,
+                })
+            );
         }
 
         trace!(
@@ -1304,9 +1362,15 @@ where
         //
         // TODO: Windows has a page cache as well, and macOS _should_, but we should verify this
         // behavior works on those platforms as well.
-        if let Some(writer) = self.writer.as_mut() {
-            writer.flush().await?;
-            self.ledger.notify_writer_waiters();
+        let flush_result = if let Some(writer) = self.writer.as_mut() {
+            writer.flush().await?
+        } else {
+            None
+        };
+
+        if let Some(flush_result) = flush_result {
+            // Publish the readable bytes before waking the reader.
+            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
         }
 
         if self.ledger.should_flush() || force_full_flush {
@@ -1335,7 +1399,6 @@ where
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.flush_inner(false).await?;
-        self.flush_write_state();
         Ok(())
     }
 }

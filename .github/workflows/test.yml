@@ -52,6 +52,7 @@ jobs:
           rust: true
           protoc: true
           libsasl2: true
+          cargo-cache: true
       - run: make check-clippy
 
   test:
@@ -75,7 +76,6 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
         with:
-          cargo-cache: false
           mold: false
           vdev: true
       - run: make check-scripts
@@ -89,7 +89,6 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
         with:
-          cargo-cache: false
           mold: false
           vdev: true
       - run: make check-events
@@ -103,7 +102,6 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
         with:
-          cargo-cache: false
           mold: false
           vdev: true
           dd-rust-license-tool: true
@@ -150,6 +148,7 @@ jobs:
           protoc: true
           cue: true
           libsasl2: true
+          cargo-cache: true
       - run: make check-generated-docs
 
   check-rust-docs:
@@ -162,6 +161,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
+          cargo-cache: true
       - run: cd rust-doc && make ci-docs-build
 
   test-vrl:
@@ -176,6 +176,7 @@ jobs:
           rust: true
           protoc: true
           wasm-pack: true
+          cargo-cache: true
       - run: make test-vrl
 
   build-vrl-playground:

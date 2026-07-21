@@ -1,8 +1,10 @@
 use std::{
+    collections::HashMap,
     fmt,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
+    sync::{LazyLock, Mutex},
 };
 
 use super::{
@@ -18,7 +20,7 @@ use openssl::{
     pkey::{PKey, Private},
     ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
     stack::Stack,
-    x509::{X509, store::X509StoreBuilder},
+    x509::{X509, store::X509StoreBuilder, verify::X509CheckFlags},
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -223,6 +225,16 @@ impl TlsSettings {
         })
     }
 
+    /// The configured SNI server name override, if any.
+    pub fn server_name(&self) -> Option<&str> {
+        self.server_name.as_deref()
+    }
+
+    /// Whether certificate hostname verification is enabled.
+    pub fn verify_hostname(&self) -> bool {
+        self.verify_hostname
+    }
+
     /// Returns the identity as PEM encoded byte arrays
     ///
     /// # Panics
@@ -324,9 +336,11 @@ impl TlsSettings {
 
         if let Some(alpn) = &self.alpn_protocols {
             if for_server {
-                let server_proto = alpn.clone();
-                // See https://github.com/sfackler/rust-openssl/pull/2360.
-                let server_proto_ref: &'static [u8] = Box::leak(server_proto.into_boxed_slice());
+                // The server ALPN select callback requires a `'static` protocol list (see
+                // https://github.com/sfackler/rust-openssl/pull/2360). Intern it so the intentional
+                // leak happens at most once per distinct list, rather than leaking a fresh copy
+                // every time the context is (re)built.
+                let server_proto_ref = intern_alpn_protocols(alpn);
                 context.set_alpn_select_callback(move |_, client_proto| {
                     select_next_proto(server_proto_ref, client_proto).ok_or(AlpnError::NOACK)
                 });
@@ -344,14 +358,62 @@ impl TlsSettings {
         &self,
         connection: &mut ConnectConfiguration,
     ) -> std::result::Result<(), openssl::error::ErrorStack> {
-        connection.set_verify_hostname(self.verify_hostname);
         if let Some(server_name) = &self.server_name {
-            // Prevent native TLS lib from inferring default SNI using domain name from url.
+            // Use the configured server name for both SNI and certificate hostname
+            // verification. `ConnectConfiguration::into_ssl` (called by the connector
+            // after this callback) would otherwise apply the URL host to SNI and the
+            // verify parameter, overriding the configured server name and causing a
+            // hostname mismatch. Disabling both here prevents that override.
             connection.set_use_server_name_indication(false);
-            connection.set_hostname(server_name)?;
+            connection.set_verify_hostname(false);
+
+            let server_ip = server_name.parse::<std::net::IpAddr>();
+
+            // SNI must be a hostname, not an IP literal.
+            if server_ip.is_err() {
+                connection.set_hostname(server_name)?;
+            }
+
+            if self.verify_hostname {
+                // Mirror `ConnectConfiguration::into_ssl`'s `setup_verify_hostname` so that
+                // verification against `server_name` behaves exactly as it would against the
+                // URL host, just with our name instead:
+                // https://github.com/rust-openssl/rust-openssl/blob/db9c9e2f5db2ad7b45fd894e8d297ee15bfd0c7c/openssl/src/ssl/connector.rs#L380-L389
+                let param = connection.param_mut();
+                // Disallow partial-wildcard matches such as `w*.example.com` matching
+                // `www.example.com`, so a wildcard label must be the entire leftmost label
+                // (`*.example.com`).
+                param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
+                match server_ip {
+                    Ok(ip) => param.set_ip(ip)?,
+                    Err(_) => param.set_host(server_name)?,
+                }
+            }
+        } else {
+            connection.set_verify_hostname(self.verify_hostname);
         }
         Ok(())
     }
+}
+
+/// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
+///
+/// `SslContextBuilder::set_alpn_select_callback` requires the protocol list to outlive the context
+/// with a `'static` lifetime, so the bytes must be leaked. Interning by content means rebuilding an
+/// acceptor with the same ALPN configuration (e.g. on every certificate reload) reuses the existing
+/// allocation instead of leaking a fresh copy each time, keeping the leak bounded and one-time.
+fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
+    static INTERNED: LazyLock<Mutex<HashMap<Vec<u8>, &'static [u8]>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    let mut interned = INTERNED.lock().expect("mutex poisoned");
+
+    if let Some(existing) = interned.get(protocols).copied() {
+        return existing;
+    }
+    let leaked: &'static [u8] = Box::leak(protocols.to_vec().into_boxed_slice());
+    interned.insert(protocols.to_vec(), leaked);
+    leaked
 }
 
 impl TlsConfig {
@@ -789,6 +851,97 @@ mod test {
         let _error = TlsSettings::from_options(Some(&options))
             .expect_err("from_options failed to check certificate");
         // Actual error is an ASN parse, doesn't really matter
+    }
+
+    // End-to-end regression test for the OpenSSL hostname-mismatch bug: the server presents a
+    // certificate for `localhost` (CN=localhost, no SAN) while the client connects by IP, so the
+    // connection URL host (`127.0.0.1`) does not match the certificate. Verification must instead
+    // use the configured `server_name`.
+    #[tokio::test]
+    async fn server_name_is_used_for_hostname_verification() {
+        use std::{net::SocketAddr, pin::Pin};
+
+        use openssl::ssl::{SslConnector, SslMethod};
+
+        // Connects to `addr` by IP, driving `into_ssl` with `url_host` exactly as
+        // `hyper-openssl` does (it passes the connection URL host).
+        async fn connect(
+            server_name: Option<&str>,
+            url_host: &str,
+            addr: SocketAddr,
+        ) -> std::result::Result<(), String> {
+            let settings = TlsSettings::from_options(Some(&TlsConfig {
+                ca_file: Some("tests/data/ca/intermediate_server/certs/ca-chain.cert.pem".into()),
+                server_name: server_name.map(Into::into),
+                ..Default::default()
+            }))
+            .unwrap();
+
+            let tcp = tokio::net::TcpStream::connect(addr)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+            settings
+                .apply_context(&mut builder)
+                .map_err(|e| e.to_string())?;
+            let mut config = builder.build().configure().unwrap();
+            settings
+                .apply_connect_configuration(&mut config)
+                .map_err(|e| e.to_string())?;
+            let ssl = config.into_ssl(url_host).map_err(|e| e.to_string())?;
+            let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
+            Pin::new(&mut stream)
+                .connect()
+                .await
+                .map_err(|e| e.to_string())
+        }
+
+        let server_settings = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .unwrap();
+        let reloader = server_settings
+            .reloadable_acceptor()
+            .unwrap()
+            .expect("tls enabled, so an acceptor should exist");
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = server_settings
+            .bind_reloadable(&addr, Some(reloader))
+            .await
+            .unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        // With `server_name` set to the certificate's name, verification uses it and succeeds even
+        // though the connection host is the IP. This passes only because `server_name` is applied
+        // to hostname verification (the bug this fixes).
+        connect(Some("localhost"), "127.0.0.1", local_addr)
+            .await
+            .expect("handshake should succeed when server_name matches the certificate");
+
+        // Control: without `server_name`, verification falls back to the connection host (the IP),
+        // which the certificate does not cover, so it fails. This proves verification is active.
+        let error = connect(None, "127.0.0.1", local_addr)
+            .await
+            .expect_err("handshake should fail when verifying against the IP");
+        assert!(
+            error.contains("certificate verify failed"),
+            "expected a certificate verification failure, got: {error}"
+        );
+
+        server.abort();
     }
 
     #[test]

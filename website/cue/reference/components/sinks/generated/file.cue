@@ -27,6 +27,20 @@ generated: components: sinks: file: configuration: {
 			type: bool: {}
 		}
 	}
+	base_dir: {
+		description: """
+			Directory under which all rendered `path` values must resolve.
+
+			When `path` contains event-field references (`{{ field }}`), Vector
+			confines every rendered path to this directory. If unset, the base
+			directory is derived from the literal prefix of `path` (the portion
+			before the first `{{` or `%`). Configuration fails if `path`
+			references event fields and no non-root base directory can be
+			derived.
+			"""
+		required: false
+		type: string: examples: ["/var/log/vector"]
+	}
 	compression: {
 		description: "Compression configuration."
 		required:    false
@@ -46,6 +60,22 @@ generated: components: sinks: file: configuration: {
 					"""
 			}
 		}
+	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	encoding: {
 		description: """
@@ -590,7 +620,7 @@ generated: components: sinks: file: configuration: {
 			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
 			syntax: "template"
 		}
-		warnings: ["The rendered path is resolved as-is and is not sanitized. Operators should ensure that the Vector process can only write to the desired locations."]
+		warnings: ["Rendered paths are confined to `base_dir` (derived from the literal prefix of `path` when unset). See the `base_dir` option."]
 	}
 	timezone: {
 		description: """

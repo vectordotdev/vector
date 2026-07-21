@@ -318,7 +318,8 @@ impl ZerobusService {
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
             .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint);
+            .unity_catalog_url(&config.unity_catalog_endpoint)
+            .application_name(config.user_agent_suffix());
         builder = builder.connector_factory(build_connector_factory(proxy)?);
         let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
             message: format!("Failed to create Zerobus SDK: {}", e),
@@ -441,7 +442,7 @@ impl ZerobusService {
             // own recovery budget is exhausted. Both layers are at-least-once, so
             // a reconnect may re-send unacknowledged batches.
             let stream_options = &self.config.stream_options;
-            let stream = self
+            let builder = self
                 .sdk
                 .stream_builder()
                 .table(self.config.table_name.clone())
@@ -449,6 +450,8 @@ impl ZerobusService {
                 .arrow(Arc::clone(&schema.arrow_schema))
                 .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
                 .flush_timeout_ms(stream_options.flush_timeout_ms)
+                .ipc_compression(stream_options.compression.into());
+            let stream = builder
                 .build_arrow()
                 .await
                 .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
@@ -712,6 +715,7 @@ mod tests {
                 client_id: SensitiveString::from("id".to_string()),
                 client_secret: SensitiveString::from("secret".to_string()),
             },
+            user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -1039,12 +1043,12 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e1 = LogEvent::default();
-        e1.insert("id", 1i64);
-        e1.insert("body", "hello");
-        e1.insert("ts", Utc::now());
+        e1.insert(vrl::event_path!("id"), 1i64);
+        e1.insert(vrl::event_path!("body"), "hello");
+        e1.insert(vrl::event_path!("ts"), Utc::now());
 
         let mut e2 = LogEvent::default();
-        e2.insert("id", 2i64);
+        e2.insert(vrl::event_path!("id"), 2i64);
         // `body` and `ts` omitted — both nullable, so they encode as null.
 
         let batch =
@@ -1082,7 +1086,7 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e = LogEvent::default();
-        e.insert("body", "no id here"); // `id` omitted
+        e.insert(vrl::event_path!("body"), "no id here"); // `id` omitted
 
         let err = ZerobusService::encode_batch(&resolved, &[Event::Log(e)]).unwrap_err();
         assert!(matches!(err, ZerobusSinkError::EncodingError { .. }));

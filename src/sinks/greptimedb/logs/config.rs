@@ -22,6 +22,7 @@ use crate::{
         prelude::*,
         util::http::HttpService,
     },
+    template::ConfinementConfig,
 };
 
 fn extra_params_examples() -> HashMap<String, String> {
@@ -124,6 +125,10 @@ pub struct GreptimeDBLogsConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl_generate_config_from_default!(GreptimeDBLogsConfig);
@@ -132,10 +137,27 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let mut config = self.clone();
+        config.table = config
+            .table
+            .confine(&self.confinement, Self::NAME, "table")?;
+        config.dbname = config
+            .dbname
+            .confine(&self.confinement, Self::NAME, "dbname")?;
+        config.pipeline_name =
+            config
+                .pipeline_name
+                .confine(&self.confinement, Self::NAME, "pipeline_name")?;
+        config.pipeline_version = config
+            .pipeline_version
+            .map(|t| t.confine(&self.confinement, Self::NAME, "pipeline_version"))
+            .transpose()?;
+        let this = &config;
+
+        let tls_settings = TlsSettings::from_options(this.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        let auth = match (self.username.clone(), self.password.clone()) {
+        let auth = match (this.username.clone(), this.password.clone()) {
             (Some(username), Some(password)) => Some(Auth::Basic {
                 user: username,
                 password,
@@ -143,38 +165,38 @@ impl SinkConfig for GreptimeDBLogsConfig {
             _ => None,
         };
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
-            endpoint: self.endpoint.clone(),
+            endpoint: this.endpoint.clone(),
             auth: auth.clone(),
             encoder: (
-                self.encoding.clone(),
+                this.encoding.clone(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoderConfig.build().into(),
                     JsonSerializerConfig::default().build().into(),
                 ),
             ),
-            compression: self.compression,
-            extra_params: self.extra_params.clone(),
-            extra_headers: self.extra_headers.clone(),
+            compression: this.compression,
+            extra_params: this.extra_params.clone(),
+            extra_headers: this.extra_headers.clone(),
         };
 
         let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =
             HttpService::new(client.clone(), request_builder.clone());
 
-        let request_limits = self.request.into_settings();
+        let request_limits = this.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, GreptimeDBHttpRetryLogic::default())
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {
-            dbname: self.dbname.clone(),
-            table: self.table.clone(),
-            pipeline_name: self.pipeline_name.clone(),
-            pipeline_version: self.pipeline_version.clone(),
+            dbname: this.dbname.clone(),
+            table: this.table.clone(),
+            pipeline_name: this.pipeline_name.clone(),
+            pipeline_version: this.pipeline_version.clone(),
         };
 
         let sink = GreptimeDBLogsHttpSink::new(
-            self.batch.into_batcher_settings()?,
+            this.batch.into_batcher_settings()?,
             service,
             request_builder,
             logs_sink_setting,
@@ -182,9 +204,10 @@ impl SinkConfig for GreptimeDBLogsConfig {
 
         let healthcheck = Box::pin(http_healthcheck(
             client,
-            self.endpoint.clone(),
+            this.endpoint.clone(),
             auth.clone(),
         ));
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
@@ -194,5 +217,36 @@ impl SinkConfig for GreptimeDBLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn confinement_rejects_unconfined_table() {
+        let template = Template::try_from("{{ table }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "greptimedb_logs", "table");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_table() {
+        let template = Template::try_from("{{ table }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "greptimedb_logs", "table");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_table() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "greptimedb_logs", "table");
+        assert!(result.is_ok());
     }
 }

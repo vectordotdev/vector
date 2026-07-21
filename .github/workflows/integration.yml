@@ -96,8 +96,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
-        # If you modify this list, please also update the `int_tests` job in changes.yml.
         service:
           [
             "amqp",
@@ -124,8 +122,8 @@ jobs:
             "kafka",
             "logstash",
             "loki",
-            "mqtt",
             "mongodb",
+            "mqtt",
             "nats",
             "nginx",
             "opentelemetry",
@@ -133,6 +131,7 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
+            "splunk",
             "webhdfs"
           ]
     timeout-minutes: 90
@@ -175,7 +174,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
           datadog-ci: true
 
       - name: Pull test runner image
@@ -196,7 +194,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-int-${{ matrix.service }}
           path: target/coverage/lcov.info
@@ -257,7 +255,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
           datadog-ci: true
 
       - name: Pull test runner image
@@ -278,7 +275,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-e2e-${{ matrix.service }}
           path: target/coverage/lcov.info

@@ -26,6 +26,8 @@ pub mod config;
 
 pub mod constants;
 
+pub mod decompression;
+
 #[cfg(feature = "conversion")]
 pub use vrl::compiler::TimeZone;
 
@@ -60,6 +62,7 @@ pub mod shutdown;
 pub mod sensitive_string;
 
 pub mod atomic;
+pub mod compression;
 pub mod stats;
 pub mod trigger;
 

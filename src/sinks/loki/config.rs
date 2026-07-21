@@ -7,6 +7,7 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{prelude::*, util::UriSerde},
+    template::ConfinementConfig,
 };
 
 const fn default_compression() -> Compression {
@@ -119,6 +120,10 @@ pub struct LokiConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 fn loki_labels_examples() -> HashMap<String, String> {
@@ -236,6 +241,7 @@ impl SinkConfig for LokiConfig {
 
         let healthcheck = healthcheck(config, client).boxed();
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
@@ -282,6 +288,7 @@ mod tests {
     use std::convert::TryInto;
 
     use super::valid_label_name;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn valid_label_names() {
@@ -298,5 +305,44 @@ mod tests {
         assert!(!valid_label_name(&" ".try_into().unwrap()));
 
         assert!(valid_label_name(&"{{field}}".try_into().unwrap()));
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "loki", "tenant_id");
+        assert!(
+            result.is_err(),
+            "bare tenant_id template with no literal prefix must be rejected"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "loki", "tenant_id");
+        assert!(result.is_ok(), "opt-out must allow bare tenant_id template");
+    }
+
+    #[test]
+    fn confinement_prefixed_tenant_id_locks_org_prefix() {
+        use crate::event::{Event, LogEvent};
+        use vrl::event_path;
+        // "team-{{ org }}" has literal prefix "team-"; an attacker controlling `org`
+        // cannot steer the rendered value to an org outside the "team-" namespace.
+        let template = Template::try_from("team-{{ org }}").unwrap();
+        let config = ConfinementConfig::default();
+        let confined = template.confine(&config, "loki", "tenant_id").unwrap();
+        let mut event = LogEvent::default();
+        event.insert(event_path!("org"), "other-tenant-entirely");
+        let rendered = confined.render_string(&Event::Log(event)).unwrap();
+        assert!(
+            rendered.starts_with("team-"),
+            "operator-controlled prefix must be preserved in rendered tenant_id"
+        );
     }
 }
