@@ -576,7 +576,7 @@ async fn cloudwatch_healthcheck() {
         confinement: Default::default(),
     };
 
-    let client = config.create_client(&ProxyConfig::default()).await.unwrap();
+    let (client, _resolved_region) = config.create_client(&ProxyConfig::default()).await.unwrap();
     healthcheck(config, client).await.unwrap();
 }
 

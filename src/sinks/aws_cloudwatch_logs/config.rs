@@ -7,6 +7,8 @@ use tower::ServiceBuilder;
 use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component, schema};
 use vrl::value::Kind;
 
+use aws_config::Region;
+
 use crate::{
     aws::{
         AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client_without_transport_metrics,
@@ -191,7 +193,10 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSinkConfig {
-    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
+    pub async fn create_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<(CloudwatchLogsClient, Region)> {
         create_client_without_transport_metrics::<CloudwatchLogsClientBuilder>(
             &CloudwatchLogsClientBuilder {},
             &self.auth,
@@ -220,7 +225,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let batcher_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.tower.into_settings();
-        let client = self.create_client(cx.proxy()).await?;
+        let (client, resolved_region) = self.create_client(cx.proxy()).await?;
         let svc = ServiceBuilder::new()
             .settings(request_settings, CloudwatchRetryLogic::new())
             .service(CloudwatchLogsPartitionSvc::new(
@@ -239,10 +244,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 transformer,
                 encoder,
             },
-            region: self
-                .region
-                .region()
-                .map_or_else(String::new, |r| r.to_string()),
+            region: resolved_region.to_string(),
             service: svc,
         };
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))

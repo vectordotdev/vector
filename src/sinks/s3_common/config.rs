@@ -436,13 +436,9 @@ pub async fn create_service(
     force_path_style: impl Into<bool>,
 ) -> crate::Result<(S3Service, String)> {
     let endpoint = region.endpoint();
-    let region_string = region
-        .region()
-        .as_ref()
-        .map_or_else(String::new, |r| r.to_string());
     let region = region.region();
     let force_path_style_value: bool = force_path_style.into();
-    let client = create_client_without_transport_metrics::<S3ClientBuilder>(
+    let (client, resolved_region) = create_client_without_transport_metrics::<S3ClientBuilder>(
         &S3ClientBuilder {
             force_path_style: Some(force_path_style_value),
         },
@@ -454,7 +450,7 @@ pub async fn create_service(
         None,
     )
     .await?;
-    Ok((S3Service::new(client), region_string))
+    Ok((S3Service::new(client), resolved_region.to_string()))
 }
 
 #[cfg(test)]

@@ -209,7 +209,7 @@ pub async fn create_client_without_transport_metrics<T>(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     timeout: Option<&AwsTimeout>,
-) -> crate::Result<T::Client>
+) -> crate::Result<(T::Client, Region)>
 where
     T: ClientBuilder,
 {
@@ -224,7 +224,6 @@ where
         false,
     )
     .await
-    .map(|(client, _)| client)
 }
 
 /// Create the SDK client and resolve the region using the provided settings.

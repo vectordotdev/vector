@@ -11,6 +11,8 @@ use super::{
     record::{KinesisStreamClient, KinesisStreamRecord},
     sink::BatchKinesisRequest,
 };
+use aws_config::Region;
+
 use crate::{
     aws::{ClientBuilder, create_client_without_transport_metrics, is_retriable_error},
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -100,7 +102,10 @@ impl KinesisStreamsSinkConfig {
         }
     }
 
-    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
+    pub async fn create_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<(KinesisClient, Region)> {
         create_client_without_transport_metrics::<KinesisClientBuilder>(
             &KinesisClientBuilder {},
             &self.base.auth,
@@ -118,7 +123,7 @@ impl KinesisStreamsSinkConfig {
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisStreamsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
+        let (client, resolved_region) = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let batch_settings = self
@@ -128,11 +133,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
 
-        let region = self
-            .base
-            .region
-            .region()
-            .map_or_else(String::new, |r| r.to_string());
+        let region = resolved_region.to_string();
         let sink = build_sink::<
             KinesisStreamClient,
             KinesisRecord,

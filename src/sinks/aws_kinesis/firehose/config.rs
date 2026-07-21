@@ -11,6 +11,8 @@ use super::{
     record::{KinesisFirehoseClient, KinesisFirehoseRecord},
     sink::BatchKinesisRequest,
 };
+use aws_config::Region;
+
 use crate::{
     aws::{ClientBuilder, create_client_without_transport_metrics, is_retriable_error},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -101,7 +103,10 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
+    pub async fn create_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<(KinesisClient, Region)> {
         create_client_without_transport_metrics::<KinesisFirehoseClientBuilder>(
             &KinesisFirehoseClientBuilder {},
             &self.base.auth,
@@ -119,7 +124,7 @@ impl KinesisFirehoseSinkConfig {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
+        let (client, resolved_region) = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let batch_settings = self
@@ -129,11 +134,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
 
-        let region = self
-            .base
-            .region
-            .region()
-            .map_or_else(String::new, |r| r.to_string());
+        let region = resolved_region.to_string();
         let sink = build_sink::<
             KinesisFirehoseClient,
             KinesisRecord,
