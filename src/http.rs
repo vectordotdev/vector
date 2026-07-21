@@ -16,7 +16,7 @@ use http::{
 use hyper::{
     body::{Body, HttpBody},
     client,
-    client::{Client, HttpConnector},
+    client::{Client, HttpConnector, connect::Connect},
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
@@ -73,15 +73,22 @@ impl HttpError {
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
-type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
+pub type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
-pub struct HttpClient<B = Body> {
-    client: Client<HttpProxyConnector, B>,
+/// An HTTP client generic over the underlying connector `C`.
+///
+/// `C` defaults to [`HttpProxyConnector`], the proxy-aware TLS connector built from Vector's
+/// [`MaybeTlsSettings`]/[`ProxyConfig`]. Callers that need a custom connector can supply
+/// their own via [`HttpClient::new_with_connector`].
+pub struct HttpClient<B = Body, C = HttpProxyConnector> {
+    client: Client<C, B>,
     user_agent: HeaderValue,
-    proxy_connector: HttpProxyConnector,
+    // Proxy-header injection only applies when the client owns a `ProxyConnector`. A custom
+    // connector supplied via `new_with_connector` sets this to `None`.
+    proxy_connector: Option<HttpProxyConnector>,
 }
 
-impl<B> HttpClient<B>
+impl<B> HttpClient<B, HttpProxyConnector>
 where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
@@ -90,7 +97,7 @@ where
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
-    ) -> Result<HttpClient<B>, HttpError> {
+    ) -> Result<Self, HttpError> {
         HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
     }
 
@@ -98,20 +105,39 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
-    ) -> Result<HttpClient<B>, HttpError> {
+    ) -> Result<Self, HttpError> {
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
         let client = client_builder.build(proxy_connector.clone());
 
-        let app_name = crate::get_app_name();
-        let version = crate::get_version();
-        let user_agent = HeaderValue::from_str(&format!("{app_name}/{version}"))
-            .expect("Invalid header value for user-agent!");
-
         Ok(HttpClient {
             client,
-            user_agent,
-            proxy_connector,
+            user_agent: default_user_agent(),
+            proxy_connector: Some(proxy_connector),
         })
+    }
+}
+
+impl<B, C> HttpClient<B, C>
+where
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error>,
+    C: Connect + Clone + Send + Sync + 'static,
+{
+    /// Build an `HttpClient` from a pre-constructed connector.
+    ///
+    /// Proxy-header injection is disabled for custom connectors (`proxy_connector` is always `None`).
+    /// It only matters for the case of a plaintext-`http` request sent through an HTTP proxy, where
+    /// `Proxy-Authorization` must ride on the request itself. HTTPS-through-proxy is unaffected:
+    /// proxy auth happens during the CONNECT handshake inside the connector.
+    pub fn new_with_connector(connector: C, client_builder: &mut client::Builder) -> Self {
+        let client = client_builder.build(connector);
+
+        HttpClient {
+            client,
+            user_agent: default_user_agent(),
+            proxy_connector: None,
+        }
     }
 
     pub fn send(
@@ -161,7 +187,10 @@ where
     }
 
     fn maybe_add_proxy_headers(&self, request: &mut Request<B>) {
-        if let Some(proxy_headers) = self.proxy_connector.http_headers(request.uri()) {
+        let Some(proxy_connector) = &self.proxy_connector else {
+            return;
+        };
+        if let Some(proxy_headers) = proxy_connector.http_headers(request.uri()) {
             for (k, v) in proxy_headers {
                 let request_headers = request.headers_mut();
                 if !request_headers.contains_key(k) {
@@ -172,10 +201,33 @@ where
     }
 }
 
+fn default_user_agent() -> HeaderValue {
+    let app_name = crate::get_app_name();
+    let version = crate::get_version();
+    HeaderValue::from_str(&format!("{app_name}/{version}"))
+        .expect("Invalid header value for user-agent!")
+}
+
 pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    // `server_name` is not applied to proxied (tunneled) TLS connections, because
+    // `hyper-proxy` offers no per-connection callback and verifies against the URL
+    // host. Warn when the combination that would silently misbehave is configured.
+    if proxy_config.enabled
+        && (proxy_config.http.is_some() || proxy_config.https.is_some())
+        && let Some(tls) = tls_settings.tls()
+        && tls.server_name().is_some()
+        && tls.verify_hostname()
+    {
+        warn!(
+            message = "`tls.server_name` is set with hostname verification enabled, but a proxy is configured. \
+                       `server_name` is not applied to proxied (tunneled) TLS connections, so certificate \
+                       verification may fail with a hostname mismatch."
+        );
+    }
+
     // Create dedicated TLS connector for the proxied connection with user TLS settings.
     let tls = tls_connector_builder(&tls_settings)
         .context(BuildTlsConnectorSnafu)?
@@ -227,11 +279,12 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
     }
 }
 
-impl<B> Service<Request<B>> for HttpClient<B>
+impl<B, C> Service<Request<B>> for HttpClient<B, C>
 where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
+    C: Connect + Clone + Send + Sync + 'static,
 {
     type Response = http::Response<Body>;
     type Error = HttpError;
@@ -246,7 +299,7 @@ where
     }
 }
 
-impl<B> Clone for HttpClient<B> {
+impl<B, C: Clone> Clone for HttpClient<B, C> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
@@ -256,7 +309,7 @@ impl<B> Clone for HttpClient<B> {
     }
 }
 
-impl<B> fmt::Debug for HttpClient<B> {
+impl<B, C> fmt::Debug for HttpClient<B, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HttpClient")
             .field("client", &self.client)
@@ -561,22 +614,23 @@ where
         Box::pin(async move {
             let mut response = future.await?;
             match version {
-                Version::HTTP_09 | Version::HTTP_10 | Version::HTTP_11 => {
-                    if start_reference.elapsed() >= max_connection_age {
-                        debug!(
-                            message = "Closing connection due to max connection age.",
-                            ?max_connection_age,
-                            connection_age = ?start_reference.elapsed(),
-                            ?peer_addr,
-                        );
-                        // Tell the client to close this connection.
-                        // Hyper will automatically close the connection after the response is sent.
-                        response.headers_mut().insert(
-                            hyper::header::CONNECTION,
-                            hyper::header::HeaderValue::from_static("close"),
-                        );
-                    }
+                Version::HTTP_09 | Version::HTTP_10 | Version::HTTP_11
+                    if start_reference.elapsed() >= max_connection_age =>
+                {
+                    debug!(
+                        message = "Closing connection due to max connection age.",
+                        ?max_connection_age,
+                        connection_age = ?start_reference.elapsed(),
+                        ?peer_addr,
+                    );
+                    // Tell the client to close this connection.
+                    // Hyper will automatically close the connection after the response is sent.
+                    response.headers_mut().insert(
+                        hyper::header::CONNECTION,
+                        hyper::header::HeaderValue::from_static("close"),
+                    );
                 }
+                Version::HTTP_09 | Version::HTTP_10 | Version::HTTP_11 => (),
                 // TODO need to send GOAWAY frame
                 Version::HTTP_2 => (),
                 // TODO need to send GOAWAY frame

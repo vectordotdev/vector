@@ -19,7 +19,7 @@ use vector_config::configurable_component;
 use vrl::compiler::value::VrlValueConvert;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, MergeFinalizable,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use crate::config::telemetry;
@@ -334,8 +334,8 @@ impl Metric {
     /// Returns `true` if `name` tag is present, and matches the provided `value`
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
         self.tags()
-            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
-            .is_some()
+            .as_ref()
+            .is_some_and(|t| t.get(name).as_ref().is_some_and(|v| *v == value))
     }
 
     /// Returns the string value of a tag, if it exists
@@ -475,6 +475,12 @@ impl EstimatedJsonEncodedSizeOf for Metric {
 impl Finalizable for Metric {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl MergeFinalizable for Metric {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
     }
 }
 

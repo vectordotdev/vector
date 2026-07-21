@@ -49,6 +49,23 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 		required:    true
 		type: string: examples: ["0.0.0.0:443", "localhost:443"]
 	}
+	common_attributes: {
+		description: """
+			A list of attributes from X-Amz-Firehose-Common-Attributes header to include in the log event.
+
+			Accepts the wildcard (`*`) character for attributes matching a specified pattern.
+
+			Specifying "*" results in all common attributes included in the log event.
+
+			Legacy namespace: selected attributes are added under the root `common_attributes` object
+			Vector namespace: selected attributes are added under the source metadata at `aws_kinesis_firehose.common_attributes`
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: examples: ["environment", "application_group", "application_*", "*"]
+		}
+	}
 	decoding: {
 		description: """
 			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
@@ -88,7 +105,7 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 					default: "bytes"
 					enum: {
 						avro: """
-															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+															Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 															[apache_avro]: https://avro.apache.org/
 															"""

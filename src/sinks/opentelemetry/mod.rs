@@ -57,6 +57,7 @@ impl Default for Protocol {
             tls: Default::default(),
             acknowledgements: Default::default(),
             retry_strategy: Default::default(),
+            confinement: Default::default(),
         })
     }
 }
@@ -80,7 +81,11 @@ impl SinkConfig for OpenTelemetryConfig {
         match &self.protocol {
             Protocol::Http(config) => {
                 warn_on_invalid_otlp_batching(config);
-                config.build(cx).await
+                let result = config
+                    .build_without_confinement_gauge(cx, Self::NAME)
+                    .await?;
+                config.confinement.set_confinement_gauge("sink", Self::NAME);
+                Ok(result)
             }
         }
     }

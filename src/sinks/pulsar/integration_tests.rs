@@ -93,7 +93,7 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
 async fn pulsar_happy() {
     let cnf = PulsarSinkConfig {
         endpoint: pulsar_address("pulsar", 6650),
-        // overriden by test
+        // overridden by test
         ..Default::default()
     };
 
@@ -109,7 +109,7 @@ async fn pulsar_happy_tls() {
             verify_certificate: None,
             verify_hostname: None,
         }),
-        // overriden by test
+        // overridden by test
         ..Default::default()
     };
 

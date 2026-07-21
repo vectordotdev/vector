@@ -1009,23 +1009,9 @@ fn to_socket_family_name(socket_family: i32) -> Result<&'static str> {
 }
 
 fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
-    if socket_protocol == SocketProtocol::Udp as i32 {
-        Ok("UDP")
-    } else if socket_protocol == SocketProtocol::Tcp as i32 {
-        Ok("TCP")
-    } else if socket_protocol == SocketProtocol::Dot as i32 {
-        Ok("DOT")
-    } else if socket_protocol == SocketProtocol::Doh as i32 {
-        Ok("DOH")
-    } else if socket_protocol == SocketProtocol::DnsCryptUdp as i32 {
-        Ok("DNSCryptUDP")
-    } else if socket_protocol == SocketProtocol::DnsCryptTcp as i32 {
-        Ok("DNSCryptTCP")
-    } else {
-        Err(Error::from(format!(
-            "Unknown socket protocol: {socket_protocol}"
-        )))
-    }
+    SocketProtocol::try_from(socket_protocol)
+        .map_err(|_| Error::from(format!("Unknown socket protocol: {socket_protocol}")))
+        .map(|sp| sp.as_str_name())
 }
 
 fn to_dnstap_data_type(data_type_id: i32) -> Option<String> {
@@ -1162,7 +1148,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1217,11 +1205,15 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in no_lowercase_expected {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
         for (exp_key, exp_value) in expected_map {
-            let value = lowercase_log_event.get(exp_key).unwrap();
+            let value = lowercase_log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1256,7 +1248,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1351,7 +1345,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1449,6 +1445,7 @@ mod tests {
         assert_eq!("DOH", to_socket_protocol_name(4).unwrap());
         assert_eq!("DNSCryptUDP", to_socket_protocol_name(5).unwrap());
         assert_eq!("DNSCryptTCP", to_socket_protocol_name(6).unwrap());
-        assert!(to_socket_protocol_name(7).is_err());
+        assert_eq!("DOQ", to_socket_protocol_name(7).unwrap());
+        assert!(to_socket_protocol_name(8).is_err());
     }
 }

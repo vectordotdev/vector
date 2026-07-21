@@ -301,6 +301,20 @@ components: sources: logstash: {
 				acknowledgements.
 				"""
 		}
+
+		compressed_frames: {
+			title: "Compressed frame limits"
+			body: """
+				The Lumberjack/Beats protocol's compressed (`C`) frame type allows a sender to wrap other frames,
+				including data, JSON, and window-size frames, in a single compressed envelope. This source only
+				accepts a single layer of compression per frame: a compressed frame whose decompressed payload
+				itself contains another compressed frame is rejected as a decode error and the connection is
+				closed. No known Lumberjack/Beats client, such as Filebeat, ever emits more than one layer of
+				compression, so this does not affect interoperability with legitimate senders. The restriction
+				exists to prevent a malicious sender from nesting compressed frames arbitrarily deep to exhaust
+				the stack of the thread decoding the connection.
+				"""
+		}
 	}
 
 	telemetry: metrics: {

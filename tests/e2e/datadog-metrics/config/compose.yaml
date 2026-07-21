@@ -37,12 +37,15 @@ services:
     environment:
       - FEATURES=e2e-tests-datadog
       - CONFIG_SERIES_API_VERSION
+      # The vector.yaml config uses ${CONFIG_SERIES_API_VERSION} interpolation,
+      # which is disabled by default since #25699. Opt back in for the test.
+      - VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true
     working_dir: /home/vector
     command:
       - "/usr/bin/vector"
       - "-vvv"
       - "-c"
-      - "/home/vector/tests/e2e/datadog-metrics/data/vector.toml"
+      - "/home/vector/tests/e2e/datadog-metrics/data/vector.yaml"
     volumes:
       - ../../../..:/home/vector
 

@@ -627,7 +627,7 @@ mod test {
         }
     }
 
-    // Intentially not using assert_source_compliance here because this is a round-trip test which
+    // Intentionally not using assert_source_compliance here because this is a round-trip test which
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn test_prometheus_routing() {
