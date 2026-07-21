@@ -48,11 +48,11 @@ use crate::{
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
-/// Fallback deadline for reading a PROXY protocol header when no explicit
-/// `max_connection_duration_secs` is configured. A valid header is sent
-/// immediately after connect, so a peer that has not produced one within this
-/// window is treated as a stalled/misbehaving connection and dropped.
-const PROXY_HEADER_READ_TIMEOUT_SECS: u64 = 10;
+/// Deadline for reading a PROXY protocol header. The header is the first bytes
+/// a proxy writes after connect, so it is round-trip-time bound and unrelated
+/// to how long the connection may subsequently live. A peer that has not sent
+/// a complete header within this window is treated as stalled and dropped.
+const PROXY_HEADER_READ_TIMEOUT_SECS: u64 = 2;
 
 pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
@@ -315,9 +315,8 @@ async fn handle_stream<T>(
         // permit) indefinitely. Honor shutdown, the connection tripwire, and
         // the configured max connection duration (falling back to a short
         // default, since a valid header arrives immediately after connect).
-        let header_deadline = tokio::time::sleep(Duration::from_secs(
-            max_connection_duration_secs.unwrap_or(PROXY_HEADER_READ_TIMEOUT_SECS),
-        ));
+        let header_deadline =
+            tokio::time::sleep(Duration::from_secs(PROXY_HEADER_READ_TIMEOUT_SECS));
         tokio::select! {
             result = super::proxy_protocol::read_v2_header(&mut socket) => match result {
                 Ok(header) => {
