@@ -801,23 +801,21 @@ fn metric_value_to_data(
 pub fn metric_event_to_export_request(
     metric: &MetricEvent,
 ) -> Result<ExportMetricsServiceRequest, vector_common::Error> {
-    use std::ops::Add;
     let (start_time_ns, timestamp_ns): (u64, u64) = match metric.timestamp() {
         Some(timestamp) => {
-            if let Some(timestamp_nanos) = timestamp.timestamp_nanos_opt() {
-                let timestamp_ns = u64::try_from(timestamp_nanos).map_err(|_| -> vector_common::Error {
-                    format!("metric timestamp {timestamp_nanos} is before the Unix epoch and cannot be encoded as an OTLP nanosecond timestamp").into()
-                })?;
+            let timestamp_nanos = timestamp.timestamp_nanos_opt().ok_or_else(|| -> vector_common::Error {
+	            format!("metric timestamp {timestamp} is outside the range representable as an OTLP nanosecond timestamp").into()
+	        })?;
+            let timestamp_ns = u64::try_from(timestamp_nanos).map_err(|_| -> vector_common::Error {
+	            format!("metric timestamp {timestamp_nanos} is before the Unix epoch and cannot be encoded as an OTLP nanosecond timestamp").into()
+	        })?;
 
-                match (metric.kind(), metric.interval_ms()) {
-                    (MetricKind::Incremental, Some(interval)) => (
-                        timestamp_ns,
-                        timestamp_ns.add(u64::from(interval.get()) * 1_000_000),
-                    ),
-                    _ => (0, timestamp_ns),
-                }
-            } else {
-                (0, 0)
+            match (metric.kind(), metric.interval_ms()) {
+                (MetricKind::Incremental, Some(interval)) => (
+                    timestamp_ns,
+                    timestamp_ns.saturating_add(u64::from(interval.get()) * 1_000_000),
+                ),
+                _ => (0, timestamp_ns),
             }
         }
         None => (0, 0),
