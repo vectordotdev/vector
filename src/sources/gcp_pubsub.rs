@@ -138,8 +138,8 @@ pub struct PubsubKeepaliveConfig {
     /// How often, in seconds, to send a keepalive PING on the connection.
     ///
     /// Shorter intervals detect dead connections faster at the cost of additional traffic.
-    /// gRPC guidance recommends no less than 60 seconds to avoid tripping `too_many_pings`
-    /// policies on servers or proxies between the source and Pub/Sub.
+    /// Pub/Sub enforces gRPC's default minimum of one ping every 5 minutes, so lowering this
+    /// below `300` risks the server closing the stream with `too_many_pings`.
     #[serde(default = "default_keepalive_interval_secs")]
     #[configurable(metadata(docs::human_name = "Keepalive Interval"))]
     pub interval_secs: NonZeroU64,
@@ -152,9 +152,10 @@ pub struct PubsubKeepaliveConfig {
 }
 
 const fn default_keepalive_interval_secs() -> NonZeroU64 {
-    // Aligned with gRPC keepalive guidance, which recommends no less than one minute to avoid
-    // tripping `too_many_pings` policies on proxies between the source and Pub/Sub.
-    NonZeroU64::new(60).expect("keepalive interval default must be nonzero")
+    // Pub/Sub follows gRPC's default server enforcement, which closes streams pinged more often
+    // than once every 5 minutes with `too_many_pings`. Google's own Pub/Sub clients keepalive at
+    // this same interval.
+    NonZeroU64::new(300).expect("keepalive interval default must be nonzero")
 }
 
 const fn default_keepalive_timeout_secs() -> NonZeroU64 {
@@ -452,7 +453,7 @@ impl SourceConfig for PubsubConfig {
             keepalive: self.keepalive_secs,
             idle_timeout,
             max_retry_errors: self.max_retry_errors.max(1),
-            consecutive_failures: 0,
+            consecutive_failures: Default::default(),
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
@@ -520,8 +521,9 @@ struct PubsubSource {
     keepalive: Duration,
     idle_timeout: Duration,
     max_retry_errors: usize,
-    // Consecutive stream failures since the last successful fetch.
-    consecutive_failures: usize,
+    // Consecutive stream failures since the last successful fetch, shared across
+    // all concurrent streams so a success on any stream resets the count.
+    consecutive_failures: Arc<AtomicUsize>,
     // The current concurrency is shared across all tasks. It is used
     // by the streams to avoid shutting down the last stream, which
     // would result in repeatedly re-opening the stream on idle.
@@ -671,7 +673,7 @@ impl PubsubSource {
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
-                        self.consecutive_failures = 0;
+                        self.consecutive_failures.store(0, Ordering::Relaxed);
                         idle_deadline
                             .as_mut()
                             .reset(tokio::time::Instant::now() + self.idle_timeout);
@@ -691,11 +693,14 @@ impl PubsubSource {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                // Restart on idle only once acks drain: dropping the stream also
-                // drops the request stream, losing finalized-but-unsent ack IDs
-                // and risking redelivery. The elapsed timer refires once acks
-                // reach zero.
-                _ = &mut idle_deadline, if pending_acks == 0 => {
+                // Restart on idle only once acks are finalized and flushed from
+                // the request channel: dropping the stream drops that channel,
+                // and any queued ack IDs would be lost, risking redelivery.
+                // Delivery is at-least-once, so a small residual window remains
+                // (IDs buffered inside the request stream), but this avoids the
+                // common case. The elapsed timer refires as the conditions clear.
+                _ = &mut idle_deadline, if pending_acks == 0
+                    && ack_ids_sender.capacity() == ack_ids_sender.max_capacity() => {
                     debug!(
                         message = "No activity on the stream within the idle timeout, restarting stream.",
                         timeout_secs = self.idle_timeout.as_secs_f64(),
@@ -811,7 +816,7 @@ impl PubsubSource {
     // error (a reset, or `Unavailable` when an idle subscription has no
     // messages). Only escalate to a component error once failures persist,
     // to avoid flooding the logs on quiet subscriptions.
-    fn handle_stream_error(&mut self, error: tonic::Status) -> State {
+    fn handle_stream_error(&self, error: tonic::Status) -> State {
         // A server-side reset is not really an error, so retry immediately
         // without counting it.
         if is_reset(&error) {
@@ -819,14 +824,14 @@ impl PubsubSource {
             return State::RetryNow;
         }
 
-        self.consecutive_failures += 1;
-        if self.consecutive_failures >= self.max_retry_errors {
+        let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
+        if consecutive_failures >= self.max_retry_errors {
             emit!(GcpPubsubReceiveError { error });
         } else {
             debug!(
                 message = "Transient error fetching events, retrying.",
                 %error,
-                consecutive_failures = self.consecutive_failures,
+                consecutive_failures,
                 max_retry_errors = self.max_retry_errors,
             );
         }

@@ -606,11 +606,8 @@ generated: components: sources: gcp_pubsub: configuration: {
 			GCP Pub/Sub can leave a streaming pull in a state where the
 			connection looks healthy but no further responses are delivered and
 			the stream never errors. This bounds that inactivity. When set, it
-			must be larger than `keepalive_secs`.
-
-			When unset, it defaults to `900`, or `keepalive_secs` plus a small
-			margin when `keepalive_secs` is configured at or above that value, so
-			that the idle timeout is always larger than the keepalive interval.
+			must be larger than `keepalive_secs`; when unset, it defaults to `900`
+			or just above `keepalive_secs`, whichever is larger.
 			"""
 		required: false
 		type: float: {}
@@ -630,11 +627,11 @@ generated: components: sources: gcp_pubsub: configuration: {
 					How often, in seconds, to send a keepalive PING on the connection.
 
 					Shorter intervals detect dead connections faster at the cost of additional traffic.
-					gRPC guidance recommends no less than 60 seconds to avoid tripping `too_many_pings`
-					policies on servers or proxies between the source and Pub/Sub.
+					Pub/Sub enforces gRPC's default minimum of one ping every 5 minutes, so lowering this
+					below `300` risks the server closing the stream with `too_many_pings`.
 					"""
 				required: false
-				type: uint: default: 60
+				type: uint: default: 300
 			}
 			timeout_secs: {
 				description: """
