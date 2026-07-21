@@ -47,14 +47,26 @@ where
         match self {
             Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
             Self::DiskV2(writer) => {
+                let pre_count = item.event_count() as u64;
+                let pre_size = item.size_of() as u64;
                 let mut writer = writer.lock().await;
 
+                let Some(item) = item.filter_unencodable() else {
+                    // The whole item was filtered out (e.g. every sub-item over the
+                    // protobuf nesting budget). Report the drop directly via the
+                    // ledger's usage handle so it shows up in the disk-v2 stage's
+                    // `received` / `dropped` metrics — `BufferSender` does not carry
+                    // its own handle for backends that `provides_instrumentation()`.
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(());
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
+
                 writer.write_record(item).await.map(|_| ()).map_err(|e| {
-                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
-                    // encoding should theoretically be recoverable -- encoded value was too big, or
-                    // error during encoding -- but the traits don't allow for recovering the
-                    // original event value because we have to consume it to do the encoding... but
-                    // that might not always be the case.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -65,19 +77,57 @@ where
 
     pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
         match self {
-            Self::InMemory(tx) => tx
+            Self::InMemory(tx) => Ok(tx
                 .try_send(item)
-                .map(|()| None)
-                .or_else(|e| Ok(Some(e.into_inner()))),
+                .err()
+                .map(super::limited_queue::TrySendError::into_inner)),
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
+                // If the disk buffer is already at its size limit, hand the item off
+                // to the caller unfiltered. The caller forwards it to the overflow
+                // stage in `WhenFull::Overflow` mode, and the overflow stage may be
+                // an in-memory buffer with no wire-format constraint — filtering
+                // here would needlessly drop sub-items that the overflow could
+                // accept. Holding the writer lock makes the check race-free against
+                // other writers (only writers grow the buffer; readers only shrink).
+                if writer.is_buffer_full() {
+                    return Ok(Some(item));
+                }
+
+                // KNOWN LIMITATION (accepted; tracked as a follow-up): past the
+                // steady-state-full check above, over-budget sub-items are filtered
+                // and dropped here even in `WhenFull::Overflow`, so a non-protobuf
+                // overflow stage (e.g. in-memory) never gets the chance to accept
+                // them. This surfaces two ways:
+                //   1. the item is partially over-budget and `try_write_record`
+                //      below then rejects the *remainder* for fullness — the
+                //      overflow receives the item minus the already-dropped events;
+                //   2. the item is fully over-budget — `filter_unencodable` returns
+                //      `None` and the whole item is dropped before any capacity
+                //      check, so nothing overflows.
+                // Routing unencodable items by `WhenFull` (drop in Block/DropNewest,
+                // overflow otherwise) is a `BufferSender`-level policy decision,
+                // whereas filtering lives here in the backend; reconciling the two
+                // is deferred. The window is narrow and atypical: it requires a
+                // disk-v2 stage in `Overflow` mode (disk is normally the terminal
+                // Block stage), a non-protobuf overflow target, an over-budget
+                // event (>32 nesting levels), and a downstream egress that could
+                // actually deliver it. In other topologies these events are dropped
+                // a stage later regardless.
+                let pre_count = item.event_count() as u64;
+                let pre_size = item.size_of() as u64;
+                let Some(item) = item.filter_unencodable() else {
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(None);
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
+
                 writer.try_write_record(item).await.map_err(|e| {
-                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
-                    // encoding should theoretically be recoverable -- encoded value was too big, or
-                    // error during encoding -- but the traits don't allow for recovering the
-                    // original event value because we have to consume it to do the encoding... but
-                    // that might not always be the case.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -248,6 +298,11 @@ impl<T: Bufferable> BufferSender<T> {
             }
         }
 
+        // Backend filter drops are accounted directly through the backend's own
+        // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
+        // stage's `received` / `dropped` metrics even when the `BufferSender`
+        // does not carry instrumentation. This block only reports fullness-driven
+        // drops captured via `was_dropped`.
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
             && was_dropped

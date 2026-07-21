@@ -120,6 +120,8 @@ impl EventCount for Sample {
     }
 }
 
+impl Bufferable for Sample {}
+
 #[derive(Debug)]
 #[allow(dead_code)] // The inner _is_ read by the `Debug` impl, but that's ignored
 pub struct BasicError(pub(crate) String);

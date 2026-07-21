@@ -19,8 +19,9 @@ use vector_common::{
 
 use super::{create_buffer_v2_with_max_data_file_size, create_default_buffer_v2};
 use crate::{
-    EventCount, assert_buffer_size, assert_enough_bytes_written, assert_file_does_not_exist_async,
-    assert_file_exists_async, assert_reader_writer_v2_file_positions, await_timeout,
+    Bufferable, EventCount, assert_buffer_size, assert_enough_bytes_written,
+    assert_file_does_not_exist_async, assert_file_exists_async,
+    assert_reader_writer_v2_file_positions, await_timeout,
     encoding::{AsMetadata, Encodable},
     test::{SizedRecord, UndecodableRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{ReaderError, backed_archive::BackedArchive, record::Record},
@@ -743,6 +744,8 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
             1
         }
     }
+
+    impl Bufferable for ControllableRecord {}
 
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
