@@ -454,6 +454,7 @@ jobs:
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
+      opentelemetry-metrics-native: ${{ steps.filter.outputs.opentelemetry-metrics-native }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -486,7 +487,8 @@ jobs:
             "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
             "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
-            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }}
+            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }},
+            "opentelemetry-metrics-native": ${{ steps.filter.outputs.opentelemetry-metrics-native }}
           }
           EOF
           )

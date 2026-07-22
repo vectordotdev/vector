@@ -18,6 +18,14 @@ releases: "0.57.0": {
 		  table or stream names): sinks now enforce a confinement boundary and reject templates with no
 		  literal prefix at startup. Set a static prefix in the template, or use
 		  `dangerously_allow_unconfined_template_resolution: true` to opt out.
+
+		Confinement was applied uniformly across most templated fields rather than tailoring it
+		field by field. The intent is to over-restrict now and relax later as specific cases are
+		analyzed. The `dangerously_allow_*` flags fully restore pre-0.57 behavior. The name is intentionally loud,
+		but it is not a verdict that every use is reckless, but rather a motivation to assess the risk for your deployments.
+
+		If you believe confinement is unwarranted for a specific field, please open an issue with a detailed rationale.
+		Proposals are always welcome.
 		"""
 
 	known_issues: [

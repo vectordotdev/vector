@@ -305,7 +305,7 @@ impl BufferUsageData {
                 buffer_id: buffer_id.to_string(),
                 idx: self.idx,
                 intentional: false,
-                reason: "corrupted_events",
+                reason: "unprocessable_events",
                 count: dropped.event_count,
                 byte_size: dropped.event_byte_size,
                 total_count: current.event_count,

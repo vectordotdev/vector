@@ -26,7 +26,7 @@ use vrl::{
 };
 
 use super::{
-    EventFinalizers, Finalizable, KeyString, ObjectMap, Value,
+    EventFinalizers, Finalizable, KeyString, MergeFinalizable, ObjectMap, Value,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
@@ -221,6 +221,12 @@ impl ByteSizeOf for LogEvent {
 impl Finalizable for LogEvent {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl MergeFinalizable for LogEvent {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
     }
 }
 
