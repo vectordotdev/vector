@@ -111,7 +111,7 @@ impl SinkConfig for WebHdfsConfig {
         let healthcheck = Box::pin(async move { Ok(check_op.check().await?) });
 
         let sink = self.build_processor(op)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok((sink, healthcheck))
     }
 

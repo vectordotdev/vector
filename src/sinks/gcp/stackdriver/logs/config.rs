@@ -320,7 +320,7 @@ impl SinkConfig for StackdriverConfig {
 
         auth.spawn_regenerate_token();
 
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 

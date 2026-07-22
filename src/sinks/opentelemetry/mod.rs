@@ -84,7 +84,7 @@ impl SinkConfig for OpenTelemetryConfig {
                 let result = config
                     .build_without_confinement_gauge(cx, Self::NAME)
                     .await?;
-                config.confinement.set_confinement_gauge("sink", Self::NAME);
+                config.confinement.set_confinement_gauge();
                 Ok(result)
             }
         }

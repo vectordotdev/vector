@@ -199,7 +199,7 @@ impl SinkConfig for AxiomConfig {
         let result = http_sink_config
             .build_without_confinement_gauge(cx, Self::NAME)
             .await?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok(result)
     }
 

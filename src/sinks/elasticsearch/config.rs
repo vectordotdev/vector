@@ -753,7 +753,7 @@ impl SinkConfig for ElasticsearchConfig {
         )
         .map_ok(|((), _)| ())
         .boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok((stream, healthcheck))
     }
 

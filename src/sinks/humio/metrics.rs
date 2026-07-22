@@ -202,7 +202,7 @@ impl SinkConfig for HumioMetricsConfig {
             transform,
         };
 
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 

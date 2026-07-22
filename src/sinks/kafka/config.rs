@@ -292,7 +292,7 @@ impl SinkConfig for KafkaSinkConfig {
             .confine(&self.confinement, Self::NAME, "topic")?;
         let sink = KafkaSink::new(config.clone())?;
         let hc = healthcheck(config, cx.healthcheck.clone()).boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 

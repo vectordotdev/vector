@@ -1287,22 +1287,26 @@ impl ConfinementConfig {
     /// build, the topology manager keeps the old sink active but the
     /// failed replacement's write would silently misreport the live
     /// sink's confinement state.
-    pub fn set_confinement_gauge(
-        &self,
-        component_kind: &'static str,
-        component_type: &'static str,
-    ) {
+    ///
+    /// `component_kind`/`component_type` are deliberately *not* parameters
+    /// here: like every other per-component metric (e.g.
+    /// `component_sent_events_total`), they're picked up automatically from
+    /// the ambient tracing span the topology builder opens around the whole
+    /// `SinkConfig::build` call (see `build_sinks` in
+    /// `src/topology/builder.rs`), tagged with the outer sink's own
+    /// registered component type. A sink that delegates to another
+    /// `SinkConfig::build` internally, or is itself wrapped by an external
+    /// sink that constructs and delegates to it, gets the correct
+    /// outer/wrapping component type for free, with no plumbing required.
+    /// Passing them explicitly here would just override that with
+    /// whichever component happens to own this particular gauge call site.
+    pub fn set_confinement_gauge(&self) {
         let value = if self.dangerously_allow_unconfined_template_resolution {
             1.0
         } else {
             0.0
         };
-        gauge!(
-            GaugeName::SecurityConfinementDisabled,
-            "component_kind" => component_kind,
-            "component_type" => component_type,
-        )
-        .set(value);
+        gauge!(GaugeName::SecurityConfinementDisabled).set(value);
     }
 }
 

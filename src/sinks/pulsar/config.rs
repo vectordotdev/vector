@@ -407,7 +407,7 @@ impl SinkConfig for PulsarSinkConfig {
         let sink = PulsarSink::new(client, config.clone())?;
         let hc = healthcheck(config).boxed();
 
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 

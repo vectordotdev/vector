@@ -235,7 +235,7 @@ impl HecLogsSinkConfig {
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let result = self.build_without_confinement_gauge(cx, Self::NAME)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok(result)
     }
 

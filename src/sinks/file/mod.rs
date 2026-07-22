@@ -248,7 +248,7 @@ impl SinkConfig for FileSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(self, cx)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        self.confinement.set_confinement_gauge();
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
