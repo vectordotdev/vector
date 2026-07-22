@@ -41,7 +41,6 @@ env:
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
-  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   VECTOR_LOG: vector=debug
   VERBOSE: true
@@ -65,7 +64,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR review author
         id: comment
-        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
+        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
           team: "Vector"
@@ -100,6 +99,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+      id-token: write
       packages: read # Required to pull test runner image from GHCR
     strategy:
       fail-fast: false
@@ -139,6 +139,7 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
+            "splunk",
             "webhdfs"
           ]
     steps:
@@ -160,7 +161,11 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/dd-token
+        if: steps.run_condition.outputs.should_run == 'true'
+
       - uses: ./.github/actions/setup
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           vdev: true
           datadog-ci: true
@@ -191,10 +196,18 @@ jobs:
     permissions:
       contents: read
       packages: read # Required to pull test runner image from GHCR
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
-        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
+        service:
+          [
+            "datadog-logs",
+            "datadog-metrics",
+            "opentelemetry-logs",
+            "opentelemetry-metrics",
+            "opentelemetry-metrics-native"
+          ]
     steps:
       - name: Evaluate run condition
         id: run_condition
@@ -214,7 +227,11 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - uses: ./.github/actions/dd-token
+        if: steps.run_condition.outputs.should_run == 'true'
+
       - uses: ./.github/actions/setup
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           vdev: true
           datadog-ci: true
@@ -258,7 +275,7 @@ jobs:
 
       - name: Validate issue comment
         if: github.event_name == 'pull_request_review'
-        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
+        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
           team: "Vector"

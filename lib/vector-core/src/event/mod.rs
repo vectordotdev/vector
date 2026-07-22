@@ -3,11 +3,11 @@ use std::{convert::TryInto, fmt::Debug, sync::Arc};
 pub use array::{EventArray, EventContainer, LogArray, MetricArray, TraceArray, into_event_stream};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
-    BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
-    Finalizable,
+    BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizerGroups,
+    EventFinalizers, EventStatus, Finalizable, GroupedFinalizable, MergeFinalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
+pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,8 @@ pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
 
+#[cfg(any(test, feature = "generate-fixtures"))]
+pub(crate) mod arbitrary_impl;
 pub mod array;
 pub mod discriminant;
 mod estimated_json_encoded_size_of;
@@ -35,6 +37,7 @@ pub mod metric;
 pub mod proto;
 mod r#ref;
 mod ser;
+
 #[cfg(test)]
 mod test;
 mod trace;
@@ -85,6 +88,16 @@ impl Finalizable for Event {
             Event::Log(log_event) => log_event.take_finalizers(),
             Event::Metric(metric) => metric.take_finalizers(),
             Event::Trace(trace_event) => trace_event.take_finalizers(),
+        }
+    }
+}
+
+impl MergeFinalizable for Event {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        match self {
+            Event::Log(log_event) => log_event.merge_finalizers(finalizers),
+            Event::Metric(metric) => metric.merge_finalizers(finalizers),
+            Event::Trace(trace_event) => trace_event.merge_finalizers(finalizers),
         }
     }
 }

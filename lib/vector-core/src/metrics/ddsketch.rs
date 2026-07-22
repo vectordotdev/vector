@@ -284,6 +284,17 @@ impl AgentDDSketch {
         })
     }
 
+    /// Overrides `sum` and `avg` with arbitrary values.
+    ///
+    /// Only available under the `generate-fixtures` feature, where we need to
+    /// produce sketches with independently-randomized summary statistics to
+    /// exercise round-trip serialization of those fields.
+    #[cfg(feature = "generate-fixtures")]
+    pub fn set_sum_avg(&mut self, sum: f64, avg: f64) {
+        self.sum = sum;
+        self.avg = avg;
+    }
+
     pub fn gamma(&self) -> f64 {
         self.config.gamma_v
     }
@@ -396,7 +407,7 @@ impl AgentDDSketch {
 
     fn insert_key_counts(&mut self, mut counts: Vec<(i16, u32)>) {
         // Counts need to be sorted by key.
-        counts.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
+        counts.sort_unstable_by_key(|(k1, _)| *k1);
 
         let mut temp = Vec::new();
 
@@ -569,9 +580,12 @@ impl AgentDDSketch {
                 remainder += fkn - fkn.trunc();
             }
 
-            // SAFETY: This integer cast is intentional: we want to get the non-fractional part, as
+            // SAFETY:
+            // [TRUNCATION] This integer cast is intentional: we want to get the non-fractional part, as
             // we've captured the fractional part in the above conditional.
-            #[allow(clippy::cast_possible_truncation)]
+            // [SIGN LOSS] fkn is always non-negative because it is computed from sketch bounds and a count,
+            // which are both non-negative
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let mut kn = fkn as u32;
             if remainder > 1.0 {
                 kn += 1;

@@ -71,7 +71,7 @@ generated: components: sinks: websocket_server: configuration: {
 					custom: """
 						Custom authentication using VRL code.
 
-						Takes in request and validates it using VRL code.
+						Takes in request and validates it using VRL code. The VRL program must return a boolean.
 						"""
 				}
 			}
@@ -604,11 +604,8 @@ generated: components: sinks: websocket_server: configuration: {
 										type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 									}
 									strip_schema_id_prefix: {
-										description: """
-																								For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
-																								According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
-																								"""
-										required: true
+										description: "For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix, as described in [Confluent Kafka's documentation](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format)."
+										required:    true
 										type: bool: {}
 									}
 								}
@@ -620,7 +617,7 @@ generated: components: sinks: websocket_server: configuration: {
 									default: "bytes"
 									enum: {
 										avro: """
-																							Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+																							Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 																							[apache_avro]: https://avro.apache.org/
 																							"""
@@ -632,13 +629,13 @@ generated: components: sinks: websocket_server: configuration: {
 
 																							The GELF specification is more strict than the actual Graylog receiver.
 																							Vector's decoder adheres more strictly to the GELF spec, with
-																							the exception that some characters such as `@`  are allowed in field names.
+																							the exception that some characters such as `@` are allowed in field names.
 
-																							Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
-																							by Graylog, and is much more relaxed than the GELF spec.
+																							Other GELF codecs, such as Loki's, use a [Go SDK][implementation] that is maintained
+																							by Graylog and is much more relaxed than the GELF spec.
 
-																							Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
-																							the codec may continue to relax the enforcement of specification.
+																							Going forward, Vector will use the [Go SDK][implementation] as the reference implementation, which means
+																							the codec may continue to relax the enforcement of the specification.
 
 																							[gelf]: https://docs.graylog.org/docs/gelf
 																							[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
@@ -656,7 +653,7 @@ generated: components: sinks: websocket_server: configuration: {
 										native: """
 																							Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
-																							This decoder can output all types of events (logs, metrics, traces).
+																							This decoder can output all types of events: logs, metrics, and traces.
 
 																							This codec is **[experimental][experimental]**.
 
@@ -666,7 +663,7 @@ generated: components: sinks: websocket_server: configuration: {
 										native_json: """
 																							Decodes the raw bytes as [native JSON format][vector_native_json].
 
-																							This decoder can output all types of events (logs, metrics, traces).
+																							This decoder can output all types of events: logs, metrics, and traces.
 
 																							This codec is **[experimental][experimental]**.
 
@@ -728,7 +725,7 @@ generated: components: sinks: websocket_server: configuration: {
 												relaxed: """
 																											Uses more relaxed validation that skips strict GELF specification checks.
 
-																											This mode will not treat specification violations as errors, allowing the decoder
+																											This mode does not treat specification violations as errors, allowing the decoder
 																											to accept messages from sources that don't strictly follow the GELF spec.
 																											"""
 												strict: "Uses strict validation that closely follows the GELF spec."
@@ -796,7 +793,7 @@ generated: components: sinks: websocket_server: configuration: {
 
 																								This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
 
-																								You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																								For more information, see [How Buf images work](https://buf.build/docs/reference/images/#how-buf-images-work).
 																								"""
 										required: false
 										type: string: default: ""
@@ -814,7 +811,7 @@ generated: components: sinks: websocket_server: configuration: {
 																								Use JSON field names (camelCase) instead of protobuf field names (snake_case).
 
 																								When enabled, the deserializer will output fields using their JSON names as defined
-																								in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+																								in the `.proto` file (for example, `jobDescription` instead of `job_description`).
 
 																								This is useful when working with data that needs to be converted to JSON or
 																								when interfacing with systems that use JSON naming conventions.
@@ -828,11 +825,11 @@ generated: components: sinks: websocket_server: configuration: {
 								description: """
 																				Signal types to attempt parsing, in priority order.
 
-																				The deserializer will try parsing in the order specified. This allows you to optimize
+																				The deserializer tries to parse signals in the specified order. This allows you to optimize
 																				performance when you know the expected signal types. For example, if you only receive
 																				traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
 
-																				If not specified, defaults to trying all types in order: logs, metrics, traces.
+																				If not specified, defaults to trying all types in this order: logs, metrics, traces.
 																				Duplicate signal types are automatically removed while preserving order.
 																				"""
 								relevant_when: "codec = \"otlp\""
@@ -870,8 +867,8 @@ generated: components: sinks: websocket_server: configuration: {
 									source: {
 										description: """
 																								The [Vector Remap Language][vrl] (VRL) program to execute for each event.
-																								Note that the final contents of the `.` target will be used as the decoding result.
-																								Compilation error or use of 'abort' in a program will result in a decoding error.
+																								The final contents of the `.` target are used as the decoding result.
+																								Compilation errors or use of `abort` in the program result in a decoding error.
 
 																								[vrl]: https://vector.dev/docs/reference/vrl
 																								"""

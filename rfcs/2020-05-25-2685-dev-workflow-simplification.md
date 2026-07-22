@@ -1,5 +1,7 @@
 # RFC 2685 - 2020-05-28 - Dev Workflow Simplification
 
+> **Archived:** This RFC is kept for historical reference only. The Docker/Podman dev environment it proposed (`make environment`, `ENVIRONMENT=true`, the `timberio/vector-dev` image) is no longer maintained and the supporting Makefile targets, workflow, and image have been removed. For current contributor instructions, see [CONTRIBUTING.md](../CONTRIBUTING.md) and [docs/DEVELOPING.md](../docs/DEVELOPING.md).
+
 Vector's `Makefile` serves a variety of purposes, and this RFC attempts to tame the complexity of common dev tasks, improving contributor and team member experience.
 
 It proposes a practical base `environment` container that merges the functionality of our non-integration test containers into one. It then suggests making common dev `make` tasks to rely on the caller environment having all dependencies, done at the same time it suggests adding `make` tasks to run common `make` tasks inside the environment. Finally, it suggests updating documentation to suggest users can use their native toolchains, `docker`.

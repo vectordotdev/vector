@@ -16,13 +16,22 @@ use std::sync::Mutex;
 use async_stream::stream;
 use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
-use metrics::{Gauge, Histogram, gauge, histogram};
+use metrics::{Gauge, Histogram};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
+use vector_common::internal_event::{GaugeName, HistogramName};
 use vector_common::stats::TimeEwmaGauge;
+use vector_common::{gauge, histogram};
 
 use crate::{InMemoryBufferable, config::MemoryBufferSize};
 
 pub const DEFAULT_EWMA_HALF_LIFE_SECONDS: f64 = 5.0;
+
+/// Identifies which buffer channel is being instrumented, determining the metric name prefix.
+#[derive(Clone, Copy, Debug)]
+pub enum BufferChannelKind {
+    Source,
+    Transform,
+}
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -99,13 +108,13 @@ where
 
 #[derive(Clone, Debug)]
 pub struct ChannelMetricMetadata {
-    prefix: &'static str,
+    kind: BufferChannelKind,
     output: Option<String>,
 }
 
 impl ChannelMetricMetadata {
-    pub fn new(prefix: &'static str, output: Option<String>) -> Self {
-        Self { prefix, output }
+    pub fn new(kind: BufferChannelKind, output: Option<String>) -> Self {
+        Self { kind, output }
     }
 }
 
@@ -134,34 +143,55 @@ impl Metrics {
     ) -> Self {
         let ewma_half_life_seconds =
             ewma_half_life_seconds.unwrap_or(DEFAULT_EWMA_HALF_LIFE_SECONDS);
-        let ChannelMetricMetadata { prefix, output } = metadata;
-        let (legacy_suffix, gauge_suffix, max_value) = match limit {
-            MemoryBufferSize::MaxEvents(max_events) => (
-                "_max_event_size",
-                "_max_size_events",
-                max_events.get() as f64,
+        let ChannelMetricMetadata { kind, output } = metadata;
+
+        let (histogram_name, level_name, mean_name) = match kind {
+            BufferChannelKind::Source => (
+                HistogramName::SourceBufferUtilization,
+                GaugeName::SourceBufferUtilizationLevel,
+                GaugeName::SourceBufferUtilizationMean,
             ),
-            MemoryBufferSize::MaxSize(max_bytes) => {
-                ("_max_byte_size", "_max_size_bytes", max_bytes.get() as f64)
-            }
+            BufferChannelKind::Transform => (
+                HistogramName::TransformBufferUtilization,
+                GaugeName::TransformBufferUtilizationLevel,
+                GaugeName::TransformBufferUtilizationMean,
+            ),
         };
-        let max_gauge_name = format!("{prefix}{gauge_suffix}");
-        let legacy_max_gauge_name = format!("{prefix}{legacy_suffix}");
-        let histogram_name = format!("{prefix}_utilization");
-        let gauge_name = format!("{prefix}_utilization_level");
-        let mean_name = format!("{prefix}_utilization_mean");
+
+        let (max_name, legacy_name, max_value) = match (kind, limit) {
+            (BufferChannelKind::Source, MemoryBufferSize::MaxEvents(n)) => (
+                GaugeName::SourceBufferMaxSizeEvents,
+                GaugeName::SourceBufferMaxEventSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Source, MemoryBufferSize::MaxSize(n)) => (
+                GaugeName::SourceBufferMaxSizeBytes,
+                GaugeName::SourceBufferMaxByteSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxEvents(n)) => (
+                GaugeName::TransformBufferMaxSizeEvents,
+                GaugeName::TransformBufferMaxEventSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxSize(n)) => (
+                GaugeName::TransformBufferMaxSizeBytes,
+                GaugeName::TransformBufferMaxByteSize,
+                n.get() as f64,
+            ),
+        };
         #[cfg(test)]
         let recorded_values = Arc::new(Mutex::new(Vec::new()));
         if let Some(label_value) = output {
-            let max_gauge = gauge!(max_gauge_name, "output" => label_value.clone());
+            let max_gauge = gauge!(max_name, "output" => label_value.clone());
             max_gauge.set(max_value);
             let mean_gauge_handle = gauge!(mean_name, "output" => label_value.clone());
             // DEPRECATED: buffer-bytes-events-metrics
-            let legacy_max_gauge = gauge!(legacy_max_gauge_name, "output" => label_value.clone());
+            let legacy_max_gauge = gauge!(legacy_name, "output" => label_value.clone());
             legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name, "output" => label_value.clone()),
-                gauge: gauge!(gauge_name, "output" => label_value.clone()),
+                gauge: gauge!(level_name, "output" => label_value.clone()),
                 mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
                 legacy_max_gauge,
@@ -169,15 +199,15 @@ impl Metrics {
                 recorded_values,
             }
         } else {
-            let max_gauge = gauge!(max_gauge_name);
+            let max_gauge = gauge!(max_name);
             max_gauge.set(max_value);
             let mean_gauge_handle = gauge!(mean_name);
             // DEPRECATED: buffer-bytes-events-metrics
-            let legacy_max_gauge = gauge!(legacy_max_gauge_name);
+            let legacy_max_gauge = gauge!(legacy_name);
             legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name),
-                gauge: gauge!(gauge_name),
+                gauge: gauge!(level_name),
                 mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
                 legacy_max_gauge,
@@ -473,7 +503,9 @@ mod tests {
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 
-    use super::{ChannelMetricMetadata, LimitedReceiver, LimitedSender, limited};
+    use super::{
+        BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender, limited,
+    };
     use crate::{
         MemoryBufferSize,
         test::MultiEventRecord,
@@ -514,7 +546,32 @@ mod tests {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
         let (mut tx, mut rx) = limited(
             limit,
-            Some(ChannelMetricMetadata::new("test_channel", None)),
+            Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
+            None,
+        );
+
+        let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+        tx.send(Sample::new(1)).await.expect("send should succeed");
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.last().copied(), Some(1));
+
+        assert_eq!(Sample::new(1), rx.next().await.unwrap());
+        let records = metrics.lock().unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records.last().copied(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn records_utilization_transform_channel() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(
+            limit,
+            Some(ChannelMetricMetadata::new(
+                BufferChannelKind::Transform,
+                None,
+            )),
             None,
         );
 
@@ -536,7 +593,7 @@ mod tests {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
         let (mut tx, mut rx) = limited(
             limit,
-            Some(ChannelMetricMetadata::new("test_channel_oversized", None)),
+            Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
             None,
         );
         let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
@@ -580,7 +637,7 @@ mod tests {
         // With the 10th message in the channel no space should be left
         assert_eq!(0, tx.available_capacity());
 
-        // Attemting to produce one more then the max capacity should block
+        // Attempting to produce one more then the max capacity should block
         let mut send_final = spawn({
             let msg_clone = msg.clone();
             async { tx.send(msg_clone).await }
@@ -919,7 +976,7 @@ mod tests {
             let limit = NonZeroUsize::new(size * 10).unwrap();
             let (tx, rx) = limited(
                 MemoryBufferSize::MaxEvents(limit),
-                Some(ChannelMetricMetadata::new("test_channel_concurrent", None)),
+                Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
                 None,
             );
             let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();

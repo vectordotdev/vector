@@ -176,7 +176,7 @@ docker restart -f $(docker ps -aqf "name=vector")
 {{< /tab >}}
 {{< /tabs >}}
 
-The commands above involve configuring Vector using TOML, but you can also use JSON or YAML. You can also use one of
+The commands above involve configuring Vector using YAML, but you can also use TOML or JSON. You can also use one of
 three image variants (the commands assume `alpine`):
 
 | Variant | Image basis |

@@ -31,19 +31,20 @@ extern crate tracing;
 #[macro_use]
 extern crate vector_lib;
 
+#[cfg(all(
+    target_os = "linux",
+    any(
+        feature = "antithesis-scenario-memory",
+        feature = "antithesis-scenario-disk"
+    )
+))]
+extern crate antithesis_instrumentation as _;
+
 pub use indoc::indoc;
 // re-export codecs for convenience
 pub use vector_lib::codecs;
 
-#[cfg(all(
-    unix,
-    feature = "tikv-jemallocator",
-    not(feature = "allocation-tracing")
-))]
-#[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-#[cfg(all(unix, feature = "tikv-jemallocator", feature = "allocation-tracing"))]
+#[cfg(all(unix, feature = "tikv-jemallocator"))]
 #[global_allocator]
 static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
     self::internal_telemetry::allocations::get_grouped_tracing_allocator(
@@ -81,6 +82,7 @@ pub mod aws;
 pub mod common;
 pub mod completion;
 mod convert_config;
+pub mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod extra_context;
@@ -240,6 +242,8 @@ pub fn get_hostname() -> std::io::Result<String> {
         hostname::get()?.to_string_lossy().into_owned()
     })
 }
+
+pub(crate) use vector_lib::spawn_in_current_span;
 
 /// Spawn a task with the given name. The name is only used if
 /// built with [`tokio_unstable`][tokio_unstable].

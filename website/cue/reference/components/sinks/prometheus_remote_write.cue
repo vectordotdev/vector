@@ -4,7 +4,6 @@ components: sinks: prometheus_remote_write: {
 	title: "Prometheus Remote Write"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"

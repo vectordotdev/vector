@@ -32,6 +32,7 @@ impl ProtobufSerializerConfig {
             message_descriptor,
             options: Options {
                 use_json_names: self.protobuf.use_json_names,
+                allow_lossy_string_coercion: true,
             },
         })
     }

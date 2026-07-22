@@ -27,19 +27,22 @@ of this component.
 
 For example, given the configuration:
 
-```toml
-[api]
-  enabled =  true
-[sources.in]
-  type = "generator"
-  format = "shuffle"
-  interval = 1.0
-  lines = ["Hello World"]
-  sequence = true
+```yaml
+api:
+  enabled: true
 
-[sinks.out]
-  type = "blackhole"
-  inputs = ["in"]
+sources:
+  in:
+    type: "generator"
+    format: "shuffle"
+    interval: 1.0
+    lines: ["Hello World"]
+    sequence: true
+
+sinks:
+  out:
+    type: "blackhole"
+    inputs: ["in"]
 ```
 
 If you were to run `vector` and then, in another terminal, run `vector tap in`,

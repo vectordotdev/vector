@@ -33,10 +33,12 @@ persistence, regardless of issues with Vector and the host system.
 
 You may already be familiar with disk buffers if you have a sink configuration that looks like this:
 
-```toml
-[sinks.http]
-# ...
-buffer.type = "disk"
+```yaml
+sinks:
+  http:
+    # ...
+    buffer:
+      type: "disk"
 ```
 
 ## Current disk buffer implementation
@@ -74,16 +76,20 @@ for those who don't utilize a stateless deployment process as mentioned above.
 With all of that said, changing Vector to use the new disk buffer implementation is as simple as
 changing a single line:
 
-```toml
+```yaml
 # From this:
-[sinks.http]
-# ...
-buffer.type = "disk"
+sinks:
+  http:
+    # ...
+    buffer:
+      type: "disk"
 
 # To this:
-[sinks.http]
-# ...
-buffer.type = "disk_v2"
+sinks:
+  http:
+    # ...
+    buffer:
+      type: "disk_v2"
 ```
 
 ## Let us know what you think!

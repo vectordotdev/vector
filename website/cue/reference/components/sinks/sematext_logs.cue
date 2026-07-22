@@ -4,7 +4,6 @@ components: sinks: sematext_logs: {
 	title: "Sematext Logs"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"

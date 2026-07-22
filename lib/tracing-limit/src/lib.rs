@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 //! Rate limiting for tracing events.
 //!
 //! This crate provides a tracing-subscriber layer that rate limits log events to prevent
@@ -12,6 +13,10 @@
 //! - **2nd occurrence**: Emits a "suppressing" warning
 //! - **3rd+ occurrences**: Silent until window expires
 //! - **After window**: Emits a summary of suppressed count, then next event normally
+//!
+//! Note: the suppressed-count summary and the resumption of normal emission are both
+//! triggered by the *next arriving event* after the window has elapsed, not by the
+//! window expiry itself. If the event stops firing, no summary is ever emitted.
 //!
 //! # Rate limit grouping
 //!
@@ -163,6 +168,7 @@ where
     /// - 1st occurrence: Emitted normally
     /// - 2nd occurrence: Shows "suppressing" warning
     /// - 3rd+ occurrences: Silent until window expires
+    /// - After window: Summary and next event emitted on next arrival (see module-level note)
     pub fn with_default_limit(mut self, internal_log_rate_limit: u64) -> Self {
         self.internal_log_rate_limit = internal_log_rate_limit;
         self

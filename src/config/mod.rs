@@ -54,9 +54,9 @@ pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
-    COLLECTOR, CONFIG_PATHS, load, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_from_str_with_secrets, load_source_from_paths, merge_path_lists,
-    process_paths,
+    COLLECTOR, CONFIG_PATHS, env_var_interpolation_enabled, load, load_from_paths,
+    load_from_paths_with_provider_and_secrets, load_from_str, load_from_str_with_secrets,
+    load_source_from_paths, merge_path_lists, process_paths, set_env_var_interpolation,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -77,7 +77,7 @@ pub use vector_lib::{
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-// // This is not a comprehensive set; variants are added as needed.
+// This is not a comprehensive set; variants are added as needed.
 pub enum ComponentType {
     Transform,
     Sink,
@@ -446,11 +446,12 @@ impl TestDefinition<String> {
                 let TestOutput {
                     extract_from,
                     conditions,
+                    expected_event_count,
                 } = old;
 
-                (extract_from.to_vec(), conditions)
+                (extract_from.to_vec(), conditions, expected_event_count)
             })
-            .filter_map(|(extract_from, conditions)| {
+            .filter_map(|(extract_from, conditions, expected_event_count)| {
                 let mut outputs = Vec::new();
                 for from in extract_from {
                     if no_outputs_from.contains(&from) {
@@ -471,6 +472,7 @@ impl TestDefinition<String> {
                     Some(TestOutput {
                         extract_from: outputs.into(),
                         conditions,
+                        expected_event_count,
                     })
                 }
             })
@@ -525,6 +527,7 @@ impl TestDefinition<OutputId> {
                     .collect::<Vec<_>>()
                     .into(),
                 conditions: old.conditions,
+                expected_event_count: old.expected_event_count,
             })
             .collect();
 
@@ -596,6 +599,15 @@ pub struct TestOutput<T: 'static = OutputId> {
 
     /// The conditions to run against the output to validate that they were transformed as expected.
     pub conditions: Option<Vec<conditions::AnyCondition>>,
+
+    /// The expected number of events to be produced by the transform.
+    ///
+    /// If specified, the test will fail if the number of events emitted by the
+    /// transform does not match this value. This check is independent of
+    /// `conditions` -- the count is verified first, then each condition is
+    /// evaluated against the output events separately. This is useful for
+    /// transforms that may emit multiple events.
+    pub expected_event_count: Option<usize>,
 }
 
 #[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]

@@ -76,6 +76,7 @@ pub(crate) struct ComposeTest {
     compose: Option<Compose>,
     env_config: Environment,
     retries: u8,
+    coverage: bool,
 }
 
 impl ComposeTest {
@@ -84,6 +85,7 @@ impl ComposeTest {
         test_name: impl Into<String>,
         environment: impl Into<String>,
         retries: u8,
+        coverage: bool,
     ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
         let environment = environment.into();
@@ -127,6 +129,7 @@ impl ComposeTest {
             compose,
             env_config: rename_environment_keys(&env_config),
             retries,
+            coverage,
         };
         trace!("Generated {compose_test:#?}");
         Ok(compose_test)
@@ -230,6 +233,12 @@ impl ComposeTest {
             Some(&self.config.features),
             &args,
             self.local_config.kind == ComposeTestKind::E2E,
+            self.coverage,
+            if self.coverage {
+                Some(self.environment.as_str())
+            } else {
+                None
+            },
         )?;
 
         Ok(())

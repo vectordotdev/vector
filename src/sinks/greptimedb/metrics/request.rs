@@ -1,6 +1,7 @@
 use std::num::NonZeroUsize;
 
-use greptimedb_ingester::{Error as GreptimeError, api::v1::*};
+use greptimedb_ingester::Error as GreptimeError;
+use greptimedb_ingester::api::v1::RowInsertRequests;
 use vector_lib::event::Metric;
 
 use crate::sinks::{

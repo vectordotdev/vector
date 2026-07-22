@@ -138,6 +138,9 @@ pub struct HumioMetricsConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[serde(flatten)]
+    pub confinement: crate::template::ConfinementConfig,
 }
 
 fn default_endpoint() -> String {
@@ -185,15 +188,21 @@ impl SinkConfig for HumioMetricsConfig {
                 vrl::path::PathPrefix::Event,
                 Some(lookup::owned_value_path!("timestamp")),
             ),
+            confinement: self.confinement.clone(),
         };
 
-        let (sink, healthcheck) = sink.clone().build(cx).await?;
+        // Route through the inner Humio helper so the wrapped
+        // `humio_logs` sink's gauge isn't emitted alongside our own —
+        // operators watching `security_confinement_disabled` for a
+        // `humio_metrics` sink should only see one series.
+        let (sink, healthcheck) = sink.build_without_confinement_gauge(cx, Self::NAME)?;
 
         let sink = HumioMetricsSink {
             inner: sink,
             transform,
         };
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 

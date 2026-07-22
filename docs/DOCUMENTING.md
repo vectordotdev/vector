@@ -147,9 +147,12 @@ watchexec "make check-docs"
 
 ### Changelog
 
-Contributors do not need to maintain a changelog. This is automatically generated
-via the `make release` command, made possible by the use of
-[conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) titles.
+Contributors document user-facing changes by adding a fragment under
+[`changelog.d/`](../changelog.d/README.md); the release CUE file's user-facing
+changelog section is assembled from those fragments by `cargo vdev release
+prepare` during release prep. The CUE file's `commits:` array is populated
+from the git log via [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/)
+titles, so PR titles must follow that spec.
 
 ### Release highlights
 

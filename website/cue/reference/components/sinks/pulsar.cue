@@ -4,7 +4,6 @@ components: sinks: pulsar: {
 	title: "Apache Pulsar"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "stream"

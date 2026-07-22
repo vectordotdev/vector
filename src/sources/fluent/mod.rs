@@ -1,14 +1,8 @@
-use std::{
-    collections::HashMap,
-    io::{self, Read},
-    net::SocketAddr,
-    time::Duration,
-};
+use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
-use flate2::read::MultiGzDecoder;
 use rmp_serde::{Deserializer, Serializer, decode};
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
@@ -23,6 +17,7 @@ use vector_lib::{
 };
 use vrl::value::{Kind, Value, kind::Collection};
 
+use super::util::decompression::{CappedDecoder, max_decompressed_size_bytes};
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
@@ -217,6 +212,7 @@ impl FluentTcpConfig {
             self.keepalive,
             shutdown_secs,
             tls,
+            None, // tls_reloader: not wired for this source
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
@@ -457,6 +453,14 @@ pub enum DecodeError {
     Decode(decode::Error),
     UnknownCompression(String),
     UnexpectedValue(rmpv::Value),
+    /// The buffered frame grew past the maximum allowed size before a complete
+    /// message could be decoded. Emitted to bound memory when a peer declares an
+    /// oversized msgpack array/map/string and streams the bytes to force
+    /// unbounded buffering.
+    FrameTooLarge {
+        size: usize,
+        max: usize,
+    },
 }
 
 impl std::fmt::Display for DecodeError {
@@ -470,6 +474,12 @@ impl std::fmt::Display for DecodeError {
             DecodeError::UnexpectedValue(value) => {
                 write!(f, "unexpected msgpack value, ignoring: {value}")
             }
+            DecodeError::FrameTooLarge { size, max } => {
+                write!(
+                    f,
+                    "fluent frame exceeds maximum size before decoding: {size} bytes buffered, limit is {max} bytes"
+                )
+            }
         }
     }
 }
@@ -481,6 +491,9 @@ impl StreamDecodingError for DecodeError {
             DecodeError::Decode(_) => true,
             DecodeError::UnknownCompression(_) => true,
             DecodeError::UnexpectedValue(_) => true,
+            // An oversized partial frame has no framing boundary to resync on, so
+            // the connection must be dropped rather than re-decoded in a loop.
+            DecodeError::FrameTooLarge { .. } => false,
         }
     }
 }
@@ -500,11 +513,18 @@ impl From<decode::Error> for DecodeError {
 #[derive(Debug, Clone)]
 struct FluentDecoder {
     log_namespace: LogNamespace,
+    /// Maximum number of bytes that may be buffered while waiting for a complete
+    /// frame. Bounds memory against a peer that declares an oversized msgpack
+    /// structure and streams the bytes to force unbounded buffering.
+    max_frame_size: usize,
 }
 
 impl FluentDecoder {
-    const fn new(log_namespace: LogNamespace) -> Self {
-        Self { log_namespace }
+    fn new(log_namespace: LogNamespace) -> Self {
+        Self {
+            log_namespace,
+            max_frame_size: max_decompressed_size_bytes(),
+        }
     }
 
     fn handle_message(
@@ -599,13 +619,11 @@ impl FluentDecoder {
             }
             FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
                 let buf = match options.compressed.as_deref() {
-                    Some("gzip") => {
-                        let mut buf = Vec::new();
-                        MultiGzDecoder::new(io::Cursor::new(bin.into_vec()))
-                            .read_to_end(&mut buf)
-                            .map(|_| buf)
-                            .map_err(Into::into)
-                    }
+                    // Cap the decompressed output so a `gzip` bomb in a single
+                    // `PackedForward` message cannot drive unbounded allocation.
+                    Some("gzip") => CappedDecoder::gzip(io::Cursor::new(bin.into_vec()))
+                        .decompress()
+                        .map_err(Into::into),
                     Some("text") | None => Ok(bin.into_vec()),
                     Some(s) => Err(DecodeError::UnknownCompression(s.to_owned())),
                 }?;
@@ -657,6 +675,17 @@ impl Decoder for FluentDecoder {
                 )) = res
                     && custom.kind() == io::ErrorKind::UnexpectedEof
                 {
+                    // We need more bytes before a full message can be decoded. Bound
+                    // the buffer so a peer cannot force unbounded memory growth by
+                    // declaring a huge msgpack array/map/string and streaming the
+                    // bytes: if the frame has already grown past the limit without
+                    // yielding a complete message, drop the connection.
+                    if src.len() > self.max_frame_size {
+                        return Err(DecodeError::FrameTooLarge {
+                            size: src.len(),
+                            max: self.max_frame_size,
+                        });
+                    }
                     return Ok(None);
                 }
 
@@ -837,6 +866,7 @@ mod tests {
     };
     use tokio_util::codec::Decoder;
     use vector_lib::{assert_event_data_eq, lookup::OwnedTargetPath, schema::Definition};
+    use vrl::event_path;
     use vrl::value::{ObjectMap, Value, kind::Collection};
 
     use super::{message::FluentMessageOptions, *};
@@ -1050,6 +1080,48 @@ mod tests {
         Ok((frame.into(), byte_size))
     }
 
+    #[test]
+    fn decode_incomplete_frame_requests_more_data() {
+        // An array of 2 elements (`0x92`) with a tag string declaring 16 bytes
+        // (`0xb0`) but only 4 bytes provided: a valid, incomplete frame. The
+        // decoder should ask for more data rather than erroring.
+        let partial: Vec<u8> = vec![0x92, 0xb0, b't', b'a', b'g'];
+        let mut buf = BytesMut::from(&partial[..]);
+        let mut decoder = FluentDecoder::new(LogNamespace::default());
+        assert!(matches!(decoder.decode(&mut buf), Ok(None)));
+        // The buffer is retained so more bytes can complete the frame.
+        assert_eq!(buf.len(), partial.len());
+    }
+
+    #[test]
+    fn decode_oversized_frame_is_rejected() {
+        // Same shape as above (a 2-element array whose string is declared far
+        // larger than what has arrived), but with a decoder whose frame cap is
+        // tiny. Once the buffer grows past the cap without yielding a complete
+        // message, the decoder must refuse to keep buffering and signal a
+        // non-recoverable error so the connection is dropped.
+        let max_frame_size = 8;
+        let partial: Vec<u8> = vec![0x92, 0xb0, b't', b'a', b'g', b'.', b'n', b'a', b'm', b'e'];
+        assert!(partial.len() > max_frame_size);
+
+        let mut buf = BytesMut::from(&partial[..]);
+        let mut decoder = FluentDecoder {
+            log_namespace: LogNamespace::default(),
+            max_frame_size,
+        };
+
+        let error = match decoder.decode(&mut buf) {
+            Err(error) => error,
+            Ok(_) => panic!("expected FrameTooLarge error, got Ok"),
+        };
+        assert!(
+            matches!(error, DecodeError::FrameTooLarge { size, max } if size == partial.len() && max == max_frame_size),
+            "unexpected error: {error:?}"
+        );
+        // A frame-too-large error must terminate the connection.
+        assert!(!error.can_continue());
+    }
+
     #[tokio::test]
     async fn ack_delivered_without_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, false).await;
@@ -1125,10 +1197,16 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
-        assert_eq!(log.get("field").unwrap(), &msg.into());
-        assert!(matches!(log.get("host").unwrap(), Value::Bytes(_)));
-        assert!(matches!(log.get("timestamp").unwrap(), Value::Timestamp(_)));
-        assert_eq!(log.get("tag").unwrap(), &tag.into());
+        assert_eq!(log.get(event_path!("field")).unwrap(), &msg.into());
+        assert!(matches!(
+            log.get(event_path!("host")).unwrap(),
+            Value::Bytes(_)
+        ));
+        assert!(matches!(
+            log.get(event_path!("timestamp")).unwrap(),
+            Value::Timestamp(_)
+        ));
+        assert_eq!(log.get(event_path!("tag")).unwrap(), &tag.into());
 
         (result, output.into())
     }
@@ -1257,6 +1335,7 @@ mod integration_tests {
     use futures::Stream;
     use tokio::time::sleep;
     use vector_lib::event::{Event, EventStatus};
+    use vrl::event_path;
 
     use crate::{
         SourceSender,
@@ -1349,8 +1428,8 @@ mod integration_tests {
             let log = events[0].as_log();
             assert_eq!(log["tag"], "http.0".into());
             assert_eq!(log["message"], msg.into());
-            assert!(log.get("timestamp").is_some());
-            assert!(log.get("host").is_some());
+            assert!(log.get(event_path!("timestamp")).is_some());
+            assert!(log.get(event_path!("host")).is_some());
         })
         .await;
     }
@@ -1428,8 +1507,8 @@ mod integration_tests {
             assert_eq!(events.len(), 1);
             assert_eq!(events[0].as_log()["tag"], "".into());
             assert_eq!(events[0].as_log()["message"], msg.into());
-            assert!(events[0].as_log().get("timestamp").is_some());
-            assert!(events[0].as_log().get("host").is_some());
+            assert!(events[0].as_log().get(event_path!("timestamp")).is_some());
+            assert!(events[0].as_log().get(event_path!("host")).is_some());
         })
         .await;
     }

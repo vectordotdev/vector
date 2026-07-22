@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn optional() {
         assert!(
-            toml::from_str::<RegionOrEndpoint>(indoc! {"
+            serde_yaml::from_str::<RegionOrEndpoint>(indoc! {"
             "})
             .is_ok()
         );
@@ -65,8 +65,8 @@ mod tests {
     #[test]
     fn region_optional() {
         assert!(
-            toml::from_str::<RegionOrEndpoint>(indoc! {r#"
-            endpoint = "http://localhost:8080"
+            serde_yaml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            endpoint: "http://localhost:8080"
         "#})
             .is_ok()
         );
@@ -75,8 +75,8 @@ mod tests {
     #[test]
     fn endpoint_optional() {
         assert!(
-            toml::from_str::<RegionOrEndpoint>(indoc! {r#"
-            region = "us-east-1"
+            serde_yaml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            region: "us-east-1"
         "#})
             .is_ok()
         );

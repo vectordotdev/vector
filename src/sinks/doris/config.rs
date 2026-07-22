@@ -13,6 +13,7 @@ use crate::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, service::HealthConfig},
     },
+    template::ConfinementConfig,
 };
 use futures;
 use futures_util::TryFutureExt;
@@ -102,6 +103,10 @@ pub struct DorisConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 fn default_label_prefix() -> String {
@@ -134,6 +139,7 @@ impl Default for DorisConfig {
             tls: None,
             endpoint_health: None,
             acknowledgements: AcknowledgementsConfig::default(),
+            confinement: ConfinementConfig::default(),
         }
     }
 }
@@ -236,6 +242,7 @@ impl SinkConfig for DorisConfig {
         .map_ok(|((), _)| ())
         .boxed();
 
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
 
@@ -261,5 +268,42 @@ mod tests {
     fn test_default_values() {
         assert_eq!(default_label_prefix(), "vector");
         assert_eq!(default_max_retries(), -1);
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_database_template() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "doris", "database");
+        assert!(
+            result.is_err(),
+            "bare template with no literal prefix must be rejected"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_database_template() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "doris", "database");
+        assert!(result.is_ok(), "opt-out must allow bare template");
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::LogEvent;
+        use vrl::event_path;
+        let template = Template::try_from("mydb_{{ tenant }}").unwrap();
+        let config = ConfinementConfig::default();
+        let confined = template.confine(&config, "doris", "database").unwrap();
+        let mut event = LogEvent::default();
+        event.insert(event_path!("tenant"), "/../evil");
+        let result = confined.render_string(&crate::event::Event::Log(event));
+        assert!(
+            result.is_err(),
+            "dotdot escape in rendered value must be rejected by prefix check"
+        );
     }
 }

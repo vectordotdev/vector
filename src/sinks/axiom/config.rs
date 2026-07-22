@@ -15,9 +15,11 @@ use crate::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            http::{RequestConfig, RetryStrategy},
         },
     },
+    template::ConfinementConfig,
     tls::TlsConfig,
 };
 
@@ -124,6 +126,13 @@ pub struct AxiomConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl GenerateConfig for AxiomConfig {
@@ -180,9 +189,18 @@ impl SinkConfig for AxiomConfig {
             ),
             payload_prefix: "".into(), // Always newline delimited JSON
             payload_suffix: "".into(), // Always newline delimited JSON
+            retry_strategy: self.retry_strategy.clone(),
+            confinement: self.confinement.clone(),
         };
 
-        http_sink_config.build(cx).await
+        // Route through the HTTP builder that doesn't emit the gauge, so
+        // per-template warnings and the sink-level gauge both carry
+        // `component_type=axiom` — not `http`.
+        let result = http_sink_config
+            .build_without_confinement_gauge(cx, Self::NAME)
+            .await?;
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        Ok(result)
     }
 
     fn input(&self) -> Input {
@@ -322,13 +340,11 @@ mod test {
     #[test]
     fn test_url_or_region_deserialization_with_url() {
         // Test that url can be deserialized at the top level (flattened)
-        let config: super::AxiomConfig = toml::from_str(
-            r#"
-            token = "test-token"
-            dataset = "test-dataset"
-            url = "https://api.eu.axiom.co"
-            "#,
-        )
+        let config: super::AxiomConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            token: "test-token"
+            dataset: "test-dataset"
+            url: "https://api.eu.axiom.co"
+        "#})
         .unwrap();
 
         assert_eq!(config.endpoint.url(), Some("https://api.eu.axiom.co"));
@@ -338,13 +354,11 @@ mod test {
     #[test]
     fn test_url_or_region_deserialization_with_region() {
         // Test that region can be deserialized at the top level (flattened)
-        let config: super::AxiomConfig = toml::from_str(
-            r#"
-            token = "test-token"
-            dataset = "test-dataset"
-            region = "mumbai.axiom.co"
-            "#,
-        )
+        let config: super::AxiomConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            token: "test-token"
+            dataset: "test-dataset"
+            region: "mumbai.axiom.co"
+        "#})
         .unwrap();
 
         assert_eq!(config.endpoint.url(), None);

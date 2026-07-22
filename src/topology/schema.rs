@@ -44,7 +44,7 @@ pub fn possible_definitions(
                 maybe_output
                     .unwrap_or_else(|| {
                         unreachable!(
-                            "source output mis-configured - output for port {:?} missing",
+                            "source output misconfigured - output for port {:?} missing",
                             &input.port
                         )
                     })
@@ -74,7 +74,7 @@ pub fn possible_definitions(
                     .expect("transform must exist - already found inputs")
                     .unwrap_or_else(|| {
                         unreachable!(
-                            "transform output mis-configured - output for port {:?} missing",
+                            "transform output misconfigured - output for port {:?} missing",
                             &input.port
                         )
                     })
@@ -148,7 +148,7 @@ pub(super) fn expanded_definitions(
                     .unwrap_or_else(|| {
                         // If we find no match, it means the topology is misconfigured. This is a fatal
                         // error, but other parts of the topology builder deal with this state.
-                        unreachable!("source output mis-configured")
+                        unreachable!("source output misconfigured")
                     });
 
             if contains_never(&source_definitions) {
@@ -232,7 +232,7 @@ pub(crate) fn input_definitions(
                 maybe_output
                     .unwrap_or_else(|| {
                         unreachable!(
-                            "source output mis-configured - output for port {:?} missing",
+                            "source output misconfigured - output for port {:?} missing",
                             &input.port
                         )
                     })
@@ -267,7 +267,7 @@ pub(crate) fn input_definitions(
                     .expect("transform must exist")
                     .unwrap_or_else(|| {
                         unreachable!(
-                            "transform output mis-configured - output for port {:?} missing",
+                            "transform output misconfigured - output for port {:?} missing",
                             &input.port
                         )
                     })
