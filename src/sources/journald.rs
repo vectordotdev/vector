@@ -519,7 +519,7 @@ impl JournaldSource {
         let events_received = register!(EventsReceived);
 
         // Spawn stderr handler task
-        let stderr_handler = tokio::spawn(Self::handle_stderr(stderr_stream));
+        let stderr_handler = crate::spawn_in_current_span(Self::handle_stderr(stderr_stream));
 
         let batch_size = self.batch_size;
         let result = loop {
@@ -1056,7 +1056,7 @@ impl Finalizer {
     ) -> Self {
         if acknowledgements {
             let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown));
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         checkpointer.lock().await.set(cursor).await;
@@ -1110,10 +1110,7 @@ impl Checkpointer {
             0 => Ok(None),
             _ => {
                 let text = String::from_utf8_lossy(&buf);
-                match text.find('\n') {
-                    Some(nl) => Ok(Some(String::from(&text[..nl]))),
-                    None => Ok(None), // Maybe return an error?
-                }
+                Ok(text.split_once('\n').map(|(line, _)| line.to_string()))
             }
         }
     }

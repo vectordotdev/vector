@@ -26,40 +26,39 @@ mission-critical production pipelines that are collaborated on.
 Let's look at a basic example that uses the [`regex_parser`
 transform][docs.transforms.regex_parser] to parse log lines:
 
-```toml title="vector.toml"
-[sources.my_logs]
-  type    = "file"
-  include = ["/var/log/my-app.log"]
+```yaml title="vector.yaml"
+sources:
+  my_logs:
+    type: "file"
+    include: ["/var/log/my-app.log"]
 
-[transforms.parser]
-  inputs = ["my_logs"]
-  type   = "regex_parser"
-  regex  = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
+transforms:
+  parser:
+    inputs: ["my_logs"]
+    type: "regex_parser"
+    regex: "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-[[tests]]
-  name = "verify_regex"
-
-  [tests.input]
-    insert_at = "parser"
-    type = "raw"
-    value = "2019-11-28T12:00:00+00:00 info Hello world"
-
-  [[tests.outputs]]
-    extract_from = "parser"
-
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "timestamp.equals" = "2019-11-28T12:00:00+00:00"
-      "level.equals" = "info"
-      "message.equals" = "Hello world"
+tests:
+  - name: "verify_regex"
+    input:
+      insert_at: "parser"
+      type: "raw"
+      value: "2019-11-28T12:00:00+00:00 info Hello world"
+    outputs:
+      - extract_from: "parser"
+        conditions:
+          - type: "check_fields"
+            "timestamp.equals": "2019-11-28T12:00:00+00:00"
+            "level.equals": "info"
+            "message.equals": "Hello world"
 ```
 
 And you can run the tests via the new `test` subcommand:
 
 ```sh
-$ vector test ./vector.toml
-Running ./vector.toml tests
-Test ./vector.toml: verify_regex ... passed
+$ vector test ./vector.yaml
+Running ./vector.yaml tests
+Test ./vector.yaml: verify_regex ... passed
 ```
 
 ## Why?

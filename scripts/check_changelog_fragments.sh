@@ -8,7 +8,7 @@
 CHANGELOG_DIR="changelog.d"
 
 # NOTE: If these are altered, update both the 'changelog.d/README.md' and
-#       'scripts/generate-release-cue.rb' accordingly.
+#       'vdev/src/commands/release/generate_cue.rs' accordingly.
 FRAGMENT_TYPES="breaking|security|deprecation|feature|enhancement|fix"
 
 if [ ! -d "${CHANGELOG_DIR}" ]; then

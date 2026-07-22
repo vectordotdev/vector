@@ -4,8 +4,9 @@ mod grpc;
 mod integration_tests;
 
 use indoc::indoc;
+use serde::Deserialize;
 use vector_config::component::GenerateConfig;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{codecs::encoding::SerializerConfig, configurable::configurable_component};
 
 use crate::{
     codecs::EncodingConfigWithFraming,
@@ -16,7 +17,8 @@ use crate::{
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
             BatchConfig, Compression, RealtimeEventBasedDefaultBatchSettings,
-            RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
+            RealtimeSizeBasedDefaultBatchSettings,
+            http::{RequestConfig, RetryStrategy},
         },
     },
     template::Template,
@@ -58,6 +60,10 @@ pub enum OtlpProtocol {
         #[configurable(derived)]
         #[serde(default)]
         batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+        #[configurable(derived)]
+        #[serde(default)]
+        retry_strategy: RetryStrategy,
     },
 
     /// Send OTLP data over gRPC.
@@ -69,7 +75,10 @@ pub enum OtlpProtocol {
 }
 
 /// Configuration for the `opentelemetry` sink.
-#[configurable_component(sink("opentelemetry", "Deliver OTLP data over HTTP or gRPC."))]
+#[configurable_component(
+    sink("opentelemetry", "Deliver OTLP data over HTTP or gRPC."),
+    no_deser
+)]
 #[derive(Clone, Debug)]
 pub struct OpenTelemetryConfig {
     /// The transport protocol to use.
@@ -98,7 +107,7 @@ pub struct OpenTelemetryConfig {
 
     #[configurable(derived)]
     #[configurable(metadata(
-        docs::warnings = "The `grpc` protocol only supports `none` and `gzip`. Specifying any other algorithm causes Vector to fail at startup."
+        docs::warnings = "The `grpc` protocol only supports `none`, `gzip`, and `zstd`. Specifying any other algorithm causes Vector to fail at startup."
     ))]
     #[serde(default)]
     pub compression: Compression,
@@ -125,6 +134,110 @@ pub struct OpenTelemetryConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
+/// Mirror of `OpenTelemetryConfig` with a plain serde derive, used to decode the new flat format.
+#[derive(Debug, Deserialize)]
+struct FlatOpenTelemetryConfig {
+    #[serde(flatten)]
+    protocol: OtlpProtocol,
+    uri: Template,
+    #[serde(default)]
+    compression: Compression,
+    #[serde(default)]
+    request: RequestConfig,
+    tls: Option<TlsConfig>,
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
+}
+
+/// Legacy (pre-flattening) nested format: everything under `protocol.*` with `protocol.type`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LegacyOpenTelemetryConfig {
+    protocol: LegacyProtocol,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum LegacyProtocol {
+    /// The legacy format embedded the full `HttpSinkConfig` (only HTTP was supported).
+    Http(HttpSinkConfig),
+}
+
+impl From<FlatOpenTelemetryConfig> for OpenTelemetryConfig {
+    fn from(flat: FlatOpenTelemetryConfig) -> Self {
+        Self {
+            protocol: flat.protocol,
+            uri: flat.uri,
+            compression: flat.compression,
+            request: flat.request,
+            tls: flat.tls,
+            acknowledgements: flat.acknowledgements,
+        }
+    }
+}
+
+impl From<LegacyOpenTelemetryConfig> for OpenTelemetryConfig {
+    fn from(legacy: LegacyOpenTelemetryConfig) -> Self {
+        match legacy.protocol {
+            LegacyProtocol::Http(http) => Self {
+                protocol: OtlpProtocol::Http {
+                    method: http.method,
+                    auth: http.auth,
+                    encoding: http.encoding,
+                    payload_prefix: http.payload_prefix,
+                    payload_suffix: http.payload_suffix,
+                    batch: http.batch,
+                    retry_strategy: http.retry_strategy,
+                },
+                uri: http.uri,
+                compression: http.compression,
+                request: http.request,
+                tls: http.tls,
+                acknowledgements: http.acknowledgements,
+            },
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for OpenTelemetryConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let value = serde_json::Value::deserialize(deserializer)?;
+
+        let is_legacy = matches!(value.get("protocol"), Some(serde_json::Value::Object(_)));
+
+        if is_legacy {
+            let legacy: LegacyOpenTelemetryConfig =
+                serde_json::from_value(value).map_err(D::Error::custom)?;
+            warn!(
+                message = "The nested `protocol.*` configuration format for the `opentelemetry` \
+                           sink is deprecated and will be removed. Migrate to the flat format: \
+                           move all fields from `protocol.*` to the top level and replace \
+                           `protocol.type` with `protocol`.",
+            );
+            Ok(legacy.into())
+        } else {
+            if matches!(
+                value.get("protocol"),
+                Some(serde_json::Value::String(protocol)) if protocol == "grpc"
+            ) && value.get("retry_strategy").is_some()
+            {
+                return Err(D::Error::custom(
+                    "`retry_strategy` is only valid when `protocol` is `http`",
+                ));
+            }
+
+            let flat: FlatOpenTelemetryConfig =
+                serde_json::from_value(value).map_err(D::Error::custom)?;
+            Ok(flat.into())
+        }
+    }
+}
+
 impl GenerateConfig for OpenTelemetryConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -148,6 +261,7 @@ impl SinkConfig for OpenTelemetryConfig {
                 payload_prefix,
                 payload_suffix,
                 batch,
+                retry_strategy,
             } => {
                 let config = HttpSinkConfig {
                     uri: self.uri.clone(),
@@ -161,15 +275,18 @@ impl SinkConfig for OpenTelemetryConfig {
                     request: self.request.clone(),
                     tls: self.tls.clone(),
                     acknowledgements: self.acknowledgements,
+                    retry_strategy: retry_strategy.clone(),
                 };
+                warn_on_invalid_otlp_batching(&config);
                 config.build(cx).await
             }
             OtlpProtocol::Grpc { batch } => {
                 let grpc_compression = match self.compression {
                     Compression::None => GrpcCompression::None,
                     Compression::Gzip(_) => GrpcCompression::Gzip,
+                    Compression::Zstd(_) => GrpcCompression::Zstd,
                     other => return Err(format!(
-                        "gRPC transport only supports 'none' or 'gzip' compression, got '{other}'"
+                        "gRPC transport only supports 'none', 'gzip', or 'zstd' compression, got '{other}'"
                     )
                     .into()),
                 };
@@ -198,10 +315,237 @@ impl SinkConfig for OpenTelemetryConfig {
     }
 }
 
+fn warn_on_invalid_otlp_batching(config: &HttpSinkConfig) {
+    let (_, serializer) = config.encoding.config();
+    let is_json = matches!(serializer, SerializerConfig::Json(_));
+    let batches_more_than_one = !matches!(config.batch.max_events, Some(1));
+    if is_json && batches_more_than_one {
+        tracing::warn!(
+            message = "`opentelemetry` sink is configured with `encoding.codec = json` and \
+                       `batch.max_events` greater than 1. This produces invalid OTLP request \
+                       bodies that receivers reject with HTTP 400. Use `encoding.codec = otlp` \
+                       (recommended) or set `batch.max_events = 1`. See \
+                       https://github.com/vectordotdev/vector/issues/22054.",
+        );
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use http::StatusCode;
+    use serde_json::json;
+
+    use super::*;
+
+    fn config_to_json(config: &OpenTelemetryConfig) -> serde_json::Value {
+        serde_json::to_value(config).expect("config should serialize to JSON")
+    }
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::OpenTelemetryConfig>();
+    }
+
+    #[test]
+    fn flat_http_format_parses() {
+        let config: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            protocol = "http"
+            uri = "http://localhost:8889/write"
+            method = "post"
+            batch.max_events = 1
+            encoding.codec = "json"
+            framing.method = "bytes"
+            [request.headers]
+            content-type = "application/json"
+        "#})
+        .unwrap();
+
+        assert_eq!(config.uri.to_string(), "http://localhost:8889/write");
+        match config.protocol {
+            OtlpProtocol::Http {
+                method,
+                batch,
+                retry_strategy,
+                ..
+            } => {
+                assert_eq!(method, HttpMethod::Post);
+                assert_eq!(batch.max_events, Some(1));
+                assert_eq!(retry_strategy, RetryStrategy::Default);
+            }
+            OtlpProtocol::Grpc { .. } => panic!("expected HTTP protocol"),
+        }
+    }
+
+    #[test]
+    fn flat_grpc_format_parses() {
+        let config: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            protocol = "grpc"
+            uri = "http://localhost:4317"
+        "#})
+        .unwrap();
+
+        assert_eq!(config.uri.to_string(), "http://localhost:4317");
+        assert!(matches!(config.protocol, OtlpProtocol::Grpc { .. }));
+    }
+
+    #[test]
+    fn legacy_format_parses_and_maps_to_flat_equivalent() {
+        let legacy: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            [protocol]
+            type = "http"
+            uri = "http://localhost:8889/write"
+            method = "post"
+            batch.max_events = 1
+            encoding.codec = "json"
+            framing.method = "bytes"
+            [protocol.request.headers]
+            content-type = "application/json"
+        "#})
+        .unwrap();
+
+        let flat: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            protocol = "http"
+            uri = "http://localhost:8889/write"
+            method = "post"
+            batch.max_events = 1
+            encoding.codec = "json"
+            framing.method = "bytes"
+            [request.headers]
+            content-type = "application/json"
+        "#})
+        .unwrap();
+
+        assert_eq!(config_to_json(&legacy), config_to_json(&flat));
+    }
+
+    #[test]
+    fn legacy_format_rejects_unknown_protocol_fields() {
+        let err = toml::from_str::<OpenTelemetryConfig>(indoc! {r#"
+            [protocol]
+            type = "http"
+            uri = "http://localhost:8889/write"
+            encoding.codec = "json"
+            unknown_field = true
+        "#})
+        .unwrap_err();
+
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn legacy_format_rejects_mixed_top_level_fields() {
+        let err = toml::from_str::<OpenTelemetryConfig>(indoc! {r#"
+            uri = "http://localhost:8889/write"
+            [protocol]
+            type = "http"
+            uri = "http://localhost:8889/write"
+            encoding.codec = "json"
+        "#})
+        .unwrap_err();
+
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn flat_format_error_on_missing_uri() {
+        let err = toml::from_str::<OpenTelemetryConfig>(indoc! {r#"
+            protocol = "http"
+            encoding.codec = "json"
+        "#})
+        .unwrap_err();
+
+        assert!(err.to_string().contains("uri"));
+    }
+
+    #[test]
+    fn flat_format_error_on_invalid_protocol_type() {
+        let err = toml::from_str::<OpenTelemetryConfig>(indoc! {r#"
+            protocol = 123
+            uri = "http://localhost:8889/write"
+        "#})
+        .unwrap_err();
+
+        assert!(!err.to_string().is_empty());
+    }
+
+    #[test]
+    fn legacy_decoded_config_serializes_to_flat_format() {
+        let config: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            [protocol]
+            type = "http"
+            uri = "http://localhost:8889/write"
+            method = "post"
+            encoding.codec = "json"
+        "#})
+        .unwrap();
+
+        let serialized = config_to_json(&config);
+        assert_eq!(serialized.get("protocol"), Some(&json!("http")));
+        assert!(serialized.get("protocol").unwrap().is_string());
+        assert_eq!(
+            serialized.get("uri"),
+            Some(&json!("http://localhost:8889/write"))
+        );
+    }
+
+    #[test]
+    fn flat_http_retry_strategy_parses() {
+        let config: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            protocol = "http"
+            uri = "http://localhost:8889/write"
+            encoding.codec = "json"
+            retry_strategy.type = "custom"
+            retry_strategy.status_codes = [502]
+        "#})
+        .unwrap();
+
+        match config.protocol {
+            OtlpProtocol::Http { retry_strategy, .. } => {
+                assert_eq!(
+                    retry_strategy,
+                    RetryStrategy::Custom {
+                        status_codes: vec![StatusCode::BAD_GATEWAY],
+                    }
+                );
+            }
+            OtlpProtocol::Grpc { .. } => panic!("expected HTTP protocol"),
+        }
+    }
+
+    #[test]
+    fn legacy_retry_strategy_maps_to_flat_equivalent() {
+        let legacy: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            [protocol]
+            type = "http"
+            uri = "http://localhost:8889/write"
+            encoding.codec = "json"
+            retry_strategy.type = "custom"
+            retry_strategy.status_codes = [502]
+        "#})
+        .unwrap();
+
+        let flat: OpenTelemetryConfig = toml::from_str(indoc! {r#"
+            protocol = "http"
+            uri = "http://localhost:8889/write"
+            encoding.codec = "json"
+            retry_strategy.type = "custom"
+            retry_strategy.status_codes = [502]
+        "#})
+        .unwrap();
+
+        assert_eq!(config_to_json(&legacy), config_to_json(&flat));
+    }
+
+    #[test]
+    fn flat_grpc_rejects_retry_strategy() {
+        let err = toml::from_str::<OpenTelemetryConfig>(indoc! {r#"
+            protocol = "grpc"
+            uri = "http://localhost:4317"
+            retry_strategy.type = "custom"
+            retry_strategy.status_codes = [502]
+        "#})
+        .unwrap_err();
+
+        assert!(err.to_string().contains("retry_strategy"));
     }
 }

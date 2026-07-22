@@ -34,11 +34,11 @@ pub enum OtlpSignalType {
 pub struct OtlpDeserializerConfig {
     /// Signal types to attempt parsing, in priority order.
     ///
-    /// The deserializer will try parsing in the order specified. This allows you to optimize
+    /// The deserializer tries to parse signals in the specified order. This allows you to optimize
     /// performance when you know the expected signal types. For example, if you only receive
     /// traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
     ///
-    /// If not specified, defaults to trying all types in order: logs, metrics, traces.
+    /// If not specified, defaults to trying all types in this order: logs, metrics, traces.
     /// Duplicate signal types are automatically removed while preserving order.
     #[serde(default = "default_signal_types")]
     pub signal_types: IndexSet<OtlpSignalType>,
@@ -181,6 +181,7 @@ impl Deserializer for OtlpDeserializer {
                     }
                 }
                 OtlpSignalType::Traces => {
+                    // TODO: <https://github.com/vectordotdev/vector/issues/25045>
                     if let Ok(mut events) =
                         self.traces_deserializer.parse(bytes.clone(), log_namespace)
                         && let Some(Event::Log(log)) = events.first()

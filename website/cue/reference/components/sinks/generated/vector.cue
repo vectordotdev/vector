@@ -72,14 +72,31 @@ generated: components: sinks: vector: configuration: {
 	}
 	compression: {
 		description: """
-			Whether or not to compress requests.
+			Compression algorithm for requests.
 
-			If set to `true`, requests are compressed with [`gzip`][gzip_docs].
+			Supports `"none"`, `"gzip"`, or `"zstd"`.
 
-			[gzip_docs]: https://www.gzip.org/
+			For backward compatibility, boolean values are still accepted:
+			- `true` defaults to gzip compression
+			- `false` disables compression (deprecated syntax)
 			"""
 		required: false
-		type: bool: default: false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
+			}
+		}
 	}
 	request: {
 		description: """

@@ -31,10 +31,9 @@ pub(crate) fn with_default_scheme(uri: Uri, tls: bool) -> crate::Result<Uri> {
         uri
     };
     if uri.authority().is_none() {
-        return Err(format!(
-            "gRPC URI {uri:?} has no host; expected \"scheme://host:port\""
-        )
-        .into());
+        return Err(
+            format!("gRPC URI {uri:?} has no host; expected \"scheme://host:port\"").into(),
+        );
     }
     Ok(uri)
 }

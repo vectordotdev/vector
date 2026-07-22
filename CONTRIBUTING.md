@@ -39,6 +39,8 @@ Vector team member will find this document useful.
 2. **You've read Vector's [docs](https://vector.dev/docs/).**
 3. **You know about the [Vector community](https://vector.dev/community/).
    Please use this for help.**
+4. **You've read our [AI Policy](AI_POLICY.md)** if you plan to use AI tools
+   in your contribution.
 
 ## Your First Contribution
 
@@ -151,13 +153,16 @@ make check-scripts
 
 ./scripts/check_changelog_fragments.sh
 
+# Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
+typos
+
 # The following check is very slow.
 # make check-component-features
 ```
 
 Please note that `make check-all` covers all checks, but it is slow and may runs checks not
-relevant to your PR. This command is defined
-[here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
+relevant to your PR. This command is defined in the
+[Makefile](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
 
 ### GitHub Pull Requests
 
@@ -173,8 +178,7 @@ branches, this means that only the pull request title must conform to this
 format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
-A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
+A scope is optional but appreciated. Use it to identify the component or subsystem affected, for example `feat(kafka source): ...` or `fix(loki sink): ...`.
 
 The following are all good examples of pull request titles:
 
@@ -309,7 +313,7 @@ git push
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md).
 
 ### Dependencies
 
@@ -325,7 +329,7 @@ documents:
 
 1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
 2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
+3. **[DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md)** - Deprecating functionality in Vector
 
 ## Legal
 
@@ -338,7 +342,7 @@ Vector requires all contributors to sign the Contributor License Agreement
 (CLA). This gives Vector the right to use your contribution as well as ensuring
 that you own your contributions and can use them for other purposes.
 
-The full text of the CLA can be found [here](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618).
+The [full text of the CLA](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618) is available on GitHub.
 
 ### Granted rights and copyright assignment
 

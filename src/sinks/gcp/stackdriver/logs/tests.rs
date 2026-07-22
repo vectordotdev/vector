@@ -317,11 +317,12 @@ async fn correct_request() {
 
 #[tokio::test]
 async fn fails_missing_creds() {
-    let config: StackdriverConfig = toml::from_str(indoc! {r#"
-            project_id = "project"
-            log_id = "testlogs"
-            resource.type = "generic_node"
-            resource.namespace = "office"
+    let config: StackdriverConfig = serde_yaml::from_str(indoc! {r#"
+            project_id: project
+            log_id: testlogs
+            resource:
+              type: generic_node
+              namespace: office
         "#})
     .unwrap();
     if config.build(SinkContext::default()).await.is_ok() {
@@ -331,19 +332,21 @@ async fn fails_missing_creds() {
 
 #[test]
 fn fails_invalid_log_names() {
-    toml::from_str::<StackdriverConfig>(indoc! {r#"
-            log_id = "testlogs"
-            resource.type = "generic_node"
-            resource.namespace = "office"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+            log_id: testlogs
+            resource:
+              type: generic_node
+              namespace: office
         "#})
     .expect_err("Config parsing failed to error with missing ids");
 
-    toml::from_str::<StackdriverConfig>(indoc! {r#"
-            project_id = "project"
-            folder_id = "folder"
-            log_id = "testlogs"
-            resource.type = "generic_node"
-            resource.namespace = "office"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+            project_id: project
+            folder_id: folder
+            log_id: testlogs
+            resource:
+              type: generic_node
+              namespace: office
         "#})
     .expect_err("Config parsing failed to error with extraneous ids");
 }

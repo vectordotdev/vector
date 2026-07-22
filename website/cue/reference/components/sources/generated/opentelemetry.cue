@@ -28,6 +28,10 @@ generated: components: sources: opentelemetry: configuration: {
 		type: object: {
 			examples: [{
 				address: "0.0.0.0:4317"
+				keepalive: {
+					max_connection_age_grace_secs: null
+					max_connection_age_secs:       null
+				}
 			}]
 			options: {
 				address: {
@@ -38,6 +42,36 @@ generated: components: sources: opentelemetry: configuration: {
 						"""
 					required: true
 					type: string: examples: ["0.0.0.0:4317", "localhost:4317"]
+				}
+				keepalive: {
+					description: "Configuration of gRPC server keepalive parameters."
+					required:    false
+					type: object: options: {
+						max_connection_age_grace_secs: {
+							description: """
+																The grace period added to `max_connection_age_secs` before the server closes the connection.
+
+																This setting only applies when `max_connection_age_secs` is set.
+																"""
+							required: false
+							type: uint: {
+								examples: [30]
+								unit: "seconds"
+							}
+						}
+						max_connection_age_secs: {
+							description: """
+																The maximum amount of time a connection may exist before the server closes it.
+
+																When unset, connections are not closed based on age.
+																"""
+							required: false
+							type: uint: {
+								examples: [300]
+								unit: "seconds"
+							}
+						}
+					}
 				}
 				tls: {
 					description: "Configures the TLS options for incoming/outgoing connections."
@@ -170,13 +204,14 @@ generated: components: sources: opentelemetry: configuration: {
 				}
 				headers: {
 					description: """
-						A list of HTTP headers to include in the log event.
+						A list of HTTP headers to include in the event.
 
 						Accepts the wildcard (`*`) character for headers matching a specified pattern.
 
-						Specifying "*" results in all headers included in the log event.
+						Specifying "*" results in all headers included in the event.
 
-						These headers are not included in the JSON payload if a field with a conflicting name exists.
+						For log events in legacy namespace mode, headers are not included if a field with a conflicting name exists.
+						For metrics and traces, headers are always added to event metadata.
 						"""
 					required: false
 					type: array: {

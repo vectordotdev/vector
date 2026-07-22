@@ -6,11 +6,6 @@ components: {
 		_args: kind: string
 		let Args = _args
 
-		// `commonly_used` specifies if the component is commonly used or not.
-		// Setting this to `true` will surface the component from other,
-		// less commonly used, components.
-		commonly_used: bool
-
 		if Args.kind == "source" || Args.kind == "sink" {
 			delivery: #DeliveryStatus
 		}

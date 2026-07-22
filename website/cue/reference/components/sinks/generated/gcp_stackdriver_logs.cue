@@ -420,6 +420,37 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 			}
 		}
 	}
+	retry_strategy: {
+		description: """
+			Configurable retry strategy for `http` based sinks.
+
+			For more information about error responses, see [Client Error Responses][error_responses].
+
+			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+			"""
+		required: false
+		type: object: options: {
+			status_codes: {
+				description:   "Retry on these specific HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
+				type: array: items: type: uint: {}
+			}
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "default"
+					enum: {
+						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
+						custom:  "Custom retry strategy"
+						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
+						none:    "Don't retry any errors, including request timeouts."
+					}
+				}
+			}
+		}
+	}
 	severity_key: {
 		description: """
 			The field of the log event from which to take the outgoing log’s `severity` field.

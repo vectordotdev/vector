@@ -11,6 +11,7 @@ use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
 };
+use vrl::value::ObjectMap;
 use warp::{
     Filter,
     filters::{
@@ -21,7 +22,7 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::decompress_body;
+use super::encoding::{decompress_body, limited_body, max_decompressed_size_bytes};
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
@@ -55,6 +56,18 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         query_parameters: &HashMap<String, String>,
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
+
+    /// Called after `enrich_events` when `custom` auth returned metadata enrichment fields.
+    /// Sources that do not override this will emit a warning and drop the enrichment.
+    fn inject_auth_enrichment(&self, _events: &mut [Event], enrichment: ObjectMap) {
+        if !enrichment.is_empty() {
+            warn!(
+                message = "Auth metadata enrichment is not supported by this source and will be dropped. \
+                           Remove %field writes from the custom auth VRL program or switch to a source that supports enrichment.",
+                fields = ?enrichment.keys().collect::<Vec<_>>(),
+            );
+        }
+    }
 
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         decompress_body(encoding_header, body)
@@ -99,6 +112,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
+            let body_filter = limited_body(max_decompressed_size_bytes());
+
             let svc = filter
                 .and(warp::path::tail())
                 .and_then(move |tail: Tail| async move {
@@ -118,7 +133,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(warp::path::full())
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
-                .and(warp::body::bytes())
+                .and(body_filter)
                 .and(warp::query::<HashMap<String, String>>())
                 .and(warp::filters::ext::optional())
                 .and_then(
@@ -132,23 +147,27 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         let http_path = path.as_str();
                         let events = auth_matcher
                             .as_ref()
-                            .map_or(Ok(()), |a| {
+                            .map_or(Ok(None), |a| {
                                 a.handle_auth(
                                     addr.as_ref().map(|a| a.0).as_ref(),
                                     &headers,
                                     path.as_str(),
                                 )
                             })
-                            .and_then(|()| self.decode(encoding_header.as_deref(), body))
-                            .and_then(|body| {
+                            .and_then(|auth_enrichment| {
+                                self.decode(encoding_header.as_deref(), body)
+                                    .map(|body| (body, auth_enrichment))
+                            })
+                            .and_then(|(body, auth_enrichment)| {
                                 emit!(HttpBytesReceived {
                                     byte_size: body.len(),
                                     http_path,
                                     protocol,
                                 });
                                 self.build_events(body, &headers, &query_parameters, path.as_str())
+                                    .map(|events| (events, auth_enrichment))
                             })
-                            .map(|mut events| {
+                            .map(|(mut events, auth_enrichment)| {
                                 emit!(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.estimated_json_encoded_size_of(),
@@ -165,6 +184,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                         .map(|PeerAddr(inner_addr)| inner_addr)
                                         .as_ref(),
                                 );
+
+                                if let Some(enrichment) = auth_enrichment {
+                                    self.inject_auth_enrichment(&mut events, enrichment);
+                                }
 
                                 events
                             });

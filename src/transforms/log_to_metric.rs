@@ -224,7 +224,7 @@ impl TransformConfig for LogToMetricConfig {
     }
 }
 
-/// Kinds of TranformError for Parsing
+/// Kinds of TransformError for Parsing
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub enum TransformParseErrorKind {
