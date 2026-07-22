@@ -10,6 +10,10 @@
 !rust-toolchain.toml
 !scripts
 !vdev
+!distribution
+!distribution/docker
+!distribution/docker/obstack
+!distribution/docker/obstack/entrypoint.sh
 
 # Exclude target directories to avoid copying build artifacts
 target

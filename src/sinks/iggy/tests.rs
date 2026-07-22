@@ -1,8 +1,11 @@
 use vrl::value::Value;
 
 use super::config::IggySinkConfig;
-use super::otlp::{Signal, decode_event, signal_of};
-use super::proto::{WriteBatch, encode_ref, shard_of_fingerprint, QueueGeneration};
+use super::otlp::{Signal, as_id, decode_event, signal_of};
+use super::proto::{
+    DEFAULT_TOPIC_PREFIX, ProducerIdentity, QueueGeneration, WriteBatch, encode_ref,
+    shard_of_fingerprint,
+};
 
 #[test]
 fn generate_config_roundtrips() {
@@ -31,7 +34,16 @@ fn maps_otlp_sum_metric_to_total_sample() {
                             "asDouble": 5.0,
                             "attributes": [
                                 {"key": "code", "value": {"stringValue": "200"}}
-                            ]
+                            ],
+                            "exemplars": [{
+                                "timeUnixNano": 1000,
+                                "asDouble": 5.0,
+                                "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                "spanId": "bbbbbbbbbbbbbbbb",
+                                "filteredAttributes": [
+                                    {"key": "request.kind", "value": {"stringValue": "checkout"}}
+                                ]
+                            }]
                         }]
                     }
                 }]
@@ -42,11 +54,20 @@ fn maps_otlp_sum_metric_to_total_sample() {
     let mut batch = WriteBatch::new("default");
     decode_event(&event, &mut batch);
     assert_eq!(batch.samples.len(), 1);
+    assert_eq!(batch.exemplars.len(), 1);
     let (labels, row) = &batch.samples[0];
     assert_eq!(row.value, 5.0);
     // metric name gains `_total`; job derives from service.name
     let names: Vec<_> = labels_names(labels);
     assert!(names.contains(&"__name__".to_string()));
+    assert_eq!(
+        batch.exemplars[0].1.trace_id.as_deref(),
+        Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    );
+    assert_eq!(
+        batch.exemplars[0].1.span_id.as_deref(),
+        Some("bbbbbbbbbbbbbbbb")
+    );
 }
 
 #[test]
@@ -73,6 +94,17 @@ fn maps_otlp_logs_with_severity_and_trace_id() {
     assert_eq!(batch.logs.len(), 1);
     assert_eq!(batch.logs[0].1.line, "boom code=500");
     assert_eq!(batch.logs[0].1.timestamp_ns, 42);
+}
+
+#[test]
+fn canonicalizes_raw_protobuf_trace_and_span_ids() {
+    let trace = Value::Bytes(bytes::Bytes::from(vec![0xab; 16]));
+    let span = Value::Bytes(bytes::Bytes::from(vec![0x01; 8]));
+    assert_eq!(as_id(Some(&trace), 16), "ab".repeat(16));
+    assert_eq!(as_id(Some(&span), 8), "01".repeat(8));
+
+    let already_hex = Value::Bytes(bytes::Bytes::from_static(b"ABAB"));
+    assert_eq!(as_id(Some(&already_hex), 16), "abab");
 }
 
 #[test]
@@ -104,7 +136,9 @@ fn encoded_sample_batch_is_shard_placed_and_decodable() {
         for (labels, _) in &part.samples {
             assert_eq!(shard_of_fingerprint(labels.fingerprint(), shards), shard);
         }
-        let bytes = encode_ref(generation, shard, shards, &part).unwrap();
+        let producer =
+            ProducerIdentity::new("default", "host.id:test", DEFAULT_TOPIC_PREFIX).unwrap();
+        let bytes = encode_ref(producer, generation, shard, shards, &part).unwrap();
         assert!(!bytes.is_empty());
     }
 }

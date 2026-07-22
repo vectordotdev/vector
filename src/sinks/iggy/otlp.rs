@@ -12,8 +12,8 @@
 use vrl::value::Value;
 
 use super::proto::{
-    Label, Labels, LogRow, SampleRow, ScalarValue, SpanEvent, SpanKind, SpanLink, SpanRow,
-    StatusCode, WriteBatch,
+    Label, Labels, LogRow, MetricExemplar, SampleRow, ScalarValue, SpanEvent, SpanKind, SpanLink,
+    SpanRow, StatusCode, WriteBatch,
 };
 
 const RESOURCE_LOGS: &str = "resourceLogs";
@@ -57,7 +57,7 @@ fn field<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
     v.as_object().and_then(|o| o.get(key))
 }
 
-fn arr<'a>(v: Option<&'a Value>) -> &'a [Value] {
+fn arr(v: Option<&Value>) -> &[Value] {
     match v.and_then(Value::as_array) {
         Some(a) => a,
         None => &[],
@@ -95,15 +95,13 @@ fn as_f64(v: Option<&Value>) -> Option<f64> {
     }
 }
 
-/// An id field: proto bytes render as a hex string here already (the
-/// reflection decoder hex/utf8-encodes bytes); pass it through unchanged,
-/// lowercased, to match Obstack's `hex::encode`.
-fn as_id(v: Option<&Value>) -> String {
-    let s = as_string(v);
-    if s.is_empty() {
-        s
-    } else {
-        s.to_ascii_lowercase()
+/// Render an OTLP protobuf ID as canonical lower-case hexadecimal. Vector's
+/// OTLP reflection decoder preserves protobuf `bytes` verbatim, while JSON
+/// fixtures commonly contain the already-hex-encoded representation.
+pub(super) fn as_id(v: Option<&Value>, raw_len: usize) -> String {
+    match v {
+        Some(Value::Bytes(bytes)) if bytes.len() == raw_len => hex::encode(bytes),
+        _ => as_string(v).to_ascii_lowercase(),
     }
 }
 
@@ -142,10 +140,9 @@ fn any_value_scalar(v: &Value) -> Option<ScalarValue> {
         Some(ScalarValue::Int(as_i64(Some(i))))
     } else if let Some(d) = obj.get("doubleValue") {
         as_f64(Some(d)).map(ScalarValue::Float)
-    } else if let Some(b) = obj.get("bytesValue") {
-        Some(ScalarValue::Str(as_string(Some(b))))
     } else {
-        None
+        obj.get("bytesValue")
+            .map(|b| ScalarValue::Str(as_string(Some(b))))
     }
 }
 
@@ -175,7 +172,10 @@ fn flatten_one(key: &str, value: &Value, out: &mut Vec<(String, ScalarValue)>) {
             }
         }
     } else if obj.contains_key("arrayValue") {
-        out.push((key.into(), ScalarValue::Str(any_value_to_json(value).to_string())));
+        out.push((
+            key.into(),
+            ScalarValue::Str(any_value_to_json(value).to_string()),
+        ));
     } else if let Some(scalar) = any_value_scalar(value) {
         out.push((key.into(), scalar));
     }
@@ -248,7 +248,7 @@ fn now_ns() -> i64 {
 
 // ---------------------------------------------------------------- logs --
 
-fn severity_level(num: i64) -> &'static str {
+const fn severity_level(num: i64) -> &'static str {
     match num {
         1..=4 => "trace",
         5..=8 => "debug",
@@ -304,11 +304,11 @@ fn decode_logs(resource_logs: Option<&Value>, out: &mut WriteBatch) {
                     .iter()
                     .map(|(k, v)| Label::new(sanitize_label_name(k), scalar_render(v)))
                     .collect();
-                let trace_id = as_id(field(rec, "traceId"));
+                let trace_id = as_id(field(rec, "traceId"), 16);
                 if !trace_id.is_empty() {
                     metadata.push(Label::new("trace_id", trace_id));
                 }
-                let span_id = as_id(field(rec, "spanId"));
+                let span_id = as_id(field(rec, "spanId"), 8);
                 if !span_id.is_empty() {
                     metadata.push(Label::new("span_id", span_id));
                 }
@@ -339,11 +339,11 @@ fn decode_traces(resource_spans: Option<&Value>, out: &mut WriteBatch) {
             for span in arr(field(ss, "spans")) {
                 let start_ns = as_i64(field(span, "startTimeUnixNano"));
                 let end_ns = as_i64(field(span, "endTimeUnixNano"));
-                let parent = as_id(field(span, "parentSpanId"));
+                let parent = as_id(field(span, "parentSpanId"), 8);
                 let status = field(span, "status");
                 out.spans.push(SpanRow {
-                    trace_id: as_id(field(span, "traceId")),
-                    span_id: as_id(field(span, "spanId")),
+                    trace_id: as_id(field(span, "traceId"), 16),
+                    span_id: as_id(field(span, "spanId"), 8),
                     parent_span_id: (!parent.is_empty()).then_some(parent),
                     name: as_string(field(span, "name")),
                     kind: SpanKind::from_i32(as_i64(field(span, "kind")) as i32),
@@ -367,8 +367,8 @@ fn decode_traces(resource_spans: Option<&Value>, out: &mut WriteBatch) {
                     links: arr(field(span, "links"))
                         .iter()
                         .map(|l| SpanLink {
-                            trace_id: as_id(field(l, "traceId")),
-                            span_id: as_id(field(l, "spanId")),
+                            trace_id: as_id(field(l, "traceId"), 16),
+                            span_id: as_id(field(l, "spanId"), 8),
                             attrs: flatten_attrs(arr(field(l, "attributes"))),
                         })
                         .collect(),
@@ -386,7 +386,11 @@ fn decode_metrics(resource_metrics: Option<&Value>, out: &mut WriteBatch) {
     for rm in arr(resource_metrics) {
         let resource_attrs = resource_attrs_of(field(rm, "resource"));
         let svc = service_name(&resource_attrs);
-        let mut resource_labels: Vec<Label> = Vec::new();
+        let mut resource_labels: Vec<Label> = resource_attrs
+            .iter()
+            .map(|(key, value)| Label::new(sanitize_label_name(key), scalar_render(value)))
+            .collect();
+        resource_labels.push(Label::new("service_name", svc.clone()));
         let job = match attr(&resource_attrs, "service.namespace").and_then(scalar_str) {
             Some(ns) if !ns.is_empty() => format!("{ns}/{svc}"),
             _ => svc,
@@ -434,7 +438,12 @@ fn decode_metrics(resource_metrics: Option<&Value>, out: &mut WriteBatch) {
                             );
                         }
                         if let Some(sum) = as_f64(field(dp, "sum")) {
-                            push_sample(out, with_name_and(&base, &format!("{name}_sum"), None), ts, sum);
+                            push_sample(
+                                out,
+                                with_name_and(&base, &format!("{name}_sum"), None),
+                                ts,
+                                sum,
+                            );
                         }
                         push_sample(
                             out,
@@ -442,13 +451,34 @@ fn decode_metrics(resource_metrics: Option<&Value>, out: &mut WriteBatch) {
                             ts,
                             as_f64(field(dp, "count")).unwrap_or(0.0),
                         );
+                        for exemplar in arr(field(dp, "exemplars")) {
+                            let Some(value) = exemplar_value(exemplar) else {
+                                continue;
+                            };
+                            let le = bounds
+                                .iter()
+                                .filter_map(|bound| as_f64(Some(bound)))
+                                .find(|bound| value <= *bound)
+                                .map(format_le)
+                                .unwrap_or_else(|| "+Inf".to_string());
+                            push_exemplar(
+                                out,
+                                with_name_and(&base, &format!("{name}_bucket"), Some(("le", &le))),
+                                exemplar,
+                            );
+                        }
                     }
                 } else if let Some(h) = mobj.and_then(|o| o.get("exponentialHistogram")) {
                     for dp in arr(field(h, "dataPoints")) {
                         let ts = as_i64(field(dp, "timeUnixNano"));
                         let base = dp_labels(&resource_labels, dp);
                         if let Some(sum) = as_f64(field(dp, "sum")) {
-                            push_sample(out, with_name_and(&base, &format!("{name}_sum"), None), ts, sum);
+                            push_sample(
+                                out,
+                                with_name_and(&base, &format!("{name}_sum"), None),
+                                ts,
+                                sum,
+                            );
                         }
                         push_sample(
                             out,
@@ -456,6 +486,13 @@ fn decode_metrics(resource_metrics: Option<&Value>, out: &mut WriteBatch) {
                             ts,
                             as_f64(field(dp, "count")).unwrap_or(0.0),
                         );
+                        for exemplar in arr(field(dp, "exemplars")) {
+                            push_exemplar(
+                                out,
+                                with_name_and(&base, &format!("{name}_count"), None),
+                                exemplar,
+                            );
+                        }
                     }
                 } else if let Some(s) = mobj.and_then(|o| o.get("summary")) {
                     for dp in arr(field(s, "dataPoints")) {
@@ -470,7 +507,12 @@ fn decode_metrics(resource_metrics: Option<&Value>, out: &mut WriteBatch) {
                                 as_f64(field(q, "value")).unwrap_or(0.0),
                             );
                         }
-                        push_sample(out, with_name_and(&base, &format!("{name}_sum"), None), ts, as_f64(field(dp, "sum")).unwrap_or(0.0));
+                        push_sample(
+                            out,
+                            with_name_and(&base, &format!("{name}_sum"), None),
+                            ts,
+                            as_f64(field(dp, "sum")).unwrap_or(0.0),
+                        );
                         push_sample(
                             out,
                             with_name_and(&base, &format!("{name}_count"), None),
@@ -493,7 +535,61 @@ fn push_number_dp(out: &mut WriteBatch, resource_labels: &[Label], name: &str, d
         return;
     };
     let base = dp_labels(resource_labels, dp);
-    push_sample(out, with_name_and(&base, name, None), as_i64(field(dp, "timeUnixNano")), value);
+    let labels = with_name_and(&base, name, None);
+    push_sample(
+        out,
+        labels.clone(),
+        as_i64(field(dp, "timeUnixNano")),
+        value,
+    );
+    for exemplar in arr(field(dp, "exemplars")) {
+        push_exemplar(out, labels.clone(), exemplar);
+    }
+}
+
+fn exemplar_value(exemplar: &Value) -> Option<f64> {
+    as_f64(field(exemplar, "asDouble"))
+        .or_else(|| field(exemplar, "asInt").map(|value| as_i64(Some(value)) as f64))
+}
+
+fn valid_otel_id(value: Option<&Value>, raw_len: usize) -> Option<String> {
+    let id = as_id(value, raw_len);
+    let expected_hex_len = raw_len * 2;
+    if id.is_empty() {
+        None
+    } else if id.len() == expected_hex_len && id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        Some(id)
+    } else {
+        tracing::warn!(
+            actual = id.len(),
+            expected = expected_hex_len,
+            "dropping malformed OTLP exemplar id"
+        );
+        None
+    }
+}
+
+fn push_exemplar(out: &mut WriteBatch, labels: Labels, exemplar: &Value) {
+    let Some(value) = exemplar_value(exemplar) else {
+        return;
+    };
+    let filtered_attributes = Labels::new(
+        flatten_attrs(arr(field(exemplar, "filteredAttributes")))
+            .into_iter()
+            .map(|(key, value)| Label::new(sanitize_label_name(&key), scalar_render(&value)))
+            .collect(),
+    );
+    out.exemplars.push((
+        labels,
+        MetricExemplar {
+            fingerprint: Default::default(),
+            timestamp_ns: as_i64(field(exemplar, "timeUnixNano")),
+            value,
+            trace_id: valid_otel_id(field(exemplar, "traceId"), 16),
+            span_id: valid_otel_id(field(exemplar, "spanId"), 8),
+            filtered_attributes,
+        },
+    ));
 }
 
 fn dp_labels(resource_labels: &[Label], dp: &Value) -> Vec<Label> {
@@ -531,4 +627,3 @@ fn format_le(b: f64) -> String {
         format!("{b}")
     }
 }
-

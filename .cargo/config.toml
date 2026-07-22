@@ -1,6 +1,12 @@
 [alias]
 vdev = "run --quiet --package vdev --"
 
+# The `sinks-iggy` feature depends on the private `obstack-wire` crate over SSH.
+# Cargo's built-in git (libgit2) does not reuse ssh-agent/ssh-config the way the
+# git CLI does, so delegate git fetches to the already-authenticated CLI.
+[net]
+git-fetch-with-cli = true
+
 [env]
 # Build jemalloc assuming 64K pages so binaries also run on aarch64 hosts whose
 # kernels ship with a 64K page size (notably EL8 aarch64). On 4K-page hosts this

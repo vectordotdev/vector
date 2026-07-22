@@ -6,6 +6,7 @@
 //! `use_otlp_decoding: true` so the OTLP structure is preserved end to end.
 
 mod config;
+mod datadog;
 mod otlp;
 mod proto;
 mod publisher;

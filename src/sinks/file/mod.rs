@@ -517,14 +517,14 @@ impl FileSink {
                 .modified()
                 .map_err(|_| ())
                 .and_then(|t| t.elapsed().map_err(|_| ()))
-            && time.as_secs() > after_close_time_secs.into()
+            && time.as_secs() > after_close_time_secs.get()
         {
             truncate = true;
         }
 
         if let Some(after_secs) = self.truncation_config.after_secs
             && let Some(file) = self.files.get(path)
-            && (file.created_at().elapsed().as_secs() > after_secs.into())
+            && (file.created_at().elapsed().as_secs() > after_secs.get())
         {
             truncate = true;
         }
@@ -534,7 +534,7 @@ impl FileSink {
                 .files
                 .get_with_deadline(path)
                 .and_then(|(_, deadline)| deadline.checked_sub(self.idle_timeout))
-            && previous_modification.elapsed().as_secs() > after_modified_time_secs.into()
+            && previous_modification.elapsed().as_secs() > after_modified_time_secs.get()
         {
             truncate = true;
         }
