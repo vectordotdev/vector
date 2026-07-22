@@ -211,7 +211,7 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain.toml"
-              - "vdev/Cargo.toml"
+              - "vdev/**"
               - ".github/workflows/changes.yml"
             dependencies:
               - ".cargo/**"
