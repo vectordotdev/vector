@@ -1478,4 +1478,31 @@ mod tests {
             vec![endpoints[0].clone()]
         );
     }
+
+    #[test]
+    fn parse_dns_address_selection_random() {
+        let config: VectorConfig = toml::from_str(
+            r#"
+                address = "http://127.0.0.1:6000"
+                dns_address_selection = "random"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            config.dns_address_selection,
+            crate::dns::DnsAddressSelection::Random
+        );
+    }
+
+    #[test]
+    fn dns_address_selection_defaults_to_first() {
+        let config: VectorConfig =
+            toml::from_str(r#"address = "http://127.0.0.1:6000""#).unwrap();
+
+        assert_eq!(
+            config.dns_address_selection,
+            crate::dns::DnsAddressSelection::First
+        );
+    }
 }

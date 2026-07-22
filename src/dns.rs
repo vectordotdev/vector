@@ -188,7 +188,9 @@ pub enum DnsError {
 
 #[cfg(test)]
 mod tests {
-    use super::Resolver;
+    use std::net::{Ipv4Addr, SocketAddr};
+
+    use super::{DnsAddressSelection, Resolver, apply_selection};
 
     async fn resolve(name: &str) -> bool {
         let resolver = Resolver::default();
@@ -213,5 +215,97 @@ mod tests {
     #[tokio::test]
     async fn resolve_ipv6() {
         assert!(resolve("::1").await);
+    }
+
+    #[test]
+    fn apply_selection_first_preserves_order() {
+        let mut addrs = vec![
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 1).into(), 80),
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 2).into(), 80),
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 3).into(), 80),
+        ];
+        let original = addrs.clone();
+        apply_selection(&mut addrs, DnsAddressSelection::First);
+        assert_eq!(addrs, original);
+    }
+
+    #[test]
+    fn apply_selection_random_returns_single_address() {
+        let mut addrs = vec![
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 1).into(), 80),
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 2).into(), 80),
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 3).into(), 80),
+        ];
+        let original = addrs.clone();
+        apply_selection(&mut addrs, DnsAddressSelection::Random);
+        assert_eq!(addrs.len(), 1);
+        assert!(original.contains(&addrs[0]));
+    }
+
+    #[test]
+    fn apply_selection_random_with_single_address() {
+        let mut addrs = vec![SocketAddr::new(Ipv4Addr::new(10, 0, 0, 1).into(), 80)];
+        apply_selection(&mut addrs, DnsAddressSelection::Random);
+        assert_eq!(addrs.len(), 1);
+        assert_eq!(addrs[0], SocketAddr::new(Ipv4Addr::new(10, 0, 0, 1).into(), 80));
+    }
+
+    #[test]
+    fn apply_selection_random_with_empty_list() {
+        let mut addrs: Vec<SocketAddr> = vec![];
+        apply_selection(&mut addrs, DnsAddressSelection::Random);
+        assert!(addrs.is_empty());
+    }
+
+    #[test]
+    fn apply_selection_random_distributes_across_addresses() {
+        let addrs = vec![
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 1).into(), 80),
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 2).into(), 80),
+            SocketAddr::new(Ipv4Addr::new(10, 0, 0, 3).into(), 80),
+        ];
+
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..100 {
+            let mut trial = addrs.clone();
+            apply_selection(&mut trial, DnsAddressSelection::Random);
+            seen.insert(trial[0]);
+        }
+        assert!(
+            seen.len() > 1,
+            "random selection should pick different addresses across invocations"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolver_with_random_selection_returns_single_ip() {
+        let resolver = Resolver {
+            selection: DnsAddressSelection::Random,
+        };
+        let results: Vec<_> = resolver
+            .lookup_ip("localhost".to_owned())
+            .await
+            .unwrap()
+            .collect();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn dns_address_selection_deserializes() {
+        #[derive(serde::Deserialize)]
+        struct Config {
+            selection: DnsAddressSelection,
+        }
+
+        let config: Config = toml::from_str(r#"selection = "first""#).unwrap();
+        assert_eq!(config.selection, DnsAddressSelection::First);
+
+        let config: Config = toml::from_str(r#"selection = "random""#).unwrap();
+        assert_eq!(config.selection, DnsAddressSelection::Random);
+    }
+
+    #[test]
+    fn dns_address_selection_default_is_first() {
+        assert_eq!(DnsAddressSelection::default(), DnsAddressSelection::First);
     }
 }
