@@ -24,6 +24,7 @@ type FilesystemUnderTest = ProductionFilesystem;
 
 mod acknowledgements;
 mod basic;
+mod cold_start;
 mod initialization;
 mod invariants;
 mod known_errors;

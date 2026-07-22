@@ -5,6 +5,7 @@ use std::{
     num::NonZeroU64,
     path::PathBuf,
     sync::Arc,
+    time::Duration,
 };
 
 use crc32fast::Hasher;
@@ -26,6 +27,22 @@ use crate::{
     topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
     variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
 };
+
+/// Upper bound on how long the reader waits for writer progress before re-checking on-disk state.
+///
+/// Writer notifications are still the normal wake-up path. This interval is only a safety net for
+/// cases where no notification arrives but re-checking file state is harmless.
+const WRITER_WAIT_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const PUBLISHED_RECORD_RETRY_INTERVAL: Duration = Duration::from_millis(1);
+
+async fn wait_for_writer_progress_or_poll<FS>(ledger: &Ledger<FS>)
+where
+    FS: Filesystem,
+{
+    match tokio::time::timeout(WRITER_WAIT_POLL_INTERVAL, ledger.wait_for_writer()).await {
+        Ok(()) | Err(_) => {}
+    }
+}
 
 pub(super) struct ReadToken {
     record_id: u64,
@@ -500,6 +517,12 @@ where
         }
     }
 
+    fn has_unread_published_record(&self) -> bool {
+        let next_reader_record_id = self.last_reader_record_id.saturating_add(1);
+        let next_writer_record_id = self.ledger.state().get_next_writer_record_id();
+        next_reader_record_id < next_writer_record_id
+    }
+
     #[cfg_attr(test, instrument(skip_all, level = "debug"))]
     async fn delete_completed_data_file(
         &mut self,
@@ -795,7 +818,7 @@ where
                                 data_file_path = data_file_path.to_string_lossy().as_ref(),
                                 "Data file does not yet exist. Waiting for writer to create."
                             );
-                            self.ledger.wait_for_writer().await;
+                            wait_for_writer_progress_or_poll(&self.ledger).await;
                         } else {
                             self.ledger.increment_acked_reader_file_id();
                         }
@@ -1117,7 +1140,17 @@ where
                     continue;
                 }
 
-                self.ledger.wait_for_writer().await;
+                if self.has_unread_published_record() {
+                    trace!(
+                        last_reader_record_id = self.last_reader_record_id,
+                        next_writer_record_id = self.ledger.state().get_next_writer_record_id(),
+                        "Published writer progress was not visible to the reader yet."
+                    );
+                    tokio::time::sleep(PUBLISHED_RECORD_RETRY_INTERVAL).await;
+                    continue;
+                }
+
+                wait_for_writer_progress_or_poll(&self.ledger).await;
             } else {
                 debug!(
                     bytes_read = self.bytes_read,
