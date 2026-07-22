@@ -91,7 +91,7 @@ async fn use_label_from_dropped_fields() {
 
 #[tokio::test]
 async fn healthcheck_includes_auth() {
-    let (mut config, _cx) = load_sink::<LokiConfig>(
+    let (mut config, cx) = load_sink::<LokiConfig>(
         r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
@@ -119,7 +119,7 @@ async fn healthcheck_includes_auth() {
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
-    healthcheck(config.clone(), client)
+    healthcheck(config.clone(), cx.healthcheck.uri, client)
         .await
         .expect("healthcheck failed");
 
@@ -135,7 +135,7 @@ async fn healthcheck_includes_auth() {
 #[tokio::test]
 async fn healthcheck_grafana_cloud() {
     test_util::trace_init();
-    let (config, _cx) = load_sink::<LokiConfig>(
+    let (config, cx) = load_sink::<LokiConfig>(
         r#"
             endpoint = "http://logs-prod-us-central1.grafana.net"
             encoding.codec = "json"
@@ -149,7 +149,7 @@ async fn healthcheck_grafana_cloud() {
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
-    healthcheck(config, client)
+    healthcheck(config, cx.healthcheck.uri, client)
         .await
         .expect("healthcheck failed");
 }
