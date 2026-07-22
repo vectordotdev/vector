@@ -178,8 +178,12 @@ context exists. `validate_with_context` runs in `vector validate` (both modes, a
 context). It is deliberately *not* run at startup: `build()` already compiles the same VRL programs
 and conditions against the real context (e.g. `filter::build` calls `condition.build`), so running
 `validate_with_context` there would double-compile and could repeat enrichment-index registration.
-The two paths cannot diverge because both go through the same `compile_vrl_program` / `condition.build`
-routines. This matches today's behavior, where `validate_env()` is not called at startup.
+This matches today's behavior, where `validate_env()` is not called at startup. Note the two paths
+are not identical: `validate_with_context` compiles against *stub* enrichment tables (whose
+`add_index()` always succeeds) while `build()` uses the *real* tables (which can reject an index), so
+they can still disagree on enrichment-dependent errors. To keep them from drifting, both must route
+through the same compilation helper, and contextual (not just structural) parity between
+`vector validate` and startup must be covered by tests (see Outstanding Questions).
 
 `--skip-healthchecks` and the per-sink and global `healthcheck.enabled` gates and the configured
 timeout remain the caller's responsibility (`TopologyPiecesBuilder`), exactly as today. `build()`
@@ -267,20 +271,27 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
 ## Outstanding Questions
 
 - Regression coverage: add tests showing that generic config compilation, `vector validate
-  --no-environment`, and startup report equivalent structural errors, so the split between
-  `validate_structure` and `validate_with_context` cannot silently drop a check on one path.
+  --no-environment`, and startup report equivalent errors, so the split between `validate_structure`
+  and `validate_with_context` cannot silently drop a check on one path. This must cover contextual
+  validation, not only structural: `validate_with_context` compiles against stub enrichment tables
+  while startup `build()` uses real ones, so parity requires both to share the compilation helper and
+  to be tested for enrichment-dependent errors, not just VRL syntax.
 - Task-transform rollback safety (deferring `TaskTransform::transform()` to post-commit) is left to
   a follow-up; see Future Improvements. Should it block removing the migration's task-transform
   carve-out, or ship independently?
-- Credential/token-refresh lifecycle versus healthcheck timing, for sinks that share credentials
-  between the healthcheck and the sink. A required healthcheck is awaited before `run()` starts, so
-  a refresher owned by `run()` is not yet available to it; a `require_healthy=false` healthcheck is
-  detached and can outlive `run()`, so tying the refresher's lifetime to the sink future either cuts
-  the detached probe off or, if kept alive for it, recreates the post-removal leak. Two candidate
-  resolutions to pick per sink: (a) the healthcheck uses only a freshly acquired token and never
-  needs the refresher, so the refresher can be owned outright by `run()`; or (b) a topology-owned
-  lifecycle object spans both the healthcheck and the sink and is cancelled on rollback/removal. Add
-  tests for required healthchecks, detached healthchecks, early sink exit, and reload rollback.
+- Ownership model for any background resource shared between the healthcheck and the sink, not just
+  credential/token refreshers. Credential refreshers (GCP `spawn_regenerate_token`) are one case;
+  another is Redis, which builds its Sentinel connection repair task during connection construction
+  and then clones that connection into the pre-run healthcheck. In all such cases a required
+  healthcheck is awaited before `run()` starts, so a resource owned by `run()` is not yet available
+  to it; a `require_healthy=false` healthcheck is detached and can outlive `run()`, so tying the
+  resource's lifetime to the sink future either cuts the detached probe off or, if kept alive for it,
+  recreates the post-removal leak. Two candidate resolutions to pick per sink: (a) the healthcheck
+  uses only freshly acquired resources and never needs the shared worker, so the worker can be owned
+  outright by `run()`; or (b) a topology-owned lifecycle object spans both the healthcheck and the
+  sink and is cancelled on rollback/removal. The same decision must apply to every shared background
+  resource surfaced by the migration step 4 audit. Add tests for required healthchecks, detached
+  healthchecks, early sink exit, and reload rollback.
 
 ## Plan Of Attack
 
