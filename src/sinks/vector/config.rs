@@ -120,8 +120,7 @@ pub struct VectorConfig {
     /// Controls how resolved DNS addresses are selected when a hostname resolves
     /// to multiple addresses.
     ///
-    /// - `first`: use the addresses in the order returned by the system resolver (default)
-    /// - `shuffle`: randomly shuffle all resolved addresses before connecting
+    /// - `first`: use the first address returned by the system resolver (default)
     /// - `random`: pick a single random address from the resolved set
     #[configurable(derived)]
     #[serde(default)]

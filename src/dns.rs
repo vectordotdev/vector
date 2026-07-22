@@ -6,7 +6,7 @@ use std::{
 
 use futures::{FutureExt, future::BoxFuture};
 use hyper::client::connect::dns::Name;
-use rand::{Rng, seq::SliceRandom};
+use rand::Rng;
 use snafu::ResultExt;
 use tokio::task::spawn_blocking;
 use tower::Service;
@@ -17,11 +17,9 @@ use vector_lib::configurable::configurable_component;
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DnsAddressSelection {
-    /// Use the addresses in the order returned by the system resolver (default).
+    /// Use the first address returned by the system resolver (default).
     #[default]
     First,
-    /// Shuffle the resolved addresses randomly before connecting.
-    Shuffle,
     /// Pick a single random address from the resolved set.
     Random,
 }
@@ -85,9 +83,6 @@ impl Resolver {
 fn apply_selection(addrs: &mut Vec<SocketAddr>, selection: DnsAddressSelection) {
     match selection {
         DnsAddressSelection::First => {}
-        DnsAddressSelection::Shuffle => {
-            addrs.shuffle(&mut rand::rng());
-        }
         DnsAddressSelection::Random => {
             if !addrs.is_empty() {
                 let idx = rand::rng().random_range(0..addrs.len());
