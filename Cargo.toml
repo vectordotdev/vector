@@ -1186,7 +1186,6 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transfo
 statistic-benches = []
 remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
-codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
@@ -1233,9 +1232,3 @@ path = "benches/transform/main.rs"
 harness = false
 test = false
 required-features = ["transform-benches"]
-
-[[bench]]
-name = "codecs"
-path = "benches/codecs/main.rs"
-harness = false
-required-features = ["codecs-benches"]
