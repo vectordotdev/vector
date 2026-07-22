@@ -84,6 +84,18 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
             cue_path.display()
         );
     }
+    let stub_path = repo_root
+        .join("website")
+        .join("content")
+        .join("en")
+        .join("releases")
+        .join(format!("{new_version}.md"));
+    if stub_path.exists() {
+        bail!(
+            "{} already exists. Delete it (or move it aside) and re-run.",
+            stub_path.display()
+        );
+    }
     // Note: the highlights collision is checked later, only if we're actually going to
     // write it — so a manually-authored upgrade guide doesn't block a release with no
     // breaking fragments.
@@ -167,11 +179,12 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
 }
 
 /// Regenerate `website/cue/reference/versions.cue` from the filenames in the `releases/`
-/// directory. Replaces the hand-maintained list and fixes the gap where `release generate-cue`
-/// previously left `versions.cue` stale (so the new version was invisible in local Hugo previews).
+/// directory, preserving any versions already listed there that have no backing `.cue` file
+/// (legacy releases predating the automated tooling). Fixes the gap where `release generate-cue`
+/// previously left `versions.cue` stale so the new version was invisible in local Hugo previews.
 pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
     let releases_dir = repo_root.join(RELEASES_DIR);
-    let mut versions: Vec<Version> = fs::read_dir(&releases_dir)
+    let mut versions: std::collections::HashSet<Version> = fs::read_dir(&releases_dir)
         .with_context(|| format!("Failed to read {}", releases_dir.display()))?
         .filter_map(std::result::Result::ok)
         .filter_map(|e| {
@@ -183,6 +196,24 @@ pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
             }
         })
         .collect();
+
+    // Preserve versions already in versions.cue that have no backing CUE file — these are
+    // legacy releases that predate the per-release CUE files and must not be silently dropped.
+    let versions_cue_path = repo_root
+        .join("website")
+        .join("cue")
+        .join("reference")
+        .join("versions.cue");
+    if let Ok(text) = fs::read_to_string(&versions_cue_path) {
+        for line in text.lines() {
+            let trimmed = line.trim().trim_end_matches(',').trim_matches('"');
+            if let Ok(v) = trimmed.parse::<Version>() {
+                versions.insert(v);
+            }
+        }
+    }
+
+    let mut versions: Vec<Version> = versions.into_iter().collect();
     versions.sort_by(|a, b| b.cmp(a));
 
     let list = versions
@@ -1514,5 +1545,36 @@ releases: "0.55.0": {
         let version = Version::parse("0.58.0").unwrap();
         let err = write_release_stub(tmp.path(), &version).unwrap_err();
         assert!(err.to_string().contains("already exists"), "{err}");
+    }
+
+    #[test]
+    fn refresh_versions_cue_preserves_legacy_versions_without_cue_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let releases_dir = tmp.path().join("website/cue/reference/releases");
+        fs::create_dir_all(&releases_dir).unwrap();
+        fs::write(releases_dir.join("0.15.0.cue"), "").unwrap();
+
+        // Simulate an existing versions.cue that lists a legacy version with no CUE file.
+        let versions_cue_dir = tmp.path().join("website/cue/reference");
+        let existing = indoc::indoc! {r#"
+            package metadata
+
+            versions: [string, ...string] & [
+            	"0.15.0",
+            	"0.14.1",
+            ]
+        "#};
+        fs::write(versions_cue_dir.join("versions.cue"), existing).unwrap();
+
+        refresh_versions_cue(tmp.path()).unwrap();
+
+        let out = fs::read_to_string(versions_cue_dir.join("versions.cue")).unwrap();
+        assert!(out.contains("\"0.15.0\""), "CUE-backed version missing");
+        assert!(out.contains("\"0.14.1\""), "legacy version was dropped");
+        // 0.15.0 must sort above 0.14.1
+        assert!(
+            out.find("\"0.15.0\"") < out.find("\"0.14.1\""),
+            "wrong sort order"
+        );
     }
 }
