@@ -205,23 +205,29 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
    preflight confinement check on a clone; `build()` must still attach confinement to the runtime
    template. The security boundary stays in `build()`; `validate_structure()` only surfaces the
    error earlier.
-4. Enforce the no-spawn contract on sink `build()` per component. The eager spawn is not unique to
-   `gcp_pubsub`: `spawn_regenerate_token()` is called from `build()` in at least `gcp_pubsub`,
-   `gcp_cloud_storage`, `gcp_stackdriver_logs`, `gcp_stackdriver_metrics`, and `gcp_chronicle`
-   (`src/sinks/gcp/*`, `src/sinks/gcp_chronicle/*`). Each must move into `run()`, and relocation
-   alone is not sufficient for rollback safety: `spawn_regenerate_token()` today detaches the task
-   and returns only a `watch::Receiver`, and its credential loop never observes closure
-   (`src/gcp.rs`), so the task would keep running after the sink is dropped. Each such spawn must be
-   given structured ownership (an abort-on-drop `JoinHandle` or an explicit cancellation signal tied
-   to the component future), with a reload/removal regression test proving the task stops. A
-   rolled-back reload then leaves nothing running. (Task-transform spawns such as
-   `aws_ec2_metadata`'s are excluded; see Motivation.) Where the same credentials back a healthcheck,
-   the ownership model interacts with healthcheck timing (a required healthcheck runs before `run()`
-   exists; a detached one can outlive it); that interaction is called out as an Outstanding Question
-   to resolve per sink before relocating its refresher.
+4. Enforce the no-spawn contract on sink `build()` per component. The audit must cover every task
+   spawned directly or transitively from `SinkConfig::build()`, not just one helper. Known examples
+   span more than the GCP sinks:
+   - `spawn_regenerate_token()`, called from `build()` in at least `gcp_pubsub`, `gcp_cloud_storage`,
+     `gcp_stackdriver_logs`, `gcp_stackdriver_metrics`, and `gcp_chronicle` (`src/sinks/gcp/*`,
+     `src/sinks/gcp_chronicle/*`). It detaches the task and returns only a `watch::Receiver`, and its
+     credential loop never observes closure (`src/gcp.rs`), so the task outlives a dropped sink.
+   - `datadog_traces`, which starts the APM stats flush thread during `build()`
+     (`src/sinks/datadog/traces/config.rs`).
+   - `redis`, whose connection repair task is spawned transitively via `build_connection()`
+     (`src/sinks/redis/sink.rs`, `src/sinks/redis/config.rs`); it is abort-on-drop today but still
+     violates the strict no-spawn contract.
+   Each such spawn must move into `run()` and be given structured ownership (an abort-on-drop
+   `JoinHandle` or an explicit cancellation signal tied to the component future), with a
+   reload/removal regression test proving the task stops. A rolled-back reload then leaves nothing
+   running. (Task-transform spawns such as `aws_ec2_metadata`'s are excluded; see Motivation.) Where
+   the same credentials back a healthcheck, the ownership model interacts with healthcheck timing (a
+   required healthcheck runs before `run()` exists; a detached one can outlive it); that interaction
+   is called out as an Outstanding Question to resolve per sink before relocating its refresher.
    The no-spawn contract may only be claimed for sinks once the tracking issue's sink audit is
-   complete: every sink that spawns in `build()` has been relocated and has a cancellation/removal
-   test. Until then it is a per-migrated-sink property, not a trait-wide guarantee.
+   complete: every sink that spawns directly or transitively in `build()` has been relocated and has
+   a cancellation/removal test. Until then it is a per-migrated-sink property, not a trait-wide
+   guarantee.
 5. Remove `validate()` and `validate_env()` only after every transform has been migrated off them;
    until then the default no-op `validate_structure()` on un-migrated transforms must not replace the
    legacy checks. This is a blocking prerequisite, tracked per the Plan of Attack below.
