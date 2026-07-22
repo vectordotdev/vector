@@ -16,11 +16,14 @@ use vector_lib::{
 use super::{VectorSinkError, compression::VectorCompression};
 use crate::{
     Error,
+    dns::HyperResolver,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
 };
+
+pub type VectorHttpConnector = HttpConnector<HyperResolver>;
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
@@ -28,6 +31,8 @@ pub struct VectorService {
     pub protocol: String,
     pub endpoint: String,
 }
+
+pub type VectorProxyConnector = ProxyConnector<HttpsConnector<VectorHttpConnector>>;
 
 pub struct VectorResponse {
     events_byte_size: GroupedCountByteSize,
@@ -68,7 +73,7 @@ impl MetaDescriptive for VectorRequest {
 
 impl VectorService {
     pub fn new(
-        hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+        hyper_client: hyper::Client<VectorProxyConnector, BoxBody>,
         uri: Uri,
         compression: VectorCompression,
     ) -> Self {
@@ -136,7 +141,7 @@ impl Service<VectorRequest> for VectorService {
 #[derive(Clone, Debug)]
 pub struct HyperSvc {
     uri: Uri,
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    client: hyper::Client<VectorProxyConnector, BoxBody>,
 }
 
 impl Service<hyper::Request<BoxBody>> for HyperSvc {
