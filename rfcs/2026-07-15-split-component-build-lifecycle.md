@@ -215,10 +215,10 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
    given structured ownership (an abort-on-drop `JoinHandle` or an explicit cancellation signal tied
    to the component future), with a reload/removal regression test proving the task stops. A
    rolled-back reload then leaves nothing running. (Task-transform spawns such as
-   `aws_ec2_metadata`'s are excluded; see Motivation.) When the same credentials back a healthcheck,
-   note that a `require_healthy=false` healthcheck is detached (`tokio::spawn`) and may run
-   concurrently with, or after, `run()`; the credential handle moved into `run()` must remain valid
-   for that detached probe.
+   `aws_ec2_metadata`'s are excluded; see Motivation.) Where the same credentials back a healthcheck,
+   the ownership model interacts with healthcheck timing (a required healthcheck runs before `run()`
+   exists; a detached one can outlive it); that interaction is called out as an Outstanding Question
+   to resolve per sink before relocating its refresher.
    The no-spawn contract may only be claimed for sinks once the tracking issue's sink audit is
    complete: every sink that spawns in `build()` has been relocated and has a cancellation/removal
    test. Until then it is a per-migrated-sink property, not a trait-wide guarantee.
@@ -258,6 +258,15 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
 - Task-transform rollback safety (deferring `TaskTransform::transform()` to post-commit) is left to
   a follow-up; see Future Improvements. Should it block removing the migration's task-transform
   carve-out, or ship independently?
+- Credential/token-refresh lifecycle versus healthcheck timing, for sinks that share credentials
+  between the healthcheck and the sink. A required healthcheck is awaited before `run()` starts, so
+  a refresher owned by `run()` is not yet available to it; a `require_healthy=false` healthcheck is
+  detached and can outlive `run()`, so tying the refresher's lifetime to the sink future either cuts
+  the detached probe off or, if kept alive for it, recreates the post-removal leak. Two candidate
+  resolutions to pick per sink: (a) the healthcheck uses only a freshly acquired token and never
+  needs the refresher, so the refresher can be owned outright by `run()`; or (b) a topology-owned
+  lifecycle object spans both the healthcheck and the sink and is cancelled on rollback/removal. Add
+  tests for required healthchecks, detached healthchecks, early sink exit, and reload rollback.
 
 ## Plan Of Attack
 
