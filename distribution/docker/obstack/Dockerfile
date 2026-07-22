@@ -1,10 +1,15 @@
-FROM rust:1.95-bookworm AS build
+# syntax=docker/dockerfile:1.7
+FROM rust:1.97-bookworm AS build
 WORKDIR /src
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends protobuf-compiler \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends protobuf-compiler openssh-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p -m 0700 /root/.ssh \
+    && ssh-keyscan -t ed25519,rsa github.com >> /root/.ssh/known_hosts
 COPY . .
-RUN cargo build --locked --release --no-default-features \
+# obstack-wire (sinks-iggy feature) is a private git dependency fetched over
+# SSH; forward the host's ssh-agent via buildx --ssh default.
+RUN --mount=type=ssh cargo build --locked --release --no-default-features \
       --features sources-datadog_agent,sources-opentelemetry,sinks-iggy \
       --bin vector
 
