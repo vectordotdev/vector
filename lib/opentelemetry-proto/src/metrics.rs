@@ -438,10 +438,7 @@ pub fn split_metric_tags(tags: MetricTags) -> (Resource, InstrumentationScope, V
     let mut scope_attributes = Vec::new();
     let mut attributes = Vec::new();
 
-    for (mut key, tag_set) in tags
-        .into_iter_sets()
-        .filter(|(key, _)| !key.trim().is_empty())
-    {
+    for (mut key, tag_set) in tags.into_iter_sets() {
         // `scope.name`/`scope.version` are scalar string fields on `InstrumentationScope`,
         // not attributes, so they collapse to a single representative value.
         if key == SCOPE_NAME_KEY {
