@@ -29,6 +29,7 @@ use super::{
     ledger::Ledger,
     record::{Record, RecordStatus, validate_record_archive},
 };
+
 use crate::{
     Bufferable,
     encoding::{AsMetadata, Encodable},
@@ -38,6 +39,7 @@ use crate::{
         record::{RECORD_HEADER_LEN, try_as_record_archive},
     },
 };
+use vector_common::finalization::{EventFinalizerGroups, EventStatus};
 
 /// Error that occurred during calls to [`BufferWriter`].
 #[derive(Debug, Snafu)]
@@ -59,8 +61,8 @@ where
     /// necessary bytes during encoding, and so this error will typically only be emitted when the
     /// encoder throws no error during the encoding step itself, but manages to fill up the encoding
     /// buffer to the limit.
-    #[snafu(display("record too large: limit is {}", limit))]
-    RecordTooLarge { limit: usize },
+    #[snafu(display("record too large: encoded length is {encoded_len}, limit is {limit}"))]
+    RecordTooLarge { encoded_len: usize, limit: usize },
 
     /// The data file did not have enough remaining space to write the record.
     ///
@@ -133,15 +135,46 @@ where
     EmptyRecord,
 }
 
+impl<T> WriterError<T>
+where
+    T: Bufferable,
+{
+    /// Whether this error means the record itself can never be written, no matter how many times
+    /// it is retried — as opposed to a transient, environmental, or buffer-wide failure.
+    ///
+    /// This covers size violations: the record exceeds the maximum record size
+    /// (`RecordTooLarge`), or the encoder bailed the moment it overflowed the size-limited buffer
+    /// (`FailedToEncode`). Both are permanent regardless of retries.
+    ///
+    /// These records are dropped (finalizers resolved as `Delivered`) rather than retried forever
+    /// or escalated into a fatal error that tears down the whole buffer/topology. All other errors
+    /// — I/O errors, OOM scratch-space failures (`FailedToSerialize`), and writer-internal state
+    /// errors (`InconsistentState`) — are explicitly excluded: they are either transient or
+    /// writer-level faults, so they propagate as fatal errors.
+    fn is_unwritable_record(&self) -> bool {
+        matches!(
+            self,
+            Self::RecordTooLarge { .. } | Self::FailedToEncode { .. }
+        )
+    }
+}
+
 impl<T: Bufferable + PartialEq> PartialEq for WriterError<T> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Io { source: l_source }, Self::Io { source: r_source }) => {
                 l_source.kind() == r_source.kind()
             }
-            (Self::RecordTooLarge { limit: l_limit }, Self::RecordTooLarge { limit: r_limit }) => {
-                l_limit == r_limit
-            }
+            (
+                Self::RecordTooLarge {
+                    encoded_len: l_encoded_len,
+                    limit: l_limit,
+                },
+                Self::RecordTooLarge {
+                    encoded_len: r_encoded_len,
+                    limit: r_limit,
+                },
+            ) => l_encoded_len == r_encoded_len && l_limit == r_limit,
             (
                 Self::DataFileFull {
                     record: l_record,
@@ -201,6 +234,62 @@ where
 {
     fn from(source: io::Error) -> Self {
         WriterError::Io { source }
+    }
+}
+
+/// The outcome of a [`BufferWriter::try_write_record`] call.
+#[derive(Debug, PartialEq)]
+pub enum TryWriteOutcome<T> {
+    /// The record was written successfully and is now in the buffer.
+    Written,
+    /// The buffer is currently full; the record is returned for retry or discard.
+    Full(T),
+    /// The record permanently exceeded the maximum record size and was dropped.
+    ///
+    /// Its finalizers have already been resolved as [`EventStatus::Dropped`] (equivalent to
+    /// `BatchStatus::Delivered`), so acking sources ack/checkpoint rather than redelivering
+    /// a record that can never be written.
+    Dropped,
+}
+
+/// RAII guard that resolves finalizers as [`EventStatus::Errored`] on drop unless explicitly
+/// disarmed.
+///
+/// Used in `try_write_record_inner` so that every `?` exit automatically notifies acking sources
+/// to nack / withhold checkpoints for any record that did not reach durable storage.
+struct FinalizerGuard {
+    finalizers: EventFinalizerGroups,
+    error_on_drop: bool,
+}
+
+impl FinalizerGuard {
+    fn new(finalizers: EventFinalizerGroups) -> Self {
+        Self {
+            finalizers,
+            error_on_drop: true,
+        }
+    }
+
+    /// Releases the guard without marking finalizers as errored.
+    ///
+    /// Call when the record was intentionally dropped (unwritable) or successfully flushed to
+    /// disk — both cases where the upstream source should ack rather than retry.
+    fn disarm(mut self) {
+        self.error_on_drop = false;
+    }
+
+    /// Returns the finalizers for reattachment to the recovered record on buffer-full retry.
+    fn into_inner(mut self) -> EventFinalizerGroups {
+        self.error_on_drop = false;
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl Drop for FinalizerGuard {
+    fn drop(&mut self) {
+        if self.error_on_drop {
+            self.finalizers.update_status(EventStatus::Errored);
+        }
     }
 }
 
@@ -476,6 +565,7 @@ where
             .context(FailedToEncodeSnafu)?;
         if encoded_len > self.max_record_size {
             return Err(WriterError::RecordTooLarge {
+                encoded_len,
                 limit: self.max_record_size,
             });
         }
@@ -511,9 +601,9 @@ where
 
         // Sanity check before we do our length math.
         if serialized_len <= 8 || self.ser_buf.len() != serialized_len {
-            return Err(WriterError::FailedToSerialize {
+            return Err(WriterError::InconsistentState {
                 reason: format!(
-                    "serializer position invalid for context: pos={} len={}",
+                    "serializer position invalid after serializing record: pos={} len={}",
                     serialized_len,
                     self.ser_buf.len(),
                 ),
@@ -1199,15 +1289,26 @@ where
 
     /// Attempts to write a record.
     ///
-    /// If the buffer is currently full, the original record will be immediately returned.
-    /// Otherwise, a write will be executed, which will run to completion, and `None` will be returned.
+    /// Returns a [`TryWriteOutcome`] indicating whether the record was written, the buffer was
+    /// full (record returned for retry), or the record was permanently dropped because it exceeded
+    /// the maximum record size.
     ///
     /// # Errors
     ///
     /// If an error occurred while writing the record, an error variant will be returned describing
     /// the error.
-    pub async fn try_write_record(&mut self, record: T) -> Result<Option<T>, WriterError<T>> {
-        self.try_write_record_inner(record).await.map(Result::err)
+    pub async fn try_write_record(
+        &mut self,
+        record: T,
+    ) -> Result<TryWriteOutcome<T>, WriterError<T>> {
+        self.try_write_record_inner(record)
+            .await
+            .map(|inner| match inner {
+                // A zero-byte write is the sentinel for a silently dropped oversized record.
+                Ok(0) => TryWriteOutcome::Dropped,
+                Ok(_) => TryWriteOutcome::Written,
+                Err(record) => TryWriteOutcome::Full(record),
+            })
     }
 
     #[instrument(skip_all, level = "debug")]
@@ -1224,6 +1325,13 @@ where
             .event_count()
             .try_into()
             .map_err(|_| WriterError::EmptyRecord)?;
+
+        // Extract the finalizers before `archive_record` consumes the record. The encoder
+        // unconditionally consumes the record (even on failure), so we must take what we need here
+        // to handle the case where encoding fails because the record is too large to ever write.
+        // The guard automatically resolves the finalizers as Errored if this function exits via
+        // `?`; call `disarm()` or `into_inner()` on the non-error paths.
+        let record_finalizers = FinalizerGuard::new(record.take_finalizer_groups());
 
         // Grab the next record ID and attempt to write the record.
         let record_id = self.get_next_record_id();
@@ -1261,6 +1369,44 @@ where
                             "Current data file reached maximum size. Rolling to the next data file."
                         );
                     }
+                    e if e.is_unwritable_record() => {
+                        // The record can never be written regardless of retries — either it
+                        // exceeds the maximum record size or the rkyv wrapper serialization
+                        // failed permanently. Retrying would loop forever and propagating the
+                        // error would tear down the entire buffer/topology. Instead, drop just
+                        // this record and carry on: the buffer and every other record are unharmed.
+                        //
+                        // Drop the finalizers with their default EventStatus::Dropped, which
+                        // propagates as BatchStatus::Delivered. Acking sources therefore ack/checkpoint
+                        // the record rather than nacking or stalling, preventing a permanent
+                        // failure from becoming a retry loop. The ledger records matching
+                        // received and dropped usage so occupancy stays balanced.
+                        //
+                        // `RecordTooLarge` carries the exact encoded length; `FailedToEncode` bails
+                        // before that size is known, so we fall back to the configured limit as a
+                        // lower-bound estimate. This byte size only feeds the cumulative
+                        // received/discarded byte counters — occupancy self-cancels because the
+                        // ledger adds the same value to both — so an estimate is acceptable for the
+                        // rare encode-failure case, and it avoids an `O(events)` `size_of()` on the
+                        // hot write path just to report a value consumed only when a record drops.
+                        let encoded_len = match &e {
+                            WriterError::RecordTooLarge { encoded_len, .. } => *encoded_len,
+                            _ => self.config.max_record_size,
+                        };
+                        error!(
+                            message = "Record cannot be written to the disk buffer; dropping it.",
+                            event_count = record_events.get(),
+                            encoded_len,
+                            max_record_size = self.config.max_record_size,
+                            error = %e,
+                        );
+                        record_finalizers.disarm();
+                        self.ledger.track_unwritable_dropped_record(
+                            record_events.get() as u64,
+                            encoded_len as u64,
+                        );
+                        return Ok(Ok(0));
+                    }
                     e => return Err(e),
                 },
             }
@@ -1278,15 +1424,26 @@ where
             .expect("writer should exist after `ensure_ready_for_write`");
 
         let (bytes_written, flush_result) = if can_write_record {
-            // We always return errors here because flushing the record won't return a recoverable error like
-            // `DataFileFull`, as that gets checked during archiving.
-            writer.flush_record(token).await?
+            // We always return errors here because flushing the record won't return a recoverable
+            // error like `DataFileFull`, as that gets checked during archiving. The guard fires
+            // Errored automatically on `?` exit.
+            let result = writer.flush_record(token).await?;
+            // Record is durable on disk; disarm so finalizers resolve as Delivered.
+            record_finalizers.disarm();
+            result
         } else {
             // The record would not fit given the current size of the buffer, so we need to recover it from the
             // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
             // errors if we encounter them, but if we recover the record successfully, we're returning
             // `Ok(Err(record))` to signal that our attempt failed but the record is able to be retried again later.
-            return Ok(Err(writer.recover_archived_record(&token)?));
+            //
+            // Reattach the finalizers: they were taken before archiving to handle the unwritable-
+            // record path, but this record is being returned for retry (block mode) or overflow.
+            // `into_inner` extracts from the guard without resolving status; the finalizers will
+            // be resolved only when the returned record is eventually written or dropped.
+            let mut record = writer.recover_archived_record(&token)?;
+            record.merge_finalizer_groups(record_finalizers.into_inner());
+            return Ok(Err(record));
         };
 
         // Track our write since things appear to have succeeded. This only updates our internal
@@ -1350,6 +1507,23 @@ where
                     self.ledger.wait_for_reader().await;
                 }
             }
+        }
+    }
+
+    /// Writes a record, preserving whether the blocking write completed by dropping an unwritable
+    /// record.
+    ///
+    /// Unlike [`Self::try_write_record`], this waits for reader progress when the buffer is full.
+    #[instrument(skip_all, level = "debug")]
+    pub async fn write_record_outcome(
+        &mut self,
+        record: T,
+    ) -> Result<TryWriteOutcome<T>, WriterError<T>> {
+        // `write_record` reports a zero-byte write as the sentinel for an unwritable record that
+        // was dropped; every other byte count means the record was written.
+        match self.write_record(record).await? {
+            0 => Ok(TryWriteOutcome::Dropped),
+            _ => Ok(TryWriteOutcome::Written),
         }
     }
 
