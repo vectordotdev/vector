@@ -239,11 +239,66 @@ impl HumioLogsConfig {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+    use tracing::Instrument;
+
     use super::*;
+    use crate::sinks::util::test::load_sink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HumioLogsConfig>();
+    }
+
+    // Regression test for the confinement gauge reporting the wrong
+    // `component_type` when this sink is built by a wrapping caller
+    // outside this crate that constructs a `HumioLogsConfig` directly and
+    // calls `SinkConfig::build` on it -- e.g. Datadog's
+    // observability-pipelines-worker `crowdstrike_next_gen_siem` sink (see
+    // https://github.com/DataDog/observability-pipelines-worker/pull/2652).
+    //
+    // In production, the topology builder opens a span tagged with the
+    // *outer* (wrapping) sink's component_type around the whole
+    // `SinkConfig::build` call; this test opens an equivalent span by hand
+    // to simulate that outer wrapper, since no such wrapper exists in this
+    // crate.
+    #[tokio::test]
+    async fn confinement_gauge_reports_wrapping_sink_component_type() {
+        crate::test_util::trace_init();
+
+        let (config, cx) = load_sink::<HumioLogsConfig>(indoc! {r#"
+            token = "atoken"
+            encoding.codec = "json"
+        "#})
+        .unwrap();
+
+        let span = error_span!(
+            "sink",
+            component_kind = "sink",
+            component_id = "confinement_gauge_wrapper_test",
+            component_type = "crowdstrike_next_gen_siem",
+        );
+        let (_sink, _healthcheck) = config.build(cx).instrument(span).await.unwrap();
+
+        let metrics = vector_lib::metrics::Controller::get()
+            .expect("metrics controller not initialized")
+            .capture_metrics();
+
+        let gauge = metrics
+            .iter()
+            .find(|m| {
+                m.name() == "security_confinement_disabled"
+                    && m.tag_value("component_id")
+                        == Some("confinement_gauge_wrapper_test".to_string())
+            })
+            .expect("security_confinement_disabled gauge was not emitted");
+
+        assert_eq!(
+            gauge.tag_value("component_type"),
+            Some("crowdstrike_next_gen_siem".to_string()),
+            "confinement gauge must report the wrapping sink's component_type, not the \
+             delegated humio_logs sink's own type"
+        );
     }
 }
 
