@@ -666,10 +666,20 @@ impl PubsubSource {
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
                     pending_acks -= 1;
                     if status == BatchStatus::Delivered {
-                        ack_ids_sender
-                            .send(receipts)
-                            .await
-                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                        // Non-blocking: awaiting a full channel would stall the
+                        // select loop, preventing the idle timeout below from
+                        // recovering a stalled request stream. Reconnect instead;
+                        // dropped ack IDs are redelivered (at-least-once).
+                        match ack_ids_sender.try_send(receipts) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(_)) => {
+                                debug!("Request stream stalled sending acks, restarting stream.");
+                                break State::RetryDelay;
+                            }
+                            Err(mpsc::error::TrySendError::Closed(_)) => {
+                                unreachable!("request stream never closes")
+                            }
+                        }
                     }
                 },
                 response = stream.next() => match response {
@@ -694,11 +704,9 @@ impl PubsubSource {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                // Always restart on idle, even with acks pending or queued: this
-                // is the recovery path for a stalled request stream, so it must
-                // not be gated on the very channel that has stopped draining.
-                // Any unsent ack IDs are dropped and their messages redelivered,
-                // which is acceptable under Pub/Sub's at-least-once semantics.
+                // The recovery path for a stalled stream: always fires, never
+                // gated on the request channel that may have stopped draining.
+                // Unsent ack IDs are dropped and redelivered (at-least-once).
                 _ = &mut idle_deadline => {
                     debug!(
                         message = "No activity on the stream within the idle timeout, restarting stream.",
@@ -718,18 +726,10 @@ impl PubsubSource {
                         // Otherwise, mark this stream as idle.
                         busy_flag.store(false, Ordering::Relaxed);
                     }
-                    // GCP Pub/Sub likes to time out connections after
-                    // about 75 seconds of inactivity. To forestall
-                    // the resulting error, send an empty array of
-                    // acknowledgement IDs to the request stream if no
-                    // other activity has happened. This will result
-                    // in a new request with empty fields, effectively
-                    // a keepalive.
-                    //
-                    // Send without blocking to avoid deadlocking the task. A
-                    // full channel already has acks queued, so the keepalive is
-                    // redundant and skipped; the idle timeout handles a genuine
-                    // stall.
+                    // GCP Pub/Sub times out connections after ~75s of
+                    // inactivity. Send an empty ack ID array as a keepalive to
+                    // forestall that. Non-blocking: a full channel already has
+                    // acks queued, so the keepalive is redundant and skipped.
                     match ack_ids_sender.try_send(Vec::new()) {
                         Ok(()) => {}
                         Err(mpsc::error::TrySendError::Full(_)) => {
@@ -823,10 +823,8 @@ impl PubsubSource {
             return State::RetryNow;
         }
 
-        // Escalate to a component error only when the streak first reaches the
-        // threshold, not on every subsequent failure, so a persistently idle
-        // subscription does not resume the error flood. A successful fetch resets
-        // the counter and re-arms escalation for the next streak.
+        // Escalate once, when the streak first hits the threshold, so a
+        // persistently idle subscription doesn't resume the error flood.
         let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
         if consecutive_failures == self.max_retry_errors {
             emit!(GcpPubsubReceiveError { error });
