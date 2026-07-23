@@ -256,6 +256,46 @@ mod tests {
     }
 
     #[test]
+    fn dump_two_metrics_concatenated_for_manual_probe() {
+        let mut serializer = OtlpSerializer::new().unwrap();
+
+        let m1 = Metric::new(
+            "cpu_usage",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 12.5 },
+        )
+        .with_timestamp(Some(Utc::now()));
+        let m2 = Metric::new(
+            "mem_usage",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 55.0 },
+        )
+        .with_timestamp(Some(Utc::now()));
+
+        let mut buf1 = BytesMut::new();
+        serializer
+            .encode(Event::Metric(m1), &mut buf1)
+            .expect("encode m1");
+        let mut buf2 = BytesMut::new();
+        serializer
+            .encode(Event::Metric(m2), &mut buf2)
+            .expect("encode m2");
+
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&buf1);
+        combined.extend_from_slice(&buf2);
+
+        std::fs::write("/tmp/two_metrics_concat.bin", &combined).unwrap();
+        std::fs::write("/tmp/one_metric.bin", &buf1).unwrap();
+        eprintln!(
+            "buf1 len={} buf2 len={} combined len={}",
+            buf1.len(),
+            buf2.len(),
+            combined.len()
+        );
+    }
+
+    #[test]
     fn unsupported_metric_values_return_err() {
         let mut serializer = OtlpSerializer::new().unwrap();
         let mut buffer = BytesMut::new();

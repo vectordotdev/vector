@@ -945,18 +945,63 @@ impl DriverResponse for HttpResponse {
     }
 }
 
-/// Creates a `RetryLogic` for use with `HttpResponse`.
-pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
+/// Maximum number of response body bytes to include in a non-retriable error's reason.
+const MAX_ERROR_BODY_BYTES: usize = 1024;
+
+/// A `RetryLogic` for use with `HttpResponse` that, unlike `HttpStatusRetryLogic`, has
+/// access to the response body so it can include it in the reason when a request is not
+/// retriable (the response body is otherwise discarded before it reaches the driver's
+/// error log).
+#[derive(Debug, Clone)]
+pub struct HttpResponseRetryLogic<Request> {
+    request: PhantomData<Request>,
     retry_strategy: RetryStrategy,
-) -> HttpStatusRetryLogic<
-    impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
-    Request,
-    HttpResponse,
-> {
-    HttpStatusRetryLogic::new(
-        |req: &HttpResponse| req.http_response.status(),
+}
+
+impl<Request: Clone + Send + Sync + 'static> RetryLogic for HttpResponseRetryLogic<Request> {
+    type Error = HttpError;
+    type Request = Request;
+    type Response = HttpResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false
+        } else {
+            error.is_retriable()
+        }
+    }
+
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+        let status = response.http_response.status();
+        match self.retry_strategy.retry_action(status) {
+            RetryAction::DontRetry(reason) => {
+                let body = response.http_response.body();
+                let truncated = &body[..body.len().min(MAX_ERROR_BODY_BYTES)];
+                RetryAction::DontRetry(
+                    format!(
+                        "{reason}, response body: {}",
+                        String::from_utf8_lossy(truncated)
+                    )
+                    .into(),
+                )
+            }
+            action => action,
+        }
+    }
+}
+
+/// Creates a `RetryLogic` for use with `HttpResponse`.
+pub const fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
+    retry_strategy: RetryStrategy,
+) -> HttpResponseRetryLogic<Request> {
+    HttpResponseRetryLogic {
+        request: PhantomData,
         retry_strategy,
-    )
+    }
 }
 
 /// Uses the estimated json encoded size to determine batch sizing.
@@ -1185,6 +1230,61 @@ mod test {
             result.is_err(),
             "expected invalid status code to fail deserialization"
         );
+    }
+
+    fn http_response_with_body(status: u16, body: impl Into<Bytes>) -> HttpResponse {
+        HttpResponse {
+            http_response: Response::builder()
+                .status(status)
+                .body(body.into())
+                .unwrap(),
+            events_byte_size: GroupedCountByteSize::new_untagged(),
+            raw_byte_size: 0,
+        }
+    }
+
+    #[test]
+    fn http_response_retry_logic_includes_body_for_non_retriable_responses() {
+        let logic = http_response_retry_logic::<()>(RetryStrategy::Default);
+        let response = http_response_with_body(400, "out of order sample");
+
+        match logic.should_retry_response(&response) {
+            RetryAction::DontRetry(reason) => {
+                assert!(reason.contains("out of order sample"), "reason: {reason}");
+            }
+            _ => panic!("expected DontRetry"),
+        }
+    }
+
+    #[test]
+    fn http_response_retry_logic_omits_body_for_retriable_responses() {
+        let logic = http_response_retry_logic::<()>(RetryStrategy::Default);
+        let response = http_response_with_body(500, "internal error detail");
+
+        match logic.should_retry_response(&response) {
+            RetryAction::Retry(reason) => {
+                assert!(
+                    !reason.contains("internal error detail"),
+                    "reason: {reason}"
+                );
+            }
+            _ => panic!("expected Retry"),
+        }
+    }
+
+    #[test]
+    fn http_response_retry_logic_truncates_long_bodies() {
+        let logic = http_response_retry_logic::<()>(RetryStrategy::Default);
+        let body = "x".repeat(MAX_ERROR_BODY_BYTES * 2);
+        let response = http_response_with_body(400, body);
+
+        match logic.should_retry_response(&response) {
+            RetryAction::DontRetry(reason) => {
+                let x_count = reason.chars().filter(|&c| c == 'x').count();
+                assert_eq!(x_count, MAX_ERROR_BODY_BYTES);
+            }
+            _ => panic!("expected DontRetry"),
+        }
     }
 
     #[tokio::test]
