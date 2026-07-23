@@ -8,12 +8,21 @@ import YAML from "yaml";
 const cueJsonOutput = "data/docs.json";
 const VECTOR_BIN = process.env.VECTOR_BIN || "vector";
 
+// Pick a source type compatible with the component's accepted input event types.
+// Returns null for trace-only components (no simple trace source available).
+const sourceTypeFor = (component) => {
+  const input = component.input;
+  if (!input || input.logs) return "stdin";
+  if (input.metrics) return "internal_metrics";
+  return null; // trace-only — skip validation
+};
+
 // Wrap a component's example YAML in a complete topology so vector validate accepts it.
-const wrapConfig = (kind, componentYaml) => {
+// Returns null when the component cannot be wrapped (e.g. trace-only).
+const wrapConfig = (kind, componentYaml, component) => {
   const parsed = YAML.parse(componentYaml);
 
   if (kind === "sources") {
-    // Extract the source key (e.g. my_source_id)
     const sourceKey = Object.keys(parsed.sources)[0];
     return YAML.stringify({
       ...parsed,
@@ -26,11 +35,13 @@ const wrapConfig = (kind, componentYaml) => {
     });
   }
 
+  const sourceType = sourceTypeFor(component);
+  if (sourceType === null) return null;
+
   if (kind === "transforms") {
     const transformKey = Object.keys(parsed.transforms)[0];
-    // Inject stdin as source, blackhole as sink
     return YAML.stringify({
-      sources: { _validate_source: { type: "stdin" } },
+      sources: { _validate_source: { type: sourceType } },
       transforms: {
         [transformKey]: {
           ...parsed.transforms[transformKey],
@@ -49,7 +60,7 @@ const wrapConfig = (kind, componentYaml) => {
   if (kind === "sinks") {
     const sinkKey = Object.keys(parsed.sinks)[0];
     return YAML.stringify({
-      sources: { _validate_source: { type: "stdin" } },
+      sources: { _validate_source: { type: sourceType } },
       sinks: {
         [sinkKey]: {
           ...parsed.sinks[sinkKey],
@@ -76,7 +87,6 @@ const validateYaml = (yaml, tmpPath) => {
 
 const summarizeError = (error) => {
   const lines = error.split("\n").filter((l) => l.trim());
-  // Find the first line with an actual error message (skip "Failed to load" boilerplate)
   const errorLine = lines.find(
     (l) => !l.includes("Failed to load") && !l.includes("-----") && !l.startsWith("error[") && l.includes("x ")
   );
@@ -92,12 +102,14 @@ const main = () => {
 
   const failures = [];
   let total = 0;
+  let skipped = 0;
   const tmpFile = path.join(os.tmpdir(), "vector-validate-example.yaml");
 
   try {
     for (const kind in components) {
       for (const componentType in components[kind]) {
-        const exampleConfigs = components[kind][componentType].example_configs;
+        const component = components[kind][componentType];
+        const exampleConfigs = component.example_configs;
         if (!exampleConfigs) continue;
 
         for (const variant of ["minimal", "advanced"]) {
@@ -107,10 +119,15 @@ const main = () => {
           total++;
           let wrapped;
           try {
-            wrapped = wrapConfig(kind, yaml);
+            wrapped = wrapConfig(kind, yaml, component);
           } catch (e) {
             failures.push({ kind, componentType, variant, error: `YAML parse error: ${e.message}` });
             console.error(chalk.red(`FAIL ${kind}/${componentType} (${variant}) [parse error]`));
+            continue;
+          }
+
+          if (wrapped === null) {
+            skipped++;
             continue;
           }
 
@@ -127,10 +144,13 @@ const main = () => {
     if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
   }
 
+  const validated = total - skipped;
   if (failures.length === 0) {
-    console.log(chalk.green(`All ${total} example configs passed vector validate.`));
+    console.log(chalk.green(`All ${validated} example configs passed vector validate (${skipped} skipped).`));
   } else {
-    console.error(chalk.yellow(`\n${failures.length}/${total} example config(s) failed validation.`));
+    console.error(
+      chalk.yellow(`\n${failures.length}/${validated} example config(s) failed validation (${skipped} skipped).`)
+    );
     if (!warnOnly) process.exit(1);
   }
 };
