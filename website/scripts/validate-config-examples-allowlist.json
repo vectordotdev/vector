@@ -21,12 +21,8 @@
   "sources/static_metrics (advanced)",
   "sources/vector (advanced)",
   "sources/vector (minimal)",
-  "transforms/delay (advanced)",
-  "transforms/delay (minimal)",
   "transforms/exclusive_route (advanced)",
   "transforms/exclusive_route (minimal)",
-  "transforms/filter (advanced)",
-  "transforms/filter (minimal)",
   "transforms/log_to_metric (advanced)",
   "transforms/lua (advanced)",
   "transforms/remap (advanced)",
@@ -35,7 +31,5 @@
   "transforms/sample (advanced)",
   "transforms/sample (minimal)",
   "transforms/throttle (advanced)",
-  "transforms/throttle (minimal)",
-  "transforms/window (advanced)",
-  "transforms/window (minimal)"
+  "transforms/throttle (minimal)"
 ]
