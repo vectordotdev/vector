@@ -77,8 +77,9 @@ const wrapConfig = (kind, componentYaml, component) => {
 const validateYaml = (yaml, tmpPath) => {
   fs.writeFileSync(tmpPath, yaml, "utf8");
   try {
-    execSync(`${VECTOR_BIN} validate --skip-healthchecks ${tmpPath}`, {
-      stdio: "pipe"
+    execSync(`${VECTOR_BIN} validate --no-environment --skip-healthchecks ${tmpPath}`, {
+      stdio: "pipe",
+      timeout: 10000
     });
     return null;
   } catch (err) {
