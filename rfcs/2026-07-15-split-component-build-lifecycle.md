@@ -65,14 +65,10 @@ where side effects are allowed.
   may acquire its own short-lived resources (a token, a probe connection) and must release them
   promptly when it completes. Background workers are therefore owned by the sink inside its own
   `run()` future and terminate when that future is dropped, so there is no topology-owned lifecycle
-  to manage even for a detached `require_healthy=false` probe. Two accepted tradeoffs: acquiring its
-  own resources means the probe validates that auth/endpoint *can* work rather than the sink's exact
-  wired client (this still catches bad credentials and unreachable endpoints); and it briefly opens
-  its own connection instead of sharing the sink's, so it must release it promptly to avoid doubling
-  connection count under constrained limits (e.g. Redis `maxclients=1`). Where a sink today couples
-  its healthcheck to live sink state (Redis clones its Sentinel repair connection into the
-  healthcheck; GCP shares a credential refresher), that coupling is a pre-existing code smell fixed
-  as part of migrating that sink.
+  to manage even for a detached `require_healthy=false` probe. Existing sinks that violate this
+  principle (by sharing a live worker or connection between their healthcheck and the sink) should be
+  refactored to conform, altering their healthcheck behavior if necessary so it acquires and releases
+  its own short-lived resources.
 - Update `TopologyPiecesBuilder` and `vector validate` to call `validate_structure()` at the right
   point for both transforms and sinks.
 - Migrate all existing transforms and sinks.
