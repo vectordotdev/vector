@@ -92,6 +92,9 @@ const getExampleValue = (param, deepFilter) => {
 
             if (Object.keys(subObj).length > 0) {
               value = topType === "array" ? [subObj] : subObj;
+            } else if (typeInfo[k].examples && typeInfo[k].examples.length > 0) {
+              const ex = typeInfo[k].examples[0];
+              if (ex != null) value = topType === "array" ? [ex] : ex;
             }
           } else {
             if (topType === "array") {
@@ -145,6 +148,9 @@ const getExampleValue = (param, deepFilter) => {
     } else if (k === "condition" && p.syntaxes && p.syntaxes.length > 0 && param.required) {
       const vrl = p.syntaxes.find((s) => s.name === "vrl") || p.syntaxes[0];
       if (vrl?.example) value = { type: "vrl", source: vrl.example };
+    } else if (k === "bool") {
+      const v = getValue(p);
+      value = v !== null && v !== undefined ? v : false;
     } else {
       value = getValue(p);
     }
@@ -160,7 +166,7 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     .filter((k) => filter(params[k]))
     .forEach((k) => {
       let value = getExampleValue(params[k], deepFilter);
-      if (value) {
+      if (value != null) {
         obj[k] = value;
       }
     });
