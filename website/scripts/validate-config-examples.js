@@ -25,15 +25,17 @@ const wrapConfig = (kind, componentYaml, component) => {
 
   if (kind === "sources") {
     const sourceKey = Object.keys(parsed.sources)[0];
-    return YAML.stringify({
-      ...parsed,
-      sinks: {
-        _validate_sink: {
-          type: "blackhole",
-          inputs: [sourceKey]
-        }
-      }
-    });
+    const outputs = component.outputs || [];
+    const hasNamedOutputs = outputs.length > 0 && outputs[0].name !== "<component_id>";
+    const sinks = {};
+    if (hasNamedOutputs) {
+      outputs.forEach(({ name }) => {
+        sinks[`_validate_sink_${name}`] = { type: "blackhole", inputs: [`${sourceKey}.${name}`] };
+      });
+    } else {
+      sinks["_validate_sink"] = { type: "blackhole", inputs: [sourceKey] };
+    }
+    return YAML.stringify({ ...parsed, sinks });
   }
 
   const sourceType = sourceTypeFor(component);
