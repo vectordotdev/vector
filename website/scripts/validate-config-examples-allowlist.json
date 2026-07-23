@@ -29,7 +29,5 @@
   "transforms/remap (minimal)",
   "transforms/route (minimal)",
   "transforms/sample (advanced)",
-  "transforms/sample (minimal)",
-  "transforms/throttle (advanced)",
-  "transforms/throttle (minimal)"
+  "transforms/sample (minimal)"
 ]
