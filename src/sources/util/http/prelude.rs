@@ -95,6 +95,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 value.clone(),
                             );
                         }
+                    } else if !enrichment.is_empty() {
+                        warn!(
+                            message = "Auth metadata enrichment is not supported for trace/metric events in the legacy namespace and will be dropped. \
+                                       Switch this source to the Vector namespace (`log_namespace: true`) to enable it for all event types.",
+                            fields = ?enrichment.keys().collect::<Vec<_>>(),
+                        );
                     }
                 }
             }
