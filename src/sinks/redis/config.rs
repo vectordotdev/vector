@@ -11,7 +11,7 @@ use super::{
 use crate::{
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
-    template::ConfinementConfig,
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -158,7 +158,7 @@ pub struct RedisSinkConfig {
     /// The Redis key to publish messages to.
     #[configurable(validation(length(min = 1)))]
     #[configurable(metadata(docs::examples = "syslog:{{ app }}", docs::examples = "vector"))]
-    pub(super) key: Template,
+    pub(super) key: UnconfinedTemplate,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -204,11 +204,13 @@ impl SinkConfig for RedisSinkConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
-        let mut config = self.clone();
-        config.key = config.key.confine(&self.confinement, Self::NAME, "key")?;
-        let conn = config.build_connection().await?;
+        let key = self
+            .key
+            .clone()
+            .confine(&self.confinement, Self::NAME, "key")?;
+        let conn = self.build_connection().await?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = RedisSink::new(&config, conn)?;
+        let sink = RedisSink::new(self, conn, key)?;
         self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -366,11 +368,11 @@ impl From<RedisProtocolVersion> for ProtocolVersion {
 
 #[cfg(test)]
 mod tests {
-    use crate::template::{ConfinementConfig, Template};
+    use crate::template::{ConfinementConfig, UnconfinedTemplate};
 
     #[test]
     fn confinement_rejects_unconfined_key() {
-        let template = Template::try_from("{{ key }}").unwrap();
+        let template = UnconfinedTemplate::try_from("{{ key }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "redis", "key");
         assert!(result.is_err());
@@ -378,7 +380,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_key() {
-        let template = Template::try_from("{{ key }}").unwrap();
+        let template = UnconfinedTemplate::try_from("{{ key }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -388,7 +390,7 @@ mod tests {
 
     #[test]
     fn confinement_allows_prefixed_key() {
-        let template = Template::try_from("events-{{ env }}").unwrap();
+        let template = UnconfinedTemplate::try_from("events-{{ env }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "redis", "key");
         assert!(result.is_ok());

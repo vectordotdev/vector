@@ -19,7 +19,7 @@ use crate::{
     event::Value,
     schema,
     sinks::{VectorSink, util::test::load_sink},
-    template::Template,
+    template::UnconfinedTemplate,
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, run_and_assert_data_volume_sink_compliance,
@@ -51,11 +51,11 @@ async fn build_sink(codec: &str, remove_timestamp: bool) -> (uuid::Uuid, VectorS
 
     let test_name = config
         .labels
-        .get_mut(&Template::try_from("test_name").unwrap())
+        .get_mut(&UnconfinedTemplate::try_from("test_name").unwrap())
         .unwrap();
     assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-    *test_name = Template::try_from(stream.to_string()).unwrap();
+    *test_name = UnconfinedTemplate::try_from(stream.to_string()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -83,11 +83,11 @@ async fn build_sink_with_compression(codec: &str, compression: &str) -> (uuid::U
 
     let test_name = config
         .labels
-        .get_mut(&Template::try_from("test_name").unwrap())
+        .get_mut(&UnconfinedTemplate::try_from("test_name").unwrap())
         .unwrap();
     assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-    *test_name = Template::try_from(stream.to_string()).unwrap();
+    *test_name = UnconfinedTemplate::try_from(stream.to_string()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -398,8 +398,8 @@ async fn interpolate_stream_key() {
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.labels.insert(
-        Template::try_from("{{ stream_key }}").unwrap(),
-        Template::try_from(stream.to_string()).unwrap(),
+        UnconfinedTemplate::try_from("{{ stream_key }}").unwrap(),
+        UnconfinedTemplate::try_from(stream.to_string()).unwrap(),
     );
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -449,11 +449,11 @@ async fn many_tenants() {
 
     let test_name = config
         .labels
-        .get_mut(&Template::try_from("test_name").unwrap())
+        .get_mut(&UnconfinedTemplate::try_from("test_name").unwrap())
         .unwrap();
     assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-    *test_name = Template::try_from(stream.to_string()).unwrap();
+    *test_name = UnconfinedTemplate::try_from(stream.to_string()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -639,8 +639,8 @@ async fn test_out_of_order_events(
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.out_of_order_action = action;
     config.labels.insert(
-        Template::try_from("test_name").unwrap(),
-        Template::try_from(stream.to_string()).unwrap(),
+        UnconfinedTemplate::try_from("test_name").unwrap(),
+        UnconfinedTemplate::try_from(stream.to_string()).unwrap(),
     );
     config.batch.max_events = Some(batch_size);
     config.batch.max_bytes = Some(4_000_000);

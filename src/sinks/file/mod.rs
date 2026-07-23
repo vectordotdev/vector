@@ -307,7 +307,7 @@ impl FileSink {
             ConfinementConfig::warn_unconfined_template("sink", "file", "path");
             None
         } else {
-            PathConfinement::for_template(&config.path, config.base_dir.as_deref())
+            PathConfinement::for_template(config.path.as_unconfined(), config.base_dir.as_deref())
                 .map_err(Box::new)?
         };
 

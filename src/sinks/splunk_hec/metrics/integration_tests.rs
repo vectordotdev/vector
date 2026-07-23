@@ -19,7 +19,7 @@ use crate::{
         },
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
-    template::Template,
+    template::UnconfinedTemplate,
     test_util::components::{
         DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS, run_and_assert_data_volume_sink_compliance,
         run_and_assert_sink_compliance,
@@ -81,7 +81,7 @@ async fn splunk_insert_counter_metric() {
     let cx = SinkContext::default();
 
     let mut config = config().await;
-    config.index = Template::try_from("testmetrics".to_string()).ok();
+    config.index = UnconfinedTemplate::try_from("testmetrics".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -118,7 +118,7 @@ async fn splunk_insert_counter_metric_data_volume() {
     let cx = SinkContext::default();
 
     let mut config = config().await;
-    config.index = Template::try_from("testmetrics".to_string()).ok();
+    config.index = UnconfinedTemplate::try_from("testmetrics".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -146,7 +146,7 @@ async fn splunk_insert_gauge_metric() {
     let cx = SinkContext::default();
 
     let mut config = config().await;
-    config.index = Template::try_from("testmetrics".to_string()).ok();
+    config.index = UnconfinedTemplate::try_from("testmetrics".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -169,7 +169,7 @@ async fn splunk_insert_multiple_counter_metrics() {
     let cx = SinkContext::default();
 
     let mut config = config().await;
-    config.index = Template::try_from("testmetrics".to_string()).ok();
+    config.index = UnconfinedTemplate::try_from("testmetrics".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -196,7 +196,7 @@ async fn splunk_insert_multiple_gauge_metrics() {
     let cx = SinkContext::default();
 
     let mut config = config().await;
-    config.index = Template::try_from("testmetrics".to_string()).ok();
+    config.index = UnconfinedTemplate::try_from("testmetrics".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();

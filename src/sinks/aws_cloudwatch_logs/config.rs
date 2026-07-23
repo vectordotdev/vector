@@ -24,7 +24,7 @@ use crate::{
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, http::RequestConfig,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, UnconfinedTemplate},
     tls::TlsConfig,
 };
 
@@ -89,7 +89,7 @@ pub struct CloudwatchLogsSinkConfig {
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     #[configurable(metadata(docs::examples = "group-name"))]
     #[configurable(metadata(docs::examples = "{{ file }}"))]
-    pub group_name: Template,
+    pub group_name: UnconfinedTemplate,
 
     /// The [stream name][stream_name] of the target CloudWatch Logs stream.
     ///
@@ -101,7 +101,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[configurable(metadata(docs::examples = "{{ host }}"))]
     #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "stream-name"))]
-    pub stream_name: Template,
+    pub stream_name: UnconfinedTemplate,
 
     /// The [AWS region][aws_region] of the target service.
     ///
@@ -298,7 +298,7 @@ impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
 #[cfg(test)]
 mod tests {
     use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
-    use crate::template::{ConfinementConfig, Template};
+    use crate::template::{ConfinementConfig, UnconfinedTemplate};
 
     #[test]
     fn test_generate_config() {
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_group_name() {
-        let template = Template::try_from("{{ group }}").unwrap();
+        let template = UnconfinedTemplate::try_from("{{ group }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
         assert!(result.is_err());
@@ -315,7 +315,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_group_name() {
-        let template = Template::try_from("{{ group }}").unwrap();
+        let template = UnconfinedTemplate::try_from("{{ group }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn confinement_allows_prefixed_group_name() {
-        let template = Template::try_from("events-{{ env }}").unwrap();
+        let template = UnconfinedTemplate::try_from("events-{{ env }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
         assert!(result.is_ok());

@@ -1,5 +1,7 @@
 //! Functionality for managing template fields used by Vector's sinks.
-use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
+use std::{
+    borrow::Cow, cell::RefCell, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock,
+};
 
 use bytes::Bytes;
 use chrono::{
@@ -8,10 +10,15 @@ use chrono::{
 };
 use http::Uri;
 use regex::Regex;
+
 use snafu::Snafu;
 use tracing::warn;
 use vector_lib::{
-    configurable::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component},
+    configurable::{
+        Configurable, ConfigurableNumber, ConfigurableString, GenerateError, Metadata, NumberClass,
+        ToValue, configurable_component,
+        schema::{SchemaGenerator, SchemaObject, generate_string_schema},
+    },
     gauge,
     internal_event::GaugeName,
     lookup::lookup_v2::parse_target_path,
@@ -20,6 +27,7 @@ use vector_lib::{
 use crate::{
     config::log_schema,
     event::{EventRef, Metric, Value},
+    sinks::util::path_confinement::MAX_RENDERED_PATH_LEN,
 };
 
 static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
@@ -83,22 +91,30 @@ pub fn confined_preview(rendered: &str) -> String {
     rendered.get(..end).unwrap_or("").to_string()
 }
 
-/// A templated field.
+/// A raw templated field — parsed but not yet confined.
 ///
 /// In many cases, components can be configured so that part of the component's functionality can be
 /// customized on a per-event basis. For example, you have a sink that writes events to a file and you want to
 /// specify which file an event should go to by using an event field as part of the
 /// input to the filename used.
 ///
-/// By using `Template`, users can specify either fixed strings or templated strings. Templated strings use a common syntax to
-/// refer to fields in an event that is used as the input data when rendering the template. An example of a fixed string
-/// is `my-file.log`. An example of a template string is `my-file-{{key}}.log`, where `{{key}}`
-/// is the key's value when the template is rendered into a string.
+/// By using `UnconfinedTemplate`, users can specify either fixed strings or templated strings.
+/// Templated strings use a common syntax to refer to fields in an event that is used as the input
+/// data when rendering the template. An example of a fixed string is `my-file.log`. An example of
+/// a template string is `my-file-{{key}}.log`, where `{{key}}` is the key's value when the
+/// template is rendered into a string.
+///
+/// **Sink authors**: store this type in config structs (it is serde-able). Call
+/// [`UnconfinedTemplate::confine`] in `build()` to obtain a [`Template`] that enforces the
+/// confinement invariant at render time.
+///
+/// **Transform / source authors**: store and render this type directly when confinement is not
+/// applicable.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Default)]
 #[serde(try_from = "String", into = "String")]
-pub struct Template {
+pub struct UnconfinedTemplate {
     src: String,
 
     #[serde(skip)]
@@ -112,70 +128,58 @@ pub struct Template {
 
     #[serde(skip)]
     tz_offset: Option<FixedOffset>,
-
-    /// Optional confinement check attached at build time by sinks that render
-    /// templates into security-relevant identifiers (file paths, object-storage
-    /// keys, HDFS paths, …). `render_string` runs this check after rendering
-    /// and returns [`TemplateRenderingError::Confined`] if it fails.
-    ///
-    /// Skipped for serialization, hashing, and equality — two templates with
-    /// the same source string are the same template regardless of whether a
-    /// confinement hook has been attached.
-    #[serde(skip)]
-    confinement: Option<ConfinementChecker>,
 }
 
-impl fmt::Debug for Template {
+impl fmt::Debug for UnconfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Template")
+        f.debug_struct("UnconfinedTemplate")
             .field("src", &self.src)
             .field("is_static", &self.is_static)
             .field("tz_offset", &self.tz_offset)
-            .field("confinement", &self.confinement.as_ref().map(|_| "<fn>"))
             .finish()
     }
 }
 
-impl PartialEq for Template {
+impl PartialEq for UnconfinedTemplate {
     fn eq(&self, other: &Self) -> bool {
         self.src == other.src && self.tz_offset == other.tz_offset
     }
 }
 
-impl Eq for Template {}
+impl Eq for UnconfinedTemplate {}
 
-impl Hash for Template {
+impl Hash for UnconfinedTemplate {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.src.hash(state);
         self.tz_offset.hash(state);
     }
 }
 
-impl TryFrom<&str> for Template {
+impl TryFrom<&str> for UnconfinedTemplate {
     type Error = TemplateParseError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
-        Template::try_from(Cow::Borrowed(src))
+        UnconfinedTemplate::try_from(Cow::Borrowed(src))
     }
 }
 
-impl TryFrom<String> for Template {
+impl TryFrom<String> for UnconfinedTemplate {
     type Error = TemplateParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        Template::try_from(Cow::Owned(src))
+        UnconfinedTemplate::try_from(Cow::Owned(src))
     }
 }
 
-impl TryFrom<PathBuf> for Template {
+impl TryFrom<PathBuf> for UnconfinedTemplate {
     type Error = TemplateParseError;
 
     fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
-        Template::try_from(p.to_string_lossy().into_owned())
+        UnconfinedTemplate::try_from(p.to_string_lossy().into_owned())
     }
 }
 
-impl TryFrom<Cow<'_, str>> for Template {
+impl TryFrom<Cow<'_, str>> for UnconfinedTemplate {
     type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
@@ -183,77 +187,56 @@ impl TryFrom<Cow<'_, str>> for Template {
             let is_static =
                 parts.is_empty() || (parts.len() == 1 && matches!(parts[0], Part::Literal(..)));
 
-            // Calculate a minimum size to reserve for rendered string. This doesn't have to be
-            // exact, and can't be because of references and time format specifiers. We just want a
-            // better starting number than 0 to avoid the first reallocations if possible.
             let reserve_size = parts
                 .iter()
                 .map(|part| match part {
                     Part::Literal(lit) => lit.len(),
-                    // We can't really put a useful number here, assume at least one byte will come
-                    // from the input event.
                     Part::Reference(_path) => 1,
                     Part::Strftime(parsed) => parsed.reserve_size(),
                 })
                 .sum();
 
-            Template {
+            UnconfinedTemplate {
                 parts,
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
                 tz_offset: None,
-                confinement: None,
             }
         })
     }
 }
 
-impl From<Template> for String {
-    fn from(template: Template) -> String {
+impl From<UnconfinedTemplate> for String {
+    fn from(template: UnconfinedTemplate) -> String {
         template.src
     }
 }
 
-impl fmt::Display for Template {
+impl fmt::Display for UnconfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.src.fmt(f)
     }
 }
 
-// This is safe because we literally defer to `String` for the schema of `Template`.
-impl ConfigurableString for Template {}
+// This is safe because we literally defer to `String` for the schema of `UnconfinedTemplate`.
+impl ConfigurableString for UnconfinedTemplate {}
 
-impl Template {
+impl UnconfinedTemplate {
     /// Set tz offset.
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.tz_offset = tz_offset;
         self
     }
 
-    /// Attach a [`ConfinementChecker`] to this template.
+    /// Confine this template to its literal prefix, returning a [`Template`] that enforces the
+    /// confinement invariant at render time.
     ///
-    /// After rendering, `render_string` passes the result to the checker. On
-    /// failure, `render_string` returns [`TemplateRenderingError::Confined`]
-    /// and the caller should discard the event as an intentional security drop.
-    ///
-    /// Called by [`Template::confine`] at build time. Call sites that don't
-    /// set a checker are unaffected — [`TemplateRenderingError::Confined`] can
-    /// never be produced by a template with no checker attached.
-    pub(crate) fn with_confinement_checker(mut self, checker: ConfinementChecker) -> Self {
-        self.confinement = Some(checker);
-        self
-    }
-
-    /// Confine this template to its literal prefix.
-    ///
-    /// Consumes `self` and returns it with a confinement checker attached (if
-    /// applicable). Three outcomes:
+    /// Three outcomes:
     ///
     /// - `dangerously_allow_unconfined_template_resolution` is `true` — no
-    ///   checker attached; a SECURITY warning is emitted. Full opt-out: both
-    ///   startup validation and runtime checks are bypassed.
-    /// - Static template (no event-field references) — returned unchanged.
+    ///   checker attached; a SECURITY warning is emitted.
+    /// - Static template (no event-field references) — returned as-is.
     /// - Dynamic template with a non-empty literal prefix — checker attached.
     /// - Dynamic template with no derivable prefix — error.
     pub fn confine(
@@ -261,48 +244,32 @@ impl Template {
         config: &ConfinementConfig,
         component_name: &'static str,
         field_name: &'static str,
-    ) -> crate::Result<Self> {
-        // Full opt-out: bypass all confinement for this template (startup AND
-        // runtime). The per-sink gauge is emitted by each sink's build() on
-        // the success path — not here — so a failed reload cannot clobber the
-        // still-active sink's gauge.
+    ) -> crate::Result<Template> {
         if config.dangerously_allow_unconfined_template_resolution {
             ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
-            return Ok(self);
+            return Ok(Confined {
+                inner: self,
+                checker: None,
+            });
         }
         match ConfinementChecker::for_template(&self) {
-            Ok(Some(checker)) => Ok(self.with_confinement_checker(checker)),
-            // Static template (no event-field references) — always safe.
-            Ok(None) => Ok(self),
+            Ok(Some(checker)) => Ok(Confined {
+                inner: self,
+                checker: Some(checker),
+            }),
+            Ok(None) => Ok(Confined {
+                inner: self,
+                checker: None,
+            }),
             Err(e) => Err(e.into()),
         }
     }
 
-    /// Run the confinement check attached to this template against a raw
-    /// string, without going through a normal render. Callers that bypass
-    /// template rendering entirely (for example the elasticsearch sink's
-    /// `auto_routing` path, which reads routing values directly off events)
-    /// must call this to keep the confinement contract intact for those
-    /// values.
-    ///
-    /// Returns `Ok(())` if no confinement checker is attached (static
-    /// templates and pure-dynamic templates with the opt-out set both fall
-    /// through this way), or if the checker accepts the value. Returns
-    /// [`TemplateRenderingError::Confined`] otherwise.
-    pub fn check_confinement(&self, rendered: &str) -> Result<(), TemplateRenderingError> {
-        if let Some(checker) = &self.confinement {
-            checker
-                .confine(rendered)
-                .map_err(|e| TemplateRenderingError::Confined {
-                    rendered_preview: confined_preview(rendered),
-                    rendered_len: rendered.len(),
-                    message: e.to_string(),
-                })?;
-        }
-        Ok(())
-    }
-
     /// Renders the given template with data from the event, returning raw bytes.
+    ///
+    /// No confinement check is applied. Use this in transforms, sources, and other contexts
+    /// where confinement is not applicable. For sinks, call [`confine`](Self::confine) first to
+    /// get a [`Template`] and render through that instead.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -312,31 +279,18 @@ impl Template {
 
     /// Renders the given template with data from the event.
     ///
-    /// If a confinement check was attached at build time (see
-    /// [`Template::confine`]),
-    /// it runs after rendering. A confinement failure returns
-    /// [`TemplateRenderingError::Confined`] — callers should emit an
-    /// intentional-drop event and discard the event, not treat it as a
-    /// field-missing error.
+    /// No confinement check is applied. Use this in transforms, sources, and other contexts
+    /// where confinement is not applicable. For sinks, call [`confine`](Self::confine) first to
+    /// get a [`Template`] and render through that instead.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
     ) -> Result<String, TemplateRenderingError> {
-        let rendered = if self.is_static {
-            self.src.clone()
+        if self.is_static {
+            Ok(self.src.clone())
         } else {
-            self.render_event(event.into())?
-        };
-        if let Some(checker) = &self.confinement {
-            checker
-                .confine(&rendered)
-                .map_err(|e| TemplateRenderingError::Confined {
-                    rendered_preview: confined_preview(&rendered),
-                    rendered_len: rendered.len(),
-                    message: e.to_string(),
-                })?;
+            self.render_event(event.into())
         }
-        Ok(rendered)
     }
 
     fn render_event(&self, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
@@ -436,6 +390,252 @@ impl Template {
         !self.is_static
     }
 }
+
+// ---------------------------------------------------------------------------
+// Confined<T> — render-capable wrapper that enforces confinement
+// ---------------------------------------------------------------------------
+
+/// Wraps a template and optionally enforces a confinement check at render time.
+///
+/// Obtain one via [`UnconfinedTemplate::confine`]. The only way to call `render` on a
+/// [`Template`] is through this wrapper.
+pub struct Confined<T> {
+    inner: T,
+    checker: Option<ConfinementChecker>,
+}
+
+impl<T: Clone> Clone for Confined<T> {
+    fn clone(&self) -> Self {
+        Confined {
+            inner: self.inner.clone(),
+            checker: self.checker.clone(),
+        }
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Confined<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Confined")
+            .field("inner", &self.inner)
+            .field("confinement", &self.checker.as_ref().map(|_| "<fn>"))
+            .finish()
+    }
+}
+
+impl<T: PartialEq> PartialEq for Confined<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<T: PartialEq> Eq for Confined<T> {}
+
+impl<T: Hash> Hash for Confined<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+    }
+}
+
+impl<T: Default> Default for Confined<T> {
+    fn default() -> Self {
+        Confined {
+            inner: T::default(),
+            checker: None,
+        }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for Confined<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(f)
+    }
+}
+
+// This is safe because Confined<UnconfinedTemplate> delegates to UnconfinedTemplate for schema.
+impl ConfigurableString for Confined<UnconfinedTemplate> {}
+
+impl Confined<UnconfinedTemplate> {
+    /// Set tz offset on the wrapped template.
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.inner.tz_offset = tz_offset;
+        self
+    }
+
+    /// Run the confinement check against a raw string without going through a normal render.
+    ///
+    /// Callers that bypass template rendering entirely (e.g. the elasticsearch sink's
+    /// `auto_routing` path) must call this to keep the confinement contract intact.
+    pub fn check_confinement(&self, rendered: &str) -> Result<(), TemplateRenderingError> {
+        if let Some(checker) = &self.checker {
+            checker
+                .confine(rendered)
+                .map_err(|e| TemplateRenderingError::Confined {
+                    rendered_preview: confined_preview(rendered),
+                    rendered_len: rendered.len(),
+                    message: e.to_string(),
+                })?;
+        }
+        Ok(())
+    }
+
+    /// Renders the given template with data from the event, returning raw bytes.
+    ///
+    /// If a confinement checker was attached via [`UnconfinedTemplate::confine`], it runs after
+    /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
+    pub fn render<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<Bytes, TemplateRenderingError> {
+        self.render_string(event.into()).map(Into::into)
+    }
+
+    /// Renders the given template with data from the event.
+    ///
+    /// If a confinement checker was attached via [`UnconfinedTemplate::confine`], it runs after
+    /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
+    pub fn render_string<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<String, TemplateRenderingError> {
+        let rendered = self.inner.render_string(event)?;
+        if let Some(checker) = &self.checker {
+            checker
+                .confine(&rendered)
+                .map_err(|e| TemplateRenderingError::Confined {
+                    rendered_preview: confined_preview(&rendered),
+                    rendered_len: rendered.len(),
+                    message: e.to_string(),
+                })?;
+        }
+        Ok(rendered)
+    }
+
+    /// Returns the fields used by this template for dynamic rendering.
+    ///
+    /// Delegates to [`UnconfinedTemplate::get_fields`].
+    pub fn get_fields(&self) -> Option<Vec<String>> {
+        self.inner.get_fields()
+    }
+
+    /// Returns a reference to the inner [`UnconfinedTemplate`].
+    pub const fn as_unconfined(&self) -> &UnconfinedTemplate {
+        &self.inner
+    }
+
+    /// Attach a confinement checker to this template, consuming `self`.
+    ///
+    /// This is a convenience forwarder for [`UnconfinedTemplate::confine`]. It exists so that
+    /// sinks whose config fields are typed as `Template` (i.e. deserialized `Confined<UnconfinedTemplate>`
+    /// with `checker: None`) can call `.confine()` without having to destructure the wrapper.
+    ///
+    /// # Panics (debug only)
+    /// Panics in debug builds if `self` already carries a checker — re-confinement would silently
+    /// drop the existing checker, which is almost certainly a bug.
+    pub fn confine(
+        self,
+        config: &ConfinementConfig,
+        component_name: &'static str,
+        field_name: &'static str,
+    ) -> crate::Result<Self> {
+        debug_assert!(
+            self.checker.is_none(),
+            "re-confining an already-confined template drops the existing checker"
+        );
+        self.inner.confine(config, component_name, field_name)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Trait impls for Confined<UnconfinedTemplate> (= Template)
+// ---------------------------------------------------------------------------
+
+impl serde::Serialize for Confined<UnconfinedTemplate> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.inner.src)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Confined<UnconfinedTemplate> {
+    // NOTE: The deserialized value always has `checker: None`. Sinks that store
+    // `Template` in their config struct must call `.confine()` (or use a separate
+    // confinement mechanism like `PathConfinement`) in `build()` before rendering.
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
+        let inner = UnconfinedTemplate::try_from(s).map_err(serde::de::Error::custom)?;
+        Ok(Confined {
+            inner,
+            checker: None,
+        })
+    }
+}
+
+impl Configurable for Confined<UnconfinedTemplate> {
+    fn metadata() -> Metadata {
+        let mut metadata = UnconfinedTemplate::metadata();
+        metadata.set_transparent();
+        metadata
+    }
+
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        Ok(generate_string_schema())
+    }
+}
+
+impl ToValue for Confined<UnconfinedTemplate> {
+    fn to_value(&self) -> serde_json::Value {
+        serde_json::Value::String(self.inner.src.clone())
+    }
+}
+
+impl TryFrom<String> for Confined<UnconfinedTemplate> {
+    type Error = TemplateParseError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        UnconfinedTemplate::try_from(s).map(|inner| Confined {
+            inner,
+            checker: None,
+        })
+    }
+}
+
+impl TryFrom<&str> for Confined<UnconfinedTemplate> {
+    type Error = TemplateParseError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        UnconfinedTemplate::try_from(s).map(|inner| Confined {
+            inner,
+            checker: None,
+        })
+    }
+}
+
+impl TryFrom<PathBuf> for Confined<UnconfinedTemplate> {
+    type Error = TemplateParseError;
+
+    fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
+        UnconfinedTemplate::try_from(p).map(|inner| Confined {
+            inner,
+            checker: None,
+        })
+    }
+}
+
+impl From<Confined<UnconfinedTemplate>> for String {
+    fn from(t: Confined<UnconfinedTemplate>) -> String {
+        t.inner.src
+    }
+}
+
+/// A template that has passed through [`UnconfinedTemplate::confine`].
+///
+/// Config structs in sinks should store [`UnconfinedTemplate`] (serde-able). Call
+/// [`UnconfinedTemplate::confine`] in `build()` to get a `Template` for runtime use.
+/// The `render` methods on this type enforce the confinement checker if one was attached.
+pub type Template = Confined<UnconfinedTemplate>;
+
+// ---------------------------------------------------------------------------
+// UnsignedIntTemplate (unchanged)
+// ---------------------------------------------------------------------------
 
 /// The source of a `uint` template. May be a constant numeric value or a template string.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -654,6 +854,10 @@ impl UnsignedIntTemplate {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Parsing internals
+// ---------------------------------------------------------------------------
+
 /// One part of the template string after parsing.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum Part {
@@ -815,7 +1019,9 @@ fn render_timestamp(
     }
 }
 
-use crate::sinks::util::path_confinement::MAX_RENDERED_PATH_LEN;
+// ---------------------------------------------------------------------------
+// Confinement types
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Snafu)]
 #[snafu(module(build_error))]
@@ -847,8 +1053,7 @@ pub(crate) enum BuildError {
 
     /// The template is an HTTP/HTTPS URI but the static prefix ends before the
     /// authority (host + optional port), so the rendered URL's destination host
-    /// is entirely event-controlled. Supply a static scheme + host, or set
-    /// `dangerously_allow_unconfined_template_resolution: true` to opt out.
+    /// is entirely event-controlled.
     #[snafu(display(
         "HTTP/HTTPS template {prefix:?} has no static authority (host): the \
          destination host would be fully event-controlled. Add a static host to \
@@ -860,9 +1065,7 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
-    /// The operator-authored URI prefix contains a percent-encoded path separator
-    /// (`%2f` or `%5c`) or a raw backslash. These would cause every rendered
-    /// event to be dropped at runtime; reject at build time instead.
+    /// The operator-authored URI prefix contains a percent-encoded path separator.
     #[snafu(display(
         "HTTP/HTTPS URI prefix {prefix:?} contains %2F, %5C, or a raw backslash \
          in the static portion. Use a literal `/` in the path instead."
@@ -919,7 +1122,10 @@ pub(crate) enum ConfineError {
     },
 
     /// Rendered value does not start with the required base prefix.
-    #[snafu(display("rendered value {rendered:?} does not start with the base prefix {base:?}"))]
+    #[snafu(display(
+        "rendered value {:?} does not start with the base prefix {base:?}",
+        confined_preview(rendered)
+    ))]
     OutsideBase {
         /// The rendered value that failed confinement.
         rendered: String,
@@ -929,15 +1135,18 @@ pub(crate) enum ConfineError {
 
     /// Rejected because a `..` segment could escape the namespace root on
     /// filesystem-like protocols (e.g. WebHDFS) even when the string prefix
-    /// check passes (e.g. `safe/../../escape` starts with `safe/`).
-    #[snafu(display("rendered value {rendered:?} contains a `..` path segment"))]
+    /// check passes — e.g. `safe/../../escape` starts with `safe/`.
+    #[snafu(display(
+        "rendered value {:?} contains a `..` path segment",
+        confined_preview(rendered)
+    ))]
     DotDotSegment {
         /// The rendered value that contained the `..` segment.
         rendered: String,
     },
 
     /// Rendered URI could not be parsed.
-    #[snafu(display("rendered value {rendered:?} is not a valid URI"))]
+    #[snafu(display("rendered value {:?} is not a valid URI", confined_preview(rendered)))]
     UriParseFailed {
         /// The rendered value that could not be parsed.
         rendered: String,
@@ -948,8 +1157,8 @@ pub(crate) enum ConfineError {
     /// (`trusted.host@evil.com`) and host-extension attacks
     /// (`trusted.host.evil.com`).
     #[snafu(display(
-        "rendered URI {rendered:?} has authority {actual:?} but the confined base \
-         requires {expected:?}"
+        "rendered URI {:?} has authority {actual:?} but the confined base requires {expected:?}",
+        confined_preview(rendered)
     ))]
     UriAuthorityMismatch {
         /// The rendered value that failed confinement.
@@ -973,7 +1182,7 @@ pub(crate) enum ConfinementChecker {
 }
 
 impl ConfinementChecker {
-    pub(crate) fn for_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
+    pub(crate) fn for_template(tpl: &UnconfinedTemplate) -> Result<Option<Self>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
             None => return Ok(None),
@@ -1240,7 +1449,7 @@ impl UriChecker {
 ///
 /// Embed this in a component config with `#[serde(flatten)]` to get the
 /// `dangerously_allow_unconfined_template_resolution` field. Pass it to
-/// [`Template::confine`] on each template the component owns.
+/// [`UnconfinedTemplate::confine`] on each template the component owns.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct ConfinementConfig {
@@ -1249,19 +1458,13 @@ pub struct ConfinementConfig {
     /// **DANGEROUS — disables a security control.**
     ///
     /// Bypasses both startup validation and runtime confinement for every
-    /// templated field on this sink. When enabled, a log producer that
-    /// controls any field used in a template can write to arbitrary keys,
-    /// paths, or routing destinations. This flag is a full opt-out: it
-    /// disables confinement even for templates that have a usable static
-    /// prefix.
+    /// templated field on this sink.
     #[serde(default)]
     pub dangerously_allow_unconfined_template_resolution: bool,
 }
 
 impl ConfinementConfig {
-    /// Logs a per-template SECURITY warning on the opt-out path. Does NOT
-    /// touch the gauge — the gauge is emitted once per sink build by
-    /// [`Self::set_confinement_gauge`].
+    /// Logs a per-template SECURITY warning on the opt-out path.
     pub fn warn_unconfined_template(
         component_kind: &'static str,
         component_type: &'static str,
@@ -1275,18 +1478,9 @@ impl ConfinementConfig {
         );
     }
 
-    /// Emit `vector_security_confinement_disabled{component_kind,component_type}`
-    /// reflecting whether this sink has the confinement policy disabled.
+    /// Emit `vector_security_confinement_disabled` gauge.
     ///
-    /// Must be called at the END of `SinkConfig::build`, on the success
-    /// path only. Value = `1` when the flag is set (operator explicitly
-    /// disabled confinement policy for this sink), `0` otherwise.
-    ///
-    /// Emitting earlier means a build that later errors would still leave
-    /// its gauge write behind. On a reload where the new config fails to
-    /// build, the topology manager keeps the old sink active but the
-    /// failed replacement's write would silently misreport the live
-    /// sink's confinement state.
+    /// Must be called at the END of `SinkConfig::build`, on the success path only.
     pub fn set_confinement_gauge(
         &self,
         component_kind: &'static str,
@@ -1306,6 +1500,10 @@ impl ConfinementConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use chrono::{Offset, TimeZone, Utc};
@@ -1322,16 +1520,18 @@ mod tests {
 
     #[test]
     fn get_fields() {
-        let f1 = Template::try_from("{{ foo }}")
+        let f1 = UnconfinedTemplate::try_from("{{ foo }}")
             .unwrap()
             .get_fields()
             .unwrap();
-        let f2 = Template::try_from("{{ foo }}-{{ bar }}")
+        let f2 = UnconfinedTemplate::try_from("{{ foo }}-{{ bar }}")
             .unwrap()
             .get_fields()
             .unwrap();
-        let f3 = Template::try_from("nofield").unwrap().get_fields();
-        let f4 = Template::try_from("%F").unwrap().get_fields();
+        let f3 = UnconfinedTemplate::try_from("nofield")
+            .unwrap()
+            .get_fields();
+        let f4 = UnconfinedTemplate::try_from("%F").unwrap().get_fields();
         let f5 = UnsignedIntTemplate::try_from("{{ foo }}-{{ bar }}")
             .unwrap()
             .get_fields()
@@ -1357,32 +1557,36 @@ mod tests {
             ("/srv-{{ id }}.log", "/srv-"),
             ("{{ full_path }}", ""),
             ("/{{ tenant }}/app.log", "/"),
-            // `%%` stops the prefix scan — in mixed segments like
-            // `100%%/%Y/{{ x }}` chrono decodes `%%` while expanding `%Y`,
-            // so we cannot determine the rendered prefix without a timestamp.
             ("100%%-literal/{{ x }}", "100"),
             ("no-template-at-all", "no-template-at-all"),
             ("only-strftime-%F.log", "only-strftime-"),
-            // single `{` is not a field opener
             ("a{b/{{ c }}", "a{b/"),
         ];
         for (src, expected) in cases {
-            let tpl = Template::try_from(src).unwrap();
+            let tpl = UnconfinedTemplate::try_from(src).unwrap();
             assert_eq!(tpl.literal_prefix(), expected, "src = {src:?}");
         }
     }
 
     #[test]
     fn is_dynamic() {
-        assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
-        assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
         assert!(
-            Template::try_from("/kube-demo/{{ foo }}")
+            UnconfinedTemplate::try_from("/kube-demo/%F")
                 .unwrap()
                 .is_dynamic()
         );
         assert!(
-            Template::try_from("/kube-demo/{{ foo }}/%F")
+            !UnconfinedTemplate::try_from("/kube-demo/echo")
+                .unwrap()
+                .is_dynamic()
+        );
+        assert!(
+            UnconfinedTemplate::try_from("/kube-demo/{{ foo }}")
+                .unwrap()
+                .is_dynamic()
+        );
+        assert!(
+            UnconfinedTemplate::try_from("/kube-demo/{{ foo }}/%F")
                 .unwrap()
                 .is_dynamic()
         );
@@ -1391,7 +1595,7 @@ mod tests {
     #[test]
     fn render_log_static() {
         let event = Event::Log(LogEvent::from("hello world"));
-        let template = Template::try_from("foo").unwrap();
+        let template = UnconfinedTemplate::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
     }
@@ -1419,7 +1623,7 @@ mod tests {
         event
             .as_mut_log()
             .insert(event_path!("log_stream"), "stream");
-        let template = Template::try_from("{{log_stream}}").unwrap();
+        let template = UnconfinedTemplate::try_from("{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
     }
@@ -1430,7 +1634,7 @@ mod tests {
         event
             .as_mut_log()
             .insert(metadata_path!("metadata_key"), "metadata_value");
-        let template = Template::try_from("{{%metadata_key}}").unwrap();
+        let template = UnconfinedTemplate::try_from("{{%metadata_key}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("metadata_value")), template.render(&event))
     }
@@ -1441,7 +1645,7 @@ mod tests {
         event
             .as_mut_log()
             .insert(event_path!("log_stream"), "stream");
-        let template = Template::try_from("abcd-{{log_stream}}").unwrap();
+        let template = UnconfinedTemplate::try_from("abcd-{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
     }
@@ -1452,7 +1656,7 @@ mod tests {
         event
             .as_mut_log()
             .insert(event_path!("log_stream"), "stream");
-        let template = Template::try_from("{{log_stream}}-abcd").unwrap();
+        let template = UnconfinedTemplate::try_from("{{log_stream}}-abcd").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
     }
@@ -1460,7 +1664,7 @@ mod tests {
     #[test]
     fn render_log_dynamic_missing_key() {
         let event = Event::Log(LogEvent::from("hello world"));
-        let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
+        let template = UnconfinedTemplate::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
             Err(TemplateRenderingError::MissingKeys {
@@ -1475,7 +1679,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(event_path!("foo"), "bar");
         event.as_mut_log().insert(event_path!("baz"), "quux");
-        let template = Template::try_from("stream-{{foo}}-{{baz}}.log").unwrap();
+        let template = UnconfinedTemplate::try_from("stream-{{foo}}-{{baz}}.log").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("stream-bar-quux.log")),
@@ -1488,7 +1692,8 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(event_path!("foo"), "bar");
         event.as_mut_log().insert(event_path!("baz"), "quux");
-        let template = Template::try_from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log").unwrap();
+        let template =
+            UnconfinedTemplate::try_from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log").unwrap();
 
         assert_eq!(
             Ok(Bytes::from(r"{stream}{\{{}}}-bar-quux.log")),
@@ -1508,7 +1713,7 @@ mod tests {
             .as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
 
-        let template = Template::try_from("abcd-%F").unwrap();
+        let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
 
         assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
     }
@@ -1522,7 +1727,6 @@ mod tests {
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(event_path!("@timestamp"), ts);
-        // use Vector namespace instead of legacy
         LogNamespace::Vector.insert_vector_metadata(
             event.as_mut_log(),
             Some(vrl::path!("foo")),
@@ -1541,7 +1745,7 @@ mod tests {
             .metadata_mut()
             .set_schema_definition(&std::sync::Arc::new(new_schema));
 
-        let template = Template::try_from("abcd-%F").unwrap();
+        let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
 
         assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
     }
@@ -1558,7 +1762,7 @@ mod tests {
             .as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
 
-        let template = Template::try_from("abcd-%F_%T").unwrap();
+        let template = UnconfinedTemplate::try_from("abcd-%F_%T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("abcd-2001-02-03_04:05:06")),
@@ -1580,7 +1784,7 @@ mod tests {
             ts,
         );
 
-        let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
+        let template = UnconfinedTemplate::try_from("{{ foo }}-%F_%T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("butts-2001-02-03_04:05:06")),
@@ -1602,7 +1806,7 @@ mod tests {
             ts,
         );
 
-        let template = Template::try_from("nested {{ format }} %T").unwrap();
+        let template = UnconfinedTemplate::try_from("nested {{ format }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested %F 04:05:06")),
@@ -1626,7 +1830,7 @@ mod tests {
             ts,
         );
 
-        let template = Template::try_from("nested {{ \"%F\" }} %T").unwrap();
+        let template = UnconfinedTemplate::try_from("nested {{ \"%F\" }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested foo 04:05:06")),
@@ -1636,7 +1840,7 @@ mod tests {
 
     #[test]
     fn render_metric_timestamp() {
-        let template = Template::try_from("timestamp %F %T").unwrap();
+        let template = UnconfinedTemplate::try_from("timestamp %F %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
@@ -1646,7 +1850,8 @@ mod tests {
 
     #[test]
     fn render_metric_with_tags() {
-        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
+        let template =
+            UnconfinedTemplate::try_from("name={{name}} component={{tags.component}}").unwrap();
         let metric = sample_metric().with_tags(Some(metric_tags!(
             "test" => "true",
             "component" => "template",
@@ -1659,7 +1864,8 @@ mod tests {
 
     #[test]
     fn render_metric_without_tags() {
-        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
+        let template =
+            UnconfinedTemplate::try_from("name={{name}} component={{tags.component}}").unwrap();
         assert_eq!(
             Err(TemplateRenderingError::MissingKeys {
                 missing_keys: vec!["tags.component".into()]
@@ -1670,7 +1876,8 @@ mod tests {
 
     #[test]
     fn render_metric_with_namespace() {
-        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let template =
+            UnconfinedTemplate::try_from("namespace={{namespace}} name={{name}}").unwrap();
         let metric = sample_metric().with_namespace(Some("vector-test"));
         assert_eq!(
             Ok(Bytes::from("namespace=vector-test name=a-counter")),
@@ -1680,7 +1887,8 @@ mod tests {
 
     #[test]
     fn render_metric_without_namespace() {
-        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let template =
+            UnconfinedTemplate::try_from("namespace={{namespace}} name={{name}}").unwrap();
         let metric = sample_metric();
         assert_eq!(
             Err(TemplateRenderingError::MissingKeys {
@@ -1694,7 +1902,7 @@ mod tests {
     fn render_log_with_timezone() {
         let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
 
-        let template = Template::try_from("vector-%Y-%m-%d-%H.log").unwrap();
+        let template = UnconfinedTemplate::try_from("vector-%Y-%m-%d-%H.log").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
@@ -1742,7 +1950,7 @@ mod tests {
     #[test]
     fn strftime_error() {
         assert_eq!(
-            Template::try_from("%E").unwrap_err(),
+            UnconfinedTemplate::try_from("%E").unwrap_err(),
             TemplateParseError::StrftimeError
         );
     }
@@ -1765,10 +1973,7 @@ mod tests {
 
     #[test]
     fn dotdot_bypass_rejected() {
-        // `safe/../../escape` passes a naive starts_with("safe/") check but must
-        // be rejected — on filesystem-like protocols (WebHDFS) the server resolves
-        // `..` and the value escapes the intended namespace.
-        let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
+        let tpl = UnconfinedTemplate::try_from("safe/{{ tenant }}/").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(c.confine("safe/legit/").is_ok());
@@ -1780,16 +1985,12 @@ mod tests {
             c.confine("safe/../escape/").unwrap_err(),
             ConfineError::DotDotSegment { .. }
         ));
-        // `..` only as a literal substring (not a full segment) is fine
         assert!(c.confine("safe/not..dotdot/").is_ok());
     }
 
     #[test]
     fn uri_path_traversal_rejected() {
-        // `https://api.internal/ingest/{{ tenant }}` with `../../admin` passes the
-        // authority check (same host) but must be caught by the path-prefix +
-        // `..` checks.
-        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(c.confine("https://api.internal/ingest/acme").is_ok());
@@ -1807,10 +2008,7 @@ mod tests {
 
     #[test]
     fn uri_percent_encoded_dotdot_rejected() {
-        // Servers that decode percent-encoding before path resolution can be
-        // tricked by `%2e%2e` instead of `..`.  All encoded variants must be
-        // rejected alongside the literal `..`.
-        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(c.confine("https://api.internal/ingest/legit").is_ok());
@@ -1838,13 +2036,7 @@ mod tests {
 
     #[test]
     fn uri_encoded_slash_traversal_rejected() {
-        // `%2f` is a percent-encoded `/`. RFC 3986 treats it as a literal slash
-        // character inside a segment, not a path separator — so `http::Uri` keeps
-        // `%2e%2e%2fadmin` as a single segment and the segment-level dot-dot checks
-        // alone would miss it. Many HTTP servers decode `%2f` before resolving the
-        // path, turning the single segment into `../admin` and escaping the prefix.
-        // We must also reject `%5c` (encoded backslash) for Windows-backed services.
-        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(matches!(
@@ -1871,7 +2063,7 @@ mod tests {
 
     #[test]
     fn uri_authority_mismatch_rejected() {
-        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         // Normal path extension is fine.
@@ -1909,10 +2101,7 @@ mod tests {
 
     #[test]
     fn uri_path_field_cannot_smuggle_backslash() {
-        // Raw `\` is accepted by `http::Uri` but Windows/IIS servers treat it
-        // as a path separator — `/ingest/..\admin` escapes the prefix on those
-        // hosts. Reject at render time.
-        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
             c.confine("https://api.internal/ingest/..\\admin")
@@ -1928,10 +2117,7 @@ mod tests {
 
     #[test]
     fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
-        // `%25` is the encoded form of `%`. A proxy that decodes once turns
-        // `%252e%252e%252fadmin` into `%2e%2e%2fadmin`; a second decoder
-        // resolves it to `../admin`. Reject at render time.
-        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
             c.confine("https://api.internal/ingest/%252e%252e%252fadmin")
@@ -1945,7 +2131,7 @@ mod tests {
         // Templates with no `?` build successfully. A field value that smuggles
         // `?...` into the path (e.g. tenant=`ok?tenant=evil`) is caught at
         // render time via the query-rejection check.
-        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
             c.confine("https://api.internal/ingest/ok?tenant=evil")
@@ -1974,7 +2160,7 @@ mod tests {
             "https://api.internal/base/{{ tenant }}/ingest#frag",
             "https://api.internal/base/{{ tenant }}#frag",
         ] {
-            let tpl = Template::try_from(*template_str).unwrap();
+            let tpl = UnconfinedTemplate::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
@@ -1987,10 +2173,8 @@ mod tests {
 
     #[test]
     fn static_uri_with_query_allowed() {
-        // A fully static URI (no `{{ }}`) with a query string is safe: the
-        // rendered value is fixed and cannot be influenced by event data.
-        // No checker is installed; `Ok(None)` is the expected result.
-        let tpl = Template::try_from("https://api.internal/ingest?source=vector").unwrap();
+        let tpl =
+            UnconfinedTemplate::try_from("https://api.internal/ingest?source=vector").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_none());
     }
 
@@ -1999,7 +2183,7 @@ mod tests {
         // `https://{{ host }}/ingest` has prefix `https://` — any host can be
         // rendered, so the confinement is meaningless. Must be rejected at build.
         for template_str in &["https://{{ host }}/ingest", "http://{{ host }}/path"] {
-            let tpl = Template::try_from(*template_str).unwrap();
+            let tpl = UnconfinedTemplate::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
@@ -2008,8 +2192,7 @@ mod tests {
                 "expected NoStaticUriAuthority for {template_str}"
             );
         }
-        // A template with a static host followed by a `/` is accepted.
-        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_some());
     }
 
@@ -2020,7 +2203,7 @@ mod tests {
             "https://tenant.{{ env }}.example.com/",
             "https://api.internal{{ path }}",
         ] {
-            let tpl = Template::try_from(*template_str).unwrap();
+            let tpl = UnconfinedTemplate::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
@@ -2033,9 +2216,7 @@ mod tests {
 
     #[test]
     fn root_only_prefix_rejected() {
-        // `/{{ tenant }}/` has a literal prefix of `/` — every rendered value
-        // trivially starts with it, so it provides no useful confinement.
-        let tpl = Template::try_from("/{{ tenant }}/").unwrap();
+        let tpl = UnconfinedTemplate::try_from("/{{ tenant }}/").unwrap();
         assert!(matches!(
             ConfinementChecker::for_template(&tpl).unwrap_err(),
             BuildError::DerivedBaseIsRoot { .. }
@@ -2044,10 +2225,40 @@ mod tests {
 
     #[test]
     fn non_root_slash_prefix_accepted() {
-        // `/data/{{ tenant }}/` has a literal prefix of `/data/` — non-root, valid.
-        let tpl = Template::try_from("/data/{{ tenant }}/").unwrap();
+        let tpl = UnconfinedTemplate::try_from("/data/{{ tenant }}/").unwrap();
         let checker = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(checker.confine("/data/tenant-a/").is_ok());
         assert!(checker.confine("/other/tenant-a/").is_err());
+    }
+
+    // Verify that a Template (= Confined<UnconfinedTemplate>) from confine() renders
+    // with the checker enforced.
+    #[test]
+    fn confined_template_renders_with_check() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(event_path!("tenant"), "acme");
+
+        let config = ConfinementConfig::default();
+        let tpl = UnconfinedTemplate::try_from("safe/{{ tenant }}/").unwrap();
+        let confined = tpl.confine(&config, "test_sink", "key").unwrap();
+
+        assert_eq!(Ok(Bytes::from("safe/acme/")), confined.render(&event));
+    }
+
+    #[test]
+    fn confined_template_rejects_escape() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../etc");
+
+        let config = ConfinementConfig::default();
+        let tpl = UnconfinedTemplate::try_from("safe/{{ tenant }}/").unwrap();
+        let confined = tpl.confine(&config, "test_sink", "key").unwrap();
+
+        assert!(matches!(
+            confined.render(&event).unwrap_err(),
+            TemplateRenderingError::Confined { .. }
+        ));
     }
 }

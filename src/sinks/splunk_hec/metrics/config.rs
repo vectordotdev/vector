@@ -8,6 +8,7 @@ use vector_lib::{
 };
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
+
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
@@ -23,7 +24,7 @@ use crate::{
             BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig, http::HttpRetryLogic,
         },
     },
-    template::Template,
+    template::{Template, UnconfinedTemplate},
     tls::TlsConfig,
 };
 
@@ -79,14 +80,14 @@ pub struct HecMetricsSinkConfig {
     ///
     /// If not specified, the default index defined within Splunk is used.
     #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
-    pub index: Option<Template>,
+    pub index: Option<UnconfinedTemplate>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk defaults to `httpevent`.
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
-    pub sourcetype: Option<Template>,
+    pub sourcetype: Option<UnconfinedTemplate>,
 
     /// The source of events sent to this sink.
     ///
@@ -99,7 +100,7 @@ pub struct HecMetricsSinkConfig {
         docs::examples = "/var/log/syslog",
         docs::examples = "UDP:514"
     ))]
-    pub source: Option<Template>,
+    pub source: Option<UnconfinedTemplate>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -150,17 +151,22 @@ impl GenerateConfig for HecMetricsSinkConfig {
 #[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.sourcetype = config
+        let templated_field_keys =
+            compute_templated_field_keys(&self.index, &self.source, &self.sourcetype);
+
+        let confined_sourcetype = self
             .sourcetype
+            .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "sourcetype"))
             .transpose()?;
-        config.source = config
+        let confined_source = self
             .source
+            .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "source"))
             .transpose()?;
-        config.index = config
+        let confined_index = self
             .index
+            .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "index"))
             .transpose()?;
 
@@ -171,7 +177,14 @@ impl SinkConfig for HecMetricsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = config.build_processor(client, cx)?;
+        let sink = self.build_processor(
+            client,
+            cx,
+            confined_sourcetype,
+            confined_source,
+            confined_index,
+            templated_field_keys, // passed to encoder, not per-event metadata
+        )?;
         self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
     }
@@ -185,17 +198,37 @@ impl SinkConfig for HecMetricsSinkConfig {
     }
 }
 
+pub(super) fn compute_templated_field_keys(
+    index: &Option<UnconfinedTemplate>,
+    source: &Option<UnconfinedTemplate>,
+    sourcetype: &Option<UnconfinedTemplate>,
+) -> Arc<[String]> {
+    [index, source, sourcetype]
+        .iter()
+        .filter_map(|t| t.as_ref())
+        .filter_map(|t| t.get_fields())
+        .flatten()
+        .map(|f| f.replace("tags.", ""))
+        .collect()
+}
+
 impl HecMetricsSinkConfig {
-    pub fn build_processor(&self, client: HttpClient, _: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        client: HttpClient,
+        _: SinkContext,
+        sourcetype: Option<Template>,
+        source: Option<Template>,
+        index: Option<Template>,
+        templated_field_keys: Arc<[String]>,
+    ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
             None
         };
 
-        let request_builder = HecMetricsRequestBuilder {
-            compression: self.compression,
-        };
+        let request_builder = HecMetricsRequestBuilder::new(self.compression, templated_field_keys);
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
@@ -226,9 +259,9 @@ impl HecMetricsSinkConfig {
             service,
             batch_settings,
             request_builder,
-            sourcetype: self.sourcetype.clone(),
-            source: self.source.clone(),
-            index: self.index.clone(),
+            sourcetype,
+            source,
+            index,
             host_key: self.host_key.path.clone(),
             default_namespace: self.default_namespace.clone(),
         };

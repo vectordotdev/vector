@@ -10,7 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use snafu::Snafu;
 use tokio::fs as tokio_fs;
 
-use crate::template::Template;
+use crate::template::UnconfinedTemplate;
 
 /// Maximum byte length of a rendered path before it is rejected.
 ///
@@ -183,7 +183,7 @@ impl PathConfinement {
     ///
     /// Performs no filesystem I/O.
     pub fn for_template(
-        tpl: &Template,
+        tpl: &UnconfinedTemplate,
         explicit: Option<&Path>,
     ) -> Result<Option<Self>, BuildError> {
         // A static template with no explicit base has nothing to confine.
@@ -474,7 +474,7 @@ mod tests {
             ),
         ];
         for (tpl_src, explicit, expected) in cases {
-            let tpl = Template::try_from(*tpl_src).unwrap();
+            let tpl = UnconfinedTemplate::try_from(*tpl_src).unwrap();
             let explicit_path = explicit.map(Path::new);
             let result = PathConfinement::for_template(&tpl, explicit_path);
             match expected {
@@ -534,7 +534,7 @@ mod tests {
             ("/tmp/100%%/{{ x }}.log", "/tmp/100%/value.log", true),
         ];
         for (tpl_src, rendered, expect_ok) in cases {
-            let tpl = Template::try_from(*tpl_src).unwrap();
+            let tpl = UnconfinedTemplate::try_from(*tpl_src).unwrap();
             let c = PathConfinement::for_template(&tpl, None).unwrap().unwrap();
             let result = c.confine(Path::new(rendered));
             assert_eq!(
@@ -550,7 +550,7 @@ mod tests {
     fn confine_blocks_nul_byte() {
         use std::ffi::OsStr;
         use std::os::unix::ffi::OsStrExt;
-        let tpl = Template::try_from("/var/log/{{ x }}").unwrap();
+        let tpl = UnconfinedTemplate::try_from("/var/log/{{ x }}").unwrap();
         let c = PathConfinement::for_template(&tpl, None).unwrap().unwrap();
         let p = Path::new(OsStr::from_bytes(b"/var/log/abc\0def"));
         assert!(matches!(c.confine(p).unwrap_err(), ConfineError::NulByte));

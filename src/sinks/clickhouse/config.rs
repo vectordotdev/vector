@@ -6,8 +6,13 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
+use vector_lib::codecs::{
+    BatchEncoder, EncoderKind, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    encoding::{BatchSerializerConfig, Framer},
+};
 
 use super::{
+    arrow,
     request_builder::ClickhouseRequestBuilder,
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
@@ -18,7 +23,7 @@ use crate::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
-    template::ConfinementConfig,
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 /// Data format.
@@ -86,11 +91,11 @@ pub struct ClickhouseConfig {
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
-    pub table: Template,
+    pub table: UnconfinedTemplate,
 
     /// The database that contains the table that data is inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
-    pub database: Option<Template>,
+    pub database: Option<UnconfinedTemplate>,
 
     /// The format to parse input data.
     #[serde(default)]
@@ -215,66 +220,67 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.table = config
-            .table
-            .confine(&self.confinement, Self::NAME, "table")?;
-        config.database = config
-            .database
-            .map(|t| t.confine(&self.confinement, Self::NAME, "database"))
-            .transpose()?;
-        let this = &config;
-
-        let endpoint = this.endpoint.with_default_parts().uri;
-
-        let auth = this.auth.choose_one(&this.endpoint.auth)?;
-
-        let tls_settings = TlsSettings::from_options(this.tls.as_ref())?;
-
+        let endpoint = self.endpoint.with_default_parts().uri;
+        let auth = self.auth.choose_one(&self.endpoint.auth)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
             endpoint: endpoint.clone(),
-            skip_unknown_fields: this.skip_unknown_fields,
-            date_time_best_effort: this.date_time_best_effort,
-            insert_random_shard: this.insert_random_shard,
-            compression: this.compression,
-            query_settings: this.query_settings,
+            skip_unknown_fields: self.skip_unknown_fields,
+            date_time_best_effort: self.date_time_best_effort,
+            insert_random_shard: self.insert_random_shard,
+            compression: self.compression,
+            query_settings: self.query_settings,
         };
 
         let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
             HttpService::new(client.clone(), clickhouse_service_request_builder);
 
-        let request_limits = this.request.into_settings();
+        let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, ClickhouseRetryLogic::default())
             .service(service);
 
-        let batch_settings = this.batch.into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
 
-        let database = this.database.clone().unwrap_or_else(|| {
-            "default"
-                .try_into()
-                .expect("'default' should be a valid template")
-        });
+        // Use unconfined templates for introspection in resolve_strategy.
+        let default_database_unconfined: UnconfinedTemplate = "default"
+            .try_into()
+            .expect("'default' should be a valid template");
+        let database_unconfined = self
+            .database
+            .as_ref()
+            .unwrap_or(&default_database_unconfined);
 
-        // Resolve the encoding strategy (format + encoder) based on configuration
-        let (format, encoder_kind) = this
-            .resolve_strategy(&client, &endpoint, &database, auth.as_ref())
+        // Resolve the encoding strategy (format + encoder) based on configuration.
+        let (format, encoder_kind) = self
+            .resolve_strategy(&client, &endpoint, database_unconfined, auth.as_ref())
             .await?;
 
+        // Confine templates for runtime use in the sink.
+        let confined_table = self
+            .table
+            .clone()
+            .confine(&self.confinement, Self::NAME, "table")?;
+        let database = self
+            .database
+            .clone()
+            .unwrap_or(default_database_unconfined)
+            .confine(&self.confinement, Self::NAME, "database")?;
+
         let request_builder = ClickhouseRequestBuilder {
-            compression: this.compression,
-            encoder: (this.encoding.clone(), encoder_kind),
+            compression: self.compression,
+            encoder: (self.encoding.clone(), encoder_kind),
         };
 
         let sink = ClickhouseSink::new(
             batch_settings,
             service,
             database,
-            this.table.clone(),
+            confined_table,
             format,
             request_builder,
         );
@@ -303,18 +309,10 @@ impl ClickhouseConfig {
         &self,
         client: &HttpClient,
         endpoint: &Uri,
-        database: &Template,
+        database: &UnconfinedTemplate,
         auth: Option<&Auth>,
     ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
-        use vector_lib::codecs::EncoderKind;
-        use vector_lib::codecs::{
-            JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
-        };
-
         if let Some(batch_encoding) = &self.batch_encoding {
-            use vector_lib::codecs::BatchEncoder;
-            use vector_lib::codecs::encoding::BatchSerializerConfig;
-
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {
                 return Err(format!(
@@ -355,12 +353,10 @@ impl ClickhouseConfig {
         &self,
         client: &HttpClient,
         endpoint: String,
-        database: &Template,
+        database: &UnconfinedTemplate,
         auth: Option<&Auth>,
         config: &mut ArrowStreamSerializerConfig,
     ) -> crate::Result<()> {
-        use super::arrow;
-
         if self.table.is_dynamic() || database.is_dynamic() {
             return Err(
                 "Arrow codec requires a static table and database. Dynamic schema inference is not supported."
@@ -384,12 +380,10 @@ impl ClickhouseConfig {
             auth.cloned(),
         );
 
-        let schema = provider.get_schema().await.map_err(|e| {
-            format!(
-                "Failed to fetch schema for {}.{}: {}.",
-                database_str, table_str, e
-            )
-        })?;
+        let schema = provider
+            .get_schema()
+            .await
+            .map_err(|e| format!("Failed to fetch schema for {database_str}.{table_str}: {e}."))?;
 
         config.schema = Some(schema);
 
@@ -434,7 +428,7 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::template::{ConfinementConfig, Template};
+    use crate::template::{ConfinementConfig, Template, UnconfinedTemplate};
     use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 
     #[test]
@@ -529,7 +523,7 @@ mod tests {
         let tls = TlsSettings::default();
         let client = HttpClient::new(tls, &Default::default()).unwrap();
         let endpoint: http::Uri = "http://localhost:8123".parse().unwrap();
-        let database: Template = "test_db".try_into().unwrap();
+        let database: UnconfinedTemplate = "test_db".try_into().unwrap();
 
         // Test incompatible formats - should all return errors
         let incompatible_formats = vec![
