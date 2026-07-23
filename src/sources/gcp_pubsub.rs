@@ -634,12 +634,23 @@ impl PubsubSource {
 
         let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
+        // Reconnect if no response arrives within the idle timeout, to
+        // recover from a stream that stalls without ever erroring. Reset
+        // whenever a response arrives. Armed before the streaming-pull call so
+        // it also bounds a startup that Pub/Sub accepts but never resolves.
+        let idle_deadline = tokio::time::sleep(self.idle_timeout);
+        tokio::pin!(idle_deadline);
+
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
         let request_stream = self.request_stream(ack_ids_receiver);
         debug!("Starting streaming pull.");
         let stream = tokio::select! {
             _ = &mut self.shutdown => return State::Shutdown,
+            _ = &mut idle_deadline => {
+                debug!("Streaming pull did not start within the idle timeout, restarting stream.");
+                return State::RetryDelay;
+            }
             result = client.streaming_pull(request_stream) => match result {
                 Ok(stream) => stream,
                 Err(error) => {
@@ -653,12 +664,6 @@ impl PubsubSource {
         let (finalizer, mut ack_stream) =
             Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
         let mut pending_acks = 0;
-
-        // Reconnect if no response arrives within the idle timeout, to
-        // recover from a stream that stalls without ever erroring. Reset
-        // whenever a response arrives.
-        let idle_deadline = tokio::time::sleep(self.idle_timeout);
-        tokio::pin!(idle_deadline);
 
         loop {
             tokio::select! {
