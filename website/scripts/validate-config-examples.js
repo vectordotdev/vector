@@ -25,15 +25,17 @@ const wrapConfig = (kind, componentYaml, component) => {
 
   if (kind === "sources") {
     const sourceKey = Object.keys(parsed.sources)[0];
-    return YAML.stringify({
-      ...parsed,
-      sinks: {
-        _validate_sink: {
-          type: "blackhole",
-          inputs: [sourceKey]
-        }
-      }
-    });
+    const outputs = component.outputs || [];
+    const hasNamedOutputs = outputs.length > 0 && outputs[0].name !== "<component_id>";
+    const sinks = {};
+    if (hasNamedOutputs) {
+      outputs.forEach(({ name }) => {
+        sinks[`_validate_sink_${name}`] = { type: "blackhole", inputs: [`${sourceKey}.${name}`] };
+      });
+    } else {
+      sinks["_validate_sink"] = { type: "blackhole", inputs: [sourceKey] };
+    }
+    return YAML.stringify({ ...parsed, sinks });
   }
 
   const sourceType = sourceTypeFor(component);
@@ -42,20 +44,24 @@ const wrapConfig = (kind, componentYaml, component) => {
 
   if (kind === "transforms") {
     const transformKey = Object.keys(parsed.transforms)[0];
+    const transformConfig = { ...parsed.transforms[transformKey], inputs: ["_validate_source"] };
+
+    // route uses a map of route-id → condition; exclusive_route uses an array of {name, condition}
+    const namedOutputs = [
+      ...Object.keys(transformConfig.route ?? {}),
+      ...(transformConfig.routes ?? []).map((r) => r?.name).filter(Boolean)
+    ];
+
+    const blackhole = (input) => ({ type: "blackhole", inputs: [input] });
+    const sinks =
+      namedOutputs.length > 0
+        ? Object.fromEntries(namedOutputs.map((n) => [`_validate_sink_${n}`, blackhole(`${transformKey}.${n}`)]))
+        : { _validate_sink: blackhole(transformKey) };
+
     return YAML.stringify({
       sources: { _validate_source: validateSource },
-      transforms: {
-        [transformKey]: {
-          ...parsed.transforms[transformKey],
-          inputs: ["_validate_source"]
-        }
-      },
-      sinks: {
-        _validate_sink: {
-          type: "blackhole",
-          inputs: [transformKey]
-        }
-      }
+      transforms: { [transformKey]: transformConfig },
+      sinks
     });
   }
 
