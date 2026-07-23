@@ -284,6 +284,14 @@ impl LogplexSource {
 }
 
 impl HttpSource for LogplexSource {
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
+    fn name() -> &'static str {
+        LogplexConfig::NAME
+    }
+
     fn build_events(
         &self,
         body: Bytes,
