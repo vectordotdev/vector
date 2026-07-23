@@ -1,5 +1,6 @@
 //! Configuration for the `Clickhouse` sink.
 
+use std::collections::HashMap;
 use std::fmt;
 
 use http::{Request, StatusCode, Uri};
@@ -152,6 +153,20 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub query_settings: QuerySettingsConfig,
 
+    /// Additional ClickHouse query parameters appended to every INSERT request URL.
+    ///
+    /// Each key-value pair is percent-encoded and forwarded as a URL query parameter.
+    /// Use this to pass any ClickHouse session setting not directly exposed by this sink,
+    /// for example `deduplicate_blocks_in_dependent_materialized_views` or `insert_quorum`.
+    ///
+    /// Keys must not conflict with parameters already managed by Vector
+    /// (`query`, `param_database`, `param_table`, `input_format_import_nested_json`,
+    /// `input_format_skip_unknown_fields`, `date_time_input_format`,
+    /// `insert_distributed_one_random_shard`, and the `async_insert_*` family).
+    #[configurable(metadata(docs::additional_props_description = "A ClickHouse query parameter name-value pair."))]
+    #[serde(default)]
+    pub extra_query_params: HashMap<String, String>,
+
     #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
@@ -241,6 +256,7 @@ impl SinkConfig for ClickhouseConfig {
             insert_random_shard: this.insert_random_shard,
             compression: this.compression,
             query_settings: this.query_settings,
+            extra_query_params: this.extra_query_params.clone(),
         };
 
         let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
