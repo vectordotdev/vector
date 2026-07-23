@@ -66,11 +66,11 @@ impl BasicSinkConfig {
 
     /// Attach a template-confinement config, marking this sink as
     /// confinement-aware so the topology emits its
-    /// `security_confinement_disabled` gauge. `disabled` sets
+    /// `security_confinement_disabled` gauge. `allowed` sets
     /// `dangerously_allow_unconfined_template_resolution`.
-    pub fn with_confinement(mut self, disabled: bool) -> Self {
+    pub fn with_confinement(mut self, allowed: bool) -> Self {
         self.confinement = Some(crate::template::ConfinementConfig {
-            dangerously_allow_unconfined_template_resolution: disabled,
+            dangerously_allow_unconfined_template_resolution: allowed,
         });
         self
     }
