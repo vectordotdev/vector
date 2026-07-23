@@ -142,6 +142,9 @@ const getExampleValue = (param, deepFilter) => {
       } else {
         value = getValue(p);
       }
+    } else if (k === "condition" && p.syntaxes && p.syntaxes.length > 0 && param.required) {
+      const vrl = p.syntaxes.find((s) => s.name === "vrl") || p.syntaxes[0];
+      if (vrl?.example) value = { type: "vrl", source: vrl.example };
     } else {
       value = getValue(p);
     }
