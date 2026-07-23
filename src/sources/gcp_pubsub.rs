@@ -823,10 +823,12 @@ impl PubsubSource {
             return State::RetryNow;
         }
 
-        // Escalate once, when the streak first hits the threshold, so a
-        // persistently idle subscription doesn't resume the error flood.
+        // Escalate once the streak reaches the threshold, and keep reporting
+        // while it persists so a genuinely broken stream stays visible (and
+        // `max_retry_errors: 1` reports every failure). A successful fetch
+        // resets the counter.
         let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
-        if consecutive_failures == self.max_retry_errors {
+        if consecutive_failures >= self.max_retry_errors {
             emit!(GcpPubsubReceiveError { error });
         } else {
             debug!(
