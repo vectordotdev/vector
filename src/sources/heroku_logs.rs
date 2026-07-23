@@ -146,7 +146,14 @@ impl LogplexConfig {
 
         // for metadata that is added to the events dynamically from config options
         if log_namespace == LogNamespace::Legacy {
-            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+            // Custom auth programs can inject any VRL value, not just bytes; widen the unknown
+            // field kind accordingly so schema-aware downstream components don't reject events.
+            let unknown_kind = if matches!(self.auth, Some(HttpServerAuthConfig::Custom { .. })) {
+                Kind::any()
+            } else {
+                Kind::bytes()
+            };
+            schema_definition = schema_definition.unknown_fields(unknown_kind);
         }
 
         schema_definition
