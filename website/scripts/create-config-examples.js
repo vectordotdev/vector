@@ -18,11 +18,30 @@ const getExampleValue = (param, deepFilter) => {
   };
 
   const getValue = (obj) => {
-    const enumVal = obj.enum != null ? Object.keys(obj.enum)[0] : null;
+    const keys = obj.enum != null ? Object.keys(obj.enum) : null;
+    const isNumericEnum = keys != null && keys.every((k) => /^\d+$/.test(k));
+    if (isNumericEnum) {
+      return obj.default || String(Math.max(...keys.map(Number)));
+    }
 
+    const enumVal = keys ? keys[0] : null;
     const examplesVal = obj.examples != null && obj.examples.length > 0 ? obj.examples[0] : null;
 
     return obj.default || examplesVal || enumVal || null;
+  };
+
+  const getValuePreferringSimple = (obj, siblingOptions) => {
+    if (obj.enum == null || siblingOptions == null) return getValue(obj);
+    const isSimple = (key) =>
+      !Object.values(siblingOptions).some(
+        (opt) => opt.required && opt.relevant_when && opt.relevant_when.includes(`"${key}"`)
+      );
+    const preferred = ["json", "text", "logfmt"];
+    const simpleKeys = Object.keys(obj.enum).filter(isSimple);
+    const simpleKey =
+      preferred.find((key) => key in obj.enum && isSimple(key)) ||
+      (simpleKeys.every((k) => /^\d+$/.test(k)) ? simpleKeys.sort((a, b) => Number(b) - Number(a))[0] : simpleKeys[0]);
+    return obj.default || simpleKey || null;
   };
 
   Object.keys(param.type).forEach((k) => {
@@ -64,6 +83,38 @@ const getExampleValue = (param, deepFilter) => {
             }
           }
         });
+      } else if (p.examples && p.examples.length > 0) {
+        value = p.examples[0];
+      } else if (p.options && (param.required || param.minimal)) {
+        const buildFromOptions = (options) => {
+          const subObj = {};
+          Object.entries(options)
+            .filter(([optKey, opt]) => optKey !== "*" && opt.required && !opt.relevant_when && opt.type)
+            .forEach(([optKey, opt]) => {
+              Object.values(opt.type).forEach((typeVal) => {
+                if (typeVal.options) {
+                  if (typeVal.examples && typeVal.examples.length > 0) {
+                    subObj[optKey] = typeVal.examples[0];
+                  } else {
+                    const nested = buildFromOptions(typeVal.options);
+                    if (Object.keys(nested).length > 0) {
+                      subObj[optKey] = nested;
+                    }
+                  }
+                } else {
+                  const v = getValuePreferringSimple(typeVal, options);
+                  if (v !== null) {
+                    subObj[optKey] = v;
+                  }
+                }
+              });
+            });
+          return subObj;
+        };
+        const subObj = buildFromOptions(p.options);
+        if (Object.keys(subObj).length > 0) {
+          value = subObj;
+        }
       } else {
         value = getValue(p);
       }
