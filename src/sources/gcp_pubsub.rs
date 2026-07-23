@@ -688,13 +688,15 @@ impl PubsubSource {
                         idle_deadline
                             .as_mut()
                             .reset(tokio::time::Instant::now() + self.idle_timeout);
-                        self.handle_response(
+                        if let Some(state) = self.handle_response(
                             response,
                             &finalizer,
                             &ack_ids_sender,
                             &mut pending_acks,
                             busy_flag,
-                        ).await;
+                        ).await {
+                            break state;
+                        }
                     }
                     Some(Err(error)) => break self.handle_stream_error(error),
                     None => break State::RetryNow,
@@ -776,6 +778,7 @@ impl PubsubSource {
         }))
     }
 
+    // Returns `Some(state)` when the stream should be torn down and restarted.
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
@@ -783,7 +786,7 @@ impl PubsubSource {
         ack_ids: &mpsc::Sender<Vec<String>>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
-    ) {
+    ) -> Option<State> {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
@@ -796,10 +799,19 @@ impl PubsubSource {
         match self.out.send_batch(events).await {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
-                None => ack_ids
-                    .send(ids)
-                    .await
-                    .unwrap_or_else(|_| unreachable!("request stream never closes")),
+                // Auto-ack: send without blocking so a stalled request stream
+                // can't park the task here and starve the idle timeout. On a
+                // full channel, reconnect; the unsent IDs are redelivered.
+                None => match ack_ids.try_send(ids) {
+                    Ok(()) => {}
+                    Err(mpsc::error::TrySendError::Full(_)) => {
+                        debug!("Request stream stalled sending acks, restarting stream.");
+                        return Some(State::RetryDelay);
+                    }
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        unreachable!("request stream never closes")
+                    }
+                },
                 Some(notifier) => {
                     finalizer
                         .as_ref()
@@ -809,6 +821,7 @@ impl PubsubSource {
                 }
             },
         }
+        None
     }
 
     // GCP frequently ends a streaming pull with a transient, auto-retried
