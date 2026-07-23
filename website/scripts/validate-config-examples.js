@@ -44,20 +44,19 @@ const wrapConfig = (kind, componentYaml, component) => {
 
   if (kind === "transforms") {
     const transformKey = Object.keys(parsed.transforms)[0];
+    const transformConfig = { ...parsed.transforms[transformKey], inputs: ["_validate_source"] };
+    // The route transform has per-route named outputs; wire a sink for each route key
+    const routeKeys = transformConfig.route ? Object.keys(transformConfig.route) : null;
+    const sinks =
+      routeKeys && routeKeys.length > 0
+        ? Object.fromEntries(
+            routeKeys.map((k) => [`_validate_sink_${k}`, { type: "blackhole", inputs: [`${transformKey}.${k}`] }])
+          )
+        : { _validate_sink: { type: "blackhole", inputs: [transformKey] } };
     return YAML.stringify({
       sources: { _validate_source: validateSource },
-      transforms: {
-        [transformKey]: {
-          ...parsed.transforms[transformKey],
-          inputs: ["_validate_source"]
-        }
-      },
-      sinks: {
-        _validate_sink: {
-          type: "blackhole",
-          inputs: [transformKey]
-        }
-      }
+      transforms: { [transformKey]: transformConfig },
+      sinks
     });
   }
 
