@@ -35,7 +35,7 @@ use crate::{
     encoding::{AsMetadata, Encodable},
     variants::disk_v2::{
         io::AsyncFile,
-        reader::{RecordReader, decode_record_payload},
+        reader::{ReadToken, RecordReader, decode_record_payload},
         record::{RECORD_HEADER_LEN, try_as_record_archive},
     },
 };
@@ -943,6 +943,30 @@ where
         should_skip
     }
 
+    fn decode_reconciliation_record(
+        reader: &mut RecordReader<FS::File, T>,
+        token: ReadToken,
+        data_file_path: &std::path::Path,
+        checkpoint_next_record_id: u64,
+    ) -> Option<T> {
+        let record_id = token.record_id();
+        let record_bytes = token.record_bytes();
+        match reader.read_record(token) {
+            Ok(record) => Some(record),
+            Err(error) => {
+                warn!(
+                    data_file_path = data_file_path.to_string_lossy().as_ref(),
+                    checkpoint_next_record_id,
+                    record_id,
+                    record_bytes,
+                    %error,
+                    "Preserving undecodable checkpointed writer record."
+                );
+                None
+            }
+        }
+    }
+
     async fn reconcile_current_data_file_with_checkpoint(&mut self) -> Result<(), WriterError<T>> {
         let checkpoint_next_record_id = self.ledger.state().get_next_writer_record_id();
         let data_file_path = self.ledger.get_current_writer_data_file_path();
@@ -954,7 +978,7 @@ where
             .context(IoSnafu)?;
         let mut reader = RecordReader::new(data_file);
         let mut record_start_offset = 0;
-        let mut last_valid_record_next_id = None;
+        let mut last_decodable_record_next_id = None;
 
         loop {
             let token = match reader.try_next_record(true).await {
@@ -963,7 +987,7 @@ where
                 Err(e) => {
                     if let Some(record_bytes) = e.consumed_record_bytes() {
                         if checkpoint_next_record_id == 1
-                            || last_valid_record_next_id == Some(checkpoint_next_record_id)
+                            || last_decodable_record_next_id == Some(checkpoint_next_record_id)
                         {
                             warn!(
                                 data_file_path = data_file_path.to_string_lossy().as_ref(),
@@ -1015,12 +1039,19 @@ where
                 break;
             }
 
-            let record: T =
-                reader
-                    .read_record(token)
-                    .map_err(|e| WriterError::FailedToValidate {
-                        reason: e.to_string(),
-                    })?;
+            // The frame itself is complete and validated, so it still provides a trustworthy byte
+            // boundary. If its payload does not provide an event count, preserve it for the
+            // runtime reader to drop without using it to prove where the checkpoint falls.
+            let Some(record) = Self::decode_reconciliation_record(
+                &mut reader,
+                token,
+                &data_file_path,
+                checkpoint_next_record_id,
+            ) else {
+                last_decodable_record_next_id = None;
+                record_start_offset += record_bytes;
+                continue;
+            };
             let record_events =
                 u64::try_from(record.event_count()).expect("event count should never exceed u64");
             let record_next = record_id + record_events;
@@ -1036,7 +1067,7 @@ where
                 break;
             }
 
-            last_valid_record_next_id = Some(record_next);
+            last_decodable_record_next_id = Some(record_next);
             record_start_offset += record_bytes;
         }
 
