@@ -16,7 +16,6 @@ use aws_sdk_cloudwatchlogs::{
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use chrono::Duration;
 use futures::{FutureExt, future::BoxFuture};
-use futures_util::TryFutureExt;
 use http::{
     HeaderValue,
     header::{HeaderName, InvalidHeaderName, InvalidHeaderValue},
@@ -33,6 +32,7 @@ use tower::{
 };
 use vector_lib::{
     finalization::EventStatus,
+    internal_event::{ByteSize, BytesSent, InternalEventHandle as _, Registered, register},
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
     stream::DriverResponse,
 };
@@ -66,6 +66,10 @@ type Svc = Buffer<
 #[derive(Debug)]
 pub enum CloudwatchError {
     Put(SdkError<PutLogEventsError, HttpResponse>),
+    PutPartial {
+        error: SdkError<PutLogEventsError, HttpResponse>,
+        bytes_sent: usize,
+    },
     DescribeLogStreams(SdkError<DescribeLogStreamsError, HttpResponse>),
     CreateStream(SdkError<CreateLogStreamError, HttpResponse>),
     CreateGroup(SdkError<CreateLogGroupError, HttpResponse>),
@@ -77,6 +81,12 @@ impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {error}"),
+            CloudwatchError::PutPartial { error, bytes_sent } => {
+                write!(
+                    f,
+                    "CloudwatchError::PutPartial({bytes_sent} bytes sent): {error}"
+                )
+            }
             CloudwatchError::DescribeLogStreams(error) => {
                 write!(f, "CloudwatchError::DescribeLogStreams: {error}")
             }
@@ -150,6 +160,7 @@ impl CloudwatchLogsPartitionSvc {
     pub fn new(
         config: CloudwatchLogsSinkConfig,
         client: CloudwatchLogsClient,
+        region: String,
     ) -> crate::Result<Self> {
         let request_settings = config.request.tower.into_settings();
 
@@ -165,12 +176,18 @@ impl CloudwatchLogsPartitionSvc {
             })
             .collect::<Result<IndexMap<_, _>, HeaderError>>()?;
 
+        let bytes_sent = register(BytesSent {
+            protocol: "https".into(),
+            extra_labels: vec![("region".into(), region.into())],
+        });
+
         Ok(Self {
             config,
             clients: HashMap::new(),
             request_settings,
             client,
             headers,
+            bytes_sent,
         })
     }
 }
@@ -230,12 +247,23 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
             svc
         };
 
+        let bytes_sent_handle = self.bytes_sent.clone();
+
         svc.oneshot(events)
-            .map_ok(move |_x| CloudwatchResponse {
-                events_byte_size,
-                byte_size,
+            .map(move |result| match result {
+                Ok(()) => Ok(CloudwatchResponse {
+                    events_byte_size,
+                    byte_size,
+                }),
+                Err(box_err) => {
+                    if let Some(CloudwatchError::PutPartial { bytes_sent, .. }) =
+                        box_err.downcast_ref::<CloudwatchError>()
+                    {
+                        bytes_sent_handle.emit(ByteSize(*bytes_sent));
+                    }
+                    Err(box_err)
+                }
             })
-            .map_err(Into::into)
             .boxed()
     }
 }
@@ -381,4 +409,5 @@ pub struct CloudwatchLogsPartitionSvc {
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
     client: CloudwatchLogsClient,
+    bytes_sent: Registered<BytesSent>,
 }

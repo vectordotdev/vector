@@ -231,6 +231,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
+                resolved_region.to_string(),
             )?);
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
