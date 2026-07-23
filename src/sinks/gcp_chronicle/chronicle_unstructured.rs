@@ -5,9 +5,8 @@ use std::{collections::HashMap, io};
 
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
-use goauth::scopes::Scope;
 use http::{
-    Request, StatusCode, Uri,
+    Request, Uri,
     header::{self, HeaderName, HeaderValue},
 };
 use hyper::Body;
@@ -30,7 +29,7 @@ use vrl::value::Kind;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
-    gcp::{GcpAuthConfig, GcpAuthenticator},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
     sinks::{
@@ -303,7 +302,7 @@ pub enum ChronicleError {
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
+        let creds = self.auth.build(Scope::MALACHITE_INGESTION).await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
@@ -314,7 +313,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
         let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
 
         let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
-        creds.spawn_regenerate_token();
+        creds.start_background_refresh();
         let sink = self.build_sink(client, endpoint, creds)?;
 
         Ok((sink, healthcheck))
@@ -348,7 +347,7 @@ impl ChronicleUnstructuredConfig {
         let partitioner = self.partitioner()?;
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic::default())
+            .settings(request, GcsRetryLogic::with_auth(creds.clone()))
             .service(ChronicleService::new(client, base_url, creds));
 
         let request_settings = ChronicleRequestBuilder::new(self)?;
@@ -623,8 +622,6 @@ impl ChronicleService {
 
 #[derive(Debug, Snafu)]
 pub enum ChronicleResponseError {
-    #[snafu(display("Server responded with an error: {}", code))]
-    ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
     HttpError { error: crate::http::HttpError },
 }
@@ -653,17 +650,17 @@ impl Service<ChronicleRequest> for ChronicleService {
         let mut client = self.client.clone();
         Box::pin(async move {
             match client.call(http_request).await {
-                Ok(response) => {
-                    let status = response.status();
-                    if status.is_success() {
-                        Ok(GcsResponse {
-                            inner: response,
-                            metadata,
-                        })
-                    } else {
-                        Err(ChronicleResponseError::ServerError { code: status })
-                    }
-                }
+                // Return every HTTP response (success or not) so the retry
+                // logic's `should_retry_response` decides based on status — in
+                // particular so a 401 triggers the credential self-heal rather
+                // than being surfaced as a terminal error the retry layer never
+                // inspects. `GcsResponse` maps the status to the right event
+                // disposition (2xx=Delivered, 5xx=Errored, else Rejected).
+                // Only a transport failure is a hard error.
+                Ok(response) => Ok(GcsResponse {
+                    inner: response,
+                    metadata,
+                }),
                 Err(error) => Err(ChronicleResponseError::HttpError { error }),
             }
         })
