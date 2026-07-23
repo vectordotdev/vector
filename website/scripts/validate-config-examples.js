@@ -57,7 +57,10 @@ const wrapConfig = (kind, componentYaml, component) => {
           )
         : exclusiveRouteNames && exclusiveRouteNames.length > 0
           ? Object.fromEntries(
-              exclusiveRouteNames.map((n) => [`_validate_sink_${n}`, { type: "blackhole", inputs: [`${transformKey}.${n}`] }])
+              exclusiveRouteNames.map((n) => [
+                `_validate_sink_${n}`,
+                { type: "blackhole", inputs: [`${transformKey}.${n}`] }
+              ])
             )
           : { _validate_sink: { type: "blackhole", inputs: [transformKey] } };
     return YAML.stringify({

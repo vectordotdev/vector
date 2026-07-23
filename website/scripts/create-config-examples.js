@@ -44,7 +44,8 @@ const getExampleValue = (param, deepFilter) => {
     }
 
     const enumVal = keys ? keys[0] : null;
-    const examplesVal = obj.examples != null && obj.examples.length > 0 && isSafe(obj.examples[0]) ? obj.examples[0] : null;
+    const examplesVal =
+      obj.examples != null && obj.examples.length > 0 && isSafe(obj.examples[0]) ? obj.examples[0] : null;
     const defaultVal = isSafe(obj.default) ? obj.default : null;
 
     return defaultVal || examplesVal || enumVal || null;
