@@ -164,12 +164,24 @@ pub struct ClickhouseConfig {
     /// `input_format_skip_unknown_fields`, `date_time_input_format`,
     /// `insert_distributed_one_random_shard`, and the `async_insert_*` family).
     #[configurable(metadata(docs::additional_props_description = "A ClickHouse query parameter name-value pair."))]
+    #[configurable(metadata(docs::examples = "extra_query_params_examples()"))]
     #[serde(default)]
     pub extra_query_params: HashMap<String, String>,
 
     #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
+}
+
+fn extra_query_params_examples() -> HashMap<String, String> {
+    [
+        (
+            "deduplicate_blocks_in_dependent_materialized_views".to_string(),
+            "0".to_string(),
+        ),
+        ("insert_quorum".to_string(), "2".to_string()),
+    ]
+    .into()
 }
 
 /// Query settings for the `clickhouse` sink.
