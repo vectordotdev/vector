@@ -182,9 +182,10 @@ Existing component wiring and serialization registration are unaffected.
 | Startup / reload (pre-commit) | `validate_structure` + `build` + `build_transform` (channel wiring) | `validate_structure` + `build`, then run or spawn the `Healthcheck` per `require_healthy` |
 | Startup / reload (post-commit) | `spawn_diff` starts the Task | `VectorSink::run` |
 
-`validate_structure` (context-free) also runs during generic `ConfigBuilder` compilation, before any
-context exists. `validate_with_context` runs in `vector validate` (both modes, against a stub
-context). It is deliberately *not* run at startup: `build()` already compiles the same VRL programs
+The table shows which validation *applies* on each path, not a fresh invocation per row.
+`validate_structure` (context-free) is executed once, owned by generic `ConfigBuilder` compilation;
+because every path above compiles the `Config` first, they inherit its result rather than re-running
+it. `validate_with_context` runs in `vector validate` (both modes, against a stub context). It is deliberately *not* run at startup: `build()` already compiles the same VRL programs
 and conditions against the real context (e.g. `filter::build` calls `condition.build`), so running
 `validate_with_context` there would double-compile and could repeat enrichment-index registration.
 This matches today's behavior, where `validate_env()` is not called at startup. Note the two paths
@@ -202,14 +203,15 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
 
 1. Add both hooks with defaults that return `Ok(())`: `validate_structure(&self)` on both
    `SinkConfig` and `TransformConfig`, and `validate_with_context(&self, context)` on
-   `TransformConfig`. No component changes are required to compile. Wire them into every place the
-   legacy hooks run today, so no consumer loses coverage. `validate_structure` (context-free) is
-   called during generic `ConfigBuilder` compilation (`src/config/validation.rs`) as well as from
-   `vector validate` and `TopologyPiecesBuilder`; `validate_with_context` is called from
-   `vector validate` (`src/validate.rs`), matching where `validate_env()` runs today, and not at
-   startup where `build()` already compiles the same programs. Because
-   `validate_structure` takes no context, the compilation-time call needs no context assembly, and
-   config-only consumers keep their structural coverage.
+   `TransformConfig`. No component changes are required to compile. Give each hook a single owner so
+   there are no divergent call paths. `validate_structure` (context-free) is owned by generic
+   `ConfigBuilder` compilation (`src/config/validation.rs`); `vector validate` and
+   `TopologyPiecesBuilder` both consume an already-compiled `Config`, so they receive its result
+   transitively and do not re-invoke it. `validate_with_context` is owned by `vector validate`
+   (`src/validate.rs`), matching where `validate_env()` runs today; it is not run at startup because
+   `build()` already compiles the same programs. Because `validate_structure` takes no context, the
+   compilation-time call needs no context assembly, and every consumer keeps its structural coverage
+   through compilation.
 2. Migrate transforms one at a time: rename `validate()` to `validate_structure()` (dropping its
    unused context parameter) and `validate_env()` to
    `validate_with_context()`, splitting any remaining context-dependent logic out of the former into
@@ -238,14 +240,16 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
    - `redis`, whose connection repair task is spawned transitively via `build_connection()`
      (`src/sinks/redis/sink.rs`, `src/sinks/redis/config.rs`); it is abort-on-drop today but still
      violates the strict no-spawn contract.
-   For each spawn: (a) move the worker into the sink's `run()` future so the sink owns it and it
-   terminates when the sink task is dropped; and (b) decouple the healthcheck from that worker,
-   giving the healthcheck its own short-lived resources rather than a clone of the sink's live
-   connection or refresher (see the side-effect-free healthcheck contract in Scope). Because the
-   healthcheck no longer shares the worker, a detached `require_healthy=false` probe can outlive
-   `run()` harmlessly, and there is no topology-owned lifecycle to manage. Add a reload/removal
-   regression test proving the worker stops when the sink is dropped, including the
-   detached-healthcheck case. (Task-transform spawns such as `aws_ec2_metadata`'s are excluded; see
+   For each spawn: (a) bring the worker under the sink's `run()` future using structured concurrency
+   so it actually stops when that future ends. A bare `tokio::spawn` inside `run()` stays detached
+   and would preserve the leak; instead poll the worker as a child future (e.g. in a `select!`) or
+   hold an abort-on-drop handle that is aborted/awaited during shutdown. And (b) decouple the
+   healthcheck from that worker, giving the healthcheck its own short-lived resources rather than a
+   clone of the sink's live connection or refresher (see the side-effect-free healthcheck contract in
+   Scope). Because the healthcheck no longer shares the worker, a detached `require_healthy=false`
+   probe can outlive `run()` harmlessly, and there is no topology-owned lifecycle to manage. Add
+   regression tests for both rollback and removal proving the worker stops when the sink is dropped,
+   including the detached-healthcheck case. (Task-transform spawns such as `aws_ec2_metadata`'s are excluded; see
    Motivation.) The no-spawn contract may only be claimed for sinks once the tracking issue's sink
    audit is complete: every sink that spawns directly or transitively in `build()` has been relocated
    into `run()` and decoupled from its healthcheck, with a rollback/removal test. Until then it is a
@@ -282,10 +286,14 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
 
 - Regression coverage: add tests showing that generic config compilation, `vector validate
   --no-environment`, and startup report equivalent errors, so the split between `validate_structure`
-  and `validate_with_context` cannot silently drop a check on one path. This must cover contextual
-  validation, not only structural: `validate_with_context` compiles against stub enrichment tables
-  while startup `build()` uses real ones, so parity requires both to share the compilation helper and
-  to be tested for enrichment-dependent errors, not just VRL syntax.
+  and `validate_with_context` cannot silently drop a check on one path. Parity is defined narrowly, to
+  the checks that do not depend on real environment state: VRL/condition syntax, types, and
+  table-name resolution. It cannot extend to errors that only a real table produces:
+  `validate_with_context` compiles against stub enrichment tables (whose `add_index()` always
+  succeeds) while startup `build()` uses real ones (which can reject an index), so those
+  real-table-only errors are tested separately as surfacing during full validation/startup, not as
+  parity with `--no-environment`. Both paths should still share one compilation helper so the
+  parity-scoped checks cannot drift.
 - Task-transform rollback safety (deferring `TaskTransform::transform()` to post-commit) is left to
   a follow-up; see Future Improvements. Should it block removing the migration's task-transform
   carve-out, or ship independently?
