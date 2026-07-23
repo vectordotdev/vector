@@ -383,6 +383,25 @@ generated: components: sinks: clickhouse: configuration: {
 		required:    true
 		type: string: examples: ["http://localhost:8123"]
 	}
+	extra_query_params: {
+		description: """
+			Additional ClickHouse query parameters appended to every INSERT request URL.
+
+			Each key-value pair is percent-encoded and forwarded as a URL query parameter.
+			Use this to pass any ClickHouse session setting not directly exposed by this sink,
+			for example `deduplicate_blocks_in_dependent_materialized_views` or `insert_quorum`.
+
+			Keys must not conflict with parameters already managed by Vector
+			(`query`, `param_database`, `param_table`, `input_format_import_nested_json`,
+			`input_format_skip_unknown_fields`, `date_time_input_format`,
+			`insert_distributed_one_random_shard`, and the `async_insert_*` family).
+			"""
+		required: false
+		type: object: {
+			examples: [{"deduplicate_blocks_in_dependent_materialized_views": "0", "insert_quorum": "2"}]
+			options: {}
+		}
+	}
 	format: {
 		description: """
 			Data format.
