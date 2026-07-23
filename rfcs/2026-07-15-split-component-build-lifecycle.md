@@ -36,7 +36,7 @@ where side effects are allowed.
   is a rename and clarifying split, not new surface; the signatures now enforce which checks may
   touch the context.
 - For `SinkConfig`: add `validate_structure()` only (new; defaults to a no-op). Sinks have no
-  schema-dependent structural checks, so they do not need `validate_with_context`. Move the lexical
+  no VRL/condition compilation checks, so they do not need `validate_with_context`. Move the lexical
   checks currently trapped in `build()` (e.g. the routing-field confinement check) into
   `validate_structure()` so `--no-environment` catches them.
 - Establishing the contract that `build()` may have side effects but must not spawn background
@@ -67,7 +67,7 @@ where side effects are allowed.
   (`lib/vector-core/src/source.rs`), so `build()`'s return value *is* the run loop rather than an
   inert handle. Adding `validate_structure()` to sources is doable but a larger effort than this
   RFC's scope; see Future Improvements.
-- Changes to user-visible configuration format or component behavior.
+- Changes to user-visible configuration format.
 
 ## Motivation
 
@@ -99,7 +99,7 @@ where side effects are allowed.
 
 ### User Experience
 
-No change to configuration format or component behavior. The one observable difference is stricter
+No change to configuration format. The one observable difference is stricter
 validation: `vector validate --no-environment` now runs `validate_structure` for sinks, so configs
 with structural errors (e.g. the routing-field confinement check) that previously passed
 `--no-environment` and only failed at boot will now be rejected earlier. This is a correctness
@@ -210,15 +210,12 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
    migration window is needed. `validate_with_context` is owned by `vector validate`, matching
    where `validate_env()` runs today.
 3. Migrate `validate()` to `validate_structure()` one transform at a time. The signature drops
-   `&TransformContext`, so this cannot be a straight rename. Six transforms implement `validate()`
-   with real logic (`route`, `throttle`, `reduce`, `exclusive_route`, `delay`, `sample`): move the
-   body to `validate_structure()` and override `validate()` to `Ok(())`. All other transforms hit
-   the default and need no override -- only add `validate_structure()` if there are structural checks
-   to pull from elsewhere (e.g. `remap`'s source/file/files exclusivity check buried in
-   `compile_vrl_program`; prerequisite: move VRL file reading to config load time so
-   `compile_vrl_program` never does I/O). Open a tracking issue listing every transform to migrate
-   and check them off incrementally. Once all are done, remove `validate()` from the call sites and
-   then from the trait.
+   `&TransformContext`, so this cannot be a straight rename. Transforms with real `validate()` logic
+   need the full move-and-override treatment; all others only need `validate_structure()` added if
+   they have structural checks hidden elsewhere (e.g. buried in `build()`). Open a tracking issue
+   covering all affected transforms -- including those with no `validate()` but with pure checks in
+   `build()` -- and check them off incrementally. Once all are done, remove `validate()` from the
+   call sites and then from the trait.
 
 **Migration for sinks:**
 
