@@ -13,7 +13,7 @@ const VECTOR_BIN = process.env.VECTOR_BIN || "vector";
 // Returns null for trace-only components (no simple trace source available).
 const sourceTypeFor = (component) => {
   const input = component.input;
-  if (!input || input.logs) return "stdin";
+  if (!input || input.logs) return "demo_logs";
   if (input.metrics) return "internal_metrics";
   return null; // trace-only — skip validation
 };
@@ -38,11 +38,12 @@ const wrapConfig = (kind, componentYaml, component) => {
 
   const sourceType = sourceTypeFor(component);
   if (sourceType === null) return null;
+  const validateSource = sourceType === "demo_logs" ? { type: "demo_logs", format: "json" } : { type: sourceType };
 
   if (kind === "transforms") {
     const transformKey = Object.keys(parsed.transforms)[0];
     return YAML.stringify({
-      sources: { _validate_source: { type: sourceType } },
+      sources: { _validate_source: validateSource },
       transforms: {
         [transformKey]: {
           ...parsed.transforms[transformKey],
@@ -61,7 +62,7 @@ const wrapConfig = (kind, componentYaml, component) => {
   if (kind === "sinks") {
     const sinkKey = Object.keys(parsed.sinks)[0];
     return YAML.stringify({
-      sources: { _validate_source: { type: sourceType } },
+      sources: { _validate_source: validateSource },
       sinks: {
         [sinkKey]: {
           ...parsed.sinks[sinkKey],
@@ -78,8 +79,7 @@ const validateYaml = (yaml, tmpPath) => {
   fs.writeFileSync(tmpPath, yaml, "utf8");
   try {
     execSync(`${VECTOR_BIN} validate --no-environment --skip-healthchecks ${tmpPath}`, {
-      stdio: "pipe",
-      timeout: 10000
+      stdio: "pipe"
     });
     return null;
   } catch (err) {
