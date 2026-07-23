@@ -253,9 +253,7 @@ mod tests {
     // Regression test for the confinement gauge reporting the wrong
     // `component_type` when this sink is built by a wrapping caller
     // outside this crate that constructs a `HumioLogsConfig` directly and
-    // calls `SinkConfig::build` on it -- e.g. Datadog's
-    // observability-pipelines-worker `crowdstrike_next_gen_siem` sink (see
-    // https://github.com/DataDog/observability-pipelines-worker/pull/2652).
+    // calls `SinkConfig::build` on it.
     //
     // In production, the topology builder opens a span tagged with the
     // *outer* (wrapping) sink's component_type around the whole
@@ -276,7 +274,7 @@ mod tests {
             "sink",
             component_kind = "sink",
             component_id = "confinement_gauge_wrapper_test",
-            component_type = "crowdstrike_next_gen_siem",
+            component_type = "wrapping_sink",
         );
         let (_sink, _healthcheck) = config.build(cx).instrument(span).await.unwrap();
 
@@ -295,7 +293,7 @@ mod tests {
 
         assert_eq!(
             gauge.tag_value("component_type"),
-            Some("crowdstrike_next_gen_siem".to_string()),
+            Some("wrapping_sink".to_string()),
             "confinement gauge must report the wrapping sink's component_type, not the \
              delegated humio_logs sink's own type"
         );
