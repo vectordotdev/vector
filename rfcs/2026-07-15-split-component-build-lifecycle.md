@@ -167,7 +167,7 @@ the same VRL/conditions at startup, so running it again there would double-compi
 enrichment-index registration. Note: `validate_with_context` compiles against stub enrichment tables
 (whose `add_index()` always succeeds) while `build()` uses the real ones (which can reject an
 index), so they can disagree on enrichment-dependent errors; both must share the same compilation
-helper (see Outstanding Questions).
+helper.
 
 `--skip-healthchecks` and the per-sink and global `healthcheck.enabled` gates and the configured
 timeout remain the caller's responsibility (`TopologyPiecesBuilder`), exactly as today. `build()`
@@ -202,14 +202,13 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
 
 **Migration for transforms:**
 
-1. Add `validate_structure(&self)` and `validate_with_context(&self, context)` to `TransformConfig`
-   with default `Ok(())`. Wire `validation.rs` to call `validate_structure()` and call `validate()`
-   alongside it during the migration window. Wire `validate.rs` to call `validate_with_context()`
-   alongside `validate_env()`. `validate_structure` is owned by `ConfigBuilder` compilation;
-   `validate_with_context` is owned by `vector validate`, matching where `validate_env()` runs today.
+1. Add `validate_structure(&self)` to `TransformConfig` with default `Ok(())`. Wire `validation.rs`
+   to call it alongside `validate()` during the migration window. `validate_structure` is owned by
+   `ConfigBuilder` compilation.
 2. Rename `validate_env()` to `validate_with_context()` in a single PR: update the trait default,
    the one call site in `validate.rs`, and all implementors. Signatures are identical so no
-   migration window is needed.
+   migration window is needed. `validate_with_context` is owned by `vector validate`, matching
+   where `validate_env()` runs today.
 3. Migrate `validate()` to `validate_structure()` one transform at a time. The signature drops
    `&TransformContext`, so this cannot be a straight rename. Six transforms implement `validate()`
    with real logic (`route`, `throttle`, `reduce`, `exclusive_route`, `delay`, `sample`): move the
