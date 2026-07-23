@@ -399,7 +399,11 @@ generated: components: sinks: clickhouse: configuration: {
 		required: false
 		type: object: {
 			examples: [{"deduplicate_blocks_in_dependent_materialized_views": "0", "insert_quorum": "2"}]
-			options: {}
+			options: "*": {
+				description: "A ClickHouse query parameter name-value pair."
+				required:    true
+				type: string: {}
+			}
 		}
 	}
 	format: {

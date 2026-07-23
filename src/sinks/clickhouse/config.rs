@@ -224,12 +224,40 @@ pub struct AsyncInsertSettingsConfig {
     pub max_query_number: Option<u64>,
 }
 
+/// Keys in `extra_query_params` that conflict with parameters Vector manages internally.
+const RESERVED_QUERY_PARAMS: &[&str] = &[
+    "query",
+    "param_database",
+    "param_table",
+    "input_format_import_nested_json",
+    "input_format_skip_unknown_fields",
+    "date_time_input_format",
+    "insert_distributed_one_random_shard",
+    "async_insert",
+    "wait_for_async_insert",
+    "wait_for_async_insert_timeout",
+    "async_insert_deduplicate",
+    "async_insert_max_data_size",
+    "async_insert_max_query_number",
+];
+
 impl_generate_config_from_default!(ClickhouseConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        for key in self.extra_query_params.keys() {
+            if RESERVED_QUERY_PARAMS.contains(&key.as_str()) {
+                return Err(format!(
+                    "extra_query_params key `{}` is reserved and managed by Vector; \
+                     use the dedicated configuration field instead",
+                    key
+                )
+                .into());
+            }
+        }
+
         let mut config = self.clone();
         config.table = config
             .table
