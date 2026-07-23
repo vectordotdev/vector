@@ -60,6 +60,19 @@ where side effects are allowed.
   topology-builder change and is out of scope (see Motivation and Future Improvements). The contract
   is therefore stated as "must not spawn" with task transforms explicitly carved out until that
   change lands, rather than claimed as universally true on introduction.
+- Healthchecks are side-effect-free probes, like Kubernetes readiness/liveness probes. A component's
+  healthcheck must not share live background workers or mutable runtime state with the component; it
+  may acquire its own short-lived resources (a token, a probe connection) and must release them
+  promptly when it completes. Background workers are therefore owned by the sink inside its own
+  `run()` future and terminate when that future is dropped, so there is no topology-owned lifecycle
+  to manage even for a detached `require_healthy=false` probe. Two accepted tradeoffs: acquiring its
+  own resources means the probe validates that auth/endpoint *can* work rather than the sink's exact
+  wired client (this still catches bad credentials and unreachable endpoints); and it briefly opens
+  its own connection instead of sharing the sink's, so it must release it promptly to avoid doubling
+  connection count under constrained limits (e.g. Redis `maxclients=1`). Where a sink today couples
+  its healthcheck to live sink state (Redis clones its Sentinel repair connection into the
+  healthcheck; GCP shares a credential refresher), that coupling is a pre-existing code smell fixed
+  as part of migrating that sink.
 - Update `TopologyPiecesBuilder` and `vector validate` to call `validate_structure()` at the right
   point for both transforms and sinks.
 - Migrate all existing transforms and sinks.
@@ -229,17 +242,18 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
    - `redis`, whose connection repair task is spawned transitively via `build_connection()`
      (`src/sinks/redis/sink.rs`, `src/sinks/redis/config.rs`); it is abort-on-drop today but still
      violates the strict no-spawn contract.
-   Each such spawn must move into `run()` and be given structured ownership (an abort-on-drop
-   `JoinHandle` or an explicit cancellation signal tied to the component future), with a
-   reload/removal regression test proving the task stops. A rolled-back reload then leaves nothing
-   running. (Task-transform spawns such as `aws_ec2_metadata`'s are excluded; see Motivation.) Where
-   the same credentials back a healthcheck, the ownership model interacts with healthcheck timing (a
-   required healthcheck runs before `run()` exists; a detached one can outlive it); that interaction
-   is called out as an Outstanding Question to resolve per sink before relocating its refresher.
-   The no-spawn contract may only be claimed for sinks once the tracking issue's sink audit is
-   complete: every sink that spawns directly or transitively in `build()` has been relocated and has
-   a cancellation/removal test. Until then it is a per-migrated-sink property, not a trait-wide
-   guarantee.
+   For each spawn: (a) move the worker into the sink's `run()` future so the sink owns it and it
+   terminates when the sink task is dropped; and (b) decouple the healthcheck from that worker,
+   giving the healthcheck its own short-lived resources rather than a clone of the sink's live
+   connection or refresher (see the side-effect-free healthcheck contract in Scope). Because the
+   healthcheck no longer shares the worker, a detached `require_healthy=false` probe can outlive
+   `run()` harmlessly, and there is no topology-owned lifecycle to manage. Add a reload/removal
+   regression test proving the worker stops when the sink is dropped, including the
+   detached-healthcheck case. (Task-transform spawns such as `aws_ec2_metadata`'s are excluded; see
+   Motivation.) The no-spawn contract may only be claimed for sinks once the tracking issue's sink
+   audit is complete: every sink that spawns directly or transitively in `build()` has been relocated
+   into `run()` and decoupled from its healthcheck, with a rollback/removal test. Until then it is a
+   per-migrated-sink property, not a trait-wide guarantee.
 5. Remove `validate()` and `validate_env()` only after every transform has been migrated off them;
    until then the default no-op `validate_structure()` on un-migrated transforms must not replace the
    legacy checks. This is a blocking prerequisite, tracked per the Plan of Attack below.
@@ -251,13 +265,13 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
 - **Add a separate `validate_environment` phase between `validate_structure` and `build`.** An
   earlier draft of this RFC did exactly that. It was rejected for two reasons. First, naming: a
   `validate_` method that resolves credentials, opens connections, and spawns a token-refresh task
-  is not validating, it is constructing; the name would lie about its side effects. Second, the
-  shared-resource problem: for sinks where the healthcheck and the sink use the same resolved client
-  (common for auth'd HTTP sinks that clone one `HttpClient` into both), splitting healthcheck
-  construction out of `build()` forces either resolving credentials twice or adding a state-transfer
-  channel to carry the resolved client from the environment phase into `build()`. Keeping healthcheck construction
-  inside `build()`, exactly as the code does today, avoids both. The genuine environment check, the
-  healthcheck probe, stays a deferred future the topology builder runs; running it is the validation.
+  is not validating, it is constructing; the name would lie about its side effects. Second, a
+  separate phase adds machinery for no gain: `build()` already returns a self-contained `Healthcheck`
+  future that the topology builder runs, and under the side-effect-free healthcheck contract that
+  future owns its own short-lived probe resources anyway. Keeping healthcheck construction inside
+  `build()`, exactly as the `(VectorSink, Healthcheck)` shape does today, needs no state-transfer
+  channel and no extra phase. The genuine environment check, the healthcheck probe, stays a deferred
+  future the topology builder runs; running it is the validation.
 - **A single `validate_structure(context)` for transforms instead of the two-hook split.** This
   would require the assembled `TransformContext` (stub enrichment plus merged schema) at every call
   site, including generic `ConfigBuilder` compilation, which today only has
@@ -279,19 +293,6 @@ returns the raw probe future unchanged; nothing about healthcheck gating moves o
 - Task-transform rollback safety (deferring `TaskTransform::transform()` to post-commit) is left to
   a follow-up; see Future Improvements. Should it block removing the migration's task-transform
   carve-out, or ship independently?
-- Ownership model for any background resource shared between the healthcheck and the sink, not just
-  credential/token refreshers. Credential refreshers (GCP `spawn_regenerate_token`) are one case;
-  another is Redis, which builds its Sentinel connection repair task during connection construction
-  and then clones that connection into the pre-run healthcheck. In all such cases a required
-  healthcheck is awaited before `run()` starts, so a resource owned by `run()` is not yet available
-  to it; a `require_healthy=false` healthcheck is detached and can outlive `run()`, so tying the
-  resource's lifetime to the sink future either cuts the detached probe off or, if kept alive for it,
-  recreates the post-removal leak. Two candidate resolutions to pick per sink: (a) the healthcheck
-  uses only freshly acquired resources and never needs the shared worker, so the worker can be owned
-  outright by `run()`; or (b) a topology-owned lifecycle object spans both the healthcheck and the
-  sink and is cancelled on rollback/removal. The same decision must apply to every shared background
-  resource surfaced by the migration step 4 audit. Add tests for required healthchecks, detached
-  healthchecks, early sink exit, and reload rollback.
 
 ## Plan Of Attack
 
