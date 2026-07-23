@@ -4,6 +4,8 @@
 //! This implements the streaming variant of the Arrow IPC protocol, which writes
 //! a continuous stream of record batches without a file footer.
 
+use std::{collections::HashSet, sync::Arc};
+
 use arrow::{
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     error::ArrowError,
@@ -51,6 +53,15 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
+
+    /// Arrow field paths whose physical struct representation contains Parquet VARIANT data.
+    ///
+    /// This is populated programmatically by schema providers that retain logical type
+    /// information. It is not user-configurable because the physical Arrow shape alone is not
+    /// sufficient to distinguish VARIANT from an ordinary struct.
+    #[serde(skip)]
+    #[configurable(derived)]
+    pub variant_fields: Vec<Vec<String>>,
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -64,6 +75,7 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
                     .map(|s| format!("{} fields", s.fields().len())),
             )
             .field("allow_nullable_fields", &self.allow_nullable_fields)
+            .field("variant_fields", &self.variant_fields)
             .finish()
     }
 }
@@ -74,7 +86,14 @@ impl ArrowStreamSerializerConfig {
         Self {
             schema: Some(schema),
             allow_nullable_fields: false,
+            variant_fields: Vec::new(),
         }
+    }
+
+    /// Mark logical Parquet VARIANT fields by their Arrow schema paths.
+    pub fn with_variant_fields(mut self, variant_fields: Vec<Vec<String>>) -> Self {
+        self.variant_fields = variant_fields;
+        self
     }
 
     /// The data type of events that are accepted by `ArrowStreamEncoder`.
@@ -92,6 +111,7 @@ impl ArrowStreamSerializerConfig {
 #[derive(Clone, Debug)]
 pub struct ArrowStreamSerializer {
     schema: SchemaRef,
+    variant_fields: Arc<HashSet<Vec<String>>>,
 }
 
 impl ArrowStreamSerializer {
@@ -105,12 +125,15 @@ impl ArrowStreamSerializer {
                 source: arrow::error::ArrowError::JsonError(e.to_string()),
             }
         })?;
-        build_record_batch(self.schema.clone(), &values)
+        build_record_batch_with_variant_fields(self.schema.clone(), &values, &self.variant_fields)
     }
 
     /// Create a new ArrowStreamSerializer with the given configuration
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
         let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
+        let variant_fields: HashSet<_> = config.variant_fields.into_iter().collect();
+
+        validate_variant_fields(&schema, &variant_fields)?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding
@@ -118,7 +141,9 @@ impl ArrowStreamSerializer {
             let nullable_fields: Fields = schema
                 .fields()
                 .iter()
-                .map(|f| make_field_nullable(f))
+                .map(|field| {
+                    make_field_nullable(field, &variant_fields, &[field.name().to_owned()])
+                })
                 .collect::<Result<Vec<_>, _>>()?
                 .into();
             Schema::new_with_metadata(nullable_fields, schema.metadata().clone())
@@ -128,6 +153,7 @@ impl ArrowStreamSerializer {
 
         Ok(Self {
             schema: SchemaRef::new(schema),
+            variant_fields: Arc::new(variant_fields),
         })
     }
 }
@@ -140,7 +166,11 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
             return Err(ArrowEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_arrow_ipc_stream(&events, self.schema.clone())?;
+        let bytes = encode_events_to_arrow_ipc_stream_with_variant_fields(
+            &events,
+            self.schema.clone(),
+            &self.variant_fields,
+        )?;
 
         buffer.extend_from_slice(&bytes);
         Ok(())
@@ -209,6 +239,15 @@ pub enum ArrowEncodingError {
         source: arrow::error::ArrowError,
     },
 
+    /// A configured VARIANT field path is missing or has an incompatible physical type.
+    #[snafu(display("Invalid VARIANT field '{}': {reason}", field_path.join(".")))]
+    InvalidVariantField {
+        /// Path to the field in the Arrow schema.
+        field_path: Vec<String>,
+        /// Description of the invalid path or physical type.
+        reason: String,
+    },
+
     /// Invalid Map schema structure
     #[snafu(display("Invalid Map schema for field '{field_name}': {reason}"))]
     InvalidMapSchema {
@@ -219,10 +258,10 @@ pub enum ArrowEncodingError {
     },
 }
 
-/// Encodes a batch of events into Arrow IPC streaming format
-pub fn encode_events_to_arrow_ipc_stream(
+fn encode_events_to_arrow_ipc_stream_with_variant_fields(
     events: &[Event],
     schema: SchemaRef,
+    variant_fields: &HashSet<Vec<String>>,
 ) -> Result<Bytes, ArrowEncodingError> {
     if events.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
@@ -234,7 +273,8 @@ pub fn encode_events_to_arrow_ipc_stream(
         }
     })?;
 
-    let record_batch = build_record_batch(schema, &json_values)?;
+    let record_batch =
+        build_record_batch_with_variant_fields(schema, &json_values, variant_fields)?;
 
     let mut buffer = BytesMut::new().writer();
     let mut writer =
@@ -245,18 +285,53 @@ pub fn encode_events_to_arrow_ipc_stream(
     Ok(buffer.into_inner().freeze())
 }
 
+#[cfg(test)]
+fn encode_events_to_arrow_ipc_stream(
+    events: &[Event],
+    schema: SchemaRef,
+) -> Result<Bytes, ArrowEncodingError> {
+    encode_events_to_arrow_ipc_stream_with_variant_fields(events, schema, &HashSet::new())
+}
+
 /// Recursively makes a Field and all its nested fields nullable
-fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
-    if is_variant_data_type(field.data_type()) {
+fn make_field_nullable(
+    field: &Field,
+    variant_fields: &HashSet<Vec<String>>,
+    path: &[String],
+) -> Result<Field, ArrowEncodingError> {
+    if variant_fields.contains(path) {
         return Ok(field.clone().with_nullable(true));
     }
 
     let new_data_type = match field.data_type() {
-        DataType::List(inner_field) => DataType::List(make_field_nullable(inner_field)?.into()),
+        DataType::List(inner_field) => {
+            let mut inner_path = path.to_vec();
+            inner_path.push(inner_field.name().to_owned());
+            DataType::List(make_field_nullable(inner_field, variant_fields, &inner_path)?.into())
+        }
+        DataType::LargeList(inner_field) => {
+            let mut inner_path = path.to_vec();
+            inner_path.push(inner_field.name().to_owned());
+            DataType::LargeList(
+                make_field_nullable(inner_field, variant_fields, &inner_path)?.into(),
+            )
+        }
+        DataType::FixedSizeList(inner_field, length) => {
+            let mut inner_path = path.to_vec();
+            inner_path.push(inner_field.name().to_owned());
+            DataType::FixedSizeList(
+                make_field_nullable(inner_field, variant_fields, &inner_path)?.into(),
+                *length,
+            )
+        }
         DataType::Struct(fields) => DataType::Struct(
             fields
                 .iter()
-                .map(|f| make_field_nullable(f))
+                .map(|child| {
+                    let mut child_path = path.to_vec();
+                    child_path.push(child.name().to_owned());
+                    make_field_nullable(child, variant_fields, &child_path)
+                })
                 .collect::<Result<Vec<_>, _>>()?
                 .into(),
         ),
@@ -279,9 +354,14 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
             );
             let key_field = &fields[0];
             let value_field = &fields[1];
+            let mut value_path = path.to_vec();
+            value_path.push(value_field.name().to_owned());
 
-            let new_struct_fields: Fields =
-                [key_field.clone(), make_field_nullable(value_field)?.into()].into();
+            let new_struct_fields: Fields = [
+                key_field.clone(),
+                make_field_nullable(value_field, variant_fields, &value_path)?.into(),
+            ]
+            .into();
 
             // Reconstruct the inner "entries" field
             // The inner field itself must be non-nullable (only the Map wrapper is nullable)
@@ -335,22 +415,27 @@ pub(crate) fn vector_log_events_to_json_values(
 }
 
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
+#[cfg(feature = "parquet")]
 pub(crate) fn build_record_batch(
     schema: SchemaRef,
     values: &[serde_json::Value],
+) -> Result<RecordBatch, ArrowEncodingError> {
+    build_record_batch_with_variant_fields(schema, values, &HashSet::new())
+}
+
+fn build_record_batch_with_variant_fields(
+    schema: SchemaRef,
+    values: &[serde_json::Value],
+    variant_fields: &HashSet<Vec<String>>,
 ) -> Result<RecordBatch, ArrowEncodingError> {
     if values.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
     }
 
     let mut encoded_values = None;
-    if schema
-        .fields()
-        .iter()
-        .any(|field| data_type_contains_variant(field.data_type()))
-    {
+    if !variant_fields.is_empty() {
         let mut values = values.to_vec();
-        encode_variant_fields(&schema, &mut values)?;
+        encode_variant_fields(&schema, &mut values, variant_fields)?;
         encoded_values = Some(values);
     }
     let values = encoded_values.as_deref().unwrap_or(values);
@@ -414,26 +499,71 @@ fn is_variant_data_type(data_type: &DataType) -> bool {
         && !fields[1].is_nullable()
 }
 
-fn data_type_contains_variant(data_type: &DataType) -> bool {
-    if is_variant_data_type(data_type) {
-        return true;
+fn validate_variant_fields(
+    schema: &Schema,
+    variant_fields: &HashSet<Vec<String>>,
+) -> Result<(), ArrowEncodingError> {
+    for path in variant_fields {
+        if path.is_empty() {
+            return Err(ArrowEncodingError::InvalidVariantField {
+                field_path: path.clone(),
+                reason: "field path must not be empty".to_owned(),
+            });
+        }
+
+        let Some(field) = field_at_path(schema, path) else {
+            return Err(ArrowEncodingError::InvalidVariantField {
+                field_path: path.clone(),
+                reason: "field does not exist in the Arrow schema".to_owned(),
+            });
+        };
+
+        if !is_variant_data_type(field.data_type()) {
+            return Err(ArrowEncodingError::InvalidVariantField {
+                field_path: path.clone(),
+                reason: format!(
+                    "expected Struct<metadata: LargeBinary not null, value: LargeBinary not null>, found {:?}",
+                    field.data_type()
+                ),
+            });
+        }
     }
 
-    match data_type {
-        DataType::Struct(fields) => fields
-            .iter()
-            .any(|field| data_type_contains_variant(field.data_type())),
-        DataType::List(field) | DataType::LargeList(field) | DataType::FixedSizeList(field, _) => {
-            data_type_contains_variant(field.data_type())
+    Ok(())
+}
+
+fn field_at_path<'a>(schema: &'a Schema, path: &[String]) -> Option<&'a Field> {
+    let (first, remaining) = path.split_first()?;
+    let field = schema.fields().iter().find(|field| field.name() == first)?;
+    nested_field_at_path(field, remaining)
+}
+
+fn nested_field_at_path<'a>(field: &'a Field, path: &[String]) -> Option<&'a Field> {
+    let Some((next, remaining)) = path.split_first() else {
+        return Some(field);
+    };
+
+    let child = match field.data_type() {
+        DataType::Struct(fields) => fields.iter().find(|field| field.name() == next)?,
+        DataType::List(child) | DataType::LargeList(child) | DataType::FixedSizeList(child, _) => {
+            (child.name() == next).then_some(child.as_ref())?
         }
-        DataType::Map(entries, _) => data_type_contains_variant(entries.data_type()),
-        _ => false,
-    }
+        DataType::Map(entries, _) => {
+            let DataType::Struct(fields) = entries.data_type() else {
+                return None;
+            };
+            fields.get(1).filter(|field| field.name() == next)?
+        }
+        _ => return None,
+    };
+
+    nested_field_at_path(child, remaining)
 }
 
 fn encode_variant_fields(
     schema: &Schema,
     values: &mut [serde_json::Value],
+    variant_fields: &HashSet<Vec<String>>,
 ) -> Result<(), ArrowEncodingError> {
     for value in values {
         let Some(object) = value.as_object_mut() else {
@@ -442,7 +572,12 @@ fn encode_variant_fields(
 
         for field in schema.fields() {
             if let Some(value) = object.get_mut(field.name()) {
-                encode_variant_value(field.data_type(), value, field.name())?;
+                encode_variant_value(
+                    field,
+                    value,
+                    &mut vec![field.name().to_owned()],
+                    variant_fields,
+                )?;
             }
         }
     }
@@ -451,15 +586,16 @@ fn encode_variant_fields(
 }
 
 fn encode_variant_value(
-    data_type: &DataType,
+    field: &Field,
     value: &mut serde_json::Value,
-    field_name: &str,
+    path: &mut Vec<String>,
+    variant_fields: &HashSet<Vec<String>>,
 ) -> Result<(), ArrowEncodingError> {
     if value.is_null() {
         return Ok(());
     }
 
-    if is_variant_data_type(data_type) {
+    if variant_fields.contains(path.as_slice()) {
         let owned_json;
         let json = if let Some(json) = value.as_str() {
             json
@@ -472,7 +608,7 @@ fn encode_variant_value(
         builder
             .append_json(json)
             .map_err(|source| ArrowEncodingError::VariantEncoding {
-                field_name: field_name.to_owned(),
+                field_name: path.join("."),
                 source,
             })?;
         let (metadata, encoded_value) = builder.finish();
@@ -483,28 +619,34 @@ fn encode_variant_value(
         return Ok(());
     }
 
-    match data_type {
+    match field.data_type() {
         DataType::Struct(fields) => {
             if let Some(object) = value.as_object_mut() {
-                for field in fields {
-                    if let Some(value) = object.get_mut(field.name()) {
-                        encode_variant_value(field.data_type(), value, field.name())?;
+                for child in fields {
+                    if let Some(value) = object.get_mut(child.name()) {
+                        path.push(child.name().to_owned());
+                        encode_variant_value(child, value, path, variant_fields)?;
+                        path.pop();
                     }
                 }
             }
         }
-        DataType::List(field) | DataType::LargeList(field) => {
+        DataType::List(child) | DataType::LargeList(child) => {
             if let Some(values) = value.as_array_mut() {
+                path.push(child.name().to_owned());
                 for value in values {
-                    encode_variant_value(field.data_type(), value, field.name())?;
+                    encode_variant_value(child, value, path, variant_fields)?;
                 }
+                path.pop();
             }
         }
-        DataType::FixedSizeList(field, _) => {
+        DataType::FixedSizeList(child, _) => {
             if let Some(values) = value.as_array_mut() {
+                path.push(child.name().to_owned());
                 for value in values {
-                    encode_variant_value(field.data_type(), value, field.name())?;
+                    encode_variant_value(child, value, path, variant_fields)?;
                 }
+                path.pop();
             }
         }
         DataType::Map(entries, _) => {
@@ -515,9 +657,11 @@ fn encode_variant_value(
                 return Ok(());
             };
             if let Some(object) = value.as_object_mut() {
+                path.push(value_field.name().to_owned());
                 for value in object.values_mut() {
-                    encode_variant_value(value_field.data_type(), value, value_field.name())?;
+                    encode_variant_value(value_field, value, path, variant_fields)?;
                 }
+                path.pop();
             }
         }
         _ => {}
@@ -544,7 +688,27 @@ mod tests {
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone())?;
+        let bytes = encode_events_to_arrow_ipc_stream_with_variant_fields(
+            &events,
+            schema,
+            &HashSet::new(),
+        )?;
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None)?;
+        Ok(reader.next().unwrap()?)
+    }
+
+    fn encode_and_decode_with_variant_fields(
+        events: Vec<Event>,
+        schema: SchemaRef,
+        variant_fields: Vec<Vec<String>>,
+    ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
+        let variant_fields = variant_fields.into_iter().collect();
+        let bytes = encode_events_to_arrow_ipc_stream_with_variant_fields(
+            &events,
+            schema,
+            &variant_fields,
+        )?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
@@ -580,7 +744,12 @@ mod tests {
                 Schema::new(vec![Field::new("attributes", variant_data_type(), false)]).into();
             let event = create_event(vec![("attributes", r#"{"name":"Alice","age":30}"#)]);
 
-            let batch = encode_and_decode(vec![event], schema).unwrap();
+            let batch = encode_and_decode_with_variant_fields(
+                vec![event],
+                schema,
+                vec![vec!["attributes".to_owned()]],
+            )
+            .unwrap();
             let array = batch.column(0).as_struct();
             let metadata = array.column(0).as_binary::<i64>().value(0);
             let value = array.column(1).as_binary::<i64>().value(0);
@@ -624,7 +793,20 @@ mod tests {
             payload.insert("properties".into(), Value::Object(properties));
             let event = create_event(vec![("payload", Value::Object(payload))]);
 
-            let batch = encode_and_decode(vec![event], schema).unwrap();
+            let batch = encode_and_decode_with_variant_fields(
+                vec![event],
+                schema,
+                vec![
+                    vec!["payload".to_owned(), "nested".to_owned()],
+                    vec!["payload".to_owned(), "items".to_owned(), "item".to_owned()],
+                    vec![
+                        "payload".to_owned(),
+                        "properties".to_owned(),
+                        "values".to_owned(),
+                    ],
+                ],
+            )
+            .unwrap();
             assert_eq!(batch.num_rows(), 1);
         }
 
@@ -634,8 +816,42 @@ mod tests {
                 Schema::new(vec![Field::new("attributes", variant_data_type(), true)]).into();
             let event = create_event(vec![("attributes", "not valid JSON")]);
 
-            let error = encode_and_decode(vec![event], schema).unwrap_err();
+            let error = encode_and_decode_with_variant_fields(
+                vec![event],
+                schema,
+                vec![vec!["attributes".to_owned()]],
+            )
+            .unwrap_err();
             assert!(error.to_string().contains("attributes"));
+        }
+
+        #[test]
+        fn preserves_unmarked_struct_with_variant_physical_shape() {
+            let schema =
+                Schema::new(vec![Field::new("payload", variant_data_type(), false)]).into();
+            let mut payload = ObjectMap::new();
+            payload.insert("metadata".into(), Value::Bytes("0102".into()));
+            payload.insert("value".into(), Value::Bytes("0304".into()));
+            let event = create_event(vec![("payload", Value::Object(payload))]);
+
+            let batch = encode_and_decode(vec![event], schema).unwrap();
+            let array = batch.column(0).as_struct();
+
+            assert_eq!(array.column(0).as_binary::<i64>().value(0), &[1, 2]);
+            assert_eq!(array.column(1).as_binary::<i64>().value(0), &[3, 4]);
+        }
+
+        #[test]
+        fn rejects_variant_marker_for_non_variant_physical_type() {
+            let schema = Schema::new(vec![Field::new("payload", DataType::LargeUtf8, false)]);
+            let config = ArrowStreamSerializerConfig::new(schema)
+                .with_variant_fields(vec![vec!["payload".to_owned()]]);
+
+            let error = ArrowStreamSerializer::new(config).unwrap_err();
+            assert!(matches!(
+                error,
+                ArrowEncodingError::InvalidVariantField { .. }
+            ));
         }
     }
 
@@ -978,6 +1194,10 @@ mod tests {
         use super::*;
         use tokio_util::codec::Encoder;
 
+        fn make_nullable_without_variants(field: &Field) -> Result<Field, ArrowEncodingError> {
+            make_field_nullable(field, &HashSet::new(), &[field.name().to_owned()])
+        }
+
         #[test]
         fn test_config_allow_nullable_fields_overrides_schema() {
             let mut log1 = LogEvent::default();
@@ -1034,7 +1254,7 @@ mod tests {
             let outer_struct = DataType::Struct(arrow::datatypes::Fields::from(vec![outer_field]));
 
             let original_field = Field::new("root", outer_struct, false);
-            let nullable_field = make_field_nullable(&original_field).unwrap();
+            let nullable_field = make_nullable_without_variants(&original_field).unwrap();
 
             assert!(
                 nullable_field.is_nullable(),
@@ -1065,7 +1285,10 @@ mod tests {
         #[test]
         fn test_make_field_nullable_preserves_variant_children() {
             let original_field = Field::new("variant", variant_data_type(), false);
-            let nullable_field = make_field_nullable(&original_field).unwrap();
+            let variant_fields = HashSet::from([vec!["variant".to_owned()]]);
+            let nullable_field =
+                make_field_nullable(&original_field, &variant_fields, &["variant".to_owned()])
+                    .unwrap();
 
             assert!(nullable_field.is_nullable());
             let DataType::Struct(fields) = nullable_field.data_type() else {
@@ -1085,7 +1308,7 @@ mod tests {
             let map_type = DataType::Map(entries_field.into(), false);
 
             let original_field = Field::new("my_map", map_type, false);
-            let nullable_field = make_field_nullable(&original_field).unwrap();
+            let nullable_field = make_nullable_without_variants(&original_field).unwrap();
 
             assert!(
                 nullable_field.is_nullable(),

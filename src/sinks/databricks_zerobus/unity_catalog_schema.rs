@@ -35,6 +35,17 @@ fn status_is_retryable(status: StatusCode) -> bool {
 use databricks_zerobus_ingest_sdk::schema::UcColumn as UnityCatalogColumn;
 pub use databricks_zerobus_ingest_sdk::schema::UcTableSchema as UnityCatalogTableSchema;
 
+/// Arrow schema plus the logical Unity Catalog VARIANT fields it contains.
+///
+/// VARIANT uses the same physical Arrow shape as a possible user-defined struct, so logical type
+/// identity must be retained separately from the wire schema.
+pub struct GeneratedArrowSchema {
+    /// Canonical schema sent to the Databricks Arrow Flight server.
+    pub schema: arrow::datatypes::Schema,
+    /// Logical VARIANT paths used only by Vector's Arrow encoder.
+    pub variant_fields: Vec<Vec<String>>,
+}
+
 /// OAuth token response from Databricks
 #[derive(Debug, Deserialize)]
 struct OAuthTokenResponse {
@@ -217,11 +228,12 @@ async fn get_oauth_token(
 /// `RecordBatch` schema in lock-step with the stream's declared schema.
 pub fn generate_arrow_schema_from_schema(
     schema: &UnityCatalogTableSchema,
-) -> Result<arrow::datatypes::Schema, ZerobusSinkError> {
+) -> Result<GeneratedArrowSchema, ZerobusSinkError> {
     let arrow_schema =
         arrow_schema_from_uc_schema(schema).map_err(|e| ZerobusSinkError::ConfigError {
             message: format!("Failed to convert Unity Catalog schema to Arrow: {}", e),
         })?;
+    let variant_fields = collect_variant_fields(schema)?;
 
     if tracing::enabled!(tracing::Level::INFO) {
         info!(
@@ -230,7 +242,101 @@ pub fn generate_arrow_schema_from_schema(
         );
     }
 
-    Ok(arrow_schema)
+    Ok(GeneratedArrowSchema {
+        schema: arrow_schema,
+        variant_fields,
+    })
+}
+
+fn collect_variant_fields(
+    schema: &UnityCatalogTableSchema,
+) -> Result<Vec<Vec<String>>, ZerobusSinkError> {
+    let mut columns: Vec<_> = schema
+        .columns
+        .iter()
+        .filter(|column| column.position >= 0)
+        .collect();
+    columns.sort_by_key(|column| column.position);
+
+    let mut variant_fields = Vec::new();
+    for column in columns {
+        let path = vec![column.name.clone()];
+        if column.type_name == "VARIANT" {
+            variant_fields.push(path);
+        } else if matches!(column.type_name.as_str(), "STRUCT" | "ARRAY" | "MAP") {
+            let data_type: serde_json::Value =
+                serde_json::from_str(&column.type_json).map_err(|error| {
+                    ZerobusSinkError::ConfigError {
+                        message: format!(
+                            "Failed to inspect Unity Catalog type for column '{}': {}",
+                            column.name, error
+                        ),
+                    }
+                })?;
+            collect_variant_fields_from_type(&data_type, &path, &mut variant_fields);
+        }
+    }
+
+    Ok(variant_fields)
+}
+
+fn collect_variant_fields_from_type(
+    data_type: &serde_json::Value,
+    path: &[String],
+    variant_fields: &mut Vec<Vec<String>>,
+) {
+    if data_type
+        .as_str()
+        .is_some_and(|data_type| data_type == "variant")
+    {
+        variant_fields.push(path.to_vec());
+        return;
+    }
+
+    let Some(data_type) = data_type.as_object() else {
+        return;
+    };
+
+    match data_type.get("type").and_then(serde_json::Value::as_str) {
+        Some("variant") => variant_fields.push(path.to_vec()),
+        Some("struct") => {
+            let Some(fields) = data_type
+                .get("fields")
+                .and_then(serde_json::Value::as_array)
+            else {
+                return;
+            };
+            for field in fields {
+                let Some(field) = field.as_object() else {
+                    continue;
+                };
+                let (Some(name), Some(data_type)) = (
+                    field.get("name").and_then(serde_json::Value::as_str),
+                    field.get("type"),
+                ) else {
+                    continue;
+                };
+                let mut child_path = path.to_vec();
+                child_path.push(name.to_owned());
+                collect_variant_fields_from_type(data_type, &child_path, variant_fields);
+            }
+        }
+        Some("array") => {
+            if let Some(element_type) = data_type.get("elementType") {
+                let mut element_path = path.to_vec();
+                element_path.push("item".to_owned());
+                collect_variant_fields_from_type(element_type, &element_path, variant_fields);
+            }
+        }
+        Some("map") => {
+            if let Some(value_type) = data_type.get("valueType") {
+                let mut value_path = path.to_vec();
+                value_path.push("values".to_owned());
+                collect_variant_fields_from_type(value_type, &value_path, variant_fields);
+            }
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]
@@ -286,8 +392,9 @@ mod tests {
             ],
         };
 
-        let arrow_schema =
+        let generated =
             generate_arrow_schema_from_schema(&schema).expect("arrow schema should be generated");
+        let arrow_schema = generated.schema;
         assert_eq!(arrow_schema.fields().len(), 2);
 
         let id = arrow_schema.field_with_name("id").expect("id field");
@@ -310,8 +417,9 @@ mod tests {
         let schema: UnityCatalogTableSchema =
             serde_json::from_str(json).expect("Failed to parse nested_structs_complete schema");
 
-        let arrow_schema =
+        let generated =
             generate_arrow_schema_from_schema(&schema).expect("Failed to generate arrow schema");
+        let arrow_schema = generated.schema;
 
         // Primitive fields map to their canonical Arrow types.
         assert_eq!(
@@ -351,5 +459,136 @@ mod tests {
                 "{struct_field} should be a Struct"
             );
         }
+    }
+
+    #[test]
+    fn tracks_variant_fields_without_marking_same_shaped_structs() {
+        let schema = UnityCatalogTableSchema {
+            name: "test_table".to_owned(),
+            catalog_name: "test_catalog".to_owned(),
+            schema_name: "test_schema".to_owned(),
+            columns: vec![
+                UnityCatalogColumn {
+                    name: "top_level".to_owned(),
+                    type_text: "variant".to_owned(),
+                    type_name: "VARIANT".to_owned(),
+                    position: 0,
+                    nullable: true,
+                    type_json: "\"variant\"".to_owned(),
+                },
+                UnityCatalogColumn {
+                    name: "payload".to_owned(),
+                    type_text: "struct<metadata:binary,value:binary,nested:variant>".to_owned(),
+                    type_name: "STRUCT".to_owned(),
+                    position: 1,
+                    nullable: true,
+                    type_json: serde_json::json!({
+                        "type": "struct",
+                        "fields": [
+                            {
+                                "name": "metadata",
+                                "type": "binary",
+                                "nullable": false,
+                                "metadata": {}
+                            },
+                            {
+                                "name": "value",
+                                "type": "binary",
+                                "nullable": false,
+                                "metadata": {}
+                            },
+                            {
+                                "name": "nested",
+                                "type": "variant",
+                                "nullable": true,
+                                "metadata": {}
+                            }
+                        ]
+                    })
+                    .to_string(),
+                },
+                UnityCatalogColumn {
+                    name: "items".to_owned(),
+                    type_text: "array<variant>".to_owned(),
+                    type_name: "ARRAY".to_owned(),
+                    position: 2,
+                    nullable: true,
+                    type_json: serde_json::json!({
+                        "type": "array",
+                        "elementType": "variant",
+                        "containsNull": true
+                    })
+                    .to_string(),
+                },
+                UnityCatalogColumn {
+                    name: "properties".to_owned(),
+                    type_text: "map<string,variant>".to_owned(),
+                    type_name: "MAP".to_owned(),
+                    position: 3,
+                    nullable: true,
+                    type_json: serde_json::json!({
+                        "type": "map",
+                        "keyType": "string",
+                        "valueType": "variant",
+                        "valueContainsNull": true
+                    })
+                    .to_string(),
+                },
+                UnityCatalogColumn {
+                    name: "binary_pair".to_owned(),
+                    type_text: "struct<metadata:binary,value:binary>".to_owned(),
+                    type_name: "STRUCT".to_owned(),
+                    position: 4,
+                    nullable: true,
+                    type_json: serde_json::json!({
+                        "type": "struct",
+                        "fields": [
+                            {
+                                "name": "metadata",
+                                "type": "binary",
+                                "nullable": false,
+                                "metadata": {}
+                            },
+                            {
+                                "name": "value",
+                                "type": "binary",
+                                "nullable": false,
+                                "metadata": {}
+                            }
+                        ]
+                    })
+                    .to_string(),
+                },
+            ],
+        };
+
+        let generated =
+            generate_arrow_schema_from_schema(&schema).expect("arrow schema should be generated");
+
+        assert_eq!(
+            generated.variant_fields,
+            vec![
+                vec!["top_level".to_owned()],
+                vec!["payload".to_owned(), "nested".to_owned()],
+                vec!["items".to_owned(), "item".to_owned()],
+                vec!["properties".to_owned(), "values".to_owned()],
+            ]
+        );
+        assert!(
+            !generated
+                .variant_fields
+                .contains(&vec!["payload".to_owned()])
+        );
+        assert!(
+            !generated
+                .variant_fields
+                .contains(&vec!["binary_pair".to_owned()])
+        );
+
+        let config =
+            vector_lib::codecs::encoding::ArrowStreamSerializerConfig::new(generated.schema)
+                .with_variant_fields(generated.variant_fields);
+        vector_lib::codecs::encoding::ArrowStreamSerializer::new(config)
+            .expect("generated VARIANT paths should match the Arrow schema");
     }
 }

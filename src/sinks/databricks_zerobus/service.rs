@@ -348,7 +348,7 @@ impl ZerobusService {
     async fn resolve_arrow_schema(
         config: &ZerobusSinkConfig,
         http_client: &HttpClient,
-    ) -> Result<arrow::datatypes::Schema, ZerobusSinkError> {
+    ) -> Result<unity_catalog_schema::GeneratedArrowSchema, ZerobusSinkError> {
         let (client_id, client_secret) = config.auth.credentials();
 
         let table_schema = unity_catalog_schema::fetch_table_schema(
@@ -367,11 +367,11 @@ impl ZerobusService {
     pub(super) async fn ensure_schema(&self) -> Result<&ResolvedSchema, ZerobusSinkError> {
         self.schema
             .get_or_try_init(|| async {
-                let arrow_schema =
-                    Self::resolve_arrow_schema(&self.config, &self.http_client).await?;
+                let generated = Self::resolve_arrow_schema(&self.config, &self.http_client).await?;
 
                 let batch_serializer = BatchSerializerConfig::ArrowStream(
-                    ArrowStreamSerializerConfig::new(arrow_schema.clone()),
+                    ArrowStreamSerializerConfig::new(generated.schema.clone())
+                        .with_variant_fields(generated.variant_fields),
                 )
                 .build_batch_serializer()
                 .map_err(|e| ZerobusSinkError::ConfigError {
@@ -380,7 +380,7 @@ impl ZerobusService {
 
                 Ok(ResolvedSchema {
                     encoder: BatchEncoder::new(batch_serializer),
-                    arrow_schema: Arc::new(arrow_schema),
+                    arrow_schema: Arc::new(generated.schema),
                 })
             })
             .await
