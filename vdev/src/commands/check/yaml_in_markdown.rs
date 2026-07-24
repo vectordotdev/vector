@@ -107,7 +107,7 @@ pub fn strip_diff_markers(content: &str) -> Option<String> {
             if line.trim().is_empty() {
                 Some(line)
             } else if matches!(line.chars().next(), Some(' ' | '+')) {
-                Some(&line[1..]) // strip the leading marker character
+                Some(line.get(1..).unwrap_or("")) // strip the leading marker character
             } else {
                 None // drop '-' (removed) lines
             }
@@ -150,6 +150,30 @@ pub fn fix_yaml_content(content: &str) -> Result<String> {
     Ok(result)
 }
 
+/// Validate every document in `content` (split on `---` separator lines),
+/// mirroring how `fix_yaml_content` processes multi-document blocks so a
+/// valid multi-document block (e.g. Hugo frontmatter delimited by `---`)
+/// isn't reported as a parse failure.
+///
+/// On failure, returns the `serde_yaml::Error` together with the 0-based
+/// line offset of the document it occurred in, relative to `content`.
+fn validate_yaml_content(content: &str) -> Result<(), (serde_yaml::Error, usize)> {
+    for part in DOC_SEPARATOR.split(content) {
+        if let Err(err) = serde_yaml::from_str::<Value>(part) {
+            // `part` is a subslice of `content`; recover its byte offset to
+            // compute which line it starts on.
+            let byte_offset = part.as_ptr() as usize - content.as_ptr() as usize;
+            let line_offset = content
+                .get(..byte_offset)
+                .unwrap_or_default()
+                .matches('\n')
+                .count();
+            return Err((err, line_offset));
+        }
+    }
+    Ok(())
+}
+
 /// Round-trip a single YAML document through `serde_yaml`.
 /// Strips the leading `---\n` that `serde_yaml::to_string` always prepends.
 fn fix_yaml_document(doc: &str) -> Result<String> {
@@ -169,9 +193,9 @@ fn fix_yaml_document(doc: &str) -> Result<String> {
 /// Blocks are processed in **reverse order by `start_line`** so earlier line
 /// offsets remain valid after replacing later blocks.
 ///
-/// Returns `true` if any file was modified.
+/// Returns `true` if any block could not be parsed and was skipped.
 pub fn fix_files(paths: &[String], verbose: bool) -> Result<bool> {
-    let mut any_modified = false;
+    let mut any_skipped = false;
 
     for path in paths {
         let text = std::fs::read_to_string(path)?;
@@ -207,6 +231,7 @@ pub fn fix_files(paths: &[String], verbose: bool) -> Result<bool> {
                     println!("{path}: block {idx} (line {}) FIXED", block.start_line);
                 }
                 Err(err) => {
+                    any_skipped = true;
                     warn!(
                         "{path}: block {idx} (line {}) SKIPPED — could not parse: {err}",
                         block.start_line
@@ -222,11 +247,10 @@ pub fn fix_files(paths: &[String], verbose: bool) -> Result<bool> {
                 output.push('\n');
             }
             std::fs::write(path, output)?;
-            any_modified = true;
         }
     }
 
-    Ok(any_modified)
+    Ok(any_skipped)
 }
 
 // ---------------------------------------------------------------------------
@@ -277,8 +301,8 @@ impl Cli {
 
                 let diff_suffix = if is_diff { " (diff)" } else { "" };
 
-                match serde_yaml::from_str::<Value>(&lint_content) {
-                    Ok(_) => {
+                match validate_yaml_content(&lint_content) {
+                    Ok(()) => {
                         if self.show_ok {
                             println!(
                                 "{path}: block {idx} (line {}){diff_suffix} OK",
@@ -286,7 +310,7 @@ impl Cli {
                             );
                         }
                     }
-                    Err(err) => {
+                    Err((err, line_offset)) => {
                         had_failure = true;
                         println!(
                             "{path}: block {idx} (line {}){diff_suffix} FAILED",
@@ -294,7 +318,7 @@ impl Cli {
                         );
                         let md_line = err
                             .location()
-                            .map(|loc| loc.line() + block.start_line - 1);
+                            .map(|loc| loc.line() + line_offset + block.start_line - 1);
                         let col = err.location().map(|loc| loc.column());
                         match (md_line, col) {
                             (Some(line), Some(col)) => {
@@ -314,5 +338,105 @@ impl Cli {
         }
 
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_yaml_blocks_single() {
+        let text = "# Title\n```yaml\nfoo: bar\nbaz: 1\n```\nSome text.\n";
+        let blocks = extract_yaml_blocks(text);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].start_line, 3);
+        assert_eq!(blocks[0].end_line, 4);
+        assert_eq!(blocks[0].content, "foo: bar\nbaz: 1\n");
+    }
+
+    #[test]
+    fn extract_yaml_blocks_case_insensitive_and_yml() {
+        let text = "```YAML\na: 1\n```\n```yml\nb: 2\n```\n";
+        let blocks = extract_yaml_blocks(text);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].content, "a: 1\n");
+        assert_eq!(blocks[1].content, "b: 2\n");
+    }
+
+    #[test]
+    fn extract_yaml_blocks_multiple() {
+        let text = "```yaml\na: 1\n```\ntext\n```yaml\nb: 2\n```\n";
+        let blocks = extract_yaml_blocks(text);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].content, "a: 1\n");
+        assert_eq!(blocks[1].content, "b: 2\n");
+    }
+
+    #[test]
+    fn extract_yaml_blocks_none() {
+        let text = "# Title\nJust some prose, no fenced blocks.\n";
+        assert!(extract_yaml_blocks(text).is_empty());
+    }
+
+    #[test]
+    fn strip_diff_markers_real_diff() {
+        let content = " a: 1\n-b: 2\n+b: 3\n c: 4\n";
+        let after = strip_diff_markers(content).expect("should be recognised as a diff");
+        assert_eq!(after, "a: 1\nb: 3\nc: 4\n");
+    }
+
+    #[test]
+    fn strip_diff_markers_all_space_is_not_a_diff() {
+        // Every line indented with a leading space is ordinary YAML nesting,
+        // not a diff, since there is no '+' or '-' marker anywhere.
+        let content = " a:\n   b: 1\n";
+        assert!(strip_diff_markers(content).is_none());
+    }
+
+    #[test]
+    fn strip_diff_markers_empty_is_none() {
+        assert!(strip_diff_markers("").is_none());
+    }
+
+    #[test]
+    fn fix_yaml_content_noop_when_canonical() {
+        let content = fix_yaml_content("foo: bar\n").unwrap();
+        assert_eq!(fix_yaml_content(&content).unwrap(), content);
+    }
+
+    #[test]
+    fn fix_yaml_content_multi_document() {
+        let content = "foo: bar\n---\nbaz: 1\n";
+        let fixed = fix_yaml_content(content).unwrap();
+        assert_eq!(fixed, "foo: bar\n---\nbaz: 1\n");
+    }
+
+    #[test]
+    fn fix_yaml_content_invalid_is_err() {
+        assert!(fix_yaml_content("foo: [unterminated\n").is_err());
+    }
+
+    #[test]
+    fn validate_yaml_content_accepts_frontmatter_style_multi_doc() {
+        // A single document explicitly delimited by "---" on both ends (as
+        // in Hugo frontmatter) must not be reported as a parse failure.
+        let content = "---\ntitle: hello\nnoindex: true\n---\n";
+        assert!(validate_yaml_content(content).is_ok());
+    }
+
+    #[test]
+    fn validate_yaml_content_reports_offset_of_failing_document() {
+        // The first document is valid; only the second (after "---") fails.
+        let content = "foo: bar\n---\nbaz: 1\n  qux: 2\n";
+        let (_, line_offset) = validate_yaml_content(content).unwrap_err();
+        // The failing document's part starts right after the "---" marker
+        // on line 2, so any line reported within it must be offset by at
+        // least the one full line ("foo: bar") that precedes it.
+        assert_eq!(line_offset, 1);
     }
 }

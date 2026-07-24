@@ -18,7 +18,12 @@ impl Cli {
         if files.is_empty() {
             return Ok(());
         }
-        core::fix_files(&files, self.show_ok)?;
+
+        let any_skipped = core::fix_files(&files, self.show_ok)?;
+        if any_skipped {
+            std::process::exit(1);
+        }
+
         Ok(())
     }
 }

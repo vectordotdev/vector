@@ -76,7 +76,6 @@ mod deprecation;
 mod e2e;
 mod features;
 mod fmt;
-mod fmt_yaml_in_markdown;
 mod info;
 mod integration;
 mod meta;
@@ -98,7 +97,6 @@ cli_commands! {
     e2e,
     features,
     fmt,
-    fmt_yaml_in_markdown,
     info,
     integration,
     meta,
