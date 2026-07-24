@@ -24,13 +24,6 @@ fn parse_template(input: &str) -> Template {
     Template::try_from(input).unwrap()
 }
 
-// Opt out of confinement for tests whose templates have no literal prefix.
-fn unconfined() -> ConfinementConfig {
-    ConfinementConfig {
-        dangerously_allow_unconfined_template_resolution: true,
-    }
-}
-
 // `bulk.action` / `bulk.version` are unconfined templates.
 fn parse_unconfined(input: &str) -> UnconfinedTemplate {
     UnconfinedTemplate::try_from(input).unwrap()
@@ -511,7 +504,7 @@ async fn allows_using_except_fields() {
         api_version: ElasticsearchApiVersion::V6,
         // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
         // exercise field encoding rather than confinement.
-        confinement: unconfined(),
+        confinement: ConfinementConfig::unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -549,7 +542,7 @@ async fn allows_using_only_fields() {
         api_version: ElasticsearchApiVersion::V6,
         // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
         // exercise field encoding rather than confinement.
-        confinement: unconfined(),
+        confinement: ConfinementConfig::unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();

@@ -1520,6 +1520,15 @@ pub struct ConfinementConfig {
 }
 
 impl ConfinementConfig {
+    /// Returns a `ConfinementConfig` that opts out of confinement.
+    ///
+    /// Use only in tests where templates intentionally have no literal prefix.
+    pub fn unconfined() -> Self {
+        Self {
+            dangerously_allow_unconfined_template_resolution: true,
+        }
+    }
+
     /// Logs a per-template SECURITY warning on the opt-out path.
     ///
     /// The `vector_security_confinement_disabled` gauge is owned by the topology
