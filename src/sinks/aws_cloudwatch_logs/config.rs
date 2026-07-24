@@ -300,7 +300,7 @@ impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
 #[cfg(test)]
 mod tests {
     use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
-    use crate::template::{ConfinementConfig, UnconfinedTemplate};
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn test_generate_config() {
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_group_name() {
-        let template = UnconfinedTemplate::try_from("{{ group }}").unwrap();
+        let template = Template::try_from("{{ group }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
         assert!(result.is_err());
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_group_name() {
-        let template = UnconfinedTemplate::try_from("{{ group }}").unwrap();
+        let template = Template::try_from("{{ group }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn confinement_allows_prefixed_group_name() {
-        let template = UnconfinedTemplate::try_from("events-{{ env }}").unwrap();
+        let template = Template::try_from("events-{{ env }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
         assert!(result.is_ok());
