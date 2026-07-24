@@ -33,7 +33,7 @@ async fn sink() -> (VectorSink, Event) {
         toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
     )
     .expect("config should be valid");
-    config.override_uri = Some(mock_endpoint);
+    config.override_endpoint = Some(mock_endpoint.to_string());
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
