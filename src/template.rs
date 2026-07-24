@@ -348,10 +348,6 @@ impl UnconfinedTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Confined<T> — render-capable wrapper that enforces confinement
-// ---------------------------------------------------------------------------
-
 /// Wraps a template and optionally enforces a confinement check at render time.
 ///
 /// Instantiated only as [`ConfinedTemplate`], obtained via [`Template::confine`].
@@ -472,10 +468,6 @@ impl Confined<UnconfinedTemplate> {
         self.inner.get_fields()
     }
 }
-
-// ---------------------------------------------------------------------------
-// Template — the deserializable, must-confine-before-render config type
-// ---------------------------------------------------------------------------
 
 /// A template that has passed through confinement via [`Template::confine`].
 ///
@@ -632,10 +624,6 @@ impl From<Template> for String {
 
 // This is safe because we literally defer to `String` for the schema of `Template`.
 impl ConfigurableString for Template {}
-
-// ---------------------------------------------------------------------------
-// UnsignedIntTemplate (unchanged)
-// ---------------------------------------------------------------------------
 
 /// The source of a `uint` template. May be a constant numeric value or a template string.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -854,10 +842,6 @@ impl UnsignedIntTemplate {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Parsing internals
-// ---------------------------------------------------------------------------
-
 /// One part of the template string after parsing.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum Part {
@@ -1018,10 +1002,6 @@ fn render_timestamp(
             .to_string(),
     }
 }
-
-// ---------------------------------------------------------------------------
-// Confinement types
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Snafu)]
 #[snafu(module(build_error))]
@@ -1497,10 +1477,6 @@ impl ConfinementConfig {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use chrono::{Offset, TimeZone, Utc};
@@ -1554,9 +1530,13 @@ mod tests {
             ("/srv-{{ id }}.log", "/srv-"),
             ("{{ full_path }}", ""),
             ("/{{ tenant }}/app.log", "/"),
+            // `%%` stops the prefix scan — in mixed segments like
+            // `100%%/%Y/{{ x }}` chrono decodes `%%` while expanding `%Y`,
+            // so we cannot determine the rendered prefix without a timestamp.
             ("100%%-literal/{{ x }}", "100"),
             ("no-template-at-all", "no-template-at-all"),
             ("only-strftime-%F.log", "only-strftime-"),
+            // single `{` is not a field opener
             ("a{b/{{ c }}", "a{b/"),
         ];
         for (src, expected) in cases {
@@ -1724,6 +1704,7 @@ mod tests {
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(event_path!("@timestamp"), ts);
+        // use Vector namespace instead of legacy
         LogNamespace::Vector.insert_vector_metadata(
             event.as_mut_log(),
             Some(vrl::path!("foo")),
@@ -1970,6 +1951,9 @@ mod tests {
 
     #[test]
     fn dotdot_bypass_rejected() {
+        // `safe/../../escape` passes a naive starts_with("safe/") check but must
+        // be rejected — on filesystem-like protocols (WebHDFS) the server resolves
+        // `..` and the value escapes the intended namespace.
         let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
@@ -1982,11 +1966,15 @@ mod tests {
             c.confine("safe/../escape/").unwrap_err(),
             ConfineError::DotDotSegment { .. }
         ));
+        // `..` only as a literal substring (not a full segment) is fine
         assert!(c.confine("safe/not..dotdot/").is_ok());
     }
 
     #[test]
     fn uri_path_traversal_rejected() {
+        // `https://api.internal/ingest/{{ tenant }}` with `../../admin` passes the
+        // authority check (same host) but must be caught by the path-prefix +
+        // `..` checks.
         let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
@@ -2005,6 +1993,9 @@ mod tests {
 
     #[test]
     fn uri_percent_encoded_dotdot_rejected() {
+        // Servers that decode percent-encoding before path resolution can be
+        // tricked by `%2e%2e` instead of `..`.  All encoded variants must be
+        // rejected alongside the literal `..`.
         let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
@@ -2033,6 +2024,12 @@ mod tests {
 
     #[test]
     fn uri_encoded_slash_traversal_rejected() {
+        // `%2f` is a percent-encoded `/`. RFC 3986 treats it as a literal slash
+        // character inside a segment, not a path separator — so `http::Uri` keeps
+        // `%2e%2e%2fadmin` as a single segment and the segment-level dot-dot checks
+        // alone would miss it. Many HTTP servers decode `%2f` before resolving the
+        // path, turning the single segment into `../admin` and escaping the prefix.
+        // We must also reject `%5c` (encoded backslash) for Windows-backed services.
         let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
@@ -2098,6 +2095,9 @@ mod tests {
 
     #[test]
     fn uri_path_field_cannot_smuggle_backslash() {
+        // Raw `\` is accepted by `http::Uri` but Windows/IIS servers treat it
+        // as a path separator — `/ingest/..\admin` escapes the prefix on those
+        // hosts. Reject at render time.
         let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
@@ -2114,6 +2114,9 @@ mod tests {
 
     #[test]
     fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
+        // `%25` is the encoded form of `%`. A proxy that decodes once turns
+        // `%252e%252e%252fadmin` into `%2e%2e%2fadmin`; a second decoder
+        // resolves it to `../admin`. Reject at render time.
         let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
@@ -2170,6 +2173,9 @@ mod tests {
 
     #[test]
     fn static_uri_with_query_allowed() {
+        // A fully static URI (no `{{ }}`) with a query string is safe: the
+        // rendered value is fixed and cannot be influenced by event data.
+        // No checker is installed; `Ok(None)` is the expected result.
         let tpl = Template::try_from("https://api.internal/ingest?source=vector").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_none());
     }
@@ -2188,6 +2194,7 @@ mod tests {
                 "expected NoStaticUriAuthority for {template_str}"
             );
         }
+        // A template with a static host followed by a `/` is accepted.
         let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_some());
     }
@@ -2212,6 +2219,8 @@ mod tests {
 
     #[test]
     fn root_only_prefix_rejected() {
+        // `/{{ tenant }}/` has a literal prefix of `/` — every rendered value
+        // trivially starts with it, so it provides no useful confinement.
         let tpl = Template::try_from("/{{ tenant }}/").unwrap();
         assert!(matches!(
             ConfinementChecker::for_template(&tpl).unwrap_err(),
@@ -2221,6 +2230,7 @@ mod tests {
 
     #[test]
     fn non_root_slash_prefix_accepted() {
+        // `/data/{{ tenant }}/` has a literal prefix of `/data/` — non-root, valid.
         let tpl = Template::try_from("/data/{{ tenant }}/").unwrap();
         let checker = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(checker.confine("/data/tenant-a/").is_ok());
