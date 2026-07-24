@@ -19,6 +19,7 @@ use crate::{
             http::{RequestConfig, RetryStrategy},
         },
     },
+    template::ConfinementConfig,
     tls::TlsConfig,
 };
 
@@ -129,6 +130,9 @@ pub struct AxiomConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl GenerateConfig for AxiomConfig {
@@ -186,10 +190,19 @@ impl SinkConfig for AxiomConfig {
             payload_prefix: "".into(), // Always newline delimited JSON
             payload_suffix: "".into(), // Always newline delimited JSON
             retry_strategy: self.retry_strategy.clone(),
-            confinement: Default::default(),
+            confinement: self.confinement.clone(),
         };
 
-        http_sink_config.build(cx).await
+        // Route through the HTTP builder threaded with our own component type,
+        // so per-template security warnings carry `component_type=axiom` rather
+        // than `http`.
+        http_sink_config
+            .build_with_component_type(cx, Self::NAME)
+            .await
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

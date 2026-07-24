@@ -421,7 +421,7 @@ where
     /// Creates a new [`BufferReader`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>, finalizer: OrderedFinalizer<u64>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
-        let next_expected_record_id = ledger_last_reader_record_id.wrapping_add(1);
+        let next_expected_record_id = ledger_last_reader_record_id + 1;
 
         Self {
             ledger,
@@ -456,7 +456,7 @@ where
         // record, plus the event count, minus one.  Another way to look at it is that the "last"
         // reader record ID is always one behind the next expected record ID.  In the above example,
         // the next record ID we would expect would be 6, regardless of how many events the record has.
-        self.last_reader_record_id = record_id.wrapping_add(event_count.get() - 1);
+        self.last_reader_record_id = record_id + event_count.get() - 1;
         if self.data_file_start_record_id.is_none() {
             self.data_file_start_record_id = Some(record_id);
         }
@@ -730,10 +730,7 @@ where
             .unwrap_or(self.last_reader_record_id);
         // Record IDs are inclusive, so if last is 1 and start is 0, that means we had two events,
         // potentially from one or two records.
-        let data_file_event_count = self
-            .last_reader_record_id
-            .wrapping_sub(data_file_start_record_id)
-            .saturating_add(1);
+        let data_file_event_count = self.last_reader_record_id - data_file_start_record_id + 1;
         let data_file_record_count = self.data_file_record_count;
         let data_file_path = self.ledger.get_current_reader_data_file_path();
         let bytes_read = self.bytes_read;
@@ -896,7 +893,7 @@ where
                     let record_events = u64::try_from(item.event_count())
                         .expect("event count should never exceed u64");
                     let last_record_id_in_data_file =
-                        last_record_id.wrapping_add(record_events.saturating_sub(1));
+                        last_record_id + record_events.saturating_sub(1);
 
                     // If we're past this data file, delete it and move on. We do this manually
                     // versus faking it via `roll_to_next_data_file` because that emits a deletion

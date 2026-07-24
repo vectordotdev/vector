@@ -220,6 +220,7 @@ impl SourceConfig for VectorConfig {
         let source = run_grpc_server_with_routes(
             self.address,
             tls_settings,
+            None,
             builder.routes(),
             self.keepalive.clone(),
             cx.shutdown,

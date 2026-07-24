@@ -210,6 +210,10 @@ impl SinkConfig for GreptimeDBLogsConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         Input::log()
     }

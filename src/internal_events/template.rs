@@ -15,35 +15,86 @@ pub struct TemplateRenderingError<'a> {
 
 impl InternalEvent for TemplateRenderingError<'_> {
     fn emit(self) {
-        let mut msg = "Failed to render template".to_owned();
+        let confined = matches!(
+            self.error,
+            crate::template::TemplateRenderingError::Confined { .. }
+        );
+
+        // Message wording tracks BOTH the error class (confinement vs render
+        // failure) AND whether the caller is dropping the event. A caller
+        // like the KeyPartitioner falling back to a dead-letter key emits
+        // `Confined` + `drop_event: false` — we still want to log the
+        // confinement violation, but claiming "dropping event" would be a
+        // lie because the event still routes to the dead-letter.
+        let mut msg = match (confined, self.drop_event) {
+            (true, true) => {
+                "Templated routing value was outside the configured confinement; dropping event"
+                    .to_owned()
+            }
+            (true, false) => {
+                "Templated routing value was outside the configured confinement".to_owned()
+            }
+            (false, _) => "Failed to render template".to_owned(),
+        };
         if let Some(field) = self.field {
             use std::fmt::Write;
             _ = write!(msg, " for \"{field}\"");
         }
         msg.push('.');
 
-        let confined = matches!(
-            self.error,
-            crate::template::TemplateRenderingError::Confined { .. }
-        );
-
-        if self.drop_event {
+        // A `Confined` error is always alert-worthy: an attacker attempted
+        // to steer routing via event data. Some callers legitimately don't
+        // drop the event (e.g. a partitioner falling back to a dead-letter
+        // key), but the confinement fire itself must still surface in logs
+        // and `component_errors_total` regardless of the caller's
+        // drop_event decision.
+        //
+        // `check-events` requires `error_type` counter tag values to be
+        // constants, so the two error-class branches are split
+        // explicitly. Confined renders always surface at `error!` +
+        // `component_errors_total` (they're security-relevant even when
+        // the caller doesn't drop the event); non-confined renders only
+        // surface on the drop path.
+        if confined {
+            error!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::CONFINEMENT_FAILED,
+                stage = error_stage::PROCESSING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_type" => error_type::CONFINEMENT_FAILED,
+                "stage" => error_stage::PROCESSING,
+            )
+            .increment(1);
+        } else if self.drop_event {
             error!(
                 message = %msg,
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
                 stage = error_stage::PROCESSING,
             );
-
             counter!(
                 CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::TEMPLATE_FAILED,
                 "stage" => error_stage::PROCESSING,
             )
             .increment(1);
+        } else {
+            warn!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                stage = error_stage::PROCESSING,
+            );
+        }
 
-            // Confinement violations are intentional security discards.
-            // All other template render failures are unintentional drops.
+        // Only emit `ComponentEventsDropped` when the caller actually
+        // dropped the event. `Confined` + `drop_event: false` (e.g. the
+        // dead-letter fallback) doesn't count as a drop — the event still
+        // lands somewhere, just at the operator-authored fallback key.
+        if self.drop_event {
             if confined {
                 emit!(ComponentEventsDropped::<INTENTIONAL> {
                     count: 1,
@@ -55,13 +106,6 @@ impl InternalEvent for TemplateRenderingError<'_> {
                     reason: "Failed to render template.",
                 });
             }
-        } else {
-            warn!(
-                message = %msg,
-                error = %self.error,
-                error_type = error_type::TEMPLATE_FAILED,
-                stage = error_stage::PROCESSING,
-            );
         }
     }
 }

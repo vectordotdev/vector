@@ -8,7 +8,7 @@ use std::{
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
 };
 
 pub use config_builder::ConfigBuilderLoader;
@@ -26,6 +26,22 @@ use super::{
 use crate::signal;
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
+
+static ALLOW_ENV_VAR_INTERPOLATION: OnceLock<bool> = OnceLock::new();
+
+/// Sets whether environment variable interpolation is enabled for the process.
+/// Must be called exactly once at startup before any config loading.
+pub fn set_env_var_interpolation(allow: bool) {
+    ALLOW_ENV_VAR_INTERPOLATION
+        .set(allow)
+        .expect("set_env_var_interpolation must only be called once");
+}
+
+/// Returns whether environment variable interpolation is currently enabled.
+/// Defaults to `false` if [`set_env_var_interpolation`] has not been called.
+pub fn env_var_interpolation_enabled() -> bool {
+    *ALLOW_ENV_VAR_INTERPOLATION.get().unwrap_or(&false)
+}
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
@@ -124,13 +140,8 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     Some(paths)
 }
 
-pub fn load_from_paths(
-    config_paths: &[ConfigPath],
-    interpolate_env: bool,
-) -> Result<Config, Vec<String>> {
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(interpolate_env)
-        .load_from_paths(config_paths)?;
+pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
+    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
@@ -147,19 +158,14 @@ pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
-    interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    let secrets_backends_loader = loader_from_paths(
-        SecretBackendLoader::default().interpolate_env(interpolate_env),
-        config_paths,
-    )?;
+    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
     let mut builder = ConfigBuilderLoader::default()
-        .interpolate_env(interpolate_env)
         .allow_empty(allow_empty)
         .secrets(secrets)
         .load_from_paths(config_paths)?;
@@ -181,20 +187,15 @@ pub async fn load_from_str_with_secrets(
     format: Format,
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
-    interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    let secrets_backends_loader = loader_from_input(
-        SecretBackendLoader::default().interpolate_env(interpolate_env),
-        input.as_bytes(),
-        format,
-    )?;
+    let secrets_backends_loader =
+        loader_from_input(SecretBackendLoader::default(), input.as_bytes(), format)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
     let builder = ConfigBuilderLoader::default()
-        .interpolate_env(interpolate_env)
         .allow_empty(allow_empty)
         .secrets(secrets)
         .load_from_input(input.as_bytes(), format)?;

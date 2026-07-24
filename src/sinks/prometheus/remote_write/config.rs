@@ -289,8 +289,11 @@ impl SinkConfig for RemoteWriteConfig {
             expire_metrics_secs: self.expire_metrics_secs,
             service,
         };
-
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

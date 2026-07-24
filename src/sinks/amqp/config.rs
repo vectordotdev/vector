@@ -148,6 +148,10 @@ impl SinkConfig for AmqpSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         Input::new(DataType::Log)
     }

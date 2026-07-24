@@ -281,8 +281,11 @@ impl SinkConfig for GcsSinkConfig {
         )?;
         auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth, cx)?;
-
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

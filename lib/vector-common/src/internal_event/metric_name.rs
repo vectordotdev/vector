@@ -98,6 +98,7 @@ pub enum CounterName {
     MemoryEnrichmentTableFlushesTotal,
     MemoryEnrichmentTableInsertionsTotal,
     MemoryEnrichmentTableReadsTotal,
+    MemoryEnrichmentTableRemovedTotal,
     MemoryEnrichmentTableTtlExpirations,
     ComponentCpuUsageNsTotal,
     DatadogLogsReservedAttributeConflictsTotal,
@@ -367,6 +368,7 @@ impl CounterName {
                 "memory_enrichment_table_insertions_total"
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
+            Self::MemoryEnrichmentTableRemovedTotal => "memory_enrichment_table_removed_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
             Self::DatadogLogsReservedAttributeConflictsTotal => {

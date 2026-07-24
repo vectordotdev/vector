@@ -175,6 +175,10 @@ impl SinkConfig for HecMetricsSinkConfig {
         Ok((sink, healthcheck))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         Input::metric()
     }

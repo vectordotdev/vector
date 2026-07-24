@@ -83,13 +83,20 @@ where
         let index_check = self.index.clone();
 
         input
-            .map(move |event| process_log(event, &data))
-            // Pre-check partition templates for confinement violations.
-            // For the Raw endpoint a None partition key still routes to Splunk
-            // (without metadata), so we must drop here rather than inside
-            // `partition`. For the Event endpoint the metadata is embedded in
-            // the event body; a Confined render would silently omit the field,
-            // so we drop here for both endpoint types.
+            // Pre-check partition templates for confinement violations
+            // BEFORE `process_log` mutates the event. `process_log` extracts
+            // and removes fields like `timestamp` from the event body, so
+            // running this check on the processed event turned a
+            // `Confined` render (e.g. `index: "idx-{{ timestamp }}"` with a
+            // `../../evil` value) into a `MissingKeys` render — the security
+            // drop was silently downgraded to "field missing", and the
+            // attack event shipped without an index.
+            //
+            // For the Raw endpoint a None partition key still routes to
+            // Splunk (without metadata), so we must drop here rather than
+            // inside `partition`. For the Event endpoint the metadata is
+            // embedded in the event body; a Confined render would silently
+            // omit the field, so we drop here for both endpoint types.
             .filter_map(move |event| {
                 future::ready(
                     if has_confined_partition_error(
@@ -104,6 +111,7 @@ where
                     },
                 )
             })
+            .map(move |event| process_log(event, &data))
             .batched_partitioned(
                 if self.endpoint_target == EndpointTarget::Raw {
                     // We only need to partition by the metadata fields for the raw endpoint since those fields
@@ -158,7 +166,7 @@ where
 /// that confinement violations result in event drops rather than silent
 /// metadata omission.
 fn has_confined_partition_error(
-    event: &HecProcessedEvent,
+    event: &Event,
     source: Option<&Template>,
     sourcetype: Option<&Template>,
     index: Option<&Template>,
@@ -170,15 +178,17 @@ fn has_confined_partition_error(
         (index, INDEX_FIELD),
     ] {
         if let Some(error) = tpl
-            .and_then(|t| t.render_string(&event.event).err())
+            .and_then(|t| t.render_string(event).err())
             .filter(|e| matches!(e, crate::template::TemplateRenderingError::Confined { .. }))
         {
-            confined = true;
             emit!(TemplateRenderingError {
                 error,
                 field: Some(field),
-                drop_event: true,
+                // Count the drop once — subsequent violations on the same event
+                // should not increment ComponentEventsDropped again.
+                drop_event: !confined,
             });
+            confined = true;
         }
     }
     confined
@@ -403,5 +413,43 @@ impl EventCount for HecProcessedEvent {
     fn event_count(&self) -> usize {
         // A HecProcessedEvent is mapped one-to-one with an event.
         1
+    }
+}
+
+#[cfg(test)]
+mod pre_check_tests {
+    use super::*;
+    use crate::template::ConfinementConfig;
+    use vector_lib::event::LogEvent;
+    use vrl::event_path;
+
+    /// Regression for issue #25829: `process_log` extracts + removes fields
+    /// like `timestamp` from the event body. If the confinement pre-check
+    /// runs *after* `process_log`, an attacker-controlled `timestamp: "../..."`
+    /// value renders as `Confined` inside `process_log`, then the field is
+    /// removed, and the pre-check sees `MissingKeys` instead of `Confined` —
+    /// the attack event ships without an index. The check must run on the
+    /// original event before any mutation.
+    #[test]
+    fn confinement_detects_attack_before_process_log_mutates_event() {
+        let index_template = Template::try_from("idx-{{ timestamp }}")
+            .unwrap()
+            .confine(&ConfinementConfig::default(), "splunk_hec_logs", "index")
+            .unwrap();
+
+        // Attacker-controlled `timestamp` field with a traversal payload.
+        let mut log = LogEvent::from("attack payload");
+        log.insert(event_path!("timestamp"), "../../evil");
+        let event = Event::Log(log);
+
+        // Running the pre-check against the original event catches the
+        // `Confined` render before any downstream mutation gets a chance
+        // to convert it to `MissingKeys`.
+        assert!(has_confined_partition_error(
+            &event,
+            None,
+            None,
+            Some(&index_template),
+        ));
     }
 }

@@ -1,7 +1,7 @@
 package metadata
 
 releases: {
-	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status" | "deprecation" | "revert"
+	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "security" | "status" | "deprecation" | "revert"
 
 	#Commit: {
 		author:           string
