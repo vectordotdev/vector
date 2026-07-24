@@ -172,8 +172,11 @@ impl SinkConfig for HecMetricsSinkConfig {
         )
         .boxed();
         let sink = config.build_processor(client, cx)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

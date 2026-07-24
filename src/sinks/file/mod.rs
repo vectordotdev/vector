@@ -248,11 +248,14 @@ impl SinkConfig for FileSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(self, cx)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
         ))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

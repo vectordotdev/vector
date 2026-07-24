@@ -213,7 +213,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
+        service:
+          [
+            "datadog-logs",
+            "datadog-metrics",
+            "opentelemetry-logs",
+            "opentelemetry-metrics",
+            "opentelemetry-metrics-native"
+          ]
     timeout-minutes: 90
 
     steps:

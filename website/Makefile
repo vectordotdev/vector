@@ -24,6 +24,9 @@ cue-%:
 config-examples:
 	yarn config-examples
 
+validate-config-examples: cue-build config-examples
+	yarn validate-config-examples
+
 VDEV ?= cargo vdev
 
 generate-vrl-docs:
