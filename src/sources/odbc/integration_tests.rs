@@ -9,7 +9,7 @@ use odbc_api::ConnectionOptions;
 use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::fs;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use vector_lib::event::Event;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Value;
@@ -69,6 +69,46 @@ const fn get_conn_opt() -> ConnectionOptions {
     }
 }
 
+fn connect_when_ready<'a>(
+    env: &'a odbc_api::Environment,
+    conn_str: &str,
+) -> odbc_api::Connection<'a> {
+    const TIMEOUT: Duration = Duration::from_secs(30);
+    const INTERVAL: Duration = Duration::from_millis(500);
+
+    let start = Instant::now();
+    loop {
+        match env.connect_with_connection_string(conn_str, get_conn_opt()) {
+            Ok(conn) => {
+                debug!(
+                    elapsed = ?start.elapsed(),
+                    "ODBC database accepted connection"
+                );
+                return conn;
+            }
+            Err(err) => {
+                let elapsed = start.elapsed();
+                if elapsed >= TIMEOUT {
+                    error!(
+                        %err,
+                        ?elapsed,
+                        ?TIMEOUT,
+                        "ODBC database not ready before timeout"
+                    );
+                    panic!("ODBC database not ready after {TIMEOUT:?}: {err}");
+                }
+                warn!(
+                    %err,
+                    ?elapsed,
+                    ?INTERVAL,
+                    "ODBC database not ready, retrying"
+                );
+                std::thread::sleep(INTERVAL);
+            }
+        }
+    }
+}
+
 fn get_value_from_event<'a>(event: &'a Event, key: &str) -> Option<Cow<'a, str>> {
     event.as_log().value().as_object()?.get(key)?.as_str()
 }
@@ -104,6 +144,9 @@ async fn parse_odbc_config() {
 #[tokio::test]
 async fn scheduled_query_executed() {
     let conn_str = get_conn_str();
+    let env = odbc_api::environment().unwrap();
+    drop(connect_when_ready(&env, &conn_str));
+
     let events = run_and_assert_source_compliance(
         OdbcConfig {
             connection_string: SensitiveString::from(conn_str),
@@ -129,9 +172,7 @@ async fn query_executed_with_init_params() {
 
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = env
-        .connect_with_connection_string(&conn_str, get_conn_opt())
-        .unwrap();
+    let conn = connect_when_ready(&env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS odbc_table;", (), Some(3))
         .unwrap();
@@ -231,9 +272,7 @@ async fn query_executed_with_filepath() {
 
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = env
-        .connect_with_connection_string(&conn_str, get_conn_opt())
-        .unwrap();
+    let conn = connect_when_ready(&env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS odbc_table;", (), Some(3))
         .unwrap();
@@ -333,9 +372,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
 async fn query_number_types() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = env
-        .connect_with_connection_string(&conn_str, get_conn_opt())
-        .unwrap();
+    let conn = connect_when_ready(&env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS number_columns;", (), Some(3))
         .unwrap();
@@ -570,9 +607,7 @@ INSERT INTO number_columns (
 async fn query_string_types() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = env
-        .connect_with_connection_string(&conn_str, get_conn_opt())
-        .unwrap();
+    let conn = connect_when_ready(&env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS string_columns;", (), Some(3))
         .unwrap();
@@ -688,9 +723,7 @@ INSERT INTO string_columns (
 async fn query_binary_columns_emit_raw_bytes_not_hex_text() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = env
-        .connect_with_connection_string(&conn_str, get_conn_opt())
-        .unwrap();
+    let conn = connect_when_ready(&env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS binary_columns;", (), Some(3))
         .unwrap();
@@ -776,9 +809,7 @@ CREATE TABLE binary_columns (
 async fn query_timestamp_columns() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = env
-        .connect_with_connection_string(&conn_str, ConnectionOptions::default())
-        .unwrap();
+    let conn = connect_when_ready(&env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS timestamp_columns;", (), Some(3))
         .unwrap();
