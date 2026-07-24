@@ -28,11 +28,13 @@ components: sources: odbc: {
 		requirements: [
 			"""
 				Only included in official 64-bit glibc Linux builds
-				(`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`) and macOS
-				(`aarch64-apple-darwin`). It is not included in musl builds (Alpine,
-				distroless-static, `*-unknown-linux-musl`) or 32-bit ARM GNU builds
-				(`armv7-unknown-linux-gnueabihf`, `arm-unknown-linux-gnueabi`). For any
-				other target (including Windows), use a custom build with `sources-odbc`.
+				(`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`). It is not
+				included in musl builds (Alpine, distroless-static,
+				`*-unknown-linux-musl`), 32-bit ARM GNU builds
+				(`armv7-unknown-linux-gnueabihf`, `arm-unknown-linux-gnueabi`), or
+				official macOS archives (`aarch64-apple-darwin`). For any other
+				target (including macOS and Windows), use a custom build with
+				`sources-odbc`.
 				""",
 			"""
 				Linux glibc builds link the unixODBC driver manager (`libodbc`).
