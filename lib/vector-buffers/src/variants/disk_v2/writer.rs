@@ -1302,7 +1302,9 @@ where
 
         // We have bytes, so we should have an archived record... hopefully! Validate the last frame
         // so post-checkpoint or torn bytes can be removed without discarding complete corrupt spans
-        // that the reader can traverse and account for.
+        // that the reader can traverse and account for. The corruption branches drop this mapping
+        // before reconciliation because reconciliation may truncate the file, which Windows does
+        // not permit while a mapped view is still open.
         let mut should_skip_to_next_file = match validate_record_archive(
             data_file_mmap.as_ref(),
             &Hasher::new(),
@@ -1375,6 +1377,7 @@ where
             // usable for positioning. Reconcile against the durable checkpoint without deleting
             // that span so the reader can account for and skip it normally.
             RecordStatus::Corrupted { .. } => {
+                drop(data_file_mmap);
                 error!(
                     "Last written record did not match the expected checksum. Corruption likely."
                 );
@@ -1384,9 +1387,9 @@ where
             // The archive cannot be validated, but the outer length delimiter still gives the
             // record a complete byte span. Preserve that span while reconciling the checkpoint.
             RecordStatus::FailedDeserialization(de) => {
-                let reason = de.into_inner();
+                drop(data_file_mmap);
                 error!(
-                    ?reason,
+                    reason = ?de.into_inner(),
                     "Last written record was unable to be deserialized. Corruption likely."
                 );
                 self.reconcile_current_data_file_with_checkpoint().await?;
