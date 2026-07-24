@@ -29,6 +29,7 @@ use crate::{
         },
         random_events_with_stream, random_string, trace_init,
     },
+    template::Template,
     tls::{self, TlsConfig},
 };
 
