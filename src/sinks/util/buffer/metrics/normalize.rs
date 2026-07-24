@@ -160,6 +160,14 @@ impl<N> MetricNormalizer<N> {
         }
     }
 
+    /// Creates a new normalizer with a time-to-live policy.
+    pub fn with_ttl(normalizer: N, ttl: Duration) -> Self {
+        Self {
+            state: MetricSet::with_policies(None, Some(TtlPolicy::new(ttl))),
+            normalizer,
+        }
+    }
+
     /// Gets a mutable reference to the current metric state for this normalizer.
     pub const fn get_state_mut(&mut self) -> &mut MetricSet {
         &mut self.state
