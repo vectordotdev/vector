@@ -267,6 +267,7 @@ pub(crate) async fn create_buffer_v2_with_data_file_count_limit<P, R>(
     data_dir: P,
     max_data_file_size: u64,
     data_file_count_limit: u64,
+    error_on_full: bool,
 ) -> (
     BufferWriter<R, FilesystemUnderTest>,
     BufferReader<R, FilesystemUnderTest>,
@@ -298,6 +299,7 @@ where
         .max_record_size(max_record_size)
         .max_data_file_size(max_data_file_size)
         .max_buffer_size(max_buffer_size)
+        .error_on_full(error_on_full)
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();

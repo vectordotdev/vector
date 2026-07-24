@@ -1684,12 +1684,19 @@ where
     }
 
     #[instrument(skip_all, level = "debug")]
+    #[allow(clippy::too_many_lines)]
     async fn try_write_record_inner(
         &mut self,
         mut record: T,
     ) -> Result<Result<usize, T>, WriterError<T>> {
         // If the buffer is already full, we definitely can't complete this write.
         if self.is_buffer_full() {
+            // `reject` sheds this record; mark its finalizers errored rather than delivered.
+            if self.config.error_on_full {
+                record
+                    .take_finalizer_groups()
+                    .update_status(EventStatus::Errored);
+            }
             return Ok(Err(record));
         }
 
@@ -1808,13 +1815,14 @@ where
             // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
             // errors if we encounter them, but if we recover the record successfully, we're returning
             // `Ok(Err(record))` to signal that our attempt failed but the record is able to be retried again later.
-            //
-            // Reattach the finalizers: they were taken before archiving to handle the unwritable-
-            // record path, but this record is being returned for retry (block mode) or overflow.
-            // `into_inner` extracts from the guard without resolving status; the finalizers will
-            // be resolved only when the returned record is eventually written or dropped.
             let mut record = writer.recover_archived_record(&token)?;
-            record.merge_finalizer_groups(record_finalizers.into_inner());
+            // `reject` sheds this record, so let the guard error its finalizers on drop; other modes
+            // reattach them so the record can be retried (block) or overflowed.
+            if self.config.error_on_full {
+                drop(record_finalizers);
+            } else {
+                record.merge_finalizer_groups(record_finalizers.into_inner());
+            }
             return Ok(Err(record));
         };
 

@@ -66,6 +66,19 @@ pub enum WhenFull {
     /// slowdown in the acceptance/consumption of events.
     DropNewest,
 
+    /// Drops the event and signals the failure back to the source.
+    ///
+    /// Like `drop_newest`, the event is dropped instead of waiting for free space in the buffer.
+    /// Unlike `drop_newest`, the dropped event is acknowledged as errored rather than delivered, so a
+    /// source with acknowledgements enabled reports the failure to its client. For example, the
+    /// `http_server` source returns `500 Internal Server Error` rather than its configured success
+    /// code. As buffer pressure is transient, clients should treat this as a retriable error and back
+    /// off.
+    ///
+    /// This applies to both `disk` and `memory` buffers. It differs from `drop_newest`, which remains
+    /// best-effort and acknowledges dropped events as delivered.
+    Reject,
+
     /// Overflows to the next stage in the buffer topology.
     ///
     /// If the current buffer stage is full, attempt to send this event to the next buffer stage.
