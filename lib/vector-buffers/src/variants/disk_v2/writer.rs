@@ -5,6 +5,7 @@ use std::{
     io::{self, ErrorKind},
     marker::PhantomData,
     num::NonZeroUsize,
+    path::Path,
     sync::Arc,
 };
 
@@ -35,7 +36,7 @@ use crate::{
     encoding::{AsMetadata, Encodable},
     variants::disk_v2::{
         io::AsyncFile,
-        reader::{ReadToken, RecordReader, decode_record_payload},
+        reader::{ReadToken, ReaderError, RecordReader, decode_record_payload},
         record::{RECORD_HEADER_LEN, try_as_record_archive},
     },
 };
@@ -833,6 +834,57 @@ where
     }
 }
 
+struct WriterCheckpointScan {
+    checkpoint_next_record_id: u64,
+    reconciled_next_record_id: u64,
+    preserved_bytes: u64,
+    last_decodable_record_next_id: Option<u64>,
+}
+
+impl WriterCheckpointScan {
+    fn new(checkpoint_next_record_id: u64) -> Self {
+        Self {
+            checkpoint_next_record_id,
+            reconciled_next_record_id: checkpoint_next_record_id,
+            preserved_bytes: 0,
+            last_decodable_record_next_id: None,
+        }
+    }
+
+    fn corrupt_record_is_post_checkpoint(&self) -> bool {
+        self.reconciled_next_record_id == 1
+            || self.last_decodable_record_next_id == Some(self.reconciled_next_record_id)
+    }
+
+    fn preserve_corrupt_record(&mut self, record_bytes: u64) {
+        self.preserved_bytes += record_bytes;
+    }
+
+    fn preserve_undecodable_record(&mut self, record_bytes: u64) {
+        self.last_decodable_record_next_id = None;
+        self.preserved_bytes += record_bytes;
+    }
+
+    fn preserve_decodable_record(&mut self, record_id: u64, record_events: u64, record_bytes: u64) {
+        let record_next = record_id + record_events;
+        self.reconciled_next_record_id = self.reconciled_next_record_id.max(record_next);
+        self.last_decodable_record_next_id = Some(record_next);
+        self.preserved_bytes += record_bytes;
+    }
+
+    fn fast_forward_range(&self) -> Option<(u64, u64)> {
+        (self.reconciled_next_record_id > self.checkpoint_next_record_id).then_some((
+            self.checkpoint_next_record_id,
+            self.reconciled_next_record_id,
+        ))
+    }
+}
+
+enum WriterCheckpointScanAction {
+    Continue,
+    Stop,
+}
+
 /// Writes records to the buffer.
 #[derive(Debug)]
 pub struct BufferWriter<T, FS>
@@ -1031,7 +1083,7 @@ where
     fn decode_reconciliation_record(
         reader: &mut RecordReader<FS::File, T>,
         token: ReadToken,
-        data_file_path: &std::path::Path,
+        data_file_path: &Path,
         checkpoint_next_record_id: u64,
     ) -> Option<T> {
         let record_id = token.record_id();
@@ -1061,95 +1113,87 @@ where
         self.unflushed_events = 0;
     }
 
-    async fn reconcile_current_data_file_with_checkpoint(&mut self) -> Result<(), WriterError<T>> {
-        let checkpoint_next_record_id = self.ledger.state().get_next_writer_record_id();
-        let mut reconciled_next_record_id = checkpoint_next_record_id;
-        let data_file_path = self.ledger.get_current_writer_data_file_path();
-        let data_file = self
-            .ledger
-            .filesystem()
-            .open_file_readable(&data_file_path)
-            .await
-            .context(IoSnafu)?;
-        let mut reader = RecordReader::new(data_file);
-        let mut record_start_offset = 0;
-        let mut last_decodable_record_next_id = None;
+    fn handle_reconciliation_read_error(
+        scan: &mut WriterCheckpointScan,
+        data_file_path: &Path,
+        error: &ReaderError<T>,
+    ) -> Result<WriterCheckpointScanAction, WriterError<T>> {
+        if let Some(record_bytes) = error.consumed_record_bytes() {
+            if scan.corrupt_record_is_post_checkpoint() {
+                warn!(
+                    data_file_path = data_file_path.to_string_lossy().as_ref(),
+                    truncate_at = scan.preserved_bytes,
+                    record_bytes,
+                    %error,
+                    "Truncating complete corrupt record proven to be beyond the durable writer checkpoint."
+                );
+                return Ok(WriterCheckpointScanAction::Stop);
+            }
 
-        loop {
-            let token = match reader.try_next_record(true).await {
-                Ok(Some(token)) => token,
-                Ok(None) => break,
-                Err(e) => {
-                    if let Some(record_bytes) = e.consumed_record_bytes() {
-                        if reconciled_next_record_id == 1
-                            || last_decodable_record_next_id == Some(reconciled_next_record_id)
-                        {
-                            warn!(
-                                data_file_path = data_file_path.to_string_lossy().as_ref(),
-                                truncate_at = record_start_offset,
-                                record_bytes,
-                                error = %e,
-                                "Truncating complete corrupt record proven to be beyond the durable writer checkpoint."
-                            );
-                            break;
-                        }
-
-                        warn!(
-                            data_file_path = data_file_path.to_string_lossy().as_ref(),
-                            record_start_offset,
-                            record_bytes,
-                            error = %e,
-                            "Preserving complete corrupt writer record while reconciling the durable checkpoint."
-                        );
-                        record_start_offset += record_bytes;
-                        continue;
-                    }
-
-                    if e.is_bad_read() {
-                        warn!(
-                            data_file_path = data_file_path.to_string_lossy().as_ref(),
-                            truncate_at = record_start_offset,
-                            error = %e,
-                            "Truncating torn writer data file tail at last complete record boundary."
-                        );
-                        break;
-                    }
-
-                    return Err(WriterError::FailedToValidate {
-                        reason: e.to_string(),
-                    });
-                }
-            };
-
-            let record_id = token.record_id();
-            let record_bytes = token.record_bytes() as u64;
-
-            // The frame itself is complete and validated, so it still provides a trustworthy byte
-            // boundary. If its payload does not provide an event count, preserve it for the
-            // runtime reader to drop without using it to prove where the checkpoint falls.
-            let Some(record) = Self::decode_reconciliation_record(
-                &mut reader,
-                token,
-                &data_file_path,
-                checkpoint_next_record_id,
-            ) else {
-                last_decodable_record_next_id = None;
-                record_start_offset += record_bytes;
-                continue;
-            };
-            let record_events =
-                u64::try_from(record.event_count()).expect("event count should never exceed u64");
-            let record_next = record_id + record_events;
-            reconciled_next_record_id = reconciled_next_record_id.max(record_next);
-            last_decodable_record_next_id = Some(record_next);
-            record_start_offset += record_bytes;
+            warn!(
+                data_file_path = data_file_path.to_string_lossy().as_ref(),
+                record_start_offset = scan.preserved_bytes,
+                record_bytes,
+                %error,
+                "Preserving complete corrupt writer record while reconciling the durable checkpoint."
+            );
+            scan.preserve_corrupt_record(record_bytes);
+            return Ok(WriterCheckpointScanAction::Continue);
         }
 
-        if record_start_offset < self.data_file_size {
-            self.truncate_current_data_file(record_start_offset).await?;
+        if error.is_bad_read() {
+            warn!(
+                data_file_path = data_file_path.to_string_lossy().as_ref(),
+                truncate_at = scan.preserved_bytes,
+                %error,
+                "Truncating torn writer data file tail at last complete record boundary."
+            );
+            return Ok(WriterCheckpointScanAction::Stop);
         }
 
-        if reconciled_next_record_id > checkpoint_next_record_id {
+        Err(WriterError::FailedToValidate {
+            reason: error.to_string(),
+        })
+    }
+
+    fn scan_reconciliation_record(
+        scan: &mut WriterCheckpointScan,
+        reader: &mut RecordReader<FS::File, T>,
+        token: ReadToken,
+        data_file_path: &Path,
+    ) {
+        let record_id = token.record_id();
+        let record_bytes = token.record_bytes() as u64;
+
+        // The frame itself is complete and validated, so it still provides a trustworthy byte
+        // boundary. If its payload does not provide an event count, preserve it for the runtime
+        // reader to drop without using it to prove where the checkpoint falls.
+        let Some(record) = Self::decode_reconciliation_record(
+            reader,
+            token,
+            data_file_path,
+            scan.checkpoint_next_record_id,
+        ) else {
+            scan.preserve_undecodable_record(record_bytes);
+            return;
+        };
+        let record_events =
+            u64::try_from(record.event_count()).expect("event count should never exceed u64");
+        scan.preserve_decodable_record(record_id, record_events, record_bytes);
+    }
+
+    async fn apply_writer_checkpoint_scan(
+        &mut self,
+        scan: WriterCheckpointScan,
+    ) -> Result<(), WriterError<T>> {
+        if scan.preserved_bytes < self.data_file_size {
+            self.truncate_current_data_file(scan.preserved_bytes)
+                .await?;
+        }
+
+        if let Some((checkpoint_next_record_id, reconciled_next_record_id)) =
+            scan.fast_forward_range()
+        {
             debug!(
                 checkpoint_next_record_id,
                 reconciled_next_record_id,
@@ -1162,6 +1206,45 @@ where
         }
 
         Ok(())
+    }
+
+    async fn reconcile_current_data_file_with_checkpoint(&mut self) -> Result<(), WriterError<T>> {
+        let checkpoint_next_record_id = self.ledger.state().get_next_writer_record_id();
+        let data_file_path = self.ledger.get_current_writer_data_file_path();
+        let data_file = self
+            .ledger
+            .filesystem()
+            .open_file_readable(&data_file_path)
+            .await
+            .context(IoSnafu)?;
+        let mut reader = RecordReader::new(data_file);
+        let mut scan = WriterCheckpointScan::new(checkpoint_next_record_id);
+
+        loop {
+            match reader.try_next_record(true).await {
+                Ok(Some(token)) => {
+                    Self::scan_reconciliation_record(
+                        &mut scan,
+                        &mut reader,
+                        token,
+                        &data_file_path,
+                    );
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    match Self::handle_reconciliation_read_error(
+                        &mut scan,
+                        &data_file_path,
+                        &error,
+                    )? {
+                        WriterCheckpointScanAction::Continue => {}
+                        WriterCheckpointScanAction::Stop => break,
+                    }
+                }
+            }
+        }
+
+        self.apply_writer_checkpoint_scan(scan).await
     }
 
     async fn truncate_current_data_file(&mut self, size: u64) -> io::Result<()> {
