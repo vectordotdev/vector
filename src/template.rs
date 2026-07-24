@@ -1527,7 +1527,7 @@ impl ConfinementConfig {
     /// Returns a `ConfinementConfig` that opts out of confinement.
     ///
     /// Use only in tests where templates intentionally have no literal prefix.
-    pub fn unconfined() -> Self {
+    pub const fn unconfined() -> Self {
         Self {
             dangerously_allow_unconfined_template_resolution: true,
         }
