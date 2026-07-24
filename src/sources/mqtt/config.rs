@@ -62,6 +62,22 @@ pub struct MqttSourceConfig {
     #[configurable(metadata(docs::examples = "topic"))]
     pub topic_key: OptionalValuePath,
 
+    /// Controls how acknowledgements are handled for this source.
+    ///
+    /// Prefer enabling `acknowledgements` at the [global][global_acks] or
+    /// sink level instead of here: this setting takes precedence over both
+    /// when explicitly set, which can silently disable acknowledgements a
+    /// connected sink otherwise requires.
+    ///
+    /// When enabled (through this setting, the global setting, or because a
+    /// connected sink requires it), the QoS 1/2 acknowledgement for an
+    /// incoming publish is deferred until the resulting events have been
+    /// delivered to all connected sinks, giving at-least-once delivery. A
+    /// stable `client_id` must also be configured, however acknowledgements
+    /// end up enabled, so the MQTT session (and its unacknowledged messages)
+    /// can be resumed after a restart.
+    ///
+    /// [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
