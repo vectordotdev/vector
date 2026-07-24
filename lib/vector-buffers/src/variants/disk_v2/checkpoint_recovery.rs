@@ -3,6 +3,36 @@
 //! Normal reads operate from the in-memory reader state in `reader.rs`. This module handles the
 //! narrower startup path where the on-disk files may be ahead of, behind, or partially inconsistent
 //! with the last flushed ledger state after a crash.
+//!
+//! The ledger tells us two important things: the last record acknowledged by the reader and the
+//! writer's next record ID. It also stores the data-file ID for each side, but those file IDs can be
+//! slightly behind the record IDs because rotating a file and flushing the ledger are separate
+//! operations. During startup, writer validation and reconciliation advance a stale writer record
+//! ID over complete, valid records found on disk. That preserves records which may already have been
+//! acknowledged before the ledger was flushed.
+//!
+//! Recovery starts with the files between the reader and writer file IDs. It skips files that the
+//! reader record ID proves are fully acknowledged. Files strictly between the effective reader and
+//! writer boundaries are entirely unread, so their full size can be counted without inspecting each
+//! record. Only the boundary files need a record-by-record scan. If the reader and writer point to
+//! the same file, that one scan applies both bounds.
+//!
+//! During a boundary scan:
+//!
+//! - The reader checkpoint tells us which record bytes have already been acknowledged and must not
+//!   be included in the recovered buffer size.
+//! - The reconciled writer checkpoint tells us where usable data ends. A record that starts at or
+//!   crosses that checkpoint is outside the recovered window, so the file is truncated before it.
+//! - An incomplete frame at the end of a file is treated as a torn write and is also truncated.
+//! - A complete length-delimited frame with a corrupt checksum or undecodable payload is preserved
+//!   unless the surrounding record IDs prove it was written after the checkpoint. Its bytes stay in
+//!   the recovered buffer size so the normal reader can encounter, drop, and account for it.
+//! - A complete corrupt frame is excluded from the recovered size when the surrounding IDs instead
+//!   prove that the reader had already acknowledged it.
+//!
+//! This code does not guess a new checkpoint or move the writer. It only trims data that is provably
+//! beyond the durable writer checkpoint and calculates the unread byte count used to initialize
+//! buffer occupancy.
 
 use std::{
     io::{self, ErrorKind},
