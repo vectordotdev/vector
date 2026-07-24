@@ -38,8 +38,8 @@ mod tests {
     #[test]
     fn retains_events_at_half_ratio() {
         let mut sampler = RatioSampler::new(0.5);
-        let sampled = (0..6).map(|_| sampler.sample()).collect::<Vec<_>>();
-        assert_eq!(sampled, [true, false, true, false, true, false]);
+        let decisions = (0..6).map(|_| sampler.sample()).collect::<Vec<_>>();
+        assert_eq!(decisions, [true, false, true, false, true, false]);
     }
 
     #[test]
