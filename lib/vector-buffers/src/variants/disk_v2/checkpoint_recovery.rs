@@ -548,8 +548,7 @@ where
     ) -> Result<Option<ReadToken>, ReaderError<T>> {
         loop {
             match record_reader.try_next_record(true).await {
-                Ok(Some(token)) => return Ok(Some(token)),
-                Ok(None) => return Ok(None),
+                Ok(result) => return Ok(result),
                 Err(e) => {
                     if let Some(record_bytes) = e.consumed_record_bytes() {
                         if scan.corrupt_record_is_provably_post_checkpoint() {
