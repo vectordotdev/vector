@@ -608,6 +608,64 @@ async fn restart_preserves_valid_records_after_complete_corrupt_record() {
     .await;
 }
 
+#[tokio::test]
+async fn restart_preserves_unread_record_after_acknowledged_corrupt_frame() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await;
+            let corrupt_bytes = writer
+                .write_record(SizedRecord::new(33))
+                .await
+                .expect("first write should not fail");
+            let unread_record = SizedRecord::new(34);
+            let unread_bytes = writer
+                .write_record(unread_record.clone())
+                .await
+                .expect("second write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            // Model a durable reader checkpoint after the first record without moving the reader's
+            // file cursor, then corrupt that acknowledged frame. The following valid record starts
+            // immediately after the checkpoint, proving that it is unread.
+            ledger.state().increment_last_reader_record_id(1);
+            ledger.flush().expect("ledger flush should not fail");
+            let data_file_path = ledger.get_current_writer_data_file_path();
+
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            corrupt_record_checksum(&data_file_path, 0, corrupt_bytes).await;
+
+            let (mut writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            assert_eq!(
+                unread_bytes as u64,
+                ledger.get_total_buffer_size(),
+                "only the unread record should occupy the recovered buffer"
+            );
+
+            let read = await_timeout!(reader.next(), 2)
+                .expect("unread record should not fail")
+                .expect("unread record should remain available after startup");
+            assert_eq!(unread_record, read);
+            assert_eq!(unread_bytes as u64, ledger.get_total_buffer_size());
+            acknowledge(read).await;
+
+            writer.close();
+            assert_eq!(
+                None,
+                reader.next().await.expect("final read should not fail")
+            );
+            assert_eq!(0, ledger.get_total_buffer_size());
+        }
+    })
+    .await;
+}
+
 // TODO: Add test that emulates "reader throws error when" such that we write three records, each to
 // a separate data file, corrupt the write in the second data file, and make sure that we get our
 // first and third record back and that after reading and acking the first and third record (plus

@@ -123,10 +123,19 @@ impl CheckpointBoundaryScanResult {
         let checkpoint_is_after_last_valid_record = self
             .last_checkpoint_record_id
             .is_some_and(|last_record_id| last_record_id < skip_through_record_id);
+        // A corrupt prefix has no preceding valid record to establish its starting ID. If the next
+        // valid record begins immediately after the durable reader checkpoint, however, contiguity
+        // proves that every complete frame before it belongs to the acknowledged prefix.
+        let next_valid_record_starts_after_checkpoint = self.last_checkpoint_record_id.is_none()
+            && skip_through_record_id
+                .checked_add(1)
+                .is_some_and(|next_expected_id| next_record_id == Some(next_expected_id));
         let checkpoint_is_before_next_valid_record =
             next_record_id.is_none_or(|record_id| skip_through_record_id < record_id);
 
-        if checkpoint_is_after_last_valid_record && checkpoint_is_before_next_valid_record {
+        if (checkpoint_is_after_last_valid_record || next_valid_record_starts_after_checkpoint)
+            && checkpoint_is_before_next_valid_record
+        {
             self.acknowledged_prefix_bytes = self.logical_file_size;
         }
     }

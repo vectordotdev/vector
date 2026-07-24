@@ -26,6 +26,7 @@ use crate::{
     variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
 };
 
+#[derive(Debug)]
 pub(super) struct ReadToken {
     record_id: u64,
     record_bytes: usize,
@@ -426,6 +427,7 @@ where
 {
     ledger: Arc<Ledger<FS>>,
     reader: Option<RecordReader<FS::File, T>>,
+    pending_read_token: Option<ReadToken>,
     bytes_read: u64,
     last_reader_record_id: u64,
     data_file_start_record_id: Option<u64>,
@@ -452,6 +454,7 @@ where
         Self {
             ledger,
             reader: None,
+            pending_read_token: None,
             bytes_read: 0,
             last_reader_record_id: 0,
             data_file_start_record_id: None,
@@ -470,6 +473,10 @@ where
     }
 
     fn reset(&mut self) {
+        debug_assert!(
+            self.pending_read_token.is_none(),
+            "cannot reset a reader while an unread record is buffered"
+        );
         self.reader = None;
         self.bytes_read = 0;
         self.data_file_start_record_id = None;
@@ -1009,6 +1016,14 @@ where
                 .context(IoSnafu)?;
             force_check_pending_data_files = false;
 
+            // Startup can read one valid frame beyond the durable reader checkpoint while using
+            // its ID to bound a preceding corrupt frame. The underlying file cursor has already
+            // advanced, but the frame itself remains in `RecordReader::aligned_buf`, so retain its
+            // token and deliver it through the normal read path once initialization is complete.
+            if let Some(token) = self.pending_read_token.take() {
+                break token;
+            }
+
             // If the writer has marked themselves as done, and the buffer has been emptied, then
             // we're done and can return.  We have to look at something besides simply the writer
             // being marked as done to know if we're actually done or not, and "buffer size" is better
@@ -1028,11 +1043,6 @@ where
 
             self.ensure_ready_for_read().await.context(IoSnafu)?;
 
-            let reader = self
-                .reader
-                .as_mut()
-                .expect("reader should exist after `ensure_ready_for_read`");
-
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
 
             // Essentially: is the writer still writing to this data file or not, and are we
@@ -1048,11 +1058,27 @@ where
             // Try reading a record, which if successful, gives us a token to actually read/get a
             // reference to the record.  This is a slightly-tricky song-and-dance due to rustc not
             // yet fully understanding mutable borrows when conditional control flow is involved.
-            match reader.try_next_record(is_finalized).await {
+            let next_record = self
+                .reader
+                .as_mut()
+                .expect("reader should exist after `ensure_ready_for_read`")
+                .try_next_record(is_finalized)
+                .await;
+            match next_record {
                 // Not even enough data to read a length delimiter, so we need to wait for the
                 // writer to signal us that there's some actual data to read.
                 Ok(None) => {}
-                // We got a valid record, so keep the token.
+                // A valid record beyond the durable reader checkpoint is unread. Retain the token
+                // so `seek_to_next_record` can finish without decoding and discarding the record.
+                Ok(Some(token))
+                    if !self.ready_to_read
+                        && token.record_id() > self.ledger.state().get_last_reader_record_id() =>
+                {
+                    self.pending_read_token = Some(token);
+                    return Ok(None);
+                }
+                // We got a valid record within the startup replay window, or a normal runtime
+                // record, so keep the token.
                 Ok(Some(token)) => break token,
                 // A complete length-delimited payload that fails archive or checksum validation
                 // still has a trustworthy consumed byte span. Drop and account for that record,
