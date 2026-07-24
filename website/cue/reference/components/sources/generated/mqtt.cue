@@ -4,16 +4,22 @@ generated: components: sources: mqtt: configuration: {
 	acknowledgements: {
 		deprecated: true
 		description: """
-			Controls how acknowledgements are handled by this source.
+			Controls how acknowledgements are handled for this source.
 
-			This setting is **deprecated** in favor of enabling `acknowledgements` at the [global][global_acks] or sink level.
+			Prefer enabling `acknowledgements` at the [global][global_acks] or
+			sink level instead of here: this setting takes precedence over both
+			when explicitly set, which can silently disable acknowledgements a
+			connected sink otherwise requires.
 
-			Enabling or disabling acknowledgements at the source level has **no effect** on acknowledgement behavior.
-
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
+			When enabled (through this setting, the global setting, or because a
+			connected sink requires it), the QoS 1/2 acknowledgement for an
+			incoming publish is deferred until the resulting events have been
+			delivered to all connected sinks, giving at-least-once delivery. A
+			stable `client_id` must also be configured, however acknowledgements
+			end up enabled, so the MQTT session (and its unacknowledged messages)
+			can be resumed after a restart.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
