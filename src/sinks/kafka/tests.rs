@@ -206,7 +206,8 @@ mod integration_test {
             confinement: Default::default(),
         };
         config.clone().to_rdkafka()?;
-        self::sink::healthcheck(config.clone(), confined_topic(&config), Default::default()).await?;
+        self::sink::healthcheck(config.clone(), confined_topic(&config), Default::default())
+            .await?;
         KafkaSink::new(config.clone(), confined_topic(&config))
     }
 

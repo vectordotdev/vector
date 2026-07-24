@@ -814,12 +814,7 @@ impl RequestConfig {
     /// # Important
     /// Callers **must** call `.confine()` on every template in the returned map before
     /// rendering.
-    pub fn split_headers(
-        &self,
-    ) -> (
-        BTreeMap<String, String>,
-        BTreeMap<String, Template>,
-    ) {
+    pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
 

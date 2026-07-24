@@ -72,7 +72,12 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
         .unwrap();
 
     assert_sink_compliance(&SINK_TAGS, async move {
-        let sink = PulsarSink::new(pulsar, cnf.clone(), ConfinedTemplate::from_str_unchecked(cnf.topic.get_ref())).unwrap();
+        let sink = PulsarSink::new(
+            pulsar,
+            cnf.clone(),
+            ConfinedTemplate::from_str_unchecked(cnf.topic.get_ref()),
+        )
+        .unwrap();
         let sink = VectorSink::from_event_streamsink(sink);
         sink.run(input_events).await
     })
