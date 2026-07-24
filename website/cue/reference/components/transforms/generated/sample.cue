@@ -45,11 +45,9 @@ generated: components: transforms: sample: configuration: {
 		description: """
 			The rate at which events are forwarded, expressed as `1/N`.
 
-			For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest
-			are dropped. This differs from `ratio` which allows more precise control over the number
-			of events retained and values greater than 1/2.
-
-			Exactly one of `ratio` or `rate` must be provided.
+			For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
+			dropped. This differs from `ratio` which allows more precise control over the number of events
+			retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
 			"""
 		required: false
 		type: uint: {}
@@ -68,13 +66,12 @@ generated: components: transforms: sample: configuration: {
 	}
 	ratio: {
 		description: """
-			The rate at which events are forwarded, expressed as a percentage.
+			The rate at which events are forwarded, expressed as a percentage
 
-			For example, `ratio = .13` means that 13% of all events on the stream are forwarded and
-			the rest are dropped. This differs from `rate` which allows the configuration of a higher
-			precision value and also the ability to retain values of greater than 50% of all events.
-
-			Exactly one of `ratio` or `rate` must be provided.
+			For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
+			the rest are dropped. This differs from `rate` allowing the configuration of a higher
+			precision value and also the ability to retain values of greater than 50% of all events. It is
+			an error to provide a value for both `rate` and `ratio`.
 			"""
 		required: true
 		type: float: examples: [
