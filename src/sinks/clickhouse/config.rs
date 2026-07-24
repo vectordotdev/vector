@@ -262,7 +262,7 @@ impl SinkConfig for ClickhouseConfig {
             .table
             .clone()
             .confine(&self.confinement, Self::NAME, "table")?;
-        let database = self.database.clone().unwrap_or(default_database).confine(
+        let database = database_template.clone().confine(
             &self.confinement,
             Self::NAME,
             "database",
