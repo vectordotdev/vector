@@ -247,14 +247,15 @@ impl SinkConfig for ClickhouseConfig {
         let batch_settings = self.batch.into_batcher_settings()?;
 
         // Use config templates for introspection in resolve_strategy.
-        let default_database: Template = "default"
-            .try_into()
-            .expect("'default' should be a valid template");
-        let database_template = self.database.as_ref().unwrap_or(&default_database);
+        let database_template = self.database.clone().unwrap_or_else(|| {
+            "default"
+                .try_into()
+                .expect("'default' should be a valid template")
+        });
 
         // Resolve the encoding strategy (format + encoder) based on configuration.
         let (format, encoder_kind) = self
-            .resolve_strategy(&client, &endpoint, database_template, auth.as_ref())
+            .resolve_strategy(&client, &endpoint, &database_template, auth.as_ref())
             .await?;
 
         // Confine templates for runtime use in the sink.
@@ -262,7 +263,7 @@ impl SinkConfig for ClickhouseConfig {
             .table
             .clone()
             .confine(&self.confinement, Self::NAME, "table")?;
-        let database = database_template.clone().confine(
+        let database = database_template.confine(
             &self.confinement,
             Self::NAME,
             "database",
