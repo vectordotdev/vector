@@ -21,7 +21,7 @@ use vector_common::{
 
 use super::{
     create_buffer_v2_with_max_data_file_size, create_default_buffer_v2,
-    create_default_buffer_v2_with_usage,
+    create_default_buffer_v2_with_usage, get_corrected_max_record_size,
 };
 use crate::{
     EventCount, assert_buffer_size, assert_enough_bytes_written, assert_file_does_not_exist_async,
@@ -1144,7 +1144,7 @@ async fn writer_detects_when_last_record_wasnt_flushed() {
 }
 
 #[tokio::test]
-async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() {
+async fn writer_fast_forwards_when_last_record_was_flushed_but_id_wasnt_incremented() {
     let assertion_registry = install_tracing_helpers();
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
@@ -1154,7 +1154,7 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
                 .build()
                 .with_name("reset")
                 .with_parent_name(
-                    "writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented",
+                    "writer_fast_forwards_when_last_record_was_flushed_but_id_wasnt_incremented",
                 )
                 .was_not_entered()
                 .finalize();
@@ -1192,17 +1192,18 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
 
             writer_did_not_call_reset.assert();
 
-            // Now reopen the buffer. The durable checkpoint is authoritative, so startup should
-            // truncate the post-checkpoint record instead of fast-forwarding the ledger to match
-            // bytes that may not have been durable before the crash.
-            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            // Now reopen the buffer. The record may already have been acknowledged upstream, so
+            // startup should preserve it and fast-forward the lazy writer checkpoint to match.
+            let (mut writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
             writer_did_not_call_reset.assert();
             assert_reader_writer_v2_file_positions!(ledger, 0, expected_final_writer_file_id);
             assert_file_does_not_exist_async!(&expected_final_write_data_file);
             assert_eq!(
-                starting_writer_next_record_id,
+                starting_writer_next_record_id + 1,
                 ledger.state().get_next_writer_record_id()
             );
+            assert_eq!(bytes_written as u64, ledger.get_total_buffer_size());
 
             let data_file = OpenOptions::new()
                 .read(true)
@@ -1213,13 +1214,205 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
                 .metadata()
                 .await
                 .expect("metadata should not fail");
-            assert_eq!(0, metadata.len());
+            assert_eq!(bytes_written as u64, metadata.len());
+
+            let recovered_record = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("record should be preserved");
+            assert_eq!(SizedRecord::new(64), recovered_record);
+            acknowledge(recovered_record).await;
+
+            writer.close();
+            assert_eq!(None, reader.next().await.expect("read should not fail"));
+            assert_eq!(0, ledger.get_total_buffer_size());
         }
     });
 
     let parent =
-        trace_span!("writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented");
+        trace_span!("writer_fast_forwards_when_last_record_was_flushed_but_id_wasnt_incremented");
     fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn writer_recovers_durable_record_from_stale_next_file_checkpoint() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let record = SizedRecord::new(64);
+            let max_data_file_size = get_corrected_max_record_size(&record) as u64;
+            let (mut writer, _, ledger) =
+                create_buffer_v2_with_max_data_file_size(data_dir.clone(), max_data_file_size)
+                    .await;
+            let checkpoint_writer_file_id = ledger.get_current_writer_file_id();
+            let checkpoint_next_record_id = ledger.state().get_next_writer_record_id();
+
+            let first_record_bytes = writer
+                .write_record(record.clone())
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let second_record_bytes = writer
+                .write_record(record.clone())
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            assert_eq!(
+                checkpoint_next_record_id + 2,
+                ledger.state().get_next_writer_record_id()
+            );
+
+            let successor_writer_file_id = ledger.get_current_writer_file_id();
+            let successor_data_file_path = ledger.get_current_writer_data_file_path();
+            assert_ne!(checkpoint_writer_file_id, successor_writer_file_id);
+            OpenOptions::new()
+                .read(true)
+                .open(&successor_data_file_path)
+                .await
+                .expect("successor data file should exist")
+                .sync_all()
+                .await
+                .expect("sync should not fail");
+
+            // Model a crash after the successor data file was synchronized but before the writer
+            // file ID and record ID were flushed to the ledger. The source may already have
+            // checkpointed the second record, so startup must recover the successor file rather
+            // than treating it as stale.
+            while ledger.get_current_writer_file_id() != checkpoint_writer_file_id {
+                ledger.state().increment_writer_file_id();
+            }
+            unsafe {
+                ledger
+                    .state()
+                    .unsafe_set_writer_next_record_id(checkpoint_next_record_id + 1);
+            }
+            ledger.flush().expect("ledger flush should not fail");
+            drop(writer);
+            drop(ledger);
+
+            let (mut writer, mut reader, ledger) =
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
+            assert_eq!(
+                successor_writer_file_id,
+                ledger.get_current_writer_file_id()
+            );
+            assert_eq!(
+                checkpoint_next_record_id + 2,
+                ledger.state().get_next_writer_record_id()
+            );
+            assert_eq!(
+                (first_record_bytes + second_record_bytes) as u64,
+                ledger.get_total_buffer_size()
+            );
+            assert_eq!(
+                second_record_bytes as u64,
+                OpenOptions::new()
+                    .read(true)
+                    .open(successor_data_file_path)
+                    .await
+                    .expect("successor data file should be preserved")
+                    .metadata()
+                    .await
+                    .expect("metadata should not fail")
+                    .len()
+            );
+
+            for _ in 0..2 {
+                let recovered_record = reader
+                    .next()
+                    .await
+                    .expect("read should not fail")
+                    .expect("record should be preserved");
+                assert_eq!(record, recovered_record);
+                acknowledge(recovered_record).await;
+            }
+
+            writer.close();
+            assert_eq!(None, reader.next().await.expect("read should not fail"));
+            assert_eq!(0, ledger.get_total_buffer_size());
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writer_fast_forwards_valid_prefix_before_truncating_torn_tail() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let starting_writer_next_record_id = ledger.state().get_next_writer_record_id();
+            let first_bytes_written = writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write should not fail");
+            let second_bytes_written = writer
+                .write_record(SizedRecord::new(65))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            let data_file_path = ledger.get_current_writer_data_file_path();
+
+            // Model a crash after both records reached the data file but before either writer ID
+            // was checkpointed, with the second record only partially surviving.
+            unsafe {
+                ledger
+                    .state()
+                    .unsafe_set_writer_next_record_id(starting_writer_next_record_id);
+            }
+            drop(writer);
+            drop(ledger);
+
+            let data_file = OpenOptions::new()
+                .write(true)
+                .open(&data_file_path)
+                .await
+                .expect("open should not fail");
+            data_file
+                .set_len((first_bytes_written + (second_bytes_written / 2)) as u64)
+                .await
+                .expect("truncating should not fail");
+            data_file.sync_all().await.expect("sync should not fail");
+            drop(data_file);
+
+            let (mut writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            assert_eq!(
+                starting_writer_next_record_id + 1,
+                ledger.state().get_next_writer_record_id()
+            );
+            assert_eq!(first_bytes_written as u64, ledger.get_total_buffer_size());
+            assert_eq!(
+                first_bytes_written as u64,
+                OpenOptions::new()
+                    .read(true)
+                    .open(data_file_path)
+                    .await
+                    .expect("open should not fail")
+                    .metadata()
+                    .await
+                    .expect("metadata should not fail")
+                    .len()
+            );
+
+            let recovered_record = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("valid prefix record should be preserved");
+            assert_eq!(SizedRecord::new(64), recovered_record);
+            acknowledge(recovered_record).await;
+
+            writer.close();
+            assert_eq!(None, reader.next().await.expect("read should not fail"));
+            assert_eq!(0, ledger.get_total_buffer_size());
+        }
+    })
+    .await;
 }
 
 #[tokio::test]

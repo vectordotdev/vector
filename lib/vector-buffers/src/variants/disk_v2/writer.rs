@@ -943,6 +943,91 @@ where
         should_skip
     }
 
+    /// Returns whether the first record in the next file proves that the writer's file checkpoint
+    /// lagged one rotation behind its record checkpoint.
+    async fn successor_data_file_continues_checkpoint(&self) -> Result<bool, WriterError<T>> {
+        let checkpoint_next_record_id = self.ledger.state().get_next_writer_record_id();
+        let successor_data_file_path = self.ledger.get_next_writer_data_file_path();
+        let successor_data_file = match self
+            .ledger
+            .filesystem()
+            .open_file_readable(&successor_data_file_path)
+            .await
+        {
+            Ok(data_file) => data_file,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
+            Err(source) => return Err(WriterError::Io { source }),
+        };
+        let mut reader: RecordReader<FS::File, T> = RecordReader::new(successor_data_file);
+        let token = match reader.try_next_record(true).await {
+            Ok(Some(token)) => token,
+            Ok(None) => return Ok(false),
+            Err(ReaderError::Io { source }) => return Err(WriterError::Io { source }),
+            Err(error) => {
+                warn!(
+                    data_file_path = successor_data_file_path.to_string_lossy().as_ref(),
+                    checkpoint_next_record_id,
+                    %error,
+                    "Could not validate possible successor writer data file."
+                );
+                return Ok(false);
+            }
+        };
+
+        if token.record_id() != checkpoint_next_record_id {
+            return Ok(false);
+        }
+
+        let record = match reader.read_record(token) {
+            Ok(record) => record,
+            Err(error) => {
+                warn!(
+                    data_file_path = successor_data_file_path.to_string_lossy().as_ref(),
+                    checkpoint_next_record_id,
+                    %error,
+                    "Could not decode possible successor writer data file."
+                );
+                return Ok(false);
+            }
+        };
+        let record_events =
+            u64::try_from(record.event_count()).expect("event count should never exceed u64");
+        if record_events == 0 {
+            return Ok(false);
+        }
+
+        debug!(
+            data_file_path = successor_data_file_path.to_string_lossy().as_ref(),
+            checkpoint_next_record_id,
+            record_events,
+            "Successor data file continues from stale writer checkpoint."
+        );
+        Ok(true)
+    }
+
+    async fn recover_successor_data_file_from_stale_checkpoint(
+        &mut self,
+    ) -> Result<bool, WriterError<T>> {
+        if !self.successor_data_file_continues_checkpoint().await? {
+            return Ok(false);
+        }
+
+        let previous_writer_file_id = self.ledger.get_current_writer_file_id();
+        self.reset();
+        self.ledger.state().increment_writer_file_id();
+        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.reconcile_current_data_file_with_checkpoint().await?;
+        self.ledger.flush().context(IoSnafu)?;
+
+        debug!(
+            previous_writer_file_id,
+            writer_file_id = self.ledger.get_current_writer_file_id(),
+            writer_next_record_id = self.ledger.state().get_next_writer_record_id(),
+            "Recovered writer data file ahead of stale file checkpoint."
+        );
+        Ok(true)
+    }
+
     fn decode_reconciliation_record(
         reader: &mut RecordReader<FS::File, T>,
         token: ReadToken,
@@ -967,8 +1052,18 @@ where
         }
     }
 
+    fn fast_forward_writer_checkpoint(&mut self, current_next: u64, new_next: u64) {
+        debug_assert!(new_next > current_next);
+        self.next_record_id = self
+            .ledger
+            .state()
+            .increment_next_writer_record_id(new_next - current_next);
+        self.unflushed_events = 0;
+    }
+
     async fn reconcile_current_data_file_with_checkpoint(&mut self) -> Result<(), WriterError<T>> {
         let checkpoint_next_record_id = self.ledger.state().get_next_writer_record_id();
+        let mut reconciled_next_record_id = checkpoint_next_record_id;
         let data_file_path = self.ledger.get_current_writer_data_file_path();
         let data_file = self
             .ledger
@@ -986,8 +1081,8 @@ where
                 Ok(None) => break,
                 Err(e) => {
                     if let Some(record_bytes) = e.consumed_record_bytes() {
-                        if checkpoint_next_record_id == 1
-                            || last_decodable_record_next_id == Some(checkpoint_next_record_id)
+                        if reconciled_next_record_id == 1
+                            || last_decodable_record_next_id == Some(reconciled_next_record_id)
                         {
                             warn!(
                                 data_file_path = data_file_path.to_string_lossy().as_ref(),
@@ -1028,16 +1123,6 @@ where
 
             let record_id = token.record_id();
             let record_bytes = token.record_bytes() as u64;
-            if record_id >= checkpoint_next_record_id {
-                debug!(
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
-                    checkpoint_next_record_id,
-                    record_id,
-                    truncate_at = record_start_offset,
-                    "Truncating writer data file tail beyond durable checkpoint."
-                );
-                break;
-            }
 
             // The frame itself is complete and validated, so it still provides a trustworthy byte
             // boundary. If its payload does not provide an event count, preserve it for the
@@ -1055,18 +1140,7 @@ where
             let record_events =
                 u64::try_from(record.event_count()).expect("event count should never exceed u64");
             let record_next = record_id + record_events;
-            if record_next > checkpoint_next_record_id {
-                warn!(
-                    data_file_path = data_file_path.to_string_lossy().as_ref(),
-                    checkpoint_next_record_id,
-                    record_id,
-                    record_events,
-                    truncate_at = record_start_offset,
-                    "Truncating writer data file at record that crosses durable checkpoint."
-                );
-                break;
-            }
-
+            reconciled_next_record_id = reconciled_next_record_id.max(record_next);
             last_decodable_record_next_id = Some(record_next);
             record_start_offset += record_bytes;
         }
@@ -1074,6 +1148,19 @@ where
         if record_start_offset < self.data_file_size {
             self.truncate_current_data_file(record_start_offset).await?;
         }
+
+        if reconciled_next_record_id > checkpoint_next_record_id {
+            debug!(
+                checkpoint_next_record_id,
+                reconciled_next_record_id,
+                "Ledger is behind valid writer data. Fast-forwarding ledger state."
+            );
+            self.fast_forward_writer_checkpoint(
+                checkpoint_next_record_id,
+                reconciled_next_record_id,
+            );
+        }
+
         Ok(())
     }
 
@@ -1133,7 +1220,7 @@ where
         // We have bytes, so we should have an archived record... hopefully! Validate the last frame
         // so post-checkpoint or torn bytes can be removed without discarding complete corrupt spans
         // that the reader can traverse and account for.
-        let should_skip_to_next_file = match validate_record_archive(
+        let mut should_skip_to_next_file = match validate_record_archive(
             data_file_mmap.as_ref(),
             &Hasher::new(),
         ) {
@@ -1184,19 +1271,18 @@ where
                         true
                     }
                     Ordering::Less => {
-                        // The data file is ahead of the durable writer checkpoint. Treat the
-                        // checkpoint as authoritative: truncate any post-checkpoint tail instead
-                        // of fast-forwarding the ledger to match bytes that may not have been
-                        // durably committed before the crash.
+                        // The data file is ahead of the durable writer checkpoint. Writer
+                        // finalizers can currently run before the ledger is flushed, so this valid
+                        // record may already have been acknowledged upstream. Preserve it and
+                        // fast-forward the lazy checkpoint to match the data file.
                         debug!(
                             ledger_next,
                             last_record_id,
                             record_events,
-                            record_next,
-                            "Writer data file is ahead of durable checkpoint."
+                            new_ledger_next = record_next,
+                            "Ledger is behind valid writer data. Fast-forwarding ledger state."
                         );
-                        self.reconcile_current_data_file_with_checkpoint().await?;
-                        self.unflushed_events = 0;
+                        self.fast_forward_writer_checkpoint(ledger_next, record_next);
 
                         false
                     }
@@ -1224,6 +1310,11 @@ where
                 false
             }
         };
+
+        let recovered_successor = self
+            .recover_successor_data_file_from_stale_checkpoint()
+            .await?;
+        should_skip_to_next_file &= !recovered_successor;
 
         // Reset our internal state, which closes the initial data file we opened, and mark
         // ourselves as needing to skip to the next data file.  This is a little convoluted, but we
