@@ -254,9 +254,10 @@ impl SinkConfig for StackdriverConfig {
         // controlled label like `resource.labels.zone: "{{ zone }}"` is as
         // steerable as `log_id` unless we confine it too. Same for arbitrary
         // log-entry labels in `label_config.labels`.
-        let mut resource = self.resource.clone();
-        resource.labels = resource
+        let resource_labels = self
+            .resource
             .labels
+            .clone()
             .into_iter()
             .map(|(k, v)| {
                 v.confine(&self.confinement, Self::NAME, "resource.labels")
@@ -264,9 +265,10 @@ impl SinkConfig for StackdriverConfig {
             })
             .collect::<crate::Result<_>>()?;
 
-        let mut label_config = self.label_config.clone();
-        label_config.labels = label_config
+        let labels = self
+            .label_config
             .labels
+            .clone()
             .into_iter()
             .map(|(k, v)| {
                 v.confine(&self.confinement, Self::NAME, "label_config.labels")
@@ -281,8 +283,10 @@ impl SinkConfig for StackdriverConfig {
                 self.encoding.clone(),
                 log_id,
                 self.log_name.clone(),
-                label_config,
-                resource,
+                labels,
+                self.label_config.labels_key.clone(),
+                self.resource.type_.clone(),
+                resource_labels,
                 self.severity_key.clone(),
             ),
         };

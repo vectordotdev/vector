@@ -24,7 +24,7 @@ use crate::{
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, http::RequestConfig,
         },
     },
-    template::{ConfinementConfig, UnconfinedTemplate},
+    template::{ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -89,7 +89,7 @@ pub struct CloudwatchLogsSinkConfig {
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     #[configurable(metadata(docs::examples = "group-name"))]
     #[configurable(metadata(docs::examples = "{{ file }}"))]
-    pub group_name: UnconfinedTemplate,
+    pub group_name: Template,
 
     /// The [stream name][stream_name] of the target CloudWatch Logs stream.
     ///
@@ -101,7 +101,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[configurable(metadata(docs::examples = "{{ host }}"))]
     #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "stream-name"))]
-    pub stream_name: UnconfinedTemplate,
+    pub stream_name: Template,
 
     /// The [AWS region][aws_region] of the target service.
     ///

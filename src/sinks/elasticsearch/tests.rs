@@ -16,12 +16,24 @@ use crate::{
         },
         util::{auth::Auth, encoding::Encoder},
     },
-    template::Template,
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
 
 // helper to unwrap template strings for tests only
 fn parse_template(input: &str) -> Template {
     Template::try_from(input).unwrap()
+}
+
+// Opt out of confinement for tests whose templates have no literal prefix.
+fn unconfined() -> ConfinementConfig {
+    ConfinementConfig {
+        dangerously_allow_unconfined_template_resolution: true,
+    }
+}
+
+// `bulk.action` / `bulk.version` are unconfined templates.
+fn parse_unconfined(input: &str) -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from(input).unwrap()
 }
 
 #[tokio::test]
@@ -32,7 +44,7 @@ async fn sets_create_action_when_configured() {
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("{{ action }}te"),
+            action: parse_unconfined("{{ action }}te"),
             index: parse_template("vector"),
             template_fallback_index: None,
             version: None,
@@ -74,7 +86,7 @@ async fn sets_create_action_when_configured() {
 async fn encoding_with_external_versioning_without_version_set_does_not_include_version() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             template_fallback_index: None,
             index: parse_template("vector"),
             version: None,
@@ -97,10 +109,10 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             template_fallback_index: None,
-            version: Some(parse_template("{{ my_field }}")),
+            version: Some(parse_unconfined("{{ my_field }}")),
             version_type: VersionType::External,
         },
         id_key: Some("my_id".into()),
@@ -147,10 +159,10 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             template_fallback_index: None,
-            version: Some(parse_template("{{ my_field }}")),
+            version: Some(parse_unconfined("{{ my_field }}")),
             version_type: VersionType::ExternalGte,
         },
         id_key: Some("my_id".into()),
@@ -336,7 +348,7 @@ async fn encode_datastream_mode_no_routing() {
 async fn handle_metrics() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             ..Default::default()
         },
@@ -381,7 +393,7 @@ async fn handle_metrics() {
 async fn decode_bulk_action_error() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("{{ action }}"),
+            action: parse_unconfined("{{ action }}"),
             index: parse_template("vector"),
             ..Default::default()
         },
@@ -414,7 +426,7 @@ async fn default_bulk_settings() {
 async fn decode_bulk_action() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             ..Default::default()
         },
@@ -497,6 +509,9 @@ async fn allows_using_except_fields() {
             .unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
+        // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
+        // exercise field encoding rather than confinement.
+        confinement: unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -532,6 +547,9 @@ async fn allows_using_only_fields() {
         encoding: Transformer::new(Some(vec!["foo".into()]), None, None).unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
+        // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
+        // exercise field encoding rather than confinement.
+        confinement: unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();

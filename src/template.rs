@@ -104,12 +104,13 @@ pub fn confined_preview(rendered: &str) -> String {
 /// a template string is `my-file-{{key}}.log`, where `{{key}}` is the key's value when the
 /// template is rendered into a string.
 ///
-/// **Sink authors**: store this type in config structs (it is serde-able). Call
-/// [`UnconfinedTemplate::confine`] in `build()` to obtain a [`Template`] that enforces the
-/// confinement invariant at render time.
-///
 /// **Transform / source authors**: store and render this type directly when confinement is not
 /// applicable.
+///
+/// **Sink authors**: store [`Template`] in config structs instead — it is serde-able but cannot be
+/// rendered until it has been confined via [`Template::confine`], which yields a
+/// [`ConfinedTemplate`]. `UnconfinedTemplate` deliberately exposes `render`, so storing it in a
+/// sink config would let a rendered value escape its confinement boundary.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Default)]
@@ -229,8 +230,8 @@ impl UnconfinedTemplate {
         self
     }
 
-    /// Confine this template to its literal prefix, returning a [`Template`] that enforces the
-    /// confinement invariant at render time.
+    /// Confine this template to its literal prefix, returning a [`ConfinedTemplate`] that enforces
+    /// the confinement invariant at render time.
     ///
     /// Three outcomes:
     ///
@@ -239,12 +240,16 @@ impl UnconfinedTemplate {
     /// - Static template (no event-field references) — returned as-is.
     /// - Dynamic template with a non-empty literal prefix — checker attached.
     /// - Dynamic template with no derivable prefix — error.
+    ///
+    /// Most sinks reach this through [`Template::confine`]; call this directly only when a sink
+    /// constructs an [`UnconfinedTemplate`] itself (e.g. from a default value) and needs to confine
+    /// it.
     pub fn confine(
         self,
         config: &ConfinementConfig,
         component_name: &'static str,
         field_name: &'static str,
-    ) -> crate::Result<Template> {
+    ) -> crate::Result<ConfinedTemplate> {
         if config.dangerously_allow_unconfined_template_resolution {
             ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
             return Ok(Confined {
@@ -397,8 +402,9 @@ impl UnconfinedTemplate {
 
 /// Wraps a template and optionally enforces a confinement check at render time.
 ///
-/// Obtain one via [`UnconfinedTemplate::confine`]. The only way to call `render` on a
-/// [`Template`] is through this wrapper.
+/// Instantiated only as [`ConfinedTemplate`], obtained via [`Template::confine`] or
+/// [`UnconfinedTemplate::confine`]. Both fields are private to this module, so a `Confined` can
+/// never be constructed (or deserialized) without going through confinement.
 pub struct Confined<T> {
     inner: T,
     checker: Option<ConfinementChecker>,
@@ -450,9 +456,6 @@ impl<T: fmt::Display> fmt::Display for Confined<T> {
         self.inner.fmt(f)
     }
 }
-
-// This is safe because Confined<UnconfinedTemplate> delegates to UnconfinedTemplate for schema.
-impl ConfigurableString for Confined<UnconfinedTemplate> {}
 
 impl Confined<UnconfinedTemplate> {
     /// Set tz offset on the wrapped template.
@@ -522,54 +525,149 @@ impl Confined<UnconfinedTemplate> {
         &self.inner
     }
 
-    /// Attach a confinement checker to this template, consuming `self`.
+    /// Test-only: build a checkerless [`ConfinedTemplate`] directly from a source string, skipping
+    /// confinement. Lets tests construct render-capable templates without threading a
+    /// [`ConfinementConfig`] through every call site; production code must go through
+    /// [`Template::confine`] / [`UnconfinedTemplate::confine`].
+    #[cfg(test)]
+    pub(crate) fn from_str_unchecked(src: &str) -> Self {
+        Confined {
+            inner: UnconfinedTemplate::try_from(src).expect("valid template in test"),
+            checker: None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Template — the deserializable, must-confine-before-render config type
+// ---------------------------------------------------------------------------
+
+/// A template that has passed through confinement via [`Template::confine`] (or
+/// [`UnconfinedTemplate::confine`]).
+///
+/// This is the only render-capable, confinement-enforcing template type. It is deliberately **not**
+/// deserializable: the sole way to obtain one is by confining a [`Template`] or an
+/// [`UnconfinedTemplate`], so a rendered value can never escape its confinement boundary. The
+/// `render` methods enforce the attached confinement checker (if any).
+pub type ConfinedTemplate = Confined<UnconfinedTemplate>;
+
+/// The templated field type stored in sink config structs.
+///
+/// `Template` is serde-able and appears as a plain string in generated configuration schemas, but
+/// it exposes **no** `render` method. To render it a sink must first call [`Template::confine`] in
+/// its `build()`, which yields a [`ConfinedTemplate`] that enforces the confinement invariant at
+/// render time. This makes confinement unavoidable: there is no way to render a sink's configured
+/// template without going through confinement first.
+///
+/// Transforms and sources, which have no confinement boundary, should store
+/// [`UnconfinedTemplate`] directly instead.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Template {
+    inner: UnconfinedTemplate,
+}
+
+impl Template {
+    /// Confine this template, returning a [`ConfinedTemplate`] that enforces the confinement
+    /// invariant at render time.
     ///
-    /// This is a convenience forwarder for [`UnconfinedTemplate::confine`]. It exists so that
-    /// sinks whose config fields are typed as `Template` (i.e. deserialized `Confined<UnconfinedTemplate>`
-    /// with `checker: None`) can call `.confine()` without having to destructure the wrapper.
-    ///
-    /// # Panics (debug only)
-    /// Panics in debug builds if `self` already carries a checker — re-confinement would silently
-    /// drop the existing checker, which is almost certainly a bug.
+    /// See [`UnconfinedTemplate::confine`] for the confinement outcomes.
     pub fn confine(
         self,
         config: &ConfinementConfig,
         component_name: &'static str,
         field_name: &'static str,
-    ) -> crate::Result<Self> {
-        debug_assert!(
-            self.checker.is_none(),
-            "re-confining an already-confined template drops the existing checker"
-        );
+    ) -> crate::Result<ConfinedTemplate> {
         self.inner.confine(config, component_name, field_name)
+    }
+
+    /// Set the tz offset used when rendering strftime specifiers.
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.inner.tz_offset = tz_offset;
+        self
+    }
+
+    /// Returns the names of the fields referenced by this template, if any.
+    ///
+    /// This is a read-only inspection that does not render, so it is available before confinement
+    /// (e.g. for topology field detection).
+    pub fn get_fields(&self) -> Option<Vec<String>> {
+        self.inner.get_fields()
+    }
+
+    /// Returns a reference to the template source string.
+    pub fn get_ref(&self) -> &str {
+        self.inner.get_ref()
+    }
+
+    /// Returns `true` if the template source is empty.
+    pub const fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Returns `true` if the template depends on the input event or time.
+    pub const fn is_dynamic(&self) -> bool {
+        self.inner.is_dynamic()
     }
 }
 
-// ---------------------------------------------------------------------------
-// Trait impls for Confined<UnconfinedTemplate> (= Template)
-// ---------------------------------------------------------------------------
+impl fmt::Display for Template {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(f)
+    }
+}
 
-impl serde::Serialize for Confined<UnconfinedTemplate> {
+impl From<UnconfinedTemplate> for Template {
+    fn from(inner: UnconfinedTemplate) -> Self {
+        Template { inner }
+    }
+}
+
+impl TryFrom<String> for Template {
+    type Error = TemplateParseError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        UnconfinedTemplate::try_from(s).map(|inner| Template { inner })
+    }
+}
+
+impl TryFrom<&str> for Template {
+    type Error = TemplateParseError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        UnconfinedTemplate::try_from(s).map(|inner| Template { inner })
+    }
+}
+
+impl TryFrom<PathBuf> for Template {
+    type Error = TemplateParseError;
+
+    fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
+        UnconfinedTemplate::try_from(p).map(|inner| Template { inner })
+    }
+}
+
+impl From<Template> for String {
+    fn from(t: Template) -> String {
+        t.inner.src
+    }
+}
+
+impl serde::Serialize for Template {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.inner.src)
     }
 }
 
-impl<'de> serde::Deserialize<'de> for Confined<UnconfinedTemplate> {
-    // NOTE: The deserialized value always has `checker: None`. Sinks that store
-    // `Template` in their config struct must call `.confine()` (or use a separate
-    // confinement mechanism like `PathConfinement`) in `build()` before rendering.
+impl<'de> serde::Deserialize<'de> for Template {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <String as serde::Deserialize>::deserialize(deserializer)?;
-        let inner = UnconfinedTemplate::try_from(s).map_err(serde::de::Error::custom)?;
-        Ok(Confined {
-            inner,
-            checker: None,
-        })
+        UnconfinedTemplate::try_from(s)
+            .map(|inner| Template { inner })
+            .map_err(serde::de::Error::custom)
     }
 }
 
-impl Configurable for Confined<UnconfinedTemplate> {
+impl Configurable for Template {
     fn metadata() -> Metadata {
         let mut metadata = UnconfinedTemplate::metadata();
         metadata.set_transparent();
@@ -581,57 +679,14 @@ impl Configurable for Confined<UnconfinedTemplate> {
     }
 }
 
-impl ToValue for Confined<UnconfinedTemplate> {
+// This is safe because we literally defer to `String` for the schema of `Template`.
+impl ConfigurableString for Template {}
+
+impl ToValue for Template {
     fn to_value(&self) -> serde_json::Value {
         serde_json::Value::String(self.inner.src.clone())
     }
 }
-
-impl TryFrom<String> for Confined<UnconfinedTemplate> {
-    type Error = TemplateParseError;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(s).map(|inner| Confined {
-            inner,
-            checker: None,
-        })
-    }
-}
-
-impl TryFrom<&str> for Confined<UnconfinedTemplate> {
-    type Error = TemplateParseError;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(s).map(|inner| Confined {
-            inner,
-            checker: None,
-        })
-    }
-}
-
-impl TryFrom<PathBuf> for Confined<UnconfinedTemplate> {
-    type Error = TemplateParseError;
-
-    fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(p).map(|inner| Confined {
-            inner,
-            checker: None,
-        })
-    }
-}
-
-impl From<Confined<UnconfinedTemplate>> for String {
-    fn from(t: Confined<UnconfinedTemplate>) -> String {
-        t.inner.src
-    }
-}
-
-/// A template that has passed through [`UnconfinedTemplate::confine`].
-///
-/// Config structs in sinks should store [`UnconfinedTemplate`] (serde-able). Call
-/// [`UnconfinedTemplate::confine`] in `build()` to get a `Template` for runtime use.
-/// The `render` methods on this type enforce the confinement checker if one was attached.
-pub type Template = Confined<UnconfinedTemplate>;
 
 // ---------------------------------------------------------------------------
 // UnsignedIntTemplate (unchanged)

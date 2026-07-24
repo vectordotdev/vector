@@ -394,18 +394,18 @@ impl GenerateConfig for PulsarSinkConfig {
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.topic = config
+        let topic = self
             .topic
+            .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
 
-        let client = config
+        let client = self
             .create_pulsar_client()
             .await
             .map_err(|e| super::sink::BuildError::CreatePulsarSink { source: e })?;
 
-        let sink = PulsarSink::new(client, config.clone())?;
-        let hc = healthcheck(config).boxed();
+        let sink = PulsarSink::new(client, self.clone(), topic.clone())?;
+        let hc = healthcheck(self.clone(), topic).boxed();
 
         self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), hc))

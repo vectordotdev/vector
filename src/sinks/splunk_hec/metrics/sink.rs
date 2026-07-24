@@ -18,9 +18,9 @@ pub struct HecMetricsSink<S> {
     pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub host_key: Option<OwnedValuePath>,
     pub default_namespace: Option<String>,
 }
@@ -147,9 +147,9 @@ pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMeta
 pub fn process_metric(
     metric: Metric,
     event_byte_size: usize,
-    sourcetype: Option<&Template>,
-    source: Option<&Template>,
-    index: Option<&Template>,
+    sourcetype: Option<&ConfinedTemplate>,
+    source: Option<&ConfinedTemplate>,
+    index: Option<&ConfinedTemplate>,
     host_key: Option<&OwnedValuePath>,
     default_namespace: Option<&str>,
 ) -> Option<HecProcessedEvent> {
@@ -160,7 +160,7 @@ pub fn process_metric(
     // Render routing templates; Confined errors are intentional security drops.
     // Returns Some(Some(value)) on success, Some(None) on non-fatal error
     // (field omitted), or None to signal the whole event must be dropped.
-    let render = |tpl: Option<&Template>, field: &'static str| -> Option<Option<String>> {
+    let render = |tpl: Option<&ConfinedTemplate>, field: &'static str| -> Option<Option<String>> {
         let Some(t) = tpl else { return Some(None) };
         match t.render_string(&metric) {
             Ok(s) => Some(Some(s)),

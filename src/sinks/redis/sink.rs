@@ -257,7 +257,7 @@ pub(super) struct RedisSink {
     transformer: vector_lib::codecs::Transformer,
     conn: RedisConnection,
     data_type: super::DataType,
-    key: Template,
+    key: ConfinedTemplate,
     score: Option<UnsignedIntTemplate>,
     batcher_settings: BatcherSettings,
 }
@@ -266,7 +266,7 @@ impl RedisSink {
     pub(super) fn new(
         config: &RedisSinkConfig,
         conn: RedisConnection,
-        key: Template,
+        key: ConfinedTemplate,
     ) -> crate::Result<Self> {
         let list_method = config.list_option.map(|option| option.method);
         let (sorted_set_method, score) = if let Some(option) = &config.sorted_set_option {

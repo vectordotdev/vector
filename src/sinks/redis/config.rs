@@ -11,7 +11,7 @@ use super::{
 use crate::{
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
-    template::{ConfinementConfig, UnconfinedTemplate},
+    template::ConfinementConfig,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -158,7 +158,7 @@ pub struct RedisSinkConfig {
     /// The Redis key to publish messages to.
     #[configurable(validation(length(min = 1)))]
     #[configurable(metadata(docs::examples = "syslog:{{ app }}", docs::examples = "vector"))]
-    pub(super) key: UnconfinedTemplate,
+    pub(super) key: Template,
 
     #[configurable(derived)]
     #[serde(default)]

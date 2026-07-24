@@ -23,7 +23,7 @@ use crate::{
         self, UriParseSnafu,
         util::{SinkBatchSettings, http::HttpBatchService},
     },
-    template::Template,
+    template::ConfinedTemplate,
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -152,7 +152,7 @@ pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
 }
 
 pub fn render_template_string<'a>(
-    template: &Template,
+    template: &ConfinedTemplate,
     event: impl Into<EventRef<'a>>,
     field_name: &str,
 ) -> Option<String> {

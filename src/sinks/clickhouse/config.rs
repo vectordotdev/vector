@@ -23,7 +23,7 @@ use crate::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
-    template::{ConfinementConfig, UnconfinedTemplate},
+    template::ConfinementConfig,
 };
 
 /// Data format.
@@ -91,11 +91,11 @@ pub struct ClickhouseConfig {
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
-    pub table: UnconfinedTemplate,
+    pub table: Template,
 
     /// The database that contains the table that data is inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
-    pub database: Option<UnconfinedTemplate>,
+    pub database: Option<Template>,
 
     /// The format to parse input data.
     #[serde(default)]
@@ -246,18 +246,15 @@ impl SinkConfig for ClickhouseConfig {
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        // Use unconfined templates for introspection in resolve_strategy.
-        let default_database_unconfined: UnconfinedTemplate = "default"
+        // Use config templates for introspection in resolve_strategy.
+        let default_database: Template = "default"
             .try_into()
             .expect("'default' should be a valid template");
-        let database_unconfined = self
-            .database
-            .as_ref()
-            .unwrap_or(&default_database_unconfined);
+        let database_template = self.database.as_ref().unwrap_or(&default_database);
 
         // Resolve the encoding strategy (format + encoder) based on configuration.
         let (format, encoder_kind) = self
-            .resolve_strategy(&client, &endpoint, database_unconfined, auth.as_ref())
+            .resolve_strategy(&client, &endpoint, database_template, auth.as_ref())
             .await?;
 
         // Confine templates for runtime use in the sink.
@@ -265,11 +262,11 @@ impl SinkConfig for ClickhouseConfig {
             .table
             .clone()
             .confine(&self.confinement, Self::NAME, "table")?;
-        let database = self
-            .database
-            .clone()
-            .unwrap_or(default_database_unconfined)
-            .confine(&self.confinement, Self::NAME, "database")?;
+        let database = self.database.clone().unwrap_or(default_database).confine(
+            &self.confinement,
+            Self::NAME,
+            "database",
+        )?;
 
         let request_builder = ClickhouseRequestBuilder {
             compression: self.compression,
@@ -309,7 +306,7 @@ impl ClickhouseConfig {
         &self,
         client: &HttpClient,
         endpoint: &Uri,
-        database: &UnconfinedTemplate,
+        database: &Template,
         auth: Option<&Auth>,
     ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
         if let Some(batch_encoding) = &self.batch_encoding {
@@ -353,7 +350,7 @@ impl ClickhouseConfig {
         &self,
         client: &HttpClient,
         endpoint: String,
-        database: &UnconfinedTemplate,
+        database: &Template,
         auth: Option<&Auth>,
         config: &mut ArrowStreamSerializerConfig,
     ) -> crate::Result<()> {
@@ -428,7 +425,7 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::template::{ConfinementConfig, Template, UnconfinedTemplate};
+    use crate::template::{ConfinementConfig, Template};
     use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 
     #[test]
@@ -523,7 +520,7 @@ mod tests {
         let tls = TlsSettings::default();
         let client = HttpClient::new(tls, &Default::default()).unwrap();
         let endpoint: http::Uri = "http://localhost:8123".parse().unwrap();
-        let database: UnconfinedTemplate = "test_db".try_into().unwrap();
+        let database: Template = "test_db".try_into().unwrap();
 
         // Test incompatible formats - should all return errors
         let incompatible_formats = vec![

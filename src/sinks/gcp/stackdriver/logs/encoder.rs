@@ -7,9 +7,7 @@ use serde_json::{Map, json, to_vec};
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, path::PathPrefix};
 
-use super::config::{
-    StackdriverLabelConfig, StackdriverLogName, StackdriverResource, default_labels_key,
-};
+use super::config::{StackdriverLogName, default_labels_key};
 use crate::{
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
     template::TemplateRenderingError,
@@ -18,36 +16,43 @@ use crate::{
 #[derive(Clone, Debug)]
 pub(super) struct StackdriverLogsEncoder {
     transformer: Transformer,
-    log_id: Template,
+    log_id: ConfinedTemplate,
     log_name: StackdriverLogName,
-    label_config: StackdriverLabelConfig,
-    resource: StackdriverResource,
+    labels: HashMap<String, ConfinedTemplate>,
+    labels_key: Option<String>,
+    resource_type: String,
+    resource_labels: HashMap<String, ConfinedTemplate>,
     severity_key: Option<ConfigValuePath>,
 }
 
 impl StackdriverLogsEncoder {
     /// Creates a new `StackdriverLogsEncoder`.
+    #[allow(clippy::too_many_arguments)]
     pub(super) const fn new(
         transformer: Transformer,
-        log_id: Template,
+        log_id: ConfinedTemplate,
         log_name: StackdriverLogName,
-        label_config: StackdriverLabelConfig,
-        resource: StackdriverResource,
+        labels: HashMap<String, ConfinedTemplate>,
+        labels_key: Option<String>,
+        resource_type: String,
+        resource_labels: HashMap<String, ConfinedTemplate>,
         severity_key: Option<ConfigValuePath>,
     ) -> Self {
         Self {
             transformer,
             log_id,
             log_name,
-            label_config,
-            resource,
+            labels,
+            labels_key,
+            resource_type,
+            resource_labels,
             severity_key,
         }
     }
 
     pub(super) fn encode_event(&self, event: Event) -> Option<serde_json::Value> {
-        let mut labels = HashMap::with_capacity(self.label_config.labels.len());
-        for (key, template) in &self.label_config.labels {
+        let mut labels = HashMap::with_capacity(self.labels.len());
+        for (key, template) in &self.labels {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
@@ -60,8 +65,8 @@ impl StackdriverLogsEncoder {
                 .ok()?;
             labels.insert(key.clone(), value);
         }
-        let mut resource_labels = HashMap::with_capacity(self.resource.labels.len());
-        for (key, template) in &self.resource.labels {
+        let mut resource_labels = HashMap::with_capacity(self.resource_labels.len());
+        for (key, template) in &self.resource_labels {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
@@ -95,7 +100,6 @@ impl StackdriverLogsEncoder {
 
         let default_labels_key = default_labels_key();
         let labels_key = self
-            .label_config
             .labels_key
             .as_deref()
             .or(default_labels_key.as_deref())
@@ -123,7 +127,7 @@ impl StackdriverLogsEncoder {
         entry.insert(
             "resource".into(),
             json!({
-                "type": self.resource.type_,
+                "type": self.resource_type,
                 "labels": resource_labels,
             }),
         );

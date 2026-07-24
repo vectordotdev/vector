@@ -12,7 +12,7 @@ use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, value};
 
 use super::{
-    config::{StackdriverConfig, StackdriverResource, default_endpoint},
+    config::{StackdriverConfig, default_endpoint},
     encoder::StackdriverLogsEncoder,
 };
 use crate::{
@@ -21,8 +21,7 @@ use crate::{
     gcp::GcpAuthenticator,
     sinks::{
         gcp::stackdriver::logs::{
-            config::{StackdriverLabelConfig, StackdriverLogName},
-            encoder::remap_severity,
+            config::StackdriverLogName, encoder::remap_severity,
             service::StackdriverLogsServiceRequestBuilder,
         },
         prelude::*,
@@ -78,28 +77,24 @@ fn encode_valid() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("{{ log_id }}").unwrap(),
+        ConfinedTemplate::from_str_unchecked("{{ log_id }}"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
-            labels_key: None,
-            labels: HashMap::from([(
-                "config_user_label_1".to_owned(),
-                Template::try_from("config_user_value_1").unwrap(),
-            )]),
-        },
-        StackdriverResource {
-            type_: "generic_node".to_owned(),
-            labels: HashMap::from([
-                (
-                    "namespace".to_owned(),
-                    Template::try_from("office").unwrap(),
-                ),
-                (
-                    "node_id".to_owned(),
-                    Template::try_from("{{ node_id }}").unwrap(),
-                ),
-            ]),
-        },
+        HashMap::from([(
+            "config_user_label_1".to_owned(),
+            ConfinedTemplate::from_str_unchecked("config_user_value_1"),
+        )]),
+        None,
+        "generic_node".to_owned(),
+        HashMap::from([
+            (
+                "namespace".to_owned(),
+                ConfinedTemplate::from_str_unchecked("office"),
+            ),
+            (
+                "node_id".to_owned(),
+                ConfinedTemplate::from_str_unchecked("{{ node_id }}"),
+            ),
+        ]),
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
@@ -142,22 +137,18 @@ fn encode_inserts_timestamp() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        ConfinedTemplate::from_str_unchecked("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
-            labels_key: None,
-            labels: HashMap::from([(
-                "config_user_label_1".to_owned(),
-                Template::try_from("value_1").unwrap(),
-            )]),
-        },
-        StackdriverResource {
-            type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
-        },
+        HashMap::from([(
+            "config_user_label_1".to_owned(),
+            ConfinedTemplate::from_str_unchecked("value_1"),
+        )]),
+        None,
+        "generic_node".to_owned(),
+        HashMap::from([(
+            "namespace".to_owned(),
+            ConfinedTemplate::from_str_unchecked("office"),
+        )]),
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
@@ -222,22 +213,18 @@ async fn correct_request() {
     let transformer = Transformer::default();
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        ConfinedTemplate::from_str_unchecked("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
-            labels_key: None,
-            labels: HashMap::from([(
-                "config_user_label_1".to_owned(),
-                Template::try_from("value_1").unwrap(),
-            )]),
-        },
-        StackdriverResource {
-            type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
-        },
+        HashMap::from([(
+            "config_user_label_1".to_owned(),
+            ConfinedTemplate::from_str_unchecked("value_1"),
+        )]),
+        None,
+        "generic_node".to_owned(),
+        HashMap::from([(
+            "namespace".to_owned(),
+            ConfinedTemplate::from_str_unchecked("office"),
+        )]),
         None,
     );
 

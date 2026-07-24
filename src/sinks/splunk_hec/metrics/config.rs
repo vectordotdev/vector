@@ -24,7 +24,7 @@ use crate::{
             BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig, http::HttpRetryLogic,
         },
     },
-    template::{Template, UnconfinedTemplate},
+    template::{ConfinedTemplate, Template},
     tls::TlsConfig,
 };
 
@@ -80,14 +80,14 @@ pub struct HecMetricsSinkConfig {
     ///
     /// If not specified, the default index defined within Splunk is used.
     #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
-    pub index: Option<UnconfinedTemplate>,
+    pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk defaults to `httpevent`.
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
-    pub sourcetype: Option<UnconfinedTemplate>,
+    pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
     ///
@@ -100,7 +100,7 @@ pub struct HecMetricsSinkConfig {
         docs::examples = "/var/log/syslog",
         docs::examples = "UDP:514"
     ))]
-    pub source: Option<UnconfinedTemplate>,
+    pub source: Option<Template>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -199,9 +199,9 @@ impl SinkConfig for HecMetricsSinkConfig {
 }
 
 pub(super) fn compute_templated_field_keys(
-    index: &Option<UnconfinedTemplate>,
-    source: &Option<UnconfinedTemplate>,
-    sourcetype: &Option<UnconfinedTemplate>,
+    index: &Option<Template>,
+    source: &Option<Template>,
+    sourcetype: &Option<Template>,
 ) -> Arc<[String]> {
     [index, source, sourcetype]
         .iter()
@@ -217,9 +217,9 @@ impl HecMetricsSinkConfig {
         &self,
         client: HttpClient,
         _: SinkContext,
-        sourcetype: Option<Template>,
-        source: Option<Template>,
-        index: Option<Template>,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
         templated_field_keys: Arc<[String]>,
     ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {

@@ -13,6 +13,7 @@ use vector_lib::{
 use vrl::event_path;
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
+use crate::template::Template;
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},

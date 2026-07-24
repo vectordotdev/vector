@@ -14,7 +14,7 @@ use crate::{
         TransformOutput,
     },
     schema,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::Transform,
 };
 
@@ -124,7 +124,7 @@ pub struct SampleConfig {
         docs::examples = "{{ service }}",
         docs::examples = "{{ hostname }}-{{ service }}"
     ))]
-    pub group_by: Option<Template>,
+    pub group_by: Option<UnconfinedTemplate>,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,

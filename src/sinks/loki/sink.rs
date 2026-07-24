@@ -18,19 +18,19 @@ use crate::{
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
     sinks::{loki::event::LokiBatchEncoding, prelude::*},
-    template::{ConfinementConfig, UnconfinedTemplate},
+    template::ConfinementConfig,
 };
 
 /// Attach the sink's confinement config to every key and value template in a
 /// `label`-style HashMap. Fails if any template rejects confinement (used at
 /// sink build time so operators get the failure up front).
 fn confine_template_map(
-    map: HashMap<UnconfinedTemplate, UnconfinedTemplate>,
+    map: HashMap<Template, Template>,
     config: &ConfinementConfig,
     component_name: &'static str,
     key_field_name: &'static str,
     value_field_name: &'static str,
-) -> crate::Result<HashMap<Template, Template>> {
+) -> crate::Result<HashMap<ConfinedTemplate, ConfinedTemplate>> {
     map.into_iter()
         .map(|(k, v)| {
             let k = k.confine(config, component_name, key_field_name)?;
@@ -40,9 +40,7 @@ fn confine_template_map(
         .collect()
 }
 
-fn paths_from_template_map(
-    map: &HashMap<UnconfinedTemplate, UnconfinedTemplate>,
-) -> Vec<OwnedTargetPath> {
+fn paths_from_template_map(map: &HashMap<Template, Template>) -> Vec<OwnedTargetPath> {
     map.values()
         .filter_map(|t| t.get_fields())
         .flatten()
@@ -51,10 +49,10 @@ fn paths_from_template_map(
 }
 
 #[derive(Clone)]
-pub struct KeyPartitioner(Option<Template>);
+pub struct KeyPartitioner(Option<ConfinedTemplate>);
 
 impl KeyPartitioner {
-    pub const fn new(template: Option<Template>) -> Self {
+    pub const fn new(template: Option<ConfinedTemplate>) -> Self {
         Self(template)
     }
 
@@ -179,10 +177,10 @@ pub(super) struct EventEncoder {
     key_partitioner: KeyPartitioner,
     transformer: Transformer,
     encoder: Encoder<()>,
-    labels: HashMap<Template, Template>,
+    labels: HashMap<ConfinedTemplate, ConfinedTemplate>,
     label_value_fields: Vec<OwnedTargetPath>,
     remove_label_fields: bool,
-    structured_metadata: HashMap<Template, Template>,
+    structured_metadata: HashMap<ConfinedTemplate, ConfinedTemplate>,
     structured_metadata_value_fields: Vec<OwnedTargetPath>,
     remove_structured_metadata_fields: bool,
     remove_timestamp: bool,
@@ -202,7 +200,7 @@ const fn is_confined(err: &crate::template::TemplateRenderingError) -> bool {
 /// `pair_kind` is used in warning messages (e.g. `"label"` or `"structured_metadata"`).
 /// Returns `Err(())` if any template triggers a confinement violation.
 fn build_template_pair_map(
-    pairs: &HashMap<Template, Template>,
+    pairs: &HashMap<ConfinedTemplate, ConfinedTemplate>,
     key_kind: &str,
     value_kind: &str,
     pair_kind: &str,
@@ -650,7 +648,7 @@ impl StreamSink<Event> for LokiSink {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, convert::TryFrom};
+    use std::collections::HashMap;
 
     use futures::stream::StreamExt;
     use vector_lib::{
@@ -664,7 +662,7 @@ mod tests {
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
         codecs::Encoder, config::log_schema, sinks::loki::config::OutOfOrderAction,
-        template::Template, test_util::random_lines,
+        template::ConfinedTemplate, test_util::random_lines,
     };
 
     #[test]
@@ -703,20 +701,20 @@ mod tests {
     fn encoder_with_labels() {
         let mut labels = HashMap::default();
         labels.insert(
-            Template::try_from("static").unwrap(),
-            Template::try_from("value").unwrap(),
+            ConfinedTemplate::from_str_unchecked("static"),
+            ConfinedTemplate::from_str_unchecked("value"),
         );
         labels.insert(
-            Template::try_from("{{ name }}").unwrap(),
-            Template::try_from("{{ value }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("{{ name }}"),
+            ConfinedTemplate::from_str_unchecked("{{ value }}"),
         );
         labels.insert(
-            Template::try_from("test_key_*").unwrap(),
-            Template::try_from("{{ dict }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("test_key_*"),
+            ConfinedTemplate::from_str_unchecked("{{ dict }}"),
         );
         labels.insert(
-            Template::try_from("going_to_fail_*").unwrap(),
-            Template::try_from("{{ value }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("going_to_fail_*"),
+            ConfinedTemplate::from_str_unchecked("{{ value }}"),
         );
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -762,16 +760,16 @@ mod tests {
     fn encoder_with_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(
-            Template::try_from("pod_labels_*").unwrap(),
-            Template::try_from("{{ kubernetes.pod_labels }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("pod_labels_*"),
+            ConfinedTemplate::from_str_unchecked("{{ kubernetes.pod_labels }}"),
         );
         labels.insert(
-            Template::try_from("*").unwrap(),
-            Template::try_from("{{ metadata }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("*"),
+            ConfinedTemplate::from_str_unchecked("{{ metadata }}"),
         );
         labels.insert(
-            Template::try_from("cluster_name").unwrap(),
-            Template::try_from("static_cluster_name").unwrap(),
+            ConfinedTemplate::from_str_unchecked("cluster_name"),
+            ConfinedTemplate::from_str_unchecked("static_cluster_name"),
         );
 
         let mut encoder = EventEncoder {
@@ -820,12 +818,12 @@ mod tests {
     fn encoder_with_colliding_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(
-            Template::try_from("l1_*").unwrap(),
-            Template::try_from("{{ map1 }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("l1_*"),
+            ConfinedTemplate::from_str_unchecked("{{ map1 }}"),
         );
         labels.insert(
-            Template::try_from("*").unwrap(),
-            Template::try_from("{{ map2 }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("*"),
+            ConfinedTemplate::from_str_unchecked("{{ map2 }}"),
         );
 
         let mut encoder = EventEncoder {
@@ -866,8 +864,8 @@ mod tests {
     fn encoder_with_failing_dynamic_label_expansion() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(
-            Template::try_from("missing_*").unwrap(),
-            Template::try_from("{{ map }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("missing_*"),
+            ConfinedTemplate::from_str_unchecked("{{ map }}"),
         );
 
         let mut encoder = EventEncoder {
@@ -924,12 +922,12 @@ mod tests {
     fn encoder_no_record_labels() {
         let mut labels = HashMap::default();
         labels.insert(
-            Template::try_from("static").unwrap(),
-            Template::try_from("value").unwrap(),
+            ConfinedTemplate::from_str_unchecked("static"),
+            ConfinedTemplate::from_str_unchecked("value"),
         );
         labels.insert(
-            Template::try_from("{{ name }}").unwrap(),
-            Template::try_from("{{ value }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("{{ name }}"),
+            ConfinedTemplate::from_str_unchecked("{{ value }}"),
         );
         // "value" is the field referenced by the dynamic label value template above.
         let label_value_fields = vec![parse_target_path("value").unwrap()];
@@ -961,16 +959,16 @@ mod tests {
     fn encoder_with_structured_metadata() -> Result<(), serde_json::Error> {
         let mut structured_metadata = HashMap::default();
         structured_metadata.insert(
-            Template::try_from("pod_labels_*").unwrap(),
-            Template::try_from("{{ kubernetes.pod_labels }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("pod_labels_*"),
+            ConfinedTemplate::from_str_unchecked("{{ kubernetes.pod_labels }}"),
         );
         structured_metadata.insert(
-            Template::try_from("*").unwrap(),
-            Template::try_from("{{ metadata }}").unwrap(),
+            ConfinedTemplate::from_str_unchecked("*"),
+            ConfinedTemplate::from_str_unchecked("{{ metadata }}"),
         );
         structured_metadata.insert(
-            Template::try_from("cluster_name").unwrap(),
-            Template::try_from("static_cluster_name").unwrap(),
+            ConfinedTemplate::from_str_unchecked("cluster_name"),
+            ConfinedTemplate::from_str_unchecked("static_cluster_name"),
         );
 
         let mut encoder = EventEncoder {

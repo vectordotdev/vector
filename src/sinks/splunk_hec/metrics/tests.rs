@@ -20,7 +20,7 @@ use crate::{
         },
         util::{Compression, test::build_test_server},
     },
-    template::Template,
+    template::{ConfinedTemplate, Template},
     test_util::addr::next_addr,
 };
 
@@ -67,6 +67,12 @@ fn get_processed_event(
     default_namespace: Option<&str>,
 ) -> HecProcessedEvent {
     let event_byte_size = metric.size_of();
+    // Tests exercise rendering, not confinement, so build checkerless confined templates.
+    let confine =
+        |t: Option<Template>| t.map(|t| ConfinedTemplate::from_str_unchecked(t.get_ref()));
+    let sourcetype = confine(sourcetype);
+    let source = confine(source);
+    let index = confine(index);
     process_metric(
         metric,
         event_byte_size,
@@ -85,11 +91,8 @@ fn make_encoder(
     index: &Option<Template>,
 ) -> HecMetricsEncoder {
     use super::config::compute_templated_field_keys;
-    let index_u = index.as_ref().map(|t| t.as_unconfined().clone());
-    let source_u = source.as_ref().map(|t| t.as_unconfined().clone());
-    let sourcetype_u = sourcetype.as_ref().map(|t| t.as_unconfined().clone());
     HecMetricsEncoder {
-        templated_field_keys: compute_templated_field_keys(&index_u, &source_u, &sourcetype_u),
+        templated_field_keys: compute_templated_field_keys(index, source, sourcetype),
     }
 }
 

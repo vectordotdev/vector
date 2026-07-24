@@ -14,7 +14,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent},
     serde::OneOrMany,
     sinks::prelude::*,
-    template::UnconfinedTemplate,
+    template::Template,
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
@@ -38,7 +38,7 @@ async fn redis_sink_sentinel_reaches_primary() {
 
     let cnf = RedisSinkConfig {
         endpoint: OneOrMany::Many(redis_sentinel_server()),
-        key: UnconfinedTemplate::try_from(format!("test-{}", random_string(10)))
+        key: Template::try_from(format!("test-{}", random_string(10)))
             .expect("should not fail to create key template"),
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
@@ -76,7 +76,7 @@ async fn redis_sink_sentinel_reaches_primary() {
 async fn redis_sink_sentinel_rpush() {
     trace_init();
 
-    let key = UnconfinedTemplate::try_from(format!("test-{}", random_string(10)))
+    let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {key}.");
     let mut rng = rand::rng();
@@ -151,7 +151,7 @@ async fn redis_sink_sentinel_rpush() {
 async fn redis_sink_list_lpush() {
     trace_init();
 
-    let key = UnconfinedTemplate::try_from(format!("test-{}", random_string(10)))
+    let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {key}.");
     let mut rng = rand::rng();
@@ -226,7 +226,7 @@ async fn redis_sink_list_lpush() {
 async fn redis_sink_list_rpush() {
     trace_init();
 
-    let key = UnconfinedTemplate::try_from(format!("test-{}", random_string(10)))
+    let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {key}.");
     let mut rng = rand::rng();
@@ -301,7 +301,7 @@ async fn redis_sink_list_rpush() {
 async fn redis_sink_sorted_set_zadd() {
     trace_init();
 
-    let key = UnconfinedTemplate::try_from(format!("test-{}", random_string(10)))
+    let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {key}.");
     let mut rng = rand::rng();
@@ -381,7 +381,7 @@ async fn redis_sink_sorted_set_zadd() {
 async fn redis_sink_channel() {
     trace_init();
 
-    let key = UnconfinedTemplate::try_from(format!("test-{}", random_string(10)))
+    let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {key}.");
     let mut rng = rand::rng();
@@ -460,7 +460,7 @@ async fn redis_sink_channel_data_volume_tags() {
         true,
     );
 
-    let key = UnconfinedTemplate::try_from(format!("test-{}", random_string(10)))
+    let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {key}.");
     let mut rng = rand::rng();
@@ -527,7 +527,7 @@ async fn redis_sink_channel_data_volume_tags() {
 async fn redis_sink_metrics() {
     trace_init();
 
-    let key = UnconfinedTemplate::try_from(format!("test-metrics-{}", random_string(10)))
+    let key = Template::try_from(format!("test-metrics-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {key}.");
     let num_events = 1000;
@@ -637,8 +637,7 @@ async fn redis_sink_traces() {
 
     assert_sink_compliance(&SINK_TAGS, async {
         // Setup Redis sink config
-        let key =
-            UnconfinedTemplate::try_from(format!("test-traces-{}", random_string(10))).unwrap();
+        let key = Template::try_from(format!("test-traces-{}", random_string(10))).unwrap();
         let config = RedisSinkConfig {
             endpoint: OneOrMany::One(redis_server()),
             key: key.clone(),

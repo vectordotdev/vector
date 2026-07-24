@@ -26,7 +26,7 @@ use crate::{
             test::build_test_server,
         },
     },
-    template::Template,
+    template::ConfinedTemplate,
     test_util::addr::next_addr,
 };
 
@@ -106,9 +106,11 @@ fn get_processed_event_timestamp(
         }
     }
 
-    let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
-    let source = Template::try_from("{{ event_source }}".to_string()).ok();
-    let index = Template::try_from("{{ event_index }}".to_string()).ok();
+    let sourcetype = Some(ConfinedTemplate::from_str_unchecked(
+        "{{ event_sourcetype }}",
+    ));
+    let source = Some(ConfinedTemplate::from_str_unchecked("{{ event_source }}"));
+    let index = Some(ConfinedTemplate::from_str_unchecked("{{ event_index }}"));
     let indexed_fields = vec![
         owned_value_path!("event_field1"),
         owned_value_path!("event_field2"),

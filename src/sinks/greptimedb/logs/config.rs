@@ -137,22 +137,24 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.table = config
+        let confined_table = self
             .table
+            .clone()
             .confine(&self.confinement, Self::NAME, "table")?;
-        config.dbname = config
-            .dbname
-            .confine(&self.confinement, Self::NAME, "dbname")?;
-        config.pipeline_name =
-            config
-                .pipeline_name
+        let confined_dbname =
+            self.dbname
+                .clone()
+                .confine(&self.confinement, Self::NAME, "dbname")?;
+        let confined_pipeline_name =
+            self.pipeline_name
+                .clone()
                 .confine(&self.confinement, Self::NAME, "pipeline_name")?;
-        config.pipeline_version = config
+        let confined_pipeline_version = self
             .pipeline_version
+            .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "pipeline_version"))
             .transpose()?;
-        let this = &config;
+        let this = self;
 
         let tls_settings = TlsSettings::from_options(this.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
@@ -189,10 +191,10 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {
-            dbname: this.dbname.clone(),
-            table: this.table.clone(),
-            pipeline_name: this.pipeline_name.clone(),
-            pipeline_version: this.pipeline_version.clone(),
+            dbname: confined_dbname,
+            table: confined_table,
+            pipeline_name: confined_pipeline_name,
+            pipeline_version: confined_pipeline_version,
         };
 
         let sink = GreptimeDBLogsHttpSink::new(

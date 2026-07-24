@@ -43,6 +43,11 @@ mod integration_test {
         format!("{}:{}", kafka_host(), port)
     }
 
+    // Tests exercise the sink itself, not confinement; build a checkerless confined topic.
+    fn confined_topic(config: &KafkaSinkConfig) -> ConfinedTemplate {
+        ConfinedTemplate::from_str_unchecked(config.topic.get_ref())
+    }
+
     #[tokio::test]
     async fn healthcheck() {
         crate::test_util::trace_init();
@@ -67,7 +72,7 @@ mod integration_test {
             acknowledgements: Default::default(),
             confinement: Default::default(),
         };
-        self::sink::healthcheck(config, Default::default())
+        self::sink::healthcheck(config.clone(), confined_topic(&config), Default::default())
             .await
             .unwrap();
     }
@@ -96,7 +101,7 @@ mod integration_test {
             acknowledgements: Default::default(),
             confinement: Default::default(),
         };
-        self::sink::healthcheck(config, Default::default())
+        self::sink::healthcheck(config.clone(), confined_topic(&config), Default::default())
             .await
             .unwrap();
     }
@@ -201,8 +206,8 @@ mod integration_test {
             confinement: Default::default(),
         };
         config.clone().to_rdkafka()?;
-        self::sink::healthcheck(config.clone(), Default::default()).await?;
-        KafkaSink::new(config)
+        self::sink::healthcheck(config.clone(), confined_topic(&config), Default::default()).await?;
+        KafkaSink::new(config.clone(), confined_topic(&config))
     }
 
     #[tokio::test]
@@ -368,7 +373,7 @@ mod integration_test {
                 events.push(Event::Trace(trace.with_batch_notifier(&batch)));
             }
 
-            let sink = KafkaSink::new(config).unwrap();
+            let sink = KafkaSink::new(config.clone(), confined_topic(&config)).unwrap();
             let sink = VectorSink::from_event_streamsink(sink);
             let stream = map_event_batch_stream(stream::iter(events), Some(batch));
             sink.run(stream).await.unwrap();
@@ -503,7 +508,7 @@ mod integration_test {
 
         if test_telemetry_tags {
             assert_data_volume_sink_compliance(&DATA_VOLUME_SINK_TAGS, async move {
-                let sink = KafkaSink::new(config).unwrap();
+                let sink = KafkaSink::new(config.clone(), confined_topic(&config)).unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })
@@ -511,7 +516,7 @@ mod integration_test {
             .expect("Running sink failed");
         } else {
             assert_sink_compliance(&SINK_TAGS, async move {
-                let sink = KafkaSink::new(config).unwrap();
+                let sink = KafkaSink::new(config.clone(), confined_topic(&config)).unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })
