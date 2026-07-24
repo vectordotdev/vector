@@ -91,6 +91,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = PushgatewaySource {
             aggregate_metrics: self.aggregate_metrics,
+            log_namespace: cx.log_namespace(None),
         };
         source.run(
             self.address,
@@ -118,6 +119,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 #[derive(Clone)]
 struct PushgatewaySource {
     aggregate_metrics: bool,
+    log_namespace: LogNamespace,
 }
 
 impl PushgatewaySource {
@@ -127,6 +129,14 @@ impl PushgatewaySource {
 }
 
 impl HttpSource for PushgatewaySource {
+    fn name() -> &'static str {
+        PrometheusPushgatewayConfig::NAME
+    }
+
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
     fn build_events(
         &self,
         body: Bytes,

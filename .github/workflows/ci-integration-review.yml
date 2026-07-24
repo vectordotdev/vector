@@ -141,6 +141,7 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
+            "splunk",
             "webhdfs"
           ]
     steps:
@@ -201,7 +202,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
+        service:
+          [
+            "datadog-logs",
+            "datadog-metrics",
+            "opentelemetry-logs",
+            "opentelemetry-metrics",
+            "opentelemetry-metrics-native"
+          ]
     steps:
       - name: Evaluate run condition
         id: run_condition

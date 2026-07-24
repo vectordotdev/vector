@@ -81,12 +81,17 @@ impl SinkConfig for OpenTelemetryConfig {
         match &self.protocol {
             Protocol::Http(config) => {
                 warn_on_invalid_otlp_batching(config);
-                let result = config
-                    .build_without_confinement_gauge(cx, Self::NAME)
-                    .await?;
-                config.confinement.set_confinement_gauge("sink", Self::NAME);
-                Ok(result)
+                // Delegate to the HTTP sink, but thread through `opentelemetry`
+                // as the component type so security warnings carry the outer
+                // sink type rather than `http`.
+                config.build_with_component_type(cx, Self::NAME).await
             }
+        }
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        match &self.protocol {
+            Protocol::Http(config) => Some(&config.confinement),
         }
     }
 

@@ -12,8 +12,6 @@ use snafu::Snafu;
 use tracing::warn;
 use vector_lib::{
     configurable::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component},
-    gauge,
-    internal_event::GaugeName,
     lookup::lookup_v2::parse_target_path,
 };
 
@@ -263,9 +261,8 @@ impl Template {
         field_name: &'static str,
     ) -> crate::Result<Self> {
         // Full opt-out: bypass all confinement for this template (startup AND
-        // runtime). The per-sink gauge is emitted by each sink's build() on
-        // the success path — not here — so a failed reload cannot clobber the
-        // still-active sink's gauge.
+        // runtime). The `vector_security_confinement_disabled` gauge is owned by
+        // the topology, not emitted here.
         if config.dangerously_allow_unconfined_template_resolution {
             ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
             return Ok(self);
@@ -872,6 +869,18 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
+    #[snafu(display(
+        "HTTP/HTTPS template {prefix:?} has a `{{{{ field }}}}` reference inside \
+         the authority (host) component: the static prefix does not contain a \
+         `/` after the host, so the rendered host is partly event-controlled. \
+         Add a `/` after the static host in your URI template, or set \
+         `dangerously_allow_unconfined_template_resolution: true` to opt out."
+    ))]
+    PartialUriAuthority {
+        /// The literal prefix whose authority was left unterminated.
+        prefix: String,
+    },
+
     /// The template is an HTTP/HTTPS URI containing `?` or `#` in combination
     /// with `{{ field }}` references.
     ///
@@ -1109,16 +1118,32 @@ impl UriChecker {
                 prefix: prefix.to_string(),
             });
         }
-        match uri.authority() {
-            Some(auth) if !auth.as_str().is_empty() => Ok(Self {
-                scheme,
-                authority: auth.as_str().to_ascii_lowercase(),
-                path_prefix: uri.path().to_string(),
-            }),
-            _ => Err(BuildError::NoStaticUriAuthority {
+        let authority = match uri.authority() {
+            Some(auth) if !auth.as_str().is_empty() => auth.as_str().to_ascii_lowercase(),
+            _ => {
+                return Err(BuildError::NoStaticUriAuthority {
+                    prefix: prefix.to_string(),
+                });
+            }
+        };
+        // `http::Uri` normalises a missing path to `"/"`, so `uri.path()` can't
+        // tell us whether the prefix actually had a `/` closing off the host. Check
+        // the raw prefix instead: no `/` after `://` means the `{{ field }}`
+        // reference sits inside (or extends) the authority we just parsed.
+        let after_scheme = prefix
+            .split_once("://")
+            .map(|(_, rest)| rest)
+            .expect("\"://\" present because prefix starts with http(s)://");
+        if !after_scheme.contains('/') {
+            return Err(BuildError::PartialUriAuthority {
                 prefix: prefix.to_string(),
-            }),
+            });
         }
+        Ok(Self {
+            scheme,
+            authority,
+            path_prefix: uri.path().to_string(),
+        })
     }
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {
@@ -1231,9 +1256,12 @@ pub struct ConfinementConfig {
 }
 
 impl ConfinementConfig {
-    /// Logs a per-template SECURITY warning on the opt-out path. Does NOT
-    /// touch the gauge — the gauge is emitted once per sink build by
-    /// [`Self::set_confinement_gauge`].
+    /// Logs a per-template SECURITY warning on the opt-out path.
+    ///
+    /// The `vector_security_confinement_disabled` gauge is owned by the topology
+    /// (see `RunningTopology::refresh_confinement_gauges`), which holds a handle
+    /// for the sink's lifetime so the metric matches the active topology and
+    /// never expires while the sink runs.
     pub fn warn_unconfined_template(
         component_kind: &'static str,
         component_type: &'static str,
@@ -1245,36 +1273,6 @@ impl ConfinementConfig {
                        field used in the template can write to arbitrary keys.",
             component_kind, component_type, field,
         );
-    }
-
-    /// Emit `vector_security_confinement_disabled{component_kind,component_type}`
-    /// reflecting whether this sink has the confinement policy disabled.
-    ///
-    /// Must be called at the END of `SinkConfig::build`, on the success
-    /// path only. Value = `1` when the flag is set (operator explicitly
-    /// disabled confinement policy for this sink), `0` otherwise.
-    ///
-    /// Emitting earlier means a build that later errors would still leave
-    /// its gauge write behind. On a reload where the new config fails to
-    /// build, the topology manager keeps the old sink active but the
-    /// failed replacement's write would silently misreport the live
-    /// sink's confinement state.
-    pub fn set_confinement_gauge(
-        &self,
-        component_kind: &'static str,
-        component_type: &'static str,
-    ) {
-        let value = if self.dangerously_allow_unconfined_template_resolution {
-            1.0
-        } else {
-            0.0
-        };
-        gauge!(
-            GaugeName::SecurityConfinementDisabled,
-            "component_kind" => component_kind,
-            "component_type" => component_type,
-        )
-        .set(value);
     }
 }
 
@@ -1843,7 +1841,7 @@ mod tests {
 
     #[test]
     fn uri_authority_mismatch_rejected() {
-        let tpl = Template::try_from("https://trusted.example.com{{ path }}").unwrap();
+        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         // Normal path extension is fine.
@@ -1980,9 +1978,27 @@ mod tests {
                 "expected NoStaticUriAuthority for {template_str}"
             );
         }
-        // A template with a static host is accepted.
-        let tpl = Template::try_from("https://trusted.example.com{{ path }}").unwrap();
+        // A template with a static host followed by a `/` is accepted.
+        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_some());
+    }
+
+    #[test]
+    fn partial_uri_authority_rejected() {
+        // A `{{ field }}` reference inside or directly extending the host.
+        for template_str in &[
+            "https://tenant.{{ env }}.example.com/",
+            "https://api.internal{{ path }}",
+        ] {
+            let tpl = Template::try_from(*template_str).unwrap();
+            assert!(
+                matches!(
+                    ConfinementChecker::for_template(&tpl).unwrap_err(),
+                    BuildError::PartialUriAuthority { .. }
+                ),
+                "expected PartialUriAuthority for {template_str}"
+            );
+        }
     }
 
     #[test]

@@ -199,7 +199,7 @@ pub use self::{
     io::{Filesystem, ProductionFilesystem},
     ledger::LedgerLoadCreateError,
     reader::{BufferReader, ReaderError},
-    writer::{BufferWriter, WriterError},
+    writer::{BufferWriter, TryWriteOutcome, WriterError},
 };
 use crate::{
     Bufferable,
