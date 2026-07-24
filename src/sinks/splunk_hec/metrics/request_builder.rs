@@ -21,7 +21,7 @@ pub struct HecMetricsRequestBuilder {
 }
 
 impl HecMetricsRequestBuilder {
-    pub const fn new(compression: Compression, templated_field_keys: Arc<[String]>) -> Self {
+    pub const fn new(compression: Compression, templated_field_keys: Box<[String]>) -> Self {
         Self {
             compression,
             encoder: HecMetricsEncoder {

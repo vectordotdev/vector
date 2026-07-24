@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, iter, sync::Arc};
+use std::{collections::BTreeMap, iter};
 
 use serde::Serialize;
 use vector_lib::{
@@ -48,10 +48,8 @@ impl<'a> HecData<'a> {
 
 /// Encoder for Splunk HEC metrics events.
 ///
-/// Holds `templated_field_keys` once for the sink lifetime so that event encoding
-/// requires only a shared borrow rather than an `Arc::clone` per event.
 pub struct HecMetricsEncoder {
-    pub(super) templated_field_keys: Arc<[String]>,
+    pub(super) templated_field_keys: Box<[String]>,
 }
 
 impl HecMetricsEncoder {

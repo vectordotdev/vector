@@ -205,7 +205,7 @@ pub(super) fn compute_templated_field_keys(
     index: &Option<Template>,
     source: &Option<Template>,
     sourcetype: &Option<Template>,
-) -> Arc<[String]> {
+) -> Box<[String]> {
     [index, source, sourcetype]
         .iter()
         .filter_map(|t| t.as_ref())
@@ -223,7 +223,7 @@ impl HecMetricsSinkConfig {
         sourcetype: Option<ConfinedTemplate>,
         source: Option<ConfinedTemplate>,
         index: Option<ConfinedTemplate>,
-        templated_field_keys: Arc<[String]>,
+        templated_field_keys: Box<[String]>,
     ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
