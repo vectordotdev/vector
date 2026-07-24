@@ -222,49 +222,6 @@ impl UnconfinedTemplate {
         self
     }
 
-    /// Confine this template to its literal prefix, returning a [`ConfinedTemplate`] that enforces
-    /// the confinement invariant at render time.
-    ///
-    /// Three outcomes:
-    ///
-    /// - `dangerously_allow_unconfined_template_resolution` is `true` — no
-    ///   checker attached; a SECURITY warning is emitted.
-    /// - Static template (no event-field references) — returned as-is.
-    /// - Dynamic template with a non-empty literal prefix — checker attached.
-    /// - Dynamic template with no derivable prefix — error.
-    ///
-    /// Most sinks reach this through [`Template::confine`]; call this directly only when a sink
-    /// constructs an [`UnconfinedTemplate`] itself (e.g. from a default value) and needs to confine
-    /// it.
-    pub fn confine(
-        self,
-        config: &ConfinementConfig,
-        component_name: &'static str,
-        field_name: &'static str,
-    ) -> crate::Result<ConfinedTemplate> {
-        // Full opt-out: bypass all confinement for this template (startup AND
-        // runtime). The `vector_security_confinement_disabled` gauge is owned by
-        // the topology, not emitted here.
-        if config.dangerously_allow_unconfined_template_resolution {
-            ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
-            return Ok(Confined {
-                inner: self,
-                checker: None,
-            });
-        }
-        match ConfinementChecker::for_template(&self) {
-            Ok(Some(checker)) => Ok(Confined {
-                inner: self,
-                checker: Some(checker),
-            }),
-            Ok(None) => Ok(Confined {
-                inner: self,
-                checker: None,
-            }),
-            Err(e) => Err(e.into()),
-        }
-    }
-
     /// Renders the given template with data from the event, returning raw bytes.
     ///
     /// No confinement check is applied. Use this in transforms, sources, and other contexts
@@ -562,17 +519,47 @@ pub struct Template {
 }
 
 impl Template {
-    /// Confine this template, returning a [`ConfinedTemplate`] that enforces the confinement
-    /// invariant at render time.
+    /// Confine this template to its literal prefix, returning a [`ConfinedTemplate`] that enforces
+    /// the confinement invariant at render time.
     ///
-    /// See [`UnconfinedTemplate::confine`] for the confinement outcomes.
+    /// Three outcomes:
+    ///
+    /// - `dangerously_allow_unconfined_template_resolution` is `true` — no
+    ///   checker attached; a SECURITY warning is emitted.
+    /// - Static template (no event-field references) — returned as-is.
+    /// - Dynamic template with a non-empty literal prefix — checker attached.
+    /// - Dynamic template with no derivable prefix — error.
+    ///
+    /// Most sinks reach this through [`Template::confine`]; call this directly only when a sink
+    /// constructs an [`UnconfinedTemplate`] itself (e.g. from a default value) and needs to confine
+    /// it.
     pub fn confine(
         self,
         config: &ConfinementConfig,
         component_name: &'static str,
         field_name: &'static str,
     ) -> crate::Result<ConfinedTemplate> {
-        self.inner.confine(config, component_name, field_name)
+        // Full opt-out: bypass all confinement for this template (startup AND
+        // runtime). The `vector_security_confinement_disabled` gauge is owned by
+        // the topology, not emitted here.
+        if config.dangerously_allow_unconfined_template_resolution {
+            ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
+            return Ok(Confined {
+                inner: self.inner,
+                checker: None,
+            });
+        }
+        match ConfinementChecker::for_template(&self) {
+            Ok(Some(checker)) => Ok(Confined {
+                inner: self.inner,
+                checker: Some(checker),
+            }),
+            Ok(None) => Ok(Confined {
+                inner: self.inner,
+                checker: None,
+            }),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Set the tz offset used when rendering strftime specifiers.
@@ -587,6 +574,15 @@ impl Template {
     /// (e.g. for topology field detection).
     pub fn get_fields(&self) -> Option<Vec<String>> {
         self.inner.get_fields()
+    }
+
+    /// Longest leading substring of the template source that is rendered
+    /// verbatim — no `{{ field }}` reference and no strftime specifier.
+    ///
+    /// Sinks use this to derive a confinement boundary from the
+    /// operator-authored portion of the template.
+    pub fn literal_prefix(&self) -> &str {
+        self.inner.literal_prefix()
     }
 
     /// Returns a reference to the template source string.
@@ -1199,7 +1195,7 @@ pub(crate) enum ConfinementChecker {
 }
 
 impl ConfinementChecker {
-    pub(crate) fn for_template(tpl: &UnconfinedTemplate) -> Result<Option<Self>, BuildError> {
+    pub(crate) fn for_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
             None => return Ok(None),
@@ -1987,7 +1983,7 @@ mod tests {
 
     #[test]
     fn dotdot_bypass_rejected() {
-        let tpl = UnconfinedTemplate::try_from("safe/{{ tenant }}/").unwrap();
+        let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(c.confine("safe/legit/").is_ok());
@@ -2004,7 +2000,7 @@ mod tests {
 
     #[test]
     fn uri_path_traversal_rejected() {
-        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(c.confine("https://api.internal/ingest/acme").is_ok());
@@ -2022,7 +2018,7 @@ mod tests {
 
     #[test]
     fn uri_percent_encoded_dotdot_rejected() {
-        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(c.confine("https://api.internal/ingest/legit").is_ok());
@@ -2050,7 +2046,7 @@ mod tests {
 
     #[test]
     fn uri_encoded_slash_traversal_rejected() {
-        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         assert!(matches!(
@@ -2077,7 +2073,7 @@ mod tests {
 
     #[test]
     fn uri_authority_mismatch_rejected() {
-        let tpl = UnconfinedTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
+        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
 
         // Normal path extension is fine.
@@ -2115,7 +2111,7 @@ mod tests {
 
     #[test]
     fn uri_path_field_cannot_smuggle_backslash() {
-        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
             c.confine("https://api.internal/ingest/..\\admin")
@@ -2131,7 +2127,7 @@ mod tests {
 
     #[test]
     fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
-        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
             c.confine("https://api.internal/ingest/%252e%252e%252fadmin")
@@ -2145,7 +2141,7 @@ mod tests {
         // Templates with no `?` build successfully. A field value that smuggles
         // `?...` into the path (e.g. tenant=`ok?tenant=evil`) is caught at
         // render time via the query-rejection check.
-        let tpl = UnconfinedTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+        let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
         let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(matches!(
             c.confine("https://api.internal/ingest/ok?tenant=evil")
@@ -2174,7 +2170,7 @@ mod tests {
             "https://api.internal/base/{{ tenant }}/ingest#frag",
             "https://api.internal/base/{{ tenant }}#frag",
         ] {
-            let tpl = UnconfinedTemplate::try_from(*template_str).unwrap();
+            let tpl = Template::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
@@ -2187,8 +2183,7 @@ mod tests {
 
     #[test]
     fn static_uri_with_query_allowed() {
-        let tpl =
-            UnconfinedTemplate::try_from("https://api.internal/ingest?source=vector").unwrap();
+        let tpl = Template::try_from("https://api.internal/ingest?source=vector").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_none());
     }
 
@@ -2197,7 +2192,7 @@ mod tests {
         // `https://{{ host }}/ingest` has prefix `https://` — any host can be
         // rendered, so the confinement is meaningless. Must be rejected at build.
         for template_str in &["https://{{ host }}/ingest", "http://{{ host }}/path"] {
-            let tpl = UnconfinedTemplate::try_from(*template_str).unwrap();
+            let tpl = Template::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
@@ -2206,7 +2201,7 @@ mod tests {
                 "expected NoStaticUriAuthority for {template_str}"
             );
         }
-        let tpl = UnconfinedTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
+        let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
         assert!(ConfinementChecker::for_template(&tpl).unwrap().is_some());
     }
 
@@ -2217,7 +2212,7 @@ mod tests {
             "https://tenant.{{ env }}.example.com/",
             "https://api.internal{{ path }}",
         ] {
-            let tpl = UnconfinedTemplate::try_from(*template_str).unwrap();
+            let tpl = Template::try_from(*template_str).unwrap();
             assert!(
                 matches!(
                     ConfinementChecker::for_template(&tpl).unwrap_err(),
@@ -2230,7 +2225,7 @@ mod tests {
 
     #[test]
     fn root_only_prefix_rejected() {
-        let tpl = UnconfinedTemplate::try_from("/{{ tenant }}/").unwrap();
+        let tpl = Template::try_from("/{{ tenant }}/").unwrap();
         assert!(matches!(
             ConfinementChecker::for_template(&tpl).unwrap_err(),
             BuildError::DerivedBaseIsRoot { .. }
@@ -2239,7 +2234,7 @@ mod tests {
 
     #[test]
     fn non_root_slash_prefix_accepted() {
-        let tpl = UnconfinedTemplate::try_from("/data/{{ tenant }}/").unwrap();
+        let tpl = Template::try_from("/data/{{ tenant }}/").unwrap();
         let checker = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
         assert!(checker.confine("/data/tenant-a/").is_ok());
         assert!(checker.confine("/other/tenant-a/").is_err());
@@ -2253,7 +2248,7 @@ mod tests {
         event.as_mut_log().insert(event_path!("tenant"), "acme");
 
         let config = ConfinementConfig::default();
-        let tpl = UnconfinedTemplate::try_from("safe/{{ tenant }}/").unwrap();
+        let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
         let confined = tpl.confine(&config, "test_sink", "key").unwrap();
 
         assert_eq!(Ok(Bytes::from("safe/acme/")), confined.render(&event));
@@ -2267,7 +2262,7 @@ mod tests {
             .insert(event_path!("tenant"), "../../etc");
 
         let config = ConfinementConfig::default();
-        let tpl = UnconfinedTemplate::try_from("safe/{{ tenant }}/").unwrap();
+        let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
         let confined = tpl.confine(&config, "test_sink", "key").unwrap();
 
         assert!(matches!(
