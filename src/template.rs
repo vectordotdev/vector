@@ -515,11 +515,6 @@ impl Confined<UnconfinedTemplate> {
         self.inner.get_fields()
     }
 
-    /// Returns a reference to the inner [`UnconfinedTemplate`].
-    pub const fn as_unconfined(&self) -> &UnconfinedTemplate {
-        &self.inner
-    }
-
     /// Test-only: build a checkerless [`ConfinedTemplate`] directly from a source string, skipping
     /// confinement. Lets tests construct render-capable templates without threading a
     /// [`ConfinementConfig`] through every call site; production code must go through
