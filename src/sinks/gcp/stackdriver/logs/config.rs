@@ -9,7 +9,8 @@ use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
 use super::{
-    encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
+    encoder::{ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder},
+    request_builder::StackdriverLogsRequestBuilder,
     service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
 };
 use crate::{
@@ -254,27 +255,33 @@ impl SinkConfig for StackdriverConfig {
         // controlled label like `resource.labels.zone: "{{ zone }}"` is as
         // steerable as `log_id` unless we confine it too. Same for arbitrary
         // log-entry labels in `label_config.labels`.
-        let resource_labels = self
-            .resource
-            .labels
-            .clone()
-            .into_iter()
-            .map(|(k, v)| {
-                v.confine(&self.confinement, Self::NAME, "resource.labels")
-                    .map(|v| (k, v))
-            })
-            .collect::<crate::Result<_>>()?;
+        let resource = ConfinedStackdriverResource {
+            type_: self.resource.type_.clone(),
+            labels: self
+                .resource
+                .labels
+                .clone()
+                .into_iter()
+                .map(|(k, v)| {
+                    v.confine(&self.confinement, Self::NAME, "resource.labels")
+                        .map(|v| (k, v))
+                })
+                .collect::<crate::Result<_>>()?,
+        };
 
-        let labels = self
-            .label_config
-            .labels
-            .clone()
-            .into_iter()
-            .map(|(k, v)| {
-                v.confine(&self.confinement, Self::NAME, "label_config.labels")
-                    .map(|v| (k, v))
-            })
-            .collect::<crate::Result<_>>()?;
+        let label_config = ConfinedStackdriverLabelConfig {
+            labels_key: self.label_config.labels_key.clone(),
+            labels: self
+                .label_config
+                .labels
+                .clone()
+                .into_iter()
+                .map(|(k, v)| {
+                    v.confine(&self.confinement, Self::NAME, "label_config.labels")
+                        .map(|v| (k, v))
+                })
+                .collect::<crate::Result<_>>()?,
+        };
 
         let auth = self.auth.build(Scope::LoggingWrite).await?;
 
@@ -283,10 +290,8 @@ impl SinkConfig for StackdriverConfig {
                 self.encoding.clone(),
                 log_id,
                 self.log_name.clone(),
-                labels,
-                self.label_config.labels_key.clone(),
-                self.resource.type_.clone(),
-                resource_labels,
+                label_config,
+                resource,
                 self.severity_key.clone(),
             ),
         };

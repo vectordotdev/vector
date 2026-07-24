@@ -40,14 +40,6 @@ fn confine_template_map(
         .collect()
 }
 
-fn paths_from_template_map(map: &HashMap<Template, Template>) -> Vec<OwnedTargetPath> {
-    map.values()
-        .filter_map(|t| t.get_fields())
-        .flatten()
-        .filter_map(|f| parse_target_path(f.as_str()).ok())
-        .collect()
-}
-
 #[derive(Clone)]
 pub struct KeyPartitioner(Option<ConfinedTemplate>);
 
@@ -178,10 +170,8 @@ pub(super) struct EventEncoder {
     transformer: Transformer,
     encoder: Encoder<()>,
     labels: HashMap<ConfinedTemplate, ConfinedTemplate>,
-    label_value_fields: Vec<OwnedTargetPath>,
     remove_label_fields: bool,
     structured_metadata: HashMap<ConfinedTemplate, ConfinedTemplate>,
-    structured_metadata_value_fields: Vec<OwnedTargetPath>,
     remove_structured_metadata_fields: bool,
     remove_timestamp: bool,
 }
@@ -319,7 +309,16 @@ impl EventEncoder {
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
-        remove_event_fields(event, self.remove_label_fields, &self.label_value_fields);
+        if self.remove_label_fields {
+            let paths: Vec<OwnedTargetPath> = self
+                .labels
+                .values()
+                .filter_map(|t| t.get_fields())
+                .flatten()
+                .filter_map(|f| parse_target_path(f.as_str()).ok())
+                .collect();
+            remove_event_fields(event, true, &paths);
+        }
     }
 
     fn build_structured_metadata(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
@@ -333,11 +332,16 @@ impl EventEncoder {
     }
 
     fn remove_structured_metadata_fields(&self, event: &mut Event) {
-        remove_event_fields(
-            event,
-            self.remove_structured_metadata_fields,
-            &self.structured_metadata_value_fields,
-        );
+        if self.remove_structured_metadata_fields {
+            let paths: Vec<OwnedTargetPath> = self
+                .structured_metadata
+                .values()
+                .filter_map(|t| t.get_fields())
+                .flatten()
+                .filter_map(|f| parse_target_path(f.as_str()).ok())
+                .collect();
+            remove_event_fields(event, true, &paths);
+        }
     }
 
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
@@ -535,11 +539,6 @@ impl LokiSink {
             .map(|template| template.confine(&config.confinement, LokiConfig::NAME, "tenant_id"))
             .transpose()?;
 
-        // Pre-compute label/metadata value field paths before confining (introspection
-        // on UnconfinedTemplate). Parsing once here avoids re-parsing on every event.
-        let label_value_fields = paths_from_template_map(&config.labels);
-        let structured_metadata_value_fields = paths_from_template_map(&config.structured_metadata);
-
         let labels = confine_template_map(
             config.labels,
             &config.confinement,
@@ -565,9 +564,7 @@ impl LokiSink {
                 transformer,
                 encoder,
                 labels,
-                label_value_fields,
                 structured_metadata,
-                structured_metadata_value_fields,
                 remove_label_fields: config.remove_label_fields,
                 remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,
@@ -657,7 +654,7 @@ mod tests {
         lookup::PathPrefix,
     };
 
-    use vrl::{event_path, path::parse_target_path};
+    use vrl::event_path;
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
@@ -684,9 +681,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             structured_metadata: HashMap::default(),
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
@@ -724,9 +719,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             structured_metadata: HashMap::default(),
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
@@ -777,9 +770,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             structured_metadata: HashMap::default(),
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
@@ -825,9 +816,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             structured_metadata: HashMap::default(),
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
@@ -864,9 +853,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             structured_metadata: HashMap::default(),
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
@@ -889,9 +876,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             structured_metadata: HashMap::default(),
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: true,
         };
@@ -913,17 +898,13 @@ mod tests {
         let mut labels = HashMap::default();
         labels.insert(confined_label("static"), confined_label("value"));
         labels.insert(confined_label("{{ name }}"), confined_label("{{ value }}"));
-        // "value" is the field referenced by the dynamic label value template above.
-        let label_value_fields = vec![parse_target_path("value").unwrap()];
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
             structured_metadata: HashMap::default(),
-            label_value_fields,
             remove_label_fields: true,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
@@ -958,9 +939,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             structured_metadata,
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
@@ -1015,9 +994,7 @@ mod tests {
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
             structured_metadata: HashMap::default(),
-            label_value_fields: vec![],
             remove_label_fields: false,
-            structured_metadata_value_fields: vec![],
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };

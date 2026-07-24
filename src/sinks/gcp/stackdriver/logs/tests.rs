@@ -13,7 +13,7 @@ use vrl::{event_path, value};
 
 use super::{
     config::{StackdriverConfig, default_endpoint},
-    encoder::StackdriverLogsEncoder,
+    encoder::{ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder},
 };
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -92,16 +92,20 @@ fn encode_valid() {
         transformer,
         confined("{{ log_id }}"),
         StackdriverLogName::Project("project".to_owned()),
-        HashMap::from([(
-            "config_user_label_1".to_owned(),
-            confined("config_user_value_1"),
-        )]),
-        None,
-        "generic_node".to_owned(),
-        HashMap::from([
-            ("namespace".to_owned(), confined("office")),
-            ("node_id".to_owned(), confined("{{ node_id }}")),
-        ]),
+        ConfinedStackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::from([(
+                "config_user_label_1".to_owned(),
+                confined("config_user_value_1"),
+            )]),
+        },
+        ConfinedStackdriverResource {
+            type_: "generic_node".to_owned(),
+            labels: HashMap::from([
+                ("namespace".to_owned(), confined("office")),
+                ("node_id".to_owned(), confined("{{ node_id }}")),
+            ]),
+        },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
@@ -146,10 +150,14 @@ fn encode_inserts_timestamp() {
         transformer,
         confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
-        None,
-        "generic_node".to_owned(),
-        HashMap::from([("namespace".to_owned(), confined("office"))]),
+        ConfinedStackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
+        },
+        ConfinedStackdriverResource {
+            type_: "generic_node".to_owned(),
+            labels: HashMap::from([("namespace".to_owned(), confined("office"))]),
+        },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
@@ -216,10 +224,14 @@ async fn correct_request() {
         transformer,
         confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
-        None,
-        "generic_node".to_owned(),
-        HashMap::from([("namespace".to_owned(), confined("office"))]),
+        ConfinedStackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
+        },
+        ConfinedStackdriverResource {
+            type_: "generic_node".to_owned(),
+            labels: HashMap::from([("namespace".to_owned(), confined("office"))]),
+        },
         None,
     );
 
