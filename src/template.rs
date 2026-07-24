@@ -1,7 +1,5 @@
 //! Functionality for managing template fields used by Vector's sinks.
-use std::{
-    borrow::Cow, cell::RefCell, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock,
-};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
 
 use bytes::Bytes;
 use chrono::{
@@ -14,11 +12,7 @@ use regex::Regex;
 use snafu::Snafu;
 use tracing::warn;
 use vector_lib::{
-    configurable::{
-        Configurable, ConfigurableNumber, ConfigurableString, GenerateError, Metadata, NumberClass,
-        ToValue, configurable_component,
-        schema::{SchemaGenerator, SchemaObject, generate_string_schema},
-    },
+    configurable::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component},
     lookup::lookup_v2::parse_target_path,
 };
 
@@ -89,7 +83,7 @@ pub fn confined_preview(rendered: &str) -> String {
     rendered.get(..end).unwrap_or("").to_string()
 }
 
-/// A raw templated field — parsed but not yet confined.
+/// A templated field.
 ///
 /// In many cases, components can be configured so that part of the component's functionality can be
 /// customized on a per-event basis. For example, you have a sink that writes events to a file and you want to
@@ -562,8 +556,13 @@ pub type ConfinedTemplate = Confined<UnconfinedTemplate>;
 ///
 /// Transforms and sources, which have no confinement boundary, should store
 /// [`UnconfinedTemplate`] directly instead.
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[serde(try_from = "String", into = "String")]
 pub struct Template {
+    /// Inner template
+    #[serde(skip)]
     inner: UnconfinedTemplate,
 }
 
@@ -653,41 +652,8 @@ impl From<Template> for String {
     }
 }
 
-impl serde::Serialize for Template {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.inner.src)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Template {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
-        UnconfinedTemplate::try_from(s)
-            .map(|inner| Template { inner })
-            .map_err(serde::de::Error::custom)
-    }
-}
-
-impl Configurable for Template {
-    fn metadata() -> Metadata {
-        let mut metadata = UnconfinedTemplate::metadata();
-        metadata.set_transparent();
-        metadata
-    }
-
-    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        Ok(generate_string_schema())
-    }
-}
-
 // This is safe because we literally defer to `String` for the schema of `Template`.
 impl ConfigurableString for Template {}
-
-impl ToValue for Template {
-    fn to_value(&self) -> serde_json::Value {
-        serde_json::Value::String(self.inner.src.clone())
-    }
-}
 
 // ---------------------------------------------------------------------------
 // UnsignedIntTemplate (unchanged)
