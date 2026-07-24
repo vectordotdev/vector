@@ -732,22 +732,21 @@ impl SinkConfig for ElasticsearchConfig {
         // Confinement of the active mode's routing templates happens in
         // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
         // parsing. There is therefore nothing to confine up front here.
-        let this = self;
-        let commons = ElasticsearchCommon::parse_many(this, cx.proxy()).await?;
+        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
-        let request_limits = this.request.tower.into_settings();
+        let request_limits = self.request.tower.into_settings();
 
-        let health_config = this.endpoint_health.clone().unwrap_or_default();
+        let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         let services = commons
             .iter()
             .map(|common| {
                 let endpoint = common.base_url.clone();
 
-                let http_request_builder = HttpRequestBuilder::new(common, this);
+                let http_request_builder = HttpRequestBuilder::new(common, self);
                 let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
                 (endpoint, service)
@@ -756,7 +755,7 @@ impl SinkConfig for ElasticsearchConfig {
 
         let service = request_limits.distributed_service(
             ElasticsearchRetryLogic {
-                retry_partial: this.request_retry_partial,
+                retry_partial: self.request_retry_partial,
             },
             services,
             health_config,
@@ -764,7 +763,7 @@ impl SinkConfig for ElasticsearchConfig {
             1,
         );
 
-        let sink = ElasticsearchSink::new(&common, this, service)?;
+        let sink = ElasticsearchSink::new(&common, self, service)?;
 
         let stream = VectorSink::from_event_streamsink(sink);
 
