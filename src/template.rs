@@ -1033,7 +1033,8 @@ pub(crate) enum BuildError {
 
     /// The template is an HTTP/HTTPS URI but the static prefix ends before the
     /// authority (host + optional port), so the rendered URL's destination host
-    /// is entirely event-controlled.
+    /// is entirely event-controlled. Supply a static scheme + host, or set
+    /// `dangerously_allow_unconfined_template_resolution: true` to opt out.
     #[snafu(display(
         "HTTP/HTTPS template {prefix:?} has no static authority (host): the \
          destination host would be fully event-controlled. Add a static host to \
@@ -1045,7 +1046,9 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
-    /// The operator-authored URI prefix contains a percent-encoded path separator.
+    /// The operator-authored URI prefix contains a percent-encoded path separator
+    /// (`%2f` or `%5c`) or a raw backslash. These would cause every rendered
+    /// event to be dropped at runtime; reject at build time instead.
     #[snafu(display(
         "HTTP/HTTPS URI prefix {prefix:?} contains %2F, %5C, or a raw backslash \
          in the static portion. Use a literal `/` in the path instead."
@@ -1115,7 +1118,7 @@ pub(crate) enum ConfineError {
 
     /// Rejected because a `..` segment could escape the namespace root on
     /// filesystem-like protocols (e.g. WebHDFS) even when the string prefix
-    /// check passes — e.g. `safe/../../escape` starts with `safe/`.
+    /// check passes (e.g. `safe/../../escape` starts with `safe/`).
     #[snafu(display(
         "rendered value {:?} contains a `..` path segment",
         confined_preview(rendered)
