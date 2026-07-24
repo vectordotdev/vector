@@ -40,167 +40,183 @@ generated: components: sinks: prometheus_exporter: configuration: {
 		}
 	}
 	auth: {
-		description: """
-			Configuration of the authentication strategy for HTTP requests.
-
-			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
-			HTTP header without any additional encryption beyond what is provided by the transport itself.
-			"""
-		required: false
+		description: "Authentication configuration for the Prometheus exporter."
+		required:    false
 		type: object: options: {
-			auth: {
-				description:   "The AWS authentication configuration."
-				relevant_when: "strategy = \"aws\""
-				required:      true
-				type: object: options: {
-					access_key_id: {
-						description: "The AWS access key ID."
-						required:    true
-						type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
-					}
-					assume_role: {
-						description: """
-																The ARN of an [IAM role][iam_role] to assume.
+			allowed_groups: {
+				description: """
+					Restrict access to users in specific groups.
 
-																[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-																"""
-						required: true
-						type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
-					}
-					credentials_file: {
-						description: "Path to the credentials file."
-						required:    true
-						type: string: examples: ["/my/aws/credentials"]
-					}
-					external_id: {
-						description: """
-																The optional unique external ID in conjunction with role to assume.
+					If specified, the authenticated user from TokenReview must be a member of at least one
+					of these groups. If not specified, any authenticated user's permissions will be checked.
 
-																[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
-																"""
-						required: false
-						type: string: examples: ["randomEXAMPLEidString"]
-					}
-					imds: {
-						description: "Configuration for authenticating with AWS through IMDS."
-						required:    false
-						type: object: options: {
-							connect_timeout_seconds: {
-								description: "Connect timeout for IMDS."
-								required:    false
-								type: uint: {
-									default: 1
-									unit:    "seconds"
-								}
-							}
-							max_attempts: {
-								description: "Number of IMDS retries for fetching tokens and metadata."
-								required:    false
-								type: uint: default: 4
-							}
-							read_timeout_seconds: {
-								description: "Read timeout for IMDS."
-								required:    false
-								type: uint: {
-									default: 1
-									unit:    "seconds"
-								}
-							}
-						}
-					}
-					load_timeout_secs: {
-						description: """
-																Timeout for successfully loading any credentials, in seconds.
+					Use this to restrict the endpoint to specific teams or roles.
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      false
+				type: array: items: type: string: examples: ["system:authenticated"]
+			}
+			allowed_user: {
+				description: """
+					Restrict access to a specific user identity.
 
-																Relevant when the default credentials chain or `assume_role` is used.
-																"""
-						required: false
-						type: uint: {
-							examples: [30]
-							unit: "seconds"
-						}
-					}
-					profile: {
-						description: """
-																The credentials profile to use.
+					If specified, the authenticated user from TokenReview must exactly match this value.
+					If not specified, any authenticated user's permissions will be checked.
 
-																Used to select AWS credentials from a provided credentials file.
-																"""
-						required: false
-						type: string: {
-							default: "default"
-							examples: ["develop"]
-						}
-					}
-					region: {
-						description: """
-																The [AWS region][aws_region] to send STS requests to.
+					Use this to restrict the endpoint to a specific service account or user.
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      false
+				type: string: examples: ["system:serviceaccount:my-namespace:myserviceaccount"]
+			}
+			audience: {
+				description: """
+					Required audience for token validation.
 
-																If not set, this defaults to the configured region
-																for the service itself.
+					The bearer token presented by the client must have been issued for this audience.
+					This prevents tokens minted for the Kubernetes API server from being replayed
+					to scrape this metrics endpoint.
 
-																[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
-																"""
-						required: false
-						type: string: examples: ["us-west-2"]
-					}
-					secret_access_key: {
-						description: "The AWS secret access key."
-						required:    true
-						type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
-					}
-					session_name: {
-						description: """
-																The optional [RoleSessionName][role_session_name] is a unique session identifier for your assumed role.
+					**Security**: It is strongly recommended to set this to a unique value specific
+					to your Vector metrics endpoint (e.g., "https://vector.my-namespace.svc.cluster.local").
 
-																Should be unique per principal or reason.
-																If not set, the session name is autogenerated like assume-role-provider-1736428351340
+					If not specified, tokens are validated for the default Kubernetes API server audience,
+					which allows API server tokens to be replayed (not recommended for production).
 
-																[role_session_name]: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
-																"""
-						required: false
-						type: string: examples: ["vector-indexer-role"]
-					}
-					session_token: {
-						description: """
-																The AWS session token.
-																See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
-																"""
-						required: false
-						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
-					}
-				}
+					When using projected service account tokens, configure your scraper (e.g., Prometheus)
+					to mount a token with this audience.
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      false
+				type: string: examples: ["https://vector-metrics.monitoring.svc.cluster.local"]
+			}
+			namespace: {
+				description: """
+					The namespace to check access in (only used with `resource`, not `path`).
+
+					If specified, checks for namespaced resource access.
+					If not specified (None), checks for cluster-scoped access.
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      false
+				type: string: {}
 			}
 			password: {
 				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: examples: ["${PASSWORD}", "password"]
+				type: string: examples: ["password"]
 			}
-			service: {
-				description:   "The AWS service name to use for signing."
-				relevant_when: "strategy = \"aws\""
-				required:      true
-				type: string: {}
+			path: {
+				description: """
+					The URL path to check access for (nonResourceURL).
+
+					Use this for API endpoints like /metrics, /healthz, /api.
+					Must start with "/" and match the nonResourceURLs in the client's RBAC.
+
+					Mutually exclusive with `resource`. Specify either `path` OR `resource`, not both.
+
+					Example RBAC rule for nonResourceURL:
+					```yaml
+					- nonResourceURLs: ["/metrics"]
+					  verbs: ["get"]
+					```
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      false
+				type: string: examples: ["/metrics"]
+			}
+			resource: {
+				description: """
+					The resource to check access for (Kubernetes resource).
+
+					Use this for Kubernetes resources like pods, services, configmaps.
+					Mutually exclusive with `path`. Specify either `path` OR `resource`, not both.
+
+					Example RBAC rule for resource:
+					```yaml
+					- apiGroups: [""]
+					  resources: ["metrics"]
+					  verbs: ["get"]
+					```
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      false
+				type: string: examples: ["metrics"]
+			}
+			resource_group: {
+				description: """
+					The API group for the resource (only used with `resource`, not `path`).
+
+					Leave empty ("") for core Kubernetes resources.
+					Use the API group name for custom resources (e.g., "metrics.k8s.io").
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      false
+				type: string: {
+					default: ""
+					examples: [""]
+				}
 			}
 			strategy: {
 				description: "The authentication strategy to use."
 				required:    true
 				type: string: enum: {
-					aws: "AWS authentication."
-					basic: """
-						Basic authentication.
+					basic:  "Basic authentication."
+					bearer: "Bearer authentication."
+					custom: "Custom Authorization Header Value."
+					sar: """
+						Kubernetes SubjectAccessReview authentication.
 
-						The username and password are concatenated and encoded using [base64][base64].
+						Validates Bearer tokens using Kubernetes TokenReview and SubjectAccessReview APIs.
+						Supports both resource-based and nonResourceURL-based authorization.
 
-						[base64]: https://en.wikipedia.org/wiki/Base64
+						## Required RBAC Permissions
+
+						Vector's ServiceAccount must have permissions to create TokenReview and SubjectAccessReview resources:
+
+						```yaml
+						apiVersion: rbac.authorization.k8s.io/v1
+						kind: ClusterRole
+						metadata:
+						  name: vector-token-validator
+						rules:
+						- apiGroups: ["authentication.k8s.io"]
+						  resources: ["tokenreviews"]
+						  verbs: ["create"]
+						- apiGroups: ["authorization.k8s.io"]
+						  resources: ["subjectaccessreviews"]
+						  verbs: ["create"]
+						```
+
+						## How it Works
+
+						1. Client (e.g., Prometheus) sends request with `Authorization: Bearer <token>`
+						2. Vector extracts the Bearer token from the request
+						3. Vector uses its own ServiceAccount to authenticate to the Kubernetes API
+						4. Vector calls TokenReview API with the client's token to validate it and get user identity
+						5. Vector calls SubjectAccessReview API to check if that user has the specified permissions
+						6. Vector allows or denies the request based on the SubjectAccessReview response
+
+						## Configuration Examples
+
+						NonResourceURL-based (for /metrics, /healthz, etc.):
+						```toml
+						[sinks.prometheus.auth]
+						strategy = "sar"
+						path = "/metrics"
+						verb = "get"
+						```
+
+						Resource-based (for Kubernetes resources):
+						```toml
+						[sinks.prometheus.auth]
+						strategy = "sar"
+						resource = "pods"
+						verb = "get"
+						resource_group = ""
+						```
 						"""
-					bearer: """
-						Bearer authentication.
-
-						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
-						"""
-					custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
 				}
 			}
 			token: {
@@ -213,13 +229,24 @@ generated: components: sinks: prometheus_exporter: configuration: {
 				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
-				type: string: examples: ["${USERNAME}", "username"]
+				type: string: examples: ["username"]
 			}
 			value: {
-				description:   "Custom string value of the Authorization header"
+				description:   "Custom string value of the Authorization header."
 				relevant_when: "strategy = \"custom\""
 				required:      true
-				type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
+				type: string: examples: ["CUSTOM_PREFIX ${TOKEN}"]
+			}
+			verb: {
+				description: """
+					The verb to check.
+
+					For resources: "get", "list", "watch", "create", "update", "delete"
+					For nonResourceURLs: typically "get" or "post"
+					"""
+				relevant_when: "strategy = \"sar\""
+				required:      true
+				type: string: examples: ["get"]
 			}
 		}
 	}

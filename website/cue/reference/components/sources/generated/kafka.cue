@@ -653,7 +653,7 @@ generated: components: sources: kafka: configuration: {
 		type: string: {
 			default: "offset"
 			examples: [
-				"offset",
+				"offset"
 			]
 		}
 	}
@@ -843,7 +843,7 @@ generated: components: sources: kafka: configuration: {
 		type: string: {
 			default: "topic"
 			examples: [
-				"topic",
+				"topic"
 			]
 		}
 	}

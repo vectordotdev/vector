@@ -864,7 +864,7 @@ generated: components: sinks: doris: configuration: {
 		type: string: {
 			default: "vector"
 			examples: [
-				"vector",
+				"vector"
 			]
 		}
 	}

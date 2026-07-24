@@ -590,7 +590,7 @@ generated: components: sinks: file: configuration: {
 		type: uint: {
 			default: 30
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}

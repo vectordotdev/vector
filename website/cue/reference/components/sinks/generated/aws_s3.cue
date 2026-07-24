@@ -385,7 +385,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"gzip",
+			"gzip"
 		]
 	}
 	content_type: {
@@ -878,7 +878,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"json",
+			"json"
 		]
 	}
 	filename_time_format: {

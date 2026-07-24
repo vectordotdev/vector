@@ -22,7 +22,9 @@ use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
-use tracing::{Instrument, Span};
+#[cfg(feature = "kubernetes")]
+use tracing::warn;
+use tracing::{Instrument, Span, error, info};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
@@ -32,6 +34,9 @@ use vector_lib::{
     },
 };
 
+#[cfg(feature = "kubernetes")]
+use kube::{Api, Client};
+
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
@@ -39,7 +44,7 @@ use crate::{
         Event, EventStatus, Finalizable,
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
     },
-    http::{Auth, build_http_trace_layer},
+    http::build_http_trace_layer,
     internal_events::PrometheusNormalizationError,
     sinks::{
         Healthcheck, VectorSink,
@@ -56,6 +61,193 @@ const LOCK_FAILED: &str = "Prometheus exporter data lock is poisoned";
 enum BuildError {
     #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
     FlushPeriodTooShort { min: u64 },
+
+    #[cfg(feature = "kubernetes")]
+    #[snafu(display(
+        "SubjectAccessReview auth must specify exactly one of 'path' (for nonResourceURLs) or 'resource' (for Kubernetes resources), not both or neither"
+    ))]
+    SarInvalidPathResourceConfig,
+}
+
+/// Authentication configuration for the Prometheus exporter.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "strategy", deny_unknown_fields)]
+#[serde(rename_all = "lowercase")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+pub enum PrometheusExporterAuth {
+    /// Basic authentication.
+    Basic {
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "username"))]
+        user: String,
+
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "password"))]
+        password: vector_lib::sensitive_string::SensitiveString,
+    },
+
+    /// Bearer authentication.
+    Bearer {
+        /// The bearer authentication token.
+        token: vector_lib::sensitive_string::SensitiveString,
+    },
+
+    /// Custom Authorization Header Value.
+    Custom {
+        /// Custom string value of the Authorization header.
+        #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
+        value: String,
+    },
+
+    #[cfg(feature = "kubernetes")]
+    /// Kubernetes SubjectAccessReview authentication.
+    ///
+    /// Validates Bearer tokens using Kubernetes TokenReview and SubjectAccessReview APIs.
+    /// Supports both resource-based and nonResourceURL-based authorization.
+    ///
+    /// ## Required RBAC Permissions
+    ///
+    /// Vector's ServiceAccount must have permissions to create TokenReview and SubjectAccessReview resources:
+    ///
+    /// ```yaml
+    /// apiVersion: rbac.authorization.k8s.io/v1
+    /// kind: ClusterRole
+    /// metadata:
+    ///   name: vector-token-validator
+    /// rules:
+    /// - apiGroups: ["authentication.k8s.io"]
+    ///   resources: ["tokenreviews"]
+    ///   verbs: ["create"]
+    /// - apiGroups: ["authorization.k8s.io"]
+    ///   resources: ["subjectaccessreviews"]
+    ///   verbs: ["create"]
+    /// ```
+    ///
+    /// ## How it Works
+    ///
+    /// 1. Client (e.g., Prometheus) sends request with `Authorization: Bearer <token>`
+    /// 2. Vector extracts the Bearer token from the request
+    /// 3. Vector uses its own ServiceAccount to authenticate to the Kubernetes API
+    /// 4. Vector calls TokenReview API with the client's token to validate it and get user identity
+    /// 5. Vector calls SubjectAccessReview API to check if that user has the specified permissions
+    /// 6. Vector allows or denies the request based on the SubjectAccessReview response
+    ///
+    /// ## Configuration Examples
+    ///
+    /// NonResourceURL-based (for /metrics, /healthz, etc.):
+    /// ```toml
+    /// [sinks.prometheus.auth]
+    /// strategy = "sar"
+    /// path = "/metrics"
+    /// verb = "get"
+    /// ```
+    ///
+    /// Resource-based (for Kubernetes resources):
+    /// ```toml
+    /// [sinks.prometheus.auth]
+    /// strategy = "sar"
+    /// resource = "pods"
+    /// verb = "get"
+    /// resource_group = ""
+    /// ```
+    ///
+    Sar {
+        /// The URL path to check access for (nonResourceURL).
+        ///
+        /// Use this for API endpoints like /metrics, /healthz, /api.
+        /// Must start with "/" and match the nonResourceURLs in the client's RBAC.
+        ///
+        /// Mutually exclusive with `resource`. Specify either `path` OR `resource`, not both.
+        ///
+        /// Example RBAC rule for nonResourceURL:
+        /// ```yaml
+        /// - nonResourceURLs: ["/metrics"]
+        ///   verbs: ["get"]
+        /// ```
+        #[serde(default)]
+        #[configurable(metadata(docs::examples = "/metrics"))]
+        path: Option<String>,
+
+        /// The resource to check access for (Kubernetes resource).
+        ///
+        /// Use this for Kubernetes resources like pods, services, configmaps.
+        /// Mutually exclusive with `path`. Specify either `path` OR `resource`, not both.
+        ///
+        /// Example RBAC rule for resource:
+        /// ```yaml
+        /// - apiGroups: [""]
+        ///   resources: ["metrics"]
+        ///   verbs: ["get"]
+        /// ```
+        #[serde(default)]
+        #[configurable(metadata(docs::examples = "metrics"))]
+        resource: Option<String>,
+
+        /// The verb to check.
+        ///
+        /// For resources: "get", "list", "watch", "create", "update", "delete"
+        /// For nonResourceURLs: typically "get" or "post"
+        #[configurable(metadata(docs::examples = "get"))]
+        verb: String,
+
+        /// The API group for the resource (only used with `resource`, not `path`).
+        ///
+        /// Leave empty ("") for core Kubernetes resources.
+        /// Use the API group name for custom resources (e.g., "metrics.k8s.io").
+        #[serde(default)]
+        #[configurable(metadata(docs::examples = ""))]
+        resource_group: String,
+
+        /// The namespace to check access in (only used with `resource`, not `path`).
+        ///
+        /// If specified, checks for namespaced resource access.
+        /// If not specified (None), checks for cluster-scoped access.
+        #[serde(default)]
+        namespace: Option<String>,
+
+        /// Restrict access to a specific user identity.
+        ///
+        /// If specified, the authenticated user from TokenReview must exactly match this value.
+        /// If not specified, any authenticated user's permissions will be checked.
+        ///
+        /// Use this to restrict the endpoint to a specific service account or user.
+        #[serde(default)]
+        #[configurable(metadata(
+            docs::examples = "system:serviceaccount:my-namespace:myserviceaccount"
+        ))]
+        allowed_user: Option<String>,
+
+        /// Restrict access to users in specific groups.
+        ///
+        /// If specified, the authenticated user from TokenReview must be a member of at least one
+        /// of these groups. If not specified, any authenticated user's permissions will be checked.
+        ///
+        /// Use this to restrict the endpoint to specific teams or roles.
+        #[serde(default)]
+        #[configurable(metadata(docs::examples = "system:authenticated"))]
+        allowed_groups: Option<Vec<String>>,
+
+        /// Required audience for token validation.
+        ///
+        /// The bearer token presented by the client must have been issued for this audience.
+        /// This prevents tokens minted for the Kubernetes API server from being replayed
+        /// to scrape this metrics endpoint.
+        ///
+        /// **Security**: It is strongly recommended to set this to a unique value specific
+        /// to your Vector metrics endpoint (e.g., "https://vector.my-namespace.svc.cluster.local").
+        ///
+        /// If not specified, tokens are validated for the default Kubernetes API server audience,
+        /// which allows API server tokens to be replayed (not recommended for production).
+        ///
+        /// When using projected service account tokens, configure your scraper (e.g., Prometheus)
+        /// to mount a token with this audience.
+        #[serde(default)]
+        #[configurable(metadata(
+            docs::examples = "https://vector-metrics.monitoring.svc.cluster.local"
+        ))]
+        audience: Option<String>,
+    },
 }
 
 /// Configuration for the `prometheus_exporter` sink.
@@ -87,7 +279,7 @@ pub struct PrometheusExporterConfig {
     pub address: SocketAddr,
 
     #[configurable(derived)]
-    pub auth: Option<Auth>,
+    pub auth: Option<PrometheusExporterAuth>,
 
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
@@ -200,6 +392,17 @@ impl SinkConfig for PrometheusExporterConfig {
 
         validate_quantiles(&self.quantiles)?;
 
+        // Validate SAR configuration: must specify exactly one of path or resource
+        #[cfg(feature = "kubernetes")]
+        if let Some(PrometheusExporterAuth::Sar { path, resource, .. }) = &self.auth {
+            match (path, resource) {
+                (Some(_), Some(_)) | (None, None) => {
+                    return Err(Box::new(BuildError::SarInvalidPathResourceConfig));
+                }
+                _ => {} // Valid: exactly one is set
+            }
+        }
+
         let sink = PrometheusExporter::new(self.clone());
         let healthcheck = future::ok(()).boxed();
 
@@ -308,29 +511,292 @@ impl Hash for MetricRef {
     }
 }
 
-fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
+/// Parameters for SubjectAccessReview authorization check.
+#[cfg(feature = "kubernetes")]
+struct SarAuthParams<'a> {
+    verb: &'a str,
+    path: Option<&'a str>,
+    resource: Option<&'a str>,
+    resource_group: Option<&'a str>,
+    namespace: &'a Option<String>,
+    user: &'a Option<String>,
+    groups: &'a Option<Vec<String>>,
+    audience: &'a Option<String>,
+}
+
+/// Validates a Bearer token using Kubernetes TokenReview and SubjectAccessReview.
+///
+/// This function supports both resource-based and nonResourceURL-based authorization:
+/// - For resource-based: provide `resource`, `resource_group`, and optionally `namespace`
+/// - For nonResourceURL-based: provide `path`
+///
+/// This function:
+/// 1. Uses Vector's own service account to authenticate to the K8s API
+/// 2. Validates the client's token using TokenReview API
+/// 3. Extracts user identity from the TokenReview response
+/// 4. Checks permissions using SubjectAccessReview API (with ResourceAttributes or NonResourceAttributes)
+#[cfg(feature = "kubernetes")]
+async fn validate_token_with_sar(
+    client: &Client,
+    token: &str,
+    params: SarAuthParams<'_>,
+) -> crate::Result<bool> {
+    use k8s_openapi::api::authentication::v1::{TokenReview, TokenReviewSpec};
+    use k8s_openapi::api::authorization::v1::{
+        NonResourceAttributes, ResourceAttributes, SubjectAccessReview, SubjectAccessReviewSpec,
+    };
+
+    debug!(
+        message = "Validating bearer token",
+        path = ?params.path,
+        resource = ?params.resource,
+        audience = ?params.audience
+    );
+
+    // Step 1: Validate the client's token using TokenReview
+    let token_review = TokenReview {
+        spec: TokenReviewSpec {
+            token: Some(token.to_string()),
+            audiences: params.audience.as_ref().map(|aud| vec![aud.clone()]),
+        },
+        ..Default::default()
+    };
+
+    debug!(
+        message = "Calling TokenReview API",
+        requested_audience = ?params.audience
+    );
+    let token_api: Api<TokenReview> = Api::all(client.clone());
+    let token_result = token_api.create(&Default::default(), &token_review).await?;
+
+    // Check if token is valid
+    let token_status = token_result
+        .status
+        .ok_or("TokenReview returned no status")?;
+
+    if !token_status.authenticated.unwrap_or(false) {
+        warn!(message = "Token authentication failed via TokenReview");
+        return Ok(false);
+    }
+
+    // Validate audience if one was requested
+    if let Some(required_audience) = params.audience {
+        let token_audiences = token_status.audiences.as_ref();
+
+        match token_audiences {
+            Some(auds) if auds.contains(required_audience) => {
+                debug!(
+                    message = "Token audience validated",
+                    required_audience = %required_audience,
+                    token_audiences = ?auds
+                );
+            }
+            Some(auds) => {
+                warn!(
+                    message = "Token audience mismatch",
+                    required_audience = %required_audience,
+                    token_audiences = ?auds
+                );
+                return Ok(false);
+            }
+            None => {
+                warn!(
+                    message = "Token has no audience but one was required",
+                    required_audience = %required_audience
+                );
+                return Ok(false);
+            }
+        }
+    }
+
+    // Extract user info from the validated token
+    let user_info = token_status
+        .user
+        .ok_or("TokenReview returned no user info")?;
+
+    // Log the authenticated user
+    debug!(
+        message = "Token authenticated successfully",
+        username = ?user_info.username,
+        uid = ?user_info.uid,
+        groups = ?user_info.groups,
+        extra = ?user_info.extra
+    );
+
+    // Check if user matches allowed_user filter (if configured)
+    if let Some(allowed_user) = params.user {
+        if user_info.username.as_deref() != Some(allowed_user as &str) {
+            warn!(
+                message = "User does not match allowed_user filter",
+                authenticated_user = ?user_info.username,
+                allowed_user = %allowed_user
+            );
+            return Ok(false);
+        }
+    }
+
+    // Check if user is in at least one allowed_groups (if configured)
+    if let Some(allowed_groups) = params.groups {
+        let user_groups = user_info.groups.as_deref().unwrap_or(&[]);
+        let has_allowed_group = allowed_groups.iter().any(|ag| user_groups.contains(ag));
+
+        if !has_allowed_group {
+            warn!(
+                message = "User is not in any allowed_groups",
+                authenticated_user = ?user_info.username,
+                user_groups = ?user_groups,
+                allowed_groups = ?allowed_groups
+            );
+            return Ok(false);
+        }
+    }
+
+    // Use the full authenticated user's identity for SAR check
+    let check_user = user_info.username;
+    let check_groups = user_info.groups;
+    let check_uid = user_info.uid;
+    let check_extra = user_info.extra;
+
+    // Step 2: Create SubjectAccessReview with appropriate attributes
+    let sar = match (params.path, params.resource) {
+        (Some(p), None) => {
+            // NonResourceURL-based authorization
+            // Normalize verb to lowercase to match Kubernetes RBAC conventions
+            let normalized_verb = params.verb.to_lowercase();
+            let non_resource_attrs = NonResourceAttributes {
+                path: Some(p.to_string()),
+                verb: Some(normalized_verb.clone()),
+            };
+
+            debug!(
+                message = "Calling SubjectAccessReview API for nonResourceURL",
+                user = ?check_user,
+                groups = ?check_groups,
+                path = %p,
+                verb = %normalized_verb
+            );
+
+            SubjectAccessReview {
+                spec: SubjectAccessReviewSpec {
+                    non_resource_attributes: Some(non_resource_attrs),
+                    user: check_user.clone(),
+                    groups: check_groups.clone(),
+                    uid: check_uid.clone(),
+                    extra: check_extra.clone(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+        }
+        (None, Some(r)) => {
+            // Resource-based authorization
+            // Normalize verb to lowercase to match Kubernetes RBAC conventions
+            let normalized_verb = params.verb.to_lowercase();
+            let resource_attrs = ResourceAttributes {
+                group: Some(params.resource_group.unwrap_or("").to_string()),
+                resource: Some(r.to_string()),
+                verb: Some(normalized_verb.clone()),
+                namespace: params.namespace.clone(),
+                ..Default::default()
+            };
+
+            debug!(
+                message = "Calling SubjectAccessReview API for resource",
+                user = ?check_user,
+                groups = ?check_groups,
+                resource = %r,
+                verb = %normalized_verb,
+                resource_group = %params.resource_group.unwrap_or(""),
+                namespace = ?params.namespace
+            );
+
+            SubjectAccessReview {
+                spec: SubjectAccessReviewSpec {
+                    resource_attributes: Some(resource_attrs),
+                    user: check_user.clone(),
+                    groups: check_groups.clone(),
+                    uid: check_uid.clone(),
+                    extra: check_extra.clone(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+        }
+        _ => {
+            return Err("Must specify either 'path' or 'resource', not both or neither".into());
+        }
+    };
+
+    // Step 3: Check if the user has the required permissions
+    let sar_api: Api<SubjectAccessReview> = Api::all(client.clone());
+    let sar_result = sar_api.create(&Default::default(), &sar).await?;
+
+    let allowed = sar_result
+        .status
+        .as_ref()
+        .map(|s| s.allowed)
+        .unwrap_or(false);
+
+    // Log the SubjectAccessReview result
+    if allowed {
+        debug!(
+            message = "SubjectAccessReview allowed access",
+            user = ?check_user,
+            path = ?params.path,
+            resource = ?params.resource,
+            verb = %params.verb
+        );
+    } else {
+        warn!(
+            message = "SubjectAccessReview denied access",
+            user = ?check_user,
+            path = ?params.path,
+            resource = ?params.resource,
+            verb = %params.verb,
+            reason = ?sar_result.status.as_ref().and_then(|s| s.reason.as_ref()),
+            evaluation_error = ?sar_result.status.as_ref().and_then(|s| s.evaluation_error.as_ref())
+        );
+    }
+
+    Ok(allowed)
+}
+
+/// Extracts the Bearer token from the Authorization header.
+#[cfg(feature = "kubernetes")]
+fn extract_bearer_token<T: HttpBody>(req: &Request<T>) -> Option<String> {
+    req.headers()
+        .get(hyper::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")
+        .map(|s| s.to_string())
+}
+
+fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<PrometheusExporterAuth>) -> bool {
     if let Some(auth) = auth {
         let headers = req.headers();
         if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
             let encoded_credentials = match auth {
-                Auth::Basic { user, password } => Some(HeaderValue::from_str(
+                PrometheusExporterAuth::Basic { user, password } => Some(HeaderValue::from_str(
                     format!(
                         "Basic {}",
                         BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
                     )
                     .as_str(),
                 )),
-                Auth::Bearer { token } => Some(HeaderValue::from_str(
+                PrometheusExporterAuth::Bearer { token } => Some(HeaderValue::from_str(
                     format!("Bearer {}", token.inner()).as_str(),
                 )),
-                Auth::Custom { value } => Some(HeaderValue::from_str(value)),
-                #[cfg(feature = "aws-core")]
-                _ => None,
+                PrometheusExporterAuth::Custom { value } => Some(HeaderValue::from_str(value)),
+                #[cfg(feature = "kubernetes")]
+                PrometheusExporterAuth::Sar { .. } => {
+                    // SubjectAccessReview is handled asynchronously in check_authorization
+                    // This should never be reached
+                    return false;
+                }
             };
 
-            if let Some(Ok(encoded_credentials)) = encoded_credentials
-                && auth_header == encoded_credentials
-            {
+            if matches!(encoded_credentials, Some(Ok(ref creds)) if auth_header == creds) {
                 return true;
             }
         }
@@ -343,32 +809,41 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
 
 #[derive(Clone)]
 struct Handler {
-    auth: Option<Auth>,
+    auth: Option<PrometheusExporterAuth>,
     default_namespace: Option<String>,
     buckets: Box<[f64]>,
     quantiles: Box<[f64]>,
     bytes_sent: Registered<BytesSent>,
     events_sent: Registered<EventsSent>,
+    #[cfg(feature = "kubernetes")]
+    kube_client: Option<Client>,
 }
 
 impl Handler {
-    fn handle<T: HttpBody>(
+    async fn handle<T: HttpBody>(
         &self,
         req: Request<T>,
         metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
     ) -> Response<Body> {
         let mut response = Response::new(Body::empty());
 
-        match (authorized(&req, &self.auth), req.method(), req.uri().path()) {
-            (false, _, _) => {
-                *response.status_mut() = StatusCode::UNAUTHORIZED;
-                response.headers_mut().insert(
-                    http::header::WWW_AUTHENTICATE,
-                    HeaderValue::from_static("Basic, Bearer"),
-                );
-            }
+        // Short-circuit non-metrics routes before authorization checks to prevent
+        // unnecessary Kubernetes API calls for invalid paths, health probes, etc.
+        match (req.method(), req.uri().path()) {
+            (&Method::GET, "/metrics") => {
+                // Only perform authorization for the metrics endpoint
+                let is_authorized = self.check_authorization(&req).await;
 
-            (true, &Method::GET, "/metrics") => {
+                if !is_authorized {
+                    *response.status_mut() = StatusCode::UNAUTHORIZED;
+                    response.headers_mut().insert(
+                        http::header::WWW_AUTHENTICATE,
+                        HeaderValue::from_static("Basic, Bearer"),
+                    );
+                    return response;
+                }
+
+                // Authorization passed, serve metrics
                 let metrics = metrics.read().expect(LOCK_FAILED);
 
                 let count = metrics.len();
@@ -404,12 +879,117 @@ impl Handler {
                 self.bytes_sent.emit(ByteSize(body_size));
             }
 
-            (true, _, _) => {
+            // All other routes return 404 without authorization checks
+            _ => {
                 *response.status_mut() = StatusCode::NOT_FOUND;
             }
         }
 
         response
+    }
+
+    async fn check_authorization<T: HttpBody>(&self, req: &Request<T>) -> bool {
+        // Handle SubjectAccessReview authentication
+        #[cfg(feature = "kubernetes")]
+        if let Some(PrometheusExporterAuth::Sar {
+            path,
+            resource,
+            verb,
+            resource_group,
+            namespace,
+            allowed_user,
+            allowed_groups,
+            audience,
+        }) = &self.auth
+        {
+            // Ensure we have a Kubernetes client
+            let client = match &self.kube_client {
+                Some(c) => c,
+                None => {
+                    error!(
+                        message =
+                            "SubjectAccessReview configured but Kubernetes client not initialized"
+                    );
+                    return false;
+                }
+            };
+
+            // For path-based (nonResourceURL) SAR, validate that configured path/verb
+            // match the actual request being authorized
+            if let Some(configured_path) = path {
+                let request_path = req.uri().path();
+                let request_method = req.method().as_str().to_lowercase();
+
+                if configured_path != request_path {
+                    error!(
+                        message = "SAR path mismatch: configured path does not match actual request",
+                        configured_path = %configured_path,
+                        request_path = %request_path,
+                        security_note = "This prevents authorizing /metrics based on permission for a different URL"
+                    );
+                    return false;
+                }
+
+                if verb.to_lowercase() != request_method {
+                    error!(
+                        message = "SAR verb mismatch: configured verb does not match actual request",
+                        configured_verb = %verb,
+                        request_method = %request_method,
+                        security_note = "This prevents authorizing GET based on permission for POST"
+                    );
+                    return false;
+                }
+
+                debug!(
+                    message = "SAR request validation passed",
+                    path = %request_path,
+                    method = %request_method
+                );
+            }
+
+            // Validate token with SubjectAccessReview
+            if let Some(token) = extract_bearer_token(req) {
+                debug!(message = "Extracted Bearer token from request");
+
+                match validate_token_with_sar(
+                    client,
+                    &token,
+                    SarAuthParams {
+                        verb,
+                        path: path.as_deref(),
+                        resource: resource.as_deref(),
+                        resource_group: Some(resource_group.as_str()),
+                        namespace,
+                        user: allowed_user,
+                        groups: allowed_groups,
+                        audience,
+                    },
+                )
+                .await
+                {
+                    Ok(allowed) => {
+                        return allowed;
+                    }
+                    Err(e) => {
+                        error!(
+                            message = "Failed to validate token with SubjectAccessReview",
+                            error = %e,
+                            path = ?path,
+                            resource = ?resource
+                        );
+                        return false;
+                    }
+                }
+            } else {
+                warn!(
+                    message = "SubjectAccessReview configured but no Bearer token provided in Authorization header"
+                );
+                return false;
+            }
+        }
+
+        // Fall back to standard auth (Basic, Bearer, Custom)
+        authorized(req, &self.auth)
     }
 }
 
@@ -427,6 +1007,29 @@ impl PrometheusExporter {
             return Ok(());
         }
 
+        // Create Kubernetes client if SAR authentication is configured
+        #[cfg(feature = "kubernetes")]
+        let kube_client = if matches!(self.config.auth, Some(PrometheusExporterAuth::Sar { .. })) {
+            match Client::try_default().await {
+                Ok(client) => {
+                    info!(
+                        message =
+                            "Kubernetes client initialized for SubjectAccessReview authentication"
+                    );
+                    Some(client)
+                }
+                Err(e) => {
+                    error!(
+                        message = "Failed to initialize Kubernetes client for SubjectAccessReview authentication",
+                        error = %e
+                    );
+                    return Err(Box::new(e));
+                }
+            }
+        } else {
+            None
+        };
+
         let handler = Handler {
             bytes_sent: register!(BytesSent::from(Protocol::HTTP)),
             events_sent: register!(EventsSent::from(Output(None))),
@@ -434,6 +1037,8 @@ impl PrometheusExporter {
             buckets: self.config.buckets.clone().into(),
             quantiles: self.config.quantiles.clone().into(),
             auth: self.config.auth.clone(),
+            #[cfg(feature = "kubernetes")]
+            kube_client,
         };
 
         let span = Span::current();
@@ -445,9 +1050,13 @@ impl PrometheusExporter {
             let handler = handler.clone();
 
             let inner = service_fn(move |req| {
-                let response = handler.handle(req, &metrics);
+                let handler = handler.clone();
+                let metrics = Arc::clone(&metrics);
 
-                future::ok::<_, Infallible>(response)
+                async move {
+                    let response = handler.handle(req, &metrics).await;
+                    Ok::<_, Infallible>(response)
+                }
             });
 
             let service = ServiceBuilder::new()
@@ -681,7 +1290,7 @@ mod tests {
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let auth_config = Auth::Basic {
+        let auth_config = PrometheusExporterAuth::Basic {
             user: "user".to_string(),
             password: SensitiveString::from("password".to_string()),
         };
@@ -718,7 +1327,7 @@ mod tests {
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let auth_config = Auth::Bearer {
+        let auth_config = PrometheusExporterAuth::Bearer {
             token: SensitiveString::from("token".to_string()),
         };
 
@@ -754,7 +1363,7 @@ mod tests {
         let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let server_auth_config = Auth::Bearer {
+        let server_auth_config = PrometheusExporterAuth::Bearer {
             token: SensitiveString::from("token".to_string()),
         };
 
@@ -771,11 +1380,11 @@ mod tests {
         let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let server_auth_config = Auth::Bearer {
+        let server_auth_config = PrometheusExporterAuth::Bearer {
             token: SensitiveString::from("token".to_string()),
         };
 
-        let client_auth_config = Auth::Basic {
+        let client_auth_config = PrometheusExporterAuth::Basic {
             user: "user".to_string(),
             password: SensitiveString::from("password".to_string()),
         };
@@ -979,8 +1588,8 @@ mod tests {
     }
 
     async fn export_and_fetch_with_auth(
-        server_auth_config: Option<Auth>,
-        client_auth_config: Option<Auth>,
+        server_auth_config: Option<PrometheusExporterAuth>,
+        client_auth_config: Option<PrometheusExporterAuth>,
         mut events: Vec<Event>,
         suppress_timestamp: bool,
     ) -> Result<String, http::status::StatusCode> {
@@ -1024,7 +1633,33 @@ mod tests {
             .expect("Error creating request.");
 
         if let Some(client_auth_config) = client_auth_config {
-            client_auth_config.apply(&mut request);
+            match client_auth_config {
+                PrometheusExporterAuth::Basic { user, password } => {
+                    let credentials = format!("{}:{}", user, password.inner());
+                    let encoded = BASE64_STANDARD.encode(credentials.as_bytes());
+                    request.headers_mut().insert(
+                        hyper::header::AUTHORIZATION,
+                        HeaderValue::from_str(&format!("Basic {}", encoded)).unwrap(),
+                    );
+                }
+                PrometheusExporterAuth::Bearer { token } => {
+                    request.headers_mut().insert(
+                        hyper::header::AUTHORIZATION,
+                        HeaderValue::from_str(&format!("Bearer {}", token.inner())).unwrap(),
+                    );
+                }
+                PrometheusExporterAuth::Custom { value } => {
+                    request.headers_mut().insert(
+                        hyper::header::AUTHORIZATION,
+                        HeaderValue::from_str(&value).unwrap(),
+                    );
+                }
+                #[cfg(feature = "kubernetes")]
+                PrometheusExporterAuth::Sar { .. } => {
+                    // SAR auth is server-side only, not used for client requests in tests
+                    panic!("SAR auth cannot be used for client-side requests in tests");
+                }
+            }
         }
 
         let proxy = ProxyConfig::default();
@@ -1450,6 +2085,173 @@ mod tests {
             .get(&MetricRef::from_metric(&expected_gauge))
             .expect("gauge metric should exist");
         assert_eq!(actual_gauge.0.value(), expected_gauge.value());
+    }
+
+    #[cfg(feature = "kubernetes")]
+    mod sar_auth_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_sar_config_validation_both_path_and_resource() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: Some("/metrics".to_string()),
+                    resource: Some("pods".to_string()),
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    audience: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("exactly one of 'path'")
+            );
+        }
+
+        #[tokio::test]
+        async fn test_sar_config_validation_neither_path_nor_resource() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: None,
+                    resource: None,
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    audience: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("exactly one of 'path'")
+            );
+        }
+
+        #[tokio::test]
+        async fn test_sar_config_validation_path_only_succeeds() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: Some("/metrics".to_string()),
+                    resource: None,
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    audience: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn test_sar_config_validation_resource_only_succeeds() {
+            let (_guard, address) = next_addr();
+            let config = PrometheusExporterConfig {
+                address,
+                auth: Some(PrometheusExporterAuth::Sar {
+                    path: None,
+                    resource: Some("pods".to_string()),
+                    verb: "get".to_string(),
+                    resource_group: "".to_string(),
+                    namespace: None,
+                    audience: None,
+                    allowed_user: None,
+                    allowed_groups: None,
+                }),
+                ..Default::default()
+            };
+
+            let result = config.build(SinkContext::default()).await;
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_deny_unknown_fields_in_sar_config() {
+            // Test that unknown fields are rejected
+            let config_str = r#"
+                strategy = "sar"
+                path = "/metrics"
+                verb = "get"
+                namesapce = "prod"
+            "#;
+
+            let result: Result<PrometheusExporterAuth, _> = toml::from_str(config_str);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("unknown field"));
+        }
+
+        #[test]
+        fn test_allowed_user_field_accepts_valid_config() {
+            let config_str = r#"
+                strategy = "sar"
+                path = "/metrics"
+                verb = "get"
+                allowed_user = "system:serviceaccount:monitoring:prometheus"
+            "#;
+
+            let result: Result<PrometheusExporterAuth, _> = toml::from_str(config_str);
+            assert!(result.is_ok());
+
+            if let PrometheusExporterAuth::Sar { allowed_user, .. } = result.unwrap() {
+                assert_eq!(
+                    allowed_user,
+                    Some("system:serviceaccount:monitoring:prometheus".to_string())
+                );
+            } else {
+                panic!("Expected SAR auth variant");
+            }
+        }
+
+        #[test]
+        fn test_allowed_groups_field_accepts_valid_config() {
+            let config_str = r#"
+                strategy = "sar"
+                resource = "pods"
+                verb = "get"
+                allowed_groups = ["system:authenticated", "system:masters"]
+            "#;
+
+            let result: Result<PrometheusExporterAuth, _> = toml::from_str(config_str);
+            assert!(result.is_ok());
+
+            if let PrometheusExporterAuth::Sar { allowed_groups, .. } = result.unwrap() {
+                assert_eq!(
+                    allowed_groups,
+                    Some(vec![
+                        "system:authenticated".to_string(),
+                        "system:masters".to_string()
+                    ])
+                );
+            } else {
+                panic!("Expected SAR auth variant");
+            }
+        }
     }
 }
 
