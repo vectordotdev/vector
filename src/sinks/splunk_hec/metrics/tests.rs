@@ -20,7 +20,7 @@ use crate::{
         },
         util::{Compression, test::build_test_server},
     },
-    template::{ConfinedTemplate, Template},
+    template::{ConfinementConfig, Template},
     test_util::addr::next_addr,
 };
 
@@ -68,8 +68,16 @@ fn get_processed_event(
 ) -> HecProcessedEvent {
     let event_byte_size = metric.size_of();
     // Tests exercise rendering, not confinement, so build checkerless confined templates.
-    let confine =
-        |t: Option<Template>| t.map(|t| ConfinedTemplate::from_str_unchecked(t.get_ref()));
+    let confine = |t: Option<Template>| {
+        t.map(|t| {
+            t.confine(
+                &ConfinementConfig::unconfined(),
+                HecMetricsSinkConfig::NAME,
+                "template",
+            )
+            .unwrap()
+        })
+    };
     let sourcetype = confine(sourcetype);
     let source = confine(source);
     let index = confine(index);

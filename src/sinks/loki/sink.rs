@@ -661,9 +661,20 @@ mod tests {
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
-        codecs::Encoder, config::log_schema, sinks::loki::config::OutOfOrderAction,
-        template::ConfinedTemplate, test_util::random_lines,
+        codecs::Encoder,
+        config::log_schema,
+        sinks::loki::config::{LokiConfig, OutOfOrderAction},
+        template::{ConfinedTemplate, ConfinementConfig, Template},
+        test_util::random_lines,
     };
+
+    // Tests exercise the encoder, not confinement; build a checkerless confined label template.
+    fn confined_label(s: &str) -> ConfinedTemplate {
+        Template::try_from(s)
+            .unwrap()
+            .confine(&ConfinementConfig::unconfined(), LokiConfig::NAME, "labels")
+            .unwrap()
+    }
 
     #[test]
     fn encoder_no_labels() {
@@ -700,21 +711,12 @@ mod tests {
     #[test]
     fn encoder_with_labels() {
         let mut labels = HashMap::default();
+        labels.insert(confined_label("static"), confined_label("value"));
+        labels.insert(confined_label("{{ name }}"), confined_label("{{ value }}"));
+        labels.insert(confined_label("test_key_*"), confined_label("{{ dict }}"));
         labels.insert(
-            ConfinedTemplate::from_str_unchecked("static"),
-            ConfinedTemplate::from_str_unchecked("value"),
-        );
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("{{ name }}"),
-            ConfinedTemplate::from_str_unchecked("{{ value }}"),
-        );
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("test_key_*"),
-            ConfinedTemplate::from_str_unchecked("{{ dict }}"),
-        );
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("going_to_fail_*"),
-            ConfinedTemplate::from_str_unchecked("{{ value }}"),
+            confined_label("going_to_fail_*"),
+            confined_label("{{ value }}"),
         );
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -760,16 +762,13 @@ mod tests {
     fn encoder_with_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(
-            ConfinedTemplate::from_str_unchecked("pod_labels_*"),
-            ConfinedTemplate::from_str_unchecked("{{ kubernetes.pod_labels }}"),
+            confined_label("pod_labels_*"),
+            confined_label("{{ kubernetes.pod_labels }}"),
         );
+        labels.insert(confined_label("*"), confined_label("{{ metadata }}"));
         labels.insert(
-            ConfinedTemplate::from_str_unchecked("*"),
-            ConfinedTemplate::from_str_unchecked("{{ metadata }}"),
-        );
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("cluster_name"),
-            ConfinedTemplate::from_str_unchecked("static_cluster_name"),
+            confined_label("cluster_name"),
+            confined_label("static_cluster_name"),
         );
 
         let mut encoder = EventEncoder {
@@ -817,14 +816,8 @@ mod tests {
     #[test]
     fn encoder_with_colliding_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("l1_*"),
-            ConfinedTemplate::from_str_unchecked("{{ map1 }}"),
-        );
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("*"),
-            ConfinedTemplate::from_str_unchecked("{{ map2 }}"),
-        );
+        labels.insert(confined_label("l1_*"), confined_label("{{ map1 }}"));
+        labels.insert(confined_label("*"), confined_label("{{ map2 }}"));
 
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -863,10 +856,7 @@ mod tests {
     #[test]
     fn encoder_with_failing_dynamic_label_expansion() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("missing_*"),
-            ConfinedTemplate::from_str_unchecked("{{ map }}"),
-        );
+        labels.insert(confined_label("missing_*"), confined_label("{{ map }}"));
 
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -921,14 +911,8 @@ mod tests {
     #[test]
     fn encoder_no_record_labels() {
         let mut labels = HashMap::default();
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("static"),
-            ConfinedTemplate::from_str_unchecked("value"),
-        );
-        labels.insert(
-            ConfinedTemplate::from_str_unchecked("{{ name }}"),
-            ConfinedTemplate::from_str_unchecked("{{ value }}"),
-        );
+        labels.insert(confined_label("static"), confined_label("value"));
+        labels.insert(confined_label("{{ name }}"), confined_label("{{ value }}"));
         // "value" is the field referenced by the dynamic label value template above.
         let label_value_fields = vec![parse_target_path("value").unwrap()];
         let mut encoder = EventEncoder {
@@ -959,16 +943,13 @@ mod tests {
     fn encoder_with_structured_metadata() -> Result<(), serde_json::Error> {
         let mut structured_metadata = HashMap::default();
         structured_metadata.insert(
-            ConfinedTemplate::from_str_unchecked("pod_labels_*"),
-            ConfinedTemplate::from_str_unchecked("{{ kubernetes.pod_labels }}"),
+            confined_label("pod_labels_*"),
+            confined_label("{{ kubernetes.pod_labels }}"),
         );
+        structured_metadata.insert(confined_label("*"), confined_label("{{ metadata }}"));
         structured_metadata.insert(
-            ConfinedTemplate::from_str_unchecked("*"),
-            ConfinedTemplate::from_str_unchecked("{{ metadata }}"),
-        );
-        structured_metadata.insert(
-            ConfinedTemplate::from_str_unchecked("cluster_name"),
-            ConfinedTemplate::from_str_unchecked("static_cluster_name"),
+            confined_label("cluster_name"),
+            confined_label("static_cluster_name"),
         );
 
         let mut encoder = EventEncoder {

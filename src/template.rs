@@ -471,18 +471,6 @@ impl Confined<UnconfinedTemplate> {
     pub fn get_fields(&self) -> Option<Vec<String>> {
         self.inner.get_fields()
     }
-
-    /// Test-only: build a checkerless [`ConfinedTemplate`] directly from a source string, skipping
-    /// confinement. Lets tests construct render-capable templates without threading a
-    /// [`ConfinementConfig`] through every call site; production code must go through
-    /// [`Template::confine`] / [`UnconfinedTemplate::confine`].
-    #[cfg(test)]
-    pub(crate) fn from_str_unchecked(src: &str) -> Self {
-        Confined {
-            inner: UnconfinedTemplate::try_from(src).expect("valid template in test"),
-            checker: None,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

@@ -30,11 +30,24 @@ use crate::{
             http::{HttpRequest, HttpServiceRequestBuilder},
         },
     },
+    template::{ConfinementConfig, Template},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };
+
+// Tests exercise the encoder, not confinement; build a checkerless confined template.
+fn confined(s: &str) -> ConfinedTemplate {
+    Template::try_from(s)
+        .unwrap()
+        .confine(
+            &ConfinementConfig::unconfined(),
+            StackdriverConfig::NAME,
+            "template",
+        )
+        .unwrap()
+}
 
 #[test]
 fn generate_config() {
@@ -77,23 +90,17 @@ fn encode_valid() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        ConfinedTemplate::from_str_unchecked("{{ log_id }}"),
+        confined("{{ log_id }}"),
         StackdriverLogName::Project("project".to_owned()),
         HashMap::from([(
             "config_user_label_1".to_owned(),
-            ConfinedTemplate::from_str_unchecked("config_user_value_1"),
+            confined("config_user_value_1"),
         )]),
         None,
         "generic_node".to_owned(),
         HashMap::from([
-            (
-                "namespace".to_owned(),
-                ConfinedTemplate::from_str_unchecked("office"),
-            ),
-            (
-                "node_id".to_owned(),
-                ConfinedTemplate::from_str_unchecked("{{ node_id }}"),
-            ),
+            ("namespace".to_owned(), confined("office")),
+            ("node_id".to_owned(), confined("{{ node_id }}")),
         ]),
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
@@ -137,18 +144,12 @@ fn encode_inserts_timestamp() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        ConfinedTemplate::from_str_unchecked("testlogs"),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        HashMap::from([(
-            "config_user_label_1".to_owned(),
-            ConfinedTemplate::from_str_unchecked("value_1"),
-        )]),
+        HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
         None,
         "generic_node".to_owned(),
-        HashMap::from([(
-            "namespace".to_owned(),
-            ConfinedTemplate::from_str_unchecked("office"),
-        )]),
+        HashMap::from([("namespace".to_owned(), confined("office"))]),
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
@@ -213,18 +214,12 @@ async fn correct_request() {
     let transformer = Transformer::default();
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        ConfinedTemplate::from_str_unchecked("testlogs"),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        HashMap::from([(
-            "config_user_label_1".to_owned(),
-            ConfinedTemplate::from_str_unchecked("value_1"),
-        )]),
+        HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
         None,
         "generic_node".to_owned(),
-        HashMap::from([(
-            "namespace".to_owned(),
-            ConfinedTemplate::from_str_unchecked("office"),
-        )]),
+        HashMap::from([("namespace".to_owned(), confined("office"))]),
         None,
     );
 
