@@ -140,7 +140,7 @@ impl ArchivedLedgerState {
 
     pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
         let previous = self.writer_next_record.fetch_add(amount, Ordering::AcqRel);
-        previous.wrapping_add(amount)
+        previous + amount
     }
 
     fn get_current_reader_file_id(&self) -> u16 {
@@ -184,22 +184,6 @@ impl ArchivedLedgerState {
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
         self.writer_next_record.store(id, Ordering::Release);
-    }
-
-    #[cfg(test)]
-    pub unsafe fn unsafe_set_reader_last_record_id(&self, id: u64) {
-        // UNSAFETY:
-        // The atomic operation itself is inherently safe, but adjusting the record IDs manually is
-        // _unsafe_ because it messes with the continuity of record IDs from the perspective of the
-        // reader.
-        //
-        // This is exclusively used under test to make it possible to check certain edge cases, as
-        // writing enough records to actually increment it to the maximum value would take longer
-        // than any of us will be alive.
-        //
-        // Despite it being test-only, we're really amping up the "this is only for testing!" factor
-        // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        self.reader_last_record.store(id, Ordering::Release);
     }
 }
 
@@ -263,7 +247,21 @@ where
         let next_writer_id = self.state().get_next_writer_record_id();
         let last_reader_id = self.state().get_last_reader_record_id();
 
-        next_writer_id.wrapping_sub(last_reader_id) - 1
+        // The writer is always ahead of the reader by at least one ID. Record ID exhaustion is
+        // not supported, so this ordinary difference cannot underflow.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always!(
+                next_writer_id > last_reader_id,
+                "ledger get_total_records never underflows on a drained buffer",
+                &serde_json::json!({
+                    "next_writer_id": next_writer_id,
+                    "last_reader_id": last_reader_id,
+                })
+            );
+        }
+        next_writer_id - last_reader_id - 1
     }
 
     /// Gets the total number of bytes for all unread records in the buffer.
@@ -289,6 +287,18 @@ where
 
     /// Decrements the total number of bytes for all unread records in the buffer.
     pub fn decrement_total_buffer_size(&self, amount: u64) {
+        // Never decrement below zero. An underflow wraps the counter to a
+        // near-maximum value, which makes the buffer look permanently full and
+        // wedges the writer.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_always_greater_than_or_equal_to!(
+                self.total_buffer_size.load(Ordering::Acquire),
+                amount,
+                "ledger total_buffer_size decrement never underflows"
+            );
+        }
         let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -365,6 +375,8 @@ where
     /// Waits for a signal from the writer that progress has been made.
     ///
     /// This will occur when a record is written, or when a new data file is created.
+    ///
+    /// Writer progress is published before this notification is sent.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
@@ -377,16 +389,21 @@ where
     }
 
     /// Notifies all tasks waiting on progress by the writer.
+    ///
+    /// Callers must publish their shared state before notifying.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_writer_waiters(&self) {
         self.writer_notify.notify_one();
     }
 
-    /// Tracks the statistics of a successful write.
-    pub fn track_write(&self, event_count: u64, record_size: u64) {
+    /// Publishes flushed writer progress and then wakes the reader.
+    pub fn publish_writer_progress(&self, event_count: u64, record_size: u64) -> u64 {
+        let next_record_id = self.state().increment_next_writer_record_id(event_count);
         self.increment_total_buffer_size(record_size);
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
+        self.notify_writer_waiters();
+        next_record_id
     }
 
     /// Tracks the statistics of multiple successful reads.
@@ -471,7 +488,7 @@ where
         );
 
         trace!(
-            unacked_reader_file_id_offset = result.map(|n| n - 1).unwrap_or(0),
+            unacked_reader_file_id_offset = result.map_or(0, |n| n - 1),
             acked_reader_file_id_offset = new_reader_file_id,
             "Incremented acknowledged reader file ID offset with corresponding unacknowledged decrement."
         );
@@ -534,6 +551,15 @@ where
         // TODO: Can we do better here?
         self.usage_handle
             .increment_dropped_event_count_and_byte_size(count, 0, false);
+    }
+
+    /// Records that a record was dropped because it could never be written to the buffer (e.g. it
+    /// exceeds the maximum record size).
+    pub fn track_unwritable_dropped_record(&self, count: u64, byte_size: u64) {
+        self.usage_handle
+            .increment_received_event_count_and_byte_size(count, byte_size);
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(count, byte_size, false);
     }
 }
 
@@ -692,6 +718,19 @@ where
             }
         }
 
+        // A non-zero sum means the buffer reopened on top of records left on disk by
+        // a previous run, the reseed path whose value the reader later draws down and
+        // the one most exposed to the buffer-size underflow.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_sometimes!(
+                total_buffer_size > 0,
+                "the buffer reopens with pre-existing on-disk records",
+                &serde_json::json!({ "total_buffer_size": total_buffer_size })
+            );
+        }
+
         self.increment_total_buffer_size(total_buffer_size);
 
         Ok(())
@@ -700,7 +739,7 @@ where
     #[must_use]
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
         let (finalizer, mut stream) = OrderedFinalizer::new(None);
-        tokio::spawn(async move {
+        vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);
                 self.notify_writer_waiters();

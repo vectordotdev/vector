@@ -34,21 +34,6 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn merge_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["merge", "--ff", branch_name])?;
-    Ok(())
-}
-
-pub fn tag_version(version: &str) -> Result<()> {
-    let _output = run_and_check_output(&["tag", "--annotate", version, "--message", version])?;
-    Ok(())
-}
-
-pub fn push_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["push", "origin", branch_name])?;
-    Ok(())
-}
-
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
@@ -136,6 +121,29 @@ pub fn commit(commit_message: &str) -> Result<String> {
     Command::new("git")
         .args(["commit", "--all", "--message", commit_message])
         .check_output()
+}
+
+/// Returns the latest semver release tag (e.g. `0.55.0`), ignoring `vdev-v…` tags.
+pub fn latest_release_version() -> Result<semver::Version> {
+    let output = Command::new("git")
+        .args(["tag", "--list", "--sort=-v:refname"])
+        .check_output()?;
+    let re = regex::Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+    for tag in output.lines() {
+        if tag.starts_with("vdev-v") {
+            continue;
+        }
+        if re.is_match(tag) {
+            return semver::Version::parse(tag.trim_start_matches('v'))
+                .context("Failed to parse version from tag");
+        }
+    }
+    anyhow::bail!("No valid semantic version tag found")
+}
+
+/// Removes a file from the index (and working tree) using `git rm`.
+pub fn rm(path: &str) -> Result<String> {
+    Command::new("git").args(["rm", path]).check_output()
 }
 
 /// Pushes changes from the current repo

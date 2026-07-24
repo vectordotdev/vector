@@ -6,6 +6,7 @@
     "typesense-sync:preview": "NODE_ENV=preview tsx scripts/typesense-sync.ts",
     "typesense-sync:production": "NODE_ENV=production tsx scripts/typesense-sync.ts",
     "config-examples": "node scripts/create-config-examples.js",
+    "validate-config-examples": "node scripts/validate-config-examples.js",
     "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
   },
   "dependencies": {
@@ -53,7 +54,7 @@
     "tailwindcss": "^2.2.4",
     "tocbot": "^4.12.2",
     "topojson-client": "^3.1.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "typesense": "^1.8.2",
     "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v2.0.0.tgz"

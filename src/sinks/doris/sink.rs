@@ -21,12 +21,22 @@ where
 {
     pub fn new(service: S, config: &DorisConfig, common: &DorisCommon) -> crate::Result<Self> {
         let batch_settings = config.batch.into_batcher_settings()?;
+        let database =
+            config
+                .database
+                .clone()
+                .confine(&config.confinement, DorisConfig::NAME, "database")?;
+        let table =
+            config
+                .table
+                .clone()
+                .confine(&config.confinement, DorisConfig::NAME, "table")?;
         Ok(DorisSink {
             batch_settings,
             service,
             request_builder: common.request_builder.clone(),
-            database: config.database.clone(),
-            table: config.table.clone(),
+            database,
+            table,
         })
     }
 

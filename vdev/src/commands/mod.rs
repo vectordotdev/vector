@@ -68,9 +68,11 @@ pub struct Cli {
 }
 
 mod build;
+pub(crate) mod changelog;
 mod check;
 mod complete;
 mod crate_versions;
+mod deprecation;
 mod e2e;
 mod features;
 mod fmt;
@@ -88,9 +90,11 @@ mod version;
 
 cli_commands! {
     build,
+    changelog,
     check,
     complete,
     crate_versions,
+    deprecation,
     e2e,
     features,
     fmt,

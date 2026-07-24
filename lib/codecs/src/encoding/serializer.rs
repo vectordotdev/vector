@@ -146,6 +146,10 @@ impl Default for SerializerConfig {
 }
 
 /// Batch serializer configuration.
+///
+/// Only available when the `arrow` feature is enabled (the `parquet` feature
+/// implies `arrow`); all batch serializers produce columnar Arrow/Parquet output.
+#[cfg(feature = "arrow")]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
@@ -159,7 +163,6 @@ pub enum BatchSerializerConfig {
     /// a continuous stream of record batches.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
-    #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
     /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
@@ -170,7 +173,7 @@ pub enum BatchSerializerConfig {
     Parquet(ParquetSerializerConfig),
 }
 
-#[cfg(any(feature = "arrow", feature = "parquet"))]
+#[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
     /// Build the batch serializer from this configuration.
     pub fn build_batch_serializer(
@@ -192,7 +195,6 @@ impl BatchSerializerConfig {
     /// The data type of events that are accepted by this batch serializer.
     pub fn input_type(&self) -> DataType {
         match self {
-            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
@@ -202,7 +204,6 @@ impl BatchSerializerConfig {
     /// The schema required by the batch serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
-            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),

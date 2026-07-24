@@ -6,6 +6,9 @@ edition = "2024"
 publish = false
 license = "MIT"
 
+[lints]
+workspace = true
+
 [target.'cfg(windows)'.dependencies]
 libc.workspace = true
 winapi = { version = "0.3", features = ["winioctl"] }
@@ -21,7 +24,7 @@ futures = { version = "0.3.31", default-features = false, features = ["executor"
 futures-util.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 file-source-common = { path = "../file-source-common" }
-async-compression = { version = "0.4.41", features = ["tokio", "gzip"] }
+async-compression.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

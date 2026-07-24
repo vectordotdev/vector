@@ -4,7 +4,6 @@ components: sinks: honeycomb: {
 	title: "Honeycomb"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"

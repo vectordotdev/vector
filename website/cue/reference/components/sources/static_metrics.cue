@@ -9,8 +9,7 @@ components: sources: static_metrics: {
 		"""
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -36,7 +35,12 @@ components: sources: static_metrics: {
 		platform_name: null
 	}
 
-	configuration: generated.components.sources.static_metrics.configuration
+	configuration: generated.components.sources.static_metrics.configuration & {
+		metrics: type: array: items: type: object: options: {
+			name: type: string: examples: ["my-metric"]
+			value: type: object: examples: [{gauge: {value: 1.0}}]
+		}
+	}
 
 	output: metrics: {
 		counter: output._passthrough_counter & {

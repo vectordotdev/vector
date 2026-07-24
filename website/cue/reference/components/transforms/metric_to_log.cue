@@ -9,7 +9,6 @@ components: transforms: metric_to_log: {
 		"""
 
 	classes: {
-		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false

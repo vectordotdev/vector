@@ -21,10 +21,11 @@ use crate::{
         prelude::*,
         util::{
             BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
-            http::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
+    template::ConfinementConfig,
 };
 
 #[derive(Debug, Snafu)]
@@ -106,6 +107,14 @@ pub(super) struct StackdriverConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 pub(super) fn default_endpoint() -> String {
@@ -235,15 +244,45 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let log_id = self
+            .log_id
+            .clone()
+            .confine(&self.confinement, Self::NAME, "log_id")?;
+
+        // Confine every label value template. Stackdriver identifies
+        // destinations by `resource.type + resource.labels`, so an event-
+        // controlled label like `resource.labels.zone: "{{ zone }}"` is as
+        // steerable as `log_id` unless we confine it too. Same for arbitrary
+        // log-entry labels in `label_config.labels`.
+        let mut resource = self.resource.clone();
+        resource.labels = resource
+            .labels
+            .into_iter()
+            .map(|(k, v)| {
+                v.confine(&self.confinement, Self::NAME, "resource.labels")
+                    .map(|v| (k, v))
+            })
+            .collect::<crate::Result<_>>()?;
+
+        let mut label_config = self.label_config.clone();
+        label_config.labels = label_config
+            .labels
+            .into_iter()
+            .map(|(k, v)| {
+                v.confine(&self.confinement, Self::NAME, "label_config.labels")
+                    .map(|v| (k, v))
+            })
+            .collect::<crate::Result<_>>()?;
+
         let auth = self.auth.build(Scope::LoggingWrite).await?;
 
         let request_builder = StackdriverLogsRequestBuilder {
             encoder: StackdriverLogsEncoder::new(
                 self.encoding.clone(),
-                self.log_id.clone(),
+                log_id,
                 self.log_name.clone(),
-                self.label_config.clone(),
-                self.resource.clone(),
+                label_config,
+                resource,
                 self.severity_key.clone(),
             ),
         };
@@ -269,7 +308,10 @@ impl SinkConfig for StackdriverConfig {
         let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);
@@ -277,8 +319,11 @@ impl SinkConfig for StackdriverConfig {
         let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
 
         auth.spawn_regenerate_token();
-
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -311,4 +356,35 @@ async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> cr
     let response = client.send(request).await?;
 
     healthcheck_response(response, HealthcheckError::NotFound.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn confinement_rejects_unconfined_log_id() {
+        let template = Template::try_from("{{ log_id }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_log_id() {
+        let template = Template::try_from("{{ log_id }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_log_id() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_ok());
+    }
 }

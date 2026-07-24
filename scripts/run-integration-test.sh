@@ -12,10 +12,25 @@ fi
 
 vdev_cmd="${VDEV:-cargo vdev}"
 
+# Reconstruct the docker compose project name that `cargo vdev` uses to start
+# the environment. It must match `ComposeTest::project_name` in
+# vdev/src/testing/integration.rs:
+#   vector-{integration|e2e}-{test_name}-{sanitized_env}
+# The project name uses the tests directory name ("integration" or "e2e"), not
+# the TEST_TYPE arg ("int" or "e2e"), and the environment has its dots replaced
+# by hyphens.
+compose_project_name() {
+  local env="$1"
+  local dir="$TEST_TYPE"
+  [[ "$dir" == "int" ]] && dir="integration"
+  echo "vector-${dir}-${TEST_NAME}-${env//./-}"
+}
+
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
+  local env="$2"
   if [[ "$LAST_RETURN_CODE" -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
-    (docker compose --project-name "${TEST_NAME}" logs) || echo "Failed to collect logs"
+    (docker compose --project-name "$(compose_project_name "$env")" logs) || echo "Failed to collect logs"
   fi
 }
 
@@ -34,6 +49,7 @@ Options:
   -v         Increase verbosity; repeat for more (e.g. -vv or -vvv)
   -e <ENV>   One or more environments to run (repeatable or comma-separated).
              If provided, these are used as TEST_ENVIRONMENTS instead of auto-discovery.
+  -c         Collect code coverage (outputs target/coverage/lcov.info)
 
 Notes:
   - All existing two-argument invocations remain compatible:
@@ -45,7 +61,8 @@ USAGE
 # Parse options
 # Note: options must come before positional args (standard getopts behavior)
 TEST_ENV=""
-while getopts ":hr:v:e:" opt; do
+COVERAGE=false
+while getopts ":hr:v:e:c" opt; do
   case "$opt" in
     h)
       usage
@@ -63,6 +80,9 @@ while getopts ":hr:v:e:" opt; do
       ;;
     e)
       TEST_ENV="$OPTARG"
+      ;;
+    c)
+      COVERAGE=true
       ;;
     \?)
       echo "ERROR: unknown option: -$OPTARG" >&2
@@ -113,6 +133,10 @@ else
   fi
 fi
 
+# Remove stale combined coverage from a previous (possibly failed) attempt so
+# retries via nick-fields/retry don't append to leftover data.
+rm -f target/coverage/lcov-combined.info
+
 for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   # Execution flow for each environment:
   # 1. Clean up previous test output
@@ -131,12 +155,29 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
 
   $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" start "${TEST_NAME}" "${TEST_ENV}"
   START_RET=$?
-  print_compose_logs_on_failure "$START_RET"
+  print_compose_logs_on_failure "$START_RET" "$TEST_ENV"
 
   if [[ "$START_RET" -eq 0 ]]; then
-    $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" "${TEST_NAME}" "${TEST_ENV}"
+    COVERAGE_FLAG=""
+    [[ "$COVERAGE" == "true" ]] && COVERAGE_FLAG="--coverage"
+
+    $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" ${COVERAGE_FLAG} "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
-    print_compose_logs_on_failure "$RET"
+    print_compose_logs_on_failure "$RET" "$TEST_ENV"
+
+    # Normalize source paths in coverage report so they are relative to the repo root.
+    # The test runner container mounts source at /home/vector; strip that prefix so
+    # Datadog can resolve files against the repository root (e.g. SF:src/foo.rs).
+    # Append each environment's coverage to a combined file so multi-env services
+    # preserve all coverage data (not just the last environment).
+    if [[ "$COVERAGE" == "true" && "$RET" -eq 0 ]]; then
+      LCOV_FILE="target/coverage/lcov.info"
+      if [[ -f "$LCOV_FILE" ]]; then
+        sed -i 's|SF:/home/vector/|SF:|g' "$LCOV_FILE"
+        cat "$LCOV_FILE" >> target/coverage/lcov-combined.info
+        rm "$LCOV_FILE"
+      fi
+    fi
 
     # Upload test results only if the vdev test step ran
     ./scripts/upload-test-results.sh
@@ -153,5 +194,10 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     exit "$RET"
   fi
 done
+
+# Promote combined coverage file to the expected output path
+if [[ "$COVERAGE" == "true" && -f target/coverage/lcov-combined.info ]]; then
+  mv target/coverage/lcov-combined.info target/coverage/lcov.info
+fi
 
 exit 0

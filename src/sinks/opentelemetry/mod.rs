@@ -56,6 +56,8 @@ impl Default for Protocol {
             request: Default::default(),
             tls: Default::default(),
             acknowledgements: Default::default(),
+            retry_strategy: Default::default(),
+            confinement: Default::default(),
         })
     }
 }
@@ -77,7 +79,19 @@ impl GenerateConfig for OpenTelemetryConfig {
 impl SinkConfig for OpenTelemetryConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         match &self.protocol {
-            Protocol::Http(config) => config.build(cx).await,
+            Protocol::Http(config) => {
+                warn_on_invalid_otlp_batching(config);
+                // Delegate to the HTTP sink, but thread through `opentelemetry`
+                // as the component type so security warnings carry the outer
+                // sink type rather than `http`.
+                config.build_with_component_type(cx, Self::NAME).await
+            }
+        }
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        match &self.protocol {
+            Protocol::Http(config) => Some(&config.confinement),
         }
     }
 
@@ -91,6 +105,21 @@ impl SinkConfig for OpenTelemetryConfig {
         match self.protocol {
             Protocol::Http(ref config) => config.acknowledgements(),
         }
+    }
+}
+
+fn warn_on_invalid_otlp_batching(config: &HttpSinkConfig) {
+    let (_, serializer) = config.encoding.config();
+    let is_json = matches!(serializer, SerializerConfig::Json(_));
+    let batches_more_than_one = !matches!(config.batch.max_events, Some(1));
+    if is_json && batches_more_than_one {
+        tracing::warn!(
+            message = "`opentelemetry` sink is configured with `encoding.codec = json` and \
+                       `batch.max_events` greater than 1. This produces invalid OTLP request \
+                       bodies that receivers reject with HTTP 400. Use `encoding.codec = otlp` \
+                       (recommended) or set `batch.max_events = 1`. See \
+                       https://github.com/vectordotdev/vector/issues/22054.",
+        );
     }
 }
 

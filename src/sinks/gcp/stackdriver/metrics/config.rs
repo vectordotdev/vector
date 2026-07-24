@@ -15,7 +15,8 @@ use crate::{
         prelude::*,
         util::{
             http::{
-                HttpRequest, HttpService, HttpServiceRequestBuilder, http_response_retry_logic,
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
             },
             service::TowerRequestConfigDefaults,
         },
@@ -77,6 +78,10 @@ pub struct StackdriverConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -126,7 +131,10 @@ impl SinkConfig for StackdriverConfig {
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = StackdriverMetricsSink::new(service, batch_settings, request_builder);
