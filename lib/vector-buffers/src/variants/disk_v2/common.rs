@@ -30,6 +30,7 @@ pub const MINIMUM_MAX_RECORD_SIZE: usize = align16(RECORD_HEADER_LEN + 1);
 // have it configured.
 pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
+// Reclaimation interval on deletion of data files that contain 100% completey acknowledged events.
 pub const DEFAULT_DATA_FILE_CLEANUP_INTERVAL: Duration = Duration::from_secs(1);
 
 // Using 256KB as it aligns nicely with the I/O size exposed by major cloud providers.  This may not
