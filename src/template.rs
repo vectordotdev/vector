@@ -225,8 +225,8 @@ impl UnconfinedTemplate {
     /// Renders the given template with data from the event, returning raw bytes.
     ///
     /// No confinement check is applied. Use this in transforms, sources, and other contexts
-    /// where confinement is not applicable. For sinks, call [`confine`](Self::confine) first to
-    /// get a [`Template`] and render through that instead.
+    /// where confinement is not applicable. For sinks, call [`Template::confine`] first to
+    /// get a [`ConfinedTemplate`] and render through that instead.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -237,8 +237,8 @@ impl UnconfinedTemplate {
     /// Renders the given template with data from the event.
     ///
     /// No confinement check is applied. Use this in transforms, sources, and other contexts
-    /// where confinement is not applicable. For sinks, call [`confine`](Self::confine) first to
-    /// get a [`Template`] and render through that instead.
+    /// where confinement is not applicable. For sinks, call [`Template::confine`] first to
+    /// get a [`ConfinedTemplate`] and render through that instead.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -354,8 +354,8 @@ impl UnconfinedTemplate {
 
 /// Wraps a template and optionally enforces a confinement check at render time.
 ///
-/// Instantiated only as [`ConfinedTemplate`], obtained via [`Template::confine`] or
-/// [`UnconfinedTemplate::confine`]. Both fields are private to this module, so a `Confined` can
+/// Instantiated only as [`ConfinedTemplate`], obtained via [`Template::confine`].
+/// Both fields are private to this module, so a `Confined` can
 /// never be constructed (or deserialized) without going through confinement.
 pub struct Confined<T> {
     inner: T,
@@ -435,7 +435,7 @@ impl Confined<UnconfinedTemplate> {
 
     /// Renders the given template with data from the event, returning raw bytes.
     ///
-    /// If a confinement checker was attached via [`UnconfinedTemplate::confine`], it runs after
+    /// If a confinement checker was attached via [`Template::confine`], it runs after
     /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
     pub fn render<'a>(
         &self,
@@ -446,7 +446,7 @@ impl Confined<UnconfinedTemplate> {
 
     /// Renders the given template with data from the event.
     ///
-    /// If a confinement checker was attached via [`UnconfinedTemplate::confine`], it runs after
+    /// If a confinement checker was attached via [`Template::confine`], it runs after
     /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
     pub fn render_string<'a>(
         &self,
@@ -477,8 +477,7 @@ impl Confined<UnconfinedTemplate> {
 // Template — the deserializable, must-confine-before-render config type
 // ---------------------------------------------------------------------------
 
-/// A template that has passed through confinement via [`Template::confine`] (or
-/// [`UnconfinedTemplate::confine`]).
+/// A template that has passed through confinement via [`Template::confine`].
 ///
 /// This is the only render-capable, confinement-enforcing template type. It is deliberately **not**
 /// deserializable: the sole way to obtain one is by confining a [`Template`] or an
@@ -1450,7 +1449,7 @@ impl UriChecker {
 ///
 /// Embed this in a component config with `#[serde(flatten)]` to get the
 /// `dangerously_allow_unconfined_template_resolution` field. Pass it to
-/// [`UnconfinedTemplate::confine`] on each template the component owns.
+/// [`Template::confine`] on each template the component owns.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct ConfinementConfig {
