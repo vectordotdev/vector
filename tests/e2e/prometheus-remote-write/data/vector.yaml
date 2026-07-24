@@ -1,0 +1,46 @@
+data_dir: /var/lib/vector
+
+sources:
+  demo_logs:
+    type: demo_logs
+    format: json
+    interval: 0.0
+    count: 4000
+  internal_metrics:
+    type: internal_metrics
+
+transforms:
+  received_logs:
+    type: log_to_metric
+    inputs:
+      - demo_logs
+    metrics:
+      - type: counter
+        field: message
+        name: received_logs_total
+        namespace: e2e
+        tags:
+          source: demo_logs
+
+sinks:
+  remote_write:
+    type: prometheus_remote_write
+    inputs:
+      - received_logs
+    endpoint: http://remote-write-receiver:8080/write
+    healthcheck:
+      enabled: false
+    buffer:
+      type: disk
+      max_size: 268435488
+      when_full: block
+    batch:
+      aggregate: false
+      max_events: 100
+      timeout_secs: 1
+    expire_metrics_secs: 60
+  internal_metrics_exporter:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: 0.0.0.0:9598

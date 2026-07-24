@@ -1,0 +1,17 @@
+features:
+  - e2e-tests-prometheus
+
+test: "e2e"
+
+test_filter: "prometheus::remote_write::"
+
+runner:
+  needs_docker_socket: true
+
+matrix: {}
+
+paths:
+  - "src/sinks/prometheus/**"
+  - "src/sinks/util/buffer/metrics/**"
+  - "tests/e2e/prometheus-remote-write/**"
+  - "tests/e2e/prometheus/**"

@@ -1113,7 +1113,8 @@ test-utils = ["vector-lib/test"]
 # End-to-End testing-related features
 all-e2e-tests = [
   "e2e-tests-datadog",
-  "e2e-tests-opentelemetry"
+  "e2e-tests-opentelemetry",
+  "e2e-tests-prometheus"
 ]
 
 e2e-tests-datadog = [
@@ -1132,6 +1133,14 @@ e2e-tests-opentelemetry = [
   "sinks-file",
   "codecs-opentelemetry",
   "dep:prost-reflect"
+]
+
+e2e-tests-prometheus = [
+  "sources-demo_logs",
+  "sources-internal_metrics",
+  "transforms-log_to_metric",
+  "sinks-prometheus",
+  "vector-lib/antithesis-disk-asserts"
 ]
 
 vector-api-tests = [

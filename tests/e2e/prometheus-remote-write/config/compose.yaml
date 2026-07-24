@@ -1,0 +1,47 @@
+name: prometheus-remote-write-vector-e2e
+services:
+  remote-write-receiver:
+    container_name: prometheus-remote-write-receiver
+    image: python:3.12-alpine
+    init: true
+    ports:
+      - "${PROM_REMOTE_WRITE_RECEIVER_PORT:-19091}:8080"
+    command:
+      - "python"
+      - "-u"
+      - "/receiver.py"
+    volumes:
+      - type: bind
+        source: ../data/receiver.py
+        target: /receiver.py
+        read_only: true
+
+  vector:
+    container_name: vector-prometheus-remote-write-e2e
+    image: ${CONFIG_VECTOR_IMAGE}
+    init: true
+    depends_on:
+      remote-write-receiver:
+        condition: service_started
+    environment:
+      - VECTOR_LOG=${VECTOR_LOG:-info}
+      - FEATURES=e2e-tests-prometheus
+      - VECTOR_DISK_V2_MAX_DATA_FILE_SIZE=262144
+    command: ["vector", "-c", "/etc/vector/vector.yaml"]
+    volumes:
+      - type: bind
+        source: ../data/vector.yaml
+        target: /etc/vector/vector.yaml
+        read_only: true
+      - type: volume
+        source: vector_target
+        target: /var/lib/vector
+
+volumes:
+  vector_target:
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
