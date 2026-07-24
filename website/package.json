@@ -6,6 +6,7 @@
     "typesense-sync:preview": "NODE_ENV=preview tsx scripts/typesense-sync.ts",
     "typesense-sync:production": "NODE_ENV=production tsx scripts/typesense-sync.ts",
     "config-examples": "node scripts/create-config-examples.js",
+    "validate-config-examples": "node scripts/validate-config-examples.js",
     "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
   },
   "dependencies": {

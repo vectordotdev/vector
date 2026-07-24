@@ -220,7 +220,7 @@ jobs:
               - 'rust-toolchain.toml'
               - 'Makefile'
               - 'scripts/cross/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             deny:
               - '**/Cargo.toml'
@@ -229,15 +229,15 @@ jobs:
             deprecations:
               - 'deprecation.d/**'
               - 'website/data/deprecations.json'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/deprecation.yaml"
               - ".github/workflows/changes.yml"
             cue:
               - 'website/cue/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             component_docs:
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'
               # If changes to the VRL sha is made the combined generated cue file will change which
@@ -246,18 +246,18 @@ jobs:
               - ".github/workflows/changes.yml"
             markdown:
               - '**/**.md'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             scripts:
               - '**/**.sh'
               - ".github/workflows/changes.yml"
             internal_events:
               - 'src/internal_events/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             docker:
               - 'distribution/docker/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             install:
               - ".github/workflows/install-sh.yml"

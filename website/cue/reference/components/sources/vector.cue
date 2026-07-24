@@ -52,7 +52,9 @@ components: sources: vector: {
 		platform_name: null
 	}
 
-	configuration: generated.components.sources.vector.configuration
+	configuration: generated.components.sources.vector.configuration & {
+		address: type: string: examples: ["0.0.0.0:6000"]
+	}
 
 	output: {
 		logs: event: {

@@ -19,8 +19,6 @@ use vector_lib::{
         ToValue, configurable_component,
         schema::{SchemaGenerator, SchemaObject, generate_string_schema},
     },
-    gauge,
-    internal_event::GaugeName,
     lookup::lookup_v2::parse_target_path,
 };
 
@@ -250,6 +248,9 @@ impl UnconfinedTemplate {
         component_name: &'static str,
         field_name: &'static str,
     ) -> crate::Result<ConfinedTemplate> {
+        // Full opt-out: bypass all confinement for this template (startup AND
+        // runtime). The `vector_security_confinement_disabled` gauge is owned by
+        // the topology, not emitted here.
         if config.dangerously_allow_unconfined_template_resolution {
             ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
             return Ok(Confined {
@@ -1520,6 +1521,11 @@ pub struct ConfinementConfig {
 
 impl ConfinementConfig {
     /// Logs a per-template SECURITY warning on the opt-out path.
+    ///
+    /// The `vector_security_confinement_disabled` gauge is owned by the topology
+    /// (see `RunningTopology::refresh_confinement_gauges`), which holds a handle
+    /// for the sink's lifetime so the metric matches the active topology and
+    /// never expires while the sink runs.
     pub fn warn_unconfined_template(
         component_kind: &'static str,
         component_type: &'static str,
@@ -1531,27 +1537,6 @@ impl ConfinementConfig {
                        field used in the template can write to arbitrary keys.",
             component_kind, component_type, field,
         );
-    }
-
-    /// Emit `vector_security_confinement_disabled` gauge.
-    ///
-    /// Must be called at the END of `SinkConfig::build`, on the success path only.
-    pub fn set_confinement_gauge(
-        &self,
-        component_kind: &'static str,
-        component_type: &'static str,
-    ) {
-        let value = if self.dangerously_allow_unconfined_template_resolution {
-            1.0
-        } else {
-            0.0
-        };
-        gauge!(
-            GaugeName::SecurityConfinementDisabled,
-            "component_kind" => component_kind,
-            "component_type" => component_type,
-        )
-        .set(value);
     }
 }
 

@@ -146,8 +146,11 @@ impl SinkConfig for AmqpSinkConfig {
             .transpose()?;
         let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
         let hc = healthcheck(sink.channels.clone()).boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

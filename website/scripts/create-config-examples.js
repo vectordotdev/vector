@@ -9,20 +9,60 @@ const cueJsonOutput = "data/docs.json";
 const getExampleValue = (param, deepFilter) => {
   let value;
 
+  // Values that exceed i64::MAX when rounded by float64 are rejected by serde_yaml
+  const isSafe = (v) => typeof v !== "number" || Math.abs(v) <= Number.MAX_SAFE_INTEGER;
+
+  // Recursively remove null values and empty objects from a plain object
+  const stripNulls = (obj) => {
+    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return obj;
+    const result = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v === null) continue;
+      const stripped = typeof v === "object" && !Array.isArray(v) ? stripNulls(v) : v;
+      if (typeof stripped !== "object" || Array.isArray(stripped) || Object.keys(stripped).length > 0) {
+        result[k] = stripped;
+      }
+    }
+    return result;
+  };
+
   const getArrayValue = (obj) => {
     const enumVal = obj.enum != null ? [Object.keys(obj.enum)[0]] : null;
 
-    const examplesVal = obj.examples != null && obj.examples.length > 0 ? [obj.examples[0]] : null;
+    const examplesVal =
+      obj.examples != null && obj.examples.length > 0 && isSafe(obj.examples[0]) ? [obj.examples[0]] : null;
+    const defaultVal = isSafe(obj.default) ? obj.default : null;
 
-    return obj.default || examplesVal || enumVal || null;
+    return defaultVal || examplesVal || enumVal || null;
   };
 
   const getValue = (obj) => {
-    const enumVal = obj.enum != null ? Object.keys(obj.enum)[0] : null;
+    const keys = obj.enum != null ? Object.keys(obj.enum) : null;
+    const isNumericEnum = keys != null && keys.every((k) => /^\d+$/.test(k));
+    if (isNumericEnum) {
+      return obj.default || String(Math.max(...keys.map(Number)));
+    }
 
-    const examplesVal = obj.examples != null && obj.examples.length > 0 ? obj.examples[0] : null;
+    const enumVal = keys ? keys[0] : null;
+    const examplesVal =
+      obj.examples != null && obj.examples.length > 0 && isSafe(obj.examples[0]) ? obj.examples[0] : null;
+    const defaultVal = isSafe(obj.default) ? obj.default : null;
 
-    return obj.default || examplesVal || enumVal || null;
+    return defaultVal || examplesVal || enumVal || null;
+  };
+
+  const getValuePreferringSimple = (obj, siblingOptions) => {
+    if (obj.enum == null || siblingOptions == null) return getValue(obj);
+    const isSimple = (key) =>
+      !Object.values(siblingOptions).some(
+        (opt) => opt.required && opt.relevant_when && opt.relevant_when.includes(`"${key}"`)
+      );
+    const preferred = ["json", "text", "logfmt"];
+    const simpleKeys = Object.keys(obj.enum).filter(isSimple);
+    const simpleKey =
+      preferred.find((key) => key in obj.enum && isSimple(key)) ||
+      (simpleKeys.every((k) => /^\d+$/.test(k)) ? simpleKeys.sort((a, b) => Number(b) - Number(a))[0] : simpleKeys[0]);
+    return obj.default || simpleKey || null;
   };
 
   Object.keys(param.type).forEach((k) => {
@@ -46,16 +86,17 @@ const getExampleValue = (param, deepFilter) => {
               .forEach((k) => {
                 Object.keys(options[k].type).forEach((key) => {
                   const deepTypeInfo = options[k].type[key];
-
-                  if (subType === "array") {
-                    subObj[k] = getArrayValue(deepTypeInfo);
-                  } else {
-                    subObj[k] = getValue(deepTypeInfo);
-                  }
+                  const v = subType === "array" ? getArrayValue(deepTypeInfo) : getValue(deepTypeInfo);
+                  if (v != null) subObj[k] = v;
                 });
               });
 
-            value = subObj;
+            if (Object.keys(subObj).length > 0) {
+              value = topType === "array" ? [subObj] : subObj;
+            } else if (typeInfo[k].examples && typeInfo[k].examples.length > 0) {
+              const ex = typeInfo[k].examples[0];
+              if (ex != null) value = topType === "array" ? [ex] : ex;
+            }
           } else {
             if (topType === "array") {
               value = getArrayValue(typeInfo[k]);
@@ -64,9 +105,53 @@ const getExampleValue = (param, deepFilter) => {
             }
           }
         });
+      } else if (p.examples && p.examples.length > 0) {
+        const ex = p.examples[0];
+        if (typeof ex === "object" && ex !== null && !Array.isArray(ex)) {
+          const stripped = stripNulls(ex);
+          if (Object.keys(stripped).length > 0) value = stripped;
+        } else {
+          value = ex;
+        }
+      } else if (p.options && (param.required || param.minimal)) {
+        const buildFromOptions = (options) => {
+          const subObj = {};
+          Object.entries(options)
+            .filter(([optKey, opt]) => optKey !== "*" && opt.required && !opt.relevant_when && opt.type)
+            .forEach(([optKey, opt]) => {
+              Object.values(opt.type).forEach((typeVal) => {
+                if (typeVal.options) {
+                  if (typeVal.examples && typeVal.examples.length > 0) {
+                    subObj[optKey] = typeVal.examples[0];
+                  } else {
+                    const nested = buildFromOptions(typeVal.options);
+                    if (Object.keys(nested).length > 0) {
+                      subObj[optKey] = nested;
+                    }
+                  }
+                } else {
+                  const v = getValuePreferringSimple(typeVal, options);
+                  if (v !== null) {
+                    subObj[optKey] = v;
+                  }
+                }
+              });
+            });
+          return subObj;
+        };
+        const subObj = buildFromOptions(p.options);
+        if (Object.keys(subObj).length > 0) {
+          value = subObj;
+        }
       } else {
         value = getValue(p);
       }
+    } else if (k === "condition" && p.syntaxes && p.syntaxes.length > 0 && param.required) {
+      const vrl = p.syntaxes.find((s) => s.name === "vrl") || p.syntaxes[0];
+      if (vrl?.example) value = { type: "vrl", source: vrl.example };
+    } else if (k === "bool") {
+      const v = getValue(p);
+      value = v !== null && v !== undefined ? v : false;
     } else {
       value = getValue(p);
     }
@@ -82,7 +167,7 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     .filter((k) => filter(params[k]))
     .forEach((k) => {
       let value = getExampleValue(params[k], deepFilter);
-      if (value) {
+      if (value != null) {
         obj[k] = value;
       }
     });

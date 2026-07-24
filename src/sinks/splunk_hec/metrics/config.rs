@@ -185,8 +185,11 @@ impl SinkConfig for HecMetricsSinkConfig {
             confined_index,
             templated_field_keys, // passed to encoder, not per-event metadata
         )?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

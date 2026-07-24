@@ -266,6 +266,15 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
         Vec::new()
     }
 
+    /// Returns this sink's template-confinement config, if it supports confinement.
+    ///
+    /// The topology uses this to own the `vector_security_confinement_disabled`
+    /// gauge for the sink's lifetime. `None` (the default) means the sink does
+    /// not participate in template confinement and emits no gauge.
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        None
+    }
+
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
 }
