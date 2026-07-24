@@ -348,64 +348,52 @@ impl UnconfinedTemplate {
     }
 }
 
-/// Wraps a template and optionally enforces a confinement check at render time.
+/// A template that has passed through confinement via [`Template::confine`].
 ///
-/// Instantiated only as [`ConfinedTemplate`], obtained via [`Template::confine`].
-/// Both fields are private to this module, so a `Confined` can
+/// This is the only render-capable, confinement-enforcing template type. It is deliberately **not**
+/// deserializable: the sole way to obtain one is by confining a [`Template`] or an
+/// [`UnconfinedTemplate`], so a rendered value can never escape its confinement boundary. The
+/// `render` methods enforce the attached confinement checker (if any).
+///
+/// Both fields are private to this module, so a `ConfinedTemplate` can
 /// never be constructed (or deserialized) without going through confinement.
-pub struct Confined<T> {
-    inner: T,
+#[derive(Clone, Default)]
+pub struct ConfinedTemplate {
+    inner: UnconfinedTemplate,
     checker: Option<ConfinementChecker>,
 }
 
-impl<T: Clone> Clone for Confined<T> {
-    fn clone(&self) -> Self {
-        Confined {
-            inner: self.inner.clone(),
-            checker: self.checker.clone(),
-        }
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for Confined<T> {
+impl fmt::Debug for ConfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Confined")
+        f.debug_struct("ConfinedTemplate")
             .field("inner", &self.inner)
             .field("confinement", &self.checker.as_ref().map(|_| "<fn>"))
             .finish()
     }
 }
 
-impl<T: PartialEq> PartialEq for Confined<T> {
+impl PartialEq for ConfinedTemplate {
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
 }
 
-impl<T: PartialEq> Eq for Confined<T> {}
+impl Eq for ConfinedTemplate {}
 
-impl<T: Hash> Hash for Confined<T> {
+impl Hash for ConfinedTemplate {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner.hash(state);
     }
 }
 
-impl<T: Default> Default for Confined<T> {
-    fn default() -> Self {
-        Confined {
-            inner: T::default(),
-            checker: None,
-        }
-    }
-}
 
-impl<T: fmt::Display> fmt::Display for Confined<T> {
+impl fmt::Display for ConfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)
     }
 }
 
-impl Confined<UnconfinedTemplate> {
+impl ConfinedTemplate {
     /// Set tz offset on the wrapped template.
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.inner.tz_offset = tz_offset;
@@ -469,14 +457,6 @@ impl Confined<UnconfinedTemplate> {
     }
 }
 
-/// A template that has passed through confinement via [`Template::confine`].
-///
-/// This is the only render-capable, confinement-enforcing template type. It is deliberately **not**
-/// deserializable: the sole way to obtain one is by confining a [`Template`] or an
-/// [`UnconfinedTemplate`], so a rendered value can never escape its confinement boundary. The
-/// `render` methods enforce the attached confinement checker (if any).
-pub type ConfinedTemplate = Confined<UnconfinedTemplate>;
-
 /// The templated field type stored in sink config structs.
 ///
 /// `Template` is serde-able and appears as a plain string in generated configuration schemas, but
@@ -523,17 +503,17 @@ impl Template {
         // the topology, not emitted here.
         if config.dangerously_allow_unconfined_template_resolution {
             ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
-            return Ok(Confined {
+            return Ok(ConfinedTemplate {
                 inner: self.inner,
                 checker: None,
             });
         }
         match ConfinementChecker::for_template(&self) {
-            Ok(Some(checker)) => Ok(Confined {
+            Ok(Some(checker)) => Ok(ConfinedTemplate {
                 inner: self.inner,
                 checker: Some(checker),
             }),
-            Ok(None) => Ok(Confined {
+            Ok(None) => Ok(ConfinedTemplate {
                 inner: self.inner,
                 checker: None,
             }),
@@ -2240,7 +2220,7 @@ mod tests {
         assert!(checker.confine("/other/tenant-a/").is_err());
     }
 
-    // Verify that a Template (= Confined<UnconfinedTemplate>) from confine() renders
+    // Verify that a ConfinedTemplate from confine() renders
     // with the checker enforced.
     #[test]
     fn confined_template_renders_with_check() {
