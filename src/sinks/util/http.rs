@@ -75,7 +75,6 @@ use crate::{
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
-    template::UnconfinedTemplate,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -814,18 +813,18 @@ impl RequestConfig {
     ///
     /// # Important
     /// Callers **must** call `.confine()` on every template in the returned map before
-    /// rendering. Rendering an `UnconfinedTemplate` directly bypasses path confinement.
+    /// rendering.
     pub fn split_headers(
         &self,
     ) -> (
         BTreeMap<String, String>,
-        BTreeMap<String, UnconfinedTemplate>,
+        BTreeMap<String, Template>,
     ) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
 
         for (name, value) in &self.headers {
-            match UnconfinedTemplate::try_from(value.as_str()) {
+            match Template::try_from(value.as_str()) {
                 Ok(template) if !template.is_dynamic() => {
                     static_headers.insert(name.clone(), value.clone());
                 }
