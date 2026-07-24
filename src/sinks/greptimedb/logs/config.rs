@@ -154,12 +154,10 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "pipeline_version"))
             .transpose()?;
-        let this = self;
-
-        let tls_settings = TlsSettings::from_options(this.tls.as_ref())?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        let auth = match (this.username.clone(), this.password.clone()) {
+        let auth = match (self.username.clone(), self.password.clone()) {
             (Some(username), Some(password)) => Some(Auth::Basic {
                 user: username,
                 password,
@@ -167,24 +165,24 @@ impl SinkConfig for GreptimeDBLogsConfig {
             _ => None,
         };
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
-            endpoint: this.endpoint.clone(),
+            endpoint: self.endpoint.clone(),
             auth: auth.clone(),
             encoder: (
-                this.encoding.clone(),
+                self.encoding.clone(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoderConfig.build().into(),
                     JsonSerializerConfig::default().build().into(),
                 ),
             ),
-            compression: this.compression,
-            extra_params: this.extra_params.clone(),
-            extra_headers: this.extra_headers.clone(),
+            compression: self.compression,
+            extra_params: self.extra_params.clone(),
+            extra_headers: self.extra_headers.clone(),
         };
 
         let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =
             HttpService::new(client.clone(), request_builder.clone());
 
-        let request_limits = this.request.into_settings();
+        let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, GreptimeDBHttpRetryLogic::default())
@@ -198,7 +196,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
         };
 
         let sink = GreptimeDBLogsHttpSink::new(
-            this.batch.into_batcher_settings()?,
+            self.batch.into_batcher_settings()?,
             service,
             request_builder,
             logs_sink_setting,
@@ -206,7 +204,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
 
         let healthcheck = Box::pin(http_healthcheck(
             client,
-            this.endpoint.clone(),
+            self.endpoint.clone(),
             auth.clone(),
         ));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
