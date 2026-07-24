@@ -22,7 +22,10 @@ use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
+use crate::sinks::{
+    aws_cloudwatch_logs::{config::Retention, service::CloudwatchError},
+    util::EncodedLength,
+};
 
 pub struct CloudwatchFuture {
     client: Client,
@@ -58,7 +61,7 @@ enum State {
 
 impl CloudwatchFuture {
     fn batch_message_bytes(batch: &[InputLogEvent]) -> usize {
-        batch.iter().map(|e| e.message.len()).sum()
+        batch.iter().map(|e| e.encoded_length()).sum()
     }
 
     /// Panics if events.is_empty()
