@@ -13,7 +13,9 @@ use vrl::{event_path, value};
 
 use super::{
     config::{StackdriverConfig, default_endpoint},
-    encoder::{ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder},
+    encoder::{
+        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+    },
 };
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},

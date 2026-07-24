@@ -9,9 +9,12 @@ use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
 use super::{
-    encoder::{ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder},
+    encoder::{
+        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+    },
     request_builder::StackdriverLogsRequestBuilder,
-    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
+    service::StackdriverLogsServiceRequestBuilder,
+    sink::StackdriverLogsSink,
 };
 use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},

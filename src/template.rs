@@ -386,7 +386,6 @@ impl Hash for ConfinedTemplate {
     }
 }
 
-
 impl fmt::Display for ConfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)

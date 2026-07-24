@@ -21,6 +21,7 @@ use crate::{
         HealthcheckError,
         util::{BatchConfig, Compression, SinkBatchSettings, auth::Auth},
     },
+    template::Template,
     test_util::{
         components::{
             COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
@@ -29,7 +30,6 @@ use crate::{
         },
         random_events_with_stream, random_string, trace_init,
     },
-    template::Template,
     tls::{self, TlsConfig},
 };
 
