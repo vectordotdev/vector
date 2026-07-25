@@ -325,7 +325,7 @@ fn build_https_connector(
     Ok(https)
 }
 
-fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
+pub fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
     if !request.headers().contains_key("User-Agent") {
         request
             .headers_mut()
