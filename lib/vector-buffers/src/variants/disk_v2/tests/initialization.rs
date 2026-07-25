@@ -4,7 +4,9 @@ use tokio::time::timeout;
 use tracing::Instrument;
 
 use crate::{
-    test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
+    test::{
+        acknowledge, install_tracing_helpers, with_temp_dir, SelectiveDecodeRecord, SizedRecord,
+    },
     variants::disk_v2::tests::{create_default_buffer_v2, set_file_length},
 };
 
@@ -180,5 +182,55 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
     });
 
     let parent = trace_span!("reader_doesnt_block_when_ahead_of_last_record_in_current_data_file");
+    fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn reader_recovers_from_decode_error_during_initialization_seek() {
+    // LOG-9468: if seek_to_next_record hits a decode failure (e.g. InvalidProtobufPayload),
+    // buffer open must not fail permanently — same recovery as partial_write/checksum.
+    let _a = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+
+            // First record fails decode; second record decodes OK so writer startup validation passes.
+            writer
+                .write_record(SelectiveDecodeRecord(true))
+                .await
+                .expect("should not fail to write");
+            writer.flush().await.expect("flush should not fail");
+
+            writer
+                .write_record(SelectiveDecodeRecord(false))
+                .await
+                .expect("should not fail to write");
+            writer.flush().await.expect("flush should not fail");
+            writer.close();
+
+            // Simulate a restart where the reader had acknowledged through record ID 1.
+            unsafe { ledger.state().unsafe_set_reader_last_record_id(1) };
+            ledger.flush().expect("should not fail to flush ledger");
+
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            let reopen = timeout(
+                Duration::from_millis(500),
+                create_default_buffer_v2::<_, SelectiveDecodeRecord>(data_dir),
+            )
+            .await;
+            assert!(
+                reopen.is_ok(),
+                "buffer open should succeed after decode error during initialization seek"
+            );
+        }
+    });
+
+    let parent = trace_span!("reader_recovers_from_decode_error_during_initialization_seek");
     fut.instrument(parent.or_current()).await;
 }
