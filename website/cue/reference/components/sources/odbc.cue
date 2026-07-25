@@ -28,19 +28,20 @@ components: sources: odbc: {
 		requirements: [
 			"""
 				Only included in official 64-bit glibc Linux builds
-				(`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`). It is not
+				(`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`) and the
+				official Windows archive (`x86_64-pc-windows-msvc`). It is not
 				included in musl builds (Alpine, distroless-static,
 				`*-unknown-linux-musl`), 32-bit ARM GNU builds
 				(`armv7-unknown-linux-gnueabihf`, `arm-unknown-linux-gnueabi`), or
-				official macOS archives (`aarch64-apple-darwin`). For any other
-				target (including macOS and Windows), use a custom build with
-				`sources-odbc`.
+				official macOS archives (`aarch64-apple-darwin`). For those
+				targets, use a custom build with `sources-odbc`.
 				""",
 			"""
 				Linux glibc builds link the unixODBC driver manager (`libodbc`).
 				Official Debian and distroless-libc images include it; `.deb`
-				packages depend on `libodbc2` or `libodbc1`. A database ODBC driver
-				must still be installed and configured separately.
+				packages depend on `libodbc2` or `libodbc1`. Windows builds use the
+				system ODBC Driver Manager. A database ODBC driver must still be
+				installed and configured separately.
 				""",
 		]
 		warnings: [
