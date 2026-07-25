@@ -236,6 +236,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 stream_template,
                 transformer,
                 encoder,
+                timezone: cx.globals.timezone(),
             },
 
             service: svc,
