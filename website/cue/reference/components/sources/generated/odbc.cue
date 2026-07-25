@@ -168,7 +168,7 @@ generated: components: sources: odbc: configuration: {
 			```yaml
 			sources:
 			  odbc:
-			    statement: "SELECT * FROM users WHERE tenant_id = ? AND id > ?"
+			    statement: "SELECT * FROM users WHERE tenant_id = ? AND id > ? ORDER BY id ASC"
 			    statement_init_params:
 			      - name: tenant_id
 			        value: "acme"
@@ -257,7 +257,7 @@ generated: components: sources: odbc: configuration: {
 			```yaml
 			sources:
 			  odbc:
-			    statement: "SELECT * FROM users WHERE id = ?"
+			    statement: "SELECT * FROM users WHERE id > ? ORDER BY id ASC"
 			    statement_init_params:
 			      - name: id
 			        value: "0"
