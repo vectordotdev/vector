@@ -68,8 +68,9 @@ pub struct KubernetesEventsConfig {
 
     /// Retention window for deduplication state.
     ///
-    /// This should be at least as large as `max_event_age_seconds`; otherwise a watch restart can
-    /// re-emit events that are older than the retention window but still within the maximum age.
+    /// Must be greater than zero. This should be at least as large as `max_event_age_seconds`;
+    /// otherwise a watch restart can re-emit events that are older than the retention window but
+    /// still within the maximum age.
     #[serde(default = "default_dedupe_retention_seconds")]
     #[configurable(metadata(
         docs::type_unit = "seconds",

@@ -67,20 +67,23 @@ struct CheckpointConfiguration {
     max_event_age_seconds: u64,
 }
 
+fn canonicalize_set(mut values: Vec<String>) -> Vec<String> {
+    values.sort();
+    values.dedup();
+    values
+}
+
 fn checkpoint_configuration(config: &KubernetesEventsConfig) -> String {
-    let canonicalize = |mut values: Vec<String>| {
-        values.sort();
-        values.dedup();
-        values
-    };
     let configuration = CheckpointConfiguration {
         api_resource: "events.k8s.io/v1/events",
-        namespaces: canonicalize(config.namespaces.clone()),
+        namespaces: canonicalize_set(config.namespaces.clone()),
         field_selector: config.field_selector.clone(),
         label_selector: config.label_selector.clone(),
-        include_types: canonicalize(config.include_types.clone()),
-        include_reasons: canonicalize(config.include_reasons.clone()),
-        include_involved_object_kinds: canonicalize(config.include_involved_object_kinds.clone()),
+        include_types: canonicalize_set(config.include_types.clone()),
+        include_reasons: canonicalize_set(config.include_reasons.clone()),
+        include_involved_object_kinds: canonicalize_set(
+            config.include_involved_object_kinds.clone(),
+        ),
         max_event_age_seconds: config.max_event_age_seconds,
     };
 
@@ -158,7 +161,12 @@ impl SourceConfig for KubernetesEventsConfig {
 
 impl KubernetesEventsSource {
     fn new(client: Client, config: KubernetesEventsConfig) -> crate::Result<Self> {
+        if config.dedupe_retention_seconds == 0 {
+            return Err("dedupe_retention_seconds must be greater than 0".into());
+        }
+
         let checkpoint_configuration = checkpoint_configuration(&config);
+        let namespaces = canonicalize_set(config.namespaces.clone());
         let type_filter = (!config.include_types.is_empty())
             .then(|| config.include_types.iter().map(|s| s.to_owned()).collect());
         let reason_filter = (!config.include_reasons.is_empty()).then(|| {
@@ -186,7 +194,7 @@ impl KubernetesEventsSource {
 
         Ok(Self {
             client,
-            namespaces: config.namespaces.clone(),
+            namespaces,
             type_filter,
             reason_filter,
             kind_filter,
@@ -340,10 +348,13 @@ impl KubernetesEventsSource {
             {
                 LeadershipEnd::Shutdown => break,
                 LeadershipEnd::RestartWatch => {}
-                LeadershipEnd::Lost(reason) => emit!(KubernetesEventsLeaderLost {
-                    identity: coordinator.settings.identity.clone(),
-                    reason,
-                }),
+                LeadershipEnd::Lost(reason) => {
+                    deduper.invalidate_previous_events();
+                    emit!(KubernetesEventsLeaderLost {
+                        identity: coordinator.settings.identity.clone(),
+                        reason,
+                    });
+                }
             }
         }
 
@@ -1038,5 +1049,33 @@ mod tests {
             checkpoint_configuration(&first),
             checkpoint_configuration(&second)
         );
+    }
+
+    #[tokio::test]
+    async fn runtime_namespaces_are_sorted_and_deduplicated() {
+        let source = make_source_with_config(KubernetesEventsConfig {
+            namespaces: vec!["b".to_string(), "a".to_string(), "a".to_string()],
+            ..KubernetesEventsConfig::default()
+        });
+
+        assert_eq!(source.namespaces, ["a", "b"]);
+    }
+
+    #[tokio::test]
+    async fn zero_dedupe_retention_is_rejected() {
+        let client_config = ClientConfig::new("http://127.0.0.1:8080".parse().unwrap());
+        let client = Client::try_from(client_config).unwrap();
+        let result = KubernetesEventsSource::new(
+            client,
+            KubernetesEventsConfig {
+                dedupe_retention_seconds: 0,
+                ..KubernetesEventsConfig::default()
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(error) if error.to_string() == "dedupe_retention_seconds must be greater than 0"
+        ));
     }
 }

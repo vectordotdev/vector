@@ -44,10 +44,6 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesEventsWatchError<E> {
             "stage" => error_stage::RECEIVING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: "watcher_error"
-        });
     }
 }
 

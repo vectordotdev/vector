@@ -5,8 +5,9 @@ generated: components: sources: kubernetes_events: configuration: {
 		description: """
 			Retention window for deduplication state.
 
-			This should be at least as large as `max_event_age_seconds`; otherwise a watch restart can
-			re-emit events that are older than the retention window but still within the maximum age.
+			Must be greater than zero. This should be at least as large as `max_event_age_seconds`;
+			otherwise a watch restart can re-emit events that are older than the retention window but
+			still within the maximum age.
 			"""
 		required: false
 		type: uint: {

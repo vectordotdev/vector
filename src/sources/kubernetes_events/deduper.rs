@@ -13,7 +13,7 @@ pub(super) struct Deduper {
 }
 
 struct CachedEvent {
-    event: KubeEvent,
+    event: Option<KubeEvent>,
     resource_version: String,
     last_seen: Instant,
 }
@@ -53,7 +53,10 @@ impl Deduper {
                     entry.last_seen = Instant::now();
                     DedupResult::Duplicate
                 } else {
-                    let previous = include_previous.then(|| Box::new(entry.event.clone()));
+                    let previous = include_previous
+                        .then(|| entry.event.clone())
+                        .flatten()
+                        .map(Box::new);
                     DedupResult::Updated { previous }
                 }
             }
@@ -71,7 +74,7 @@ impl Deduper {
         self.entries.insert(
             record.uid,
             CachedEvent {
-                event: record.event,
+                event: Some(record.event),
                 resource_version: record.resource_version,
                 last_seen: Instant::now(),
             },
@@ -109,6 +112,14 @@ impl Deduper {
 
     pub(super) fn remove(&mut self, uid: &str) {
         self.entries.remove(uid);
+    }
+
+    /// Retains resource versions for replay suppression while discarding payloads that may no
+    /// longer represent the version most recently delivered by another leader.
+    pub(super) fn invalidate_previous_events(&mut self) {
+        for entry in self.entries.values_mut() {
+            entry.event = None;
+        }
     }
 }
 
@@ -232,9 +243,8 @@ mod tests {
         assert_eq!(
             deduper.entries.get("uid").and_then(|entry| entry
                 .event
-                .metadata
-                .resource_version
-                .as_deref()),
+                .as_ref()
+                .and_then(|event| event.metadata.resource_version.as_deref())),
             Some("1"),
             "updates should not replace the cached event before delivery"
         );
@@ -247,9 +257,8 @@ mod tests {
         assert_eq!(
             deduper.entries.get("uid").and_then(|entry| entry
                 .event
-                .metadata
-                .resource_version
-                .as_deref()),
+                .as_ref()
+                .and_then(|event| event.metadata.resource_version.as_deref())),
             Some("2")
         );
     }
@@ -328,5 +337,38 @@ mod tests {
             deduper.entries.contains_key("uid"),
             "same resourceVersion replay should refresh the dedupe retention"
         );
+    }
+
+    #[test]
+    fn invalidating_previous_events_preserves_resource_version_dedupe() {
+        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let first = make_event("uid", "1", timestamp);
+
+        deduper.commit(PendingDedupeRecord {
+            uid: "uid".to_string(),
+            resource_version: "1".to_string(),
+            event: first.clone(),
+        });
+        deduper.invalidate_previous_events();
+
+        assert!(matches!(
+            deduper.evaluate("uid", "1", true),
+            DedupResult::Duplicate
+        ));
+        assert!(matches!(
+            deduper.evaluate("uid", "2", true),
+            DedupResult::Updated { previous: None }
+        ));
+
+        deduper.commit(PendingDedupeRecord {
+            uid: "uid".to_string(),
+            resource_version: "2".to_string(),
+            event: make_event("uid", "2", timestamp),
+        });
+        assert!(matches!(
+            deduper.evaluate("uid", "3", true),
+            DedupResult::Updated { previous: Some(_) }
+        ));
     }
 }

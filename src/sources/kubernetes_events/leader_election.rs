@@ -228,15 +228,10 @@ impl LeaseCoordinator {
             return Ok(LeaseUpdate::HeldByOther);
         };
 
-        match self
-            .api
+        self.api
             .replace(&self.settings.lease_name, &PostParams::default(), &updated)
-            .await
-        {
-            Ok(_) => Ok(LeaseUpdate::Held { prior_checkpoints }),
-            Err(KubeError::Api(status)) if status.is_conflict() => Ok(LeaseUpdate::HeldByOther),
-            Err(error) => Err(error),
-        }
+            .await?;
+        Ok(LeaseUpdate::Held { prior_checkpoints })
     }
 }
 
@@ -416,6 +411,21 @@ fn kube_micro_time(timestamp: DateTime<Utc>) -> MicroTime {
 mod tests {
     use super::*;
     use chrono::{Duration as ChronoDuration, TimeZone};
+    use http_1::{Request, Response, StatusCode, header::CONTENT_TYPE};
+    use kube::client::Body;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    use tower::service_fn;
+
+    fn json_response(status: StatusCode, value: impl Into<Vec<u8>>) -> Response<Body> {
+        Response::builder()
+            .status(status)
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from(value.into()))
+            .unwrap()
+    }
 
     fn leader_settings(identity: &str) -> LeaderElectionSettings {
         LeaderElectionSettings {
@@ -594,6 +604,49 @@ mod tests {
 
         assert_eq!(spec.holder_identity.as_deref(), Some("vector-0"));
         assert_eq!(spec.lease_transitions, Some(1));
+    }
+
+    #[tokio::test]
+    async fn renewal_conflict_is_retryable_within_deadline() {
+        let request_count = Arc::new(AtomicUsize::new(0));
+        let service = {
+            let request_count = Arc::clone(&request_count);
+            service_fn(move |_request: Request<Body>| {
+                let request_number = request_count.fetch_add(1, Ordering::SeqCst);
+                let body = if request_number == 0 {
+                    serde_json::to_vec(&make_lease(Some("vector-0"), Some(Utc::now()), Some(1)))
+                        .unwrap()
+                } else {
+                    serde_json::to_vec(&serde_json::json!({
+                        "apiVersion": "v1",
+                        "kind": "Status",
+                        "status": "Failure",
+                        "message": "the object has been modified",
+                        "reason": "Conflict",
+                        "code": 409,
+                    }))
+                    .unwrap()
+                };
+                let status = if request_number == 0 {
+                    StatusCode::OK
+                } else {
+                    StatusCode::CONFLICT
+                };
+                async move { Ok::<_, std::io::Error>(json_response(status, body)) }
+            })
+        };
+        let coordinator =
+            LeaseCoordinator::new(Client::new(service, "default"), leader_settings("vector-0"));
+        let mut last_renewal = Instant::now();
+        let checkpoints = checkpoints("config", &[("all", "123")]);
+
+        let end = renew_leadership(&coordinator, &mut last_renewal, &checkpoints).await;
+
+        assert!(
+            end.is_none(),
+            "a replace conflict must be retried until the renewal deadline"
+        );
+        assert_eq!(request_count.load(Ordering::SeqCst), 2);
     }
 
     #[test]

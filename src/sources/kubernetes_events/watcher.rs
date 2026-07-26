@@ -3,6 +3,8 @@
 //! Unlike `kube::runtime::watcher`, this stream exposes the resource versions that are safe to
 //! checkpoint and accepts a resource version from which to resume after a leader transition.
 
+use std::time::Duration;
+
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use k8s_openapi::api::events::v1::Event as KubeEvent;
@@ -12,6 +14,9 @@ use kube::{
     core::response::Status,
     runtime::watcher,
 };
+use tokio::time::sleep;
+
+const WATCH_EOF_RETRY_DELAY: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ApplyKind {
@@ -214,6 +219,10 @@ pub(super) fn resumable_watcher(
                     }
                 }
             }
+
+            // A normal watch timeout and a proxy repeatedly returning an empty response both end
+            // as a clean EOF. Delay reconnecting so the latter cannot create a tight request loop.
+            sleep(WATCH_EOF_RETRY_DELAY).await;
         }
     }
 }
@@ -322,6 +331,43 @@ mod tests {
         assert_eq!(requests.len(), 1);
         assert!(requests[0].contains("watch=true"));
         assert!(requests[0].contains("resourceVersion=40"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn clean_watch_eof_delays_before_reconnecting() {
+        let request_count = Arc::new(AtomicUsize::new(0));
+        let service = {
+            let request_count = Arc::clone(&request_count);
+            service_fn(move |_request: Request<Body>| {
+                let request_number = request_count.fetch_add(1, Ordering::SeqCst);
+                let body = if request_number == 0 {
+                    Vec::new()
+                } else {
+                    format!(
+                        "{}\n",
+                        serde_json::json!({
+                            "type": "MODIFIED",
+                            "object": make_event("uid", "41", Utc::now()),
+                        })
+                    )
+                    .into_bytes()
+                };
+                async move { Ok::<_, std::io::Error>(json_response(body)) }
+            })
+        };
+        let api = Api::all(Client::new(service, "default"));
+        let mut events = Box::pin(resumable_watcher(
+            api,
+            watcher::Config::default(),
+            Some("40".to_string()),
+        ));
+        let started_at = tokio::time::Instant::now();
+
+        let event = events.next().await.unwrap().unwrap();
+
+        assert!(matches!(event, Event::Apply { .. }));
+        assert!(started_at.elapsed() >= WATCH_EOF_RETRY_DELAY);
+        assert_eq!(request_count.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]
