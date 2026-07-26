@@ -15,6 +15,7 @@ use kube::{
     config::{KubeConfigOptions, Kubeconfig},
     runtime::{WatchStreamExt, watcher},
 };
+use serde::Serialize;
 use tokio::select;
 use tokio::time::{Interval, MissedTickBehavior, interval};
 use vector_lib::{
@@ -27,9 +28,10 @@ use super::config::{self, KubernetesEventsConfig};
 use super::deduper::{DedupResult, Deduper, PendingDedupeRecord};
 use super::kube_timestamp_to_chrono;
 use super::leader_election::{
-    LeaderElectionSettings, LeadershipEnd, LeaseCoordinator, max_watermark, renew_leadership,
-    replay_cutoff,
+    LeaderElectionSettings, LeadershipEnd, LeaseCoordinator, ResourceVersionCheckpoints,
+    renew_leadership,
 };
+use super::watcher::{self as checkpoint_watcher, ApplyKind};
 use crate::{
     SourceSender,
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
@@ -41,12 +43,56 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
-type WatchItem = (Option<String>, watcher::Result<watcher::Event<KubeEvent>>);
+type WatchItem = (
+    String,
+    Option<String>,
+    Result<checkpoint_watcher::Event, checkpoint_watcher::Error>,
+);
 type WatchStream = Pin<Box<dyn Stream<Item = WatchItem> + Send>>;
 
 struct EventIdentity {
     uid: String,
     resource_version: String,
+}
+
+#[derive(Serialize)]
+struct CheckpointConfiguration {
+    api_resource: &'static str,
+    namespaces: Vec<String>,
+    field_selector: Option<String>,
+    label_selector: Option<String>,
+    include_types: Vec<String>,
+    include_reasons: Vec<String>,
+    include_involved_object_kinds: Vec<String>,
+    max_event_age_seconds: u64,
+}
+
+fn checkpoint_configuration(config: &KubernetesEventsConfig) -> String {
+    let canonicalize = |mut values: Vec<String>| {
+        values.sort();
+        values.dedup();
+        values
+    };
+    let configuration = CheckpointConfiguration {
+        api_resource: "events.k8s.io/v1/events",
+        namespaces: canonicalize(config.namespaces.clone()),
+        field_selector: config.field_selector.clone(),
+        label_selector: config.label_selector.clone(),
+        include_types: canonicalize(config.include_types.clone()),
+        include_reasons: canonicalize(config.include_reasons.clone()),
+        include_involved_object_kinds: canonicalize(config.include_involved_object_kinds.clone()),
+        max_event_age_seconds: config.max_event_age_seconds,
+    };
+
+    serde_json::to_string(&configuration)
+        .expect("checkpoint configuration contains only serializable values")
+}
+
+fn checkpoint_stream(namespace: &Option<String>) -> String {
+    namespace.as_ref().map_or_else(
+        || "all-namespaces".to_string(),
+        |namespace| format!("namespace/{namespace}"),
+    )
 }
 
 pub(super) struct KubernetesEventsSource {
@@ -60,6 +106,7 @@ pub(super) struct KubernetesEventsSource {
     watcher_config: watcher::Config,
     include_previous_event: bool,
     leader_election: Option<LeaderElectionSettings>,
+    checkpoint_configuration: String,
 }
 
 #[async_trait::async_trait]
@@ -111,6 +158,7 @@ impl SourceConfig for KubernetesEventsConfig {
 
 impl KubernetesEventsSource {
     fn new(client: Client, config: KubernetesEventsConfig) -> crate::Result<Self> {
+        let checkpoint_configuration = checkpoint_configuration(&config);
         let type_filter = (!config.include_types.is_empty())
             .then(|| config.include_types.iter().map(|s| s.to_owned()).collect());
         let reason_filter = (!config.include_reasons.is_empty()).then(|| {
@@ -147,31 +195,44 @@ impl KubernetesEventsSource {
             watcher_config,
             include_previous_event: config.include_previous_event,
             leader_election: LeaderElectionSettings::from_config(&config.leader_election)?,
+            checkpoint_configuration,
         })
     }
 
-    fn build_streams(&self) -> SelectAll<WatchStream> {
+    fn build_streams(
+        &self,
+        checkpoints: Option<&ResourceVersionCheckpoints>,
+    ) -> SelectAll<WatchStream> {
         let mut streams = SelectAll::new();
 
         if self.namespaces.is_empty() {
             let api: Api<KubeEvent> = Api::all(self.client.clone());
-            streams.push(self.make_stream(api, None));
+            streams.push(self.make_stream(api, None, checkpoints));
         } else {
             for namespace in &self.namespaces {
                 let api: Api<KubeEvent> = Api::namespaced(self.client.clone(), namespace);
-                streams.push(self.make_stream(api, Some(namespace.clone())));
+                streams.push(self.make_stream(api, Some(namespace.clone()), checkpoints));
             }
         }
 
         streams
     }
 
-    fn make_stream(&self, api: Api<KubeEvent>, namespace: Option<String>) -> WatchStream {
+    fn make_stream(
+        &self,
+        api: Api<KubeEvent>,
+        namespace: Option<String>,
+        checkpoints: Option<&ResourceVersionCheckpoints>,
+    ) -> WatchStream {
         let cfg = self.watcher_config.clone();
+        let stream = checkpoint_stream(&namespace);
+        let initial_resource_version = checkpoints
+            .and_then(|checkpoints| checkpoints.get(&stream))
+            .map(ToString::to_string);
         Box::pin(
-            watcher(api, cfg)
-                .backoff(watcher::DefaultBackoff::default())
-                .map(move |event| (namespace.clone(), event)),
+            checkpoint_watcher::resumable_watcher(api, cfg, initial_resource_version)
+                .default_backoff()
+                .map(move |event| (stream.clone(), namespace.clone(), event)),
         )
     }
 
@@ -206,21 +267,20 @@ impl KubernetesEventsSource {
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
     ) -> Result<(), ()> {
-        let mut streams = self.build_streams();
+        let mut streams = self.build_streams(None);
 
         loop {
             select! {
                 _ = &mut *shutdown => break,
                 maybe_event = streams.next() => {
                     match maybe_event {
-                        Some((namespace, Ok(event))) => {
+                        Some((_, namespace, Ok(event))) => {
                             if let Some(processed) =
                                 self.handle_event(
                                     namespace.as_deref(),
                                     event,
                                     log_namespace,
                                     deduper,
-                                    None,
                                 )?
                             {
                                 let dedupe_record = processed.dedupe_record;
@@ -230,7 +290,7 @@ impl KubernetesEventsSource {
                                 deduper.commit(dedupe_record);
                             }
                         }
-                        Some((_, Err(error))) => {
+                        Some((_, _, Err(error))) => {
                             emit!(KubernetesEventsWatchError { error });
                         }
                         None => break,
@@ -253,7 +313,10 @@ impl KubernetesEventsSource {
         let coordinator = LeaseCoordinator::new(self.client.clone(), settings);
 
         loop {
-            let Some(acquired) = coordinator.wait_for_leadership(shutdown).await else {
+            let Some(acquired) = coordinator
+                .wait_for_leadership(shutdown, &self.checkpoint_configuration)
+                .await
+            else {
                 break;
             };
 
@@ -261,7 +324,7 @@ impl KubernetesEventsSource {
                 identity: coordinator.settings.identity.clone(),
                 lease_namespace: coordinator.settings.lease_namespace.clone(),
                 lease_name: coordinator.settings.lease_name.clone(),
-                resume_watermark: acquired.watermark,
+                checkpoint_streams: acquired.checkpoints.len(),
             });
 
             match self
@@ -271,7 +334,7 @@ impl KubernetesEventsSource {
                     log_namespace,
                     deduper,
                     &coordinator,
-                    acquired.watermark,
+                    acquired.checkpoints,
                 )
                 .await?
             {
@@ -294,14 +357,9 @@ impl KubernetesEventsSource {
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
         coordinator: &LeaseCoordinator,
-        acquired_watermark: Option<DateTime<Utc>>,
+        mut checkpoints: ResourceVersionCheckpoints,
     ) -> Result<LeadershipEnd, ()> {
-        // Replays are filtered against the watermark observed at acquisition, not the advancing
-        // one: an event first seen through a mid-epoch relist may be older than events this
-        // replica already forwarded, and must not be dropped.
-        let replay_cutoff = replay_cutoff(acquired_watermark, coordinator.settings.watermark_grace);
-        let mut watermark = acquired_watermark;
-        let mut streams = self.build_streams();
+        let mut streams = self.build_streams(Some(&checkpoints));
         let mut renew_interval = interval(coordinator.settings.retry_period);
         renew_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut last_renewal = Instant::now();
@@ -311,25 +369,24 @@ impl KubernetesEventsSource {
                 _ = &mut *shutdown => return Ok(LeadershipEnd::Shutdown),
                 _ = renew_interval.tick() => {
                     if let Some(end) =
-                        renew_leadership(coordinator, &mut last_renewal, watermark).await
+                        renew_leadership(coordinator, &mut last_renewal, &checkpoints).await
                     {
                         return Ok(end);
                     }
                 }
                 maybe_event = streams.next() => {
                     match maybe_event {
-                        Some((namespace, Ok(event))) => {
+                        Some((stream, namespace, Ok(event))) => {
+                            let checkpoint = event.checkpoint().map(ToString::to_string);
                             if let Some(processed) =
                                 self.handle_event(
                                     namespace.as_deref(),
                                     event,
                                     log_namespace,
                                     deduper,
-                                    replay_cutoff,
                                 )?
                             {
                                 let dedupe_record = processed.dedupe_record;
-                                let event_timestamp = processed.timestamp;
                                 if let Some(end) = send_event_with_leadership(
                                     out,
                                     processed.event,
@@ -337,17 +394,19 @@ impl KubernetesEventsSource {
                                     &mut renew_interval,
                                     &mut last_renewal,
                                     coordinator,
-                                    watermark,
+                                    &checkpoints,
                                 )
                                 .await?
                                 {
                                     return Ok(end);
                                 }
                                 deduper.commit(dedupe_record);
-                                watermark = max_watermark(watermark, event_timestamp);
+                            }
+                            if let Some(resource_version) = checkpoint {
+                                checkpoints.set(stream, resource_version);
                             }
                         }
-                        Some((_, Err(error))) => {
+                        Some((_, _, Err(error))) => {
                             emit!(KubernetesEventsWatchError { error });
                         }
                         None => return Ok(LeadershipEnd::RestartWatch),
@@ -360,31 +419,29 @@ impl KubernetesEventsSource {
     fn handle_event(
         &mut self,
         namespace: Option<&str>,
-        event: watcher::Event<KubeEvent>,
+        event: checkpoint_watcher::Event,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-        replay_cutoff: Option<DateTime<Utc>>,
     ) -> Result<Option<ProcessedEvent>, ()> {
         match event {
-            watcher::Event::Apply(ev) => {
-                // Live watch events are new writes to the API server; the watermark only applies
-                // to the initial list, which replays state a previous leader already forwarded.
-                self.process_apply_event(namespace, ev, log_namespace, deduper, None)
+            checkpoint_watcher::Event::Apply { event, kind } => {
+                self.process_apply_event(namespace, event, log_namespace, deduper, Some(kind))
             }
-            watcher::Event::InitApply(ev) => {
-                self.process_apply_event(namespace, ev, log_namespace, deduper, replay_cutoff)
+            checkpoint_watcher::Event::InitApply(event) => {
+                self.process_apply_event(namespace, event, log_namespace, deduper, None)
             }
-            watcher::Event::Delete(ev) => {
-                if let Some(uid) = ev.metadata.uid.as_deref() {
+            checkpoint_watcher::Event::Delete(event) => {
+                if let Some(uid) = event.metadata.uid.as_deref() {
                     deduper.remove(uid);
                 }
                 Ok(None)
             }
-            watcher::Event::Init => Ok(None),
-            watcher::Event::InitDone => {
+            checkpoint_watcher::Event::Init => Ok(None),
+            checkpoint_watcher::Event::InitDone { .. } => {
                 deduper.prune();
                 Ok(None)
             }
+            checkpoint_watcher::Event::Bookmark { .. } => Ok(None),
         }
     }
 
@@ -394,7 +451,7 @@ impl KubernetesEventsSource {
         event: KubeEvent,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-        replay_cutoff: Option<DateTime<Utc>>,
+        apply_kind: Option<ApplyKind>,
     ) -> Result<Option<ProcessedEvent>, ()> {
         let Some(identity) = event_identity(&event) else {
             return Ok(None);
@@ -421,18 +478,6 @@ impl KubernetesEventsSource {
             return Ok(None);
         }
 
-        // Events without an observable timestamp are never dropped here; the deduper is the only
-        // protection against replaying those.
-        if let (Some(cutoff), Some(observed)) = (replay_cutoff, observed_timestamp)
-            && observed <= cutoff
-        {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "already_forwarded"
-            });
-            return Ok(None);
-        }
-
         deduper.prune();
 
         let dedupe_record = PendingDedupeRecord {
@@ -451,7 +496,14 @@ impl KubernetesEventsSource {
                 });
                 return Ok(None);
             }
-            DedupResult::Added => ("ADDED", None),
+            DedupResult::Added => (
+                if apply_kind == Some(ApplyKind::Modified) {
+                    "UPDATED"
+                } else {
+                    "ADDED"
+                },
+                None,
+            ),
             DedupResult::Updated { previous } => ("UPDATED", previous),
         };
 
@@ -506,7 +558,6 @@ impl KubernetesEventsSource {
         Ok(Some(ProcessedEvent {
             event: Event::from(log),
             dedupe_record,
-            timestamp: observed_timestamp,
         }))
     }
 
@@ -612,9 +663,6 @@ fn insert_kubernetes_events_metadata(
 struct ProcessedEvent {
     event: Event,
     dedupe_record: PendingDedupeRecord,
-    /// The observable timestamp used to advance the delivery watermark; `None` when the event
-    /// carries no usable timestamp.
-    timestamp: Option<DateTime<Utc>>,
 }
 
 async fn send_event(out: &mut SourceSender, event: Event) -> Result<(), ()> {
@@ -633,7 +681,7 @@ async fn send_event_with_leadership(
     renew_interval: &mut Interval,
     last_renewal: &mut Instant,
     coordinator: &LeaseCoordinator,
-    watermark: Option<DateTime<Utc>>,
+    checkpoints: &ResourceVersionCheckpoints,
 ) -> Result<Option<LeadershipEnd>, ()> {
     let send = out.send_event(event);
     tokio::pin!(send);
@@ -649,7 +697,7 @@ async fn send_event_with_leadership(
                 return Ok(None);
             }
             _ = renew_interval.tick() => {
-                if let Some(end) = renew_leadership(coordinator, last_renewal, watermark).await {
+                if let Some(end) = renew_leadership(coordinator, last_renewal, checkpoints).await {
                     return Ok(Some(end));
                 }
             }
@@ -827,10 +875,9 @@ mod tests {
         let processed = source
             .handle_event(
                 None,
-                watcher::Event::InitApply(event),
+                checkpoint_watcher::Event::InitApply(event),
                 LogNamespace::Legacy,
                 &mut deduper,
-                None,
             )
             .unwrap();
 
@@ -845,10 +892,9 @@ mod tests {
         let processed = source
             .handle_event(
                 None,
-                watcher::Event::InitApply(replayed_event),
+                checkpoint_watcher::Event::InitApply(replayed_event),
                 LogNamespace::Legacy,
                 &mut deduper,
-                None,
             )
             .unwrap();
 
@@ -903,115 +949,94 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bootstrap_replays_below_watermark_are_dropped() {
+    async fn bootstrap_events_are_never_suppressed_by_event_timestamp() {
         let mut source = make_source();
         let mut deduper = Deduper::new(Duration::from_secs(60));
-        let cutoff = Utc::now() - ChronoDuration::seconds(60);
-
-        let already_sent = make_event("uid-old", "rv1", cutoff - ChronoDuration::seconds(30));
-        let processed = source
-            .handle_event(
-                None,
-                watcher::Event::InitApply(already_sent),
-                LogNamespace::Legacy,
-                &mut deduper,
-                Some(cutoff),
-            )
-            .unwrap();
-        assert!(
-            processed.is_none(),
-            "initial-list events at or below the watermark cutoff should be skipped"
+        let delayed = make_event(
+            "uid-delayed",
+            "rv1",
+            Utc::now() - ChronoDuration::minutes(30),
         );
-
-        let fresh = make_event("uid-new", "rv2", cutoff + ChronoDuration::seconds(30));
         let processed = source
             .handle_event(
                 None,
-                watcher::Event::InitApply(fresh),
+                checkpoint_watcher::Event::InitApply(delayed),
                 LogNamespace::Legacy,
                 &mut deduper,
-                Some(cutoff),
-            )
-            .unwrap();
-        assert!(
-            processed.is_some(),
-            "initial-list events newer than the cutoff should be emitted"
-        );
-    }
-
-    #[tokio::test]
-    async fn bootstrap_replay_at_exact_watermark_is_dropped() {
-        let mut source = make_source();
-        let mut deduper = Deduper::new(Duration::from_secs(60));
-        let cutoff = Utc::now() - ChronoDuration::seconds(60);
-
-        let at_watermark = make_event("uid", "rv", cutoff);
-        let processed = source
-            .handle_event(
-                None,
-                watcher::Event::InitApply(at_watermark),
-                LogNamespace::Legacy,
-                &mut deduper,
-                Some(cutoff),
-            )
-            .unwrap();
-
-        assert!(
-            processed.is_none(),
-            "an event exactly at the cutoff was already forwarded and should be skipped"
-        );
-    }
-
-    #[tokio::test]
-    async fn live_apply_events_ignore_watermark() {
-        let mut source = make_source();
-        let mut deduper = Deduper::new(Duration::from_secs(60));
-        let cutoff = Utc::now() - ChronoDuration::seconds(60);
-
-        let live = make_event("uid", "rv", cutoff - ChronoDuration::seconds(30));
-        let processed = source
-            .handle_event(
-                None,
-                watcher::Event::Apply(live),
-                LogNamespace::Legacy,
-                &mut deduper,
-                Some(cutoff),
             )
             .unwrap();
 
         assert!(
             processed.is_some(),
-            "live watch events are new API writes and must not be filtered by the watermark"
+            "event timestamps cannot prove whether an initial-list object was delivered"
         );
     }
 
     #[tokio::test]
-    async fn bootstrap_replay_without_timestamp_is_not_dropped() {
+    async fn modified_watch_event_is_updated_without_local_dedupe_state() {
         let mut source = make_source();
         let mut deduper = Deduper::new(Duration::from_secs(60));
-        let cutoff = Utc::now() - ChronoDuration::seconds(60);
+        let event = make_event("uid", "rv", Utc::now());
+        let processed = source
+            .handle_event(
+                None,
+                checkpoint_watcher::Event::Apply {
+                    event,
+                    kind: ApplyKind::Modified,
+                },
+                LogNamespace::Legacy,
+                &mut deduper,
+            )
+            .unwrap()
+            .expect("modified event should be emitted");
 
-        let mut event = make_event("uid", "rv", cutoff - ChronoDuration::seconds(30));
+        assert_eq!(
+            processed.event.as_log().value().get(path!("verb")),
+            Some(&value!("UPDATED"))
+        );
+    }
+
+    #[tokio::test]
+    async fn bootstrap_event_without_timestamp_is_emitted() {
+        let mut source = make_source();
+        let mut deduper = Deduper::new(Duration::from_secs(60));
+
+        let mut event = make_event("uid", "rv", Utc::now());
         event.event_time = None;
         assert!(observed_event_timestamp(&event).is_none());
 
         let processed = source
             .handle_event(
                 None,
-                watcher::Event::InitApply(event),
+                checkpoint_watcher::Event::InitApply(event),
                 LogNamespace::Legacy,
                 &mut deduper,
-                Some(cutoff),
             )
             .unwrap();
 
         assert!(
             processed.is_some(),
-            "events without an observable timestamp cannot be proven already-forwarded"
+            "events without an observable timestamp should still be handled"
         );
-        assert!(
-            processed.unwrap().timestamp.is_none(),
-            "timestampless events must not advance the delivery watermark"
+    }
+
+    #[test]
+    fn checkpoint_configuration_is_canonical_for_set_like_fields() {
+        let first = KubernetesEventsConfig {
+            namespaces: vec!["b".to_string(), "a".to_string()],
+            include_types: vec!["Warning".to_string(), "Normal".to_string()],
+            ..KubernetesEventsConfig::default()
+        };
+
+        let second = KubernetesEventsConfig {
+            namespaces: vec!["a".to_string(), "b".to_string()],
+            include_types: vec!["Normal".to_string(), "Warning".to_string()],
+            ..KubernetesEventsConfig::default()
+        };
+
+        assert_eq!(
+            checkpoint_configuration(&first),
+            checkpoint_configuration(&second)
         );
     }
 }

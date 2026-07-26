@@ -4,19 +4,18 @@
 //! designed for singleton deployments that run once per cluster.
 //!
 //! With leader election enabled, replicas coordinate through a `coordination.k8s.io/v1` Lease.
-//! The active leader additionally persists a delivery watermark (the newest event timestamp it
-//! has successfully forwarded) as an annotation on that Lease, piggybacked on the periodic
-//! renewal write. When leadership changes hands, the new leader reads the watermark and skips
-//! events at or below it (minus a configurable grace window for out-of-order timestamps) during
-//! the initial watch replay, instead of re-emitting everything within `max_event_age_seconds`.
-//! The watermark only ever advances over events that were actually handed to the topology, so
-//! failover preserves at-least-once delivery; duplicates remain possible in the failover window
+//! The active leader additionally persists the last safely handled Kubernetes `resourceVersion`
+//! for each watch stream as an annotation on that Lease, piggybacked on the periodic renewal
+//! write. When leadership changes hands, the new leader resumes each watch from its API-server
+//! checkpoint. Checkpoints advance only after events are handed to the topology, so failover
+//! preserves at-least-once delivery into Vector; duplicates remain possible in the failover window
 //! and downstream consumers can deduplicate on `event_uid` plus the event's `resourceVersion`.
 
 mod config;
 mod deduper;
 mod leader_election;
 mod source;
+mod watcher;
 
 use chrono::{DateTime, Utc};
 use k8s_openapi::jiff::Timestamp as KubeTimestamp;

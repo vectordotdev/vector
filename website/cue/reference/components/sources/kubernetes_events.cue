@@ -61,18 +61,17 @@ components: sources: kubernetes_events: {
 				With `leader_election.enabled` set to `true`, replicas coordinate through a
 				`coordination.k8s.io/v1` Lease so that only one replica streams events at a time.
 
-				The active leader also records a delivery watermark—the newest event timestamp it has
-				forwarded downstream—as an annotation on the Lease, updated with each renewal. When
-				leadership changes hands, the new leader resumes from that watermark: during the initial
-				watch replay it skips events at or below the watermark, minus
-				`leader_election.watermark_grace_seconds` to tolerate out-of-order event timestamps,
-				instead of re-emitting everything within `max_event_age_seconds`.
+				The active leader records the last safely handled Kubernetes `resourceVersion` for each
+				watch stream as an annotation on the Lease, updated with each renewal. When leadership
+				changes hands, the new leader resumes each watch from that API-server checkpoint instead
+				of replaying all retained Event objects.
 
-				Delivery is at-least-once: the watermark only advances over events that were handed to
-				the topology, so a crashed leader never causes silent gaps. Duplicates remain possible
-				in the failover window (for example, when a partitioned leader keeps sending until its
-				renew deadline expires). Downstream consumers that need exactly-once semantics can
-				deduplicate on the emitted `event_uid` together with the event's `resourceVersion`.
+				Delivery into Vector is at-least-once: checkpoints only advance over events that were
+				handed to the topology. Duplicates remain possible in the failover window (for example,
+				when a partitioned leader keeps sending until its renew deadline expires) or when the
+				API server has expired a stored resource version and Vector must perform a fresh list.
+				Downstream consumers that need exactly-once semantics can deduplicate on the emitted
+				`event_uid` together with the event's `resourceVersion`.
 				"""
 		}
 	}

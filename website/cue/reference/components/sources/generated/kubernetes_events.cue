@@ -62,13 +62,11 @@ generated: components: sources: kubernetes_events: configuration: {
 		description: """
 			Lease-based leader election settings for running multiple replicas safely.
 
-			The elected leader records a delivery watermark (the newest event timestamp it has
-			forwarded) as an annotation on the Lease object. When another replica takes over, it skips
-			events at or below that watermark instead of replaying everything within
-			`max_event_age_seconds`. Duplicates can still occur during the failover window (for
-			example, if the old leader keeps sending until its renew deadline expires), so downstream
-			consumers that require exactly-once behavior should deduplicate on the emitted `event_uid`
-			and the event's `resourceVersion`.
+			The elected leader stores the last safely handled Kubernetes `resourceVersion` for each
+			watch stream as an annotation on the Lease object. When another replica takes over, it
+			resumes each watch from that checkpoint. Duplicates can still occur during the failover
+			window, so downstream consumers that require exactly-once behavior should deduplicate on
+			the emitted `event_uid` and the event's `resourceVersion`.
 			"""
 		required: false
 		type: object: options: {
@@ -128,22 +126,6 @@ generated: components: sources: kubernetes_events: configuration: {
 				required:    false
 				type: uint: {
 					default: 2
-					unit:    "seconds"
-				}
-			}
-			watermark_grace_seconds: {
-				description: """
-					Tolerance for out-of-order event timestamps when resuming from the persisted watermark.
-
-					After taking over leadership, events whose timestamp falls within this window below the
-					stored watermark are re-emitted rather than skipped. This protects against losing events
-					whose timestamps lag their write to the API server (for example, batched `EventSeries`
-					updates), at the cost of a bounded number of duplicates per failover. Set to `0` to resume
-					exactly at the watermark.
-					"""
-				required: false
-				type: uint: {
-					default: 600
 					unit:    "seconds"
 				}
 			}

@@ -20,7 +20,6 @@ pub const SERVICE_ACCOUNT_NAMESPACE_PATH: &str =
 pub const DEFAULT_LEASE_DURATION_SECS: u64 = 15;
 pub const DEFAULT_RENEW_DEADLINE_SECS: u64 = 10;
 pub const DEFAULT_RETRY_PERIOD_SECS: u64 = 2;
-pub const DEFAULT_WATERMARK_GRACE_SECS: u64 = 600;
 
 /// Configuration for the `kubernetes_events` source.
 #[configurable_component(source(
@@ -89,13 +88,11 @@ pub struct KubernetesEventsConfig {
 
     /// Lease-based leader election settings for running multiple replicas safely.
     ///
-    /// The elected leader records a delivery watermark (the newest event timestamp it has
-    /// forwarded) as an annotation on the Lease object. When another replica takes over, it skips
-    /// events at or below that watermark instead of replaying everything within
-    /// `max_event_age_seconds`. Duplicates can still occur during the failover window (for
-    /// example, if the old leader keeps sending until its renew deadline expires), so downstream
-    /// consumers that require exactly-once behavior should deduplicate on the emitted `event_uid`
-    /// and the event's `resourceVersion`.
+    /// The elected leader stores the last safely handled Kubernetes `resourceVersion` for each
+    /// watch stream as an annotation on the Lease object. When another replica takes over, it
+    /// resumes each watch from that checkpoint. Duplicates can still occur during the failover
+    /// window, so downstream consumers that require exactly-once behavior should deduplicate on
+    /// the emitted `event_uid` and the event's `resourceVersion`.
     #[serde(default)]
     pub leader_election: KubernetesEventsLeaderElectionConfig,
 
@@ -148,17 +145,6 @@ pub struct KubernetesEventsLeaderElectionConfig {
     #[serde(default = "default_retry_period_seconds")]
     #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Retry Period"))]
     pub retry_period_seconds: u64,
-
-    /// Tolerance for out-of-order event timestamps when resuming from the persisted watermark.
-    ///
-    /// After taking over leadership, events whose timestamp falls within this window below the
-    /// stored watermark are re-emitted rather than skipped. This protects against losing events
-    /// whose timestamps lag their write to the API server (for example, batched `EventSeries`
-    /// updates), at the cost of a bounded number of duplicates per failover. Set to `0` to resume
-    /// exactly at the watermark.
-    #[serde(default = "default_watermark_grace_seconds")]
-    #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Watermark Grace"))]
-    pub watermark_grace_seconds: u64,
 }
 
 impl Default for KubernetesEventsLeaderElectionConfig {
@@ -171,7 +157,6 @@ impl Default for KubernetesEventsLeaderElectionConfig {
             lease_duration_seconds: DEFAULT_LEASE_DURATION_SECS,
             renew_deadline_seconds: DEFAULT_RENEW_DEADLINE_SECS,
             retry_period_seconds: DEFAULT_RETRY_PERIOD_SECS,
-            watermark_grace_seconds: DEFAULT_WATERMARK_GRACE_SECS,
         }
     }
 }
@@ -228,10 +213,6 @@ const fn default_renew_deadline_seconds() -> u64 {
 
 const fn default_retry_period_seconds() -> u64 {
     DEFAULT_RETRY_PERIOD_SECS
-}
-
-const fn default_watermark_grace_seconds() -> u64 {
-    DEFAULT_WATERMARK_GRACE_SECS
 }
 
 pub fn schema_definition(log_namespace: LogNamespace) -> Definition {

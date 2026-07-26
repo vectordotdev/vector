@@ -1,20 +1,22 @@
-//! Lease-based leader election and delivery-watermark persistence.
+//! Lease-based leader election and resource-version checkpoint persistence.
 //!
 //! Replicas coordinate through a `coordination.k8s.io/v1` Lease. The active leader additionally
-//! records the newest event timestamp it has forwarded downstream (the delivery watermark) as an
-//! annotation on the Lease, piggybacked on the periodic renewal write, so that a replica taking
-//! over can resume where the previous leader stopped.
+//! records the last safely handled Kubernetes `resourceVersion` for each watch stream as an
+//! annotation on the Lease. A replica taking over can therefore resume each watch from API-server
+//! progress rather than guessing from event timestamps.
 
 use std::{
+    collections::BTreeMap,
     env, fs,
     time::{Duration, Instant},
 };
 
-use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use k8s_openapi::api::coordination::v1::{Lease, LeaseSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta};
 use k8s_openapi::jiff::Timestamp as KubeTimestamp;
 use kube::{Api, Client, Error as KubeError, api::PostParams};
+use serde::{Deserialize, Serialize};
 use tokio::select;
 use tokio::time::sleep;
 
@@ -22,8 +24,53 @@ use super::config::{self, FALLBACK_IDENTITY_ENV_VAR, KubernetesEventsLeaderElect
 use super::kube_timestamp_to_chrono;
 use crate::{internal_events::KubernetesEventsLeaderElectionError, shutdown::ShutdownSignal};
 
-/// Lease annotation holding the newest event timestamp the leader has forwarded downstream.
-const WATERMARK_ANNOTATION: &str = "kubernetes-events.vector.dev/watermark";
+const CHECKPOINTS_ANNOTATION: &str = "kubernetes-events.vector.dev/resource-version-checkpoints";
+const LEGACY_WATERMARK_ANNOTATION: &str = "kubernetes-events.vector.dev/watermark";
+const CHECKPOINTS_VERSION: u8 = 1;
+
+/// Resource versions that have been safely handled, keyed by logical watch stream.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(super) struct ResourceVersionCheckpoints {
+    version: u8,
+    configuration: String,
+    streams: BTreeMap<String, String>,
+}
+
+impl ResourceVersionCheckpoints {
+    pub(super) const fn new(configuration: String) -> Self {
+        Self {
+            version: CHECKPOINTS_VERSION,
+            configuration,
+            streams: BTreeMap::new(),
+        }
+    }
+
+    fn resume(persisted: Option<Self>, configuration: &str) -> Self {
+        match persisted {
+            Some(checkpoints)
+                if checkpoints.version == CHECKPOINTS_VERSION
+                    && checkpoints.configuration == configuration =>
+            {
+                checkpoints
+            }
+            _ => Self::new(configuration.to_string()),
+        }
+    }
+
+    pub(super) fn get(&self, stream: &str) -> Option<&str> {
+        self.streams.get(stream).map(String::as_str)
+    }
+
+    pub(super) fn set(&mut self, stream: String, resource_version: String) {
+        if !resource_version.is_empty() {
+            self.streams.insert(stream, resource_version);
+        }
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.streams.len()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub(super) struct LeaderElectionSettings {
@@ -33,7 +80,6 @@ pub(super) struct LeaderElectionSettings {
     pub(super) lease_duration: Duration,
     pub(super) renew_deadline: Duration,
     pub(super) retry_period: Duration,
-    pub(super) watermark_grace: Duration,
 }
 
 impl LeaderElectionSettings {
@@ -73,7 +119,6 @@ impl LeaderElectionSettings {
             lease_duration: Duration::from_secs(config.lease_duration_seconds),
             renew_deadline: Duration::from_secs(config.renew_deadline_seconds),
             retry_period: Duration::from_secs(config.retry_period_seconds),
-            watermark_grace: Duration::from_secs(config.watermark_grace_seconds),
         }))
     }
 }
@@ -92,12 +137,16 @@ impl LeaseCoordinator {
     pub(super) async fn wait_for_leadership(
         &self,
         shutdown: &mut ShutdownSignal,
+        checkpoint_configuration: &str,
     ) -> Option<AcquiredLeadership> {
         loop {
             match self.try_acquire_or_renew(None).await {
-                Ok(LeaseUpdate::Held { prior_watermark }) => {
+                Ok(LeaseUpdate::Held { prior_checkpoints }) => {
                     return Some(AcquiredLeadership {
-                        watermark: prior_watermark,
+                        checkpoints: ResourceVersionCheckpoints::resume(
+                            prior_checkpoints,
+                            checkpoint_configuration,
+                        ),
                     });
                 }
                 Ok(LeaseUpdate::HeldByOther) => {}
@@ -113,15 +162,15 @@ impl LeaseCoordinator {
 
     async fn try_acquire_or_renew(
         &self,
-        watermark: Option<DateTime<Utc>>,
+        checkpoints: Option<&ResourceVersionCheckpoints>,
     ) -> Result<LeaseUpdate, KubeError> {
         let now = Utc::now();
         match self.api.get(&self.settings.lease_name).await {
-            Ok(lease) => self.update_existing_lease(lease, now, watermark).await,
+            Ok(lease) => self.update_existing_lease(lease, now, checkpoints).await,
             Err(KubeError::Api(status)) if status.is_not_found() => {
-                match self.create_lease(now, watermark).await {
+                match self.create_lease(now, checkpoints).await {
                     Ok(_) => Ok(LeaseUpdate::Held {
-                        prior_watermark: None,
+                        prior_checkpoints: None,
                     }),
                     Err(KubeError::Api(status))
                         if status.is_already_exists() || status.is_conflict() =>
@@ -138,16 +187,16 @@ impl LeaseCoordinator {
     async fn create_lease(
         &self,
         now: DateTime<Utc>,
-        watermark: Option<DateTime<Utc>>,
+        checkpoints: Option<&ResourceVersionCheckpoints>,
     ) -> Result<Lease, KubeError> {
         let lease = Lease {
             metadata: ObjectMeta {
                 name: Some(self.settings.lease_name.clone()),
                 namespace: Some(self.settings.lease_namespace.clone()),
-                annotations: watermark.map(|timestamp| {
+                annotations: checkpoints.map(|checkpoints| {
                     [(
-                        WATERMARK_ANNOTATION.to_string(),
-                        format_watermark(timestamp),
+                        CHECKPOINTS_ANNOTATION.to_string(),
+                        serialize_checkpoints(checkpoints),
                     )]
                     .into_iter()
                     .collect()
@@ -172,10 +221,10 @@ impl LeaseCoordinator {
         &self,
         lease: Lease,
         now: DateTime<Utc>,
-        watermark: Option<DateTime<Utc>>,
+        checkpoints: Option<&ResourceVersionCheckpoints>,
     ) -> Result<LeaseUpdate, KubeError> {
-        let prior_watermark = lease_watermark(&lease);
-        let Some(updated) = prepare_lease_update(lease, &self.settings, now, watermark) else {
+        let prior_checkpoints = lease_checkpoints(&lease);
+        let Some(updated) = prepare_lease_update(lease, &self.settings, now, checkpoints) else {
             return Ok(LeaseUpdate::HeldByOther);
         };
 
@@ -184,7 +233,7 @@ impl LeaseCoordinator {
             .replace(&self.settings.lease_name, &PostParams::default(), &updated)
             .await
         {
-            Ok(_) => Ok(LeaseUpdate::Held { prior_watermark }),
+            Ok(_) => Ok(LeaseUpdate::Held { prior_checkpoints }),
             Err(KubeError::Api(status)) if status.is_conflict() => Ok(LeaseUpdate::HeldByOther),
             Err(error) => Err(error),
         }
@@ -194,14 +243,14 @@ impl LeaseCoordinator {
 #[derive(Debug, PartialEq, Eq)]
 enum LeaseUpdate {
     Held {
-        prior_watermark: Option<DateTime<Utc>>,
+        prior_checkpoints: Option<ResourceVersionCheckpoints>,
     },
     HeldByOther,
 }
 
 /// The state observed on the Lease at the moment leadership was acquired.
 pub(super) struct AcquiredLeadership {
-    pub(super) watermark: Option<DateTime<Utc>>,
+    pub(super) checkpoints: ResourceVersionCheckpoints,
 }
 
 pub(super) enum LeadershipEnd {
@@ -213,9 +262,9 @@ pub(super) enum LeadershipEnd {
 pub(super) async fn renew_leadership(
     coordinator: &LeaseCoordinator,
     last_renewal: &mut Instant,
-    watermark: Option<DateTime<Utc>>,
+    checkpoints: &ResourceVersionCheckpoints,
 ) -> Option<LeadershipEnd> {
-    match coordinator.try_acquire_or_renew(watermark).await {
+    match coordinator.try_acquire_or_renew(Some(checkpoints)).await {
         Ok(LeaseUpdate::Held { .. }) => {
             *last_renewal = Instant::now();
             None
@@ -281,12 +330,8 @@ fn prepare_lease_update(
     mut lease: Lease,
     settings: &LeaderElectionSettings,
     now: DateTime<Utc>,
-    watermark: Option<DateTime<Utc>>,
+    checkpoints: Option<&ResourceVersionCheckpoints>,
 ) -> Option<Lease> {
-    // The stored watermark never regresses, and acquisitions (which pass no watermark of their
-    // own yet) preserve the previous holder's value.
-    let effective_watermark = max_watermark(lease_watermark(&lease), watermark);
-
     let spec = lease.spec.get_or_insert_with(LeaseSpec::default);
     let held_by_self = spec
         .holder_identity
@@ -306,55 +351,33 @@ fn prepare_lease_update(
     spec.lease_duration_seconds = Some(duration_as_i32(settings.lease_duration));
     spec.renew_time = Some(kube_micro_time(now));
 
-    if let Some(timestamp) = effective_watermark {
-        lease
+    if let Some(checkpoints) = checkpoints {
+        let annotations = lease
             .metadata
             .annotations
-            .get_or_insert_with(Default::default)
-            .insert(
-                WATERMARK_ANNOTATION.to_string(),
-                format_watermark(timestamp),
-            );
+            .get_or_insert_with(Default::default);
+        annotations.remove(LEGACY_WATERMARK_ANNOTATION);
+        annotations.insert(
+            CHECKPOINTS_ANNOTATION.to_string(),
+            serialize_checkpoints(checkpoints),
+        );
     }
 
     Some(lease)
 }
 
-fn lease_watermark(lease: &Lease) -> Option<DateTime<Utc>> {
+fn lease_checkpoints(lease: &Lease) -> Option<ResourceVersionCheckpoints> {
     lease
         .metadata
         .annotations
         .as_ref()?
-        .get(WATERMARK_ANNOTATION)
-        .and_then(|raw| DateTime::parse_from_rfc3339(raw).ok())
-        .map(|timestamp| timestamp.with_timezone(&Utc))
+        .get(CHECKPOINTS_ANNOTATION)
+        .and_then(|raw| serde_json::from_str(raw).ok())
 }
 
-fn format_watermark(timestamp: DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::Micros, true)
-}
-
-pub(super) fn max_watermark(
-    current: Option<DateTime<Utc>>,
-    candidate: Option<DateTime<Utc>>,
-) -> Option<DateTime<Utc>> {
-    match (current, candidate) {
-        (Some(current), Some(candidate)) => Some(current.max(candidate)),
-        (current, candidate) => current.or(candidate),
-    }
-}
-
-/// The timestamp at or below which initial-list replays are dropped for the current leadership
-/// epoch. `None` disables replay filtering (no stored watermark, or a grace window that exceeds
-/// the representable range).
-pub(super) fn replay_cutoff(
-    watermark: Option<DateTime<Utc>>,
-    grace: Duration,
-) -> Option<DateTime<Utc>> {
-    let watermark = watermark?;
-    TimeDelta::from_std(grace)
-        .ok()
-        .and_then(|grace| watermark.checked_sub_signed(grace))
+fn serialize_checkpoints(checkpoints: &ResourceVersionCheckpoints) -> String {
+    serde_json::to_string(checkpoints)
+        .expect("resource-version checkpoints contain only serializable values")
 }
 
 fn lease_is_expired(spec: &LeaseSpec, now: DateTime<Utc>, fallback_duration: Duration) -> bool {
@@ -402,7 +425,6 @@ mod tests {
             lease_duration: Duration::from_secs(15),
             renew_deadline: Duration::from_secs(10),
             retry_period: Duration::from_secs(2),
-            watermark_grace: Duration::from_secs(600),
         }
     }
 
@@ -428,14 +450,22 @@ mod tests {
         }
     }
 
-    fn annotate_watermark(lease: &mut Lease, timestamp: DateTime<Utc>) {
+    fn checkpoints(configuration: &str, entries: &[(&str, &str)]) -> ResourceVersionCheckpoints {
+        let mut checkpoints = ResourceVersionCheckpoints::new(configuration.to_string());
+        for (stream, resource_version) in entries {
+            checkpoints.set((*stream).to_string(), (*resource_version).to_string());
+        }
+        checkpoints
+    }
+
+    fn annotate_checkpoints(lease: &mut Lease, checkpoints: &ResourceVersionCheckpoints) {
         lease
             .metadata
             .annotations
             .get_or_insert_with(Default::default)
             .insert(
-                WATERMARK_ANNOTATION.to_string(),
-                format_watermark(timestamp),
+                CHECKPOINTS_ANNOTATION.to_string(),
+                serialize_checkpoints(checkpoints),
             );
     }
 
@@ -567,94 +597,87 @@ mod tests {
     }
 
     #[test]
-    fn lease_watermark_round_trips_through_annotation() {
-        let timestamp = Utc.timestamp_micros(1_700_000_000_123_456).unwrap();
-        let mut lease = make_lease(Some("vector-0"), Some(timestamp), Some(1));
-        annotate_watermark(&mut lease, timestamp);
+    fn lease_checkpoints_round_trip_through_annotation() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let expected = checkpoints("config", &[("all", "123"), ("namespace/default", "120")]);
+        let mut lease = make_lease(Some("vector-0"), Some(now), Some(1));
+        annotate_checkpoints(&mut lease, &expected);
 
-        assert_eq!(lease_watermark(&lease), Some(timestamp));
+        assert_eq!(lease_checkpoints(&lease), Some(expected));
     }
 
     #[test]
-    fn lease_watermark_ignores_missing_or_invalid_annotation() {
+    fn lease_checkpoints_ignore_missing_or_invalid_annotation() {
         let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let lease = make_lease(Some("vector-0"), Some(now), Some(1));
-        assert_eq!(lease_watermark(&lease), None);
+        assert_eq!(lease_checkpoints(&lease), None);
 
         let mut lease = make_lease(Some("vector-0"), Some(now), Some(1));
         lease
             .metadata
             .annotations
             .get_or_insert_with(Default::default)
-            .insert(WATERMARK_ANNOTATION.to_string(), "not-a-timestamp".into());
-        assert_eq!(lease_watermark(&lease), None);
+            .insert(CHECKPOINTS_ANNOTATION.to_string(), "not-json".into());
+        assert_eq!(lease_checkpoints(&lease), None);
     }
 
     #[test]
-    fn lease_update_preserves_watermark_on_acquisition() {
+    fn checkpoint_resume_requires_matching_configuration_and_version() {
+        let persisted = checkpoints("config-a", &[("all", "123")]);
+        assert_eq!(
+            ResourceVersionCheckpoints::resume(Some(persisted.clone()), "config-a"),
+            persisted
+        );
+
+        let reset = ResourceVersionCheckpoints::resume(Some(persisted.clone()), "config-b");
+        assert_eq!(reset.get("all"), None);
+
+        let mut future = persisted;
+        future.version = CHECKPOINTS_VERSION + 1;
+        assert_eq!(
+            ResourceVersionCheckpoints::resume(Some(future), "config-a").get("all"),
+            None
+        );
+    }
+
+    #[test]
+    fn lease_update_preserves_checkpoints_on_acquisition() {
         let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
-        let watermark = now - ChronoDuration::seconds(60);
-        // Expired lease held by the previous leader, carrying its watermark.
+        let expected = checkpoints("config", &[("all", "123")]);
         let mut lease = make_lease(
             Some("vector-1"),
             Some(now - ChronoDuration::seconds(16)),
             Some(2),
         );
-        annotate_watermark(&mut lease, watermark);
+        annotate_checkpoints(&mut lease, &expected);
 
         let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, None)
             .expect("expired lease should be acquired");
 
         assert_eq!(
-            lease_watermark(&prepared),
-            Some(watermark),
-            "acquiring a lease must not discard the previous holder's watermark"
+            lease_checkpoints(&prepared),
+            Some(expected),
+            "acquiring a lease must not discard the previous holder's checkpoints"
         );
     }
 
     #[test]
-    fn lease_update_advances_watermark_on_renewal() {
+    fn lease_update_replaces_checkpoints_on_renewal() {
         let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
-        let old_watermark = now - ChronoDuration::seconds(120);
-        let new_watermark = now - ChronoDuration::seconds(5);
+        let old = checkpoints("config", &[("all", "100")]);
+        let updated = checkpoints("config", &[("all", "123")]);
         let mut lease = make_lease(
             Some("vector-0"),
             Some(now - ChronoDuration::seconds(2)),
             Some(1),
         );
-        annotate_watermark(&mut lease, old_watermark);
+        annotate_checkpoints(&mut lease, &old);
 
-        let prepared = prepare_lease_update(
-            lease,
-            &leader_settings("vector-0"),
-            now,
-            Some(new_watermark),
-        )
-        .expect("self-held lease should renew");
+        let prepared =
+            prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(&updated))
+                .expect("self-held lease should renew");
 
-        assert_eq!(lease_watermark(&prepared), Some(new_watermark));
-    }
-
-    #[test]
-    fn lease_update_never_regresses_watermark() {
-        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
-        let newer = now - ChronoDuration::seconds(5);
-        let older = now - ChronoDuration::seconds(120);
-        let mut lease = make_lease(
-            Some("vector-0"),
-            Some(now - ChronoDuration::seconds(2)),
-            Some(1),
-        );
-        annotate_watermark(&mut lease, newer);
-
-        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(older))
-            .expect("self-held lease should renew");
-
-        assert_eq!(
-            lease_watermark(&prepared),
-            Some(newer),
-            "a stale caller-provided watermark must not overwrite a newer stored one"
-        );
+        assert_eq!(lease_checkpoints(&prepared), Some(updated));
     }
 
     #[test]
@@ -670,9 +693,11 @@ mod tests {
             .annotations
             .get_or_insert_with(Default::default)
             .insert("example.com/other".to_string(), "keep-me".to_string());
+        let updated = checkpoints("config", &[("all", "123")]);
 
-        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(now))
-            .expect("self-held lease should renew");
+        let prepared =
+            prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(&updated))
+                .expect("self-held lease should renew");
 
         assert_eq!(
             prepared
@@ -686,29 +711,29 @@ mod tests {
     }
 
     #[test]
-    fn max_watermark_prefers_newest() {
-        let older = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
-        let newer = older + ChronoDuration::seconds(10);
+    fn checkpoint_write_removes_legacy_watermark() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let mut lease = make_lease(Some("vector-0"), Some(now), Some(1));
+        lease
+            .metadata
+            .annotations
+            .get_or_insert_with(Default::default)
+            .insert(
+                LEGACY_WATERMARK_ANNOTATION.to_string(),
+                "legacy".to_string(),
+            );
+        let updated = checkpoints("config", &[("all", "123")]);
 
-        assert_eq!(max_watermark(Some(older), Some(newer)), Some(newer));
-        assert_eq!(max_watermark(Some(newer), Some(older)), Some(newer));
-        assert_eq!(max_watermark(None, Some(older)), Some(older));
-        assert_eq!(max_watermark(Some(older), None), Some(older));
-        assert_eq!(max_watermark(None, None), None);
-    }
+        let prepared =
+            prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(&updated))
+                .expect("self-held lease should renew");
 
-    #[test]
-    fn replay_cutoff_subtracts_grace() {
-        let watermark = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
-
-        assert_eq!(
-            replay_cutoff(Some(watermark), Duration::from_secs(600)),
-            Some(watermark - ChronoDuration::seconds(600))
+        assert!(
+            prepared
+                .metadata
+                .annotations
+                .as_ref()
+                .is_none_or(|annotations| !annotations.contains_key(LEGACY_WATERMARK_ANNOTATION))
         );
-        assert_eq!(
-            replay_cutoff(Some(watermark), Duration::ZERO),
-            Some(watermark)
-        );
-        assert_eq!(replay_cutoff(None, Duration::from_secs(600)), None);
     }
 }
