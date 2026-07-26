@@ -41,6 +41,9 @@ use crate::{
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
 const ACK_TOKEN: &str = "ack-token";
+// Matches `SPLUNK_HEC_TOKEN` in tests/integration/splunk/config/compose.yaml, which is not
+// configured for indexer acknowledgements (unlike `ACK_TOKEN`).
+const DEFAULT_TOKEN: &str = "abcd1234";
 
 async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
     let client = reqwest::Client::builder()
@@ -462,7 +465,12 @@ async fn splunk_indexer_acknowledgements() {
 async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let cx = SinkContext::default();
 
-    let config = config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await;
+    // `config()` fetches whatever token Splunk's inputs API happens to list first, which can
+    // be `ACK_TOKEN` and would defeat the point of this test. Force the non-ack token instead.
+    let config = HecLogsSinkConfig {
+        default_token: String::from(DEFAULT_TOKEN).into(),
+        ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
+    };
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();

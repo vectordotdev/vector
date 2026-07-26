@@ -20,9 +20,14 @@ pub(crate) fn render_key_with_fallback(
 ) -> Option<String> {
     match template.render_string(event) {
         Ok(key) => Some(key),
-        Err(TplRenderError::Confined { rendered, message }) => {
+        Err(TplRenderError::Confined {
+            rendered_preview,
+            rendered_len,
+            message,
+        }) => {
             emit!(KeyOutsideBasePrefixError {
-                key: &rendered,
+                key_preview: &rendered_preview,
+                key_len: rendered_len,
                 message: &message,
             });
             None

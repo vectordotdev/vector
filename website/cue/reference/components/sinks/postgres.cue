@@ -58,7 +58,10 @@ components: sinks: postgres: {
 		notices: []
 	}
 
-	configuration: generated.components.sinks.postgres.configuration
+	configuration: generated.components.sinks.postgres.configuration & {
+		endpoint: type: string: examples: ["postgres://localhost:5432"]
+		table: type: string: examples: ["my_table"]
+	}
 
 	input: {
 		logs: true

@@ -288,6 +288,7 @@ async fn http_passes_custom_headers() {
 async fn http_passes_template_headers() {
     run_sink_with_events(
         indoc::indoc! {r#"
+        dangerously_allow_unconfined_template_resolution: true
         request:
           headers:
             Static-Header: static-value
@@ -350,6 +351,7 @@ async fn http_passes_template_headers() {
 async fn http_template_headers_missing_fields() {
     run_sink_with_events(
         indoc::indoc! {r#"
+        dangerously_allow_unconfined_template_resolution: true
         request:
           headers:
             X-Required-Field: "{{required_field}}"

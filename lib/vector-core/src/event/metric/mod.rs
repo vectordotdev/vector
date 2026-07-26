@@ -19,7 +19,7 @@ use vector_config::configurable_component;
 use vrl::compiler::value::VrlValueConvert;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, MergeFinalizable,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use crate::config::telemetry;
@@ -475,6 +475,12 @@ impl EstimatedJsonEncodedSizeOf for Metric {
 impl Finalizable for Metric {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl MergeFinalizable for Metric {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
     }
 }
 

@@ -114,6 +114,10 @@ impl SinkConfig for WebHdfsConfig {
         Ok((sink, healthcheck))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }

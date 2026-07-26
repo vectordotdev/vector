@@ -41,6 +41,13 @@ pub enum BuildError {
 
     #[snafu(display("`base_dir` must be an absolute path, got {path:?}"))]
     BaseNotAbsolute { path: PathBuf },
+
+    #[snafu(display(
+        "static path {path:?} is outside the configured `base_dir` {base:?}; \
+         this configuration would drop every event at runtime. \
+         Either align the path with `base_dir`, or remove `base_dir`."
+    ))]
+    StaticPathOutsideBase { path: PathBuf, base: PathBuf },
 }
 
 /// Errors raised while confining a rendered path against a base directory.
@@ -168,9 +175,10 @@ pub struct PathConfinement {
 
 impl PathConfinement {
     /// Build a confinement for `tpl`. Returns:
-    /// - `Ok(None)` if the template has no field references (nothing to confine).
     /// - `Ok(Some(_))` with a base derived from `explicit` (if set) or from
     ///   the template's literal prefix.
+    /// - `Ok(None)` only when the template has no field references AND no
+    ///   explicit base was set — nothing to confine.
     /// - `Err(_)` if no usable base can be derived and `explicit` is unset.
     ///
     /// Performs no filesystem I/O.
@@ -178,9 +186,14 @@ impl PathConfinement {
         tpl: &Template,
         explicit: Option<&Path>,
     ) -> Result<Option<Self>, BuildError> {
+        // A static template with no explicit base has nothing to confine.
+        // But if `explicit` is set, the operator asked for confinement, so
+        // we still want to enforce `base_dir` + `O_NOFOLLOW` on the
+        // rendered path.
         let fields = match tpl.get_fields() {
             Some(f) => f,
-            None => return Ok(None),
+            None if explicit.is_none() => return Ok(None),
+            None => Vec::new(),
         };
 
         let base_path = match explicit {
@@ -217,6 +230,25 @@ impl PathConfinement {
                            confinement is effectively disabled.",
                 base_dir = ?base_path,
             );
+        }
+
+        // Static template with an explicit base: the rendered path is known
+        // now, so validate it immediately rather than silently dropping every
+        // event at runtime.  Mirror the runtime join logic in `confine()`:
+        // relative paths are resolved against the base before comparison.
+        if fields.is_empty() {
+            let raw = Path::new(tpl.get_ref());
+            let resolved = if raw.is_absolute() {
+                normalize_lexically(raw)
+            } else {
+                normalize_lexically(&base_path.join(raw))
+            };
+            if !resolved.starts_with(&base_path) {
+                return Err(BuildError::StaticPathOutsideBase {
+                    path: resolved,
+                    base: base_path,
+                });
+            }
         }
 
         Ok(Some(Self {
@@ -400,6 +432,7 @@ mod tests {
             ErrNoDerivable,
             ErrDerivedIsRoot,
             ErrNotAbsolute,
+            ErrStaticOutside,
         }
         use Expected::*;
         let cases: &[(&str, Option<&str>, Expected)] = &[
@@ -423,6 +456,22 @@ mod tests {
             ("/tmp/100%%/{{ x }}.log", None, Base("/tmp")),
             // relative explicit base is always rejected
             ("{{ x }}", Some("relative/dir"), ErrNotAbsolute),
+            // static path inside explicit base_dir → confinement applies
+            (
+                "/var/log/vector/out.log",
+                Some("/var/log/vector"),
+                Base("/var/log/vector"),
+            ),
+            // static path outside explicit base_dir → rejected at build time
+            ("/tmp/out.log", Some("/var/log/vector"), ErrStaticOutside),
+            // relative static path + explicit base → resolved and accepted
+            ("out.log", Some("/var/log/vector"), Base("/var/log/vector")),
+            // relative static path that traverses outside base → rejected
+            (
+                "../../etc/passwd",
+                Some("/var/log/vector"),
+                ErrStaticOutside,
+            ),
         ];
         for (tpl_src, explicit, expected) in cases {
             let tpl = Template::try_from(*tpl_src).unwrap();
@@ -445,6 +494,13 @@ mod tests {
                 ),
                 ErrNotAbsolute => assert!(
                     matches!(result.unwrap_err(), BuildError::BaseNotAbsolute { .. }),
+                    "tpl = {tpl_src:?}"
+                ),
+                ErrStaticOutside => assert!(
+                    matches!(
+                        result.unwrap_err(),
+                        BuildError::StaticPathOutsideBase { .. }
+                    ),
                     "tpl = {tpl_src:?}"
                 ),
             }

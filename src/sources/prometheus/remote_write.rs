@@ -128,6 +128,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         let source = RemoteWriteSource {
             metadata_conflict_strategy: self.metadata_conflict_strategy,
             skip_nan_values: self.skip_nan_values,
+            log_namespace: cx.log_namespace(None),
         };
         source.run(
             self.address,
@@ -156,6 +157,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 struct RemoteWriteSource {
     metadata_conflict_strategy: MetadataConflictStrategy,
     skip_nan_values: bool,
+    log_namespace: LogNamespace,
 }
 
 impl RemoteWriteSource {
@@ -184,6 +186,14 @@ impl RemoteWriteSource {
 }
 
 impl HttpSource for RemoteWriteSource {
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
+    fn name() -> &'static str {
+        PrometheusRemoteWriteConfig::NAME
+    }
+
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         // Default to snappy decoding the request body.
         decompress_body(encoding_header.or(Some("snappy")), body)

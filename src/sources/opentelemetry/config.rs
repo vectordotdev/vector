@@ -42,7 +42,7 @@ use vector_lib::{
         },
     },
     schema::Definition,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
 use vrl::value::{Kind, kind::Collection};
 
@@ -269,10 +269,14 @@ impl OpentelemetryConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "opentelemetry")]
-impl SourceConfig for OpentelemetryConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+impl OpentelemetryConfig {
+    /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
+    pub async fn build_with_tls_reloaders(
+        &self,
+        cx: SourceContext,
+        grpc_tls_reloader: Option<TlsAcceptorReloader>,
+        http_tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -332,6 +336,7 @@ impl SourceConfig for OpentelemetryConfig {
         let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
+            grpc_tls_reloader,
             builder.routes(),
             self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
@@ -361,6 +366,7 @@ impl SourceConfig for OpentelemetryConfig {
         let http_source = run_http_server(
             self.http.address,
             http_tls_settings,
+            http_tls_reloader,
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
@@ -370,6 +376,14 @@ impl SourceConfig for OpentelemetryConfig {
         });
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "opentelemetry")]
+impl SourceConfig for OpentelemetryConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        self.build_with_tls_reloaders(cx, None, None).await
     }
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",

@@ -24,6 +24,7 @@ async fn interpolate_labels() {
         labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
         encoding.codec = "json"
         remove_label_fields = true
+        dangerously_allow_unconfined_template_resolution = true
     "#,
     )
     .unwrap();
@@ -65,6 +66,7 @@ async fn use_label_from_dropped_fields() {
             labels.bar = "{{ foo }}"
             encoding.codec = "json"
             encoding.except_fields = ["foo"]
+            dangerously_allow_unconfined_template_resolution = true
         "#,
     )
     .unwrap();
@@ -159,6 +161,7 @@ async fn timestamp_out_of_range() {
         endpoint = "http://localhost:3100"
         labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
         encoding.codec = "json"
+        dangerously_allow_unconfined_template_resolution = true
     "#,
     )
     .unwrap();
@@ -189,6 +192,7 @@ async fn structured_metadata_as_json() {
         structured_metadata.bar = "{{ foo }}"
         encoding.codec = "json"
         encoding.except_fields = ["foo"]
+        dangerously_allow_unconfined_template_resolution = true
         "#,
     )
     .unwrap();

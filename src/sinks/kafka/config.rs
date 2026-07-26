@@ -295,6 +295,10 @@ impl SinkConfig for KafkaSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 

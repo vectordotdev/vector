@@ -18,7 +18,26 @@ use crate::{
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
     sinks::{loki::event::LokiBatchEncoding, prelude::*},
+    template::ConfinementConfig,
 };
+
+/// Attach the sink's confinement config to every key and value template in a
+/// `label`-style HashMap. Fails if any template rejects confinement (used at
+/// sink build time so operators get the failure up front).
+fn confine_template_map(
+    map: HashMap<Template, Template>,
+    config: &ConfinementConfig,
+    component_name: &'static str,
+    field_name: &'static str,
+) -> crate::Result<HashMap<Template, Template>> {
+    map.into_iter()
+        .map(|(k, v)| {
+            let k = k.confine(config, component_name, field_name)?;
+            let v = v.confine(config, component_name, field_name)?;
+            Ok((k, v))
+        })
+        .collect()
+}
 
 #[derive(Clone)]
 pub struct KeyPartitioner(Option<Template>);
@@ -156,17 +175,40 @@ pub(super) struct EventEncoder {
     remove_timestamp: bool,
 }
 
+/// Returns `true` if a `TemplateRenderingError` is a confinement violation.
+const fn is_confined(err: &crate::template::TemplateRenderingError) -> bool {
+    matches!(
+        err,
+        crate::template::TemplateRenderingError::Confined { .. }
+    )
+}
+
 impl EventEncoder {
-    fn build_labels(&self, event: &Event) -> Vec<(String, String)> {
+    /// Renders each label pair. Returns `Err(())` if any template rendered a
+    /// confined value — the caller must drop the event as an intentional
+    /// security discard (matches the tenant_id contract).
+    fn build_labels(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
         let mut static_labels: HashMap<String, String> = HashMap::new();
         let mut dynamic_labels: HashMap<String, String> = HashMap::new();
 
         for (key_template, value_template) in self.labels.iter() {
-            let key = key_template.render_string(event);
-            let value = value_template.render_string(event);
-
-            if key.is_err() || value.is_err() {
-                if key.is_err() {
+            match (
+                key_template.render_string(event),
+                value_template.render_string(event),
+            ) {
+                (Ok(key_s), Ok(value_s)) => {
+                    if let Err(err) =
+                        pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels)
+                    {
+                        warn!(
+                            "Failed to expand dynamic label. value: {}, err: {}",
+                            value_s, err
+                        );
+                    }
+                }
+                (Err(key_err), Err(val_err)) => {
+                    let key_confined = is_confined(&key_err);
+                    let val_confined = is_confined(&val_err);
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
@@ -174,11 +216,9 @@ impl EventEncoder {
                             )
                             .as_str()
                         ),
-                        drop_event: false,
-                        error: key.err().unwrap(),
+                        drop_event: key_confined,
+                        error: key_err,
                     });
-                }
-                if value.is_err() {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
@@ -186,22 +226,46 @@ impl EventEncoder {
                             )
                             .as_str()
                         ),
-                        drop_event: false,
-                        error: value.err().unwrap(),
+                        // Count the drop once — key already flagged it if confined.
+                        drop_event: val_confined && !key_confined,
+                        error: val_err,
                     });
+                    if key_confined || val_confined {
+                        return Err(());
+                    }
                 }
-                continue;
-            }
-
-            let key_s = key.unwrap();
-            let value_s = value.unwrap();
-            let result = pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels);
-            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
-            if let Err(err) = result {
-                warn!(
-                    "Failed to expand dynamic label. value: {}, err: {}",
-                    value_s, err
-                );
+                (Err(key_err), Ok(_)) => {
+                    let key_confined = is_confined(&key_err);
+                    emit!(TemplateRenderingError {
+                        field: Some(
+                            format!(
+                                "label_key \"{key_template}\" with label_value \"{value_template}\""
+                            )
+                            .as_str()
+                        ),
+                        drop_event: key_confined,
+                        error: key_err,
+                    });
+                    if key_confined {
+                        return Err(());
+                    }
+                }
+                (Ok(_), Err(val_err)) => {
+                    let val_confined = is_confined(&val_err);
+                    emit!(TemplateRenderingError {
+                        field: Some(
+                            format!(
+                                "label_value \"{value_template}\" with label_key \"{key_template}\""
+                            )
+                            .as_str()
+                        ),
+                        drop_event: val_confined,
+                        error: val_err,
+                    });
+                    if val_confined {
+                        return Err(());
+                    }
+                }
             }
         }
 
@@ -215,7 +279,7 @@ impl EventEncoder {
             };
         }
 
-        Vec::from_iter(dynamic_labels)
+        Ok(Vec::from_iter(dynamic_labels))
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
@@ -232,16 +296,31 @@ impl EventEncoder {
         }
     }
 
-    fn build_structured_metadata(&self, event: &Event) -> Vec<(String, String)> {
+    fn build_structured_metadata(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
         let mut static_structured_metadata: HashMap<String, String> = HashMap::new();
         let mut dynamic_structured_metadata: HashMap<String, String> = HashMap::new();
 
         for (key_template, value_template) in self.structured_metadata.iter() {
-            let key = key_template.render_string(event);
-            let value = value_template.render_string(event);
-
-            if key.is_err() || value.is_err() {
-                if key.is_err() {
+            match (
+                key_template.render_string(event),
+                value_template.render_string(event),
+            ) {
+                (Ok(key_s), Ok(value_s)) => {
+                    if let Err(err) = pair_expansion(
+                        &key_s,
+                        &value_s,
+                        &mut static_structured_metadata,
+                        &mut dynamic_structured_metadata,
+                    ) {
+                        warn!(
+                            "Failed to expand dynamic structured metadata. value: {}, err: {}",
+                            value_s, err
+                        );
+                    }
+                }
+                (Err(key_err), Err(val_err)) => {
+                    let key_confined = is_confined(&key_err);
+                    let val_confined = is_confined(&val_err);
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
@@ -249,11 +328,9 @@ impl EventEncoder {
                     )
                             .as_str()
                         ),
-                        drop_event: false,
-                        error: key.err().unwrap(),
+                        drop_event: key_confined,
+                        error: key_err,
                     });
-                }
-                if value.is_err() {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
@@ -261,27 +338,46 @@ impl EventEncoder {
                     )
                             .as_str()
                         ),
-                        drop_event: false,
-                        error: value.err().unwrap(),
+                        // Count the drop once — key already flagged it if confined.
+                        drop_event: val_confined && !key_confined,
+                        error: val_err,
                     });
+                    if key_confined || val_confined {
+                        return Err(());
+                    }
                 }
-                continue;
-            }
-
-            let key_s = key.unwrap();
-            let value_s = value.unwrap();
-            let result = pair_expansion(
-                &key_s,
-                &value_s,
-                &mut static_structured_metadata,
-                &mut dynamic_structured_metadata,
-            );
-            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
-            if let Err(err) = result {
-                warn!(
-                    "Failed to expand dynamic structured metadata. value: {}, err: {}",
-                    value_s, err
-                );
+                (Err(key_err), Ok(_)) => {
+                    let key_confined = is_confined(&key_err);
+                    emit!(TemplateRenderingError {
+                        field: Some(
+                            format!(
+                        "structured_metadata_key \"{key_template}\" with structured_metadata_value \"{value_template}\""
+                    )
+                            .as_str()
+                        ),
+                        drop_event: key_confined,
+                        error: key_err,
+                    });
+                    if key_confined {
+                        return Err(());
+                    }
+                }
+                (Ok(_), Err(val_err)) => {
+                    let val_confined = is_confined(&val_err);
+                    emit!(TemplateRenderingError {
+                        field: Some(
+                            format!(
+                        "structured_metadata_value \"{value_template}\" with structured_metadata_key \"{key_template}\""
+                    )
+                            .as_str()
+                        ),
+                        drop_event: val_confined,
+                        error: val_err,
+                    });
+                    if val_confined {
+                        return Err(());
+                    }
+                }
             }
         }
 
@@ -295,7 +391,7 @@ impl EventEncoder {
             };
         }
 
-        Vec::from_iter(dynamic_structured_metadata)
+        Ok(Vec::from_iter(dynamic_structured_metadata))
     }
 
     fn remove_structured_metadata_fields(&self, event: &mut Event) {
@@ -319,9 +415,16 @@ impl EventEncoder {
         };
         let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
-        let mut labels: Vec<(String, String)> = self.build_labels(&event);
+        let mut labels: Vec<(String, String)> = match self.build_labels(&event) {
+            Ok(labels) => labels,
+            Err(()) => return None, // Confined label — intentional security drop
+        };
         self.remove_label_fields(&mut event);
-        let structured_metadata: Vec<(String, String)> = self.build_structured_metadata(&event);
+        let structured_metadata: Vec<(String, String)> =
+            match self.build_structured_metadata(&event) {
+                Ok(md) => md,
+                Err(()) => return None, // Confined structured_metadata — intentional security drop
+            };
         self.remove_structured_metadata_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
@@ -500,6 +603,19 @@ impl LokiSink {
             .map(|template| template.confine(&config.confinement, LokiConfig::NAME, "tenant_id"))
             .transpose()?;
 
+        let labels = confine_template_map(
+            config.labels,
+            &config.confinement,
+            LokiConfig::NAME,
+            "labels",
+        )?;
+        let structured_metadata = confine_template_map(
+            config.structured_metadata,
+            &config.confinement,
+            LokiConfig::NAME,
+            "structured_metadata",
+        )?;
+
         Ok(Self {
             request_builder: LokiRequestBuilder {
                 compression,
@@ -509,8 +625,8 @@ impl LokiSink {
                 key_partitioner: KeyPartitioner::new(tenant_id),
                 transformer,
                 encoder,
-                labels: config.labels,
-                structured_metadata: config.structured_metadata,
+                labels,
+                structured_metadata,
                 remove_label_fields: config.remove_label_fields,
                 remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,

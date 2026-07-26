@@ -8,8 +8,13 @@ branding:
 inputs:
   cargo-cache:
     required: false
-    default: true
+    default: false
     description: "Cache Cargo registry, index, and git DB. Enabled automatically if any Rust tools are requested."
+
+  cache-save:
+    required: false
+    default: "false"
+    description: "Whether this job is allowed to write the shared cache. Only warm-cache.yml opts in."
 
   mold:
     required: false
@@ -133,33 +138,6 @@ runs:
       if: ${{ env.NEEDS_RUST == 'true' }}
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
-
-    # Two steps so that the actions/cache post-step (which saves the cache) runs
-    # directly from this composite, not a nested one — nested composites break
-    # post-step input resolution (actions/runner#3514, #2030).
-    - name: Cache Cargo registry, index, and git DB
-      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref == 'refs/heads/master' }}
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-
-    - name: Restore Cargo registry, index, and git DB
-      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref != 'refs/heads/master' }}
-      uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
 
     - name: Install mold
       if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
@@ -299,3 +277,18 @@ runs:
       if: ${{ inputs.vdev == 'true' }}
       shell: bash
       run: echo "VDEV=$(which vdev)" >> "$GITHUB_ENV"
+
+    # Runs after prepare.sh so Swatinem can invoke rustc/cargo (fresh
+    # self-hosted runners install rustup there). Only warm-cache.yml
+    # opts in to saving; other master-ref workflows may dispatch with
+    # a user-supplied ref and must not poison the shared cache.
+    - name: Cache Cargo + target/
+      if: ${{ inputs.cargo-cache == 'true' && env.NEEDS_RUST == 'true' }}
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      with:
+        prefix-key: "v1-vector"
+        shared-key: "workspace"
+        # Rotate the key when cache mechanics change so the warmer can save a fresh entry.
+        key: ${{ hashFiles('.github/actions/setup/action.yml', '.github/workflows/warm-cache.yml') }}
+        cache-bin: "false"
+        save-if: ${{ inputs.cache-save == 'true' && github.ref == 'refs/heads/master' }}

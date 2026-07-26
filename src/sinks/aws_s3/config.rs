@@ -235,6 +235,10 @@ impl SinkConfig for S3SinkConfig {
         Ok((sink, healthcheck))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         #[cfg(feature = "codecs-parquet")]
         if let Some(batch_encoding) = &self.batch_encoding {

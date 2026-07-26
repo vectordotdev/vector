@@ -406,8 +406,11 @@ impl SinkConfig for PulsarSinkConfig {
 
         let sink = PulsarSink::new(client, config.clone())?;
         let hc = healthcheck(config).boxed();
-
         Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
