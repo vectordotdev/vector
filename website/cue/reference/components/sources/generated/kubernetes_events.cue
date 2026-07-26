@@ -149,8 +149,12 @@ generated: components: sources: kubernetes_events: configuration: {
 		}
 	}
 	watch_timeout_seconds: {
-		description: "Timeout applied to the Kubernetes watch call."
-		required:    false
+		description: """
+			Timeout applied to the Kubernetes watch call.
+
+			Must be between 1 and 294 seconds.
+			"""
+		required: false
 		type: uint: {
 			default: 290
 			unit:    "seconds"

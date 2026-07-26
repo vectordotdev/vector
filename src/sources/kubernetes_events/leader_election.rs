@@ -8,6 +8,7 @@
 use std::{
     collections::BTreeMap,
     env, fs,
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
@@ -21,6 +22,7 @@ use tokio::select;
 use tokio::time::sleep;
 
 use super::config::{self, FALLBACK_IDENTITY_ENV_VAR, KubernetesEventsLeaderElectionConfig};
+#[cfg(test)]
 use super::kube_timestamp_to_chrono;
 use crate::{internal_events::KubernetesEventsLeaderElectionError, shutdown::ShutdownSignal};
 
@@ -126,12 +128,22 @@ impl LeaderElectionSettings {
 pub(super) struct LeaseCoordinator {
     api: Api<Lease>,
     pub(super) settings: LeaderElectionSettings,
+    observed_lease: Mutex<Option<ObservedLease>>,
+}
+
+struct ObservedLease {
+    spec: LeaseSpec,
+    observed_at: Instant,
 }
 
 impl LeaseCoordinator {
     pub(super) fn new(client: Client, settings: LeaderElectionSettings) -> Self {
         let api = Api::namespaced(client, &settings.lease_namespace);
-        Self { api, settings }
+        Self {
+            api,
+            settings,
+            observed_lease: Mutex::new(None),
+        }
     }
 
     pub(super) async fn wait_for_leadership(
@@ -214,7 +226,9 @@ impl LeaseCoordinator {
             }),
         };
 
-        self.api.create(&PostParams::default(), &lease).await
+        let created = self.api.create(&PostParams::default(), &lease).await?;
+        self.observe_lease(&created);
+        Ok(created)
     }
 
     async fn update_existing_lease(
@@ -224,14 +238,47 @@ impl LeaseCoordinator {
         checkpoints: Option<&ResourceVersionCheckpoints>,
     ) -> Result<LeaseUpdate, KubeError> {
         let prior_checkpoints = lease_checkpoints(&lease);
-        let Some(updated) = prepare_lease_update(lease, &self.settings, now, checkpoints) else {
+        let locally_expired = lease
+            .spec
+            .as_ref()
+            .is_some_and(|spec| self.observed_lease_is_expired(spec));
+        let Some(updated) =
+            prepare_lease_update(lease, &self.settings, now, locally_expired, checkpoints)
+        else {
             return Ok(LeaseUpdate::HeldByOther);
         };
 
-        self.api
+        let replaced = self
+            .api
             .replace(&self.settings.lease_name, &PostParams::default(), &updated)
             .await?;
+        self.observe_lease(&replaced);
         Ok(LeaseUpdate::Held { prior_checkpoints })
+    }
+
+    fn observed_lease_is_expired(&self, spec: &LeaseSpec) -> bool {
+        let mut observed = self
+            .observed_lease
+            .lock()
+            .expect("lease observation mutex should not be poisoned");
+        locally_observed_lease_is_expired(
+            &mut observed,
+            spec,
+            Instant::now(),
+            self.settings.lease_duration,
+        )
+    }
+
+    fn observe_lease(&self, lease: &Lease) {
+        if let Some(spec) = lease.spec.clone() {
+            *self
+                .observed_lease
+                .lock()
+                .expect("lease observation mutex should not be poisoned") = Some(ObservedLease {
+                spec,
+                observed_at: Instant::now(),
+            });
+        }
     }
 }
 
@@ -325,6 +372,7 @@ fn prepare_lease_update(
     mut lease: Lease,
     settings: &LeaderElectionSettings,
     now: DateTime<Utc>,
+    locally_expired: bool,
     checkpoints: Option<&ResourceVersionCheckpoints>,
 ) -> Option<Lease> {
     let spec = lease.spec.get_or_insert_with(LeaseSpec::default);
@@ -333,7 +381,12 @@ fn prepare_lease_update(
         .as_deref()
         .is_some_and(|holder| holder == settings.identity);
 
-    if !held_by_self && !lease_is_expired(spec, now, settings.lease_duration) {
+    let held_by_other = spec
+        .holder_identity
+        .as_deref()
+        .is_some_and(|holder| !holder.is_empty() && holder != settings.identity);
+
+    if held_by_other && !locally_expired {
         return None;
     }
 
@@ -375,7 +428,22 @@ fn serialize_checkpoints(checkpoints: &ResourceVersionCheckpoints) -> String {
         .expect("resource-version checkpoints contain only serializable values")
 }
 
-fn lease_is_expired(spec: &LeaseSpec, now: DateTime<Utc>, fallback_duration: Duration) -> bool {
+fn locally_observed_lease_is_expired(
+    observed: &mut Option<ObservedLease>,
+    spec: &LeaseSpec,
+    now: Instant,
+    fallback_duration: Duration,
+) -> bool {
+    if observed
+        .as_ref()
+        .is_none_or(|observed| observed.spec != *spec)
+    {
+        *observed = Some(ObservedLease {
+            spec: spec.clone(),
+            observed_at: now,
+        });
+    }
+
     let lease_duration = spec
         .lease_duration_seconds
         .and_then(|duration| u64::try_from(duration).ok())
@@ -383,17 +451,9 @@ fn lease_is_expired(spec: &LeaseSpec, now: DateTime<Utc>, fallback_duration: Dur
         .map(Duration::from_secs)
         .unwrap_or(fallback_duration);
 
-    let Some(renew_time) = spec.renew_time.as_ref() else {
-        return true;
-    };
-    let Some(renewed_at) = kube_timestamp_to_chrono(renew_time.0) else {
-        return true;
-    };
-
-    match now.signed_duration_since(renewed_at).to_std() {
-        Ok(elapsed) => elapsed > lease_duration,
-        Err(_) => false,
-    }
+    observed.as_ref().is_some_and(|observed| {
+        now.saturating_duration_since(observed.observed_at) >= lease_duration
+    })
 }
 
 fn duration_as_i32(duration: Duration) -> i32 {
@@ -548,7 +608,7 @@ mod tests {
             Some(now - ChronoDuration::seconds(5)),
             Some(2),
         );
-        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, None)
+        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, false, None)
             .expect("self-held lease should renew");
         let spec = prepared.spec.expect("lease spec should be set");
 
@@ -570,7 +630,9 @@ mod tests {
             Some(2),
         );
 
-        assert!(prepare_lease_update(lease, &leader_settings("vector-0"), now, None).is_none());
+        assert!(
+            prepare_lease_update(lease, &leader_settings("vector-0"), now, false, None).is_none()
+        );
     }
 
     #[test]
@@ -581,7 +643,7 @@ mod tests {
             Some(now - ChronoDuration::seconds(16)),
             Some(2),
         );
-        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, None)
+        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, true, None)
             .expect("expired lease should be acquired");
         let spec = prepared.spec.expect("lease spec should be set");
 
@@ -595,10 +657,58 @@ mod tests {
     }
 
     #[test]
+    fn leader_election_lease_expiry_uses_local_observation_time() {
+        let remote_now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let mut spec = make_lease(
+            Some("vector-1"),
+            Some(remote_now - ChronoDuration::hours(1)),
+            Some(2),
+        )
+        .spec
+        .expect("lease spec should be set");
+        let mut observed = None;
+        let first_observation = Instant::now();
+        let lease_duration = Duration::from_secs(15);
+
+        assert!(
+            !locally_observed_lease_is_expired(
+                &mut observed,
+                &spec,
+                first_observation,
+                lease_duration,
+            ),
+            "an old remote timestamp must not make a newly observed lease expire"
+        );
+        assert!(!locally_observed_lease_is_expired(
+            &mut observed,
+            &spec,
+            first_observation + lease_duration - Duration::from_millis(1),
+            lease_duration,
+        ));
+        assert!(locally_observed_lease_is_expired(
+            &mut observed,
+            &spec,
+            first_observation + lease_duration,
+            lease_duration,
+        ));
+
+        spec.renew_time = Some(kube_micro_time(remote_now + ChronoDuration::hours(1)));
+        assert!(
+            !locally_observed_lease_is_expired(
+                &mut observed,
+                &spec,
+                first_observation + lease_duration,
+                lease_duration,
+            ),
+            "a changed lease spec must reset the local observation time"
+        );
+    }
+
+    #[test]
     fn leader_election_takes_lease_without_holder() {
         let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let lease = make_lease(None, None, None);
-        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, None)
+        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, false, None)
             .expect("empty lease should be acquired");
         let spec = prepared.spec.expect("lease spec should be set");
 
@@ -704,7 +814,7 @@ mod tests {
         );
         annotate_checkpoints(&mut lease, &expected);
 
-        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, None)
+        let prepared = prepare_lease_update(lease, &leader_settings("vector-0"), now, true, None)
             .expect("expired lease should be acquired");
 
         assert_eq!(
@@ -726,9 +836,14 @@ mod tests {
         );
         annotate_checkpoints(&mut lease, &old);
 
-        let prepared =
-            prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(&updated))
-                .expect("self-held lease should renew");
+        let prepared = prepare_lease_update(
+            lease,
+            &leader_settings("vector-0"),
+            now,
+            false,
+            Some(&updated),
+        )
+        .expect("self-held lease should renew");
 
         assert_eq!(lease_checkpoints(&prepared), Some(updated));
     }
@@ -748,9 +863,14 @@ mod tests {
             .insert("example.com/other".to_string(), "keep-me".to_string());
         let updated = checkpoints("config", &[("all", "123")]);
 
-        let prepared =
-            prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(&updated))
-                .expect("self-held lease should renew");
+        let prepared = prepare_lease_update(
+            lease,
+            &leader_settings("vector-0"),
+            now,
+            false,
+            Some(&updated),
+        )
+        .expect("self-held lease should renew");
 
         assert_eq!(
             prepared
@@ -777,9 +897,14 @@ mod tests {
             );
         let updated = checkpoints("config", &[("all", "123")]);
 
-        let prepared =
-            prepare_lease_update(lease, &leader_settings("vector-0"), now, Some(&updated))
-                .expect("self-held lease should renew");
+        let prepared = prepare_lease_update(
+            lease,
+            &leader_settings("vector-0"),
+            now,
+            false,
+            Some(&updated),
+        )
+        .expect("self-held lease should renew");
 
         assert!(
             prepared

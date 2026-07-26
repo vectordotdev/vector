@@ -11,6 +11,7 @@ use vrl::value::{Kind, kind::Collection};
 pub const DEFAULT_MAX_EVENT_AGE_SECS: u64 = 3600;
 pub const DEFAULT_DEDUPE_RETENTION_SECS: u64 = 3600;
 pub const DEFAULT_WATCH_TIMEOUT_SECS: u32 = 290;
+pub const MAX_WATCH_TIMEOUT_SECS: u32 = 294;
 pub const DEFAULT_LEASE_NAME: &str = "vector-kubernetes-events";
 pub const DEFAULT_IDENTITY_ENV_VAR: &str = "VECTOR_SELF_POD_NAME";
 pub const FALLBACK_IDENTITY_ENV_VAR: &str = "HOSTNAME";
@@ -79,6 +80,8 @@ pub struct KubernetesEventsConfig {
     pub dedupe_retention_seconds: u64,
 
     /// Timeout applied to the Kubernetes watch call.
+    ///
+    /// Must be between 1 and 294 seconds.
     #[serde(default = "default_watch_timeout_seconds")]
     #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Watch Timeout"))]
     pub watch_timeout_seconds: u32,

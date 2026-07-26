@@ -164,6 +164,13 @@ impl KubernetesEventsSource {
         if config.dedupe_retention_seconds == 0 {
             return Err("dedupe_retention_seconds must be greater than 0".into());
         }
+        if !(1..=config::MAX_WATCH_TIMEOUT_SECS).contains(&config.watch_timeout_seconds) {
+            return Err(format!(
+                "watch_timeout_seconds must be between 1 and {}",
+                config::MAX_WATCH_TIMEOUT_SECS
+            )
+            .into());
+        }
 
         let checkpoint_configuration = checkpoint_configuration(&config);
         let namespaces = canonicalize_set(config.namespaces.clone());
@@ -469,9 +476,17 @@ impl KubernetesEventsSource {
         };
         let uid = identity.uid;
         let resource_version = identity.resource_version;
+        deduper.prune();
 
         if !self.type_allowed(&event) || !self.reason_allowed(&event) || !self.kind_allowed(&event)
         {
+            if self.include_previous_event {
+                deduper.commit(PendingDedupeRecord {
+                    uid,
+                    resource_version,
+                    event: Some(event),
+                });
+            }
             emit!(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "filtered"
@@ -482,14 +497,19 @@ impl KubernetesEventsSource {
         let observed_timestamp = observed_event_timestamp(&event);
         let timestamp = observed_timestamp.unwrap_or_else(Utc::now);
         if self.is_older_than(timestamp) {
+            if self.include_previous_event {
+                deduper.commit(PendingDedupeRecord {
+                    uid,
+                    resource_version,
+                    event: Some(event),
+                });
+            }
             emit!(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "expired"
             });
             return Ok(None);
         }
-
-        deduper.prune();
 
         let dedupe_record = PendingDedupeRecord {
             uid: uid.clone(),
@@ -1038,6 +1058,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn filtered_versions_are_retained_for_previous_event_output() {
+        let mut source = make_source_with_config(KubernetesEventsConfig {
+            include_types: vec!["Normal".to_string()],
+            include_previous_event: true,
+            ..KubernetesEventsConfig::default()
+        });
+        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut first = make_event("uid", "1", Utc::now());
+        first.type_ = Some("Normal".to_string());
+        let first = source
+            .handle_event(
+                None,
+                checkpoint_watcher::Event::InitApply(first),
+                LogNamespace::Legacy,
+                &mut deduper,
+            )
+            .unwrap()
+            .expect("matching event should be emitted");
+        deduper.commit(first.dedupe_record);
+
+        let mut filtered = make_event("uid", "2", Utc::now());
+        filtered.type_ = Some("Warning".to_string());
+        assert!(
+            source
+                .handle_event(
+                    None,
+                    checkpoint_watcher::Event::InitApply(filtered),
+                    LogNamespace::Legacy,
+                    &mut deduper,
+                )
+                .unwrap()
+                .is_none(),
+            "filtered event should not be emitted"
+        );
+
+        let mut latest = make_event("uid", "3", Utc::now());
+        latest.type_ = Some("Normal".to_string());
+        let latest = source
+            .handle_event(
+                None,
+                checkpoint_watcher::Event::InitApply(latest),
+                LogNamespace::Legacy,
+                &mut deduper,
+            )
+            .unwrap()
+            .expect("event matching the filter again should be emitted");
+
+        assert_eq!(
+            latest
+                .event
+                .as_log()
+                .value()
+                .get(path!("old_event", "metadata", "resourceVersion")),
+            Some(&value!("2")),
+            "old_event should contain the most recently observed version"
+        );
+    }
+
+    #[tokio::test]
     async fn bootstrap_event_without_timestamp_is_emitted() {
         let mut source = make_source();
         let mut deduper = Deduper::new(Duration::from_secs(60));
@@ -1107,5 +1186,41 @@ mod tests {
             result,
             Err(error) if error.to_string() == "dedupe_retention_seconds must be greater than 0"
         ));
+    }
+
+    #[tokio::test]
+    async fn invalid_watch_timeouts_are_rejected() {
+        let client_config = ClientConfig::new("http://127.0.0.1:8080".parse().unwrap());
+        let client = Client::try_from(client_config).unwrap();
+
+        for watch_timeout_seconds in [0, config::MAX_WATCH_TIMEOUT_SECS + 1] {
+            let result = KubernetesEventsSource::new(
+                client.clone(),
+                KubernetesEventsConfig {
+                    watch_timeout_seconds,
+                    ..KubernetesEventsConfig::default()
+                },
+            );
+
+            assert!(matches!(
+                result,
+                Err(error) if error.to_string()
+                    == format!(
+                        "watch_timeout_seconds must be between 1 and {}",
+                        config::MAX_WATCH_TIMEOUT_SECS
+                    )
+            ));
+        }
+
+        assert!(
+            KubernetesEventsSource::new(
+                client,
+                KubernetesEventsConfig {
+                    watch_timeout_seconds: config::MAX_WATCH_TIMEOUT_SECS,
+                    ..KubernetesEventsConfig::default()
+                },
+            )
+            .is_ok()
+        );
     }
 }
