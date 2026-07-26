@@ -30,7 +30,7 @@ pub(super) enum DedupResult {
 pub(super) struct PendingDedupeRecord {
     pub(super) uid: String,
     pub(super) resource_version: String,
-    pub(super) event: KubeEvent,
+    pub(super) event: Option<KubeEvent>,
 }
 
 impl Deduper {
@@ -74,7 +74,7 @@ impl Deduper {
         self.entries.insert(
             record.uid,
             CachedEvent {
-                event: Some(record.event),
+                event: record.event,
                 resource_version: record.resource_version,
                 last_seen: Instant::now(),
             },
@@ -95,7 +95,7 @@ impl Deduper {
             self.commit(PendingDedupeRecord {
                 uid,
                 resource_version,
-                event: event.clone(),
+                event: Some(event.clone()),
             });
         }
         result
@@ -233,7 +233,7 @@ mod tests {
         deduper.commit(PendingDedupeRecord {
             uid: "uid".to_string(),
             resource_version: "1".to_string(),
-            event: first_event,
+            event: Some(first_event),
         });
 
         assert!(matches!(
@@ -252,7 +252,7 @@ mod tests {
         deduper.commit(PendingDedupeRecord {
             uid: "uid".to_string(),
             resource_version: "2".to_string(),
-            event: updated_event,
+            event: Some(updated_event),
         });
         assert_eq!(
             deduper.entries.get("uid").and_then(|entry| entry
@@ -297,7 +297,7 @@ mod tests {
         deduper.commit(PendingDedupeRecord {
             uid: "uid".to_string(),
             resource_version: "1".to_string(),
-            event,
+            event: Some(event),
         });
 
         if let Some(entry) = deduper.entries.get_mut("uid") {
@@ -348,7 +348,7 @@ mod tests {
         deduper.commit(PendingDedupeRecord {
             uid: "uid".to_string(),
             resource_version: "1".to_string(),
-            event: first.clone(),
+            event: Some(first.clone()),
         });
         deduper.invalidate_previous_events();
 
@@ -364,7 +364,7 @@ mod tests {
         deduper.commit(PendingDedupeRecord {
             uid: "uid".to_string(),
             resource_version: "2".to_string(),
-            event: make_event("uid", "2", timestamp),
+            event: Some(make_event("uid", "2", timestamp)),
         });
         assert!(matches!(
             deduper.evaluate("uid", "3", true),

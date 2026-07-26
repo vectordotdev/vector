@@ -494,7 +494,7 @@ impl KubernetesEventsSource {
         let dedupe_record = PendingDedupeRecord {
             uid: uid.clone(),
             resource_version: resource_version.clone(),
-            event: event.clone(),
+            event: self.include_previous_event.then(|| event.clone()),
         };
 
         let dedup_result = deduper.evaluate(&uid, &resource_version, self.include_previous_event);
@@ -1005,6 +1005,36 @@ mod tests {
             processed.event.as_log().value().get(path!("verb")),
             Some(&value!("UPDATED"))
         );
+    }
+
+    #[tokio::test]
+    async fn caches_event_payload_only_when_previous_event_is_enabled() {
+        for include_previous_event in [false, true] {
+            let mut source = make_source_with_config(KubernetesEventsConfig {
+                include_previous_event,
+                ..KubernetesEventsConfig::default()
+            });
+            let mut deduper = Deduper::new(Duration::from_secs(60));
+            let processed = source
+                .handle_event(
+                    None,
+                    checkpoint_watcher::Event::InitApply(make_event("uid", "rv", Utc::now())),
+                    LogNamespace::Legacy,
+                    &mut deduper,
+                )
+                .unwrap()
+                .expect("event should be emitted");
+
+            assert_eq!(
+                processed.dedupe_record.event.is_some(),
+                include_previous_event
+            );
+            deduper.commit(processed.dedupe_record);
+            assert!(matches!(
+                deduper.evaluate("uid", "rv", include_previous_event),
+                DedupResult::Duplicate
+            ));
+        }
     }
 
     #[tokio::test]
