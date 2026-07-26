@@ -224,8 +224,10 @@ impl Fingerprinter {
             .map_err(|error| {
                 match error.kind() {
                     ErrorKind::UnexpectedEof => {
-                        if file_size != Some(0) && !known_small_files.contains_key(path) {
-                            emitter.emit_file_checksum_failed(path);
+                        if !known_small_files.contains_key(path) {
+                            if file_size != Some(0) {
+                                emitter.emit_file_checksum_failed(path);
+                            }
                             known_small_files.insert(path.to_path_buf(), time::Instant::now());
                         }
                         return;
@@ -280,7 +282,17 @@ async fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, fs, io::Error, path::Path, time::Duration};
+    use std::{
+        collections::HashMap,
+        fs,
+        io::Error,
+        path::Path,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
 
     use async_compression::tokio::bufread::GzipEncoder;
     use bytes::BytesMut;
@@ -642,10 +654,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn no_error_on_empty_file() {
+    async fn fingerprint_or_emit_only_warns_on_non_empty_small_files() {
         let target_dir = tempdir().unwrap();
         let empty_path = target_dir.path().join("empty.log");
+        let too_small_path = target_dir.path().join("too_small.log");
+
         fs::write(&empty_path, []).unwrap();
+        fs::write(&too_small_path, b"missing newline").unwrap();
 
         let mut fingerprinter = Fingerprinter::new(
             FingerprintStrategy::FirstLinesChecksum {
@@ -656,14 +671,26 @@ mod test {
             false,
         );
 
+        let emitter = RecordingEmitter::default();
         let mut small_files = HashMap::new();
+
         assert!(
             fingerprinter
-                .fingerprint_or_emit(&empty_path, &mut small_files, &NoErrors)
+                .fingerprint_or_emit(&empty_path, &mut small_files, &emitter)
                 .await
                 .is_none()
         );
-        assert!(!small_files.contains_key(&empty_path));
+        assert_eq!(emitter.checksum_failed_count(), 0);
+        assert!(small_files.contains_key(&empty_path));
+
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&too_small_path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 1);
+        assert!(small_files.contains_key(&too_small_path));
     }
 
     #[test]
@@ -684,6 +711,47 @@ mod test {
     }
     #[derive(Clone)]
     struct NoErrors;
+
+    #[derive(Clone, Default)]
+    struct RecordingEmitter {
+        checksum_failed: Arc<AtomicUsize>,
+    }
+
+    impl RecordingEmitter {
+        fn checksum_failed_count(&self) -> usize {
+            self.checksum_failed.load(Ordering::SeqCst)
+        }
+    }
+
+    impl FileSourceInternalEvents for RecordingEmitter {
+        fn emit_file_added(&self, _: &Path) {}
+
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+
+        fn emit_file_deleted(&self, _: &Path) {}
+
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+
+        fn emit_file_checksum_failed(&self, _: &Path) {
+            self.checksum_failed.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn emit_file_checkpoint_write_error(&self, _: Error) {}
+
+        fn emit_files_open(&self, _: usize) {}
+
+        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
+    }
 
     impl FileSourceInternalEvents for NoErrors {
         fn emit_file_added(&self, _: &Path) {}
