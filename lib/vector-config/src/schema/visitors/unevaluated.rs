@@ -512,8 +512,14 @@ fn mark_schema_closed(schema: &mut SchemaObject) {
 
     // Ensure the schema has an explicit `"type": "object"` when `unevaluatedProperties` is set.
     // Some validators (e.g. Ajv in strict mode) require that object-level keywords like
-    // `unevaluatedProperties` are accompanied by an explicit type declaration.
-    if schema.instance_type.is_none() {
+    // `unevaluatedProperties` are accompanied by an explicit type declaration. `oneOf` and
+    // `anyOf` can also permit non-object values, though, so adding an object type to those
+    // schemas would change their validation semantics.
+    let has_union = match schema.subschemas.as_ref() {
+        Some(subschemas) => subschemas.one_of.is_some() || subschemas.any_of.is_some(),
+        None => false,
+    };
+    if schema.instance_type.is_none() && !has_union {
         schema.instance_type = Some(SingleOrVec::Single(Box::new(InstanceType::Object)));
     }
 }
@@ -569,6 +575,39 @@ mod tests {
                     "a": { "type": "string" }
                 }
             }],
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn does_not_add_type_object_for_union_with_non_object_alternative() {
+        let mut actual_schema = as_schema(json!({
+            "oneOf": [
+                { "type": "null" },
+                {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": "string" }
+                    }
+                }
+            ]
+        }));
+
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "oneOf": [
+                { "type": "null" },
+                {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": "string" }
+                    }
+                }
+            ],
             "unevaluatedProperties": false
         }));
 
