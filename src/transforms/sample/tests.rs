@@ -305,6 +305,26 @@ fn handles_trace_event() {
 }
 
 #[test]
+fn group_by_uses_independent_ratio_samplers() {
+    let mut sampler = Sample::new(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.5),
+        None,
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        None,
+        default_sample_rate_key(),
+    );
+
+    let sampled = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
+        let mut event = LogEvent::from("event");
+        event.insert(event_path!("service"), service);
+        transform_one(&mut sampler, event.into()).is_some()
+    });
+
+    assert_eq!(sampled, [true, true, false, false]);
+}
+
+#[test]
 fn sample_at_rates_higher_then_half() {
     // Retain 80% of the events of the stream
     let events = random_events(10000);
