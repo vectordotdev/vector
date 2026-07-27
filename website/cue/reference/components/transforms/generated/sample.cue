@@ -50,9 +50,7 @@ generated: components: transforms: sample: configuration: {
 			retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
 			"""
 		required: false
-		type: uint: examples: [
-			1500,
-		]
+		type: uint: {}
 	}
 	rate_field: {
 		description: """
@@ -64,7 +62,7 @@ generated: components: transforms: sample: configuration: {
 			This option cannot be used together with `ratio_field`.
 			"""
 		required: false
-		type: string: examples: ["sample_rate_n"]
+		type: string: {}
 	}
 	ratio: {
 		description: """
@@ -75,7 +73,7 @@ generated: components: transforms: sample: configuration: {
 			precision value and also the ability to retain values of greater than 50% of all events. It is
 			an error to provide a value for both `rate` and `ratio`.
 			"""
-		required: false
+		required: true
 		type: float: examples: [
 			0.13,
 		]
@@ -90,7 +88,7 @@ generated: components: transforms: sample: configuration: {
 			This option cannot be used together with `rate_field`.
 			"""
 		required: false
-		type: string: examples: ["sample_rate"]
+		type: string: {}
 	}
 	sample_rate_key: {
 		description: "The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event."

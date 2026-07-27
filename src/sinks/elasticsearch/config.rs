@@ -753,8 +753,11 @@ impl SinkConfig for ElasticsearchConfig {
         )
         .map_ok(|((), _)| ())
         .boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((stream, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

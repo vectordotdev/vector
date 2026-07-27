@@ -189,12 +189,11 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    /// Confinement + sink construction without emitting the per-sink
-    /// confinement gauge. `component_name` is used for both the gauge label
-    /// (by the caller) and the per-template security warnings emitted from
-    /// `Template::confine`, so wrapping sinks (Humio) see their own type in
-    /// logs and metrics rather than the delegated `splunk_hec_logs`.
-    pub(crate) fn build_without_confinement_gauge(
+    /// Confinement + sink construction. `component_name` is threaded into the
+    /// per-template security warnings emitted from `Template::confine`, so
+    /// wrapping sinks (Humio) see their own type in logs rather than the
+    /// delegated `splunk_hec_logs`.
+    pub(crate) fn build_with_component_type(
         &self,
         cx: SinkContext,
         component_name: &'static str,
@@ -234,9 +233,11 @@ impl HecLogsSinkConfig {
 #[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let result = self.build_without_confinement_gauge(cx, Self::NAME)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
-        Ok(result)
+        self.build_with_component_type(cx, Self::NAME)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

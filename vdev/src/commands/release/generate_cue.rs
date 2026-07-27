@@ -84,6 +84,18 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
             cue_path.display()
         );
     }
+    let stub_path = repo_root
+        .join("website")
+        .join("content")
+        .join("en")
+        .join("releases")
+        .join(format!("{new_version}.md"));
+    if stub_path.exists() {
+        bail!(
+            "{} already exists. Delete it (or move it aside) and re-run.",
+            stub_path.display()
+        );
+    }
     // Note: the highlights collision is checked later, only if we're actually going to
     // write it — so a manually-authored upgrade guide doesn't block a release with no
     // breaking fragments.
@@ -159,8 +171,115 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
         warn!("cue fmt failed (skipping format): {e}");
     }
 
+    refresh_versions_cue(&repo_root)?;
+    write_release_stub(&repo_root, &new_version)?;
+
     success!("Wrote {}", cue_path.display());
     Ok(cue_path)
+}
+
+/// Regenerate `website/cue/reference/versions.cue` from the filenames in the `releases/`
+/// directory, preserving any versions already listed there that have no backing `.cue` file
+/// (legacy releases predating the automated tooling). Fixes the gap where `release generate-cue`
+/// previously left `versions.cue` stale so the new version was invisible in local Hugo previews.
+pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
+    let releases_dir = repo_root.join(RELEASES_DIR);
+    let mut versions: std::collections::HashSet<Version> = fs::read_dir(&releases_dir)
+        .with_context(|| format!("Failed to read {}", releases_dir.display()))?
+        .filter_map(std::result::Result::ok)
+        .filter_map(|e| {
+            let p = e.path();
+            if p.extension().is_some_and(|ext| ext == "cue") {
+                p.file_stem()?.to_str()?.parse::<Version>().ok()
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Preserve versions already in versions.cue that have no backing CUE file — these are
+    // legacy releases that predate the per-release CUE files and must not be silently dropped.
+    let versions_cue_path = repo_root
+        .join("website")
+        .join("cue")
+        .join("reference")
+        .join("versions.cue");
+    if let Ok(text) = fs::read_to_string(&versions_cue_path) {
+        for line in text.lines() {
+            let trimmed = line.trim().trim_end_matches(',').trim_matches('"');
+            if let Ok(v) = trimmed.parse::<Version>() {
+                versions.insert(v);
+            }
+        }
+    }
+
+    let mut versions: Vec<Version> = versions.into_iter().collect();
+    versions.sort_by(|a, b| b.cmp(a));
+
+    let list = versions
+        .iter()
+        .map(|v| format!("\t\"{v}\","))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let content = format!("package metadata\n\nversions: [string, ...string] & [\n{list}\n]\n");
+
+    let versions_cue = repo_root
+        .join("website")
+        .join("cue")
+        .join("reference")
+        .join("versions.cue");
+    atomic_write(&versions_cue, &content)?;
+    Ok(())
+}
+
+/// Write `website/content/en/releases/<version>.md` — the Hugo stub Hugo needs to route
+/// `/releases/<version>/`. Weight is derived from the highest weight found among existing
+/// stubs so the new release naturally sorts last (newest).
+pub(super) fn write_release_stub(repo_root: &Path, version: &Version) -> Result<()> {
+    let releases_dir = repo_root
+        .join("website")
+        .join("content")
+        .join("en")
+        .join("releases");
+
+    let stub_path = releases_dir.join(format!("{version}.md"));
+    if stub_path.exists() {
+        bail!(
+            "{} already exists. Delete it (or move it aside) and re-run.",
+            stub_path.display()
+        );
+    }
+
+    let max_weight: u32 = fs::read_dir(&releases_dir)
+        .with_context(|| format!("Failed to read {}", releases_dir.display()))?
+        .filter_map(std::result::Result::ok)
+        .filter(|e| {
+            let p = e.path();
+            p.extension().is_some_and(|x| x == "md")
+                && p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n != "_index.md")
+        })
+        .filter_map(|e| {
+            let text = fs::read_to_string(e.path()).ok()?;
+            text.lines()
+                .find(|l| l.trim_start().starts_with("weight:"))?
+                .split_once(':')?
+                .1
+                .trim()
+                .parse::<u32>()
+                .ok()
+        })
+        .max()
+        .unwrap_or(0);
+
+    let content = format!(
+        "---\ntitle: Vector v{version} release notes\nweight: {}\n---\n",
+        max_weight + 1
+    );
+    atomic_write(&stub_path, &content)?;
+    Ok(())
 }
 
 // ---------- Tag / version discovery ----------
@@ -1355,5 +1474,107 @@ releases: "0.55.0": {
 
         "#};
         assert_eq!(md, expected);
+    }
+
+    #[test]
+    fn refresh_versions_cue_sorts_descending_and_writes_correct_format() {
+        let tmp = tempfile::tempdir().unwrap();
+        let releases_dir = tmp.path().join("website/cue/reference/releases");
+        fs::create_dir_all(&releases_dir).unwrap();
+        for v in ["0.9.0", "0.10.0", "0.9.1", "0.8.2"] {
+            fs::write(releases_dir.join(format!("{v}.cue")), "").unwrap();
+        }
+        fs::write(releases_dir.join("README.md"), "not a version").unwrap();
+
+        refresh_versions_cue(tmp.path()).unwrap();
+
+        let out =
+            fs::read_to_string(tmp.path().join("website/cue/reference/versions.cue")).unwrap();
+
+        let expected = indoc::indoc! {r#"
+            package metadata
+
+            versions: [string, ...string] & [
+            	"0.10.0",
+            	"0.9.1",
+            	"0.9.0",
+            	"0.8.2",
+            ]
+        "#};
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn write_release_stub_picks_max_weight_and_writes_correct_format() {
+        let tmp = tempfile::tempdir().unwrap();
+        let stubs_dir = tmp.path().join("website/content/en/releases");
+        fs::create_dir_all(&stubs_dir).unwrap();
+        fs::write(stubs_dir.join("_index.md"), "---\n---\n").unwrap();
+        fs::write(
+            stubs_dir.join("0.56.0.md"),
+            "---\ntitle: Vector v0.56.0 release notes\nweight: 35\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            stubs_dir.join("0.57.0.md"),
+            "---\ntitle: Vector v0.57.0 release notes\nweight: 36\n---\n",
+        )
+        .unwrap();
+
+        let version = Version::parse("0.58.0").unwrap();
+        write_release_stub(tmp.path(), &version).unwrap();
+
+        let out = fs::read_to_string(stubs_dir.join("0.58.0.md")).unwrap();
+        assert_eq!(
+            out,
+            "---\ntitle: Vector v0.58.0 release notes\nweight: 37\n---\n"
+        );
+    }
+
+    #[test]
+    fn write_release_stub_rejects_existing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let stubs_dir = tmp.path().join("website/content/en/releases");
+        fs::create_dir_all(&stubs_dir).unwrap();
+        fs::write(
+            stubs_dir.join("0.58.0.md"),
+            "---\ntitle: Vector v0.58.0 release notes\nweight: 37\n---\n",
+        )
+        .unwrap();
+
+        let version = Version::parse("0.58.0").unwrap();
+        let err = write_release_stub(tmp.path(), &version).unwrap_err();
+        assert!(err.to_string().contains("already exists"), "{err}");
+    }
+
+    #[test]
+    fn refresh_versions_cue_preserves_legacy_versions_without_cue_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let releases_dir = tmp.path().join("website/cue/reference/releases");
+        fs::create_dir_all(&releases_dir).unwrap();
+        fs::write(releases_dir.join("0.15.0.cue"), "").unwrap();
+
+        // Simulate an existing versions.cue that lists a legacy version with no CUE file.
+        let versions_cue_dir = tmp.path().join("website/cue/reference");
+        let existing = indoc::indoc! {r#"
+            package metadata
+
+            versions: [string, ...string] & [
+            	"0.15.0",
+            	"0.14.1",
+            ]
+        "#};
+        fs::write(versions_cue_dir.join("versions.cue"), existing).unwrap();
+
+        refresh_versions_cue(tmp.path()).unwrap();
+
+        let out = fs::read_to_string(versions_cue_dir.join("versions.cue")).unwrap();
+        assert!(out.contains("\"0.15.0\""), "CUE-backed version missing");
+        assert!(out.contains("\"0.14.1\""), "legacy version was dropped");
+        // 0.15.0 must sort above 0.14.1
+        assert!(
+            out.find("\"0.15.0\"") < out.find("\"0.14.1\""),
+            "wrong sort order"
+        );
     }
 }

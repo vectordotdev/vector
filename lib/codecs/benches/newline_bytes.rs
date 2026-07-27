@@ -1,15 +1,15 @@
 use std::{fmt, time::Duration};
 
 use bytes::BytesMut;
+use codecs::{
+    BytesDeserializer, Decoder, NewlineDelimitedDecoder,
+    decoding::{Deserializer, Framer},
+};
 use criterion::{
     BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
     measurement::WallTime,
 };
-use tokio_util::codec::Decoder;
-use vector_lib::codecs::{
-    BytesDeserializer, CharacterDelimitedDecoder,
-    decoding::{Deserializer, Framer},
-};
+use tokio_util::codec::Decoder as _;
 
 #[derive(Debug)]
 struct Param {
@@ -43,19 +43,19 @@ fn decoding(c: &mut Criterion) {
     ] {
         group.throughput(Throughput::Bytes(param.input.len() as u64));
         group.bench_with_input(
-            BenchmarkId::new("character_delimited_bytes", param),
+            BenchmarkId::new("newline_bytes", param),
             &param,
             |b, param| {
                 b.iter_batched(
                     || {
-                        let framer = Framer::CharacterDelimited(
+                        let framer = Framer::NewlineDelimited(
                             param
                                 .max_length
-                                .map(|ml| CharacterDelimitedDecoder::new_with_max_length(b'a', ml))
-                                .unwrap_or(CharacterDelimitedDecoder::new(b'a')),
+                                .map(NewlineDelimitedDecoder::new_with_max_length)
+                                .unwrap_or_default(),
                         );
                         let deserializer = Deserializer::Bytes(BytesDeserializer);
-                        let decoder = vector::codecs::Decoder::new(framer, deserializer);
+                        let decoder = Decoder::new(framer, deserializer);
 
                         (Box::new(decoder), param.input.clone())
                     },

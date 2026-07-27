@@ -180,9 +180,11 @@ impl GenerateConfig for HumioLogsConfig {
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let result = self.build_without_confinement_gauge(cx, Self::NAME)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
-        Ok(result)
+        self.build_with_component_type(cx, Self::NAME)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -195,19 +197,17 @@ impl SinkConfig for HumioLogsConfig {
 }
 
 impl HumioLogsConfig {
-    /// Confinement + sink construction without emitting the per-sink
-    /// confinement gauge. `component_name` is threaded through so both the
-    /// gauge (emitted by the caller) and per-template security warnings
-    /// carry the outer sink type — `humio_logs` when this is the top-level
-    /// sink, `humio_metrics` when [`HumioMetricsConfig::build`] delegates
-    /// here.
-    pub(super) fn build_without_confinement_gauge(
+    /// Confinement + sink construction. `component_name` is threaded through so
+    /// per-template security warnings carry the outer sink type — `humio_logs`
+    /// when this is the top-level sink, `humio_metrics` when
+    /// [`HumioMetricsConfig::build`] delegates here.
+    pub(super) fn build_with_component_type(
         &self,
         cx: SinkContext,
         component_name: &'static str,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_hec_config()
-            .build_without_confinement_gauge(cx, component_name)
+            .build_with_component_type(cx, component_name)
     }
 
     fn build_hec_config(&self) -> HecLogsSinkConfig {

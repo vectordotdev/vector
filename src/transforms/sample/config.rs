@@ -61,7 +61,6 @@ pub struct SampleConfig {
     /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
     /// dropped. This differs from `ratio` which allows more precise control over the number of events
     /// retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = 1500))]
     pub rate: Option<u64>,
 
     /// The rate at which events are forwarded, expressed as a percentage
@@ -70,7 +69,7 @@ pub struct SampleConfig {
     /// the rest are dropped. This differs from `rate` allowing the configuration of a higher
     /// precision value and also the ability to retain values of greater than 50% of all events. It is
     /// an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = 0.13))]
+    #[configurable(metadata(docs::examples = 0.13, docs::required))]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub ratio: Option<f64>,
 
@@ -80,7 +79,6 @@ pub struct SampleConfig {
     /// in `(0, 1]` to be considered valid (for example, `0.25` keeps 25%). If the field is missing
     /// or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
     /// This option cannot be used together with `rate_field`.
-    #[configurable(metadata(docs::examples = "sample_rate"))]
     pub ratio_field: Option<String>,
 
     /// The event field whose integer value is used as the sampling rate on a per-event basis, expressed as `1/N`.
@@ -89,7 +87,6 @@ pub struct SampleConfig {
     /// are rejected. The value must be a positive integer to be considered valid. If the field is
     /// missing or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
     /// This option cannot be used together with `ratio_field`.
-    #[configurable(metadata(docs::examples = "sample_rate_n"))]
     pub rate_field: Option<String>,
 
     /// The name of the field whose value is hashed to determine if the event should be

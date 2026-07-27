@@ -39,7 +39,10 @@ use dnstap_proto::{
 use vector_core::config::log_schema;
 use vector_lookup::{PathPrefix, lookup_v2::ValuePath};
 
-use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
+use crate::{
+    internal_events::DnstapParseWarning, parser::dnstap_proto::HttpProtocol,
+    schema::DNSTAP_VALUE_PATHS,
+};
 
 #[derive(Debug, Snafu)]
 enum DnstapParserError {
@@ -237,6 +240,15 @@ impl DnstapParser {
                 dnstap_message.response_message.as_ref(),
                 &DNSTAP_MESSAGE_RESPONSE_TYPE_IDS,
             )?;
+        }
+
+        if let Some(http_protocol) = dnstap_message.http_protocol {
+            DnstapParser::insert(
+                event,
+                prefix.clone(),
+                &DNSTAP_VALUE_PATHS.http_protocol,
+                to_http_protocol_name(http_protocol)?.to_string(),
+            );
         }
 
         DnstapParser::parse_dnstap_message_type(
@@ -1014,6 +1026,12 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         .map(|sp| sp.as_str_name())
 }
 
+fn to_http_protocol_name(http_protocol: i32) -> Result<&'static str> {
+    HttpProtocol::try_from(http_protocol)
+        .map_err(|_| Error::from(format!("Unknown HTTP protocol: {http_protocol}")))
+        .map(|sp| sp.as_str_name())
+}
+
 fn to_dnstap_data_type(data_type_id: i32) -> Option<String> {
     match data_type_id {
         1 => Some(String::from("Message")),
@@ -1447,5 +1465,13 @@ mod tests {
         assert_eq!("DNSCryptTCP", to_socket_protocol_name(6).unwrap());
         assert_eq!("DOQ", to_socket_protocol_name(7).unwrap());
         assert!(to_socket_protocol_name(8).is_err());
+    }
+
+    #[test]
+    fn test_get_http_protocol_name() {
+        assert_eq!("HTTP1", to_http_protocol_name(1).unwrap());
+        assert_eq!("HTTP2", to_http_protocol_name(2).unwrap());
+        assert_eq!("HTTP3", to_http_protocol_name(3).unwrap());
+        assert!(to_http_protocol_name(4).is_err());
     }
 }

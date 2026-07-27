@@ -7,8 +7,6 @@ use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
 use std::{
     env, fs,
-    fs::File,
-    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -104,10 +102,6 @@ impl Prepare {
 
         self.update_vector_version(&self.repo_root.join(KUBECLT_CUE_FILE))?;
         self.update_vector_version(&self.repo_root.join(INSTALL_SCRIPT))?;
-
-        self.add_new_version_to_versions_cue()?;
-
-        self.create_new_release_md()?;
 
         if !self.dry_run {
             self.open_release_pr()?;
@@ -265,95 +259,6 @@ impl Prepare {
             file_path.strip_prefix(&self.repo_root).unwrap().display(),
         ))?;
 
-        Ok(())
-    }
-
-    /// Step 9: Add new version to `versions.cue`
-    fn add_new_version_to_versions_cue(&self) -> Result<()> {
-        debug!("add_new_version_to_versions_cue");
-        let cure_reference_path = &self.repo_root.join("website").join("cue").join("reference");
-        let versions_cue_path = cure_reference_path.join("versions.cue");
-        if !versions_cue_path.is_file() {
-            return Err(anyhow!("{} not found", versions_cue_path.display()));
-        }
-
-        let vector_version = &self.new_vector_version;
-        let temp_file_path = cure_reference_path.join(format!("{vector_version}.cue.tmp"));
-        let input_file = File::open(&versions_cue_path)?;
-        let reader = BufReader::new(input_file);
-        let mut output_file = File::create(&temp_file_path)?;
-
-        for line in reader.lines() {
-            let line = line?;
-            writeln!(output_file, "{line}")?;
-            if line.contains("versions:") {
-                writeln!(output_file, "\t\"{vector_version}\",")?;
-            }
-        }
-
-        fs::rename(&temp_file_path, &versions_cue_path)?;
-
-        git::commit(&format!(
-            "chore(releasing): Add {vector_version} to versions.cue"
-        ))?;
-        Ok(())
-    }
-
-    /// Step 10: Create a new release md file
-    fn create_new_release_md(&self) -> Result<()> {
-        debug!("create_new_release_md");
-        let releases_dir = self
-            .repo_root
-            .join("website")
-            .join("content")
-            .join("en")
-            .join("releases");
-
-        let old_version = &self.latest_vector_version;
-        let new_version = &self.new_vector_version;
-        let old_file_path = releases_dir.join(format!("{old_version}.md"));
-        if !old_file_path.exists() {
-            return Err(anyhow!(
-                "Source file not found: {}",
-                old_file_path.display()
-            ));
-        }
-
-        let content = fs::read_to_string(&old_file_path)?;
-        let updated_content = content.replace(&old_version.to_string(), &new_version.to_string());
-        let lines: Vec<&str> = updated_content.lines().collect();
-        let mut updated_lines = Vec::new();
-        let mut weight_updated = false;
-
-        for line in lines {
-            if line.trim().starts_with("weight: ") && !weight_updated {
-                // Extract the current weight value
-                let weight_str = line
-                    .trim()
-                    .strip_prefix("weight: ")
-                    .ok_or_else(|| anyhow!("Invalid weight format"))?;
-                let weight: i32 = weight_str
-                    .parse()
-                    .map_err(|e| anyhow!("Failed to parse weight: {e}"))?;
-                // Increase by 1
-                let new_weight = weight + 1;
-                updated_lines.push(format!("weight: {new_weight}"));
-                weight_updated = true;
-            } else {
-                updated_lines.push(line.to_string());
-            }
-        }
-
-        if !weight_updated {
-            error!("Couldn't update 'weight' line from {old_file_path:?}");
-        }
-
-        let new_file_path = releases_dir.join(format!("{new_version}.md"));
-        updated_lines.push(String::new()); // File should end with a newline.
-        let updated_content = updated_lines.join("\n");
-        fs::write(&new_file_path, updated_content)?;
-        git::add_files_in_current_dir()?;
-        git::commit("chore(releasing): Created release md file")?;
         Ok(())
     }
 

@@ -280,9 +280,11 @@ impl SinkConfig for ClickhouseConfig {
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
