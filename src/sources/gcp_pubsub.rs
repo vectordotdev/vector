@@ -620,7 +620,7 @@ impl PubsubSource {
         let connection = match self.endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
-                if self.should_escalate_failure() {
+                if self.should_escalate_failure("connecting", &error) {
                     emit!(GcpPubsubConnectError { error });
                 }
                 return State::RetryDelay;
@@ -667,7 +667,7 @@ impl PubsubSource {
             result = client.streaming_pull(request_stream) => match result {
                 Ok(stream) => stream,
                 Err(error) => {
-                    if self.should_escalate_failure() {
+                    if self.should_escalate_failure("setting up streaming pull", &error) {
                         emit!(GcpPubsubStreamingPullError { error });
                     }
                     return State::RetryDelay;
@@ -686,6 +686,10 @@ impl PubsubSource {
         // the finalizer is `None` and no worker is spawned (its `ack_stream`
         // would never resolve).
         let pending_acks = Arc::new(AtomicUsize::new(0));
+        // Woken by the worker when `pending_acks` reaches zero, so the main loop
+        // re-evaluates its shutdown guard immediately instead of waiting for the
+        // next keepalive or idle timer.
+        let acks_drained = Arc::new(tokio::sync::Notify::new());
         let mut finalizer = None;
         let _ack_worker = if self.acknowledgements {
             let (new_finalizer, mut ack_stream) =
@@ -693,18 +697,18 @@ impl PubsubSource {
             finalizer = new_finalizer;
             let ack_ids_sender = ack_ids_sender.clone();
             let pending_acks = Arc::clone(&pending_acks);
+            let acks_drained = Arc::clone(&acks_drained);
             Some(AbortOnDrop(crate::spawn_in_current_span(async move {
                 while let Some((status, receipts)) = ack_stream.next().await {
-                    if status == BatchStatus::Delivered {
+                    let sent = status != BatchStatus::Delivered
                         // Keep the ack pending until its send resolves, so the
                         // main task's guards don't drop the stream mid-flush.
-                        let sent = ack_ids_sender.send(receipts).await.is_ok();
-                        pending_acks.fetch_sub(1, Ordering::Relaxed);
-                        if !sent {
-                            break;
-                        }
-                    } else {
-                        pending_acks.fetch_sub(1, Ordering::Relaxed);
+                        || ack_ids_sender.send(receipts).await.is_ok();
+                    if pending_acks.fetch_sub(1, Ordering::Relaxed) == 1 {
+                        acks_drained.notify_one();
+                    }
+                    if !sent {
+                        break;
                     }
                 }
             })))
@@ -737,6 +741,8 @@ impl PubsubSource {
                 _ = &mut self.shutdown, if pending_acks.load(Ordering::Relaxed) == 0 => {
                     return State::Shutdown;
                 }
+                // Re-evaluate the shutdown guard promptly once acks drain.
+                _ = acks_drained.notified() => {}
                 _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
@@ -831,11 +837,12 @@ impl PubsubSource {
             Ok(()) => match notifier {
                 // Auto-ack runs on the main loop, so send without blocking to
                 // keep the idle timer live. A full channel means the request
-                // stream stalled; reconnect rather than park. A closed channel
-                // means it is already gone; the next `stream.next()` reconnects.
+                // stream stalled and a closed channel means it is already gone;
+                // reconnect either way rather than drop acknowledgements.
                 None => match ack_ids.try_send(ids) {
-                    Ok(()) | Err(mpsc::error::TrySendError::Closed(_)) => {}
+                    Ok(()) => {}
                     Err(mpsc::error::TrySendError::Full(_)) => return Some(State::RetryDelay),
+                    Err(mpsc::error::TrySendError::Closed(_)) => return Some(State::RetryNow),
                 },
                 Some(notifier) => {
                     finalizer
@@ -853,15 +860,19 @@ impl PubsubSource {
     // transient, auto-retried error (a reset, or `Unavailable` when an idle
     // subscription has no messages). Count a failure and report whether it
     // should escalate to a component error, so all three paths only flood the
-    // logs once failures persist. Escalation stays on while the streak persists
-    // (so a genuinely broken source stays visible and `max_retry_errors: 1`
-    // reports every failure); a successful fetch resets the counter.
-    fn should_escalate_failure(&self) -> bool {
+    // logs once failures persist. Suppressed failures are still logged at
+    // `debug` with the error and operation so there is an actionable record.
+    // Escalation stays on while the streak persists (so a genuinely broken
+    // source stays visible and `max_retry_errors: 1` reports every failure); a
+    // successful fetch resets the counter.
+    fn should_escalate_failure(&self, operation: &str, error: &dyn std::fmt::Display) -> bool {
         let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
         let escalate = consecutive_failures >= self.max_retry_errors;
         if !escalate {
             debug!(
                 message = "Transient error, retrying.",
+                operation,
+                %error,
                 consecutive_failures,
                 max_retry_errors = self.max_retry_errors,
             );
@@ -877,7 +888,7 @@ impl PubsubSource {
             return State::RetryNow;
         }
 
-        if self.should_escalate_failure() {
+        if self.should_escalate_failure("fetching events", &error) {
             emit!(GcpPubsubReceiveError { error });
         }
         State::RetryDelay
