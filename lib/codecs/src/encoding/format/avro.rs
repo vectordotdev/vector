@@ -15,6 +15,7 @@ type AvroValue = apache_avro::types::Value;
 fn coerce_logical_types(
     value: AvroValue,
     schema: &apache_avro::Schema,
+    names: &apache_avro::schema::NamesRef<'_>,
 ) -> vector_common::Result<AvroValue> {
     use apache_avro::Schema;
     match (value, schema) {
@@ -32,6 +33,12 @@ fn coerce_logical_types(
                     "Avro time-millis value {millis} is out of range for i32"
                 ))
             }),
+        (value, Schema::Ref { name }) => {
+            let schema = names.get(name).ok_or_else(|| {
+                vector_common::Error::from(format!("Unknown schema ref: {}", name.fullname(None)))
+            })?;
+            coerce_logical_types(value, schema, names)
+        }
         (AvroValue::Record(fields), Schema::Record(record_schema)) => {
             let fields = fields
                 .into_iter()
@@ -39,7 +46,7 @@ fn coerce_logical_types(
                     let value = match record_schema.lookup.get(&name) {
                         Some(index) => {
                             let field_schema = &record_schema.fields[*index].schema;
-                            coerce_logical_types(value, field_schema)?
+                            coerce_logical_types(value, field_schema, names)?
                         }
                         None => value,
                     };
@@ -55,7 +62,7 @@ fn coerce_logical_types(
                     let value = match record_schema.lookup.get(&name) {
                         Some(index) => {
                             let field_schema = &record_schema.fields[*index].schema;
-                            coerce_logical_types(value, field_schema)?
+                            coerce_logical_types(value, field_schema, names)?
                         }
                         None => value,
                     };
@@ -66,13 +73,13 @@ fn coerce_logical_types(
         }
         (AvroValue::Array(items), Schema::Array(array_schema)) => items
             .into_iter()
-            .map(|item| coerce_logical_types(item, &array_schema.items))
+            .map(|item| coerce_logical_types(item, &array_schema.items, names))
             .collect::<Result<Vec<_>, _>>()
             .map(AvroValue::Array),
         (AvroValue::Map(entries), Schema::Map(map_schema)) => entries
             .into_iter()
             .map(|(key, value)| {
-                coerce_logical_types(value, &map_schema.types).map(|value| (key, value))
+                coerce_logical_types(value, &map_schema.types, names).map(|value| (key, value))
             })
             .collect::<vector_common::Result<_>>()
             .map(AvroValue::Map),
@@ -81,7 +88,7 @@ fn coerce_logical_types(
                 .variants()
                 .get(index as usize)
                 .unwrap_or(schema);
-            coerce_logical_types(*value, schema)
+            coerce_logical_types(*value, schema, names)
                 .map(|value| AvroValue::Union(index, Box::new(value)))
         }
         (value, Schema::Union(union_schema)) => {
@@ -91,7 +98,7 @@ fn coerce_logical_types(
 
             let mut last_err = None;
             for (index, variant) in union_schema.variants().iter().enumerate() {
-                match coerce_logical_types(value.clone(), variant) {
+                match coerce_logical_types(value.clone(), variant, names) {
                     Ok(coerced) if coerced.clone().resolve(variant).is_ok() => {
                         return Ok(AvroValue::Union(index as u32, Box::new(coerced)));
                     }
@@ -174,7 +181,11 @@ impl Encoder<Event> for AvroSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
         let value = apache_avro::to_value(log)?;
-        let value = coerce_logical_types(value, &self.schema)?;
+        let resolved =
+            apache_avro::schema::ResolvedSchema::try_from(&self.schema).map_err(|error| {
+                vector_common::Error::from(format!("Failed resolving Avro schema: {error}"))
+            })?;
+        let value = coerce_logical_types(value, &self.schema, resolved.get_names())?;
         let value = value.resolve(&self.schema)?;
         let bytes = apache_avro::to_avro_datum(&self.schema, value)?;
         buffer.put_slice(&bytes);
@@ -329,7 +340,8 @@ mod tests {
             ),
         ]);
 
-        let value = coerce_logical_types(value, &schema).unwrap();
+        let resolved = apache_avro::schema::ResolvedSchema::try_from(&schema).unwrap();
+        let value = coerce_logical_types(value, &schema, resolved.get_names()).unwrap();
         let value = value.resolve(&schema).unwrap();
 
         assert!(matches!(
@@ -370,5 +382,39 @@ mod tests {
                     )
             }
         ));
+    }
+
+    #[test]
+    fn coerce_date_through_named_record_reference() {
+        let schema = apache_avro::Schema::parse_str(indoc! {r#"
+            {
+                "type": "record",
+                "name": "Outer",
+                "fields": [
+                    {
+                        "name": "definition",
+                        "type": {
+                            "type": "record",
+                            "name": "Inner",
+                            "fields": [{
+                                "name": "date",
+                                "type": {"type": "int", "logicalType": "date"}
+                            }]
+                        }
+                    },
+                    {"name": "reference", "type": "Inner"}
+                ]
+            }
+        "#})
+        .unwrap();
+        let inner = || AvroValue::Record(vec![("date".to_owned(), AvroValue::Long(20_000))]);
+        let value = AvroValue::Record(vec![
+            ("definition".to_owned(), inner()),
+            ("reference".to_owned(), inner()),
+        ]);
+
+        let resolved = apache_avro::schema::ResolvedSchema::try_from(&schema).unwrap();
+        let value = coerce_logical_types(value, &schema, resolved.get_names()).unwrap();
+        value.resolve(&schema).unwrap();
     }
 }
