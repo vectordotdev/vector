@@ -86,15 +86,9 @@ pub fn confined_preview(rendered: &str) -> String {
 /// A templated field.
 ///
 /// In many cases, components can be configured so that part of the component's functionality can be
-/// customized on a per-event basis. For example, you have a sink that writes events to a file and you want to
-/// specify which file an event should go to by using an event field as part of the
-/// input to the filename used.
-///
-/// By using `UnconfinedTemplate`, users can specify either fixed strings or templated strings.
-/// Templated strings use a common syntax to refer to fields in an event that is used as the input
-/// data when rendering the template. An example of a fixed string is `my-file.log`. An example of
-/// a template string is `my-file-{{key}}.log`, where `{{key}}` is the key's value when the
-/// template is rendered into a string.
+/// customized on a per-event basis. By using `UnconfinedTemplate`, users can specify either fixed
+/// strings or templated strings. Templated strings use a common syntax to refer to fields in an
+/// event that is used as the input data when rendering the template.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Default)]
