@@ -29,9 +29,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     finalizer::UnorderedFinalizer,
-    internal_event::{
-        EventsReceived, Registered,
-    },
+    internal_event::{EventsReceived, Registered},
     lookup::owned_value_path,
 };
 use vrl::{
@@ -518,8 +516,7 @@ impl PubsubSource {
         };
         let mut stream = stream.into_inner();
 
-        let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, None);
+        let (finalizer, mut ack_stream) = Finalizer::maybe_new(self.acknowledgements, None);
         let mut pending_acks = 0;
 
         loop {
