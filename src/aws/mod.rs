@@ -281,7 +281,7 @@ where
     let connector = AwsHttpClient {
         http: connector,
         region: region.clone(),
-        emit_bytes_sent: true,
+        emit_bytes_sent,
     };
 
     // Build the configuration first.
