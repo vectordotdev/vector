@@ -8,6 +8,7 @@ use futures_util::{
     stream::{self, BoxStream},
 };
 use tower::Service;
+use tracing::Instrument;
 use vector_lib::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
@@ -136,11 +137,18 @@ where
             .concurrent_map(
                 default_request_builder_concurrency_limit(),
                 |((api_key, endpoint), metrics)| {
-                    Box::pin(async move {
-                        let collapsed_metrics =
-                            sort_and_collapse_counters_by_series_and_timestamp(metrics);
-                        ((api_key, endpoint), collapsed_metrics)
-                    })
+                    // `concurrent_map` spawns this future on a detached task. The closure itself
+                    // runs within `run_inner`'s span, so `in_current_span` captures the sink span
+                    // here and re-enters it on the spawned task to preserve the sink's automatic
+                    // component tags on any internal metrics/logs emitted during aggregation.
+                    Box::pin(
+                        async move {
+                            let collapsed_metrics =
+                                sort_and_collapse_counters_by_series_and_timestamp(metrics);
+                            ((api_key, endpoint), collapsed_metrics)
+                        }
+                        .in_current_span(),
+                    )
                 },
             )
             // We build our requests "incrementally", which means that for a single batch of metrics, we might generate
@@ -209,7 +217,7 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
             a.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
         )
             .cmp(&(
-                a.value().as_name(),
+                b.value().as_name(),
                 b.series(),
                 b.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
             ))
@@ -382,6 +390,24 @@ mod tests {
         ];
         let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
 
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn sort_metric_type_is_primary_sort_key() {
+        // The sort key is (type_name, series, timestamp). "counter" < "gauge" alphabetically,
+        // so a counter must always precede a gauge regardless of series name.
+        let input = vec![
+            create_gauge("aaa", 1.0),
+            create_counter("zzz", 1.0),
+            create_counter("aaa", 1.0),
+        ];
+        let expected = vec![
+            create_counter("aaa", 1.0),
+            create_counter("zzz", 1.0),
+            create_gauge("aaa", 1.0),
+        ];
+        let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
         assert_eq!(expected, actual);
     }
 

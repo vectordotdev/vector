@@ -219,6 +219,7 @@ impl SourceConfig for StatsdConfig {
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     None,

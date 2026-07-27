@@ -33,11 +33,19 @@ observability data with Vector.
 
 ## Configuring
 
-As shown above, you can pass a custom
-[Vector configuration file][docs.setup.configuration] via the `-c` flag. You'll want
-to do this since the
-[default `/etc/vector/vector.yaml` configuration file][urls.default_configuration]
-doesn't do anything.
+Vector images do not ship a default configuration. You must provide one via the
+`-c` flag, typically by mounting a [Vector configuration file][docs.setup.configuration]
+from the host:
+
+```bash
+docker run \
+  -v "$PWD/vector.yaml:/etc/vector/vector.yaml:ro" \
+  timberio/vector:latest-alpine \
+  -c /etc/vector/vector.yaml
+```
+
+A reference [example configuration][urls.example_configuration] is bundled at
+`/usr/share/vector/examples/vector.yaml` inside the image.
 
 ## Deploying
 
@@ -128,7 +136,7 @@ Vector's Docker source files are located
 [docs.transforms]: https://vector.dev/docs/reference/configurationtransforms/
 [pages.index#correctness]: https://vector.dev/#correctness
 [pages.index#performance]: https://vector.dev/#performance
-[urls.default_configuration]: https://github.com/vectordotdev/vector/blob/master/config/vector.yaml
+[urls.example_configuration]: https://github.com/vectordotdev/vector/blob/master/config/vector.yaml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.rust]: https://www.rust-lang.org/

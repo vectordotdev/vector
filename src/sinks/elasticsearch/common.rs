@@ -429,7 +429,7 @@ async fn get(
     let mut builder = Request::get(format!("{base_url}{path}"));
 
     for (header, value) in &request.headers {
-        builder = builder.header(&header[..], &value[..]);
+        builder = builder.header(header.as_str(), value.as_str());
     }
     let mut request = builder.body(Bytes::new())?;
 

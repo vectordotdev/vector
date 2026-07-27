@@ -16,7 +16,7 @@ use crate::{
         prelude::*,
         util::{
             BatchConfig, BoxedRawValue,
-            http::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
 };
@@ -59,6 +59,10 @@ pub struct KeepConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 fn default_endpoint() -> String {
@@ -111,7 +115,10 @@ impl SinkConfig for KeepConfig {
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
         let sink = KeepSink::new(service, batch_settings, request_builder);

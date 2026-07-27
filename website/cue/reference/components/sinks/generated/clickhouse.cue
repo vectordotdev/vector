@@ -256,12 +256,12 @@ generated: components: sinks: clickhouse: configuration: {
 				description: """
 					Allow null values for non-nullable fields in the schema.
 
-					When enabled, missing or incompatible values will be encoded as null even for fields
+					When enabled, missing or incompatible values are encoded as null, even for fields
 					marked as non-nullable in the Arrow schema. This is useful when working with downstream
 					systems that can handle null values through defaults, computed columns, or other mechanisms.
 
-					When disabled (default), missing values for non-nullable fields will cause encoding errors,
-					ensuring all required data is present before sending to the sink.
+					When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
+					help ensure all required data is present before sending it to the sink.
 					"""
 				required: false
 				type: bool: default: false
@@ -320,6 +320,22 @@ generated: components: sinks: clickhouse: configuration: {
 					"""
 			}
 		}
+	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	database: {
 		description: "The database that contains the table that data is inserted into."

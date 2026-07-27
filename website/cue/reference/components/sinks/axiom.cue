@@ -4,7 +4,6 @@ components: sinks: axiom: {
 	title: "Axiom"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"

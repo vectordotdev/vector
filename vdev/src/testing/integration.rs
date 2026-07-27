@@ -76,6 +76,7 @@ pub(crate) struct ComposeTest {
     compose: Option<Compose>,
     env_config: Environment,
     retries: u8,
+    coverage: bool,
 }
 
 impl ComposeTest {
@@ -84,6 +85,7 @@ impl ComposeTest {
         test_name: impl Into<String>,
         environment: impl Into<String>,
         retries: u8,
+        coverage: bool,
     ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
         let environment = environment.into();
@@ -127,6 +129,7 @@ impl ComposeTest {
             compose,
             env_config: rename_environment_keys(&env_config),
             retries,
+            coverage,
         };
         trace!("Generated {compose_test:#?}");
         Ok(compose_test)
@@ -187,6 +190,9 @@ impl ComposeTest {
         }
 
         env_vars.insert("VECTOR_LOG".to_string(), Some("info".into()));
+        if let Ok(val) = std::env::var("CARGO_TERM_COLOR") {
+            env_vars.insert("CARGO_TERM_COLOR".to_string(), Some(val));
+        }
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
@@ -230,6 +236,12 @@ impl ComposeTest {
             Some(&self.config.features),
             &args,
             self.local_config.kind == ComposeTestKind::E2E,
+            self.coverage,
+            if self.coverage {
+                Some(self.environment.as_str())
+            } else {
+                None
+            },
         )?;
 
         Ok(())

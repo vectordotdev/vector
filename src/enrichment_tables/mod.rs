@@ -35,6 +35,7 @@ pub mod mmdb;
 /// condition. We don't recommend using a condition that uses only date range searches.
 ///
 ///
+#[allow(clippy::large_enum_variant)]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
