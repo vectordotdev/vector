@@ -1,7 +1,6 @@
-Fixed a bug in the `gcp_pubsub` source where the source could hang indefinitely on shutdown
-when acknowledgements were enabled and a shutdown signal arrived while event batches were
-still pending acknowledgement. The internal finalizer stream terminated prematurely on
-shutdown, leaving pending acks unprocessable and preventing the shutdown condition from
-being satisfied.
+Fixed bugs in the `gcp_pubsub` source where the source could fail to shut down cleanly when
+acknowledgements were enabled. The source now keeps the finalizer alive long enough to drain
+pending acknowledgements, and stops accepting new Pub/Sub batches after shutdown begins so it
+can finish shutting down under backlog or continuous publishing.
 
 authors: thomasqueirozb
