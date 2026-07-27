@@ -258,7 +258,7 @@ impl TransformConfig for ReduceConfig {
         }
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
         if let Some(Err(e)) = self
             .ends_when

@@ -255,16 +255,16 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         Ok(())
     }
 
-    /// Validates the transform configuration against environment resources: compiles VRL
-    /// programs, builds conditions, and resolves enrichment table references. Only called
-    /// from `vector validate` (via `validate_transforms`), not during normal startup because
-    /// `build()` performs equivalent checks with real resources.
+    /// Validates the transform configuration against the schema and enrichment context.
+    /// Compiles VRL programs, builds conditions, and resolves enrichment table references.
+    /// Only called from `vector validate` (via `validate_transforms`), not during normal startup
+    /// because `build()` performs equivalent checks with real resources.
     ///
     /// # Errors
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate_env(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
         Ok(())
     }
 

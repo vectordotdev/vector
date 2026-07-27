@@ -236,7 +236,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         // Structural validation: reserved names, duplicate routes, invalid sample rates.
         // Uses a default context so transforms that require environment resources (VRL
         // compilation, condition building) must guard on context.key being None and skip
-        // those checks — they run later in validate_transforms() with a real context.
+        // those checks — they run later in validate.rs with a real context via validate_with_context().
         if let Err(errs) = transform.inner.validate(&TransformContext::default()) {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
