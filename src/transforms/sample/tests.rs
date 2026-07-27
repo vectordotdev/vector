@@ -310,7 +310,7 @@ fn group_by_uses_independent_ratio_samplers() {
         "sample".to_string(),
         SampleMode::new_ratio(0.5),
         None,
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
