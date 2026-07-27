@@ -11,6 +11,7 @@ use azure_core::{
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
 
 use bytes::Bytes;
+use chrono::NaiveDate;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -107,6 +108,15 @@ pub struct AzureBlobSinkConfig {
     #[configurable(metadata(docs::examples = "https://mylogstorage.blob.core.windows.net/"))]
     pub(super) blob_endpoint: Option<String>,
 
+    /// The Azure Blob Storage service API version to use for requests.
+    ///
+    /// This sets the `x-ms-version` request header. If unset, the version selected by the Azure
+    /// SDK is used. Setting an older version can be useful with Azure Stack or other storage
+    /// services that do not support the SDK's default version. The configured version must support
+    /// every operation and option used by this sink.
+    #[configurable(metadata(docs::examples = "2021-08-06"))]
+    pub api_version: Option<String>,
+
     /// The Azure Blob Storage Account container name.
     #[configurable(metadata(docs::examples = "my-logs"))]
     pub(super) container_name: String,
@@ -202,6 +212,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             account_name: None,
             blob_endpoint: None,
+            api_version: None,
             container_name: String::from("logs"),
             blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
@@ -268,6 +279,7 @@ impl SinkConfig for AzureBlobSinkConfig {
             self.auth.clone(),
             connection_string.clone(),
             self.container_name.clone(),
+            self.api_version.clone(),
             cx.proxy(),
             self.tls.clone(),
         )
@@ -353,6 +365,37 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<AzureBlobSinkConfig>();
+    }
+
+    #[test]
+    fn api_version_overrides_sdk_default() {
+        let mut options = BlobContainerClientOptions::default();
+
+        set_api_version(&mut options, Some("2021-08-06")).unwrap();
+
+        assert_eq!(options.version, "2021-08-06");
+    }
+
+    #[test]
+    fn api_version_uses_sdk_default_when_unset() {
+        let mut options = BlobContainerClientOptions::default();
+        let sdk_default = options.version.clone();
+
+        set_api_version(&mut options, None).unwrap();
+
+        assert_eq!(options.version, sdk_default);
+    }
+
+    #[test]
+    fn api_version_rejects_invalid_date() {
+        let mut options = BlobContainerClientOptions::default();
+
+        let error = set_api_version(&mut options, Some("2021-13-40")).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Invalid Azure Blob Storage API version `2021-13-40`; expected YYYY-MM-DD"
+        );
     }
 
     #[test]
@@ -501,6 +544,7 @@ pub async fn build_client(
     auth: Option<AzureAuthentication>,
     connection_string: String,
     container_name: String,
+    api_version: Option<String>,
     proxy: &crate::config::ProxyConfig,
     tls: Option<AzureBlobTlsConfig>,
 ) -> crate::Result<Arc<BlobContainerClient>> {
@@ -517,6 +561,7 @@ pub async fn build_client(
 
     // Prepare options; attach Shared Key policy if needed
     let mut options = BlobContainerClientOptions::default();
+    set_api_version(&mut options, api_version.as_deref())?;
     match (parsed.auth(), &auth) {
         (Auth::None, None) => {
             warn!("No authentication method provided, requests will be anonymous.");
@@ -533,13 +578,8 @@ pub async fn build_client(
         ) => {
             info!("Using Shared Key authentication.");
 
-            let policy = SharedKeyAuthorizationPolicy::new(
-                account_name,
-                account_key,
-                // Use an Azurite-supported storage service version
-                String::from("2025-11-05"),
-            )
-            .map_err(|e| format!("Failed to create SharedKey policy: {e}"))?;
+            let policy = SharedKeyAuthorizationPolicy::new(account_name, account_key)
+                .map_err(|e| format!("Failed to create SharedKey policy: {e}"))?;
             options
                 .client_options
                 .per_call_policies
@@ -629,4 +669,17 @@ pub async fn build_client(
     let client =
         BlobContainerClient::new(url, credential, Some(options)).map_err(|e| format!("{e}"))?;
     Ok(Arc::new(client))
+}
+
+fn set_api_version(
+    options: &mut BlobContainerClientOptions,
+    api_version: Option<&str>,
+) -> crate::Result<()> {
+    if let Some(api_version) = api_version {
+        NaiveDate::parse_from_str(api_version, "%Y-%m-%d").map_err(|_| {
+            format!("Invalid Azure Blob Storage API version `{api_version}`; expected YYYY-MM-DD")
+        })?;
+        options.version = api_version.to_owned();
+    }
+    Ok(())
 }
