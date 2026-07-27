@@ -123,7 +123,7 @@ impl Visitor for DisallowUnevaluatedPropertiesVisitor {
         // If we encountered any subschema validation, or if this schema itself is an object schema,
         // mark the schema as closed by setting `unevaluatedProperties` to `false`.
         if had_relevant_subschemas || is_object_schema(schema) {
-            mark_schema_closed(schema);
+            mark_schema_closed(definitions, schema);
         }
     }
 }
@@ -476,7 +476,7 @@ fn get_object_subschemas_from_parent_mut(
     .filter_map(Schema::as_object_mut)
 }
 
-fn mark_schema_closed(schema: &mut SchemaObject) {
+fn mark_schema_closed(definitions: &Map<String, Schema>, schema: &mut SchemaObject) {
     // Make sure this schema doesn't also have `additionalProperties` set to a non-boolean schema,
     // as it would be a logical inconsistency to then also set `unevaluatedProperties` to `false`.
     //
@@ -512,15 +512,77 @@ fn mark_schema_closed(schema: &mut SchemaObject) {
 
     // Ensure the schema has an explicit `"type": "object"` when `unevaluatedProperties` is set.
     // Some validators (e.g. Ajv in strict mode) require that object-level keywords like
-    // `unevaluatedProperties` are accompanied by an explicit type declaration. `oneOf` and
-    // `anyOf` can also permit non-object values, though, so adding an object type to those
-    // schemas would change their validation semantics.
-    let has_union = match schema.subschemas.as_ref() {
-        Some(subschemas) => subschemas.one_of.is_some() || subschemas.any_of.is_some(),
-        None => false,
-    };
-    if schema.instance_type.is_none() && !has_union {
+    // `unevaluatedProperties` are accompanied by an explicit type declaration. Only add it when
+    // the schema's composition permits object values exclusively, so it cannot narrow validation.
+    if schema.instance_type.is_none()
+        && schema_is_object_only(definitions, schema, &mut HashSet::new())
+    {
         schema.instance_type = Some(SingleOrVec::Single(Box::new(InstanceType::Object)));
+    }
+}
+
+fn schema_is_object_only(
+    definitions: &Map<String, Schema>,
+    schema: &SchemaObject,
+    resolving_references: &mut HashSet<String>,
+) -> bool {
+    if let Some(instance_type) = schema.instance_type.as_ref() {
+        return match instance_type {
+            SingleOrVec::Single(instance_type) => instance_type.as_ref() == &InstanceType::Object,
+            SingleOrVec::Vec(instance_types) => {
+                instance_types.len() == 1 && instance_types.first() == Some(&InstanceType::Object)
+            }
+        };
+    }
+
+    let reference_requires_object = schema.reference.as_ref().is_some_and(|reference| {
+        let reference = get_cleaned_schema_reference(reference);
+        if !resolving_references.insert(reference.to_owned()) {
+            return false;
+        }
+
+        let result = definitions.get(reference).is_some_and(|schema| {
+            schema_value_is_object_only(definitions, schema, resolving_references)
+        });
+        resolving_references.remove(reference);
+        result
+    });
+
+    let Some(subschemas) = schema.subschemas.as_ref() else {
+        return reference_requires_object;
+    };
+
+    let all_of_requires_object = subschemas.all_of.as_ref().is_some_and(|schemas| {
+        schemas
+            .iter()
+            .any(|schema| schema_value_is_object_only(definitions, schema, resolving_references))
+    });
+    let one_of_allows_only_objects = subschemas.one_of.as_ref().is_some_and(|schemas| {
+        schemas
+            .iter()
+            .all(|schema| schema_value_is_object_only(definitions, schema, resolving_references))
+    });
+    let any_of_allows_only_objects = subschemas.any_of.as_ref().is_some_and(|schemas| {
+        schemas
+            .iter()
+            .all(|schema| schema_value_is_object_only(definitions, schema, resolving_references))
+    });
+
+    reference_requires_object
+        || all_of_requires_object
+        || one_of_allows_only_objects
+        || any_of_allows_only_objects
+}
+
+fn schema_value_is_object_only(
+    definitions: &Map<String, Schema>,
+    schema: &Schema,
+    resolving_references: &mut HashSet<String>,
+) -> bool {
+    match schema {
+        Schema::Bool(false) => true,
+        Schema::Bool(true) => false,
+        Schema::Object(schema) => schema_is_object_only(definitions, schema, resolving_references),
     }
 }
 
@@ -605,6 +667,72 @@ mod tests {
                     "type": "object",
                     "properties": {
                         "a": { "type": "string" }
+                    }
+                }
+            ],
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn does_not_add_type_object_for_nested_union_with_non_object_alternative() {
+        let mut actual_schema = as_schema(json!({
+            "allOf": [{
+                "oneOf": [
+                    { "type": "null" },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "a": { "type": "string" }
+                        }
+                    }
+                ]
+            }]
+        }));
+
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        assert!(actual_schema.schema.instance_type.is_none());
+    }
+
+    #[test]
+    fn adds_type_object_for_union_with_only_object_alternatives() {
+        let mut actual_schema = as_schema(json!({
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": "string" }
+                    }
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "b": { "type": "string" }
+                    }
+                }
+            ]
+        }));
+
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": "string" }
+                    }
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "b": { "type": "string" }
                     }
                 }
             ],
