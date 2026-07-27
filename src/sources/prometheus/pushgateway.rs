@@ -94,7 +94,15 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             log_namespace: cx.log_namespace(None),
         };
         source.run(
-            self.address,
+            Some(self.address),
+            #[cfg(unix)]
+            None,
+            #[cfg(unix)]
+            None,
+            #[cfg(unix)]
+            None,
+            #[cfg(unix)]
+            None,
             "",
             HttpMethod::Post,
             http::StatusCode::OK,

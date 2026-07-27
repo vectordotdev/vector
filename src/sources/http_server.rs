@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
@@ -72,12 +72,39 @@ impl SourceConfig for HttpConfig {
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
-    /// The socket address to listen for connections on.
+    /// The TCP socket address to listen for connections on.
     ///
-    /// It _must_ include a port.
+    /// It _must_ include a port. This is mutually exclusive with `socket_path`.
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
-    address: SocketAddr,
+    #[serde(default)]
+    address: Option<SocketAddr>,
+
+    /// The Unix domain socket path to listen for connections on.
+    ///
+    /// This is mutually exclusive with `address`.
+    #[configurable(metadata(docs::examples = "/var/run/vector-http.sock"))]
+    #[serde(default)]
+    socket_path: Option<PathBuf>,
+
+    /// Unix file mode bits to apply to the Unix socket file.
+    ///
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    #[configurable(metadata(docs::examples = 0o660))]
+    #[configurable(metadata(docs::examples = 0o666))]
+    #[serde(default)]
+    socket_file_mode: Option<u32>,
+
+    /// User ID to own the Unix socket file.
+    #[configurable(metadata(docs::examples = 1000))]
+    #[serde(default)]
+    socket_file_uid: Option<u32>,
+
+    /// Group ID to own the Unix socket file.
+    #[configurable(metadata(docs::examples = 1000))]
+    #[serde(default)]
+    socket_file_gid: Option<u32>,
 
     /// The expected encoding of received data.
     ///
@@ -186,6 +213,30 @@ pub struct SimpleHttpConfig {
 }
 
 impl SimpleHttpConfig {
+    fn validate_address(&self) -> crate::Result<()> {
+        if self.socket_path.is_none()
+            && (self.socket_file_mode.is_some()
+                || self.socket_file_uid.is_some()
+                || self.socket_file_gid.is_some())
+        {
+            return Err(
+                "`socket_file_mode`, `socket_file_uid`, and `socket_file_gid` require `socket_path`."
+                    .into(),
+            );
+        }
+
+        match (&self.address, &self.socket_path) {
+            (Some(_), Some(_)) => Err("`address` and `socket_path` are mutually exclusive.".into()),
+            (None, Some(_)) => {
+                #[cfg(not(unix))]
+                return Err("`socket_path` is only supported on Unix platforms.".into());
+                #[cfg(unix)]
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         let mut schema_definition = self
@@ -284,7 +335,11 @@ impl SimpleHttpConfig {
 impl Default for SimpleHttpConfig {
     fn default() -> Self {
         Self {
-            address: "0.0.0.0:8080".parse().unwrap(),
+            address: Some(default_address()),
+            socket_path: None,
+            socket_file_mode: None,
+            socket_file_uid: None,
+            socket_file_gid: None,
             encoding: None,
             headers: Vec::new(),
             query_parameters: Vec::new(),
@@ -306,6 +361,10 @@ impl Default for SimpleHttpConfig {
 }
 
 impl_generate_config_from_default!(SimpleHttpConfig);
+
+fn default_address() -> SocketAddr {
+    "0.0.0.0:8080".parse().unwrap()
+}
 
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Post
@@ -389,8 +448,23 @@ impl SourceConfig for SimpleHttpConfig {
             decoder,
             log_namespace,
         };
+        self.validate_address()?;
+
+        let address = match (&self.address, &self.socket_path) {
+            (None, None) => Some(default_address()),
+            (address, _) => address.clone(),
+        };
+
         source.run(
-            self.address,
+            address,
+            #[cfg(unix)]
+            self.socket_path.clone(),
+            #[cfg(unix)]
+            self.socket_file_mode,
+            #[cfg(unix)]
+            self.socket_file_uid,
+            #[cfg(unix)]
+            self.socket_file_gid,
             self.path.as_str(),
             self.method,
             self.response_code,
@@ -420,7 +494,12 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![Resource::tcp(self.address)]
+        match (&self.address, &self.socket_path) {
+            (Some(address), None) => vec![Resource::tcp(*address)],
+            (None, Some(path)) => vec![Resource::unix_socket(path.clone())],
+            (None, None) => vec![Resource::tcp(default_address())],
+            _ => vec![],
+        }
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -548,6 +627,7 @@ impl HttpSource for SimpleHttpSource {
 
 #[cfg(test)]
 mod tests {
+
     use std::{io::Write, net::SocketAddr, str::FromStr};
 
     use flate2::{
@@ -558,6 +638,8 @@ mod tests {
     use headers::{Authorization, authorization::Credentials};
     use http::{HeaderMap, Method, StatusCode, Uri, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
+    #[cfg(unix)]
+    use tokio::net::UnixStream;
     use vector_lib::{
         codecs::{
             BytesDecoderConfig, JsonDeserializerConfig,
@@ -626,7 +708,11 @@ mod tests {
 
         tokio::spawn(async move {
             SimpleHttpConfig {
-                address,
+                address: Some(address),
+                socket_path: None,
+                socket_file_mode: None,
+                socket_file_uid: None,
+                socket_file_gid: None,
                 headers,
                 encoding: None,
                 query_parameters,
@@ -723,12 +809,97 @@ mod tests {
             .as_u16()
     }
 
+    #[cfg(unix)]
+    async fn send_unix(path: std::path::PathBuf, body: &str) -> u16 {
+        let stream = UnixStream::connect(&path).await.unwrap();
+        let (mut sender, connection) = hyper::client::conn::http1::handshake(stream).await.unwrap();
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                panic!("Unix HTTP connection failed: {error}");
+            }
+        });
+
+        sender
+            .send_request(
+                hyper::Request::post("/")
+                    .header(hyper::header::HOST, "localhost")
+                    .body(hyper::Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
     async fn spawn_ok_collect_n(
         send: impl std::future::Future<Output = u16> + Send + 'static,
         rx: impl Stream<Item = Event> + Unpin,
         n: usize,
     ) -> Vec<Event> {
         spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
+    }
+
+    #[test]
+    fn unix_socket_config_validation() {
+        // Valid config
+        let config: SimpleHttpConfig = serde_yaml::from_str(
+            "socket_path: /tmp/vector-http.sock\nsocket_file_mode: 432\nsocket_file_uid: 1000\nsocket_file_gid: 1001",
+        ).unwrap();
+        assert_eq!(config.socket_path, Some("/tmp/vector-http.sock".into()));
+        assert_eq!(config.socket_file_mode, Some(0o660));
+        assert!(config.validate_address().is_ok());
+
+        // Invalid: Both address and socket_path provided
+        let config: SimpleHttpConfig =
+            serde_yaml::from_str("address: 127.0.0.1:8080\nsocket_path: /tmp/vector-http.sock")
+                .unwrap();
+        assert!(config.validate_address().is_err());
+
+        // Invalid: Permissions set without a socket_path
+        let config: SimpleHttpConfig = serde_yaml::from_str("socket_file_mode: 432").unwrap();
+        assert!(config.validate_address().is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_socket_receives_events_and_cleans_up() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let socket_path = tempdir.path().join("http-server.sock");
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (trigger_shutdown, shutdown, _) = crate::shutdown::ShutdownSignal::new_wired();
+        let mut context = SourceContext::new_test(sender, None);
+        context.shutdown = shutdown;
+
+        let source = SimpleHttpConfig {
+            socket_path: Some(socket_path.clone()),
+            socket_file_mode: Some(0o660),
+            ..Default::default()
+        }
+        .build(context)
+        .await
+        .unwrap();
+
+        let handle = tokio::spawn(async move { source.await.unwrap() });
+
+        crate::test_util::wait_for({
+            let path = socket_path.clone();
+            move || {
+                let path = path.clone();
+                async move { path.exists() }
+            }
+        })
+        .await;
+
+        let mut events = spawn_ok_collect_n(send_unix(socket_path.clone(), "test"), recv, 1).await;
+        assert_eq!(
+            *events.remove(0).as_log().get_message().unwrap(),
+            "test".into()
+        );
+
+        drop(trigger_shutdown);
+        handle.await.unwrap();
+        assert!(!socket_path.exists());
     }
 
     #[tokio::test]
@@ -1964,7 +2135,12 @@ mod tests {
 
             let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
 
-            let listen_addr_http = format!("http://{}/", config.address);
+            let listen_addr_http = format!(
+                "http://{}/",
+                config
+                    .address
+                    .expect("default config should have a TCP address")
+            );
             let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
             let external_resource = ExternalResource::new(
