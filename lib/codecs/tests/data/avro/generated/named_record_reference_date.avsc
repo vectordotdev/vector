@@ -1,0 +1,1 @@
+{"type":"record","name":"Outer","fields":[{"name":"definition","type":{"type":"record","name":"Inner","fields":[{"name":"date","type":{"type":"int","logicalType":"date"}}]}},{"name":"reference","type":"Inner"}]}

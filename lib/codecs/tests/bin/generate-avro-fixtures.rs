@@ -297,6 +297,35 @@ fn generate_avro_test_case_date() -> Result<()> {
     generate_test_case(schema, value, "date")
 }
 
+fn generate_avro_test_case_named_record_reference_date() -> Result<()> {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "Outer",
+        "fields": [
+            {
+                "name": "definition",
+                "type": {
+                    "type": "record",
+                    "name": "Inner",
+                    "fields": [{
+                        "name": "date",
+                        "type": {"type": "int", "logicalType": "date"}
+                    }]
+                }
+            },
+            {"name": "reference", "type": "Inner"}
+        ]
+    }
+    "#;
+    let inner = |date| Value::Record(vec![("date".into(), Value::Date(date))]);
+    let value = Value::Record(vec![
+        ("definition".into(), inner(20_000)),
+        ("reference".into(), inner(20_001)),
+    ]);
+    generate_test_case_from_value(schema, value, "named_record_reference_date")
+}
+
 #[allow(unused)]
 fn generate_avro_test_case_decimal_var() -> Result<()> {
     let schema = r#"
@@ -526,6 +555,7 @@ fn main() -> Result<()> {
     generate_avro_test_case_boolean()?;
     generate_avro_test_case_bytes()?;
     generate_avro_test_case_date()?;
+    generate_avro_test_case_named_record_reference_date()?;
     generate_avro_test_case_double()?;
     generate_avro_test_case_enum()?;
     generate_avro_test_case_fixed()?;
