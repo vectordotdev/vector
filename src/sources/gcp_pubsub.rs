@@ -518,20 +518,33 @@ impl PubsubSource {
 
         let (finalizer, mut ack_stream) = Finalizer::maybe_new(self.acknowledgements, None);
         let mut pending_acks = 0;
+        let mut shutting_down = false;
 
         loop {
             tokio::select! {
                 biased;
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
-                    pending_acks -= 1;
-                    if status == BatchStatus::Delivered {
-                        ack_ids_sender
-                            .send(receipts)
-                            .await
-                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                receipts = ack_stream.next(), if pending_acks > 0 => match receipts {
+                    Some((status, receipts)) => {
+                        pending_acks -= 1;
+                        if status == BatchStatus::Delivered {
+                            ack_ids_sender
+                                .send(receipts)
+                                .await
+                                .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                        }
+                        if shutting_down && pending_acks == 0 {
+                            return State::Shutdown;
+                        }
+                    }
+                    None => {
+                        warn!("Acknowledgement finalizer stream ended before all acknowledgements were processed.");
+                        if shutting_down {
+                            return State::Shutdown;
+                        }
+                        break State::RetryNow;
                     }
                 },
-                response = stream.next() => match response {
+                response = stream.next(), if !shutting_down => match response {
                     Some(Ok(response)) => {
                         self.handle_response(
                             response,
@@ -544,12 +557,21 @@ impl PubsubSource {
                     Some(Err(error)) => break translate_error(error),
                     None => break State::RetryNow,
                 },
-                _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
-                _ = self.token_generator.changed() => {
+                _ = &mut self.shutdown, if !shutting_down => {
+                    if pending_acks == 0 {
+                        return State::Shutdown;
+                    }
+                    shutting_down = true;
+                    debug!(
+                        pending_acks,
+                        "Draining pending acknowledgements before shutting down."
+                    );
+                },
+                _ = self.token_generator.changed(), if !shutting_down => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                _ = tokio::time::sleep(self.keepalive) => {
+                _ = tokio::time::sleep(self.keepalive), if !shutting_down => {
                     if pending_acks == 0 {
                         // No pending acks, and no new data, so drop
                         // this stream if we aren't the only active
