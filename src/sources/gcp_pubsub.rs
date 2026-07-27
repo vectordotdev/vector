@@ -523,6 +523,16 @@ impl PubsubSource {
         loop {
             tokio::select! {
                 biased;
+                _ = &mut self.shutdown, if !shutting_down => {
+                    if pending_acks == 0 {
+                        return State::Shutdown;
+                    }
+                    shutting_down = true;
+                    debug!(
+                        pending_acks,
+                        "Draining pending acknowledgements before shutting down."
+                    );
+                },
                 receipts = ack_stream.next(), if pending_acks > 0 => match receipts {
                     Some((status, receipts)) => {
                         pending_acks -= 1;
@@ -556,16 +566,6 @@ impl PubsubSource {
                     }
                     Some(Err(error)) => break translate_error(error),
                     None => break State::RetryNow,
-                },
-                _ = &mut self.shutdown, if !shutting_down => {
-                    if pending_acks == 0 {
-                        return State::Shutdown;
-                    }
-                    shutting_down = true;
-                    debug!(
-                        pending_acks,
-                        "Draining pending acknowledgements before shutting down."
-                    );
                 },
                 _ = self.token_generator.changed(), if !shutting_down => {
                     debug!("New authentication token generated, restarting stream.");
