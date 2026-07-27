@@ -399,6 +399,18 @@ mod tests {
     }
 
     #[test]
+    fn api_version_rejects_noncanonical_date() {
+        let mut options = BlobContainerClientOptions::default();
+
+        let error = set_api_version(&mut options, Some("2021-8-6")).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Invalid Azure Blob Storage API version `2021-8-6`; expected YYYY-MM-DD"
+        );
+    }
+
+    #[test]
     fn confinement_rejects_unconfined_blob_prefix() {
         let template = Template::try_from("{{ tenant }}").unwrap();
         let err = template
@@ -676,9 +688,19 @@ fn set_api_version(
     api_version: Option<&str>,
 ) -> crate::Result<()> {
     if let Some(api_version) = api_version {
-        NaiveDate::parse_from_str(api_version, "%Y-%m-%d").map_err(|_| {
-            format!("Invalid Azure Blob Storage API version `{api_version}`; expected YYYY-MM-DD")
-        })?;
+        let bytes = api_version.as_bytes();
+        let is_canonical = bytes.len() == 10
+            && bytes.iter().enumerate().all(|(index, byte)| match index {
+                4 | 7 => *byte == b'-',
+                _ => byte.is_ascii_digit(),
+            });
+
+        if !is_canonical || NaiveDate::parse_from_str(api_version, "%Y-%m-%d").is_err() {
+            return Err(format!(
+                "Invalid Azure Blob Storage API version `{api_version}`; expected YYYY-MM-DD"
+            )
+            .into());
+        }
         options.version = api_version.to_owned();
     }
     Ok(())
