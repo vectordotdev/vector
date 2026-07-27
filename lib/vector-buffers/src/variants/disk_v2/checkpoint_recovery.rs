@@ -109,6 +109,12 @@ enum DataFileClassification {
     NeedsBoundaryScan,
 }
 
+enum CheckpointRecordRead {
+    Record(ReadToken),
+    EndOfFile,
+    Truncate { offset: u64 },
+}
+
 impl CheckpointBoundaryScanResult {
     fn current_offset(&self) -> u64 {
         self.logical_file_size
@@ -496,21 +502,34 @@ where
 
         let mut record_reader = RecordReader::new(data_file);
 
-        while let Some(token) = self
-            .try_next_checkpoint_record(&mut record_reader, &mut scan)
-            .await?
-        {
+        let truncate_at = loop {
+            let token = match self
+                .try_next_checkpoint_record(&mut record_reader, &mut scan)
+                .await?
+            {
+                CheckpointRecordRead::Record(token) => token,
+                CheckpointRecordRead::EndOfFile => break None,
+                CheckpointRecordRead::Truncate { offset } => break Some(offset),
+            };
             let record_id = token.record_id();
-            if self.truncate_if_post_checkpoint(&scan, record_id).await? {
-                break;
+            if let Some(offset) = Self::post_checkpoint_truncation_offset(&scan, record_id) {
+                break Some(offset);
             }
 
             let record = Self::decode_checkpoint_record(&mut record_reader, token, &scan);
-            if self.truncate_if_checkpoint_crossing(&scan, &record).await? {
-                break;
+            if let Some(offset) = Self::checkpoint_crossing_truncation_offset(&scan, &record) {
+                break Some(offset);
             }
 
             scan.include_record(&record);
+        };
+
+        // Windows does not permit truncating a file while the scan's read handle remains open.
+        drop(record_reader);
+        if let Some(offset) = truncate_at {
+            self.truncate_data_file(scan.file.path, offset)
+                .await
+                .map_err(|source| ReaderError::Io { source })?;
         }
 
         Ok(scan)
@@ -545,10 +564,11 @@ where
         &self,
         record_reader: &mut RecordReader<FS::File, T>,
         scan: &mut CheckpointBoundaryScan<'_>,
-    ) -> Result<Option<ReadToken>, ReaderError<T>> {
+    ) -> Result<CheckpointRecordRead, ReaderError<T>> {
         loop {
             match record_reader.try_next_record(true).await {
-                Ok(result) => return Ok(result),
+                Ok(Some(token)) => return Ok(CheckpointRecordRead::Record(token)),
+                Ok(None) => return Ok(CheckpointRecordRead::EndOfFile),
                 Err(e) => {
                     if let Some(record_bytes) = e.consumed_record_bytes() {
                         if scan.corrupt_record_is_provably_post_checkpoint() {
@@ -560,10 +580,9 @@ where
                                 error = %e,
                                 "Corrupt record is beyond writer checkpoint; truncating file."
                             );
-                            self.truncate_data_file(scan.file.path, record_start_offset)
-                                .await
-                                .map_err(|source| ReaderError::Io { source })?;
-                            return Ok(None);
+                            return Ok(CheckpointRecordRead::Truncate {
+                                offset: record_start_offset,
+                            });
                         }
 
                         warn!(
@@ -585,10 +604,9 @@ where
                             error = %e,
                             "Torn checkpoint tail; truncating file."
                         );
-                        self.truncate_data_file(scan.file.path, record_start_offset)
-                            .await
-                            .map_err(|source| ReaderError::Io { source })?;
-                        return Ok(None);
+                        return Ok(CheckpointRecordRead::Truncate {
+                            offset: record_start_offset,
+                        });
                     }
 
                     return Err(e);
@@ -644,48 +662,39 @@ where
         }
     }
 
-    /// Truncates before a record whose starting ID is outside the durable writer checkpoint.
-    async fn truncate_if_post_checkpoint(
-        &self,
+    /// Returns the truncation boundary before a record outside the durable writer checkpoint.
+    fn post_checkpoint_truncation_offset(
         scan: &CheckpointBoundaryScan<'_>,
         record_id: u64,
-    ) -> Result<bool, ReaderError<T>> {
-        let Some(writer_next_record_id) = scan.writer_next_record_id else {
-            return Ok(false);
-        };
+    ) -> Option<u64> {
+        let writer_next_record_id = scan.writer_next_record_id?;
         if record_id < writer_next_record_id {
-            return Ok(false);
+            return None;
         }
 
+        let truncate_at = scan.current_offset();
         debug!(
             data_file_id = scan.file.id,
             writer_next_record_id,
             record_id,
-            truncate_at = scan.current_offset(),
+            truncate_at,
             "Record starts beyond writer checkpoint; truncating file."
         );
-        self.truncate_data_file(scan.file.path, scan.current_offset())
-            .await
-            .map_err(|source| ReaderError::Io { source })?;
-        Ok(true)
+        Some(truncate_at)
     }
 
-    /// Truncates before a multi-event record that straddles the durable writer checkpoint.
-    async fn truncate_if_checkpoint_crossing(
-        &self,
+    /// Returns the truncation boundary before a record that straddles the writer checkpoint.
+    fn checkpoint_crossing_truncation_offset(
         scan: &CheckpointBoundaryScan<'_>,
         record: &CheckpointRecord,
-    ) -> Result<bool, ReaderError<T>> {
-        let Some(writer_next_record_id) = scan.writer_next_record_id else {
-            return Ok(false);
-        };
-        let Some(next_id) = record.next_id else {
-            return Ok(false);
-        };
+    ) -> Option<u64> {
+        let writer_next_record_id = scan.writer_next_record_id?;
+        let next_id = record.next_id?;
         if next_id <= writer_next_record_id {
-            return Ok(false);
+            return None;
         }
 
+        let truncate_at = scan.current_offset();
         warn!(
             data_file_id = scan.file.id,
             writer_next_record_id,
@@ -693,13 +702,10 @@ where
             record_events = record
                 .events
                 .expect("a record with a next ID must have an event count"),
-            truncate_at = scan.current_offset(),
+            truncate_at,
             "Record crosses writer checkpoint; truncating file."
         );
-        self.truncate_data_file(scan.file.path, scan.current_offset())
-            .await
-            .map_err(|source| ReaderError::Io { source })?;
-        Ok(true)
+        Some(truncate_at)
     }
 
     /// Returns the physical file size, or `None` when the checkpointed file is missing.

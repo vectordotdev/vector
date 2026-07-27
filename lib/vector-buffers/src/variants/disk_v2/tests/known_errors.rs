@@ -1270,6 +1270,8 @@ async fn writer_recovers_durable_record_from_stale_next_file_checkpoint() {
             assert_ne!(checkpoint_writer_file_id, successor_writer_file_id);
             OpenOptions::new()
                 .read(true)
+                // `sync_all` requires a write-capable handle on Windows.
+                .write(true)
                 .open(&successor_data_file_path)
                 .await
                 .expect("successor data file should exist")

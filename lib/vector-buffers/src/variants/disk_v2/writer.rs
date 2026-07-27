@@ -1244,6 +1244,8 @@ where
             }
         }
 
+        // Windows does not permit truncating a file while the scan's read handle remains open.
+        drop(reader);
         self.apply_writer_checkpoint_scan(scan).await
     }
 
