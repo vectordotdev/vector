@@ -315,6 +315,7 @@ impl_generate_config_from_default!(HealthcheckOptions);
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Resource {
     Port(SocketAddr, Protocol),
+    UnixSocket(PathBuf),
     SystemFdOffset(usize),
     Fd(u32),
     DiskBuffer(String),
@@ -333,6 +334,10 @@ impl Resource {
 
     pub const fn udp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Udp)
+    }
+
+    pub const fn unix_socket(path: PathBuf) -> Self {
+        Self::UnixSocket(path)
     }
 
     /// From given components returns all that have a resource conflict with any other component.
@@ -393,6 +398,7 @@ impl Display for Resource {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             Resource::Port(address, protocol) => write!(fmt, "{protocol} {address}"),
+            Resource::UnixSocket(path) => write!(fmt, "unix socket {}", path.display()),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
             Resource::Fd(fd) => write!(fmt, "file descriptor: {fd}"),
             Resource::DiskBuffer(name) => write!(fmt, "disk buffer {name:?}"),
@@ -1238,6 +1244,7 @@ mod resource_tests {
     use std::{
         collections::{HashMap, HashSet},
         net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+        path::PathBuf,
     };
 
     use proptest::prelude::*;
@@ -1250,6 +1257,10 @@ mod resource_tests {
 
     fn udp(addr: impl Into<IpAddr>, port: u16) -> Resource {
         Resource::udp(SocketAddr::new(addr.into(), port))
+    }
+
+    fn unix(path: &str) -> Resource {
+        Resource::unix_socket(PathBuf::from(path))
     }
 
     fn unspecified() -> impl Strategy<Value = IpAddr> {
@@ -1358,6 +1369,23 @@ mod resource_tests {
         ];
         let conflicting = Resource::conflicts(components);
         assert_eq!(conflicting, HashMap::new());
+    }
+
+    #[test]
+    fn conflicting_unix_socket_path() {
+        let components = vec![
+            ("source_0", vec![unix("/tmp/vector.sock")]),
+            ("source_1", vec![unix("/tmp/vector.sock")]),
+            ("source_2", vec![unix("/tmp/other.sock")]),
+        ];
+        let conflicting = Resource::conflicts(components);
+        assert_eq!(
+            conflicting,
+            hashmap(vec![(
+                unix("/tmp/vector.sock"),
+                vec!["source_0", "source_1"]
+            )])
+        );
     }
 }
 
