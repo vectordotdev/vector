@@ -15,7 +15,7 @@ use crate::{
     config::TransformContext,
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::TaskTransform,
 };
 
@@ -23,7 +23,7 @@ use crate::{
 pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     pub quota: Quota,
     pub flush_keys_interval: Duration,
-    key_field: Option<Template>,
+    key_field: Option<UnconfinedTemplate>,
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,

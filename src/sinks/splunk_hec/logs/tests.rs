@@ -26,9 +26,21 @@ use crate::{
             test::build_test_server,
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     test_util::addr::next_addr,
 };
+
+// Tests exercise the sink, not confinement; build a checkerless confined template.
+fn confined(s: &str) -> ConfinedTemplate {
+    Template::try_from(s)
+        .unwrap()
+        .confine(
+            &ConfinementConfig::unconfined(),
+            HecLogsSinkConfig::NAME,
+            "template",
+        )
+        .unwrap()
+}
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {
@@ -106,9 +118,9 @@ fn get_processed_event_timestamp(
         }
     }
 
-    let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
-    let source = Template::try_from("{{ event_source }}".to_string()).ok();
-    let index = Template::try_from("{{ event_index }}".to_string()).ok();
+    let sourcetype = Some(confined("{{ event_sourcetype }}"));
+    let source = Some(confined("{{ event_source }}"));
+    let index = Some(confined("{{ event_index }}"));
     let indexed_fields = vec![
         owned_value_path!("event_field1"),
         owned_value_path!("event_field2"),

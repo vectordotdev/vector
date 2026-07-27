@@ -9,7 +9,7 @@ use crate::{
     conditions::{Condition, ConditionalConfig, VrlConfig},
     config::log_schema,
     event::{Event, LogEvent, TraceEvent},
-    template::Template,
+    template::UnconfinedTemplate,
     test_util::{components::assert_transform_compliance, random_lines},
     transforms::{
         FunctionTransform, OutputBuffer,
@@ -163,7 +163,10 @@ fn always_passes_events_matching_pass_list() {
 
 #[test]
 fn handles_group_by() {
-    for group_by in &[None, Some(Template::try_from("{{ other_field }}").unwrap())] {
+    for group_by in &[
+        None,
+        Some(UnconfinedTemplate::try_from("{{ other_field }}").unwrap()),
+    ] {
         let mut event = Event::Log(LogEvent::from("nananana"));
         let log = event.as_mut_log();
         log.insert(event_path!("other_field"), "foo");
@@ -442,7 +445,7 @@ fn dynamic_ratio_honors_group_by_key() {
             ratio_field: Some("dynamic_ratio".to_string()),
             rate_field: None,
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
@@ -489,7 +492,7 @@ fn dynamic_rate_honors_group_by_key() {
             ratio_field: None,
             rate_field: Some("dynamic_rate".to_string()),
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
@@ -535,7 +538,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
             ratio_field: Some("dynamic_ratio".to_string()),
             rate_field: None,
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
@@ -585,7 +588,7 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
             ratio_field: None,
             rate_field: Some("dynamic_rate".to_string()),
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );

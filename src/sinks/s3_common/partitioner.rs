@@ -2,7 +2,7 @@ use vector_lib::{event::Event, partition::Partitioner};
 
 use crate::{
     internal_events::TemplateRenderingError, sinks::util::partitioner::render_key_with_fallback,
-    template::Template,
+    template::ConfinedTemplate,
 };
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -17,15 +17,15 @@ pub struct S3PartitionKey {
 /// [`Template::confine`][crate::template::Template::confine]),
 /// keys that escape the base prefix are dropped as intentional security discards.
 pub struct S3KeyPartitioner {
-    key_prefix_template: Template,
-    ssekms_key_id_template: Option<Template>,
+    key_prefix_template: ConfinedTemplate,
+    ssekms_key_id_template: Option<ConfinedTemplate>,
     dead_letter_key_prefix: Option<String>,
 }
 
 impl S3KeyPartitioner {
     pub const fn new(
-        key_prefix_template: Template,
-        ssekms_key_id_template: Option<Template>,
+        key_prefix_template: ConfinedTemplate,
+        ssekms_key_id_template: Option<ConfinedTemplate>,
         dead_letter_key_prefix: Option<String>,
     ) -> Self {
         Self {

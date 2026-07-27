@@ -52,7 +52,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::{Template, TemplateParseError},
+    template::{TemplateParseError, UnconfinedTemplate},
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -201,7 +201,7 @@ pub struct ChronicleUnstructuredConfig {
         docs::examples = "production-{{ namespace }}",
     ))]
     #[configurable(metadata(docs::advanced))]
-    pub namespace: Option<Template>,
+    pub namespace: Option<UnconfinedTemplate>,
 
     /// A set of labels that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "chronicle_labels_examples()"))]
@@ -236,7 +236,7 @@ pub struct ChronicleUnstructuredConfig {
     ///
     /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
     #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
-    pub log_type: Template,
+    pub log_type: UnconfinedTemplate,
 
     /// The default `log_type` to attach to events if the template in `log_type` cannot be resolved.
     #[configurable(metadata(docs::examples = "VECTOR_DEV"))]

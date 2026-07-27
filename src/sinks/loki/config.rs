@@ -7,7 +7,7 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{prelude::*, util::UriSerde},
-    template::ConfinementConfig,
+    template::{ConfinementConfig, Template},
 };
 
 const fn default_compression() -> Compression {
