@@ -97,7 +97,7 @@ impl TransformConfig for ThrottleConfig {
         }
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         if let Some(Err(e)) = self
             .exclude
             .as_ref()

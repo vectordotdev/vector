@@ -115,7 +115,7 @@ impl TransformConfig for DelayConfig {
         }
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         self.condition
             .as_ref()
             .map(|c| {

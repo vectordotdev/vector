@@ -134,7 +134,7 @@ impl TransformConfig for ExclusiveRouteConfig {
         }
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         let errors: Vec<String> = self
             .routes
             .iter()
