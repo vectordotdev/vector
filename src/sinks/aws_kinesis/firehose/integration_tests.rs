@@ -4,6 +4,7 @@ use futures::{StreamExt, TryFutureExt};
 use serde_json::{Value, json};
 use tokio::time::{Duration, sleep};
 use vector_lib::{codecs::JsonSerializerConfig, lookup::lookup_v2::ConfigValuePath};
+use vrl::event_path;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
@@ -174,13 +175,14 @@ async fn firehose_put_records_with_partition_key() {
 
     let events = events.map(move |mut events| {
         events.iter_logs_mut().for_each(move |log| {
-            log.insert("partition_key", partition_value);
+            log.insert(event_path!("partition_key"), partition_value);
         });
         events
     });
 
     input.iter_mut().for_each(move |log| {
-        log.as_mut_log().insert("partition_key", partition_value);
+        log.as_mut_log()
+            .insert(event_path!("partition_key"), partition_value);
     });
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;

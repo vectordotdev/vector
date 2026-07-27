@@ -116,7 +116,7 @@ make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
 make check-generated-docs     # Check generated documentation
-./scripts/check_changelog_fragments.sh  # Verify changelog
+make check-changelog-fragments  # Verify changelog
 ```
 
 ### Website/Docs Development (Separate Process)
@@ -184,8 +184,7 @@ make check-fmt
 make check-clippy
 make check-markdown
 make check-generated-docs
-
-./scripts/check_changelog_fragments.sh
+make check-changelog-fragments
 ```
 
 Then: `chmod +x .git/hooks/pre-push`
@@ -263,6 +262,11 @@ After adding/updating dependencies:
 cargo install dd-rust-license-tool --locked
 make build-licenses
 ```
+
+## Git Conventions
+
+- **Commit messages:** Do NOT include co-authoring information from coding agents (i.e. avoid "Co-Authored-By: Claude" attribution)
+- **Pull requests:** Do NOT add "Generated with Claude Code" or similar footers — keep PR descriptions focused on the technical changes
 
 ## Creating Pull Requests
 

@@ -91,4 +91,26 @@ impl TransformConfig for WindowConfig {
             clone_input_definitions(input_definitions),
         )]
     }
+
+    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if let Some(Err(e)) = self
+            .forward_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("forward_when: {e}"));
+        }
+        if let Err(e) = self
+            .flush_when
+            .validate(&context.enrichment_tables, &context.metrics_storage)
+        {
+            errors.push(format!("flush_when: {e}"));
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }

@@ -190,6 +190,9 @@ impl ComposeTest {
         }
 
         env_vars.insert("VECTOR_LOG".to_string(), Some("info".into()));
+        if let Ok(val) = std::env::var("CARGO_TERM_COLOR") {
+            env_vars.insert("CARGO_TERM_COLOR".to_string(), Some(val));
+        }
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());

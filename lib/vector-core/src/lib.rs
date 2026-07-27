@@ -16,8 +16,6 @@
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::cast_sign_loss)]
 #![allow(clippy::default_trait_access)] // triggers on generated prost code
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wildcard_for_single_variants)]
@@ -39,6 +37,7 @@ pub mod serde;
 pub mod sink;
 pub mod source;
 pub mod source_sender;
+pub mod span_fields;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
@@ -83,3 +82,10 @@ macro_rules! register {
         vector_lib::internal_event::register($event)
     };
 }
+
+pub use span_fields::SpanField;
+
+// Re-export `inventory` so `register_extra_span_field!` can resolve `submit!` through this
+// crate without forcing downstream callers to declare `inventory` as a direct dependency.
+#[doc(hidden)]
+pub use inventory as __inventory;

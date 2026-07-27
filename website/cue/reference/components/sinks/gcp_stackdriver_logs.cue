@@ -4,7 +4,6 @@ components: sinks: gcp_stackdriver_logs: {
 	title: "GCP Operations (formerly Stackdriver) Logs"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -65,7 +64,15 @@ components: sinks: gcp_stackdriver_logs: {
 		notices: []
 	}
 
-	configuration: generated.components.sinks.gcp_stackdriver_logs.configuration
+	configuration: generated.components.sinks.gcp_stackdriver_logs.configuration & {
+		resource: type: object: examples: [{
+			type:       "gce_instance"
+			instanceId: "Twilight"
+			zone:       "{{ zone }}"
+		}]
+		project_id: type: string: examples: ["my-project"]
+		log_id: type: string: examples: ["my-log"]
+	}
 
 	input: {
 		logs:    true

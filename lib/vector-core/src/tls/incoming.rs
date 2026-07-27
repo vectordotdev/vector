@@ -7,6 +7,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use arc_swap::ArcSwap;
 use futures::{FutureExt, Stream, future::BoxFuture, stream};
 use ipnet::IpNet;
 use openssl::{
@@ -24,7 +25,7 @@ use tonic::transport::{Certificate, server::Connected};
 
 use super::{
     CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
-    SslBuildSnafu, TcpBindSnafu, TlsError, TlsSettings,
+    SslBuildSnafu, TcpBindSnafu, TlsAcceptorReloader, TlsError, TlsSettings,
 };
 use crate::tcp::{self, TcpKeepaliveConfig};
 
@@ -43,11 +44,35 @@ impl TlsSettings {
 
 impl MaybeTlsSettings {
     pub async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
+        self.bind_reloadable(addr, None).await
+    }
+
+    pub async fn bind_with_allowlist(
+        &self,
+        addr: &SocketAddr,
+        allow_origin: Vec<IpNet>,
+    ) -> crate::tls::Result<MaybeTlsListener> {
+        Ok(self
+            .bind_reloadable(addr, None)
+            .await?
+            .with_allowlist(Some(allow_origin)))
+    }
+
+    /// Bind a listener, optionally sharing a [`TlsAcceptorReloader`] so its acceptor can be swapped
+    /// at runtime. When `reloader` is `Some` and TLS is enabled, connections accepted by the
+    /// returned listener use the acceptor the reloader currently holds; otherwise the acceptor is
+    /// fixed for the lifetime of the listener.
+    pub async fn bind_reloadable(
+        &self,
+        addr: &SocketAddr,
+        reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::tls::Result<MaybeTlsListener> {
         let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
 
-        let acceptor = match self {
-            Self::Tls(tls) => Some(tls.acceptor()?),
-            Self::Raw(()) => None,
+        let acceptor = match (self, reloader) {
+            (Self::Raw(()), _) => None,
+            (Self::Tls(_), Some(reloader)) => Some(reloader.shared()),
+            (Self::Tls(tls), None) => Some(Arc::new(ArcSwap::from_pointee(tls.acceptor()?))),
         };
 
         Ok(MaybeTlsListener {
@@ -56,30 +81,11 @@ impl MaybeTlsSettings {
             origin_filter: None,
         })
     }
-
-    pub async fn bind_with_allowlist(
-        &self,
-        addr: &SocketAddr,
-        allow_origin: Vec<IpNet>,
-    ) -> crate::tls::Result<MaybeTlsListener> {
-        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
-
-        let acceptor = match self {
-            Self::Tls(tls) => Some(tls.acceptor()?),
-            Self::Raw(()) => None,
-        };
-
-        Ok(MaybeTlsListener {
-            listener,
-            acceptor,
-            origin_filter: Some(allow_origin),
-        })
-    }
 }
 
 pub struct MaybeTlsListener {
     listener: TcpListener,
-    acceptor: Option<SslAcceptor>,
+    acceptor: Option<Arc<ArcSwap<SslAcceptor>>>,
     origin_filter: Option<Vec<IpNet>>,
 }
 
@@ -90,7 +96,11 @@ impl MaybeTlsListener {
             .accept()
             .await
             .map(|(stream, peer_addr)| {
-                MaybeTlsIncomingStream::new(stream, peer_addr, self.acceptor.clone())
+                let acceptor = self
+                    .acceptor
+                    .as_ref()
+                    .map(|accptr| accptr.load().as_ref().clone());
+                MaybeTlsIncomingStream::new(stream, peer_addr, acceptor)
             })
             .context(IncomingListenerSnafu)?;
 
@@ -421,10 +431,7 @@ impl From<X509> for CertificateMetadata {
     fn from(cert: X509) -> Self {
         let mut subject_metadata: HashMap<String, String> = HashMap::new();
         for entry in cert.subject_name().entries() {
-            let data_string = match entry.data().as_utf8() {
-                Ok(data) => data.to_string(),
-                Err(_) => String::new(),
-            };
+            let data_string = entry.data().to_string().unwrap_or_default();
             subject_metadata.insert(entry.object().to_string(), data_string);
         }
         Self {

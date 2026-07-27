@@ -62,7 +62,7 @@ generated: components: sources: heroku_logs: configuration: {
 					custom: """
 						Custom authentication using VRL code.
 
-						Takes in request and validates it using VRL code.
+						Takes in request and validates it using VRL code. The VRL program must return a boolean.
 						"""
 				}
 			}
@@ -113,7 +113,7 @@ generated: components: sources: heroku_logs: configuration: {
 					default: "bytes"
 					enum: {
 						avro: """
-															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+															Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 															[apache_avro]: https://avro.apache.org/
 															"""

@@ -15,11 +15,11 @@ use crate::{
     event::{Event, Value},
     internal_events::SampleEventDiscarded,
     sinks::prelude::TemplateRenderingError,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-/// Exists only for backwards compatability purposes so that the value of sample_rate_key is
+/// Exists only for backwards compatibility purposes so that the value of sample_rate_key is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
 /// of percentages
 #[derive(Clone, Debug)]
@@ -131,11 +131,11 @@ impl fmt::Display for SampleMode {
 pub enum SampleKeySource {
     Static {
         key_field: Option<String>,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
     },
     Dynamic {
         fields: DynamicSampleFields,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
     },
 }
 
@@ -157,7 +157,7 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         key_field: Option<String>,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
@@ -177,7 +177,7 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         fields: DynamicSampleFields,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {

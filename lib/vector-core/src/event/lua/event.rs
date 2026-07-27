@@ -95,8 +95,9 @@ mod test {
 
     #[test]
     fn into_lua_log() {
+        use vrl::event_path;
         let mut event = LogEvent::default();
-        event.insert("field", "value");
+        event.insert(event_path!("field"), "value");
 
         let assertions = vec![
             "type(event) == 'table'",

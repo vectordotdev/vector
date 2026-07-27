@@ -38,6 +38,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
         request: Default::default(),
         acknowledgements: Default::default(),
         tls: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -243,17 +244,14 @@ fn azure_blob_build_request_with_uuid() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_null_auth() {
-    let config: Result<AzureBlobSinkConfig, toml::de::Error> = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-        "#,
-    );
+    let config: Result<AzureBlobSinkConfig, _> =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth: {}
+        "#});
 
     match config {
         Ok(_) => panic!("Config parsing should have failed due to invalid auth config"),
@@ -270,22 +268,19 @@ async fn azure_blob_build_config_with_null_auth() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_client_id_and_secret() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     assert!(&config.auth.is_some());
 
@@ -312,23 +307,20 @@ async fn azure_blob_build_config_with_client_id_and_secret() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_client_certificate() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_certificate_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            certificate_path = "tests/data/ClientCertificateAuth.pfx"
-            certificate_password = "MockPassword123"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_certificate_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              certificate_path: tests/data/ClientCertificateAuth.pfx
+              certificate_password: MockPassword123
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     assert!(&config.auth.is_some());
 
@@ -350,22 +342,19 @@ async fn azure_blob_build_config_with_client_certificate() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_account_name() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let _ = config
@@ -376,16 +365,14 @@ async fn azure_blob_build_config_with_account_name() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_account_name_with_no_auth() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let sink = config.build(cx).await;
@@ -404,22 +391,19 @@ async fn azure_blob_build_config_with_account_name_with_no_auth() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_blob_endpoint() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            blob_endpoint = "https://localhost:10000/devstoreaccount1"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            blob_endpoint: "https://localhost:10000/devstoreaccount1"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let _ = config
@@ -430,16 +414,14 @@ async fn azure_blob_build_config_with_blob_endpoint() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_blob_endpoint_with_no_auth() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            blob_endpoint = "https://localhost:10000/devstoreaccount1"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            blob_endpoint: "https://localhost:10000/devstoreaccount1"
+            container_name: my-logs
+            encoding:
+              codec: json
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let sink = config.build(cx).await;
@@ -458,17 +440,15 @@ async fn azure_blob_build_config_with_blob_endpoint_with_no_auth() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_conflicting_connection_string_and_account_name() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let sink = config.build(cx).await;
@@ -489,22 +469,19 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_account_
 
 #[tokio::test]
 async fn azure_blob_build_config_with_conflicting_connection_string_and_client_id_and_secret() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage;AccountKey=mockkey"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage;AccountKey=mockkey"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     assert!(&config.auth.is_some());
 
@@ -528,25 +505,21 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_client_i
 
 #[tokio::test]
 async fn azure_blob_build_config_with_custom_ca_certificate() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [tls]
-            ca_file = "tests/data/ca/certs/ca.cert.pem"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+            tls:
+              ca_file: tests/data/ca/certs/ca.cert.pem
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let _ = config
