@@ -42,7 +42,7 @@ use crate::{
         path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 mod bytes_path;
@@ -66,7 +66,7 @@ pub struct FileSinkConfig {
     #[configurable(metadata(
         docs::warnings = "Rendered paths are confined to `base_dir` (derived from the literal prefix of `path` when unset). See the `base_dir` option."
     ))]
-    pub path: Template,
+    pub path: UnconfinedTemplate,
 
     /// Directory under which all rendered `path` values must resolve.
     ///
@@ -140,7 +140,7 @@ pub struct FileTruncateConfig {
 impl GenerateConfig for FileSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
+            path: UnconfinedTemplate::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
@@ -268,7 +268,7 @@ impl SinkConfig for FileSinkConfig {
 }
 
 pub struct FileSink {
-    path: Template,
+    path: UnconfinedTemplate,
     transformer: Transformer,
     encoder: Encoder<Framer>,
     idle_timeout: Duration,

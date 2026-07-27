@@ -8,8 +8,8 @@ pub struct DorisSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     request_builder: DorisRequestBuilder,
-    database: Template,
-    table: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
 }
 
 impl<S> DorisSink<S>
@@ -92,16 +92,16 @@ pub struct DorisPartitionKey {
 
 /// KeyPartitioner that partitions events by (database, table) pair.
 struct DorisKeyPartitioner {
-    database: Template,
-    table: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
 }
 
 impl DorisKeyPartitioner {
-    const fn new(database: Template, table: Template) -> Self {
+    const fn new(database: ConfinedTemplate, table: ConfinedTemplate) -> Self {
         Self { database, table }
     }
 
-    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
         template
             .render_string(item)
             .map_err(|error| {

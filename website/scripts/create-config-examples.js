@@ -161,10 +161,30 @@ const getExampleValue = (param, deepFilter) => {
 };
 
 Object.makeExampleParams = (params, filter, deepFilter) => {
-  var obj = {};
+  // First pass: collect selected values for fields used in relevant_when conditions.
+  // Only consider fields that are required/minimal and have no relevant_when themselves
+  // (they are the "discriminators", e.g. mode = "tcp").
+  const discriminators = {};
+  Object.keys(params).forEach((k) => {
+    const p = params[k];
+    if ((p.required || p.minimal) && !p.relevant_when) {
+      const val = getExampleValue(p, () => false);
+      if (val != null) discriminators[k] = String(val);
+    }
+  });
 
+  // Evaluate a relevant_when condition string against the discriminators.
+  // Handles "key = \"value\"" and "key = \"v1\" or key = \"v2\"" by matching the first clause.
+  const matchesWhen = (p) => {
+    if (!p.relevant_when) return true;
+    const m = p.relevant_when.match(/^(\w+)\s*=\s*"([^"]+)"/);
+    if (!m) return true;
+    return discriminators[m[1]] === m[2];
+  };
+
+  const obj = {};
   Object.keys(params)
-    .filter((k) => filter(params[k]))
+    .filter((k) => filter(params[k]) && matchesWhen(params[k]))
     .forEach((k) => {
       let value = getExampleValue(params[k], deepFilter);
       if (value != null) {
@@ -370,10 +390,11 @@ const main = () => {
           (p) => p.required || p.minimal,
           (p) => p.required || p.minimal
         );
+        const hasFieldExamples = (p) => Object.values(p.type || {}).some((t) => (t.examples || []).length > 0);
         const advancedParams = Object.makeExampleParams(
           configuration,
           (_) => true,
-          (p) => p.required || p.minimal || p.relevant_when
+          (p) => p.required || p.minimal || p.relevant_when || hasFieldExamples(p)
         );
         const useCaseExamples = makeUseCaseExamples(component);
 
