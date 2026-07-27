@@ -95,14 +95,6 @@ pub fn confined_preview(rendered: &str) -> String {
 /// data when rendering the template. An example of a fixed string is `my-file.log`. An example of
 /// a template string is `my-file-{{key}}.log`, where `{{key}}` is the key's value when the
 /// template is rendered into a string.
-///
-/// **Transform / source authors**: store and render this type directly when confinement is not
-/// applicable.
-///
-/// **Sink authors**: store [`Template`] in config structs instead — it is serde-able but cannot be
-/// rendered until it has been confined via [`Template::confine`], which yields a
-/// [`ConfinedTemplate`]. `UnconfinedTemplate` deliberately exposes `render`, so storing it in a
-/// sink config would let a rendered value escape its confinement boundary.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Default)]
@@ -223,10 +215,6 @@ impl UnconfinedTemplate {
     }
 
     /// Renders the given template with data from the event, returning raw bytes.
-    ///
-    /// No confinement check is applied. Use this in transforms, sources, and other contexts
-    /// where confinement is not applicable. For sinks, call [`Template::confine`] first to
-    /// get a [`ConfinedTemplate`] and render through that instead.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -236,9 +224,6 @@ impl UnconfinedTemplate {
 
     /// Renders the given template with data from the event.
     ///
-    /// No confinement check is applied. Use this in transforms, sources, and other contexts
-    /// where confinement is not applicable. For sinks, call [`Template::confine`] first to
-    /// get a [`ConfinedTemplate`] and render through that instead.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -479,14 +464,6 @@ pub struct Template {
 impl Template {
     /// Confine this template to its literal prefix, returning a [`ConfinedTemplate`] that enforces
     /// the confinement invariant at render time.
-    ///
-    /// Three outcomes:
-    ///
-    /// - `dangerously_allow_unconfined_template_resolution` is `true` — no
-    ///   checker attached; a SECURITY warning is emitted.
-    /// - Static template (no event-field references) — returned as-is.
-    /// - Dynamic template with a non-empty literal prefix — checker attached.
-    /// - Dynamic template with no derivable prefix — error.
     ///
     /// Most sinks reach this through [`Template::confine`]; call this directly only when a sink
     /// constructs an [`UnconfinedTemplate`] itself (e.g. from a default value) and needs to confine
