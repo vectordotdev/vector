@@ -336,7 +336,7 @@ impl UnconfinedTemplate {
 ///
 /// Both fields are private to this module, so a `ConfinedTemplate` can
 /// never be constructed (or deserialized) without going through confinement.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ConfinedTemplate {
     inner: UnconfinedTemplate,
     checker: Option<ConfinementChecker>,
