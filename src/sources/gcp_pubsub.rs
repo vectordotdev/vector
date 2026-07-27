@@ -541,6 +541,17 @@ enum State {
     Shutdown,
 }
 
+/// Aborts the wrapped task when dropped, tying the ack worker's lifetime to a
+/// single `run_once` so a reconnect cannot strand workers that keep draining a
+/// finalizer (and hold a `ShutdownSignal`) after their request stream is gone.
+struct AbortOnDrop(tokio::task::JoinHandle<()>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 impl PubsubSource {
     async fn run_all(mut self, max_concurrency: usize, poll_time: Duration) -> crate::Result<()> {
         let mut tasks = FuturesUnordered::new();
@@ -609,7 +620,9 @@ impl PubsubSource {
         let connection = match self.endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
-                emit!(GcpPubsubConnectError { error });
+                if self.should_escalate_failure() {
+                    emit!(GcpPubsubConnectError { error });
+                }
                 return State::RetryDelay;
             }
         };
@@ -654,7 +667,9 @@ impl PubsubSource {
             result = client.streaming_pull(request_stream) => match result {
                 Ok(stream) => stream,
                 Err(error) => {
-                    emit!(GcpPubsubStreamingPullError { error });
+                    if self.should_escalate_failure() {
+                        emit!(GcpPubsubStreamingPullError { error });
+                    }
                     return State::RetryDelay;
                 }
             }
@@ -665,17 +680,20 @@ impl PubsubSource {
         // request stream from a dedicated task, so a slow request stream
         // backpressures the finalizer instead of the main loop (which must stay
         // free for the idle timeout). `pending_acks` is shared so the loop can
-        // still tell when acknowledgements are in flight. On shutdown the
-        // finalizer drains its receivers before `ack_stream` ends, so remaining
-        // acks are flushed here. When acks are disabled the finalizer is `None`
-        // and no worker is spawned (its `ack_stream` would never resolve).
+        // still tell when acknowledgements are in flight. The worker is aborted
+        // when this `run_once` returns, so a reconnect cannot strand it draining
+        // a finalizer after the request stream is gone. When acks are disabled
+        // the finalizer is `None` and no worker is spawned (its `ack_stream`
+        // would never resolve).
         let pending_acks = Arc::new(AtomicUsize::new(0));
-        let finalizer = if self.acknowledgements {
-            let (finalizer, mut ack_stream) =
+        let mut finalizer = None;
+        let _ack_worker = if self.acknowledgements {
+            let (new_finalizer, mut ack_stream) =
                 Finalizer::maybe_new(true, Some(self.shutdown.clone()));
+            finalizer = new_finalizer;
             let ack_ids_sender = ack_ids_sender.clone();
             let pending_acks = Arc::clone(&pending_acks);
-            crate::spawn_in_current_span(async move {
+            Some(AbortOnDrop(crate::spawn_in_current_span(async move {
                 while let Some((status, receipts)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         // Keep the ack pending until its send resolves, so the
@@ -689,8 +707,7 @@ impl PubsubSource {
                         pending_acks.fetch_sub(1, Ordering::Relaxed);
                     }
                 }
-            });
-            finalizer
+            })))
         } else {
             None
         };
@@ -832,10 +849,26 @@ impl PubsubSource {
         None
     }
 
-    // GCP frequently ends a streaming pull with a transient, auto-retried
-    // error (a reset, or `Unavailable` when an idle subscription has no
-    // messages). Only escalate to a component error once failures persist,
-    // to avoid flooding the logs on quiet subscriptions.
+    // GCP frequently fails a connect, stream setup, or streaming pull with a
+    // transient, auto-retried error (a reset, or `Unavailable` when an idle
+    // subscription has no messages). Count a failure and report whether it
+    // should escalate to a component error, so all three paths only flood the
+    // logs once failures persist. Escalation stays on while the streak persists
+    // (so a genuinely broken source stays visible and `max_retry_errors: 1`
+    // reports every failure); a successful fetch resets the counter.
+    fn should_escalate_failure(&self) -> bool {
+        let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
+        let escalate = consecutive_failures >= self.max_retry_errors;
+        if !escalate {
+            debug!(
+                message = "Transient error, retrying.",
+                consecutive_failures,
+                max_retry_errors = self.max_retry_errors,
+            );
+        }
+        escalate
+    }
+
     fn handle_stream_error(&self, error: tonic::Status) -> State {
         // A server-side reset is not really an error, so retry immediately
         // without counting it.
@@ -844,20 +877,8 @@ impl PubsubSource {
             return State::RetryNow;
         }
 
-        // Escalate once the streak reaches the threshold, and keep reporting
-        // while it persists so a genuinely broken stream stays visible (and
-        // `max_retry_errors: 1` reports every failure). A successful fetch
-        // resets the counter.
-        let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
-        if consecutive_failures >= self.max_retry_errors {
+        if self.should_escalate_failure() {
             emit!(GcpPubsubReceiveError { error });
-        } else {
-            debug!(
-                message = "Transient error fetching events, retrying.",
-                %error,
-                consecutive_failures,
-                max_retry_errors = self.max_retry_errors,
-            );
         }
         State::RetryDelay
     }
