@@ -374,6 +374,15 @@ impl Filesystem for TestFilesystem {
         }
     }
 
+    async fn truncate_file(&self, path: &Path, size: u64) -> io::Result<()> {
+        let file = {
+            let mut inner = self.inner.lock().expect("poisoned");
+            inner.open_file_writable(path)
+        };
+        file.truncate(size).await?;
+        file.sync_all().await
+    }
+
     fn delete_file<'a>(
         &'a self,
         path: &'a Path,

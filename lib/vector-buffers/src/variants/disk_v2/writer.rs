@@ -510,23 +510,6 @@ where
         }
     }
 
-    async fn truncate(&mut self, size: u64) -> io::Result<()> {
-        if size > self.current_data_file_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "cannot extend a file through the truncation API",
-            ));
-        }
-
-        self.writer.flush().await?;
-        let writer = self.writer.get_mut();
-        writer.truncate(size).await?;
-        writer.sync_all().await?;
-        self.current_data_file_size = size;
-
-        Ok(())
-    }
-
     /// Gets a reference to the underlying writer.
     #[cfg(test)]
     pub fn get_ref(&self) -> &W {
@@ -1254,7 +1237,21 @@ where
             .writer
             .as_mut()
             .expect("writer should exist after `ensure_ready_for_write`");
-        writer.truncate(size).await?;
+        if size > writer.current_data_file_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot extend a file through the truncation API",
+            ));
+        }
+        writer.writer.flush().await?;
+
+        let data_file_path = self.ledger.get_current_writer_data_file_path();
+        self.ledger
+            .filesystem()
+            .truncate_file(&data_file_path, size)
+            .await?;
+
+        writer.current_data_file_size = size;
         self.data_file_size = size;
 
         Ok(())
@@ -1438,15 +1435,11 @@ where
         }
 
         let reader_data_file_path = self.ledger.get_current_reader_data_file_path();
-        let reader_data_file = self
-            .ledger
+        self.ledger
             .filesystem()
-            .open_file_writable(&reader_data_file_path)
+            .truncate_file(&reader_data_file_path, 0)
             .await
             .context(IoSnafu)?;
-        reader_data_file.truncate(0).await.context(IoSnafu)?;
-        reader_data_file.sync_all().await.context(IoSnafu)?;
-        drop(reader_data_file);
 
         self.reset();
         self.mark_for_skip();

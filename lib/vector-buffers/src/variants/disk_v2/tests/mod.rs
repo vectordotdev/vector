@@ -17,7 +17,7 @@ use super::{
 };
 use crate::{
     Bufferable, buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable,
-    variants::disk_v2::common::align16,
+    test::with_temp_dir, variants::disk_v2::common::align16,
 };
 
 type FilesystemUnderTest = ProductionFilesystem;
@@ -480,6 +480,51 @@ async fn async_file_truncate_rejects_extension() {
             assert_eq!(
                 file.metadata().await.expect("metadata should load").len(),
                 2
+            );
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn production_filesystem_truncates_with_append_handle_open() {
+    with_temp_dir(|dir| {
+        let path = dir.join("truncate-with-append-handle");
+
+        async move {
+            let filesystem = ProductionFilesystem;
+            filesystem
+                .truncate_file(&path, 0)
+                .await
+                .expect("truncating a missing file to zero should create it");
+            let mut append_file = filesystem
+                .open_file_writable(&path)
+                .await
+                .expect("opening append file should succeed");
+            append_file
+                .write_all(b"abcdef")
+                .await
+                .expect("initial write should succeed");
+            append_file.flush().await.expect("flush should succeed");
+
+            filesystem
+                .truncate_file(&path, 2)
+                .await
+                .expect("truncation should succeed");
+
+            append_file
+                .write_all(b"z")
+                .await
+                .expect("append after truncation should succeed");
+            append_file.flush().await.expect("flush should succeed");
+            drop(append_file);
+
+            assert_eq!(
+                b"abz",
+                tokio::fs::read(path)
+                    .await
+                    .expect("reading truncated file should succeed")
+                    .as_slice()
             );
         }
     })

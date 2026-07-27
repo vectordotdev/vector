@@ -82,6 +82,17 @@ pub trait Filesystem: Send + Sync {
     /// memory map the file, an error variant will be returned describing the underlying error.
     async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap>;
 
+    /// Durably truncates a file to `size`, creating it when it does not exist.
+    ///
+    /// This is separate from [`Filesystem::open_file_writable`] because writable data files are
+    /// opened in append mode. On Windows, append-only handles cannot resize a file.
+    ///
+    /// # Errors
+    ///
+    /// If `size` is greater than the current file size, or an I/O error occurs while truncating or
+    /// synchronizing the file, an error is returned.
+    async fn truncate_file(&self, path: &Path, size: u64) -> io::Result<()>;
+
     /// Deletes a file.
     ///
     /// # Errors
@@ -189,6 +200,14 @@ impl Filesystem for ProductionFilesystem {
 
         let std_file = file.into_std().await;
         unsafe { memmap2::MmapMut::map_mut(&std_file) }
+    }
+
+    async fn truncate_file(&self, path: &Path, size: u64) -> io::Result<()> {
+        // Windows append handles can write to a file, but cannot resize it. Open a separate
+        // read/write handle for truncation.
+        let file = create_writable_file_options(false).open(path).await?;
+        AsyncFile::truncate(&file, size).await?;
+        AsyncFile::sync_all(&file).await
     }
 
     fn delete_file<'a>(

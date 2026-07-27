@@ -728,13 +728,10 @@ where
 
     /// Durably truncates a data file so recovery and later appends observe the same physical EOF.
     async fn truncate_data_file(&self, data_file_path: &Path, size: u64) -> io::Result<()> {
-        let data_file = self
-            .ledger()
+        self.ledger()
             .filesystem()
-            .open_file_writable(data_file_path)
-            .await?;
-        data_file.truncate(size).await?;
-        data_file.sync_all().await
+            .truncate_file(data_file_path, size)
+            .await
     }
 }
 
