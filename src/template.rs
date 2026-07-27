@@ -19,8 +19,13 @@ use vector_lib::{
 use crate::{
     config::log_schema,
     event::{EventRef, Metric, Value},
-    sinks::util::path_confinement::MAX_RENDERED_PATH_LEN,
 };
+
+/// Maximum byte length of a rendered value before it is rejected.
+///
+/// Bounds per-event cost and provides a coarse cap on memory blow-up from
+/// attacker-controlled fields.
+pub const MAX_RENDERED_PATH_LEN: usize = 1024;
 
 static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 

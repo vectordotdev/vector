@@ -10,13 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use snafu::Snafu;
 use tokio::fs as tokio_fs;
 
-use crate::template::UnconfinedTemplate;
-
-/// Maximum byte length of a rendered path before it is rejected.
-///
-/// Bounds per-event cost (path canonicalization, directory creation) and
-/// provides a coarse cap on memory blow-up from attacker-controlled fields.
-pub const MAX_RENDERED_PATH_LEN: usize = 1024;
+use crate::template::{MAX_RENDERED_PATH_LEN, UnconfinedTemplate};
 
 /// Errors raised while building a [`PathConfinement`] from a template.
 #[derive(Debug, Snafu)]
