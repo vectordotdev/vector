@@ -363,7 +363,7 @@ pub enum BuildError {
 }
 
 impl Config {
-    fn validate(&self) -> crate::Result<()> {
+    fn validate_structure_impl(&self) -> crate::Result<()> {
         // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
         if !matches!(self.global.mode, Mode::Probabilistic(_)) {
             for (tag_key, tag_cfg) in &self.per_tag_limits {
@@ -405,7 +405,6 @@ impl Config {
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for Config {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        self.validate()?;
         Ok(Transform::event_task(TagCardinalityLimit::new(
             self.clone(),
         )))
@@ -421,5 +420,9 @@ impl TransformConfig for Config {
         _: &[(OutputId, schema::Definition)],
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
+    }
+
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        self.validate_structure_impl().map_err(|e| vec![e.to_string()])
     }
 }
