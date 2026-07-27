@@ -61,6 +61,7 @@ pub struct LokiConfig {
     /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
     #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
+    #[configurable(metadata(docs::required = true))]
     pub labels: HashMap<Template, Template>,
 
     /// Whether or not to delete fields from the event when they are used as labels.

@@ -418,6 +418,10 @@ impl SchemaContext {
             || property_schema
                 .get("required")
                 .and_then(Value::as_bool)
+                .unwrap_or(false)
+            || property
+                .get("required")
+                .and_then(Value::as_bool)
                 .unwrap_or(false);
 
         property.as_object_mut().unwrap().insert(
