@@ -1,4 +1,11 @@
 //! Functionality for managing template fields used by Vector's sinks.
+mod configurable;
+mod confined;
+mod confinement;
+mod parsing;
+mod unconfined;
+mod unsigned;
+
 use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
 
 use bytes::Bytes;
@@ -20,6 +27,13 @@ use crate::{
     config::log_schema,
     event::{EventRef, Metric, Value},
 };
+
+use confinement::ConfinementChecker;
+use parsing::Part;
+use unsigned::UnsignedIntTemplateSource;
+
+#[cfg(test)]
+use confinement::{BuildError, ConfineError};
 
 /// Maximum byte length of a rendered value before it is rejected.
 ///
@@ -88,12 +102,106 @@ pub fn confined_preview(rendered: &str) -> String {
     rendered.get(..end).unwrap_or("").to_string()
 }
 
-include!("unconfined.rs");
-include!("confined.rs");
-include!("configurable.rs");
-include!("unsigned.rs");
-include!("parsing.rs");
-include!("confinement.rs");
+/// A templated field.
+///
+/// In many cases, components can be configured so that part of the component's functionality can be
+/// customized on a per-event basis. By using `UnconfinedTemplate`, users can specify either fixed
+/// strings or templated strings. Templated strings use a common syntax to refer to fields in an
+/// event that is used as the input data when rendering the template.
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
+#[serde(try_from = "String", into = "String")]
+pub struct UnconfinedTemplate {
+    src: String,
+
+    #[serde(skip)]
+    parts: Vec<Part>,
+
+    #[serde(skip)]
+    is_static: bool,
+
+    #[serde(skip)]
+    reserve_size: usize,
+
+    #[serde(skip)]
+    tz_offset: Option<FixedOffset>,
+}
+
+/// A template that has passed through confinement via [`Template::confine`].
+///
+/// This is the only render-capable, confinement-enforcing template type. It is deliberately **not**
+/// deserializable: the sole way to obtain one is by confining a [`Template`] or an
+/// [`UnconfinedTemplate`], so a rendered value can never escape its confinement boundary. The
+/// `render` methods enforce the attached confinement checker (if any).
+///
+/// Both fields are private to this module, so a `ConfinedTemplate` can
+/// never be constructed (or deserialized) without going through confinement.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ConfinedTemplate {
+    inner: UnconfinedTemplate,
+    checker: Option<ConfinementChecker>,
+}
+
+/// The templated field type stored in sink config structs.
+///
+/// `Template` is serde-able and appears as a plain string in generated configuration schemas, but
+/// it exposes **no** `render` method. To render it a sink must first call [`Template::confine`] in
+/// its `build()`, which yields a [`ConfinedTemplate`] that enforces the confinement invariant at
+/// render time. This makes confinement unavoidable: there is no way to render a sink's configured
+/// template without going through confinement first.
+///
+/// Transforms and sources, which have no confinement boundary, should store
+/// [`UnconfinedTemplate`] directly instead.
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[serde(try_from = "String", into = "String")]
+pub struct Template {
+    /// Inner template
+    #[serde(skip)]
+    inner: UnconfinedTemplate,
+}
+
+/// Unsigned integer template.
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[serde(
+    try_from = "UnsignedIntTemplateSource",
+    into = "UnsignedIntTemplateSource"
+)]
+pub struct UnsignedIntTemplate {
+    src: UnsignedIntTemplateSource,
+
+    #[serde(skip)]
+    parts: Vec<Part>,
+
+    #[serde(skip)]
+    tz_offset: Option<FixedOffset>,
+}
+
+/// Serializable config fragment for template confinement.
+///
+/// Embed this in a component config with `#[serde(flatten)]` to get the
+/// `dangerously_allow_unconfined_template_resolution` field. Pass it to
+/// [`Template::confine`] on each template the component owns.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub struct ConfinementConfig {
+    /// Disable all template confinement checks for this sink.
+    ///
+    /// **DANGEROUS — disables a security control.**
+    ///
+    /// Bypasses both startup validation and runtime confinement for every
+    /// templated field on this sink. When enabled, a log producer that
+    /// controls any field used in a template can write to arbitrary keys,
+    /// paths, or routing destinations. This flag is a full opt-out: it
+    /// disables confinement even for templates that have a usable static
+    /// prefix.
+    #[serde(default)]
+    pub dangerously_allow_unconfined_template_resolution: bool,
+}
 
 #[cfg(test)]
 mod tests;

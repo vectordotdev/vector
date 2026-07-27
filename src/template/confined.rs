@@ -1,17 +1,4 @@
-/// A template that has passed through confinement via [`Template::confine`].
-///
-/// This is the only render-capable, confinement-enforcing template type. It is deliberately **not**
-/// deserializable: the sole way to obtain one is by confining a [`Template`] or an
-/// [`UnconfinedTemplate`], so a rendered value can never escape its confinement boundary. The
-/// `render` methods enforce the attached confinement checker (if any).
-///
-/// Both fields are private to this module, so a `ConfinedTemplate` can
-/// never be constructed (or deserialized) without going through confinement.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ConfinedTemplate {
-    inner: UnconfinedTemplate,
-    checker: Option<ConfinementChecker>,
-}
+use super::*;
 
 impl fmt::Debug for ConfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -1,6 +1,8 @@
+use super::*;
+
 /// One part of the template string after parsing.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum Part {
+pub(super) enum Part {
     /// A literal piece of text to be copied verbatim into the output.
     Literal(String),
     /// A literal piece of text containing a time format string.
@@ -11,7 +13,7 @@ enum Part {
 
 // Wrap the parsed time formatter in order to provide `impl Hash` and some convenience functions.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct ParsedStrftime(Box<[Item<'static>]>);
+pub(super) struct ParsedStrftime(Box<[Item<'static>]>);
 
 impl ParsedStrftime {
     fn parse(fmt: &str) -> Result<Self, TemplateParseError> {
@@ -54,7 +56,7 @@ impl ParsedStrftime {
         self.0.iter()
     }
 
-    fn reserve_size(&self) -> usize {
+    pub(super) fn reserve_size(&self) -> usize {
         self.0
             .iter()
             .map(|item| match item {
@@ -70,7 +72,7 @@ impl ParsedStrftime {
     }
 }
 
-fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
+pub(super) fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
     let parsed = ParsedStrftime::parse(src)?;
     Ok(if parsed.is_dynamic() {
         Part::Strftime(parsed)
@@ -80,7 +82,7 @@ fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
 }
 
 // Pre-parse the template string into a series of parts to be filled in at render time.
-fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
+pub(super) fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     let mut last_end = 0;
     let mut parts = Vec::new();
     for cap in RE.captures_iter(src) {
@@ -115,7 +117,7 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     Ok(parts)
 }
 
-fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
+pub(super) fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
         "name" => Some(metric.name()),
         "namespace" => metric.namespace(),
@@ -126,7 +128,7 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     }
 }
 
-fn render_timestamp(
+pub(super) fn render_timestamp(
     items: &ParsedStrftime,
     event: EventRef<'_>,
     tz_offset: Option<FixedOffset>,

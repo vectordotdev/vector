@@ -1,28 +1,5 @@
-/// A templated field.
-///
-/// In many cases, components can be configured so that part of the component's functionality can be
-/// customized on a per-event basis. By using `UnconfinedTemplate`, users can specify either fixed
-/// strings or templated strings. Templated strings use a common syntax to refer to fields in an
-/// event that is used as the input data when rendering the template.
-#[configurable_component]
-#[configurable(metadata(docs::templateable))]
-#[derive(Clone, Default, PartialEq, Eq, Hash)]
-#[serde(try_from = "String", into = "String")]
-pub struct UnconfinedTemplate {
-    src: String,
-
-    #[serde(skip)]
-    parts: Vec<Part>,
-
-    #[serde(skip)]
-    is_static: bool,
-
-    #[serde(skip)]
-    reserve_size: usize,
-
-    #[serde(skip)]
-    tz_offset: Option<FixedOffset>,
-}
+use super::parsing::{parse_template, render_metric_field, render_timestamp};
+use super::*;
 
 impl fmt::Debug for UnconfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

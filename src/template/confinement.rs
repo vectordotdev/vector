@@ -423,28 +423,6 @@ impl UriChecker {
     }
 }
 
-/// Serializable config fragment for template confinement.
-///
-/// Embed this in a component config with `#[serde(flatten)]` to get the
-/// `dangerously_allow_unconfined_template_resolution` field. Pass it to
-/// [`Template::confine`] on each template the component owns.
-#[configurable_component]
-#[derive(Clone, Debug, Default)]
-pub struct ConfinementConfig {
-    /// Disable all template confinement checks for this sink.
-    ///
-    /// **DANGEROUS — disables a security control.**
-    ///
-    /// Bypasses both startup validation and runtime confinement for every
-    /// templated field on this sink. When enabled, a log producer that
-    /// controls any field used in a template can write to arbitrary keys,
-    /// paths, or routing destinations. This flag is a full opt-out: it
-    /// disables confinement even for templates that have a usable static
-    /// prefix.
-    #[serde(default)]
-    pub dangerously_allow_unconfined_template_resolution: bool,
-}
-
 impl ConfinementConfig {
     /// Returns a `ConfinementConfig` that opts out of confinement.
     ///
@@ -474,3 +452,4 @@ impl ConfinementConfig {
         );
     }
 }
+use super::*;

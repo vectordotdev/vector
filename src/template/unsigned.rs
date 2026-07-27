@@ -1,8 +1,11 @@
+use super::parsing::{parse_template, render_metric_field, render_timestamp};
+use super::*;
+
 /// The source of a `uint` template. May be a constant numeric value or a template string.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[configurable_component]
 #[serde(untagged)]
-enum UnsignedIntTemplateSource {
+pub(super) enum UnsignedIntTemplateSource {
     /// A static unsigned number.
     Number(u64),
     /// A string, which may be a template.
@@ -22,24 +25,6 @@ impl fmt::Display for UnsignedIntTemplateSource {
             Self::String(s) => s.fmt(f),
         }
     }
-}
-
-/// Unsigned integer template.
-#[configurable_component]
-#[configurable(metadata(docs::templateable))]
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-#[serde(
-    try_from = "UnsignedIntTemplateSource",
-    into = "UnsignedIntTemplateSource"
-)]
-pub struct UnsignedIntTemplate {
-    src: UnsignedIntTemplateSource,
-
-    #[serde(skip)]
-    parts: Vec<Part>,
-
-    #[serde(skip)]
-    tz_offset: Option<FixedOffset>,
 }
 
 impl TryFrom<UnsignedIntTemplateSource> for UnsignedIntTemplate {

@@ -1,22 +1,4 @@
-/// The templated field type stored in sink config structs.
-///
-/// `Template` is serde-able and appears as a plain string in generated configuration schemas, but
-/// it exposes **no** `render` method. To render it a sink must first call [`Template::confine`] in
-/// its `build()`, which yields a [`ConfinedTemplate`] that enforces the confinement invariant at
-/// render time. This makes confinement unavoidable: there is no way to render a sink's configured
-/// template without going through confinement first.
-///
-/// Transforms and sources, which have no confinement boundary, should store
-/// [`UnconfinedTemplate`] directly instead.
-#[configurable_component]
-#[configurable(metadata(docs::templateable))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[serde(try_from = "String", into = "String")]
-pub struct Template {
-    /// Inner template
-    #[serde(skip)]
-    inner: UnconfinedTemplate,
-}
+use super::*;
 
 impl Template {
     /// Confine this template to its literal prefix, returning a [`ConfinedTemplate`] that enforces
