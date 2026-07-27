@@ -7,9 +7,12 @@ use std::{
 
 use k8s_openapi::api::events::v1::Event as KubeEvent;
 
+const MAX_PRUNE_INTERVAL: Duration = Duration::from_secs(60);
+
 pub(super) struct Deduper {
     entries: HashMap<String, CachedEvent>,
     retention: Duration,
+    last_pruned: Instant,
 }
 
 struct CachedEvent {
@@ -38,6 +41,7 @@ impl Deduper {
         Self {
             entries: HashMap::new(),
             retention,
+            last_pruned: Instant::now(),
         }
     }
 
@@ -47,10 +51,20 @@ impl Deduper {
         resource_version: &str,
         include_previous: bool,
     ) -> DedupResult {
+        let now = Instant::now();
+        self.prune_if_due(now);
+        if self
+            .entries
+            .get(uid)
+            .is_some_and(|entry| entry.is_expired(now, self.retention))
+        {
+            self.entries.remove(uid);
+        }
+
         match self.entries.get_mut(uid) {
             Some(entry) => {
                 if resource_version == entry.resource_version {
-                    entry.last_seen = Instant::now();
+                    entry.last_seen = now;
                     DedupResult::Duplicate
                 } else {
                     let previous = include_previous
@@ -71,12 +85,14 @@ impl Deduper {
     }
 
     pub(super) fn commit(&mut self, record: PendingDedupeRecord) {
+        let now = Instant::now();
+        self.prune_if_due(now);
         self.entries.insert(
             record.uid,
             CachedEvent {
                 event: record.event,
                 resource_version: record.resource_version,
-                last_seen: Instant::now(),
+                last_seen: now,
             },
         );
     }
@@ -102,12 +118,21 @@ impl Deduper {
     }
 
     pub(super) fn prune(&mut self) {
-        if self.retention.is_zero() {
-            return;
+        self.prune_at(Instant::now());
+    }
+
+    fn prune_if_due(&mut self, now: Instant) {
+        let interval = self.retention.min(MAX_PRUNE_INTERVAL);
+        if now.saturating_duration_since(self.last_pruned) >= interval {
+            self.prune_at(now);
         }
+    }
+
+    fn prune_at(&mut self, now: Instant) {
         let retention = self.retention;
         self.entries
-            .retain(|_, entry| entry.last_seen.elapsed() <= retention);
+            .retain(|_, entry| !entry.is_expired(now, retention));
+        self.last_pruned = now;
     }
 
     pub(super) fn remove(&mut self, uid: &str) {
@@ -120,6 +145,12 @@ impl Deduper {
         for entry in self.entries.values_mut() {
             entry.event = None;
         }
+    }
+}
+
+impl CachedEvent {
+    fn is_expired(&self, now: Instant, retention: Duration) -> bool {
+        now.saturating_duration_since(self.last_seen) > retention
     }
 }
 
@@ -324,7 +355,7 @@ mod tests {
         ));
 
         if let Some(entry) = deduper.entries.get_mut("uid") {
-            entry.last_seen = Instant::now() - retention - Duration::from_secs(1);
+            entry.last_seen = Instant::now() - retention + Duration::from_secs(1);
         }
 
         assert!(matches!(
@@ -337,6 +368,46 @@ mod tests {
             deduper.entries.contains_key("uid"),
             "same resourceVersion replay should refresh the dedupe retention"
         );
+    }
+
+    #[test]
+    fn deduper_lazily_expires_accessed_uid() {
+        let retention = Duration::from_secs(60);
+        let mut deduper = Deduper::new(retention);
+        let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let event = make_event("uid", "1", timestamp);
+
+        deduper.commit(PendingDedupeRecord {
+            uid: "uid".to_string(),
+            resource_version: "1".to_string(),
+            event: Some(event),
+        });
+        if let Some(entry) = deduper.entries.get_mut("uid") {
+            entry.last_seen = Instant::now() - retention - Duration::from_secs(1);
+        }
+        deduper.last_pruned = Instant::now();
+
+        assert!(matches!(
+            deduper.evaluate("uid", "1", false),
+            DedupResult::Added
+        ));
+        assert!(
+            !deduper.entries.contains_key("uid"),
+            "an expired accessed UID should be removed without a full-map prune"
+        );
+    }
+
+    #[test]
+    fn deduper_throttles_full_map_pruning() {
+        let mut deduper = Deduper::new(Duration::from_secs(3600));
+        let last_pruned = deduper.last_pruned;
+
+        deduper.prune_if_due(last_pruned + MAX_PRUNE_INTERVAL - Duration::from_millis(1));
+        assert_eq!(deduper.last_pruned, last_pruned);
+
+        let next_prune = last_pruned + MAX_PRUNE_INTERVAL;
+        deduper.prune_if_due(next_prune);
+        assert_eq!(deduper.last_pruned, next_prune);
     }
 
     #[test]

@@ -476,7 +476,6 @@ impl KubernetesEventsSource {
         };
         let uid = identity.uid;
         let resource_version = identity.resource_version;
-        deduper.prune();
 
         if !self.type_allowed(&event) || !self.reason_allowed(&event) || !self.kind_allowed(&event)
         {
