@@ -184,8 +184,9 @@ impl Deserializer for OtlpDeserializer {
                     // Always use LogNamespace::Vector for traces to avoid spurious timestamp injection.
                     // The log_namespace concept is logs-specific and doesn't apply to trace events.
                     // See: https://github.com/vectordotdev/vector/issues/25045
-                    if let Ok(mut events) =
-                        self.traces_deserializer.parse(bytes.clone(), LogNamespace::Vector)
+                    if let Ok(mut events) = self
+                        .traces_deserializer
+                        .parse(bytes.clone(), LogNamespace::Vector)
                         && let Some(Event::Log(log)) = events.first()
                         && log.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some()
                     {
@@ -471,7 +472,7 @@ mod tests {
         }
 
         // The trace should still have the OTLP trace data
-        assert!(trace.get(RESOURCE_SPANS_JSON_FIELD).is_some());
+        assert!(trace.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some());
         validate_trace_ids(trace.value());
     }
 }
