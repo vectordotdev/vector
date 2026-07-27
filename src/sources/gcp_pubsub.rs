@@ -632,19 +632,7 @@ impl PubsubSource {
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
 
-        // Forward acks to the bounded request channel from a worker task, so a
-        // stalled request stream backpressures the worker instead of blocking
-        // the main loop (which must stay free for the idle timeout). The worker
-        // exits when this function returns and drops `ack_ids_sender`.
-        let (ack_ids_sender, mut ack_ids_receiver) = mpsc::unbounded_channel::<Vec<String>>();
-        let (request_ack_sender, request_ack_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
-        crate::spawn_in_current_span(async move {
-            while let Some(ids) = ack_ids_receiver.recv().await {
-                if request_ack_sender.send(ids).await.is_err() {
-                    break;
-                }
-            }
-        });
+        let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
         // Reconnect if no response arrives within the idle timeout, to
         // recover from a stream that stalls without ever erroring. Reset
@@ -655,7 +643,7 @@ impl PubsubSource {
 
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
-        let request_stream = self.request_stream(request_ack_receiver);
+        let request_stream = self.request_stream(ack_ids_receiver);
         debug!("Starting streaming pull.");
         let stream = tokio::select! {
             _ = &mut self.shutdown => return State::Shutdown,
@@ -673,21 +661,33 @@ impl PubsubSource {
         };
         let mut stream = stream.into_inner();
 
+        // Forward finalized acks to the request stream from a dedicated task, so
+        // a slow request stream backpressures the finalizer instead of the main
+        // loop (which must stay free for the idle timeout). `pending_acks` is
+        // shared so the loop can still tell when acknowledgements are in flight.
+        // On shutdown the finalizer drains its receivers before `ack_stream`
+        // ends, so remaining acks are flushed here.
         let (finalizer, mut ack_stream) =
             Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
-        let mut pending_acks = 0;
+        let pending_acks = Arc::new(AtomicUsize::new(0));
+        {
+            let ack_ids_sender = ack_ids_sender.clone();
+            let pending_acks = Arc::clone(&pending_acks);
+            crate::spawn_in_current_span(async move {
+                while let Some((status, receipts)) = ack_stream.next().await {
+                    pending_acks.fetch_sub(1, Ordering::Relaxed);
+                    if status == BatchStatus::Delivered
+                        && ack_ids_sender.send(receipts).await.is_err()
+                    {
+                        break;
+                    }
+                }
+            });
+        }
 
         loop {
             tokio::select! {
                 biased;
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
-                    pending_acks -= 1;
-                    if status == BatchStatus::Delivered {
-                        // A send error means the stream is gone; `stream.next()`
-                        // drives the reconnect and unsent acks are redelivered.
-                        ack_ids_sender.send(receipts).ok();
-                    }
-                },
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
                         self.consecutive_failures.store(0, Ordering::Relaxed);
@@ -698,14 +698,16 @@ impl PubsubSource {
                             response,
                             &finalizer,
                             &ack_ids_sender,
-                            &mut pending_acks,
+                            &pending_acks,
                             busy_flag,
                         ).await;
                     }
                     Some(Err(error)) => break self.handle_stream_error(error),
                     None => break State::RetryNow,
                 },
-                _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
+                _ = &mut self.shutdown, if pending_acks.load(Ordering::Relaxed) == 0 => {
+                    return State::Shutdown;
+                }
                 _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
@@ -720,7 +722,7 @@ impl PubsubSource {
                     break State::RetryDelay;
                 },
                 _ = tokio::time::sleep(self.keepalive) => {
-                    if pending_acks == 0 {
+                    if pending_acks.load(Ordering::Relaxed) == 0 {
                         // No pending acks, and no new data, so drop
                         // this stream if we aren't the only active
                         // one.
@@ -734,7 +736,9 @@ impl PubsubSource {
                     // GCP Pub/Sub times out connections after ~75s of
                     // inactivity. Send an empty ack ID array as a keepalive to
                     // forestall that.
-                    ack_ids_sender.send(Vec::new()).ok();
+                    if ack_ids_sender.send(Vec::new()).await.is_err() {
+                        break State::RetryNow;
+                    }
                 }
             }
         }
@@ -776,8 +780,8 @@ impl PubsubSource {
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
-        ack_ids: &mpsc::UnboundedSender<Vec<String>>,
-        pending_acks: &mut usize,
+        ack_ids: &mpsc::Sender<Vec<String>>,
+        pending_acks: &Arc<AtomicUsize>,
         busy_flag: &Arc<AtomicBool>,
     ) {
         if response.received_messages.len() >= self.full_response_size {
@@ -792,15 +796,17 @@ impl PubsubSource {
         match self.out.send_batch(events).await {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
+                // Auto-ack: a send error means the request stream is gone; the
+                // caller reconnects on the next `stream.next()`.
                 None => {
-                    ack_ids.send(ids).ok();
+                    ack_ids.send(ids).await.ok();
                 }
                 Some(notifier) => {
                     finalizer
                         .as_ref()
                         .expect("Finalizer must have been set up for acknowledgements")
                         .add(ids, notifier);
-                    *pending_acks += 1;
+                    pending_acks.fetch_add(1, Ordering::Relaxed);
                 }
             },
         }
