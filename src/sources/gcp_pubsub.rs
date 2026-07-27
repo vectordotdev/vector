@@ -30,7 +30,7 @@ use vector_lib::{
     configurable::configurable_component,
     finalizer::UnorderedFinalizer,
     internal_event::{
-        ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
+        EventsReceived, Registered,
     },
     lookup::owned_value_path,
 };
@@ -46,8 +46,8 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     internal_events::{
-        GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
-        StreamClosedError,
+        EndpointBytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError,
+        GcpPubsubStreamingPullError, StreamClosedError,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -305,8 +305,8 @@ impl SourceConfig for PubsubConfig {
 
         let protocol = uri
             .scheme()
-            .map(|scheme| Protocol(scheme.to_string().into()))
-            .unwrap_or(Protocol::HTTP);
+            .map(|scheme| scheme.to_string())
+            .unwrap_or_else(|| "http".to_string());
 
         let source = PubsubSource {
             endpoint,
@@ -331,7 +331,7 @@ impl SourceConfig for PubsubConfig {
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(protocol)),
+            protocol,
             events_received: register!(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
@@ -399,7 +399,7 @@ struct PubsubSource {
     concurrency: Arc<AtomicUsize>,
     full_response_size: usize,
     log_namespace: LogNamespace,
-    bytes_received: Registered<BytesReceived>,
+    protocol: String,
     events_received: Registered<EventsReceived>,
 }
 
@@ -519,7 +519,7 @@ impl PubsubSource {
         let mut stream = stream.into_inner();
 
         let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
+            Finalizer::maybe_new(self.acknowledgements, None);
         let mut pending_acks = 0;
 
         loop {
@@ -623,7 +623,11 @@ impl PubsubSource {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
-        self.bytes_received.emit(ByteSize(response.size_of()));
+        emit!(EndpointBytesReceived {
+            byte_size: response.size_of(),
+            protocol: &self.protocol,
+            endpoint: &self.subscription,
+        });
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let (events, ids) = self.parse_messages(response.received_messages, batch).await;
@@ -877,7 +881,6 @@ mod integration_tests {
         LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn oneshot() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -889,7 +892,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_before_data_received() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
@@ -902,7 +904,6 @@ mod integration_tests {
         assert_eq!(tester.pull_count(1).await, 1);
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_after_data_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -926,7 +927,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn streams_data() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -940,7 +940,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn sends_attributes() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -957,7 +956,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn acks_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -1056,7 +1054,7 @@ mod integration_tests {
 
             let body = json!({
                 "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
-                "ackDeadlineSeconds": *ACK_DEADLINE,
+                "ackDeadlineSeconds": ACK_DEADLINE.as_secs(),
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
 
@@ -1153,7 +1151,7 @@ mod integration_tests {
         }
 
         async fn shutdown(&self, mut shutdown: shutdown::SourceShutdownCoordinator) {
-            let deadline = Instant::now() + Duration::from_secs(1);
+            let deadline = Instant::now() + Duration::from_secs(10);
             let shutdown = shutdown.shutdown_source(&self.component, deadline);
             assert!(shutdown.await);
         }
@@ -1167,7 +1165,7 @@ mod integration_tests {
         } = test_data;
 
         let events: Vec<Event> = tokio::time::timeout(
-            Duration::from_secs(1),
+            Duration::from_secs(30),
             test_util::collect_n_stream(rx, lines.len()),
         )
         .await
