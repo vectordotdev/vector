@@ -16,7 +16,7 @@ use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::Future
 use http::uri::{InvalidUri, Scheme, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     Code, Request, Status,
@@ -65,6 +65,32 @@ const MAX_ACK_DEADLINE_SECS: u64 = 600;
 const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
+
+struct AckRequest {
+    ids: Vec<String>,
+    // Set during shutdown to wait until the request stream has pulled the final ack request.
+    consumed: Option<oneshot::Sender<()>>,
+}
+
+impl AckRequest {
+    const fn new(ids: Vec<String>) -> Self {
+        Self {
+            ids,
+            consumed: None,
+        }
+    }
+
+    fn new_with_consumed_signal(ids: Vec<String>) -> (Self, oneshot::Receiver<()>) {
+        let (sender, receiver) = oneshot::channel();
+        (
+            Self {
+                ids,
+                consumed: Some(sender),
+            },
+            receiver,
+        )
+    }
+}
 
 // prost emits some generated code that includes clones on `Arc`
 // objects, which causes a clippy ding on this block. We don't
@@ -536,13 +562,28 @@ impl PubsubSource {
                 receipts = ack_stream.next(), if pending_acks > 0 => match receipts {
                     Some((status, receipts)) => {
                         pending_acks -= 1;
+                        let shutdown_drained = shutting_down && pending_acks == 0;
                         if status == BatchStatus::Delivered {
-                            ack_ids_sender
-                                .send(receipts)
-                                .await
-                                .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                            if shutdown_drained {
+                                let (request, consumed) =
+                                    AckRequest::new_with_consumed_signal(receipts);
+                                ack_ids_sender
+                                    .send(request)
+                                    .await
+                                    .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                                if consumed.await.is_err() {
+                                    debug!(
+                                        "Ack request stream closed before final acknowledgement was consumed."
+                                    );
+                                }
+                            } else {
+                                ack_ids_sender
+                                    .send(AckRequest::new(receipts))
+                                    .await
+                                    .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                            }
                         }
-                        if shutting_down && pending_acks == 0 {
+                        if shutdown_drained {
                             return State::Shutdown;
                         }
                     }
@@ -591,7 +632,7 @@ impl PubsubSource {
                     // in a new request with empty fields, effectively
                     // a keepalive.
                     ack_ids_sender
-                        .send(Vec::new())
+                        .send(AckRequest::new(Vec::new()))
                         .await
                         .unwrap_or_else(|_| unreachable!("request stream never closes"));
                 }
@@ -601,7 +642,7 @@ impl PubsubSource {
 
     fn request_stream(
         &self,
-        ack_ids: mpsc::Receiver<Vec<String>>,
+        ack_ids: mpsc::Receiver<AckRequest>,
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static + use<> {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
@@ -619,13 +660,23 @@ impl PubsubSource {
             }
         })
         .chain(ack_ids.map(|chunks| {
+            let mut ack_ids = Vec::new();
+            for request in chunks {
+                ack_ids.extend(request.ids);
+                if let Some(consumed) = request.consumed
+                    && consumed.send(()).is_err()
+                {
+                    debug!("Ack request was consumed after shutdown completed.");
+                }
+            }
+
             // These "requests" serve only to send updates about
             // acknowledgements to the server. None of the above
             // fields need to be repeated and, in fact, will cause
             // an stream error and cancellation if they are
             // present.
             proto::StreamingPullRequest {
-                ack_ids: chunks.into_iter().flatten().collect(),
+                ack_ids,
                 ..Default::default()
             }
         }))
@@ -635,7 +686,7 @@ impl PubsubSource {
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
-        ack_ids: &mpsc::Sender<Vec<String>>,
+        ack_ids: &mpsc::Sender<AckRequest>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
     ) {
@@ -656,7 +707,7 @@ impl PubsubSource {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
-                    .send(ids)
+                    .send(AckRequest::new(ids))
                     .await
                     .unwrap_or_else(|_| unreachable!("request stream never closes")),
                 Some(notifier) => {
