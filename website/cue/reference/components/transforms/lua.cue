@@ -8,7 +8,6 @@ components: transforms: lua: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
@@ -38,7 +37,9 @@ components: transforms: lua: {
 		notices: []
 	}
 
-	configuration: generated.components.transforms.lua.configuration
+	configuration: generated.components.transforms.lua.configuration & {
+		timers: type: array: items: type: object: options: interval_seconds: type: uint: examples: [2]
+	}
 
 	input: {
 		logs: true

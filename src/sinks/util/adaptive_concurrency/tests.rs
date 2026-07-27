@@ -673,14 +673,14 @@ async fn run_compare(input: TestInput) {
 
 #[rstest]
 #[tokio::test]
-async fn all_tests(#[files("tests/data/adaptive-concurrency/*.toml")] file_path: PathBuf) {
+async fn all_tests(#[files("tests/data/adaptive-concurrency/*.yaml")] file_path: PathBuf) {
     let mut data = String::new();
     File::open(&file_path)
         .unwrap()
         .read_to_string(&mut data)
         .unwrap();
-    let input: TestInput = toml::from_str(&data)
-        .unwrap_or_else(|error| panic!("Invalid TOML in {file_path:?}: {error:?}"));
+    let input: TestInput = serde_yaml::from_str(&data)
+        .unwrap_or_else(|error| panic!("Invalid YAML in {file_path:?}: {error:?}"));
 
     time::pause();
 

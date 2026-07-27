@@ -283,14 +283,16 @@ where
         .expect("should not fail to create buffer")
 }
 
-/// Creates a disk v2 buffer with the specified maximum record size.
-pub(crate) async fn create_buffer_v2_with_max_record_size<P, R>(
+/// Creates a disk v2 buffer with the specified maximum record size, but returns a handle to the
+/// buffer usage tracker.
+pub(crate) async fn create_buffer_v2_with_max_record_size_and_usage<P, R>(
     data_dir: P,
     max_record_size: usize,
 ) -> (
     BufferWriter<R, FilesystemUnderTest>,
     BufferReader<R, FilesystemUnderTest>,
     Arc<Ledger<FilesystemUnderTest>>,
+    BufferUsageHandle,
 )
 where
     P: AsRef<Path>,
@@ -301,10 +303,10 @@ where
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
-
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger, usage_handle)
 }
 
 /// Creates a disk v2 buffer with the specified maximum data file size.

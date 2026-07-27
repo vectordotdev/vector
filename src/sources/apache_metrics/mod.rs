@@ -382,11 +382,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
                 match m.tags() {
                     Some(tags) => {
-                        assert_eq!(
-                            tags.get("endpoint"),
-                            Some(&format!("http://{in_addr}/metrics")[..])
-                        );
-                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()[..]));
+                        let endpoint = format!("http://{in_addr}/metrics");
+                        let host = in_addr.to_string();
+                        assert_eq!(tags.get("endpoint"), Some(endpoint.as_str()));
+                        assert_eq!(tags.get("host"), Some(host.as_str()));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }

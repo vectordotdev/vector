@@ -10,10 +10,22 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # Fork PRs don't get `id-token: write`, so federation cannot succeed.
-    # Allow the step to fail and let downstream steps run without DD credentials.
+    # Fork PRs don't get `id-token: write`, so ACTIONS_ID_TOKEN_REQUEST_URL is
+    # unset. Read it via shell (env context only covers YAML-declared vars) and
+    # skip federation when absent to avoid a hard failure.
+    - name: Check OIDC token availability
+      id: oidc
+      shell: bash
+      run: |
+        if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL}" ]; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Federate Datadog token
       id: dd-sts
+      if: ${{ steps.oidc.outputs.available == 'true' }}
       continue-on-error: true
       uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
       with:
@@ -26,7 +38,26 @@ runs:
         DD_STS_APP_KEY: ${{ steps.dd-sts.outputs.app_key }}
       run: |
         if [ -n "${DD_STS_API_KEY}" ]; then
-          echo "DD_API_KEY=${DD_STS_API_KEY}" >> "$GITHUB_ENV"
+          # Poll until the API key is valid; the DD API can be slow to propagate
+          # permissions after token issuance.
+          app_key_header=()
+          if [ -n "${DD_STS_APP_KEY}" ]; then
+            app_key_header=(-H "DD-APPLICATION-KEY: ${DD_STS_APP_KEY}")
+          fi
+          delay=1
+          for i in $(seq 1 6); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+              -H "DD-API-KEY: ${DD_STS_API_KEY}" \
+              "${app_key_header[@]}" \
+              "https://api.datadoghq.com/api/v1/validate") || status="000"
+            if [ "$status" = "200" ]; then
+              echo "DD_API_KEY=${DD_STS_API_KEY}" >> "$GITHUB_ENV"
+              break
+            fi
+            echo "Credentials not yet valid (attempt ${i}/6, HTTP ${status}), retrying in ${delay}s..."
+            sleep "${delay}"
+            delay=$((delay * 2))
+          done
         fi
         if [ -n "${DD_STS_APP_KEY}" ]; then
           echo "DD_APP_KEY=${DD_STS_APP_KEY}" >> "$GITHUB_ENV"

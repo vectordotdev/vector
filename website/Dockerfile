@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 ARG HUGO_VERSION=0.154.5
-ARG CUE_VERSION=0.10.0
+ARG CUE_VERSION=0.16.1
 ARG NODE_VERSION=24
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

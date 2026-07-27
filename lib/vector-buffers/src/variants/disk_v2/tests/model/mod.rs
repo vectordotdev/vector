@@ -25,10 +25,7 @@ use crate::{
 };
 
 mod action;
-use self::{
-    action::{Action, arb_actions},
-    record::EncodeError,
-};
+use self::action::{Action, arb_actions};
 
 mod common;
 use self::common::{Progress, arb_buffer_config};
@@ -668,35 +665,20 @@ impl WriterModel {
                 return Progress::Blocked;
             }
 
-            // Check if the record would exceed the maximum record size, which should always fail.
-            //
-            // NOTE: Why are we using the "failed to encode" error here and not the "record too
-            // large" error? As the comments in the actual writer code elucidate, the encoding may
-            // fail when it actually tries to make sure there's enough space to encode itself, gets
-            // told there isn't, and returns a generic error.  We don't know that from the generic
-            // error alone, so we have some stand-in code that returns encoder errors as a
-            // passthrough, and then it checks afterwards if the encoding buffer exceeds the
-            // configured limit.
-            //
-            // This is a bit redundant as we explicitly limit the buffer we pass to the encoding
-            // method to have a maximum capacity of whatever the maximum record limit is.. but it's
-            // there to be thorough in the case of a bug on the `bytes` side.
-            //
-            // TODO: We should probably provide a generic error enum for encoding/decoding where the
-            // type can tell us specifically if it ran out of space to encode itself, or if it hit
-            // another general error... that's starting to nest the errors a bit deep, though, so
-            // I'm not entirely sold.  For our purposes here, we know the expected error when the
-            // record can't encode itself due to space limitations, so the differentiation on the
-            // front end is more about providing an informative error, but the writer can't really
-            // do anything different if they get "failed to encode" vs "record too large".
+            // Mirror the writer's size check: permanently oversized records are dropped and
+            // reported as successful zero-byte writes.
             let encoded_len = record
                 .encoded_size()
                 .expect("record used in model must provide this");
             let encoded_len_limit = self.ledger.config().max_record_size - RECORD_HEADER_LEN;
             if encoded_len > encoded_len_limit {
-                return Progress::WriteError(WriterError::FailedToEncode {
-                    source: EncodeError,
-                });
+                // The record exceeds the maximum record size, so it can never be written. Rather
+                // than erroring (which used to tear down the whole buffer), the writer drops it and
+                // reports success with zero bytes written, leaving the buffer untouched. A real
+                // write always writes at least a record header, so zero bytes unambiguously means
+                // "dropped".
+                self.state.transition_to_idle();
+                return Progress::RecordWritten(0);
             }
 
             // Write the record in the same way that the buffer would, which is the only way we can

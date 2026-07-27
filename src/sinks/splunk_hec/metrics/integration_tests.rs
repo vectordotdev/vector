@@ -46,6 +46,7 @@ async fn config() -> HecMetricsSinkConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     }
 }
 

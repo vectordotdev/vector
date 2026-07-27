@@ -75,10 +75,32 @@ impl Partitioner for KeyPartitioner {
         let dbname = Self::render(&self.dbname, item, "dbname_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
         let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")?;
-        let pipeline_version = self
-            .pipeline_version
-            .as_ref()
-            .and_then(|template| Self::render(template, item, "pipeline_version"));
+
+        // pipeline_version is optional: a Confined render error drops the event;
+        // any other render error omits the field and continues.
+        let pipeline_version = match &self.pipeline_version {
+            None => None,
+            Some(template) => match template.render_string(item) {
+                Ok(s) => Some(s),
+                Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("pipeline_version"),
+                        drop_event: true,
+                    });
+                    return None;
+                }
+                Err(error) => {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("pipeline_version"),
+                        drop_event: false,
+                    });
+                    None
+                }
+            },
+        };
+
         Some(PartitionKey {
             dbname,
             table,
