@@ -415,15 +415,7 @@ impl ConfinedTemplate {
         event: impl Into<EventRef<'a>>,
     ) -> Result<String, TemplateRenderingError> {
         let rendered = self.inner.render_string(event)?;
-        if let Some(checker) = &self.checker {
-            checker
-                .confine(&rendered)
-                .map_err(|e| TemplateRenderingError::Confined {
-                    rendered_preview: confined_preview(&rendered),
-                    rendered_len: rendered.len(),
-                    message: e.to_string(),
-                })?;
-        }
+        self.check_confinement(&rendered)?;
         Ok(rendered)
     }
 
