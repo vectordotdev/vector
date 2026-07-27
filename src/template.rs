@@ -91,7 +91,7 @@ pub fn confined_preview(rendered: &str) -> String {
 /// event that is used as the input data when rendering the template.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
 #[serde(try_from = "String", into = "String")]
 pub struct UnconfinedTemplate {
     src: String,
@@ -116,21 +116,6 @@ impl fmt::Debug for UnconfinedTemplate {
             .field("is_static", &self.is_static)
             .field("tz_offset", &self.tz_offset)
             .finish()
-    }
-}
-
-impl PartialEq for UnconfinedTemplate {
-    fn eq(&self, other: &Self) -> bool {
-        self.src == other.src && self.tz_offset == other.tz_offset
-    }
-}
-
-impl Eq for UnconfinedTemplate {}
-
-impl Hash for UnconfinedTemplate {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.src.hash(state);
-        self.tz_offset.hash(state);
     }
 }
 
@@ -336,7 +321,7 @@ impl UnconfinedTemplate {
 ///
 /// Both fields are private to this module, so a `ConfinedTemplate` can
 /// never be constructed (or deserialized) without going through confinement.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ConfinedTemplate {
     inner: UnconfinedTemplate,
     checker: Option<ConfinementChecker>,
@@ -348,20 +333,6 @@ impl fmt::Debug for ConfinedTemplate {
             .field("inner", &self.inner)
             .field("confinement", &self.checker.as_ref().map(|_| "<fn>"))
             .finish()
-    }
-}
-
-impl PartialEq for ConfinedTemplate {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner
-    }
-}
-
-impl Eq for ConfinedTemplate {}
-
-impl Hash for ConfinedTemplate {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.inner.hash(state);
     }
 }
 
@@ -1100,7 +1071,7 @@ pub(crate) enum ConfineError {
 /// Dispatches to `PrefixChecker` for non-URI fields (Kafka topics, Redis
 /// keys, tenant IDs, …) or `UriChecker` for HTTP/HTTPS URI fields. Common
 /// guards (NUL bytes, length limit) run before dispatching.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ConfinementChecker {
     Prefix(PrefixChecker),
     Uri(UriChecker),
@@ -1169,7 +1140,7 @@ impl ConfinementChecker {
 ///
 /// Enforces that the rendered value starts with the operator-controlled literal
 /// prefix and contains no `..` path segments.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct PrefixChecker {
     base: String,
 }
@@ -1220,7 +1191,7 @@ impl PrefixChecker {
 /// URI templates containing `?` are rejected at build time — query parameters
 /// cannot be safely confined to a static boundary and must not appear in
 /// dynamic URI templates.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct UriChecker {
     /// Lowercased scheme, e.g. `"https"`.
     scheme: String,
