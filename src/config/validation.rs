@@ -234,9 +234,12 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
     for (key, transform) in config.transforms.iter() {
         // Structural validation: reserved names, duplicate routes, invalid sample rates.
-        // Uses a default context so transforms that require environment resources (VRL
-        // compilation, condition building) must guard on context.key being None and skip
-        // those checks — they run later in validate.rs with a real context via validate_with_context().
+        // These checks run during config compilation. Transforms that need the schema/enrichment
+        // context must implement validate_with_context(), called later in validate.rs.
+        if let Err(errs) = transform.inner.validate_structure() {
+            errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
+        }
+        // validate() is deprecated. Use validate_structure() for new transforms.
         if let Err(errs) = transform.inner.validate(&TransformContext::default()) {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
