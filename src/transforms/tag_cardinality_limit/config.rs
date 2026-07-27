@@ -362,45 +362,6 @@ pub enum BuildError {
     CacheSizeRequiresProbabilistic { tag_key: String },
 }
 
-impl Config {
-    fn validate_structure_impl(&self) -> crate::Result<()> {
-        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
-        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
-            for (tag_key, tag_cfg) in &self.per_tag_limits {
-                if let PerTagMode::LimitOverride {
-                    cache_size_per_key: Some(_),
-                    ..
-                } = tag_cfg.mode
-                {
-                    return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
-                        tag_key: tag_key.clone(),
-                    }));
-                }
-            }
-        }
-
-        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
-        // mode is probabilistic.
-        for per_metric in self.per_metric_limits.values() {
-            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
-                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
-                    if let PerTagMode::LimitOverride {
-                        cache_size_per_key: Some(_),
-                        ..
-                    } = tag_cfg.mode
-                    {
-                        return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
-                            tag_key: tag_key.clone(),
-                        }));
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for Config {
@@ -423,6 +384,51 @@ impl TransformConfig for Config {
     }
 
     fn validate_structure(&self) -> Result<(), Vec<String>> {
-        self.validate_structure_impl().map_err(|e| vec![e.to_string()])
+        let mut errors = Vec::new();
+
+        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
+        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
+            for (tag_key, tag_cfg) in &self.per_tag_limits {
+                if let PerTagMode::LimitOverride {
+                    cache_size_per_key: Some(_),
+                    ..
+                } = tag_cfg.mode
+                {
+                    errors.push(
+                        BuildError::CacheSizeRequiresProbabilistic {
+                            tag_key: tag_key.clone(),
+                        }
+                        .to_string(),
+                    );
+                }
+            }
+        }
+
+        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
+        // mode is probabilistic.
+        for per_metric in self.per_metric_limits.values() {
+            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
+                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
+                    if let PerTagMode::LimitOverride {
+                        cache_size_per_key: Some(_),
+                        ..
+                    } = tag_cfg.mode
+                    {
+                        errors.push(
+                            BuildError::CacheSizeRequiresProbabilistic {
+                                tag_key: tag_key.clone(),
+                            }
+                            .to_string(),
+                        );
+                    }
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
