@@ -354,11 +354,18 @@ impl TlsSettings {
         Ok(())
     }
 
+    /// Apply per-connection TLS settings.
+    ///
+    /// `skip_server_name` must be set when the connection targets a forward proxy rather than the
+    /// upstream destination. The `server_name` override applies only to the destination; applying it
+    /// to the proxy's own TLS connection would verify the proxy certificate against the upstream
+    /// name and fail.
     pub fn apply_connect_configuration(
         &self,
         connection: &mut ConnectConfiguration,
+        skip_server_name: bool,
     ) -> std::result::Result<(), openssl::error::ErrorStack> {
-        if let Some(server_name) = &self.server_name {
+        if let Some(server_name) = self.server_name.as_deref().filter(|_| !skip_server_name) {
             // Use the configured server name for both SNI and certificate hostname
             // verification. `ConnectConfiguration::into_ssl` (called by the connector
             // after this callback) would otherwise apply the URL host to SNI and the
@@ -867,6 +874,7 @@ mod test {
         // `hyper-openssl` does (it passes the connection URL host).
         async fn connect(
             server_name: Option<&str>,
+            skip_server_name: bool,
             url_host: &str,
             addr: SocketAddr,
         ) -> std::result::Result<(), String> {
@@ -886,7 +894,7 @@ mod test {
                 .map_err(|e| e.to_string())?;
             let mut config = builder.build().configure().unwrap();
             settings
-                .apply_connect_configuration(&mut config)
+                .apply_connect_configuration(&mut config, skip_server_name)
                 .map_err(|e| e.to_string())?;
             let ssl = config.into_ssl(url_host).map_err(|e| e.to_string())?;
             let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
@@ -927,15 +935,26 @@ mod test {
         // With `server_name` set to the certificate's name, verification uses it and succeeds even
         // though the connection host is the IP. This passes only because `server_name` is applied
         // to hostname verification (the bug this fixes).
-        connect(Some("localhost"), "127.0.0.1", local_addr)
+        connect(Some("localhost"), false, "127.0.0.1", local_addr)
             .await
             .expect("handshake should succeed when server_name matches the certificate");
 
         // Control: without `server_name`, verification falls back to the connection host (the IP),
         // which the certificate does not cover, so it fails. This proves verification is active.
-        let error = connect(None, "127.0.0.1", local_addr)
+        let error = connect(None, false, "127.0.0.1", local_addr)
             .await
             .expect_err("handshake should fail when verifying against the IP");
+        assert!(
+            error.contains("certificate verify failed"),
+            "expected a certificate verification failure, got: {error}"
+        );
+
+        // With `skip_server_name` (as when dialing a proxy), the `server_name` override is ignored
+        // and verification falls back to the connection host (the IP), which fails. This is what
+        // keeps an HTTPS proxy's own certificate verified against the proxy host.
+        let error = connect(Some("localhost"), true, "127.0.0.1", local_addr)
+            .await
+            .expect_err("handshake should fail when the server_name override is skipped");
         assert!(
             error.contains("certificate verify failed"),
             "expected a certificate verification failure, got: {error}"

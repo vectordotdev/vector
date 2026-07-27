@@ -15,7 +15,7 @@ use crate::{
     event::{Event, Value},
     internal_events::SampleEventDiscarded,
     sinks::prelude::TemplateRenderingError,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -131,11 +131,11 @@ impl fmt::Display for SampleMode {
 pub enum SampleKeySource {
     Static {
         key_field: Option<String>,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
     },
     Dynamic {
         fields: DynamicSampleFields,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
     },
 }
 
@@ -157,7 +157,7 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         key_field: Option<String>,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
@@ -177,7 +177,7 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         fields: DynamicSampleFields,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {

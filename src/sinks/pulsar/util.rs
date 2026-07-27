@@ -7,13 +7,13 @@ use vrl::value::{KeyString, Value};
 use crate::{
     internal_events::{PulsarPropertyExtractionError, TemplateRenderingError},
     sinks::pulsar::{config::PulsarSinkConfig, sink::PulsarEvent},
-    template::Template,
+    template::ConfinedTemplate,
 };
 
 /// Transforms an event into a Pulsar event by rendering the required template fields.
 /// Returns None if there is an error whilst rendering.
 pub(super) fn make_pulsar_event(
-    topic: &Template,
+    topic: &ConfinedTemplate,
     config: &PulsarSinkConfig,
     event: Event,
 ) -> Option<PulsarEvent> {

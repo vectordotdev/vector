@@ -11,7 +11,7 @@ use crate::{
     schema,
     sinks::util::{UriSerde, tcp::TcpSinkConfig},
     tcp::TcpKeepaliveConfig,
-    template::Template,
+    template::UnconfinedTemplate,
     tls::TlsEnableableConfig,
 };
 
@@ -39,7 +39,7 @@ pub struct PapertrailConfig {
     /// The value to use as the `process` in Papertrail.
     #[configurable(metadata(docs::examples = "{{ process }}", docs::examples = "my-process",))]
     #[serde(default = "default_process")]
-    process: Template,
+    process: UnconfinedTemplate,
 
     #[configurable(derived)]
     #[serde(
@@ -50,8 +50,8 @@ pub struct PapertrailConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_process() -> Template {
-    Template::try_from("vector").unwrap()
+fn default_process() -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from("vector").unwrap()
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -125,7 +125,7 @@ impl SinkConfig for PapertrailConfig {
 #[derive(Debug, Clone)]
 struct PapertrailEncoder {
     pid: u32,
-    process: Template,
+    process: UnconfinedTemplate,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
@@ -182,8 +182,6 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
-
     use bytes::BytesMut;
     use futures::{future::ready, stream};
     use serde::Deserialize;
@@ -232,7 +230,7 @@ mod tests {
 
         let mut encoder = PapertrailEncoder {
             pid: 0,
-            process: Template::try_from("{{ process }}").unwrap(),
+            process: UnconfinedTemplate::try_from("{{ process }}").unwrap(),
             transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         };

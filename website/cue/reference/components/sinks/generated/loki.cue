@@ -754,7 +754,7 @@ generated: components: sinks: loki: configuration: {
 
 			[label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
 			"""
-		required: false
+		required: true
 		type: object: {
 			examples: [{
 				"\"*\"":             "{{ metadata }}"

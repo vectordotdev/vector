@@ -1,3 +1,3 @@
-Fixed the `tls.server_name` option so that it is used for certificate hostname verification in addition to SNI. Previously, on the OpenSSL path (used by HTTP-based sinks such as `datadog_logs`), the certificate was still verified against the connection URL host, causing a "hostname mismatch" verification failure when `server_name` differed from the endpoint host.
+Fixed the `tls.server_name` option so that it is used for certificate hostname verification in addition to SNI. Previously, on the OpenSSL path (used by HTTP-based sinks such as `datadog_logs`), the certificate was still verified against the connection URL host, causing a "hostname mismatch" verification failure when `server_name` differed from the endpoint host. The override applies only to the upstream destination, so an HTTPS forward proxy's own certificate is verified against the proxy host.
 
 authors: gwenaskell

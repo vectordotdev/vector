@@ -9,7 +9,7 @@ use crate::{
     conditions::AnyCondition,
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     schema,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::Transform,
 };
 
@@ -52,7 +52,7 @@ pub struct ThrottleConfig {
     /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
     /// limited separately.
     #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
-    pub key_field: Option<Template>,
+    pub key_field: Option<UnconfinedTemplate>,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,

@@ -30,7 +30,7 @@ pub struct NatsHeaderConfig {
     #[configurable(metadata(docs::templateable))]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[configurable(metadata(docs::examples = "{{ event_id }}"))]
-    pub(super) message_id: Option<Template>,
+    pub(super) message_id: Option<UnconfinedTemplate>,
 }
 
 impl NatsHeaderConfig {
@@ -172,7 +172,7 @@ impl GenerateConfig for NatsSinkConfig {
             jetstream: JetStreamConfig {
                 enabled: true,
                 headers: Some(NatsHeaderConfig {
-                    message_id: Some(Template::try_from("{{ event_id }}").unwrap()),
+                    message_id: Some(UnconfinedTemplate::try_from("{{ event_id }}").unwrap()),
                 }),
             },
             confinement: ConfinementConfig::default(),
@@ -185,14 +185,17 @@ impl GenerateConfig for NatsSinkConfig {
 #[typetag::serde(name = "nats")]
 impl SinkConfig for NatsSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.subject = config
+        let subject = self
             .subject
+            .clone()
             .confine(&self.confinement, Self::NAME, "subject")?;
-        let sink = NatsSink::new(config.clone()).await?;
-        let healthcheck = healthcheck(config).boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        let sink = NatsSink::new(self.clone(), subject).await?;
+        let healthcheck = healthcheck(self.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

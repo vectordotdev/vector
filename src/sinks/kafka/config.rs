@@ -286,14 +286,17 @@ impl GenerateConfig for KafkaSinkConfig {
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.topic = config
+        let topic = self
             .topic
+            .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
-        let sink = KafkaSink::new(config.clone())?;
-        let hc = healthcheck(config, cx.healthcheck.clone()).boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        let sink = KafkaSink::new(self.clone(), topic.clone())?;
+        let hc = healthcheck(self.clone(), topic, cx.healthcheck.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
