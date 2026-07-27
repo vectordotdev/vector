@@ -661,29 +661,39 @@ impl PubsubSource {
         };
         let mut stream = stream.into_inner();
 
-        // Forward finalized acks to the request stream from a dedicated task, so
-        // a slow request stream backpressures the finalizer instead of the main
-        // loop (which must stay free for the idle timeout). `pending_acks` is
-        // shared so the loop can still tell when acknowledgements are in flight.
-        // On shutdown the finalizer drains its receivers before `ack_stream`
-        // ends, so remaining acks are flushed here.
-        let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
+        // When acknowledgements are enabled, forward finalized acks to the
+        // request stream from a dedicated task, so a slow request stream
+        // backpressures the finalizer instead of the main loop (which must stay
+        // free for the idle timeout). `pending_acks` is shared so the loop can
+        // still tell when acknowledgements are in flight. On shutdown the
+        // finalizer drains its receivers before `ack_stream` ends, so remaining
+        // acks are flushed here. When acks are disabled the finalizer is `None`
+        // and no worker is spawned (its `ack_stream` would never resolve).
         let pending_acks = Arc::new(AtomicUsize::new(0));
-        {
+        let finalizer = if self.acknowledgements {
+            let (finalizer, mut ack_stream) =
+                Finalizer::maybe_new(true, Some(self.shutdown.clone()));
             let ack_ids_sender = ack_ids_sender.clone();
             let pending_acks = Arc::clone(&pending_acks);
             crate::spawn_in_current_span(async move {
                 while let Some((status, receipts)) = ack_stream.next().await {
-                    pending_acks.fetch_sub(1, Ordering::Relaxed);
-                    if status == BatchStatus::Delivered
-                        && ack_ids_sender.send(receipts).await.is_err()
-                    {
-                        break;
+                    if status == BatchStatus::Delivered {
+                        // Keep the ack pending until its send resolves, so the
+                        // main task's guards don't drop the stream mid-flush.
+                        let sent = ack_ids_sender.send(receipts).await.is_ok();
+                        pending_acks.fetch_sub(1, Ordering::Relaxed);
+                        if !sent {
+                            break;
+                        }
+                    } else {
+                        pending_acks.fetch_sub(1, Ordering::Relaxed);
                     }
                 }
             });
-        }
+            finalizer
+        } else {
+            None
+        };
 
         loop {
             tokio::select! {
@@ -694,13 +704,15 @@ impl PubsubSource {
                         idle_deadline
                             .as_mut()
                             .reset(tokio::time::Instant::now() + self.idle_timeout);
-                        self.handle_response(
+                        if let Some(state) = self.handle_response(
                             response,
                             &finalizer,
                             &ack_ids_sender,
                             &pending_acks,
                             busy_flag,
-                        ).await;
+                        ).await {
+                            break state;
+                        }
                     }
                     Some(Err(error)) => break self.handle_stream_error(error),
                     None => break State::RetryNow,
@@ -735,9 +747,12 @@ impl PubsubSource {
                     }
                     // GCP Pub/Sub times out connections after ~75s of
                     // inactivity. Send an empty ack ID array as a keepalive to
-                    // forestall that.
-                    if ack_ids_sender.send(Vec::new()).await.is_err() {
-                        break State::RetryNow;
+                    // forestall that, without blocking the loop: a full channel
+                    // means the request stream stalled, so reconnect.
+                    match ack_ids_sender.try_send(Vec::new()) {
+                        Ok(()) => {}
+                        Err(mpsc::error::TrySendError::Full(_)) => break State::RetryDelay,
+                        Err(mpsc::error::TrySendError::Closed(_)) => break State::RetryNow,
                     }
                 }
             }
@@ -776,6 +791,7 @@ impl PubsubSource {
         }))
     }
 
+    // Returns `Some(state)` when the stream should be torn down and restarted.
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
@@ -783,7 +799,7 @@ impl PubsubSource {
         ack_ids: &mpsc::Sender<Vec<String>>,
         pending_acks: &Arc<AtomicUsize>,
         busy_flag: &Arc<AtomicBool>,
-    ) {
+    ) -> Option<State> {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
@@ -796,11 +812,14 @@ impl PubsubSource {
         match self.out.send_batch(events).await {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
-                // Auto-ack: a send error means the request stream is gone; the
-                // caller reconnects on the next `stream.next()`.
-                None => {
-                    ack_ids.send(ids).await.ok();
-                }
+                // Auto-ack runs on the main loop, so send without blocking to
+                // keep the idle timer live. A full channel means the request
+                // stream stalled; reconnect rather than park. A closed channel
+                // means it is already gone; the next `stream.next()` reconnects.
+                None => match ack_ids.try_send(ids) {
+                    Ok(()) | Err(mpsc::error::TrySendError::Closed(_)) => {}
+                    Err(mpsc::error::TrySendError::Full(_)) => return Some(State::RetryDelay),
+                },
                 Some(notifier) => {
                     finalizer
                         .as_ref()
@@ -810,6 +829,7 @@ impl PubsubSource {
                 }
             },
         }
+        None
     }
 
     // GCP frequently ends a streaming pull with a transient, auto-retried
