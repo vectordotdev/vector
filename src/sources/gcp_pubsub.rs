@@ -845,11 +845,14 @@ impl PubsubSource {
                     Err(mpsc::error::TrySendError::Closed(_)) => return Some(State::RetryNow),
                 },
                 Some(notifier) => {
+                    // Count the ack before publishing it to the finalizer: the
+                    // worker may finalize and decrement it immediately, which
+                    // would underflow the counter if it ran first.
+                    pending_acks.fetch_add(1, Ordering::Relaxed);
                     finalizer
                         .as_ref()
                         .expect("Finalizer must have been set up for acknowledgements")
                         .add(ids, notifier);
-                    pending_acks.fetch_add(1, Ordering::Relaxed);
                 }
             },
         }
