@@ -3,7 +3,7 @@ The `gcp_pubsub` source no longer floods the logs with misleading errors on idle
 The source is also more resilient to connections that silently break and stop delivering messages until Vector is restarted:
 
 - HTTP/2 keepalive pings are sent on the gRPC connection so a dead-but-open connection is detected and torn down instead of hanging. The ping interval and timeout are configurable via the new `keepalive` option.
-- The stream keepalive uses a non-blocking send, so a backed-up request channel can no longer deadlock the task.
+- Acknowledgements are sent on a dedicated task, so a backed-up request stream applies backpressure instead of stalling message processing.
 - A new `idle_timeout_secs` option (defaulting to `900`) restarts the stream if no activity is seen on an active connection within that window.
 
 authors: SamyDjemai

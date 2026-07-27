@@ -632,7 +632,19 @@ impl PubsubSource {
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
 
-        let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
+        // Forward acks to the bounded request channel from a worker task, so a
+        // stalled request stream backpressures the worker instead of blocking
+        // the main loop (which must stay free for the idle timeout). The worker
+        // exits when this function returns and drops `ack_ids_sender`.
+        let (ack_ids_sender, mut ack_ids_receiver) = mpsc::unbounded_channel::<Vec<String>>();
+        let (request_ack_sender, request_ack_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
+        crate::spawn_in_current_span(async move {
+            while let Some(ids) = ack_ids_receiver.recv().await {
+                if request_ack_sender.send(ids).await.is_err() {
+                    break;
+                }
+            }
+        });
 
         // Reconnect if no response arrives within the idle timeout, to
         // recover from a stream that stalls without ever erroring. Reset
@@ -643,7 +655,7 @@ impl PubsubSource {
 
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
-        let request_stream = self.request_stream(ack_ids_receiver);
+        let request_stream = self.request_stream(request_ack_receiver);
         debug!("Starting streaming pull.");
         let stream = tokio::select! {
             _ = &mut self.shutdown => return State::Shutdown,
@@ -671,20 +683,9 @@ impl PubsubSource {
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
                     pending_acks -= 1;
                     if status == BatchStatus::Delivered {
-                        // Non-blocking: awaiting a full channel would stall the
-                        // select loop, preventing the idle timeout below from
-                        // recovering a stalled request stream. Reconnect instead;
-                        // dropped ack IDs are redelivered (at-least-once).
-                        match ack_ids_sender.try_send(receipts) {
-                            Ok(()) => {}
-                            Err(mpsc::error::TrySendError::Full(_)) => {
-                                debug!("Request stream stalled sending acks, restarting stream.");
-                                break State::RetryDelay;
-                            }
-                            Err(mpsc::error::TrySendError::Closed(_)) => {
-                                unreachable!("request stream never closes")
-                            }
-                        }
+                        // A send error means the stream is gone; `stream.next()`
+                        // drives the reconnect and unsent acks are redelivered.
+                        ack_ids_sender.send(receipts).ok();
                     }
                 },
                 response = stream.next() => match response {
@@ -693,15 +694,13 @@ impl PubsubSource {
                         idle_deadline
                             .as_mut()
                             .reset(tokio::time::Instant::now() + self.idle_timeout);
-                        if let Some(state) = self.handle_response(
+                        self.handle_response(
                             response,
                             &finalizer,
                             &ack_ids_sender,
                             &mut pending_acks,
                             busy_flag,
-                        ).await {
-                            break state;
-                        }
+                        ).await;
                     }
                     Some(Err(error)) => break self.handle_stream_error(error),
                     None => break State::RetryNow,
@@ -711,9 +710,8 @@ impl PubsubSource {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                // The recovery path for a stalled stream: always fires, never
-                // gated on the request channel that may have stopped draining.
-                // Unsent ack IDs are dropped and redelivered (at-least-once).
+                // Recover a stream that stalls without erroring. Unflushed acks
+                // are redelivered (at-least-once).
                 _ = &mut idle_deadline => {
                     debug!(
                         message = "No activity on the stream within the idle timeout, restarting stream.",
@@ -735,17 +733,8 @@ impl PubsubSource {
                     }
                     // GCP Pub/Sub times out connections after ~75s of
                     // inactivity. Send an empty ack ID array as a keepalive to
-                    // forestall that. Non-blocking: a full channel already has
-                    // acks queued, so the keepalive is redundant and skipped.
-                    match ack_ids_sender.try_send(Vec::new()) {
-                        Ok(()) => {}
-                        Err(mpsc::error::TrySendError::Full(_)) => {
-                            debug!("Keepalive skipped: request stream has acks queued.");
-                        }
-                        Err(mpsc::error::TrySendError::Closed(_)) => {
-                            unreachable!("request stream never closes")
-                        }
-                    }
+                    // forestall that.
+                    ack_ids_sender.send(Vec::new()).ok();
                 }
             }
         }
@@ -783,15 +772,14 @@ impl PubsubSource {
         }))
     }
 
-    // Returns `Some(state)` when the stream should be torn down and restarted.
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
-        ack_ids: &mpsc::Sender<Vec<String>>,
+        ack_ids: &mpsc::UnboundedSender<Vec<String>>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
-    ) -> Option<State> {
+    ) {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
@@ -804,19 +792,9 @@ impl PubsubSource {
         match self.out.send_batch(events).await {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
-                // Auto-ack: send without blocking so a stalled request stream
-                // can't park the task here and starve the idle timeout. On a
-                // full channel, reconnect; the unsent IDs are redelivered.
-                None => match ack_ids.try_send(ids) {
-                    Ok(()) => {}
-                    Err(mpsc::error::TrySendError::Full(_)) => {
-                        debug!("Request stream stalled sending acks, restarting stream.");
-                        return Some(State::RetryDelay);
-                    }
-                    Err(mpsc::error::TrySendError::Closed(_)) => {
-                        unreachable!("request stream never closes")
-                    }
-                },
+                None => {
+                    ack_ids.send(ids).ok();
+                }
                 Some(notifier) => {
                     finalizer
                         .as_ref()
@@ -826,7 +804,6 @@ impl PubsubSource {
                 }
             },
         }
-        None
     }
 
     // GCP frequently ends a streaming pull with a transient, auto-retried
