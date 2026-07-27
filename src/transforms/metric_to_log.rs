@@ -683,7 +683,7 @@ mod tests {
             ));
             // The resulting tag must be either a single string value or not present.
             let value = values.into_single().map(|value| Value::Bytes(value.into()));
-            assert_eq!(tags.get(&*name), value.as_ref());
+            assert_eq!(tags.get(vrl::path!(&*name)), value.as_ref());
         }
 
         #[test]
@@ -695,7 +695,7 @@ mod tests {
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
             ));
-            let tag = tags.get(&*name);
+            let tag = tags.get(vrl::path!(&*name));
             match values.len() {
                 // Empty tag set => missing tag
                 0 => assert_eq!(tag, None),

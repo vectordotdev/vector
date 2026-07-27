@@ -13,13 +13,10 @@ use vector_lib::{
     },
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
-    lookup::{PathPrefix, lookup_v2::OptionalValuePath, owned_value_path, path},
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
-use vrl::{
-    path::ValuePath as _,
-    value::{Kind, ObjectMap, kind::Collection},
-};
+use vrl::value::{Kind, kind::Collection};
 use warp::http::HeaderMap;
 
 use crate::{
@@ -442,6 +439,14 @@ struct SimpleHttpSource {
 }
 
 impl HttpSource for SimpleHttpSource {
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
+    fn name() -> &'static str {
+        SimpleHttpConfig::NAME
+    }
+
     /// Enriches the log events with metadata for the `request_path` and for each of the headers.
     /// Non-log events are skipped.
     fn enrich_events(
@@ -538,42 +543,6 @@ impl HttpSource for SimpleHttpSource {
 
     fn enable_source_ip(&self) -> bool {
         self.host_key.path.is_some()
-    }
-
-    /// Injects `%field` enrichment from a `custom` auth VRL program into events.
-    /// Both namespaces use insert-if-empty semantics so auth enrichment never
-    /// overwrites built-in source metadata (`path`, `host`, `headers`, …) that
-    /// `enrich_events` already populated.
-    /// Vector namespace: inserted into event metadata under `http_server.<field>` for
-    ///   all event types (Log, Metric, Trace).
-    /// Legacy namespace: inserted into the Log event body only (Metric/Trace are skipped).
-    fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
-        for event in events.iter_mut() {
-            match self.log_namespace {
-                LogNamespace::Vector => {
-                    // metadata_mut() dispatches to Log, Metric, and Trace so every
-                    // decoded event type receives the auth enrichment fields.
-                    let meta = event.metadata_mut().value_mut();
-                    for (key, value) in &enrichment {
-                        let key_str = key.as_str();
-                        let name_part = path!(SimpleHttpConfig::NAME);
-                        let key_part = path!(key_str);
-                        let full_path = name_part.concat(key_part);
-                        if meta.get(full_path.clone()).is_none() {
-                            meta.insert(full_path, value.clone());
-                        }
-                    }
-                }
-                LogNamespace::Legacy => {
-                    // Legacy enrichment targets the event body; only Log events have one.
-                    if let Event::Log(log) = event {
-                        for (key, value) in &enrichment {
-                            log.try_insert((PathPrefix::Event, path!(key.as_str())), value.clone());
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

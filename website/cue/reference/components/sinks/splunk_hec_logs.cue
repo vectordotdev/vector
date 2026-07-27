@@ -71,7 +71,9 @@ components: sinks: splunk_hec_logs: {
 		notices: []
 	}
 
-	configuration: generated.components.sinks.splunk_hec_logs.configuration
+	configuration: generated.components.sinks.splunk_hec_logs.configuration & {
+		default_token: type: string: examples: ["SECRET[splunk_secrets.token]"]
+	}
 
 	input: {
 		logs:    true

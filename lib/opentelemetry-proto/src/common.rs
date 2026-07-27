@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use ordered_float::NotNan;
-use vector_core::event::metric::TagValue;
+use vector_core::event::metric::{TagValue, TagValueSet};
 use vrl::value::{ObjectMap, Value};
 
-use super::proto::common::v1::{KeyValue, any_value::Value as PBValue};
+use super::proto::common::v1::{AnyValue, ArrayValue, KeyValue, any_value::Value as PBValue};
 
 impl From<PBValue> for Value {
     fn from(av: PBValue) -> Self {
@@ -34,6 +34,36 @@ impl From<PBValue> for TagValue {
             PBValue::BytesValue(b) => TagValue::from(String::from_utf8_lossy(&b).to_string()),
             _ => TagValue::from("null"),
         }
+    }
+}
+
+impl From<&TagValue> for AnyValue {
+    fn from(tag: &TagValue) -> Self {
+        match tag {
+            TagValue::Value(s) => Self {
+                value: Some(PBValue::StringValue(s.clone())),
+            },
+            TagValue::Bare => Self { value: None },
+        }
+    }
+}
+
+pub fn str_to_key_value(key: &str, val: &TagValue) -> KeyValue {
+    KeyValue {
+        key: key.to_string(),
+        value: Some(val.into()),
+    }
+}
+
+pub fn tag_set_to_any_value(tag_set: &TagValueSet) -> Option<AnyValue> {
+    match tag_set {
+        TagValueSet::Empty => None,
+        TagValueSet::Single(tag) => Some(tag.into()),
+        TagValueSet::Set(set) => Some(AnyValue {
+            value: Some(PBValue::ArrayValue(ArrayValue {
+                values: set.iter().map(Into::into).collect(),
+            })),
+        }),
     }
 }
 

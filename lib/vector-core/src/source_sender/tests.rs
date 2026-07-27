@@ -19,7 +19,7 @@ use crate::{
 async fn emits_lag_time_for_log() {
     emit_and_test(|timestamp| {
         let mut log = LogEvent::from("Log message");
-        log.insert("timestamp", timestamp);
+        log.insert(event_path!("timestamp"), timestamp);
         Event::Log(log)
     })
     .await;

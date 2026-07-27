@@ -22,6 +22,7 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
     lookup::PathPrefix,
 };
+use vrl::event_path;
 use warp::Filter;
 
 use crate::{
@@ -77,7 +78,7 @@ async fn insert_events() {
     let (mut input_event, mut receiver) = make_event();
     input_event
         .as_mut_log()
-        .insert("items", vec!["item1", "item2"]);
+        .insert(event_path!("items"), vec!["item1", "item2"]);
 
     run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
         .await;
@@ -122,7 +123,9 @@ async fn skip_unknown_fields() {
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let (mut input_event, mut receiver) = make_event();
-    input_event.as_mut_log().insert("unknown", "mysteries");
+    input_event
+        .as_mut_log()
+        .insert(event_path!("unknown"), "mysteries");
 
     run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
         .await;
@@ -130,7 +133,7 @@ async fn skip_unknown_fields() {
     let output = client.select_all(&table).await;
     assert_eq!(1, output.rows);
 
-    input_event.as_mut_log().remove("unknown");
+    input_event.as_mut_log().remove(event_path!("unknown"));
     let expected = serde_json::to_value(input_event.into_log()).unwrap();
     assert_eq!(expected, output.data[0]);
 
@@ -346,7 +349,9 @@ async fn templated_table() {
         .map(|_| {
             let table = random_table_name();
             let (mut event, receiver) = make_event();
-            event.as_mut_log().insert("table", table.as_str());
+            event
+                .as_mut_log()
+                .insert(event_path!("table"), table.as_str());
             (table, event, receiver)
         })
         .collect();
@@ -358,7 +363,7 @@ async fn templated_table() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: "{{ .table }}".try_into().unwrap(),
+        table: "vec_{{ .table }}".try_into().unwrap(),
         batch,
         ..Default::default()
     };
@@ -367,7 +372,7 @@ async fn templated_table() {
     for (table, _, _) in &table_events {
         client
             .create_table(
-                table,
+                &format!("vec_{table}"),
                 "host String, timestamp String, message String, table String",
             )
             .await;
@@ -382,19 +387,20 @@ async fn templated_table() {
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     for (table, event, mut receiver) in table_events {
-        let output = client.select_all(&table).await;
-        assert_eq!(1, output.rows, "table {table} should have 1 row");
+        let prefixed = format!("vec_{table}");
+        let output = client.select_all(&prefixed).await;
+        assert_eq!(1, output.rows, "table {prefixed} should have 1 row");
 
         let expected = serde_json::to_value(event.into_log()).unwrap();
         assert_eq!(
             expected, output.data[0],
-            "table \"{table}\"'s one row should have the correct data"
+            "table \"{prefixed}\"'s one row should have the correct data"
         );
 
         assert_eq!(
             receiver.try_recv(),
             Ok(BatchStatus::Delivered),
-            "table \"{table}\"'s event should have been delivered"
+            "table \"{prefixed}\"'s event should have been delivered"
         );
     }
 }
@@ -402,7 +408,7 @@ async fn templated_table() {
 fn make_event() -> (Event, BatchStatusReceiver) {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
-    event.insert("host", "example.com");
+    event.insert(event_path!("host"), "example.com");
     (event.into(), receiver)
 }
 
@@ -528,8 +534,8 @@ async fn insert_events_arrow_format() {
     let mut events: Vec<Event> = Vec::new();
     for i in 0..5 {
         let mut event = LogEvent::from(format!("log message {}", i));
-        event.insert("host", format!("host{}.example.com", i));
-        event.insert("count", i as i64);
+        event.insert(event_path!("host"), format!("host{}.example.com", i));
+        event.insert(event_path!("count"), i as i64);
         events.push(event.into());
     }
 
@@ -593,13 +599,13 @@ async fn insert_events_arrow_with_schema_fetching() {
     let mut events: Vec<Event> = Vec::new();
     for i in 0..3 {
         let mut event = LogEvent::from(format!("Test message {}", i));
-        event.insert("host", format!("host{}.example.com", i));
-        event.insert("id", i as i64);
-        event.insert("name", format!("user_{}", i));
-        event.insert("score", 95.5 + i as f64);
-        event.insert("active", i % 2 == 0);
+        event.insert(event_path!("host"), format!("host{}.example.com", i));
+        event.insert(event_path!("id"), i as i64);
+        event.insert(event_path!("name"), format!("user_{}", i));
+        event.insert(event_path!("score"), 95.5 + i as f64);
+        event.insert(event_path!("active"), i % 2 == 0);
         event.insert(
-            "request_id",
+            event_path!("request_id"),
             format!("550e8400-e29b-41d4-a716-44665544000{}", i),
         );
         events.push(event.into());
@@ -701,11 +707,11 @@ async fn test_complex_types() {
 
     // Event 1: Comprehensive test with all complex types
     let mut event1 = LogEvent::from("Comprehensive complex types test");
-    event1.insert("host", "host1.example.com");
+    event1.insert(event_path!("host"), "host1.example.com");
 
     // Nested arrays
     event1.insert(
-        "nested_int_array",
+        event_path!("nested_int_array"),
         vector_lib::event::Value::Array(vec![
             vector_lib::event::Value::Array(vec![
                 vector_lib::event::Value::Integer(1),
@@ -718,7 +724,7 @@ async fn test_complex_types() {
         ]),
     );
     event1.insert(
-        "nested_string_array",
+        event_path!("nested_string_array"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Array(vec![
             vector_lib::event::Value::Bytes("a".into()),
             vector_lib::event::Value::Bytes("b".into()),
@@ -734,7 +740,10 @@ async fn test_complex_types() {
             vector_lib::event::Value::Bytes("banana".into()),
         ]),
     );
-    event1.insert("array_map", vector_lib::event::Value::Object(array_map));
+    event1.insert(
+        event_path!("array_map"),
+        vector_lib::event::Value::Object(array_map),
+    );
 
     let mut int_array_map = vector_lib::event::ObjectMap::new();
     int_array_map.insert(
@@ -745,7 +754,7 @@ async fn test_complex_types() {
         ]),
     );
     event1.insert(
-        "int_array_map",
+        event_path!("int_array_map"),
         vector_lib::event::Value::Object(int_array_map),
     );
 
@@ -763,7 +772,7 @@ async fn test_complex_types() {
         ]),
     );
     event1.insert(
-        "tuple_with_array",
+        event_path!("tuple_with_array"),
         vector_lib::event::Value::Object(tuple_with_array),
     );
 
@@ -779,7 +788,7 @@ async fn test_complex_types() {
     );
     tuple_with_map.insert("f1".into(), vector_lib::event::Value::Object(inner_map));
     event1.insert(
-        "tuple_with_map",
+        event_path!("tuple_with_map"),
         vector_lib::event::Value::Object(tuple_with_map),
     );
 
@@ -799,7 +808,7 @@ async fn test_complex_types() {
     );
     tuple_complex.insert("f2".into(), vector_lib::event::Value::Object(inner_map2));
     event1.insert(
-        "tuple_with_nested",
+        event_path!("tuple_with_nested"),
         vector_lib::event::Value::Object(tuple_complex),
     );
 
@@ -818,7 +827,7 @@ async fn test_complex_types() {
         vector_lib::event::Value::Float(NotNan::new(-122.4194).unwrap()),
     );
     event1.insert(
-        "locations",
+        event_path!("locations"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(loc1)]),
     );
 
@@ -826,14 +835,14 @@ async fn test_complex_types() {
     let mut tags1 = vector_lib::event::ObjectMap::new();
     tags1.insert("env".into(), vector_lib::event::Value::Bytes("prod".into()));
     event1.insert(
-        "tags_history",
+        event_path!("tags_history"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(tags1)]),
     );
 
     let mut metrics1 = vector_lib::event::ObjectMap::new();
     metrics1.insert("cpu".into(), vector_lib::event::Value::Integer(45));
     event1.insert(
-        "metrics_history",
+        event_path!("metrics_history"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(metrics1)]),
     );
 
@@ -843,7 +852,10 @@ async fn test_complex_types() {
         "user-agent".into(),
         vector_lib::event::Value::Bytes("Mozilla/5.0".into()),
     );
-    event1.insert("request_headers", vector_lib::event::Value::Object(headers));
+    event1.insert(
+        event_path!("request_headers"),
+        vector_lib::event::Value::Object(headers),
+    );
 
     let mut metrics = vector_lib::event::ObjectMap::new();
     metrics.insert("f0".into(), vector_lib::event::Value::Integer(200));
@@ -853,12 +865,12 @@ async fn test_complex_types() {
         vector_lib::event::Value::Float(NotNan::new(0.145).unwrap()),
     );
     event1.insert(
-        "response_metrics",
+        event_path!("response_metrics"),
         vector_lib::event::Value::Object(metrics),
     );
 
     event1.insert(
-        "tags",
+        event_path!("tags"),
         vector_lib::event::Value::Array(vec![
             vector_lib::event::Value::Bytes("api".into()),
             vector_lib::event::Value::Bytes("v2".into()),
@@ -871,13 +883,13 @@ async fn test_complex_types() {
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Bytes("admin".into())]),
     );
     event1.insert(
-        "user_properties",
+        event_path!("user_properties"),
         vector_lib::event::Value::Object(user_props),
     );
 
     // Nullable array
     event1.insert(
-        "array_with_nulls",
+        event_path!("array_with_nulls"),
         vector_lib::event::Value::Array(vec![
             vector_lib::event::Value::Integer(100),
             vector_lib::event::Value::Integer(200),
@@ -903,7 +915,7 @@ async fn test_complex_types() {
     );
 
     event1.insert(
-        "array_with_named_tuple",
+        event_path!("array_with_named_tuple"),
         vector_lib::event::Value::Array(vec![
             vector_lib::event::Value::Object(named_tuple1),
             vector_lib::event::Value::Object(named_tuple2),
@@ -914,20 +926,23 @@ async fn test_complex_types() {
 
     // Event 2: Empty and edge cases
     let mut event2 = LogEvent::from("Test empty collections");
-    event2.insert("host", "host2.example.com");
-    event2.insert("nested_int_array", vector_lib::event::Value::Array(vec![]));
+    event2.insert(event_path!("host"), "host2.example.com");
     event2.insert(
-        "nested_string_array",
+        event_path!("nested_int_array"),
+        vector_lib::event::Value::Array(vec![]),
+    );
+    event2.insert(
+        event_path!("nested_string_array"),
         vector_lib::event::Value::Array(vec![]),
     );
 
     let empty_map = vector_lib::event::ObjectMap::new();
     event2.insert(
-        "array_map",
+        event_path!("array_map"),
         vector_lib::event::Value::Object(empty_map.clone()),
     );
     event2.insert(
-        "int_array_map",
+        event_path!("int_array_map"),
         vector_lib::event::Value::Object(empty_map.clone()),
     );
 
@@ -935,7 +950,7 @@ async fn test_complex_types() {
     empty_tuple.insert("f0".into(), vector_lib::event::Value::Bytes("empty".into()));
     empty_tuple.insert("f1".into(), vector_lib::event::Value::Array(vec![]));
     event2.insert(
-        "tuple_with_array",
+        event_path!("tuple_with_array"),
         vector_lib::event::Value::Object(empty_tuple),
     );
 
@@ -946,7 +961,7 @@ async fn test_complex_types() {
         vector_lib::event::Value::Object(empty_map.clone()),
     );
     event2.insert(
-        "tuple_with_map",
+        event_path!("tuple_with_map"),
         vector_lib::event::Value::Object(empty_tuple_map),
     );
 
@@ -958,15 +973,24 @@ async fn test_complex_types() {
         vector_lib::event::Value::Object(empty_map.clone()),
     );
     event2.insert(
-        "tuple_with_nested",
+        event_path!("tuple_with_nested"),
         vector_lib::event::Value::Object(empty_tuple_complex),
     );
 
-    event2.insert("locations", vector_lib::event::Value::Array(vec![]));
-    event2.insert("tags_history", vector_lib::event::Value::Array(vec![]));
-    event2.insert("metrics_history", vector_lib::event::Value::Array(vec![]));
     event2.insert(
-        "request_headers",
+        event_path!("locations"),
+        vector_lib::event::Value::Array(vec![]),
+    );
+    event2.insert(
+        event_path!("tags_history"),
+        vector_lib::event::Value::Array(vec![]),
+    );
+    event2.insert(
+        event_path!("metrics_history"),
+        vector_lib::event::Value::Array(vec![]),
+    );
+    event2.insert(
+        event_path!("request_headers"),
         vector_lib::event::Value::Object(empty_map.clone()),
     );
 
@@ -978,18 +1002,21 @@ async fn test_complex_types() {
         vector_lib::event::Value::Float(NotNan::new(0.0).unwrap()),
     );
     event2.insert(
-        "response_metrics",
+        event_path!("response_metrics"),
         vector_lib::event::Value::Object(empty_metrics),
     );
 
-    event2.insert("tags", vector_lib::event::Value::Array(vec![]));
+    event2.insert(event_path!("tags"), vector_lib::event::Value::Array(vec![]));
     event2.insert(
-        "user_properties",
+        event_path!("user_properties"),
         vector_lib::event::Value::Object(empty_map),
     );
-    event2.insert("array_with_nulls", vector_lib::event::Value::Array(vec![]));
     event2.insert(
-        "array_with_named_tuple",
+        event_path!("array_with_nulls"),
+        vector_lib::event::Value::Array(vec![]),
+    );
+    event2.insert(
+        event_path!("array_with_named_tuple"),
         vector_lib::event::Value::Array(vec![]),
     );
 
@@ -997,17 +1024,17 @@ async fn test_complex_types() {
 
     // Event 3: More varied data
     let mut event3 = LogEvent::from("Test varied data");
-    event3.insert("host", "host3.example.com");
+    event3.insert(event_path!("host"), "host3.example.com");
 
     event3.insert(
-        "nested_int_array",
+        event_path!("nested_int_array"),
         vector_lib::event::Value::Array(vec![
             vector_lib::event::Value::Array(vec![]),
             vector_lib::event::Value::Array(vec![vector_lib::event::Value::Integer(99)]),
         ]),
     );
     event3.insert(
-        "nested_string_array",
+        event_path!("nested_string_array"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Array(vec![
             vector_lib::event::Value::Bytes("test".into()),
         ])]),
@@ -1018,14 +1045,20 @@ async fn test_complex_types() {
         "colors".into(),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Bytes("red".into())]),
     );
-    event3.insert("array_map", vector_lib::event::Value::Object(map3));
+    event3.insert(
+        event_path!("array_map"),
+        vector_lib::event::Value::Object(map3),
+    );
 
     let mut int_map3 = vector_lib::event::ObjectMap::new();
     int_map3.insert(
         "values".into(),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Integer(42)]),
     );
-    event3.insert("int_array_map", vector_lib::event::Value::Object(int_map3));
+    event3.insert(
+        event_path!("int_array_map"),
+        vector_lib::event::Value::Object(int_map3),
+    );
 
     let mut tuple3 = vector_lib::event::ObjectMap::new();
     tuple3.insert("f0".into(), vector_lib::event::Value::Bytes("data".into()));
@@ -1033,7 +1066,10 @@ async fn test_complex_types() {
         "f1".into(),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Integer(5)]),
     );
-    event3.insert("tuple_with_array", vector_lib::event::Value::Object(tuple3));
+    event3.insert(
+        event_path!("tuple_with_array"),
+        vector_lib::event::Value::Object(tuple3),
+    );
 
     let mut map_inner = vector_lib::event::ObjectMap::new();
     map_inner.insert(
@@ -1044,7 +1080,7 @@ async fn test_complex_types() {
     tuple_map3.insert("f0".into(), vector_lib::event::Value::Bytes("test".into()));
     tuple_map3.insert("f1".into(), vector_lib::event::Value::Object(map_inner));
     event3.insert(
-        "tuple_with_map",
+        event_path!("tuple_with_map"),
         vector_lib::event::Value::Object(tuple_map3),
     );
 
@@ -1061,7 +1097,7 @@ async fn test_complex_types() {
     );
     tuple_nested3.insert("f2".into(), vector_lib::event::Value::Object(map_inner2));
     event3.insert(
-        "tuple_with_nested",
+        event_path!("tuple_with_nested"),
         vector_lib::event::Value::Object(tuple_nested3),
     );
 
@@ -1076,21 +1112,21 @@ async fn test_complex_types() {
         vector_lib::event::Value::Float(NotNan::new(-74.0060).unwrap()),
     );
     event3.insert(
-        "locations",
+        event_path!("locations"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(loc3)]),
     );
 
     let mut tags3 = vector_lib::event::ObjectMap::new();
     tags3.insert("env".into(), vector_lib::event::Value::Bytes("dev".into()));
     event3.insert(
-        "tags_history",
+        event_path!("tags_history"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(tags3)]),
     );
 
     let mut metrics3 = vector_lib::event::ObjectMap::new();
     metrics3.insert("cpu".into(), vector_lib::event::Value::Integer(60));
     event3.insert(
-        "metrics_history",
+        event_path!("metrics_history"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(metrics3)]),
     );
 
@@ -1100,7 +1136,7 @@ async fn test_complex_types() {
         vector_lib::event::Value::Bytes("application/json".into()),
     );
     event3.insert(
-        "request_headers",
+        event_path!("request_headers"),
         vector_lib::event::Value::Object(headers3),
     );
 
@@ -1112,12 +1148,12 @@ async fn test_complex_types() {
         vector_lib::event::Value::Float(NotNan::new(0.001).unwrap()),
     );
     event3.insert(
-        "response_metrics",
+        event_path!("response_metrics"),
         vector_lib::event::Value::Object(metrics3_resp),
     );
 
     event3.insert(
-        "tags",
+        event_path!("tags"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Bytes("test".into())]),
     );
 
@@ -1127,12 +1163,12 @@ async fn test_complex_types() {
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Bytes("read".into())]),
     );
     event3.insert(
-        "user_properties",
+        event_path!("user_properties"),
         vector_lib::event::Value::Object(user_props3),
     );
 
     event3.insert(
-        "array_with_nulls",
+        event_path!("array_with_nulls"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Integer(42)]),
     );
 
@@ -1147,7 +1183,7 @@ async fn test_complex_types() {
         vector_lib::event::Value::Bytes("active".into()),
     );
     event3.insert(
-        "array_with_named_tuple",
+        event_path!("array_with_named_tuple"),
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(named_tuple3)]),
     );
 
@@ -1248,7 +1284,7 @@ async fn test_missing_required_field_emits_null_constraint_error() {
 
     // Create an event WITHOUT the required_field
     let mut event = LogEvent::from("test message");
-    event.insert("host", "example.com");
+    event.insert(event_path!("host"), "example.com");
     // Deliberately NOT inserting "required_field"
 
     // Run the sink - should fail due to missing required field
@@ -1347,11 +1383,11 @@ async fn arrow_schema_excludes_non_insertable_columns() {
     let mut events: Vec<Event> = Vec::new();
     for i in 0..2 {
         let mut event = LogEvent::from(format!("log message {i}"));
-        event.insert("host", format!("host-{i}.example.com"));
+        event.insert(event_path!("host"), format!("host-{i}.example.com"));
 
         if i == 1 {
             event.insert(
-                "timestamp_date",
+                event_path!("timestamp_date"),
                 vector_lib::event::Value::Timestamp(
                     Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap(),
                 ),
@@ -1364,7 +1400,7 @@ async fn arrow_schema_excludes_non_insertable_columns() {
             vector_lib::event::Value::Bytes(format!("cluster-{i}").into()),
         );
         event.insert(
-            "resource_attributes",
+            event_path!("resource_attributes"),
             vector_lib::event::Value::Object(attrs),
         );
 
