@@ -31,7 +31,7 @@ use vector_lib::{
 };
 use vrl::{
     compiler::value::Collection,
-    value,
+    event_path, value,
     value::{Kind, ObjectMap},
 };
 
@@ -1312,7 +1312,7 @@ async fn decode_traces() {
             assert_eq!(trace_v1.as_map()["host"], "a_hostname".into());
             assert_eq!(trace_v1.as_map()["env"], "an_environment".into());
             assert_eq!(trace_v1.as_map()["language_name"], "ada".into());
-            assert!(trace_v1.contains("spans"));
+            assert!(trace_v1.contains(vrl::event_path!("spans")));
             assert_eq!(trace_v1.as_map()["spans"].as_array().unwrap().len(), 1);
             let span_from_trace_v1 = trace_v1.as_map()["spans"].as_array().unwrap()[0]
                 .as_object()
@@ -1348,7 +1348,7 @@ async fn decode_traces() {
             );
 
             let apm_event = events[1].as_trace();
-            assert!(apm_event.contains("spans"));
+            assert!(apm_event.contains(event_path!("spans")));
             assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
             assert_eq!(apm_event.as_map()["env"], "an_environment".into());
             assert_eq!(apm_event.as_map()["language_name"], "ada".into());
@@ -1392,7 +1392,7 @@ async fn decode_traces() {
                 trace_v2.as_map()["error_tps"],
                 Value::Float(NotNan::new(10.0f64).unwrap())
             );
-            assert!(trace_v2.contains("spans"));
+            assert!(trace_v2.contains(vrl::event_path!("spans")));
             assert_eq!(trace_v2.as_map()["spans"].as_array().unwrap().len(), 1);
             let span_from_trace_v2 = trace_v2.as_map()["spans"].as_array().unwrap()[0]
                 .as_object()

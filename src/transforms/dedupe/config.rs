@@ -172,24 +172,26 @@ mod tests {
     }
 
     async fn basic(transform_config: DedupeConfig, first_path: &str, second_path: &str) {
+        let first_path = vrl::path::parse_target_path(first_path).unwrap();
+        let second_path = vrl::path::parse_target_path(second_path).unwrap();
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert(first_path, "some value");
-            event1.as_mut_log().insert(second_path, "another value");
+            event1.as_mut_log().insert(&first_path, "some value");
+            event1.as_mut_log().insert(&second_path, "another value");
 
             // Test that unmatched field isn't considered
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert(first_path, "some value2");
-            event2.as_mut_log().insert(second_path, "another value");
+            event2.as_mut_log().insert(&first_path, "some value2");
+            event2.as_mut_log().insert(&second_path, "another value");
 
             // Test that matched field is considered
             let mut event3 = Event::Log(LogEvent::from("message"));
-            event3.as_mut_log().insert(first_path, "some value");
-            event3.as_mut_log().insert(second_path, "another value2");
+            event3.as_mut_log().insert(&first_path, "some value");
+            event3.as_mut_log().insert(&second_path, "another value2");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -236,10 +238,14 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched1", "some value");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched1"), "some value");
 
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched2", "some value");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched2"), "some value");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -286,13 +292,21 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched1", "value1");
-            event1.as_mut_log().insert("matched2", "value2");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched1"), "value1");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched2"), "value2");
 
             // Add fields in opposite order
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched2", "value2");
-            event2.as_mut_log().insert("matched1", "value1");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched2"), "value2");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched1"), "value1");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -334,10 +348,14 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "some value");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "some value");
 
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", "some value2");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "some value2");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -404,7 +422,9 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "some value");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "some value");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -454,10 +474,12 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "123");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "123");
 
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", 123);
+            event2.as_mut_log().insert(vrl::event_path!("matched"), 123);
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -505,12 +527,16 @@ mod tests {
             let mut map1 = ObjectMap::new();
             map1.insert("key".into(), "123".into());
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", map1);
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), map1);
 
             let mut map2 = ObjectMap::new();
             map2.insert("key".into(), 123.into());
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", map2);
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), map2);
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -554,7 +580,9 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", Value::Null);
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), Value::Null);
 
             let mut event2 = Event::Log(LogEvent::from("message"));
 

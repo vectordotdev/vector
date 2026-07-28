@@ -447,8 +447,10 @@ mod tests {
     #[test]
     fn test_encode_event_apply_rules() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("timestamp", ts());
+        event
+            .as_mut_log()
+            .insert(event_path!("host"), "aws.cloud.eur");
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let mut sink = create_sink(
             "http://localhost:9999",
@@ -488,14 +490,20 @@ mod tests {
     #[test]
     fn test_encode_event_v1() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(event_path!("host"), "aws.cloud.eur");
+        event
+            .as_mut_log()
+            .insert(event_path!("source_type"), "file");
 
-        event.as_mut_log().insert("int", 4i32);
-        event.as_mut_log().insert("float", 5.5);
-        event.as_mut_log().insert("bool", true);
-        event.as_mut_log().insert("string", "thisisastring");
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("int"), 4i32);
+        event.as_mut_log().insert(event_path!("float"), 5.5);
+        event.as_mut_log().insert(event_path!("bool"), true);
+        event
+            .as_mut_log()
+            .insert(event_path!("string"), "thisisastring");
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -533,14 +541,20 @@ mod tests {
     #[test]
     fn test_encode_event() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(event_path!("host"), "aws.cloud.eur");
+        event
+            .as_mut_log()
+            .insert(event_path!("source_type"), "file");
 
-        event.as_mut_log().insert("int", 4i32);
-        event.as_mut_log().insert("float", 5.5);
-        event.as_mut_log().insert("bool", true);
-        event.as_mut_log().insert("string", "thisisastring");
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("int"), 4i32);
+        event.as_mut_log().insert(event_path!("float"), 5.5);
+        event.as_mut_log().insert(event_path!("bool"), true);
+        event
+            .as_mut_log()
+            .insert(event_path!("string"), "thisisastring");
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -579,8 +593,8 @@ mod tests {
     fn test_encode_event_without_tags() {
         let mut event = Event::Log(LogEvent::from("hello"));
 
-        event.as_mut_log().insert("value", 100);
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("value"), 100);
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let mut sink = create_sink(
             "http://localhost:9999",
@@ -617,12 +631,12 @@ mod tests {
     fn test_encode_nested_fields() {
         let mut event = LogEvent::default();
 
-        event.insert("a", 1);
-        event.insert("nested.field", "2");
-        event.insert("nested.bool", true);
-        event.insert("nested.array[0]", "example-value");
-        event.insert("nested.array[2]", "another-value");
-        event.insert("nested.array[3]", 15);
+        event.insert(event_path!("a"), 1);
+        event.insert(event_path!("nested", "field"), "2");
+        event.insert(event_path!("nested", "bool"), true);
+        event.insert(event_path!("nested", "array", 0isize), "example-value");
+        event.insert(event_path!("nested", "array", 2isize), "another-value");
+        event.insert(event_path!("nested", "array", 3isize), 15);
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -657,10 +671,12 @@ mod tests {
     #[test]
     fn test_add_tag() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(event_path!("source_type"), "file");
 
-        event.as_mut_log().insert("as_a_tag", 10);
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("as_a_tag"), 10);
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -782,14 +798,14 @@ mod tests {
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
-            event.insert(format!("key{i}").as_str(), format!("value{i}"));
+            event.insert(event_path!(format!("key{i}").as_str()), format!("value{i}"));
 
             let timestamp = Utc
                 .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
                 .single()
                 .expect("invalid timestamp");
-            event.insert("timestamp", timestamp);
-            event.insert("source_type", "file");
+            event.insert(event_path!("timestamp"), timestamp);
+            event.insert(event_path!("source_type"), "file");
 
             events.push(Event::Log(event));
         }
@@ -928,12 +944,12 @@ mod integration_tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
         let mut event1 = LogEvent::from("message_1").with_batch_notifier(&batch);
-        event1.insert("host", "aws.cloud.eur");
-        event1.insert("source_type", "file");
+        event1.insert(event_path!("host"), "aws.cloud.eur");
+        event1.insert(event_path!("source_type"), "file");
 
         let mut event2 = LogEvent::from("message_2").with_batch_notifier(&batch);
-        event2.insert("host", "aws.cloud.eur");
-        event2.insert("source_type", "file");
+        event2.insert(event_path!("host"), "aws.cloud.eur");
+        event2.insert(event_path!("source_type"), "file");
 
         let mut namespaced_log =
             LogEvent::from(value!("namespaced message")).with_batch_notifier(&batch);

@@ -27,6 +27,7 @@ use vector_common::{
     byte_size_of::ByteSizeOf,
     finalization::{
         AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+        MergeFinalizable,
     },
 };
 
@@ -72,6 +73,12 @@ impl EventCount for VariableMessage {
 impl Finalizable for VariableMessage {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MergeFinalizable for VariableMessage {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.finalizers.merge(finalizers);
     }
 }
 

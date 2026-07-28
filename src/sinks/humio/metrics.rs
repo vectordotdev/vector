@@ -138,6 +138,9 @@ pub struct HumioMetricsConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[serde(flatten)]
+    pub confinement: crate::template::ConfinementConfig,
 }
 
 fn default_endpoint() -> String {
@@ -185,16 +188,23 @@ impl SinkConfig for HumioMetricsConfig {
                 vrl::path::PathPrefix::Event,
                 Some(lookup::owned_value_path!("timestamp")),
             ),
+            confinement: self.confinement.clone(),
         };
 
-        let (sink, healthcheck) = sink.clone().build(cx).await?;
+        // Route through the inner Humio helper threaded with our own component
+        // type, so per-template security warnings carry `humio_metrics` rather
+        // than the delegated `humio_logs`/`splunk_hec_logs`.
+        let (sink, healthcheck) = sink.build_with_component_type(cx, Self::NAME)?;
 
         let sink = HumioMetricsSink {
             inner: sink,
             transform,
         };
-
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

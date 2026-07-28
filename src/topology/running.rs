@@ -4,6 +4,7 @@ use std::{
 };
 
 use futures::{Future, FutureExt, future};
+use metrics::Gauge;
 use snafu::Snafu;
 use stream_cancel::Trigger;
 use tokio::{
@@ -13,6 +14,8 @@ use tokio::{
 use tracing::Instrument;
 use vector_lib::{
     buffers::topology::channel::BufferSender,
+    gauge,
+    internal_event::GaugeName,
     shutdown::ShutdownSignal,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
     trigger::DisabledTrigger,
@@ -70,6 +73,7 @@ pub struct RunningTopology {
     metrics_task: Option<TaskHandle>,
     metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
+    sink_confinement_gauges: HashMap<ComponentKey, Gauge>,
 }
 
 impl RunningTopology {
@@ -94,6 +98,7 @@ impl RunningTopology {
             metrics_task: None,
             metrics_task_shutdown_trigger: None,
             pending_reload: None,
+            sink_confinement_gauges: HashMap::new(),
         }
     }
 
@@ -332,6 +337,7 @@ impl RunningTopology {
                 self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
+                self.refresh_confinement_gauges();
 
                 info!("New configuration loaded successfully.");
 
@@ -357,6 +363,9 @@ impl RunningTopology {
         {
             self.connect_diff(&diff, &mut new_pieces).await;
             self.spawn_diff(&diff, new_pieces);
+            // `self.config` still holds the old config on the rollback path, so
+            // this restores the gauges for the re-spawned old sinks.
+            self.refresh_confinement_gauges();
 
             info!("Old configuration restored successfully.");
 
@@ -1074,6 +1083,47 @@ impl RunningTopology {
         }
     }
 
+    /// Reconcile the `vector_security_confinement_disabled` gauges with the
+    /// currently active topology.
+    ///
+    /// The topology is the single owner of this gauge: it holds a handle for
+    /// every confinement-aware sink for the sink's whole lifetime, which keeps
+    /// the metric from expiring out of the registry (a dropped handle would let
+    /// it age out after the idle timeout even while the sink runs). The value
+    /// is `1` when the sink opted out of confinement, `0` otherwise.
+    ///
+    /// This rebuilds from `self.config`, so it must be called *after* `self.config`
+    /// reflects the active topology (updated to the new config on a successful
+    /// reload, or left as the old config on a rollback). Handles for sinks no
+    /// longer present are dropped, allowing their series to expire naturally.
+    fn refresh_confinement_gauges(&mut self) {
+        // Rebuild the handle set from the active config on every call. Reusing a
+        // handle keyed only by `ComponentKey` would be wrong: a reloaded sink
+        // can keep its id but change `type`, and a cached handle carries the old
+        // `component_type` label. Recreating is cheap — `gauge!` returns a
+        // handle to the same registry entry for a given label set.
+        let mut gauges = HashMap::with_capacity(self.sink_confinement_gauges.len());
+        for (key, outer) in self.config.sinks() {
+            let Some(confinement) = outer.inner.confinement_config() else {
+                continue;
+            };
+            let value = f64::from(confinement.dangerously_allow_unconfined_template_resolution);
+            let handle = gauge!(
+                GaugeName::SecurityConfinementDisabled,
+                "component_kind" => "sink",
+                "component_id" => key.id().to_string(),
+                "component_type" => outer.inner.get_component_name(),
+            );
+            handle.set(value);
+            gauges.insert(key.clone(), handle);
+        }
+
+        // Replacing the map drops handles for sinks that are gone (or changed
+        // type), letting their now-stale series expire instead of reporting a
+        // stale value forever.
+        self.sink_confinement_gauges = gauges;
+    }
+
     /// Starts any new or changed components in the given configuration diff.
     pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: TopologyPieces) {
         for key in &diff.sources.to_change {
@@ -1382,6 +1432,8 @@ impl RunningTopology {
         }
         running_topology.connect_diff(&diff, &mut pieces).await;
         running_topology.spawn_diff(&diff, pieces);
+        // `running_topology.config` was set from the initial config in `new()`.
+        running_topology.refresh_confinement_gauges();
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();
@@ -1418,33 +1470,36 @@ impl RunningTopology {
     }
 }
 
+/// Returns the subset of `output_ids` whose upstream fanout was replaced during this reload and so
+/// must be reattached to the still-running downstream consumer.
+///
+/// A producer's fanout is replaced when its key was respawned in place (`to_change`) or when it
+/// disappeared as one kind of producer and reappeared as another (e.g. an enrichment-table-derived
+/// source removed while a regular source with the same key was added, or a transform removed while
+/// a source with the same key was added).
 fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
-    let mut changed_outputs = Vec::new();
+    let producer_destroyed = |key: &ComponentKey| {
+        diff.sources.to_change.contains(key)
+            || diff.sources.to_remove.contains(key)
+            || diff.transforms.to_change.contains(key)
+            || diff.transforms.to_remove.contains(key)
+            || diff.enrichment_tables.sources.to_change.contains(key)
+            || diff.enrichment_tables.sources.to_remove.contains(key)
+    };
+    let producer_recreated = |key: &ComponentKey| {
+        diff.sources.to_change.contains(key)
+            || diff.sources.to_add.contains(key)
+            || diff.transforms.to_change.contains(key)
+            || diff.transforms.to_add.contains(key)
+            || diff.enrichment_tables.sources.to_change.contains(key)
+            || diff.enrichment_tables.sources.to_add.contains(key)
+    };
 
-    for source_key in diff
-        .sources
-        .to_change
+    output_ids
         .iter()
-        .chain(diff.enrichment_tables.sources.to_change.iter())
-    {
-        changed_outputs.extend(
-            output_ids
-                .iter()
-                .filter(|id| &id.component == source_key)
-                .cloned(),
-        );
-    }
-
-    for transform_key in &diff.transforms.to_change {
-        changed_outputs.extend(
-            output_ids
-                .iter()
-                .filter(|id| &id.component == transform_key)
-                .cloned(),
-        );
-    }
-
-    changed_outputs
+        .filter(|id| producer_destroyed(&id.component) && producer_recreated(&id.component))
+        .cloned()
+        .collect()
 }
 
 fn enrichment_table_sink_resources(config: &Config, sink_key: &ComponentKey) -> Vec<Resource> {

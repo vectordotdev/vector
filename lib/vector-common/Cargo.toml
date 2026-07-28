@@ -38,6 +38,8 @@ tokenize = []
 
 [dependencies]
 async-compression.workspace = true
+flate2.workspace = true
+zstd.workspace = true
 async-stream = "0.3.6"
 bytes = { version = "1.11.1", default-features = false, optional = true }
 chrono.workspace = true

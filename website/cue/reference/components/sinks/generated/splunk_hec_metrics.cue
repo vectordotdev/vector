@@ -120,6 +120,22 @@ generated: components: sinks: splunk_hec_metrics: configuration: {
 			}
 		}
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	default_namespace: {
 		description: """
 			Sets the default namespace for any metrics sent.

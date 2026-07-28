@@ -373,6 +373,10 @@ check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
 check-all: check-scripts check-deny check-generated-docs check-licenses
 
+.PHONY: check-changelog-fragments
+check-changelog-fragments: ## Validate changelog fragments added in this branch/PR
+	$(VDEV) check changelog-fragments
+
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
 	$(VDEV) check component-features

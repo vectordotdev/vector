@@ -6,11 +6,11 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{Deserialize, de};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
         JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
@@ -19,6 +19,8 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
     finalization::AddBatchNotifier,
 };
+
+use vrl::event_path;
 
 use super::{
     config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
@@ -68,6 +70,7 @@ fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
         tls: Default::default(),
         acknowledgements: Default::default(),
         retry_strategy: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -285,6 +288,7 @@ async fn http_passes_custom_headers() {
 async fn http_passes_template_headers() {
     run_sink_with_events(
         indoc::indoc! {r#"
+        dangerously_allow_unconfined_template_resolution: true
         request:
           headers:
             Static-Header: static-value
@@ -295,8 +299,10 @@ async fn http_passes_template_headers() {
         "#},
         || {
             let mut event = Event::Log(LogEvent::from("test message"));
-            event.as_mut_log().insert("level", "info");
-            event.as_mut_log().insert("message", "templated message");
+            event.as_mut_log().insert(event_path!("level"), "info");
+            event
+                .as_mut_log()
+                .insert(event_path!("message"), "templated message");
             event
         },
         10,
@@ -345,6 +351,7 @@ async fn http_passes_template_headers() {
 async fn http_template_headers_missing_fields() {
     run_sink_with_events(
         indoc::indoc! {r#"
+        dangerously_allow_unconfined_template_resolution: true
         request:
           headers:
             X-Required-Field: "{{required_field}}"
@@ -352,7 +359,9 @@ async fn http_template_headers_missing_fields() {
         "#},
         || {
             let mut event = Event::Log(LogEvent::from("good event"));
-            event.as_mut_log().insert("required_field", "present");
+            event
+                .as_mut_log()
+                .insert(event_path!("required_field"), "present");
             event
         },
         10,
@@ -823,11 +832,16 @@ async fn templateable_uri_auth() {
     let another_user = "another_user";
     let another_pass = "another_pass";
     let (_guard, in_addr) = next_addr();
+    // Event-controlled credentials have no static URI authority, so they
+    // require the opt-out flag. This is intentional: an attacker who controls
+    // the `user` or `pass` fields could inject `@evil.com` as the username and
+    // redirect the request. Operators using this pattern accept that risk.
     let config = format!(
         r#"
         uri: "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
         encoding:
           codec: json
+        dangerously_allow_unconfined_template_resolution: true
         "#
     );
 
@@ -985,9 +999,10 @@ where
     T: de::DeserializeOwned,
 {
     match compression {
-        "gzip" => serde_json::from_reader(MultiGzDecoder::new(buf.reader())).unwrap(),
-        "zstd" => serde_json::from_reader(zstd::Decoder::new(buf.reader()).unwrap()).unwrap(),
-        "zlib" => serde_json::from_reader(ZlibDecoder::new(buf.reader())).unwrap(),
+        "gzip" => serde_json::from_reader(CappedDecoder::gzip(buf.reader()).into_reader()).unwrap(),
+        "zstd" => serde_json::from_reader(CappedDecoder::zstd(buf.reader()).unwrap().into_reader())
+            .unwrap(),
+        "zlib" => serde_json::from_reader(CappedDecoder::zlib(buf.reader()).into_reader()).unwrap(),
         _ => panic!("undefined compression: {compression}"),
     }
 }

@@ -8,6 +8,7 @@ use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
     nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
+    template::ConfinementConfig,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -29,7 +30,7 @@ pub struct NatsHeaderConfig {
     #[configurable(metadata(docs::templateable))]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[configurable(metadata(docs::examples = "{{ event_id }}"))]
-    pub(super) message_id: Option<Template>,
+    pub(super) message_id: Option<UnconfinedTemplate>,
 }
 
 impl NatsHeaderConfig {
@@ -147,6 +148,10 @@ pub struct NatsSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) jetstream: JetStreamConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 fn default_name() -> String {
@@ -167,9 +172,10 @@ impl GenerateConfig for NatsSinkConfig {
             jetstream: JetStreamConfig {
                 enabled: true,
                 headers: Some(NatsHeaderConfig {
-                    message_id: Some(Template::try_from("{{ event_id }}").unwrap()),
+                    message_id: Some(UnconfinedTemplate::try_from("{{ event_id }}").unwrap()),
                 }),
             },
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -179,9 +185,17 @@ impl GenerateConfig for NatsSinkConfig {
 #[typetag::serde(name = "nats")]
 impl SinkConfig for NatsSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = NatsSink::new(self.clone()).await?;
+        let subject = self
+            .subject
+            .clone()
+            .confine(&self.confinement, Self::NAME, "subject")?;
+        let sink = NatsSink::new(self.clone(), subject).await?;
         let healthcheck = healthcheck(self.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -298,5 +312,36 @@ impl NatsPublisher {
                 })
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn confinement_rejects_unconfined_subject() {
+        let template = Template::try_from("{{ subject }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "nats", "subject");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_subject() {
+        let template = Template::try_from("{{ subject }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "nats", "subject");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_subject() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "nats", "subject");
+        assert!(result.is_ok());
     }
 }

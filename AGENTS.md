@@ -116,7 +116,7 @@ make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
 make check-generated-docs     # Check generated documentation
-./scripts/check_changelog_fragments.sh  # Verify changelog
+make check-changelog-fragments  # Verify changelog
 ```
 
 ### Website/Docs Development (Separate Process)
@@ -184,8 +184,7 @@ make check-fmt
 make check-clippy
 make check-markdown
 make check-generated-docs
-
-./scripts/check_changelog_fragments.sh
+make check-changelog-fragments
 ```
 
 Then: `chmod +x .git/hooks/pre-push`

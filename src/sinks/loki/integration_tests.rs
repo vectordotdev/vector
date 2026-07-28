@@ -1,5 +1,7 @@
 use std::{convert::TryFrom, sync::Arc};
 
+use vrl::event_path;
+
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
@@ -109,8 +111,11 @@ fn namespaced_timestamp_generator(
 ) -> impl Fn(usize) -> Event {
     move |index: usize| {
         let mut log = LogEvent::default();
-        log.insert("message", line_generator(index));
-        log.insert(timestamp_field.as_str(), Value::from(timestamp));
+        log.insert(event_path!("message"), line_generator(index));
+        log.insert(
+            &vrl::path::parse_target_path(&timestamp_field).unwrap(),
+            Value::from(timestamp),
+        );
 
         // We need vector metadata for it to pick up that it is in the Vector namespace.
         LogNamespace::Vector.insert_standard_vector_source_metadata(&mut log, "loki", Utc::now());
@@ -282,7 +287,7 @@ async fn json_nested_fields() {
     let generator = |idx| {
         let mut event = event_generator(idx);
         let log = event.as_mut_log();
-        log.insert("foo.bar", "baz");
+        log.insert(event_path!("foo", "bar"), "baz");
         event
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
@@ -328,6 +333,7 @@ async fn many_streams() {
             labels = {test_name = "{{ stream_id }}"}
             encoding.codec = "text"
             tenant_id = "default"
+            dangerously_allow_unconfined_template_resolution = true
         "#;
     let (config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
@@ -339,9 +345,9 @@ async fn many_streams() {
         if idx < 10 {
             let log = event.as_mut_log();
             if idx % 2 == 0 {
-                log.insert("stream_id", stream1.to_string());
+                log.insert(event_path!("stream_id"), stream1.to_string());
             } else {
-                log.insert("stream_id", stream2.to_string());
+                log.insert(event_path!("stream_id"), stream2.to_string());
             }
         }
         event
@@ -388,6 +394,7 @@ async fn interpolate_stream_key() {
             labels = {"{{ stream_key }}" = "placeholder"}
             encoding.codec = "text"
             tenant_id = "default"
+            dangerously_allow_unconfined_template_resolution = true
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.labels.insert(
@@ -401,7 +408,9 @@ async fn interpolate_stream_key() {
     let generator = |idx| {
         let mut event = event_generator(idx);
         if idx < 10 {
-            event.as_mut_log().insert("stream_key", "test_name");
+            event
+                .as_mut_log()
+                .insert(event_path!("stream_key"), "test_name");
         }
         event
     };
@@ -434,7 +443,7 @@ async fn many_tenants() {
         + r#"
             labels = {test_name = "placeholder"}
             encoding.codec = "text"
-            tenant_id = "{{ tenant_id }}"
+            tenant_id = "tenant{{ tenant_id }}"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
@@ -459,7 +468,7 @@ async fn many_tenants() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
 
-        log.insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
+        log.insert(event_path!("tenant_id"), if i % 2 == 0 { "1" } else { "2" });
     }
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;

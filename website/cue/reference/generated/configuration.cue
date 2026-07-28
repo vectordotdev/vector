@@ -216,6 +216,184 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"file\""
 					}
+					filter: {
+						type: object: options: {
+							bucket_size: {
+								type: uint: default: 4
+								description: "Number of slots in each bucket"
+								required:    false
+							}
+							concurrent_scanning: {
+								type: bool: default: false
+								description: """
+																		If set to true scanning will not block insertions.
+																		This may affect behavior since blocking scans would free up space before insertions.
+
+																		By default, scanning is blocking.
+																		"""
+								required: false
+							}
+							counter_bits: {
+								type: uint: default: 8
+								description: "Number of bits to use to track counter. This will limit the max value."
+								required:    false
+							}
+							counter_enabled: {
+								type: bool: default: false
+								description: "Can be set to true to track a count alongside hashes."
+								required:    false
+							}
+							counter_field: {
+								type: string: default: ""
+								description: "Field in the incoming value used as the counter increment override."
+								required:    false
+							}
+							counter_insertion_increment: {
+								type: int: default: 1
+								description: "The amount to increment the counter by on every insertion. Negative values are allowed."
+								required:    false
+							}
+							counter_lookup_increment: {
+								type: int: default: 1
+								description: "The amount to increment the counter by on every lookup. Negative values are allowed."
+								required:    false
+							}
+							export_interval: {
+								type: uint: {}
+								description: """
+																		The interval used for exporting data.
+
+																		By default, export is only done on exit.
+																		"""
+								required: false
+							}
+							fingerprint_bits: {
+								type: uint: default: 8
+								description: "Number of bits used for fingerprint."
+								required:    false
+							}
+							lru_aging_strategy: {
+								type: object: options: {
+									value: {
+										type: uint: {}
+										description:   "Value to decrement by"
+										required:      true
+										relevant_when: "strategy = \"decrement\""
+									}
+									strategy: {
+										required: false
+										type: string: {
+											enum: {
+												halving:   "Aging LRU counters by halving their value on each scan."
+												decrement: "Aging LRU counters by decrementing by a fixed value on each scan."
+											}
+											default: "halving"
+										}
+										description: "The LRU aging strategy to use."
+									}
+								}
+								description: "Strategy to use when aging LRU counters at each scan."
+								required:    false
+							}
+							lru_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track LRU counter.
+																		Low bit count will reduce the maximum LRU counter value, making the items expire sooner if
+																		unused.
+																		"""
+								required: false
+							}
+							lru_deletion_enabled: {
+								type: bool: default: false
+								description: "Can be set to true to delete unused items on scan when LRU is used."
+								required:    false
+							}
+							lru_enabled: {
+								type: bool: default: false
+								description: "Can be set to true to use LRU strategy for kicking."
+								required:    false
+							}
+							lru_increment: {
+								type: uint: default: 1
+								description: "Value to increase LRU counter by on each item access."
+								required:    false
+							}
+							lru_starting_value: {
+								type: uint: default: 1
+								description: """
+																		Starting value for LRU counter on item insertion.
+																		Higher value will give newer items a higher probability to stay in the filter.
+																		"""
+								required: false
+							}
+							max_entries: {
+								type: uint: {}
+								description: """
+																		Maximum number of entries that can be stored in the filter (actual capacity will usually be
+																		larger)
+																		"""
+								required: true
+							}
+							max_kicks: {
+								type: uint: default: 500
+								description: "Max number of kicks when experiencing hash collisions."
+								required:    false
+							}
+							persistence_path: {
+								type: string: {}
+								description: """
+																		Path to the file to export data to periodically and on exit.
+																		Data will be imported from this file on startup and reload.
+
+																		If table `reload_behavior` is set to `clear-state` and this is set, the persisted state will
+																		still be read after reload.
+																		"""
+								required: false
+							}
+							scanning_threads: {
+								type: uint: {}
+								description: """
+																		Number of threads to use for scanning and updating LRU/TTL.
+
+																		By default, scanning is single threaded.
+																		"""
+								required: false
+							}
+							ttl_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track TTL. Low bit count will reduce maximum TTL and also require a
+																		worse resolution to keep working.
+																		"""
+								required: false
+							}
+							ttl_enabled: {
+								type: bool: default: true
+								description: "Can be set to true to also track TTL for entries."
+								required:    false
+							}
+							type: {
+								type: string: enum: cuckoo: """
+																					Cuckoo filter
+
+																					Supports removal by accepting null values for keys, as well as TTL and LRU.
+																					"""
+								description: """
+																		Cuckoo filter
+
+																		Supports removal by accepting null values for keys, as well as TTL and LRU.
+																		"""
+								required: true
+							}
+						}
+						description: """
+														Set to make the table act as a probabilistic filter instead of storing original values. This
+														will prevent reading values from the table - found keys will have empty value.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
 					flush_interval: {
 						type: uint: {}
 						description: """
@@ -224,6 +402,9 @@ generated: configuration: {
 														but there is a longer delay before the data is visible in the table.
 														Since every TTL scan makes its changes visible, only use this value
 														if it is shorter than the `scan_interval`.
+
+														NOTE: For cuckoo filter, all writes are visible immediately. Flush interval still defines
+														when metrics for cuckoo filter are made visible.
 
 														By default, all writes are made visible immediately.
 														"""

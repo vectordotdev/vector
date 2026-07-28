@@ -8,14 +8,6 @@ This should help the reviewers give feedback faster and with higher quality. -->
 ## How did you test this PR?
 <!-- Please describe how you tested your changes. Also include any information about your setup. -->
 
-## Change Type
-
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Dependencies
-- [ ] Non-functional (chore, refactoring, docs)
-- [ ] Performance
-
 ## Is this a breaking change?
 
 - [ ] Yes
