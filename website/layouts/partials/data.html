@@ -2150,6 +2150,15 @@
             </div>
           {{ end }}
 
+          {{ if eq $k "array" }}
+            {{/* Array examples live on the item type, not the array itself */}}
+            {{ range $k, $v := $v.items.type }}
+              {{ with $v.examples }}
+                {{ template "config-array-examples" (dict "examples" .) }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+
           {{ with $v.examples }}
             {{ template "config-examples" (dict "examples" . "syntax" $v.syntax) }}
           {{ end }}
