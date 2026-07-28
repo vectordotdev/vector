@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    ComponentKey, Config, OutputId, Resource, TransformContext, builder::ConfigBuilder,
+    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
     transform::get_transform_output_ids,
 };
 
@@ -237,10 +237,6 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         // These checks run during config compilation. Transforms that need the schema/enrichment
         // context must implement validate_with_context(), called later in validate.rs.
         if let Err(errs) = transform.inner.validate_structure() {
-            errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
-        }
-        // validate() is deprecated. Use validate_structure() for new transforms.
-        if let Err(errs) = transform.inner.validate(&TransformContext::default()) {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
