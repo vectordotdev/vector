@@ -608,7 +608,7 @@ _values: {
 		]
 	}
 
-	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_program" | "strftime"
+	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "vrl_program" | "lua" | "yaml" | "toml" | "strftime"
 }
 
 #TypeAsciiChar: {
