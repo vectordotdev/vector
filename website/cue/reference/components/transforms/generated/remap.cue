@@ -113,7 +113,7 @@ generated: components: transforms: remap: configuration: {
 				.duration = parse_duration!(.duration, "s")
 				.new_name = del(.old_name)
 				"""]
-			syntax: "remap_program"
+			syntax: "vrl_program"
 		}
 	}
 	timezone: {

@@ -68,7 +68,7 @@ pub struct RemapConfig {
     #[configurable(metadata(
         docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
         docs::required,
-        docs::syntax_override = "remap_program"
+        docs::syntax_override = "vrl_program"
     ))]
     pub source: Option<String>,
 
