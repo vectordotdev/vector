@@ -97,10 +97,22 @@ pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
-    let cfg = toml::to_string(&T::generate_config()).unwrap();
+    let generated = T::generate_config();
 
-    toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{e}\n'{cfg}'"));
+    let toml_cfg = toml::to_string(&generated).unwrap();
+    toml::from_str::<T>(&toml_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from TOML string:\n\n{e}\n'{toml_cfg}'")
+    });
+
+    let yaml_cfg = serde_yaml::to_string(&generated).unwrap();
+    serde_yaml::from_str::<T>(&yaml_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from YAML string:\n\n{e}\n'{yaml_cfg}'")
+    });
+
+    let json_cfg = serde_json::to_string(&generated).unwrap();
+    serde_json::from_str::<T>(&json_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from JSON string:\n\n{e}\n'{json_cfg}'")
+    });
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
