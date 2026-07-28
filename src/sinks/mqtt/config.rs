@@ -116,18 +116,20 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.topic = config
+        let topic = self
             .topic
+            .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
-        let connector = config.build_connector()?;
-        let sink = MqttSink::new(&config, connector.clone())?;
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        let connector = self.build_connector()?;
+        let sink = MqttSink::new(self, topic, connector.clone())?;
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

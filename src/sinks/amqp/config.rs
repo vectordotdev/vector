@@ -135,18 +135,22 @@ impl GenerateConfig for AmqpSinkConfig {
 #[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.exchange = config
+        let exchange = self
             .exchange
+            .clone()
             .confine(&self.confinement, Self::NAME, "exchange")?;
-        config.routing_key = config
+        let routing_key = self
             .routing_key
+            .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "routing_key"))
             .transpose()?;
-        let sink = AmqpSink::new(config).await?;
+        let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
         let hc = healthcheck(sink.channels.clone()).boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

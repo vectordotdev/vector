@@ -204,13 +204,18 @@ impl SinkConfig for RedisSinkConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
-        let mut config = self.clone();
-        config.key = config.key.confine(&self.confinement, Self::NAME, "key")?;
-        let conn = config.build_connection().await?;
+        let key = self
+            .key
+            .clone()
+            .confine(&self.confinement, Self::NAME, "key")?;
+        let conn = self.build_connection().await?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = RedisSink::new(&config, conn)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        let sink = RedisSink::new(self, conn, key)?;
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

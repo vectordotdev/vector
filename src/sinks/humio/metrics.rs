@@ -191,19 +191,20 @@ impl SinkConfig for HumioMetricsConfig {
             confinement: self.confinement.clone(),
         };
 
-        // Route through the inner Humio helper so the wrapped
-        // `humio_logs` sink's gauge isn't emitted alongside our own —
-        // operators watching `security_confinement_disabled` for a
-        // `humio_metrics` sink should only see one series.
-        let (sink, healthcheck) = sink.build_without_confinement_gauge(cx, Self::NAME)?;
+        // Route through the inner Humio helper threaded with our own component
+        // type, so per-template security warnings carry `humio_metrics` rather
+        // than the delegated `humio_logs`/`splunk_hec_logs`.
+        let (sink, healthcheck) = sink.build_with_component_type(cx, Self::NAME)?;
 
         let sink = HumioMetricsSink {
             inner: sink,
             transform,
         };
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

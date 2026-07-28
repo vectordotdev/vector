@@ -101,7 +101,7 @@ impl TransformConfig for ExclusiveRouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         let mut counts = std::collections::HashMap::new();
@@ -134,7 +134,7 @@ impl TransformConfig for ExclusiveRouteConfig {
         }
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         let errors: Vec<String> = self
             .routes
             .iter()

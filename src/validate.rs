@@ -283,10 +283,9 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
 
         for err in transform
             .inner
-            .validate(&context)
+            .validate_with_context(&context)
             .err()
             .into_iter()
-            .chain(transform.inner.validate_env(&context).err())
             .flatten()
         {
             errors.push(format!("Transform \"{key}\": {err}"));

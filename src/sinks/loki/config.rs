@@ -7,7 +7,7 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{prelude::*, util::UriSerde},
-    template::ConfinementConfig,
+    template::{ConfinementConfig, Template},
 };
 
 const fn default_compression() -> Compression {
@@ -61,6 +61,7 @@ pub struct LokiConfig {
     /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
     #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
+    #[configurable(metadata(docs::required = true))]
     pub labels: HashMap<Template, Template>,
 
     /// Whether or not to delete fields from the event when they are used as labels.
@@ -240,9 +241,11 @@ impl SinkConfig for LokiConfig {
         let sink = LokiSink::new(config.clone(), client.clone())?;
 
         let healthcheck = healthcheck(config, client).boxed();
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

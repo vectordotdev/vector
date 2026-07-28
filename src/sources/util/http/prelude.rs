@@ -8,10 +8,10 @@ use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    config::SourceAcknowledgementsConfig,
+    config::{LogNamespace, SourceAcknowledgementsConfig},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
 };
-use vrl::value::ObjectMap;
+use vrl::{path::PathPrefix, path::ValuePath as _, value::ObjectMap};
 use warp::{
     Filter,
     filters::{
@@ -49,6 +49,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) {
     }
 
+    fn log_namespace(&self) -> LogNamespace;
+
+    fn name() -> &'static str;
+
     fn build_events(
         &self,
         body: Bytes,
@@ -57,15 +61,49 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
-    /// Called after `enrich_events` when `custom` auth returned metadata enrichment fields.
-    /// Sources that do not override this will emit a warning and drop the enrichment.
-    fn inject_auth_enrichment(&self, _events: &mut [Event], enrichment: ObjectMap) {
-        if !enrichment.is_empty() {
-            warn!(
-                message = "Auth metadata enrichment is not supported by this source and will be dropped. \
-                           Remove %field writes from the custom auth VRL program or switch to a source that supports enrichment.",
-                fields = ?enrichment.keys().collect::<Vec<_>>(),
-            );
+    /// Injects `%field` enrichment from a `custom` auth VRL program into events.
+    /// Both namespaces use insert-if-empty semantics so auth enrichment never
+    /// overwrites built-in source metadata (`path`, `host`, `headers`, …) that
+    /// `enrich_events` already populated.
+    /// Vector namespace: inserted into event metadata under `http_server.<field>` for
+    ///   all event types (Log, Metric, Trace).
+    /// Legacy namespace: inserted into the Log event body only (Metric/Trace are skipped).
+    fn inject_auth_enrichment(&self, events: &mut [Event], enrichment: ObjectMap) {
+        for event in events.iter_mut() {
+            match self.log_namespace() {
+                LogNamespace::Vector => {
+                    // metadata_mut() dispatches to Log, Metric, and Trace so every
+                    // decoded event type receives the auth enrichment fields.
+                    let meta = event.metadata_mut().value_mut();
+                    let source_name = Self::name();
+                    for (key, value) in &enrichment {
+                        let key_str = key.as_str();
+                        let name_part = vrl::path!(source_name);
+                        let key_part = vrl::path!(key_str);
+                        let full_path = name_part.concat(key_part);
+                        if meta.get(full_path.clone()).is_none() {
+                            meta.insert(full_path, value.clone());
+                        }
+                    }
+                }
+                LogNamespace::Legacy => {
+                    // Legacy enrichment targets the event body; only Log events have one.
+                    if let Event::Log(log) = event {
+                        for (key, value) in &enrichment {
+                            log.try_insert(
+                                (PathPrefix::Event, vrl::path!(key.as_str())),
+                                value.clone(),
+                            );
+                        }
+                    } else if !enrichment.is_empty() {
+                        warn!(
+                            message = "Auth metadata enrichment is not supported for trace/metric events in the legacy namespace and will be dropped. \
+                                       Switch this source to the Vector namespace (`log_namespace: true`) to enable it for all event types.",
+                            fields = ?enrichment.keys().collect::<Vec<_>>(),
+                        );
+                    }
+                }
+            }
         }
     }
 
