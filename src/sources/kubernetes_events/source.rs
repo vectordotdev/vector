@@ -16,6 +16,7 @@ use kube::{
     runtime::{WatchStreamExt, watcher},
 };
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use tokio::select;
 use tokio::time::{Interval, MissedTickBehavior, interval};
 use vector_lib::{
@@ -73,7 +74,7 @@ fn canonicalize_set(mut values: Vec<String>) -> Vec<String> {
     values
 }
 
-fn checkpoint_configuration(config: &KubernetesEventsConfig) -> String {
+fn checkpoint_configuration_hash(config: &KubernetesEventsConfig) -> String {
     let configuration = CheckpointConfiguration {
         api_resource: "events.k8s.io/v1/events",
         namespaces: canonicalize_set(config.namespaces.clone()),
@@ -87,8 +88,9 @@ fn checkpoint_configuration(config: &KubernetesEventsConfig) -> String {
         max_event_age_seconds: config.max_event_age_seconds,
     };
 
-    serde_json::to_string(&configuration)
-        .expect("checkpoint configuration contains only serializable values")
+    let serialized = serde_json::to_vec(&configuration)
+        .expect("checkpoint configuration contains only serializable values");
+    format!("{:x}", Sha256::digest(serialized))
 }
 
 fn checkpoint_stream(namespace: &Option<String>) -> String {
@@ -109,7 +111,7 @@ pub(super) struct KubernetesEventsSource {
     watcher_config: watcher::Config,
     include_previous_event: bool,
     leader_election: Option<LeaderElectionSettings>,
-    checkpoint_configuration: String,
+    checkpoint_configuration_hash: String,
 }
 
 #[async_trait::async_trait]
@@ -172,7 +174,7 @@ impl KubernetesEventsSource {
             .into());
         }
 
-        let checkpoint_configuration = checkpoint_configuration(&config);
+        let checkpoint_configuration_hash = checkpoint_configuration_hash(&config);
         let namespaces = canonicalize_set(config.namespaces.clone());
         let type_filter = (!config.include_types.is_empty())
             .then(|| config.include_types.iter().map(|s| s.to_owned()).collect());
@@ -210,7 +212,7 @@ impl KubernetesEventsSource {
             watcher_config,
             include_previous_event: config.include_previous_event,
             leader_election: LeaderElectionSettings::from_config(&config.leader_election)?,
-            checkpoint_configuration,
+            checkpoint_configuration_hash,
         })
     }
 
@@ -329,7 +331,7 @@ impl KubernetesEventsSource {
 
         loop {
             let Some(acquired) = coordinator
-                .wait_for_leadership(shutdown, &self.checkpoint_configuration)
+                .wait_for_leadership(shutdown, &self.checkpoint_configuration_hash)
                 .await
             else {
                 break;
@@ -1140,7 +1142,7 @@ mod tests {
     }
 
     #[test]
-    fn checkpoint_configuration_is_canonical_for_set_like_fields() {
+    fn checkpoint_configuration_hash_is_canonical_for_set_like_fields() {
         let first = KubernetesEventsConfig {
             namespaces: vec!["b".to_string(), "a".to_string()],
             include_types: vec!["Warning".to_string(), "Normal".to_string()],
@@ -1154,9 +1156,26 @@ mod tests {
         };
 
         assert_eq!(
-            checkpoint_configuration(&first),
-            checkpoint_configuration(&second)
+            checkpoint_configuration_hash(&first),
+            checkpoint_configuration_hash(&second)
         );
+    }
+
+    #[test]
+    fn checkpoint_configuration_hash_is_compact_and_configuration_specific() {
+        let mut config = KubernetesEventsConfig {
+            namespaces: (0..5_000)
+                .map(|index| format!("namespace-{index}"))
+                .collect(),
+            ..KubernetesEventsConfig::default()
+        };
+
+        let original = checkpoint_configuration_hash(&config);
+        config.field_selector = Some("regarding.kind=Pod".to_string());
+        let changed = checkpoint_configuration_hash(&config);
+
+        assert_eq!(original.len(), 64);
+        assert_ne!(original, changed);
     }
 
     #[tokio::test]

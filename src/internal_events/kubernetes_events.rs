@@ -14,7 +14,7 @@ pub struct KubernetesEventsReceived {
 impl InternalEvent for KubernetesEventsReceived {
     fn emit(self) {
         trace!(
-            message = "Kubernetes event received.",
+            message = "Events received.",
             count = 1,
             byte_size = %self.byte_size,
         );
@@ -113,6 +113,23 @@ impl InternalEvent for KubernetesEventsLeaderLost {
 #[derive(Debug, NamedInternalEvent)]
 pub struct KubernetesEventsLeaderElectionError<E> {
     pub error: E,
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct KubernetesEventsCheckpointTooLarge {
+    pub size: usize,
+    pub limit: usize,
+}
+
+impl InternalEvent for KubernetesEventsCheckpointTooLarge {
+    fn emit(self) {
+        warn!(
+            message = "Kubernetes events checkpoints exceed the Lease annotation size limit; continuing without persistent checkpoints.",
+            size = self.size,
+            limit = self.limit,
+            internal_log_rate_limit = true,
+        );
+    }
 }
 
 impl<E: std::fmt::Display> InternalEvent for KubernetesEventsLeaderElectionError<E> {

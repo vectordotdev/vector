@@ -67,7 +67,9 @@ generated: components: sources: kubernetes_events: configuration: {
 			watch stream as an annotation on the Lease object. When another replica takes over, it
 			resumes each watch from that checkpoint. Duplicates can still occur during the failover
 			window, so downstream consumers that require exactly-once behavior should deduplicate on
-			the emitted `event_uid` and the event's `resourceVersion`.
+			the emitted `event_uid` and the event's `resourceVersion`. If the checkpoint data would
+			exceed Kubernetes' total annotation size limit, Vector keeps renewing the Lease without a
+			checkpoint and the next leader starts with a fresh list.
 			"""
 		required: false
 		type: object: options: {
@@ -89,20 +91,27 @@ generated: components: sources: kubernetes_events: configuration: {
 				}
 			}
 			lease_duration_seconds: {
-				description: "Lease duration."
-				required:    false
+				description: """
+					Lease duration.
+
+					Must be greater than `renew_deadline_seconds`.
+					"""
+				required: false
 				type: uint: {
 					default: 15
 					unit:    "seconds"
 				}
 			}
 			lease_name: {
-				description: "Name of the Kubernetes Lease object used for coordination."
-				required:    false
-				type: string: {
-					default: "vector-kubernetes-events"
-					examples: ["vector-kubernetes-events"]
-				}
+				description: """
+					Name of the Kubernetes Lease object used for coordination.
+
+					This is required when leader election is enabled. All replicas of the same logical source
+					must use the same name, and separate sources in the same Lease namespace must use different
+					names.
+					"""
+				required: false
+				type: string: examples: ["vector-kubernetes-events"]
 			}
 			lease_namespace: {
 				description: """
@@ -115,16 +124,24 @@ generated: components: sources: kubernetes_events: configuration: {
 				type: string: examples: ["observability"]
 			}
 			renew_deadline_seconds: {
-				description: "Maximum time this replica will continue as leader without a successful renewal."
-				required:    false
+				description: """
+					Maximum time this replica will continue as leader without a successful renewal.
+
+					Must be greater than `retry_period_seconds` and less than `lease_duration_seconds`.
+					"""
+				required: false
 				type: uint: {
 					default: 10
 					unit:    "seconds"
 				}
 			}
 			retry_period_seconds: {
-				description: "Time between leader election acquire and renew attempts."
-				required:    false
+				description: """
+					Time between leader election acquire and renew attempts.
+
+					Must be greater than zero and less than `renew_deadline_seconds`.
+					"""
+				required: false
 				type: uint: {
 					default: 2
 					unit:    "seconds"

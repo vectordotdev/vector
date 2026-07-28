@@ -12,7 +12,6 @@ pub const DEFAULT_MAX_EVENT_AGE_SECS: u64 = 3600;
 pub const DEFAULT_DEDUPE_RETENTION_SECS: u64 = 3600;
 pub const DEFAULT_WATCH_TIMEOUT_SECS: u32 = 290;
 pub const MAX_WATCH_TIMEOUT_SECS: u32 = 294;
-pub const DEFAULT_LEASE_NAME: &str = "vector-kubernetes-events";
 pub const DEFAULT_IDENTITY_ENV_VAR: &str = "VECTOR_SELF_POD_NAME";
 pub const FALLBACK_IDENTITY_ENV_VAR: &str = "HOSTNAME";
 pub const POD_NAMESPACE_ENV_VAR: &str = "VECTOR_SELF_POD_NAMESPACE";
@@ -96,7 +95,9 @@ pub struct KubernetesEventsConfig {
     /// watch stream as an annotation on the Lease object. When another replica takes over, it
     /// resumes each watch from that checkpoint. Duplicates can still occur during the failover
     /// window, so downstream consumers that require exactly-once behavior should deduplicate on
-    /// the emitted `event_uid` and the event's `resourceVersion`.
+    /// the emitted `event_uid` and the event's `resourceVersion`. If the checkpoint data would
+    /// exceed Kubernetes' total annotation size limit, Vector keeps renewing the Lease without a
+    /// checkpoint and the next leader starts with a fresh list.
     #[serde(default)]
     pub leader_election: KubernetesEventsLeaderElectionConfig,
 
@@ -116,9 +117,13 @@ pub struct KubernetesEventsLeaderElectionConfig {
     pub enabled: bool,
 
     /// Name of the Kubernetes Lease object used for coordination.
-    #[serde(default = "default_lease_name")]
+    ///
+    /// This is required when leader election is enabled. All replicas of the same logical source
+    /// must use the same name, and separate sources in the same Lease namespace must use different
+    /// names.
+    #[serde(default)]
     #[configurable(metadata(docs::examples = "vector-kubernetes-events"))]
-    pub lease_name: String,
+    pub lease_name: Option<String>,
 
     /// Namespace containing the Kubernetes Lease object.
     ///
@@ -136,16 +141,22 @@ pub struct KubernetesEventsLeaderElectionConfig {
     pub identity_env_var: String,
 
     /// Lease duration.
+    ///
+    /// Must be greater than `renew_deadline_seconds`.
     #[serde(default = "default_lease_duration_seconds")]
     #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Lease Duration"))]
     pub lease_duration_seconds: u64,
 
     /// Maximum time this replica will continue as leader without a successful renewal.
+    ///
+    /// Must be greater than `retry_period_seconds` and less than `lease_duration_seconds`.
     #[serde(default = "default_renew_deadline_seconds")]
     #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Renew Deadline"))]
     pub renew_deadline_seconds: u64,
 
     /// Time between leader election acquire and renew attempts.
+    ///
+    /// Must be greater than zero and less than `renew_deadline_seconds`.
     #[serde(default = "default_retry_period_seconds")]
     #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Retry Period"))]
     pub retry_period_seconds: u64,
@@ -155,7 +166,7 @@ impl Default for KubernetesEventsLeaderElectionConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            lease_name: DEFAULT_LEASE_NAME.to_string(),
+            lease_name: None,
             lease_namespace: None,
             identity_env_var: DEFAULT_IDENTITY_ENV_VAR.to_string(),
             lease_duration_seconds: DEFAULT_LEASE_DURATION_SECS,
@@ -197,10 +208,6 @@ const fn default_dedupe_retention_seconds() -> u64 {
 
 const fn default_watch_timeout_seconds() -> u32 {
     DEFAULT_WATCH_TIMEOUT_SECS
-}
-
-fn default_lease_name() -> String {
-    DEFAULT_LEASE_NAME.to_string()
 }
 
 fn default_identity_env_var() -> String {

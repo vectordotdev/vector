@@ -24,38 +24,44 @@ use tokio::time::sleep;
 use super::config::{self, FALLBACK_IDENTITY_ENV_VAR, KubernetesEventsLeaderElectionConfig};
 #[cfg(test)]
 use super::kube_timestamp_to_chrono;
-use crate::{internal_events::KubernetesEventsLeaderElectionError, shutdown::ShutdownSignal};
+use crate::{
+    internal_events::{KubernetesEventsCheckpointTooLarge, KubernetesEventsLeaderElectionError},
+    shutdown::ShutdownSignal,
+};
 
 const CHECKPOINTS_ANNOTATION: &str = "kubernetes-events.vector.dev/resource-version-checkpoints";
 const LEGACY_WATERMARK_ANNOTATION: &str = "kubernetes-events.vector.dev/watermark";
-const CHECKPOINTS_VERSION: u8 = 1;
+const CHECKPOINTS_VERSION: u8 = 2;
+// Kubernetes validates the combined byte length of all annotation keys and values against this
+// limit. Keeping the calculation local avoids turning an oversized checkpoint into renewal loss.
+const KUBERNETES_ANNOTATIONS_SIZE_LIMIT_BYTES: usize = 256 * 1024;
 
 /// Resource versions that have been safely handled, keyed by logical watch stream.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(super) struct ResourceVersionCheckpoints {
     version: u8,
-    configuration: String,
+    configuration_hash: String,
     streams: BTreeMap<String, String>,
 }
 
 impl ResourceVersionCheckpoints {
-    pub(super) const fn new(configuration: String) -> Self {
+    pub(super) const fn new(configuration_hash: String) -> Self {
         Self {
             version: CHECKPOINTS_VERSION,
-            configuration,
+            configuration_hash,
             streams: BTreeMap::new(),
         }
     }
 
-    fn resume(persisted: Option<Self>, configuration: &str) -> Self {
+    fn resume(persisted: Option<Self>, configuration_hash: &str) -> Self {
         match persisted {
             Some(checkpoints)
                 if checkpoints.version == CHECKPOINTS_VERSION
-                    && checkpoints.configuration == configuration =>
+                    && checkpoints.configuration_hash == configuration_hash =>
             {
                 checkpoints
             }
-            _ => Self::new(configuration.to_string()),
+            _ => Self::new(configuration_hash.to_string()),
         }
     }
 
@@ -101,21 +107,26 @@ impl LeaderElectionSettings {
         if config.retry_period_seconds == 0 {
             return Err("leader_election.retry_period_seconds must be greater than 0".into());
         }
+        let lease_name = config
+            .lease_name
+            .as_deref()
+            .and_then(non_empty_trimmed)
+            .ok_or("leader_election.lease_name must be set when leader election is enabled")?;
         if config.renew_deadline_seconds >= config.lease_duration_seconds {
             return Err(
                 "leader_election.renew_deadline_seconds must be less than lease_duration_seconds"
                     .into(),
             );
         }
-        if config.retry_period_seconds > config.renew_deadline_seconds {
+        if config.retry_period_seconds >= config.renew_deadline_seconds {
             return Err(
-                "leader_election.retry_period_seconds must be less than or equal to renew_deadline_seconds"
+                "leader_election.retry_period_seconds must be less than renew_deadline_seconds"
                     .into(),
             );
         }
 
         Ok(Some(Self {
-            lease_name: config.lease_name.clone(),
+            lease_name,
             lease_namespace: resolve_lease_namespace(config.lease_namespace.as_deref()),
             identity: resolve_identity(&config.identity_env_var)?,
             lease_duration: Duration::from_secs(config.lease_duration_seconds),
@@ -149,7 +160,7 @@ impl LeaseCoordinator {
     pub(super) async fn wait_for_leadership(
         &self,
         shutdown: &mut ShutdownSignal,
-        checkpoint_configuration: &str,
+        checkpoint_configuration_hash: &str,
     ) -> Option<AcquiredLeadership> {
         loop {
             match self.try_acquire_or_renew(None).await {
@@ -157,7 +168,7 @@ impl LeaseCoordinator {
                     return Some(AcquiredLeadership {
                         checkpoints: ResourceVersionCheckpoints::resume(
                             prior_checkpoints,
-                            checkpoint_configuration,
+                            checkpoint_configuration_hash,
                         ),
                     });
                 }
@@ -201,20 +212,17 @@ impl LeaseCoordinator {
         now: DateTime<Utc>,
         checkpoints: Option<&ResourceVersionCheckpoints>,
     ) -> Result<Lease, KubeError> {
+        let mut metadata = ObjectMeta {
+            name: Some(self.settings.lease_name.clone()),
+            namespace: Some(self.settings.lease_namespace.clone()),
+            ..ObjectMeta::default()
+        };
+        if let Some(checkpoints) = checkpoints {
+            set_checkpoint_annotation(&mut metadata, checkpoints);
+        }
+
         let lease = Lease {
-            metadata: ObjectMeta {
-                name: Some(self.settings.lease_name.clone()),
-                namespace: Some(self.settings.lease_namespace.clone()),
-                annotations: checkpoints.map(|checkpoints| {
-                    [(
-                        CHECKPOINTS_ANNOTATION.to_string(),
-                        serialize_checkpoints(checkpoints),
-                    )]
-                    .into_iter()
-                    .collect()
-                }),
-                ..ObjectMeta::default()
-            },
+            metadata,
             spec: Some(LeaseSpec {
                 acquire_time: Some(kube_micro_time(now)),
                 holder_identity: Some(self.settings.identity.clone()),
@@ -400,15 +408,7 @@ fn prepare_lease_update(
     spec.renew_time = Some(kube_micro_time(now));
 
     if let Some(checkpoints) = checkpoints {
-        let annotations = lease
-            .metadata
-            .annotations
-            .get_or_insert_with(Default::default);
-        annotations.remove(LEGACY_WATERMARK_ANNOTATION);
-        annotations.insert(
-            CHECKPOINTS_ANNOTATION.to_string(),
-            serialize_checkpoints(checkpoints),
-        );
+        set_checkpoint_annotation(&mut lease.metadata, checkpoints);
     }
 
     Some(lease)
@@ -426,6 +426,37 @@ fn lease_checkpoints(lease: &Lease) -> Option<ResourceVersionCheckpoints> {
 fn serialize_checkpoints(checkpoints: &ResourceVersionCheckpoints) -> String {
     serde_json::to_string(checkpoints)
         .expect("resource-version checkpoints contain only serializable values")
+}
+
+fn set_checkpoint_annotation(metadata: &mut ObjectMeta, checkpoints: &ResourceVersionCheckpoints) {
+    let serialized = serialize_checkpoints(checkpoints);
+    let other_annotations_size = metadata
+        .annotations
+        .as_ref()
+        .into_iter()
+        .flatten()
+        .filter(|(key, _)| {
+            key.as_str() != CHECKPOINTS_ANNOTATION && key.as_str() != LEGACY_WATERMARK_ANNOTATION
+        })
+        .map(|(key, value)| key.len() + value.len())
+        .sum::<usize>();
+    let size = other_annotations_size + CHECKPOINTS_ANNOTATION.len() + serialized.len();
+
+    let annotations = metadata.annotations.get_or_insert_with(Default::default);
+    annotations.remove(LEGACY_WATERMARK_ANNOTATION);
+    if size <= KUBERNETES_ANNOTATIONS_SIZE_LIMIT_BYTES {
+        annotations.insert(CHECKPOINTS_ANNOTATION.to_string(), serialized);
+    } else {
+        annotations.remove(CHECKPOINTS_ANNOTATION);
+        emit!(KubernetesEventsCheckpointTooLarge {
+            size,
+            limit: KUBERNETES_ANNOTATIONS_SIZE_LIMIT_BYTES,
+        });
+    }
+
+    if annotations.is_empty() {
+        metadata.annotations = None;
+    }
 }
 
 fn locally_observed_lease_is_expired(
@@ -537,6 +568,41 @@ mod tests {
                 CHECKPOINTS_ANNOTATION.to_string(),
                 serialize_checkpoints(checkpoints),
             );
+    }
+
+    #[test]
+    fn leader_election_requires_an_explicit_lease_name() {
+        let config = KubernetesEventsLeaderElectionConfig {
+            enabled: true,
+            ..KubernetesEventsLeaderElectionConfig::default()
+        };
+
+        let error = LeaderElectionSettings::from_config(&config)
+            .expect_err("an enabled election must identify its logical source");
+
+        assert_eq!(
+            error.to_string(),
+            "leader_election.lease_name must be set when leader election is enabled"
+        );
+    }
+
+    #[test]
+    fn leader_election_rejects_retry_period_equal_to_renew_deadline() {
+        let config = KubernetesEventsLeaderElectionConfig {
+            enabled: true,
+            lease_name: Some("events".to_string()),
+            renew_deadline_seconds: 10,
+            retry_period_seconds: 10,
+            ..KubernetesEventsLeaderElectionConfig::default()
+        };
+
+        let error = LeaderElectionSettings::from_config(&config)
+            .expect_err("the schedule must leave time for a retry before the deadline");
+
+        assert_eq!(
+            error.to_string(),
+            "leader_election.retry_period_seconds must be less than renew_deadline_seconds"
+        );
     }
 
     #[test]
@@ -846,6 +912,52 @@ mod tests {
         .expect("self-held lease should renew");
 
         assert_eq!(lease_checkpoints(&prepared), Some(updated));
+    }
+
+    #[test]
+    fn lease_update_omits_checkpoints_that_exceed_annotation_limit() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let mut lease = make_lease(Some("vector-0"), Some(now), Some(1));
+        let annotations = lease
+            .metadata
+            .annotations
+            .get_or_insert_with(Default::default);
+        annotations.insert(
+            LEGACY_WATERMARK_ANNOTATION.to_string(),
+            "legacy".to_string(),
+        );
+        annotations.insert("example.com/other".to_string(), "keep-me".to_string());
+
+        let oversized = checkpoints(
+            "config",
+            &[("all", &"x".repeat(KUBERNETES_ANNOTATIONS_SIZE_LIMIT_BYTES))],
+        );
+        let prepared = prepare_lease_update(
+            lease,
+            &leader_settings("vector-0"),
+            now,
+            false,
+            Some(&oversized),
+        )
+        .expect("an oversized checkpoint must not prevent lease renewal");
+        let annotations = prepared
+            .metadata
+            .annotations
+            .expect("unrelated annotations should remain");
+
+        assert!(!annotations.contains_key(CHECKPOINTS_ANNOTATION));
+        assert!(!annotations.contains_key(LEGACY_WATERMARK_ANNOTATION));
+        assert_eq!(
+            annotations.get("example.com/other").map(String::as_str),
+            Some("keep-me")
+        );
+        assert_eq!(
+            prepared
+                .spec
+                .and_then(|spec| spec.renew_time)
+                .and_then(|time| kube_timestamp_to_chrono(time.0)),
+            Some(now)
+        );
     }
 
     #[test]
