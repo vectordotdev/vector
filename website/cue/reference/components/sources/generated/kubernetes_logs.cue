@@ -232,16 +232,30 @@ generated: components: sources: kubernetes_logs: configuration: {
 	namespace_annotation_fields: {
 		description: "Configuration for how the events are enriched with Namespace metadata."
 		required:    false
-		type: object: options: namespace_labels: {
-			description: """
-				Event field for the Namespace's labels.
+		type: object: options: {
+			namespace_annotations: {
+				description: """
+					Event field for the Namespace's annotations.
 
-				Set to `""` to suppress this key.
-				"""
-			required: false
-			type: string: {
-				default: ".kubernetes.namespace_labels"
-				examples: [".k8s.ns_labels", "k8s.ns_labels", ""]
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.namespace_annotations"
+					examples: [".k8s.ns_annotations", "k8s.ns_annotations", ""]
+				}
+			}
+			namespace_labels: {
+				description: """
+					Event field for the Namespace's labels.
+
+					Set to `""` to suppress this key.
+					"""
+				required: false
+				type: string: {
+					default: ".kubernetes.namespace_labels"
+					examples: [".k8s.ns_labels", "k8s.ns_labels", ""]
+				}
 			}
 		}
 	}
