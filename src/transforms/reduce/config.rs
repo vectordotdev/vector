@@ -232,7 +232,7 @@ impl TransformConfig for ReduceConfig {
         vec![TransformOutput::new(DataType::Log, output_definitions)]
     }
 
-    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         if self.ends_when.is_some() && self.starts_when.is_some() {
