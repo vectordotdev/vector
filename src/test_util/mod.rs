@@ -99,7 +99,8 @@ where
 {
     let generated = T::generate_config();
 
-    let toml_cfg = toml::to_string(&generated).unwrap();
+    // TOML cannot represent JSON null; strip None-valued fields before serializing.
+    let toml_cfg = toml::to_string(&crate::generate::strip_nulls(generated.clone())).unwrap();
     toml::from_str::<T>(&toml_cfg).unwrap_or_else(|e| {
         panic!("Invalid config generated from TOML string:\n\n{e}\n'{toml_cfg}'")
     });

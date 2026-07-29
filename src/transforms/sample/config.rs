@@ -163,8 +163,8 @@ impl SampleConfig {
 }
 
 impl GenerateConfig for SampleConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             rate: None,
             ratio: Some(0.1),
             ratio_field: None,

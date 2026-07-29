@@ -119,7 +119,7 @@ impl Default for AmqpSinkConfig {
 }
 
 impl GenerateConfig for AmqpSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"connection_string = "amqp://localhost:5672/%2f"
             routing_key = "user_id"

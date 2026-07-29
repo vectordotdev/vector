@@ -111,8 +111,8 @@ fn route_examples() -> IndexMap<String, AnyCondition> {
 }
 
 impl GenerateConfig for RouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             reroute_unmatched: true,
             route: route_examples(),
         })

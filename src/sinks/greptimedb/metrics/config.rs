@@ -22,7 +22,7 @@ use crate::sinks::{
 pub struct GreptimeDBConfig(GreptimeDBMetricsConfig);
 
 impl GenerateConfig for GreptimeDBConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         <GreptimeDBMetricsConfig as GenerateConfig>::generate_config()
     }
 }
