@@ -666,7 +666,7 @@ gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 enrichment-tables-mmdb = ["dep:maxminddb"]
-enrichment-tables-memory = ["dep:cuckoo-clock", "dep:evmap", "dep:evmap-derive", "dep:thread_local", "dep:tempfile"]
+enrichment-tables-memory = ["dep:bloomy", "dep:cuckoo-clock", "dep:evmap", "dep:evmap-derive", "dep:thread_local", "dep:tempfile"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
@@ -1187,7 +1187,6 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transfo
 statistic-benches = []
 remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
-codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
@@ -1234,9 +1233,3 @@ path = "benches/transform/main.rs"
 harness = false
 test = false
 required-features = ["transform-benches"]
-
-[[bench]]
-name = "codecs"
-path = "benches/codecs/main.rs"
-harness = false
-required-features = ["codecs-benches"]

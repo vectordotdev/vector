@@ -163,8 +163,8 @@ const fn default_endpoint_target() -> EndpointTarget {
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
             host_key: None,
@@ -189,12 +189,11 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    /// Confinement + sink construction without emitting the per-sink
-    /// confinement gauge. `component_name` is used for both the gauge label
-    /// (by the caller) and the per-template security warnings emitted from
-    /// `Template::confine`, so wrapping sinks (Humio) see their own type in
-    /// logs and metrics rather than the delegated `splunk_hec_logs`.
-    pub(crate) fn build_without_confinement_gauge(
+    /// Confinement + sink construction. `component_name` is threaded into the
+    /// per-template security warnings emitted from `Template::confine`, so
+    /// wrapping sinks (Humio) see their own type in logs rather than the
+    /// delegated `splunk_hec_logs`.
+    pub(crate) fn build_with_component_type(
         &self,
         cx: SinkContext,
         component_name: &'static str,
@@ -203,17 +202,19 @@ impl HecLogsSinkConfig {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
 
-        let mut confined_config = self.clone();
-        confined_config.index = confined_config
+        let index = self
             .index
+            .clone()
             .map(|t| t.confine(&self.confinement, component_name, "index"))
             .transpose()?;
-        confined_config.source = confined_config
+        let source = self
             .source
+            .clone()
             .map(|t| t.confine(&self.confinement, component_name, "source"))
             .transpose()?;
-        confined_config.sourcetype = confined_config
+        let sourcetype = self
             .sourcetype
+            .clone()
             .map(|t| t.confine(&self.confinement, component_name, "sourcetype"))
             .transpose()?;
 
@@ -224,7 +225,7 @@ impl HecLogsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = confined_config.build_processor(client, cx)?;
+        let sink = self.build_processor(client, cx, sourcetype, source, index)?;
 
         Ok((sink, healthcheck))
     }
@@ -234,9 +235,11 @@ impl HecLogsSinkConfig {
 #[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let result = self.build_without_confinement_gauge(cx, Self::NAME)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
-        Ok(result)
+        self.build_with_component_type(cx, Self::NAME)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -249,7 +252,14 @@ impl SinkConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    pub fn build_processor(&self, client: HttpClient, _: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        client: HttpClient,
+        _: SinkContext,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
+    ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
@@ -298,9 +308,9 @@ impl HecLogsSinkConfig {
             service,
             request_builder,
             batch_settings,
-            sourcetype: self.sourcetype.clone(),
-            source: self.source.clone(),
-            index: self.index.clone(),
+            sourcetype,
+            source,
+            index,
             indexed_fields: self
                 .indexed_fields
                 .iter()

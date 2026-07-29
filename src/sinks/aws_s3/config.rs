@@ -198,8 +198,8 @@ pub(super) fn default_filename_time_format() -> String {
 }
 
 impl GenerateConfig for S3SinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             bucket: "".to_owned(),
             key_prefix: default_key_prefix(),
             filename_time_format: default_filename_time_format(),
@@ -232,8 +232,11 @@ impl SinkConfig for S3SinkConfig {
         let service = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
         let sink = self.build_processor(service, cx)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

@@ -191,8 +191,8 @@ pub struct ZerobusSinkConfig {
 }
 
 impl GenerateConfig for ZerobusSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             ingestion_endpoint: "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
                 .to_string(),
             table_name: "main.default.logs".to_string(),

@@ -113,8 +113,10 @@ components: sources: pulsar: {
 		topics: {
 			description: "The Pulsar topic names to read events from."
 			required:    true
-			type: string: {
-				examples: ["topic-1234"]
+			type: array: {
+				items: type: string: {
+					examples: ["topic-1234"]
+				}
 			}
 		}
 	}

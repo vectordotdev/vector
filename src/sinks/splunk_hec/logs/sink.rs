@@ -20,7 +20,7 @@ use crate::{
         },
         util::processed_event::ProcessedEvent,
     },
-    template::Template,
+    template::ConfinedTemplate,
 };
 
 // NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
@@ -30,9 +30,9 @@ pub struct HecLogsSink<S> {
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub indexed_fields: Vec<OwnedValuePath>,
     pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<String>,
@@ -42,9 +42,9 @@ pub struct HecLogsSink<S> {
 }
 
 pub struct HecLogData<'a> {
-    pub sourcetype: Option<&'a Template>,
-    pub source: Option<&'a Template>,
-    pub index: Option<&'a Template>,
+    pub sourcetype: Option<&'a ConfinedTemplate>,
+    pub source: Option<&'a ConfinedTemplate>,
+    pub index: Option<&'a ConfinedTemplate>,
     pub indexed_fields: &'a [OwnedValuePath],
     pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<&'a String>,
@@ -167,9 +167,9 @@ where
 /// metadata omission.
 fn has_confined_partition_error(
     event: &Event,
-    source: Option<&Template>,
-    sourcetype: Option<&Template>,
-    index: Option<&Template>,
+    source: Option<&ConfinedTemplate>,
+    sourcetype: Option<&ConfinedTemplate>,
+    index: Option<&ConfinedTemplate>,
 ) -> bool {
     let mut confined = false;
     for (tpl, field) in [
@@ -205,17 +205,17 @@ pub(super) struct Partitioned {
 
 #[derive(Default)]
 struct EventPartitioner {
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub host_key: Option<OptionalTargetPath>,
 }
 
 impl EventPartitioner {
     const fn new(
-        sourcetype: Option<Template>,
-        source: Option<Template>,
-        index: Option<Template>,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
         host_key: Option<OptionalTargetPath>,
     ) -> Self {
         Self {
@@ -419,7 +419,7 @@ impl EventCount for HecProcessedEvent {
 #[cfg(test)]
 mod pre_check_tests {
     use super::*;
-    use crate::template::ConfinementConfig;
+    use crate::template::{ConfinementConfig, Template};
     use vector_lib::event::LogEvent;
     use vrl::event_path;
 

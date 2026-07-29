@@ -254,7 +254,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
 }
 
 impl GenerateConfig for GcsSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"
@@ -281,9 +281,11 @@ impl SinkConfig for GcsSinkConfig {
         )?;
         auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth, cx)?;
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
