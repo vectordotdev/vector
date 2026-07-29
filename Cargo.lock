@@ -13204,6 +13204,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes",
+ "chrono",
  "clap",
  "crc32fast",
  "criterion",
@@ -13238,6 +13239,7 @@ dependencies = [
  "tracing-subscriber",
  "vector-common",
  "vector-config",
+ "vector-core",
 ]
 
 [[package]]

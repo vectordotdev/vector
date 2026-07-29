@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
+autobenches = false
 
 [lints]
 workspace = true
@@ -42,6 +43,7 @@ antithesis-disk-asserts = ["dep:antithesis_sdk", "dep:serde_json"]
 test = []
 
 [dev-dependencies]
+chrono.workspace = true
 clap.workspace = true
 criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.12"
@@ -57,9 +59,11 @@ temp-dir = "0.1.16"
 tokio-test.workspace = true
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
+vector-core = { path = "../vector-core", default-features = false }
 
 [[bench]]
-name = "sized_records"
+name = "vector-buffers"
+path = "benches/main.rs"
 harness = false
 
 [[example]]

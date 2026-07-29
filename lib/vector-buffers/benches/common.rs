@@ -1,4 +1,8 @@
-use std::{error, fmt, path::PathBuf};
+use std::{
+    error, fmt,
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 use bytes::{Buf, BufMut};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
@@ -6,7 +10,7 @@ use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
-    BufferType, EventCount,
+    BufferType, Bufferable, EventCount, MemoryBufferSize, WhenFull,
     encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
@@ -19,6 +23,81 @@ use vector_common::{
         AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable, MergeFinalizable,
     },
 };
+
+/// Owns a temporary benchmark data directory and creates isolated iteration paths.
+pub struct DataDir {
+    index: usize,
+    base: PathBuf,
+    current: Option<PathBuf>,
+}
+
+impl DataDir {
+    pub fn new(name: &str) -> Self {
+        let mut base = std::env::temp_dir();
+        base.push(name);
+        if base.exists() {
+            // Remove data abandoned by an interrupted benchmark before reusing its deterministic path.
+            std::fs::remove_dir_all(&base).expect("could not remove stale base dir");
+        }
+        std::fs::create_dir_all(&base).expect("could not make base dir");
+
+        Self {
+            index: 0,
+            base,
+            current: None,
+        }
+    }
+
+    /// Removes the prior iteration directory before creating the next one.
+    ///
+    /// This cleanup intentionally occurs in Criterion's setup closure, outside the timed routine.
+    /// Disk buffers must allocate at least 256 MiB, so retaining a directory per iteration would
+    /// quickly exhaust disk space; deleting it from the timed routine would benchmark cleanup.
+    pub fn next(&mut self) -> PathBuf {
+        if let Some(current) = self.current.take() {
+            std::fs::remove_dir_all(current).expect("could not remove previous dir");
+        }
+
+        let mut next = self.base.clone();
+        next.push(self.index.to_string());
+        self.index += 1;
+        std::fs::create_dir_all(&next).expect("could not make next dir");
+
+        self.current = Some(next.clone());
+        next
+    }
+}
+
+impl Drop for DataDir {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.base).expect("could not remove base dir");
+    }
+}
+
+pub fn disk_buffer(max_size: u64) -> BufferType {
+    BufferType::DiskV2 {
+        max_size: NonZeroU64::new(max_size).expect("disk capacity must be non-zero"),
+        when_full: WhenFull::DropNewest,
+    }
+}
+
+pub fn memory_buffer_by_events(max_events: usize) -> BufferType {
+    BufferType::Memory {
+        size: MemoryBufferSize::MaxEvents(
+            NonZeroUsize::new(max_events).expect("event count must be non-zero"),
+        ),
+        when_full: WhenFull::DropNewest,
+    }
+}
+
+pub fn memory_buffer_by_bytes(max_size: usize) -> BufferType {
+    BufferType::Memory {
+        size: MemoryBufferSize::MaxSize(
+            NonZeroUsize::new(max_size).expect("memory capacity must be non-zero"),
+        ),
+        when_full: WhenFull::DropNewest,
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Message<const N: usize> {
@@ -122,33 +201,89 @@ impl<const N: usize> FixedEncodable for Message<N> {
     }
 }
 
-#[allow(dead_code)]
-#[allow(clippy::type_complexity)]
-pub async fn setup<const N: usize>(
-    variant: BufferType,
-    total_events: usize,
-    data_dir: Option<PathBuf>,
-    id: String,
-) -> (
-    BufferSender<Message<N>>,
-    BufferReceiver<Message<N>>,
-    Vec<Message<N>>,
-) {
-    let mut messages: Vec<Message<N>> = Vec::with_capacity(total_events);
-    for i in 0..total_events {
-        messages.push(Message::new(i as u64));
+pub struct BenchmarkState<T: Bufferable> {
+    sender: BufferSender<T>,
+    receiver: BufferReceiver<T>,
+    messages: Vec<T>,
+    received: Vec<T>,
+}
+
+impl<T: Bufferable> BenchmarkState<T> {
+    async fn write_then_read(mut self) -> Self {
+        let message_count = self.messages.len();
+        for message in self.messages.drain(..) {
+            self.sender.send(message, None).await.unwrap();
+        }
+        self.sender
+            .flush()
+            .await
+            .expect("buffer flush must succeed");
+
+        for _ in 0..message_count {
+            self.received
+                .push(self.receiver.next().await.expect("record must exist"));
+        }
+
+        self
     }
 
-    let mut builder = TopologyBuilder::default();
-    variant
-        .add_to_builder(&mut builder, data_dir, id)
-        .expect("should not fail to add variant to builder");
-    let (tx, rx) = builder
-        .build(String::from("benches"), Span::none())
-        .await
-        .expect("should not fail to build topology");
+    async fn write_and_read(mut self) -> Self {
+        for message in self.messages.drain(..) {
+            self.sender.send(message, None).await.unwrap();
+            self.sender
+                .flush()
+                .await
+                .expect("buffer flush must succeed");
+            self.received.push(self.receiver.next().await.unwrap());
+        }
 
-    (tx, rx, messages)
+        self
+    }
+
+    pub async fn setup_with<F>(
+        variant: BufferType,
+        total_records: usize,
+        data_dir: Option<PathBuf>,
+        id: String,
+        mut make_record: F,
+    ) -> Self
+    where
+        T: Clone,
+        F: FnMut(usize) -> T,
+    {
+        let messages = (0..total_records).map(&mut make_record).collect();
+        let received = Vec::with_capacity(total_records);
+
+        let mut builder = TopologyBuilder::default();
+        variant
+            .add_to_builder(&mut builder, data_dir, id)
+            .expect("should not fail to add variant to builder");
+        let (sender, receiver) = builder
+            .build(String::from("benches"), Span::none())
+            .await
+            .expect("should not fail to build topology");
+
+        Self {
+            sender,
+            receiver,
+            messages,
+            received,
+        }
+    }
+}
+
+impl<const N: usize> BenchmarkState<Message<N>> {
+    pub async fn setup(
+        variant: BufferType,
+        total_events: usize,
+        data_dir: Option<PathBuf>,
+        id: String,
+    ) -> Self {
+        Self::setup_with(variant, total_events, data_dir, id, |id| {
+            Message::new(id as u64)
+        })
+        .await
+    }
 }
 
 pub fn init_instrumentation() {
@@ -169,26 +304,24 @@ pub fn init_instrumentation() {
 // reads it from the buffer.
 //
 
-pub async fn wtr_measurement<const N: usize>(
-    mut sender: BufferSender<Message<N>>,
-    mut receiver: BufferReceiver<Message<N>>,
-    messages: Vec<Message<N>>,
-) {
-    for msg in messages.into_iter() {
-        sender.send(msg, None).await.unwrap();
-    }
-    drop(sender);
-
-    while receiver.next().await.is_some() {}
+#[derive(Clone, Copy)]
+pub enum Operation {
+    WriteThenRead,
+    WriteAndRead,
 }
 
-pub async fn war_measurement<const N: usize>(
-    mut sender: BufferSender<Message<N>>,
-    mut receiver: BufferReceiver<Message<N>>,
-    messages: Vec<Message<N>>,
-) {
-    for msg in messages.into_iter() {
-        sender.send(msg, None).await.unwrap();
-        _ = receiver.next().await.unwrap();
+impl Operation {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::WriteThenRead => "write-then-read",
+            Self::WriteAndRead => "write-and-read",
+        }
+    }
+
+    pub async fn measure<T: Bufferable>(self, state: BenchmarkState<T>) -> BenchmarkState<T> {
+        match self {
+            Self::WriteThenRead => state.write_then_read().await,
+            Self::WriteAndRead => state.write_and_read().await,
+        }
     }
 }
