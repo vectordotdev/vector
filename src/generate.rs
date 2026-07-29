@@ -482,8 +482,8 @@ mod tests {
 
                 [transforms.transform0]
                 inputs = ["source0"]
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
 
                 [sinks.sink0]
@@ -522,8 +522,8 @@ mod tests {
 
                 [transforms.transform0]
                 inputs = ["source0"]
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
 
                 [sinks.sink0]
@@ -616,20 +616,20 @@ mod tests {
 
                 [transforms.transform0]
                 inputs = []
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
 
                 [transforms.transform1]
                 inputs = ["transform0"]
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
 
                 [transforms.transform2]
                 inputs = ["transform1"]
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
             "#}
             .to_string())
@@ -642,20 +642,20 @@ mod tests {
             Ok(indoc::indoc! {r#"
                 [transforms.transform0]
                 inputs = []
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
 
                 [transforms.transform1]
                 inputs = ["transform0"]
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
 
                 [transforms.transform2]
                 inputs = ["transform1"]
-                increase = 0.0
                 suffix = ""
+                increase = 0.0
                 type = "test_basic"
             "#}
             .to_string())
@@ -682,21 +682,21 @@ mod tests {
             data_dir: /var/lib/vector/
             sources:
               source0:
+                interval: 1.0
                 count: 9223372036854775807
-                decoding:
-                  codec: bytes
                 format: json
                 framing:
                   method: bytes
-                interval: 1.0
+                decoding:
+                  codec: bytes
                 type: demo_logs
             transforms:
               transform0:
                 inputs:
                 - source0
-                drop_on_abort: false
-                drop_on_error: false
                 metric_tag_values: single
+                drop_on_error: false
+                drop_on_abort: false
                 reroute_dropped: false
                 runtime: ast
                 type: remap
@@ -704,11 +704,11 @@ mod tests {
               sink0:
                 inputs:
                 - transform0
+                target: stdout
                 encoding:
                   codec: json
                   json:
                     pretty: false
-                target: stdout
                 type: console
                 healthcheck:
                   enabled: true
@@ -742,15 +742,15 @@ mod tests {
               "data_dir": "/var/lib/vector/",
               "sources": {
                 "source0": {
+                  "interval": 1.0,
                   "count": 9223372036854775807,
-                  "decoding": {
-                    "codec": "bytes"
-                  },
                   "format": "json",
                   "framing": {
                     "method": "bytes"
                   },
-                  "interval": 1.0,
+                  "decoding": {
+                    "codec": "bytes"
+                  },
                   "type": "demo_logs"
                 }
               },
@@ -759,9 +759,9 @@ mod tests {
                   "inputs": [
                     "source0"
                   ],
-                  "drop_on_abort": false,
-                  "drop_on_error": false,
                   "metric_tag_values": "single",
+                  "drop_on_error": false,
+                  "drop_on_abort": false,
                   "reroute_dropped": false,
                   "runtime": "ast",
                   "type": "remap"
@@ -772,13 +772,13 @@ mod tests {
                   "inputs": [
                     "transform0"
                   ],
+                  "target": "stdout",
                   "encoding": {
                     "codec": "json",
                     "json": {
                       "pretty": false
                     }
                   },
-                  "target": "stdout",
                   "type": "console",
                   "healthcheck": {
                     "enabled": true,
