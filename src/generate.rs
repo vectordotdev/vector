@@ -9,7 +9,7 @@ use clap::Parser;
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
-use toml::{Value, map::Map};
+use serde_json::{Map, Value};
 use vector_lib::{
     buffers::BufferConfig,
     config::GlobalOptions,
@@ -115,6 +115,19 @@ struct FullConfig {
     config: Config,
 }
 
+pub(crate) fn strip_nulls(value: Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .filter(|(_, v)| !v.is_null())
+                .map(|(k, v)| (k, strip_nulls(v)))
+                .collect(),
+        ),
+        Value::Array(arr) => Value::Array(arr.into_iter().map(strip_nulls).collect()),
+        other => other,
+    }
+}
+
 pub(crate) fn generate_example(
     opts: &Opts,
     transform_inputs_strategy: TransformInputsStrategy,
@@ -157,16 +170,16 @@ pub(crate) fn generate_example(
             source_names.push(name.clone());
 
             let mut example = match SourceDescription::example(&source_type) {
-                Ok(example) => example,
+                Ok(example) => strip_nulls(example),
                 Err(err) => {
                     errs.push(format!("failed to generate source '{source_type}': {err}"));
-                    Value::Table(Map::new())
+                    Value::Object(Map::new())
                 }
             };
             example
-                .as_table_mut()
+                .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".into(), source_type.to_owned().into());
+                .insert("type".to_string(), Value::String(source_type.to_owned()));
 
             sources.insert(name, example);
         }
@@ -216,18 +229,18 @@ pub(crate) fn generate_example(
             };
 
             let mut example = match TransformDescription::example(&transform_type) {
-                Ok(example) => example,
+                Ok(example) => strip_nulls(example),
                 Err(err) => {
                     errs.push(format!(
                         "failed to generate transform '{transform_type}': {err}"
                     ));
-                    Value::Table(Map::new())
+                    Value::Object(Map::new())
                 }
             };
             example
-                .as_table_mut()
+                .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".into(), transform_type.to_owned().into());
+                .insert("type".to_string(), Value::String(transform_type.to_owned()));
 
             transforms.insert(
                 name,
@@ -264,16 +277,16 @@ pub(crate) fn generate_example(
             };
 
             let mut example = match SinkDescription::example(&sink_type) {
-                Ok(example) => example,
+                Ok(example) => strip_nulls(example),
                 Err(err) => {
                     errs.push(format!("failed to generate sink '{sink_type}': {err}"));
-                    Value::Table(Map::new())
+                    Value::Object(Map::new())
                 }
             };
             example
-                .as_table_mut()
+                .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".into(), sink_type.to_owned().into());
+                .insert("type".to_string(), Value::String(sink_type.to_owned()));
 
             sinks.insert(
                 name,
