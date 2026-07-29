@@ -17,6 +17,12 @@ components: sinks: file: {
 		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    10000000
+				timeout_secs: 300.0
+			}
 			compression: {
 				enabled: true
 				default: "none"
@@ -77,6 +83,27 @@ components: sinks: file: {
 				ensures that the operating system does not generate an
 				error, it does not wait until the data is written to
 				disk before acknowledging the events.
+				"""
+		}
+
+		parquet: {
+			title: "Apache Parquet Encoding"
+			body: """
+				By default, the file sink writes events one at a time
+				using the configured `encoding` and `framing`. Setting
+				`batch_encoding.codec` to `parquet` switches the sink to
+				batch events together and encode them as columnar
+				[Apache Parquet](https://parquet.apache.org/) files. The
+				`batch` option controls how events are grouped into
+				batches when `batch_encoding` is set.
+
+				Because columnar files cannot be appended to, each batch
+				is written to a distinct file: a millisecond timestamp is
+				inserted into the rendered `path` before the file
+				extension so that successive batches do not overwrite one
+				another. The columnar format handles its own internal
+				compression, so the top-level `compression` setting is
+				ignored when `batch_encoding` is set.
 				"""
 		}
 	}
