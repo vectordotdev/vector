@@ -22,6 +22,8 @@
 
                 {{ if $v.required }}
                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                {{ else if $v.required_one_of }}
+                  {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                 {{ else }}
                   {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
                 {{ end }}
@@ -519,6 +521,8 @@
 
               {{ if $v.required }}
                 {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+              {{ else if $v.required_one_of }}
+                {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
               {{ else }}
                 {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
               {{ end }}
@@ -625,6 +629,8 @@
 
                   {{ if $v.required }}
                     {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                  {{ else if $v.required_one_of }}
+                    {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                   {{ else }}
                     {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
                   {{ end }}
@@ -663,6 +669,8 @@
                               <span class="flex space-x-1">
                                 {{ if $v.required }}
                                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                                {{ else if $v.required_one_of }}
+                                  {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                                 {{ else }}
                                   {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
                                 {{ end }}
@@ -2045,6 +2053,8 @@
 
             {{ if $v.required }}
               {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+            {{ else if $v.required_one_of }}
+              {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
             {{ else }}
               {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
             {{ end }}

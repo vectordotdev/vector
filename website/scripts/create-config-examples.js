@@ -173,6 +173,21 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     }
   });
 
+  // For required_one_of groups, pick one representative (the first element listed in the group).
+  // This ensures minimal examples include exactly one field from each mutually exclusive group.
+  const requiredOneOfSelected = new Set();
+  const seenGroups = new Set();
+  Object.keys(params).forEach((k) => {
+    const p = params[k];
+    if (Array.isArray(p.required_one_of) && p.required_one_of.length > 0) {
+      const representative = p.required_one_of[0];
+      if (!seenGroups.has(representative)) {
+        seenGroups.add(representative);
+        requiredOneOfSelected.add(representative);
+      }
+    }
+  });
+
   // Evaluate a relevant_when condition string against the discriminators.
   // Handles "key = \"value\"" and "key = \"v1\" or key = \"v2\"" by matching the first clause.
   const matchesWhen = (p) => {
@@ -184,7 +199,7 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
 
   const obj = {};
   Object.keys(params)
-    .filter((k) => filter(params[k]) && matchesWhen(params[k]))
+    .filter((k) => (filter(params[k]) || requiredOneOfSelected.has(k)) && matchesWhen(params[k]))
     .forEach((k) => {
       let value = getExampleValue(params[k], deepFilter);
       if (value != null) {

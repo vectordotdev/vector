@@ -226,6 +226,15 @@ impl<'a> Field<'a> {
         self.attrs.flatten
     }
 
+    /// The `required_one_of` group name, if any.
+    ///
+    /// When set, this field is part of a named group where exactly one member must be provided.
+    /// The generated JSON Schema expresses this as an `allOf: [{ oneOf: [{ required: [...] }] }]`
+    /// constraint on the parent struct.
+    pub fn required_one_of(&self) -> Option<&str> {
+        self.attrs.required_one_of.as_deref()
+    }
+
     /// Metadata (custom attributes) for the field, if any.
     ///
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
@@ -264,6 +273,7 @@ struct Attributes {
     validation: Vec<Validation>,
     #[darling(skip)]
     delegated_ty: Option<syn::Type>,
+    required_one_of: Option<String>,
 }
 
 impl Attributes {
