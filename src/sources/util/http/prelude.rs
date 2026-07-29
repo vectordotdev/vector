@@ -43,7 +43,10 @@ use crate::{
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[cfg(unix)]
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
 use crate::sources::util::{change_socket_ownership, change_socket_permissions};
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -304,7 +307,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         error!("An error occurred: {:?}.", err);
                     })?;
             } else {
-                #[cfg(unix)]
+                #[cfg(all(
+                    unix,
+                    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+                ))]
                 if let Some(path) = socket_path {
                     let listener = UnixListener::bind(&path).map_err(|err| {
                         error!(message = "Failed to bind Unix socket.", ?path, %err);

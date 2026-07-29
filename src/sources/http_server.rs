@@ -225,6 +225,10 @@ impl SimpleHttpConfig {
             );
         }
 
+        if self.socket_path.is_some() && self.keepalive != KeepaliveConfig::default() {
+            return Err("`keepalive` configuration is not supported for Unix sockets.".into());
+        }
+
         match (&self.address, &self.socket_path) {
             (Some(_), Some(_)) => Err("`address` and `socket_path` are mutually exclusive.".into()),
             (None, Some(_)) => {
@@ -233,7 +237,8 @@ impl SimpleHttpConfig {
                 #[cfg(unix)]
                 Ok(())
             }
-            _ => Ok(()),
+            (Some(_), None) => Ok(()),
+            (None, None) => Err("Must specify either `address` or `socket_path`.".into()),
         }
     }
 
@@ -450,10 +455,7 @@ impl SourceConfig for SimpleHttpConfig {
         };
         self.validate_address()?;
 
-        let address = match (&self.address, &self.socket_path) {
-            (None, None) => Some(default_address()),
-            (address, _) => address.clone(),
-        };
+        let address = self.address.clone();
 
         source.run(
             address,
@@ -840,6 +842,7 @@ mod tests {
         spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
     }
 
+    #[cfg(unix)]
     #[test]
     fn unix_socket_config_validation() {
         // Valid config
@@ -859,6 +862,13 @@ mod tests {
         // Invalid: Permissions set without a socket_path
         let config: SimpleHttpConfig = serde_yaml::from_str("socket_file_mode: 432").unwrap();
         assert!(config.validate_address().is_err());
+
+        // Invalid: keepalive configured with socket_path
+        let config: SimpleHttpConfig = serde_yaml::from_str(
+            "socket_path: /tmp/vector-http.sock\nkeepalive:\n  max_connection_age_secs: 100",
+        )
+        .unwrap();
+        assert!(config.validate_address().is_err());
     }
 
     #[cfg(unix)]
@@ -872,6 +882,7 @@ mod tests {
         context.shutdown = shutdown;
 
         let source = SimpleHttpConfig {
+            address: None,
             socket_path: Some(socket_path.clone()),
             socket_file_mode: Some(0o660),
             ..Default::default()
