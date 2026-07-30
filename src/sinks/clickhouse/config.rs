@@ -6,8 +6,13 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
+use vector_lib::codecs::{
+    BatchEncoder, EncoderKind, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    encoding::{BatchSerializerConfig, Framer},
+};
 
 use super::{
+    arrow,
     request_builder::ClickhouseRequestBuilder,
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
@@ -18,6 +23,7 @@ use crate::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
+    template::ConfinementConfig,
 };
 
 /// Data format.
@@ -150,6 +156,10 @@ pub struct ClickhouseConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub query_settings: QuerySettingsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 /// Query settings for the `clickhouse` sink.
@@ -211,11 +221,8 @@ impl_generate_config_from_default!(ClickhouseConfig);
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.with_default_parts().uri;
-
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
-
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
@@ -239,16 +246,24 @@ impl SinkConfig for ClickhouseConfig {
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let database = self.database.clone().unwrap_or_else(|| {
+        // Use config templates for introspection in resolve_strategy.
+        let database_template = self.database.clone().unwrap_or_else(|| {
             "default"
                 .try_into()
                 .expect("'default' should be a valid template")
         });
 
-        // Resolve the encoding strategy (format + encoder) based on configuration
+        // Resolve the encoding strategy (format + encoder) based on configuration.
         let (format, encoder_kind) = self
-            .resolve_strategy(&client, &endpoint, &database, auth.as_ref())
+            .resolve_strategy(&client, &endpoint, &database_template, auth.as_ref())
             .await?;
+
+        // Confine templates for runtime use in the sink.
+        let confined_table = self
+            .table
+            .clone()
+            .confine(&self.confinement, Self::NAME, "table")?;
+        let database = database_template.confine(&self.confinement, Self::NAME, "database")?;
 
         let request_builder = ClickhouseRequestBuilder {
             compression: self.compression,
@@ -259,14 +274,17 @@ impl SinkConfig for ClickhouseConfig {
             batch_settings,
             service,
             database,
-            self.table.clone(),
+            confined_table,
             format,
             request_builder,
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
-
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -290,15 +308,7 @@ impl ClickhouseConfig {
         database: &Template,
         auth: Option<&Auth>,
     ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
-        use vector_lib::codecs::EncoderKind;
-        use vector_lib::codecs::{
-            JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
-        };
-
         if let Some(batch_encoding) = &self.batch_encoding {
-            use vector_lib::codecs::BatchEncoder;
-            use vector_lib::codecs::encoding::BatchSerializerConfig;
-
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {
                 return Err(format!(
@@ -343,8 +353,6 @@ impl ClickhouseConfig {
         auth: Option<&Auth>,
         config: &mut ArrowStreamSerializerConfig,
     ) -> crate::Result<()> {
-        use super::arrow;
-
         if self.table.is_dynamic() || database.is_dynamic() {
             return Err(
                 "Arrow codec requires a static table and database. Dynamic schema inference is not supported."
@@ -368,12 +376,10 @@ impl ClickhouseConfig {
             auth.cloned(),
         );
 
-        let schema = provider.get_schema().await.map_err(|e| {
-            format!(
-                "Failed to fetch schema for {}.{}: {}.",
-                database_str, table_str, e
-            )
-        })?;
+        let schema = provider
+            .get_schema()
+            .await
+            .map_err(|e| format!("Failed to fetch schema for {database_str}.{table_str}: {e}."))?;
 
         config.schema = Some(schema);
 
@@ -418,11 +424,38 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::template::{ConfinementConfig, Template};
     use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ClickhouseConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_table() {
+        let template = Template::try_from("{{ table }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "clickhouse", "table");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_table() {
+        let template = Template::try_from("{{ table }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "clickhouse", "table");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_table() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "clickhouse", "table");
+        assert!(result.is_ok());
     }
 
     #[test]

@@ -117,14 +117,14 @@ fn render_and_import_schema(
     let final_json = serde_json::to_string_pretty(&data)?;
     let json_output_file = write_to_temp_file(&prefix, ".json", &final_json)?;
 
-    info!(
+    debug!(
         "[✓]   Wrote {} schema to '{}'. ({} bytes)",
         friendly_name,
         json_output_file.display(),
         final_json.len()
     );
 
-    info!("[*] Importing {} schema as Cue file...", friendly_name);
+    debug!("[*] Importing {} schema as Cue file...", friendly_name);
     let cue_output_file = PathBuf::from("website/cue/reference").join(cue_relative_path);
 
     if let Some(parent) = cue_output_file.parent() {
@@ -150,7 +150,7 @@ fn render_and_import_schema(
         );
     }
 
-    info!(
+    debug!(
         "[✓]   Imported {} schema to '{}'.",
         friendly_name,
         cue_output_file.display()
@@ -313,14 +313,14 @@ fn render_and_import_generated_top_level_config_schema(
     let final_json = serde_json::to_string_pretty(&data)?;
     let json_output_file = write_to_temp_file(prefix, ".json", &final_json)?;
 
-    info!(
+    debug!(
         "[✓]   Wrote {} schema to '{}'. ({} bytes)",
         friendly_name,
         json_output_file.display(),
         final_json.len()
     );
 
-    info!("[*] Importing {} schema as Cue file...", friendly_name);
+    debug!("[*] Importing {} schema as Cue file...", friendly_name);
     let cue_output_file =
         PathBuf::from("website/cue/reference").join("generated/configuration.cue");
 
@@ -347,7 +347,7 @@ fn render_and_import_generated_top_level_config_schema(
         );
     }
 
-    info!(
+    debug!(
         "[✓]   Imported {} schema to '{}'.",
         friendly_name,
         cue_output_file.display()

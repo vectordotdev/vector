@@ -67,7 +67,8 @@ pub struct RemapConfig {
     /// [vrl]: https://vector.dev/docs/reference/vrl
     #[configurable(metadata(
         docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
-        docs::syntax_override = "remap_program"
+        docs::required,
+        docs::syntax_override = "vrl_program"
     ))]
     pub source: Option<String>,
 
@@ -78,7 +79,6 @@ pub struct RemapConfig {
     /// Required if `source` is missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(docs::examples = "./my/program.vrl"))]
     pub file: Option<PathBuf>,
 
     /// File paths to the [Vector Remap Language][vrl] (VRL) programs to execute for each event.
@@ -88,7 +88,6 @@ pub struct RemapConfig {
     /// Required if `source` or `file` are missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(docs::examples = "['./my/program.vrl', './my/program2.vrl']"))]
     pub files: Option<Vec<PathBuf>>,
 
     /// When set to `single`, metric tag values are exposed as single strings, the
@@ -285,7 +284,10 @@ impl TransformConfig for RemapConfig {
         Ok(transform)
     }
 
-    fn validate_env(&self, context: &TransformContext) -> std::result::Result<(), Vec<String>> {
+    fn validate_with_context(
+        &self,
+        context: &TransformContext,
+    ) -> std::result::Result<(), Vec<String>> {
         self.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.metrics_storage.clone(),

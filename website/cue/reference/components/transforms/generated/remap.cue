@@ -44,7 +44,7 @@ generated: components: transforms: remap: configuration: {
 			[vrl]: https://vector.dev/docs/reference/vrl
 			"""
 		required: false
-		type: string: examples: ["./my/program.vrl"]
+		type: string: {}
 	}
 	files: {
 		description: """
@@ -57,7 +57,7 @@ generated: components: transforms: remap: configuration: {
 			[vrl]: https://vector.dev/docs/reference/vrl
 			"""
 		required: false
-		type: array: items: type: string: examples: ["['./my/program.vrl', './my/program2.vrl']"]
+		type: array: items: type: string: {}
 	}
 	metric_tag_values: {
 		description: """
@@ -115,7 +115,7 @@ generated: components: transforms: remap: configuration: {
 
 			[vrl]: https://vector.dev/docs/reference/vrl
 			"""
-		required: false
+		required: true
 		type: string: {
 			examples: ["""
 				. = parse_json!(.message)
@@ -124,7 +124,7 @@ generated: components: transforms: remap: configuration: {
 				.duration = parse_duration!(.duration, "s")
 				.new_name = del(.old_name)
 				"""]
-			syntax: "remap_program"
+			syntax: "vrl_program"
 		}
 	}
 	timezone: {

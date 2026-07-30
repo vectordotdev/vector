@@ -1,7 +1,7 @@
 use std::{cell::RefCell, marker::PhantomData};
 
+use serde_json::Value;
 use snafu::Snafu;
-use toml::Value;
 use vector_config_common::{attributes::CustomAttribute, constants};
 
 use super::{ComponentMarker, GenerateConfig};

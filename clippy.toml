@@ -7,6 +7,10 @@ disallowed-methods = [
   { path = "std::io::Write::write", reason = "This doesn't handle short writes, use `write_all` instead." },
   { path = "vrl::stdlib::all", reason = "Use `vector_vrl_functions::all()` instead for consistency across all Vector VRL functions." },
   { path = "async_compression::tokio::bufread::GzipDecoder::new", reason = "Use `vector_common::compression::gzip_multiple_decoder` instead, which enables `multiple_members` to handle concatenated gzip streams." },
+  { path = "zstd::stream::copy_decode", reason = "Use `vector_common::decompression::CappedDecoder::zstd` (or `CappedDecoder::zstd_http` in HTTP contexts) to enforce the decompression size cap." },
+  { path = "zstd::stream::decode_all", reason = "Use `vector_common::decompression::CappedDecoder::zstd` (or `CappedDecoder::zstd_http` in HTTP contexts) to enforce the decompression size cap." },
+  { path = "zstd::bulk::decompress", reason = "Use `vector_common::decompression::CappedDecoder::zstd` (or `CappedDecoder::zstd_http` in HTTP contexts) to enforce the decompression size cap." },
+  { path = "warp::body::bytes", reason = "Reads the whole request body into memory unbounded. Use `crate::sources::util::http::capped_body()` to cap the compressed body size at the global decompressed-size limit." },
 ]
 
 disallowed-macros = [
@@ -20,6 +24,11 @@ disallowed-types = [
   { path = "once_cell::unsync::OnceCell", reason = "Use `std::cell::OnceCell` instead." },
   { path = "once_cell::sync::Lazy", reason = "Use `std::sync::LazyLock` instead." },
   { path = "once_cell::unsync::Lazy", reason = "Use `std::sync::LazyCell` instead." },
+  { path = "flate2::read::GzDecoder", reason = "Use `vector_common::decompression::CappedDecoder::gzip` to enforce the decompression size cap." },
+  { path = "flate2::read::MultiGzDecoder", reason = "Use `vector_common::decompression::CappedDecoder::gzip` to enforce the decompression size cap." },
+  { path = "flate2::read::ZlibDecoder", reason = "Use `vector_common::decompression::CappedDecoder::zlib` to enforce the decompression size cap." },
+  { path = "flate2::read::DeflateDecoder", reason = "Use `vector_common::decompression::CappedDecoder` for decompression with the size cap." },
+  { path = "zstd::stream::read::Decoder", reason = "Use `vector_common::decompression::CappedDecoder::zstd` (or `CappedDecoder::zstd_http` in HTTP contexts) to enforce the decompression size cap." },
 ]
 
 

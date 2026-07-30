@@ -30,7 +30,7 @@ use crate::{
         MetricMetadataParseError, ParserMissingFieldError,
     },
     schema,
-    template::{Template, TemplateRenderingError},
+    template::{TemplateRenderingError, UnconfinedTemplate},
     transforms::{
         FunctionTransform, OutputBuffer, Transform, log_to_metric::TransformError::PathNotFound,
     },
@@ -99,22 +99,22 @@ pub struct CounterConfig {
 #[derive(Clone, Debug)]
 pub struct MetricConfig {
     /// Name of the field in the event to generate the metric.
-    pub field: Template,
+    pub field: UnconfinedTemplate,
 
     /// Overrides the name of the counter.
     ///
     /// If not specified, `field` is used as the name of the metric.
-    pub name: Option<Template>,
+    pub name: Option<UnconfinedTemplate>,
 
     /// Sets the namespace for the metric.
-    pub namespace: Option<Template>,
+    pub namespace: Option<UnconfinedTemplate>,
 
     /// Tags to apply to the metric.
     ///
     /// Both keys and values can be templated, allowing you to attach dynamic tags to events.
     ///
     #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
-    pub tags: Option<IndexMap<Template, TagConfig>>,
+    pub tags: Option<IndexMap<UnconfinedTemplate, TagConfig>>,
 
     #[configurable(derived)]
     #[serde(flatten)]
@@ -129,10 +129,10 @@ pub struct MetricConfig {
 #[serde(untagged)]
 pub enum TagConfig {
     /// A single tag value.
-    Plain(Option<Template>),
+    Plain(Option<UnconfinedTemplate>),
 
     /// An array of values to give to the same tag name.
-    Multi(Vec<Option<Template>>),
+    Multi(Vec<Option<UnconfinedTemplate>>),
 }
 
 /// Specification of the type of an individual metric, and any associated data.
@@ -178,8 +178,8 @@ pub struct LogToMetric {
 }
 
 impl GenerateConfig for LogToMetricConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             metrics: Some(vec![MetricConfig {
                 field: "field_name".try_into().expect("Fixed template"),
                 name: None,
@@ -270,14 +270,14 @@ enum TransformError {
     },
 }
 
-fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
+fn render_template(template: &UnconfinedTemplate, event: &Event) -> Result<String, TransformError> {
     template
         .render_string(event)
         .map_err(TransformError::TemplateRenderingError)
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<Template, TagConfig>>,
+    tags: &Option<IndexMap<UnconfinedTemplate, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
     let mut static_tags: HashMap<String, String> = HashMap::new();
@@ -328,8 +328,8 @@ fn render_tags(
 
 fn render_tag_into(
     event: &Event,
-    key_template: &Template,
-    value_template: Option<&Template>,
+    key_template: &UnconfinedTemplate,
+    value_template: Option<&UnconfinedTemplate>,
     result: &mut MetricTags,
     static_tags: &mut HashMap<String, String>,
     dynamic_tags: &mut HashMap<String, String>,

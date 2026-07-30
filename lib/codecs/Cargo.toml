@@ -65,6 +65,7 @@ vector-vrl-functions.workspace = true
 toml = { version = "0.9.8", optional = true }
 
 [dev-dependencies]
+criterion.workspace = true
 futures.workspace = true
 indoc.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
@@ -82,3 +83,9 @@ parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
 test = []
+
+[[bench]]
+name = "codecs"
+path = "benches/main.rs"
+harness = false
+required-features = ["opentelemetry"]

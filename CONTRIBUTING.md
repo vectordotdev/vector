@@ -150,8 +150,7 @@ make check-deny
 make check-docs
 make check-examples
 make check-scripts
-
-./scripts/check_changelog_fragments.sh
+make check-changelog-fragments
 
 # Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
 typos

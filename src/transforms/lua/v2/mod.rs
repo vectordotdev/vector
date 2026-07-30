@@ -60,6 +60,7 @@ pub struct LuaConfig {
     #[configurable(metadata(
         docs::examples = "function init()\n\tcount = 0\nend\n\nfunction process()\n\tcount = count + 1\nend\n\nfunction timer_handler(emit)\n\temit(make_counter(counter))\n\tcounter = 0\nend\n\nfunction shutdown(emit)\n\temit(make_counter(counter))\nend\n\nfunction make_counter(value)\n\treturn metric = {\n\t\tname = \"event_counter\",\n\t\tkind = \"incremental\",\n\t\ttimestamp = os.date(\"!*t\"),\n\t\tcounter = {\n\t\t\tvalue = value\n\t\t}\n \t}\nend",
         docs::examples = "-- external file with hooks and timers defined\nrequire('custom_module')",
+        docs::syntax_override = "lua",
     ))]
     source: Option<String>,
 
@@ -125,6 +126,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
         docs::examples = "init",
+        docs::syntax_override = "lua",
     ))]
     init: Option<String>,
 
@@ -138,6 +140,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (event, emit)\n\tevent.log.field = \"value\" -- set value of a field\n\tevent.log.another_field = nil -- remove field\n\tevent.log.first, event.log.second = nil, event.log.first -- rename field\n\t-- Very important! Emit the processed event.\n\temit(event)\nend",
         docs::examples = "process",
+        docs::syntax_override = "lua",
     ))]
     process: String,
 
@@ -150,6 +153,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
         docs::examples = "shutdown",
+        docs::syntax_override = "lua",
     ))]
     shutdown: Option<String>,
 }
