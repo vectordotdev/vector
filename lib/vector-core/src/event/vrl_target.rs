@@ -35,9 +35,8 @@ const VALID_METRIC_PATHS_GET: &str =
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
-// `MetricTagMode` lives in its own always-compiled module so the `lua`
-// feature can use the same type without pulling in `vrl`. The canonical
-// public path is `crate::event::MetricTagMode`.
+// See `metric_tag_mode` for rationale. The canonical public path is
+// `crate::event::MetricTagMode`.
 use super::metric_tag_mode::MetricTagMode;
 
 /// An adapter to turn `Event`s into `vrl_lib::Target`s.

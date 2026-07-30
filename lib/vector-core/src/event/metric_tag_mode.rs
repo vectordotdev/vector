@@ -1,14 +1,9 @@
 //! How metric tags are exposed to and accepted from VRL or Lua.
 //!
-//! This enum lives in its own always-compiled module (rather than inside
-//! `vrl_target`, which is gated on the `vrl` feature) so that the `lua`
-//! feature can depend on the same type without being forced to also enable
-//! `vrl`. The `vrl_target` and `lua` modules both re-export it.
-//!
-//! It mirrors `codecs::MetricTagValues`, but lives in `vector-core` so that
-//! the crate dependency direction (`codecs -> vector-core`) is preserved.
-//! Callers at the `codecs::MetricTagValues` boundary translate using the
-//! `From<MetricTagValues>` impl on the codecs side.
+//! Mirrors `codecs::MetricTagValues` in `vector-core` (dependency direction:
+//! `codecs` → `vector-core`). Shared by VRL and Lua paths. Callers at the
+//! `codecs::MetricTagValues` boundary translate using the `From<MetricTagValues>`
+//! impl on the codecs side.
 
 /// How metric tags are exposed to and accepted from VRL or Lua.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
