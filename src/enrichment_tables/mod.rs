@@ -84,8 +84,8 @@ impl vector_lib::configurable::NamedComponent for EnrichmentTables {
 }
 
 impl GenerateConfig for EnrichmentTables {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::File(file::FileConfig {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::File(file::FileConfig {
             file: file::FileSettings {
                 path: "path/to/file".into(),
                 encoding: file::Encoding::default(),

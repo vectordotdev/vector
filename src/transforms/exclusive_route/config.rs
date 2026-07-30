@@ -81,8 +81,8 @@ fn routes_example() -> Vec<Route> {
 }
 
 impl GenerateConfig for ExclusiveRouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             routes: routes_example(),
         })
         .unwrap()

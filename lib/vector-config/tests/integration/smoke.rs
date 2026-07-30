@@ -336,8 +336,8 @@ pub struct SimpleSourceConfig {
 }
 
 impl GenerateConfig for SimpleSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             listen_addr: default_simple_source_listen_addr(),
             timeout: default_simple_source_timeout(),
         })
@@ -382,8 +382,8 @@ pub struct SimpleSinkConfig {
 }
 
 impl GenerateConfig for SimpleSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoint: default_simple_sink_endpoint(),
             batch: default_simple_sink_batch(),
             encoding: default_simple_sink_encoding(),
@@ -464,8 +464,8 @@ pub enum TagConfig {
 }
 
 impl GenerateConfig for AwsBleepBloopSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             auth: AwsAuthentication::default(),
             folder_id: String::from("foo12"),
             batch: default_aws_bleep_bloop_sink_batch(),
@@ -524,8 +524,8 @@ pub mod vector_v2 {
     }
 
     impl GenerateConfig for VectorConfig {
-        fn generate_config() -> toml::Value {
-            toml::Value::try_from(Self {
+        fn generate_config() -> serde_json::Value {
+            serde_json::to_value(Self {
                 address: "0.0.0.0:6000".parse().unwrap(),
                 shutdown_timeout_secs: default_shutdown_timeout_secs(),
             })
@@ -564,12 +564,12 @@ pub enum VectorSourceConfig {
 }
 
 impl GenerateConfig for VectorSourceConfig {
-    fn generate_config() -> toml::Value {
-        let config = toml::Value::try_into::<self::vector_v2::VectorConfig>(
+    fn generate_config() -> serde_json::Value {
+        let config = serde_json::from_value::<self::vector_v2::VectorConfig>(
             self::vector_v2::VectorConfig::generate_config(),
         )
         .unwrap();
-        toml::Value::try_from(VectorConfigV2 {
+        serde_json::to_value(VectorConfigV2 {
             version: Some(V2::V2),
             config,
         })

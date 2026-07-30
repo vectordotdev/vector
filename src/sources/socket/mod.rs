@@ -98,7 +98,7 @@ impl From<udp::UdpConfig> for SocketConfig {
 }
 
 impl GenerateConfig for SocketConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"mode = "tcp"
             address = "0.0.0.0:9000""#,

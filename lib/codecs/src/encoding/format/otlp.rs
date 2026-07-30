@@ -100,13 +100,13 @@ impl Encoder<Event> for OtlpSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        match &event {
+        match event {
             Event::Log(log) => {
                 if log.contains(event_path!(RESOURCE_LOGS_JSON_FIELD)) {
-                    self.logs_descriptor.encode(event, buffer)
+                    self.logs_descriptor.encode(Event::Log(log), buffer)
                 } else if log.contains(event_path!(RESOURCE_METRICS_JSON_FIELD)) {
                     // Currently the OTLP metrics are Vector logs (not metrics).
-                    self.metrics_descriptor.encode(event, buffer)
+                    self.metrics_descriptor.encode(Event::Log(log), buffer)
                 } else {
                     Err(format!(
                         "Log event does not contain OTLP top-level fields ({RESOURCE_LOGS_JSON_FIELD} or {RESOURCE_METRICS_JSON_FIELD})",
@@ -116,7 +116,7 @@ impl Encoder<Event> for OtlpSerializer {
             }
             Event::Trace(trace) => {
                 if trace.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
-                    self.traces_descriptor.encode(event, buffer)
+                    self.traces_descriptor.encode(Event::Trace(trace), buffer)
                 } else {
                     Err(format!(
                         "Trace event does not contain OTLP top-level field ({RESOURCE_SPANS_JSON_FIELD})",
@@ -126,8 +126,7 @@ impl Encoder<Event> for OtlpSerializer {
             }
             Event::Metric(metric) => {
                 let request = metric_event_to_export_request(metric)?;
-                request.encode(buffer)?;
-                Ok(())
+                request.encode(buffer).map_err(Into::into)
             }
         }
     }
