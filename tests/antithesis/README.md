@@ -1,10 +1,14 @@
 # Antithesis Tests
 
 This directory contains a sub-project to run Antithesis tests for Vector. The
-current focus is the `disk_v2` disk buffer: establishing that events Vector
-acknowledges are conserved rather than lost across crashes, restarts, and
-injected faults, and probing whether an acknowledgement's claimed
-durability actually holds under those conditions.
+`vector_disk_buffer_soundness` scenario tests the `disk_v2` contract Vector can
+support today: bounded storage and accounting, integrity of delivered records,
+crash-safe restart, post-fault drain, and fresh progress. It deliberately does
+not treat a source response as proof that the disk buffer has fsynced the event.
+
+The older end-to-end scenario separately probes acknowledgement conservation.
+Its result must be interpreted against the acknowledgement boundary implemented
+by the topology under test.
 
 ## Prerequisites
 
