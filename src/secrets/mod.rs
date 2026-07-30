@@ -94,8 +94,8 @@ impl vector_lib::configurable::NamedComponent for SecretBackends {
 }
 
 impl GenerateConfig for SecretBackends {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::File(file::FileBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::File(file::FileBackend {
             path: "path/to/file".into(),
         }))
         .unwrap()

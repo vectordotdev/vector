@@ -71,7 +71,7 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
 }
 
 impl GenerateConfig for FileDescriptorSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let fd = null_fd().unwrap();
         toml::from_str(&format!(
             r#"

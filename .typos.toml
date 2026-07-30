@@ -4,7 +4,7 @@ extend-exclude = [
   # Binary/fuzz test data
   "lib/codecs/tests/data/",
   # Classic novel used in benchmarks
-  "benches/codecs/moby_dick.txt",
+  "lib/codecs/benches/moby_dick.txt",
   # OpenSSL license is a verbatim upstream copy with typos in the original text
   "licenses/OpenSSL",
   "LICENSE-3rdparty.csv",

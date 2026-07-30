@@ -116,18 +116,20 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.topic = config
+        let topic = self
             .topic
+            .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
-        let connector = config.build_connector()?;
-        let sink = MqttSink::new(&config, connector.clone())?;
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        let connector = self.build_connector()?;
+        let sink = MqttSink::new(self, topic, connector.clone())?;
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -173,11 +175,20 @@ impl MqttSinkConfig {
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = tls.identity_pem();
-            let alpn = Some(vec!["mqtt".into()]);
+            // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
+            // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
+            let alpn = self
+                .common
+                .tls
+                .as_ref()
+                .and_then(|tls| tls.options.alpn_protocols.as_ref())
+                .filter(|protocols| !protocols.is_empty())
+                .map(|protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect())
+                .unwrap_or_else(|| vec![b"mqtt".to_vec()]);
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,
-                alpn,
+                alpn: Some(alpn),
             }));
         }
         Ok(MqttConnector::new(options))
