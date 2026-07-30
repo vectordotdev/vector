@@ -297,6 +297,19 @@ where
         #[cfg(feature = "antithesis-disk-asserts")]
         {
             #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            let configured_on_disk_limit =
+                ledger.config().max_buffer_size + ledger.config().max_data_file_size;
+            antithesis_sdk::assert_always_less_than_or_equal_to!(
+                unread_buffer_size,
+                configured_on_disk_limit,
+                "recovered disk buffer occupancy stays within its configured on-disk limit",
+                &serde_json::json!({
+                    "unread_buffer_size": unread_buffer_size,
+                    "configured_on_disk_limit": configured_on_disk_limit,
+                    "internal_buffer_limit": ledger.config().max_buffer_size,
+                    "max_data_file_size": ledger.config().max_data_file_size,
+                })
+            );
             antithesis_sdk::assert_sometimes!(
                 unread_buffer_size > 0,
                 "the buffer reopens with pre-existing on-disk records",

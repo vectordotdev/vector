@@ -7,5 +7,7 @@ mod payload;
 mod protocol;
 
 pub use client::{all_endpoints_healthy, endpoint_healthy, OracleClient, VectorClient};
-pub use payload::{decode_payload_field, payload_field, payload_for};
+pub use payload::{
+    decode_payload_field, is_progress_probe_payload, payload_field, payload_for, payload_length,
+};
 pub use protocol::{Event, OracleReport};

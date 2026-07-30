@@ -17,6 +17,18 @@ const PAYLOAD_LENGTHS: [usize; 8] = [
     768 * 1024,
 ];
 
+/// Payload length selected for an id.
+pub fn payload_length(id: u64) -> usize {
+    PAYLOAD_LENGTHS[(id % PAYLOAD_LENGTHS.len() as u64) as usize]
+}
+
+/// True for the payload class used by the terminal progress probe. Its encoded
+/// disk record is large enough that a short sequence crosses data-file
+/// boundaries, while remaining comfortably below the scenario's record limit.
+pub fn is_progress_probe_payload(id: u64) -> bool {
+    payload_length(id) == DISK_V2_WRITE_BUFFER_SIZE + 1
+}
+
 /// One splitmix64 step. A full-avalanche mixer, so flipping any input bit
 /// scrambles the whole output. Seeding the stream with this keyed by id means a
 /// length-preserving corruption still changes the bytes the oracle expects.
@@ -33,7 +45,7 @@ fn splitmix64(state: &mut u64) -> u64 {
 /// the same expected bytes with no per-id state to carry. Length comes from the
 /// id's class; content is a splitmix64 stream seeded by id.
 pub fn payload_for(id: u64) -> Vec<u8> {
-    let len = PAYLOAD_LENGTHS[(id % PAYLOAD_LENGTHS.len() as u64) as usize];
+    let len = payload_length(id);
     let mut out = Vec::with_capacity(len);
     let mut state = id;
     while out.len() < len {
@@ -88,7 +100,18 @@ mod tests {
     #[test]
     fn payload_length_follows_class() {
         for id in 0..PAYLOAD_LENGTHS.len() as u64 {
+            assert_eq!(payload_length(id), PAYLOAD_LENGTHS[id as usize]);
             assert_eq!(payload_for(id).len(), PAYLOAD_LENGTHS[id as usize]);
+        }
+    }
+
+    #[test]
+    fn progress_probe_uses_the_just_over_write_buffer_class() {
+        for id in 0..PAYLOAD_LENGTHS.len() as u64 {
+            assert_eq!(
+                is_progress_probe_payload(id),
+                payload_length(id) == DISK_V2_WRITE_BUFFER_SIZE + 1
+            );
         }
     }
 
