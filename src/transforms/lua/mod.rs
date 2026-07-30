@@ -112,19 +112,10 @@ impl TransformConfig for LuaConfig {
             LuaConfig::V2(v2) => v2.config.outputs(input_definitions),
         }
     }
-
-    fn validate_structure(&self) -> Result<(), Vec<String>> {
-        match self {
-            LuaConfig::V2(v2) => v2.config.validate_structure(),
-            _ => Ok(()),
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::config::TransformConfig;
-
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::LuaConfig>();
@@ -132,23 +123,18 @@ mod test {
 
     #[test]
     fn rejects_auto_metric_tag_values() {
-        let config: super::LuaConfig = serde_yaml::from_str(indoc::indoc! {r#"
-            version: "2"
-            metric_tag_values: auto
-            hooks:
-              process: |
-                function (event, emit)
-                  emit(event)
-                end
-        "#})
-        .unwrap();
-
-        let errors = config
-            .validate_structure()
-            .expect_err("auto must be rejected");
         assert!(
-            errors.iter().any(|e| e.contains("auto")),
-            "unexpected errors: {errors:?}"
+            serde_yaml::from_str::<super::LuaConfig>(indoc::indoc! {r#"
+                version: "2"
+                metric_tag_values: auto
+                hooks:
+                  process: |
+                    function (event, emit)
+                      emit(event)
+                    end
+            "#})
+            .is_err(),
+            "metric_tag_values = auto must be rejected at parse time"
         );
     }
 }

@@ -20,6 +20,7 @@ generated: components: transforms: metric_to_log: configuration: {
 			When set to `single`, only the last non-bare value of tags is displayed with the
 			metric.  When set to `full`, all metric tags are exposed as separate assignments as
 			described by [the `native_json` codec][vector_native_json].
+			When set to `auto`, tag values are encoded using their underlying shape.
 
 			[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 			"""
@@ -29,9 +30,8 @@ generated: components: transforms: metric_to_log: configuration: {
 			enum: {
 				auto: """
 					Tag values are exposed using their underlying shape: single-value tags as strings,
-					multi-value tags as arrays. Writes follow the same rule -- a string or null produces
-					a single tag; an array of length >= 2 produces a multi-value tag. A length-1 array
-					round-trips as a scalar; use `Full` to force array shape.
+					multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+					force array shape.
 					"""
 				full: "All tags are exposed as arrays of either string or null values."
 				single: """

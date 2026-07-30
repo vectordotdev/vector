@@ -120,13 +120,7 @@ impl IntoLua for LuaMetricTags {
             MetricTagMode::Single => Ok(LuaValue::Table(
                 lua.create_table_from(self.tags.iter_single())?,
             )),
-            // `Auto` is intentionally unsupported for Lua: bare tags cannot
-            // round-trip through Lua table semantics (`nil` removes keys and
-            // truncates array sequences). The `lua` transform rejects
-            // `metric_tag_values = "auto"` at config validation time.
-            MetricTagMode::Auto => {
-                unreachable!("metric_tag_values = \"auto\" is not supported by the lua transform")
-            }
+            MetricTagMode::Auto => unreachable!("Auto is not used by the lua transform"),
         }
     }
 }

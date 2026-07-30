@@ -121,6 +121,5 @@ const fn lua_build_error_code(err: &BuildError) -> &'static str {
         RuntimeErrorHooksShutdown { .. } => "runtime_error_hook_shutdown",
         RuntimeErrorTimerHandler { .. } => "runtime_error_timer_handler",
         RuntimeErrorGc { .. } => "runtime_error_gc",
-        UnsupportedMetricTagValuesAuto => "unsupported_metric_tag_values_auto",
     }
 }

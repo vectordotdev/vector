@@ -81,9 +81,6 @@ generated: components: transforms: lua: configuration: {
 
 			When set to `full`, all metric tags are exposed as arrays of either string or null
 			values.
-
-			The `auto` value is not supported by the `lua` transform. Use the `remap` transform
-			if you need shape-preserving single/multi-value tag handling.
 			"""
 		required: false
 		type: string: {
