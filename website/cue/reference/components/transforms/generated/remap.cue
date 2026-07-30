@@ -39,12 +39,14 @@ generated: components: transforms: remap: configuration: {
 
 			If a relative path is provided, its root is the current working directory.
 
-			Required if `source` is missing.
-
 			[vrl]: https://vector.dev/docs/reference/vrl
+
+			Exactly one of `source`, `file`, or `files` must be set.
 			"""
 		required: false
-		type: string: examples: ["./my/program.vrl"]
+		required_one_of: ["source", "file", "files"]
+		required_one_of_group: "program"
+		type: string: {}
 	}
 	files: {
 		description: """
@@ -52,12 +54,14 @@ generated: components: transforms: remap: configuration: {
 
 			If a relative path is provided, its root is the current working directory.
 
-			Required if `source` or `file` are missing.
-
 			[vrl]: https://vector.dev/docs/reference/vrl
+
+			Exactly one of `source`, `file`, or `files` must be set.
 			"""
 		required: false
-		type: array: items: type: string: examples: ["['./my/program.vrl', './my/program2.vrl']"]
+		required_one_of: ["source", "file", "files"]
+		required_one_of_group: "program"
+		type: array: items: type: string: {}
 	}
 	metric_tag_values: {
 		description: """
@@ -100,11 +104,13 @@ generated: components: transforms: remap: configuration: {
 		description: """
 			The [Vector Remap Language][vrl] (VRL) program to execute for each event.
 
-			Required if `file` is missing.
-
 			[vrl]: https://vector.dev/docs/reference/vrl
+
+			Exactly one of `source`, `file`, or `files` must be set.
 			"""
 		required: false
+		required_one_of: ["source", "file", "files"]
+		required_one_of_group: "program"
 		type: string: {
 			examples: ["""
 				. = parse_json!(.message)
@@ -113,7 +119,7 @@ generated: components: transforms: remap: configuration: {
 				.duration = parse_duration!(.duration, "s")
 				.new_name = del(.old_name)
 				"""]
-			syntax: "remap_program"
+			syntax: "vrl_program"
 		}
 	}
 	timezone: {

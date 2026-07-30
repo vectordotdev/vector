@@ -80,8 +80,8 @@ pub struct WebHdfsConfig {
 }
 
 impl GenerateConfig for WebHdfsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             root: "/".to_string(),
             prefix: "%F/".to_string(),
             endpoint: "http://127.0.0.1:9870".to_string(),
@@ -111,8 +111,11 @@ impl SinkConfig for WebHdfsConfig {
         let healthcheck = Box::pin(async move { Ok(check_op.check().await?) });
 
         let sink = self.build_processor(op)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

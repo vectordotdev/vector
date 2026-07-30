@@ -196,8 +196,8 @@ pub fn default_blob_prefix() -> Template {
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             auth: None,
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             account_name: None,
@@ -275,8 +275,11 @@ impl SinkConfig for AzureBlobSinkConfig {
 
         let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
         let sink = self.build_processor(client)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

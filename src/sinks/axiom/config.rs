@@ -136,7 +136,7 @@ pub struct AxiomConfig {
 }
 
 impl GenerateConfig for AxiomConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"token = "${AXIOM_TOKEN}"
             dataset = "${AXIOM_DATASET}"
@@ -193,14 +193,16 @@ impl SinkConfig for AxiomConfig {
             confinement: self.confinement.clone(),
         };
 
-        // Route through the HTTP builder that doesn't emit the gauge, so
-        // per-template warnings and the sink-level gauge both carry
-        // `component_type=axiom` — not `http`.
-        let result = http_sink_config
-            .build_without_confinement_gauge(cx, Self::NAME)
-            .await?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
-        Ok(result)
+        // Route through the HTTP builder threaded with our own component type,
+        // so per-template security warnings carry `component_type=axiom` rather
+        // than `http`.
+        http_sink_config
+            .build_with_component_type(cx, Self::NAME)
+            .await
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

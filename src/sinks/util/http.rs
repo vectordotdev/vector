@@ -75,7 +75,6 @@ use crate::{
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
-    template::Template,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -810,6 +809,7 @@ fn headers_examples() -> BTreeMap<String, String> {
 }
 
 impl RequestConfig {
+    /// Split headers into static (non-dynamic) and template (dynamic) maps.
     pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();

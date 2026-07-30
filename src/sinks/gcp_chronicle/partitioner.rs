@@ -1,6 +1,6 @@
 use vector_lib::{event::Event, partition::Partitioner};
 
-use crate::{internal_events::TemplateRenderingError, template::Template};
+use crate::{internal_events::TemplateRenderingError, template::UnconfinedTemplate};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ChroniclePartitionKey {
@@ -10,16 +10,16 @@ pub struct ChroniclePartitionKey {
 
 /// Partitions items based on the generated key for the given event.
 pub struct ChroniclePartitioner {
-    log_type: Template,
+    log_type: UnconfinedTemplate,
     fallback_log_type: Option<String>,
-    namespace_template: Option<Template>,
+    namespace_template: Option<UnconfinedTemplate>,
 }
 
 impl ChroniclePartitioner {
     pub const fn new(
-        log_type: Template,
+        log_type: UnconfinedTemplate,
         fallback_log_type: Option<String>,
-        namespace_template: Option<Template>,
+        namespace_template: Option<UnconfinedTemplate>,
     ) -> Self {
         Self {
             log_type,

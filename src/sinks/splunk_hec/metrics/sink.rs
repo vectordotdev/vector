@@ -18,9 +18,9 @@ pub struct HecMetricsSink<S> {
     pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub host_key: Option<OwnedValuePath>,
     pub default_namespace: Option<String>,
 }
@@ -109,7 +109,6 @@ pub struct HecMetricsProcessedEventMetadata {
     pub host: Option<String>,
     pub metric_name: String,
     pub metric_value: f64,
-    pub templated_field_keys: Vec<String>,
 }
 
 impl ByteSizeOf for HecMetricsProcessedEventMetadata {
@@ -119,7 +118,6 @@ impl ByteSizeOf for HecMetricsProcessedEventMetadata {
             + self.index.allocated_bytes()
             + self.host.allocated_bytes()
             + self.metric_name.allocated_bytes()
-            + self.templated_field_keys.allocated_bytes()
     }
 }
 
@@ -149,19 +147,12 @@ pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMeta
 pub fn process_metric(
     metric: Metric,
     event_byte_size: usize,
-    sourcetype: Option<&Template>,
-    source: Option<&Template>,
-    index: Option<&Template>,
+    sourcetype: Option<&ConfinedTemplate>,
+    source: Option<&ConfinedTemplate>,
+    index: Option<&ConfinedTemplate>,
     host_key: Option<&OwnedValuePath>,
     default_namespace: Option<&str>,
 ) -> Option<HecProcessedEvent> {
-    let templated_field_keys = [index.as_ref(), source.as_ref(), sourcetype.as_ref()]
-        .iter()
-        .flatten()
-        .filter_map(|t| t.get_fields())
-        .flatten()
-        .map(|f| f.replace("tags.", ""))
-        .collect::<Vec<_>>();
     let metric_name =
         HecMetricsProcessedEventMetadata::extract_metric_name(&metric, default_namespace);
     let metric_value = HecMetricsProcessedEventMetadata::extract_metric_value(&metric)?;
@@ -169,7 +160,7 @@ pub fn process_metric(
     // Render routing templates; Confined errors are intentional security drops.
     // Returns Some(Some(value)) on success, Some(None) on non-fatal error
     // (field omitted), or None to signal the whole event must be dropped.
-    let render = |tpl: Option<&Template>, field: &'static str| -> Option<Option<String>> {
+    let render = |tpl: Option<&ConfinedTemplate>, field: &'static str| -> Option<Option<String>> {
         let Some(t) = tpl else { return Some(None) };
         match t.render_string(&metric) {
             Ok(s) => Some(Some(s)),
@@ -205,7 +196,6 @@ pub fn process_metric(
         host,
         metric_name,
         metric_value,
-        templated_field_keys,
     };
 
     Some(HecProcessedEvent {

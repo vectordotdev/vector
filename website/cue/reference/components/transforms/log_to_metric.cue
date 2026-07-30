@@ -23,7 +23,9 @@ components: transforms: log_to_metric: {
 		notices: []
 	}
 
-	configuration: generated.components.transforms.log_to_metric.configuration
+	configuration: generated.components.transforms.log_to_metric.configuration & {
+		metrics: type: array: items: type: object: options: field: type: string: examples: [".my_field"]
+	}
 
 	input: {
 		logs:    true
