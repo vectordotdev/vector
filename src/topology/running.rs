@@ -242,6 +242,7 @@ impl RunningTopology {
 
                 if all_done {
                     info!("Shutdown reporter exiting: all components shut down.");
+                    info!("All components shut down gracefully.");
                     break;
                 } else if deadline_passed {
                     error!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded.");
@@ -251,7 +252,9 @@ impl RunningTopology {
         };
 
         // Finishes once all tasks have shutdown.
-        let success = futures::future::join_all(wait_handles).map(|_| ());
+        let success = futures::future::join_all(wait_handles).map(|_| {
+            info!("All components shut down gracefully.");
+        });
 
         // Aggregate future that ends once anything detects that all tasks have shutdown.
         let shutdown_complete_future = future::select_all(vec![
