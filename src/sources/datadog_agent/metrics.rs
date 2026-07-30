@@ -283,8 +283,8 @@ pub(crate) fn decode_ddseries_v2(
             };
 
             serie.resources.into_iter().for_each(|r| {
-                // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
-                // the hostname can be found in MetricSeries::resources and that is the only value stored there.
+                // As per https://github.com/DataDog/datadog-agent/blob/965622d50073913d95176606ebcbd0f7553627b6/pkg/serializer/internal/metrics/iterable_series.go#L201-L264
+                // MetricSeries::resources can contain host, device, and other series resources.
                 if r.r#type.eq("host") {
                     log_schema()
                         .host_key()

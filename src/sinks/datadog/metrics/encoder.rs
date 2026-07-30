@@ -34,6 +34,8 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
+const DATADOG_AGENT_SOURCE_TYPE: &str = "datadog_agent";
+
 pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
 const DEFAULT_DD_ORIGIN_PRODUCT_VALUE: u32 = 14;
@@ -622,11 +624,31 @@ fn series_to_proto_message(
         });
     }
 
+    let event_metadata = metric.metadata();
+    if event_metadata.source_type() == Some(DATADOG_AGENT_SOURCE_TYPE) {
+        let resource_tags: Vec<_> = tags
+            .keys()
+            .filter_map(|tag| {
+                tag.strip_prefix("resource.")
+                    .filter(|resource_type| !resource_type.is_empty())
+                    .map(|resource_type| (tag.to_string(), resource_type.to_string()))
+            })
+            .collect();
+
+        for (tag, resource_type) in resource_tags {
+            if let Some(name) = tags.remove(&tag) {
+                resources.push(ddmetric_proto::metric_payload::Resource {
+                    r#type: resource_type,
+                    name,
+                });
+            }
+        }
+    }
+
     let source_type_name = tags.remove("source_type_name").unwrap_or_default();
 
     let tags = encode_tags(&tags);
 
-    let event_metadata = metric.metadata();
     let metadata = generate_proto_metadata(
         event_metadata.datadog_origin_metadata(),
         event_metadata.source_type(),
@@ -1227,6 +1249,81 @@ mod tests {
     fn test_encode_timestamp() {
         assert_eq!(encode_timestamp(None), Utc::now().timestamp());
         assert_eq!(encode_timestamp(Some(ts())), 1542182950);
+    }
+
+    #[test]
+    fn encode_datadog_agent_resource_tags_as_v2_resources() {
+        let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+            "resource.aws_docdb_cluster" => "docdb-cluster",
+            "abc.def.ghi" => "database_name:mongo_potatoes",
+        }));
+        metric.metadata_mut().set_source_type("datadog_agent");
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
+        }));
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "aws_docdb_cluster" && resource.name == "docdb-cluster"
+        }));
+        assert_eq!(
+            series_proto.tags,
+            vec!["abc.def.ghi:database_name:mongo_potatoes"]
+        );
+    }
+
+    #[test]
+    fn encode_non_datadog_agent_resource_tag_as_tag() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+        }));
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert!(!series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
+        }));
+        assert_eq!(
+            series_proto.tags,
+            vec!["resource.database_instance:mongo-repro-01"]
+        );
+    }
+
+    #[test]
+    fn encode_datadog_agent_resource_as_v1_tag() {
+        let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+        }));
+        metric.metadata_mut().set_source_type("datadog_agent");
+
+        let series = generate_series_metrics(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            series[0].tags,
+            Some(vec![
+                "resource.database_instance:mongo-repro-01".to_string()
+            ])
+        );
     }
 
     #[test]
