@@ -45,6 +45,11 @@ pub enum BuildError {
 
     #[snafu(display("Cannot call GC in Lua runtime: {}", source))]
     RuntimeErrorGc { source: mlua::Error },
+
+    #[snafu(display(
+        "metric_tag_values = \"auto\" is not supported by the lua transform; use \"single\" or \"full\", or use the remap transform for auto mode"
+    ))]
+    UnsupportedMetricTagValuesAuto,
 }
 
 /// Configuration for the version two of the `lua` transform.
@@ -86,9 +91,8 @@ pub struct LuaConfig {
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
     ///
-    /// When set to `auto`, single-value tags are exposed as strings and multi-value tags as
-    /// arrays, preserving the underlying shape of metrics that mix single- and multi-value
-    /// tags.
+    /// The `auto` value is not supported by the `lua` transform. Use the `remap` transform
+    /// if you need shape-preserving single/multi-value tag handling.
     #[serde(default)]
     metric_tag_values: MetricTagValues,
 }
@@ -180,7 +184,21 @@ struct TimerConfig {
 }
 
 impl LuaConfig {
+    pub fn validate_structure(&self) -> Result<(), Vec<String>> {
+        if self.metric_tag_values == MetricTagValues::Auto {
+            Err(vec![
+                "metric_tag_values = \"auto\" is not supported by the lua transform; use \"single\" or \"full\", or use the remap transform for auto mode".to_string(),
+            ])
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn build(&self, key: ComponentKey) -> crate::Result<Transform> {
+        if self.metric_tag_values == MetricTagValues::Auto {
+            return Err(UnsupportedMetricTagValuesAutoSnafu.build().into());
+        }
+
         Lua::new(self, key).map(Transform::event_task)
     }
 

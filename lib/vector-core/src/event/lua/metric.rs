@@ -120,30 +120,12 @@ impl IntoLua for LuaMetricTags {
             MetricTagMode::Single => Ok(LuaValue::Table(
                 lua.create_table_from(self.tags.iter_single())?,
             )),
-            // `Auto` exposes single-value tags as scalars and multi-value tags
-            // as arrays. Only a 1-element set scalarises -- empty sets keep
-            // the array shape so a noop Auto round-trip preserves them.
-            // (`as_single()` is unsuitable here because it deliberately
-            // collapses multi-value sets to their last value to power
-            // `Single` mode.)
+            // `Auto` is intentionally unsupported for Lua: bare tags cannot
+            // round-trip through Lua table semantics (`nil` removes keys and
+            // truncates array sequences). The `lua` transform rejects
+            // `metric_tag_values = "auto"` at config validation time.
             MetricTagMode::Auto => {
-                let table = lua.create_table()?;
-                for (key, value) in self.tags.0 {
-                    if value.len() == 1 {
-                        let scalar =
-                            value.into_iter().next().and_then(TagValue::into_option);
-                        table.raw_set(key, scalar)?;
-                    } else {
-                        let arr: Vec<_> = value
-                            .into_iter()
-                            .filter_map(|tag_value| {
-                                tag_value.into_option().into_lua(lua).ok()
-                            })
-                            .collect();
-                        table.raw_set(key, arr)?;
-                    }
-                }
-                Ok(LuaValue::Table(table))
+                unreachable!("metric_tag_values = \"auto\" is not supported by the lua transform")
             }
         }
     }
@@ -476,96 +458,6 @@ mod test {
         );
     }
 
-    /// `Auto` exposes single-value tags as scalars and multi-value tags as
-    /// arrays, matching how each shape would naturally appear in Lua.
-    #[test]
-    fn auto_mode_preserves_tag_shapes() {
-        let mut tags = BTreeMap::new();
-        tags.insert(
-            "single".to_string(),
-            TagValueSet::from(vec!["one".to_string()]),
-        );
-        tags.insert(
-            "multi".to_string(),
-            TagValueSet::from(vec!["a".to_string(), "b".to_string()]),
-        );
-        let metric = Metric::new(
-            "example counter",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
-        )
-        .with_tags(Some(MetricTags(tags)));
-
-        assert_metric(
-            metric,
-            MetricTagMode::Auto,
-            vec![
-                "type(metric.tags) == 'table'",
-                "metric.tags['single'] == 'one'",
-                "type(metric.tags['multi']) == 'table'",
-                "metric.tags['multi'][1] == 'a'",
-                "metric.tags['multi'][2] == 'b'",
-            ],
-        );
-    }
-
-    /// `Auto` round-trip: a 1-element multi-value tag is normalised to a
-    /// single-value tag by the metric storage layer (`TagValueSet::Set` is
-    /// never reduced below 2 elements), so it surfaces in Lua as a string
-    /// scalar rather than a 1-element table. This test pins that behaviour
-    /// as intentional -- a true array-shape preserving round-trip needs
-    /// `MetricTagMode::Full`.
-    #[test]
-    fn auto_mode_one_element_array_normalises_to_scalar() {
-        let mut tags = BTreeMap::new();
-        tags.insert(
-            "region".to_string(),
-            TagValueSet::from(vec!["us-east-1".to_string()]),
-        );
-        let metric = Metric::new(
-            "example counter",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
-        )
-        .with_tags(Some(MetricTags(tags)));
-
-        assert_metric(
-            metric,
-            MetricTagMode::Auto,
-            vec![
-                "type(metric.tags) == 'table'",
-                "type(metric.tags['region']) == 'string'",
-                "metric.tags['region'] == 'us-east-1'",
-            ],
-        );
-    }
-
-    /// `Auto` keeps an empty tag set as an array (Lua table). Without this,
-    /// an empty multi-value tag would silently morph into `nil` (and a Lua
-    /// `tags['empty'] = ...` assignment would then need to know the original
-    /// shape to round-trip correctly).
-    #[test]
-    fn auto_mode_empty_set_stays_array() {
-        let mut tags = BTreeMap::new();
-        tags.insert("empty".to_string(), TagValueSet::default());
-        let metric = Metric::new(
-            "example counter",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
-        )
-        .with_tags(Some(MetricTags(tags)));
-
-        assert_metric(
-            metric,
-            MetricTagMode::Auto,
-            vec![
-                "type(metric.tags) == 'table'",
-                "type(metric.tags['empty']) == 'table'",
-                "#metric.tags['empty'] == 0",
-            ],
-        );
-    }
-
     #[test]
     fn into_lua_counter_minimal() {
         let metric = Metric::new(
@@ -576,7 +468,7 @@ mod test {
             },
         );
 
-        for tag_mode in [MetricTagMode::Single, MetricTagMode::Full, MetricTagMode::Auto] {
+        for tag_mode in [MetricTagMode::Single, MetricTagMode::Full] {
             assert_metric(
                 metric.clone(),
                 tag_mode,

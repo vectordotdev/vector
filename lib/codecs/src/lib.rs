@@ -58,6 +58,9 @@ pub enum MetricTagValues {
     /// multi-value tags as arrays. Writes follow the same rule -- a string or null produces
     /// a single tag; an array of length >= 2 produces a multi-value tag. A length-1 array
     /// round-trips as a scalar; use `Full` to force array shape.
+    ///
+    /// Currently supported by the `remap` transform. The `lua` transform rejects this value
+    /// at config time.
     Auto,
 }
 

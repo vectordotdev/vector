@@ -24,6 +24,10 @@ pub enum MetricTagMode {
     /// strings, multi-value tags as arrays. Writes: scalar values produce
     /// single-value tags; arrays of length >= 2 produce multi-value tags.
     ///
+    /// Supported by the `remap` transform. The `lua` transform rejects this
+    /// mode at config time because bare tags cannot round-trip through Lua
+    /// table semantics.
+    ///
     /// A length-1 array is normalised to a single-value tag by the metric
     /// storage layer (`TagValueSet::Set` is never reduced below 2 elements),
     /// so an assignment like `.tags.region = ["us-east-1"]` round-trips as

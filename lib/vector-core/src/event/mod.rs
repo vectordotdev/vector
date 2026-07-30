@@ -9,6 +9,7 @@ pub use finalization::{
 pub use log_event::LogEvent;
 pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
+pub use metric_tag_mode::MetricTagMode;
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
@@ -17,7 +18,6 @@ use vector_common::{
     EventDataEq, byte_size_of::ByteSizeOf, config::ComponentKey, finalization,
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
-pub use metric_tag_mode::MetricTagMode;
 pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};

@@ -14,7 +14,10 @@ use vrl::{
     value::{Kind, ObjectMap, Value},
 };
 
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, metric::{MetricTags, TagValue, TagValueSet}};
+use super::{
+    Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent,
+    metric::{MetricTags, TagValue, TagValueSet},
+};
 use crate::{
     config::{LogNamespace, log_schema},
     schema::Definition,
@@ -251,7 +254,12 @@ fn merge_array_definitions(mut definition: Definition) -> Definition {
     definition
 }
 
-fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, tag_mode: MetricTagMode) {
+fn set_metric_tag_values(
+    name: String,
+    value: &Value,
+    metric: &mut Metric,
+    tag_mode: MetricTagMode,
+) {
     // `Auto` dispatches by the *shape* of the assigned value: arrays go through
     // the multi-value path, scalars go through the single-value path. `Full`
     // and `Single` are unchanged.
@@ -624,15 +632,12 @@ fn get_auto_value_tags(metric: &Metric) -> Option<Value> {
 }
 
 fn tag_ref_to_vrl_value(value: Option<&str>) -> Value {
-    value.map(Value::from).unwrap_or(Value::Null)
+    value.map_or(Value::Null, Value::from)
 }
 
 fn tag_value_set_to_vrl_value(tag_set: &TagValueSet, tag_mode: MetricTagMode) -> Value {
     match tag_mode {
-        MetricTagMode::Single => tag_set
-            .as_single()
-            .map(Value::from)
-            .unwrap_or(Value::Null),
+        MetricTagMode::Single => tag_set.as_single().map_or(Value::Null, Value::from),
         MetricTagMode::Full => Value::Array(tag_set.iter().map(tag_ref_to_vrl_value).collect()),
         MetricTagMode::Auto => match tag_set.len() {
             1 => match tag_set.iter().next() {
@@ -653,12 +658,7 @@ fn metric_tags_to_vrl_value(tags: MetricTags, tag_mode: MetricTagMode) -> Value 
             .into(),
         MetricTagMode::Full | MetricTagMode::Auto => tags
             .iter_sets()
-            .map(|(tag, tag_set)| {
-                (
-                    tag.into(),
-                    tag_value_set_to_vrl_value(tag_set, tag_mode),
-                )
-            })
+            .map(|(tag, tag_set)| (tag.into(), tag_value_set_to_vrl_value(tag_set, tag_mode)))
             .collect::<ObjectMap>()
             .into(),
     }
@@ -887,8 +887,11 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let target =
-                VrlTarget::new(Event::Log(LogEvent::from(value)), &info, MetricTagMode::Single);
+            let target = VrlTarget::new(
+                Event::Log(LogEvent::from(value)),
+                &info,
+                MetricTagMode::Single,
+            );
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -992,8 +995,11 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target =
-                VrlTarget::new(Event::Log(LogEvent::from(object)), &info, MetricTagMode::Single);
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::from(object)),
+                &info,
+                MetricTagMode::Single,
+            );
             let expect = LogEvent::from(expect);
             let value: Value = value;
             let path = OwnedTargetPath::event(path);
@@ -1092,8 +1098,11 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target =
-                VrlTarget::new(Event::Log(LogEvent::from(object)), &info, MetricTagMode::Single);
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::from(object)),
+                &info,
+                MetricTagMode::Single,
+            );
             let path = OwnedTargetPath::event(path);
             let removed = Target::target_get(&target, &path).unwrap().cloned();
 
@@ -1579,10 +1588,7 @@ mod test {
             tags,
             Value::Object(BTreeMap::from([
                 ("env".into(), Value::from("prod")),
-                (
-                    "shard".into(),
-                    Value::Array(vec!["a".into(), "b".into()])
-                ),
+                ("shard".into(), Value::Array(vec!["a".into(), "b".into()])),
             ])),
         );
     }
@@ -1615,7 +1621,11 @@ mod test {
             .find(|(k, _)| *k == "env")
             .expect("env tag missing")
             .1;
-        assert_eq!(tag_set.len(), 1, "scalar assignment must produce a 1-element set");
+        assert_eq!(
+            tag_set.len(),
+            1,
+            "scalar assignment must produce a 1-element set"
+        );
         assert_eq!(tag_set.as_single(), Some("staging"));
     }
 
@@ -1676,8 +1686,7 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         );
         let info = auto_mode_program_info();
-        let mut first_pass =
-            VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+        let mut first_pass = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
 
         first_pass
             .target_insert(
@@ -1747,10 +1756,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([(
-                "empty".into(),
-                Value::Array(vec![])
-            )])),
+            Value::Object(BTreeMap::from([("empty".into(), Value::Array(vec![]))])),
             "empty tag set must surface as an empty array, not as null",
         );
     }
@@ -1786,7 +1792,11 @@ mod test {
             .1;
         assert_eq!(tag_set.len(), 1);
         let collected: Vec<Option<&str>> = tag_set.iter().collect();
-        assert_eq!(collected, vec![None], "null must produce a single bare value");
+        assert_eq!(
+            collected,
+            vec![None],
+            "null must produce a single bare value"
+        );
     }
 
     /// `del(.tags.<field>)` must return the same shape that a read would have
