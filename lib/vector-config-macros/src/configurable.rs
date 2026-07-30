@@ -624,20 +624,6 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
-    let maybe_clear_title_description = field
-        .title()
-        .or_else(|| field.description())
-        .is_some()
-        .then(|| {
-            quote! {
-                // Fields with a title/description of their own cannot merge with the title/description
-                // of the field type itself, as this will generally lead to confusing output, so we
-                // explicitly clear the title/description first if we're about to set our own
-                // title/description.
-                #meta_ident.clear_title();
-                #meta_ident.clear_description();
-            }
-        });
     let maybe_default_value = if field_ty != field_schema_ty {
         get_metadata_default_value_delegated(meta_ident, field_schema_ty, field.default_value())
     } else {
@@ -652,7 +638,6 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
 
     quote! {
         let mut #meta_ident = ::vector_config::Metadata::default();
-        #maybe_clear_title_description
         #maybe_title
         #maybe_description
         #maybe_default_value
@@ -1254,7 +1239,7 @@ fn generate_enum_variant_apply_metadata(variant: &Variant<'_>) -> proc_macro2::T
 
     quote! {
         #variant_metadata
-        ::vector_config::schema::apply_base_metadata(&mut subschema, #variant_metadata_ref);
+        ::vector_config::schema::apply_metadata(&mut subschema, #variant_metadata_ref);
     }
 }
 
@@ -1264,7 +1249,7 @@ fn generate_enum_variant_tag_apply_metadata(variant: &Variant<'_>) -> proc_macro
 
     quote! {
         #variant_tag_metadata
-        ::vector_config::schema::apply_base_metadata(&mut tag_subschema, #variant_tag_metadata_ref);
+        ::vector_config::schema::apply_metadata(&mut tag_subschema, #variant_tag_metadata_ref);
     }
 }
 
