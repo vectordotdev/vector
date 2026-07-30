@@ -98,7 +98,7 @@ components: sinks: file: {
 				batches when `batch_encoding` is set.
 
 				Because columnar files cannot be appended to, each batch
-				is written to a distinct file: a millisecond timestamp is
+				is written to a distinct file: a time-ordered UUID (v7) is
 				inserted into the rendered `path` before the file
 				extension so that successive batches do not overwrite one
 				another. The columnar format handles its own internal

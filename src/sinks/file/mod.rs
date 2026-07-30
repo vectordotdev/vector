@@ -40,13 +40,11 @@ use crate::{
         FilePathOutsideBaseDirError, TemplateRenderingError,
     },
     sinks::util::{
-        BatchConfig,
-        BulkSizeBasedDefaultBatchSettings,
-        StreamSink,
+        BatchConfig, BulkSizeBasedDefaultBatchSettings, StreamSink,
         path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 mod bytes_path;
@@ -87,7 +85,7 @@ pub struct FileSinkConfig {
     #[configurable(metadata(
         docs::warnings = "Rendered paths are confined to `base_dir` (derived from the literal prefix of `path` when unset). See the `base_dir` option."
     ))]
-    pub path: Template,
+    pub path: UnconfinedTemplate,
 
     /// Directory under which all rendered `path` values must resolve.
     ///
@@ -125,7 +123,7 @@ pub struct FileSinkConfig {
     /// `compression` setting is ignored.
     ///
     /// Because columnar files cannot be appended to, each batch is written to a
-    /// distinct file: a millisecond timestamp is inserted into the rendered `path`
+    /// distinct file: a time-ordered UUID (v7) is inserted into the rendered `path`
     /// before the file extension so that successive batches do not overwrite one
     /// another.
     #[cfg(feature = "codecs-parquet")]
@@ -183,9 +181,9 @@ pub struct FileTruncateConfig {
 }
 
 impl GenerateConfig for FileSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
+            path: UnconfinedTemplate::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             #[cfg(feature = "codecs-parquet")]
@@ -305,11 +303,14 @@ impl SinkConfig for FileSinkConfig {
         }
 
         let sink = FileSink::new(self, cx)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
         ))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -326,8 +327,40 @@ impl SinkConfig for FileSinkConfig {
     }
 }
 
+/// Derive the path confinement for `config`.
+///
+/// Shared by the streaming [`FileSink`] and the batch (Parquet) sink so that
+/// both enforce the same boundary: a config that is rejected — or confined —
+/// on one path behaves identically on the other.
+fn build_confinement(config: &FileSinkConfig) -> crate::Result<Option<PathConfinement>> {
+    // Config validation runs regardless of the opt-out: a relative
+    // `base_dir` is a syntactic error, not a confinement decision.
+    if let Some(base) = config.base_dir.as_ref()
+        && base.is_relative()
+    {
+        return Err(Box::new(
+            crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
+                path: base.clone(),
+            },
+        ));
+    }
+
+    if config
+        .confinement
+        .dangerously_allow_unconfined_template_resolution
+    {
+        ConfinementConfig::warn_unconfined_template("sink", "file", "path");
+        return Ok(None);
+    }
+
+    Ok(
+        PathConfinement::for_template(&config.path, config.base_dir.as_deref())
+            .map_err(Box::new)?,
+    )
+}
+
 pub struct FileSink {
-    path: Template,
+    path: UnconfinedTemplate,
     transformer: Transformer,
     encoder: Encoder<Framer>,
     idle_timeout: Duration,
@@ -350,28 +383,7 @@ impl FileSink {
             .or(cx.globals.timezone)
             .and_then(timezone_to_offset);
 
-        // Config validation runs regardless of the opt-out: a relative
-        // `base_dir` is a syntactic error, not a confinement decision.
-        if let Some(base) = config.base_dir.as_ref()
-            && base.is_relative()
-        {
-            return Err(Box::new(
-                crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
-                    path: base.clone(),
-                },
-            ));
-        }
-
-        let confinement = if config
-            .confinement
-            .dangerously_allow_unconfined_template_resolution
-        {
-            ConfinementConfig::warn_unconfined_template("sink", "file", "path");
-            None
-        } else {
-            PathConfinement::for_template(&config.path, config.base_dir.as_deref())
-                .map_err(Box::new)?
-        };
+        let confinement = build_confinement(config)?;
 
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
@@ -411,6 +423,7 @@ impl FileSink {
                         path: &rendered_path,
                         base_dir: confinement.base_dir(),
                         error,
+                        dropped_events: 1,
                     });
                     None
                 }
@@ -528,6 +541,7 @@ impl FileSink {
                         path: &rendered,
                         base_dir: &base,
                         error,
+                        dropped_events: 1,
                     });
                     event.metadata().update_status(EventStatus::Errored);
                     return;
@@ -1467,6 +1481,39 @@ mod tests {
             &bytes[bytes.len() - 4..],
             b"PAR1",
             "missing trailing parquet magic"
+        );
+    }
+
+    #[cfg(feature = "codecs-parquet")]
+    #[tokio::test]
+    async fn parquet_batch_confines_to_base_dir() {
+        use vector_lib::codecs::encoding::format::{ParquetSchemaMode, ParquetSerializerConfig};
+
+        // PoC payload: a tenant-controlled field escapes the derived base dir
+        // (`<dir>/apps/`) into `<dir>/escaped/`. The batch path must be
+        // rejected before anything is written.
+        let directory = temp_dir();
+        let path = format!("{}/apps/{{{{ service }}}}/app.parquet", directory.display());
+
+        let mut config = base_config(&path);
+        config.batch_encoding = Some(FileBatchEncoding::Parquet(ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            ..Default::default()
+        }));
+
+        let mut event = Event::Log(LogEvent::from("payload"));
+        event
+            .as_mut_log()
+            .insert(event_path!("service"), "../escaped/poc");
+
+        let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+        sink.run(Box::pin(stream::iter(vec![event.into()])))
+            .await
+            .expect("Running sink failed");
+
+        assert!(
+            !directory.join("escaped").exists(),
+            "batch was written outside the base directory"
         );
     }
 
