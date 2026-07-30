@@ -549,7 +549,7 @@ where
 {
     fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
         if !self.emit_bytes_sent {
-            return self.http.call(req);
+            return HttpConnectorFuture::new(self.call_inner(req));
         }
 
         let bytes_sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));

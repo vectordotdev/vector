@@ -45,7 +45,7 @@ impl<Request: Send + Sync + 'static, Response: Send + Sync + 'static> RetryLogic
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            CloudwatchError::Put(err) => {
+            CloudwatchError::Put(err) | CloudwatchError::PutPartial { error: err, .. } => {
                 if let SdkError::ServiceError(inner) = err {
                     let err = inner.err();
                     if matches!(err, PutLogEventsError::ServiceUnavailableException(_)) {
@@ -54,10 +54,6 @@ impl<Request: Send + Sync + 'static, Response: Send + Sync + 'static> RetryLogic
                 }
                 is_retriable_error(err)
             }
-            // PutPartial means some sub-batches were already acknowledged by
-            // CloudWatch. Retrying would re-send those sub-batches, causing
-            // duplicate log delivery and double-counted bytes metrics.
-            CloudwatchError::PutPartial { .. } => false,
             CloudwatchError::DescribeLogStreams(err) => {
                 if let SdkError::ServiceError(inner) = err {
                     let err = inner.err();
