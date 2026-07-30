@@ -1,8 +1,14 @@
 # Antithesis Tests
 
-This directory contains Vector's Antithesis workloads and scenarios. The current
-focus is testing event conservation, integrity, and post-fault liveness across
-Vector topologies, especially topologies using `disk_v2` buffers.
+This directory contains Vector's Antithesis workloads and scenarios. The
+`vector_disk_buffer_soundness` scenario tests the `disk_v2` contract Vector can
+support today: bounded storage and accounting, integrity of delivered records,
+crash-safe restart, post-fault drain, and fresh progress. It deliberately does
+not treat a source response as proof that the disk buffer has fsynced the event.
+
+The older end-to-end scenario separately probes acknowledgement conservation.
+Its result must be interpreted against the acknowledgement boundary implemented
+by the topology under test.
 
 ## Layout
 
@@ -48,6 +54,7 @@ phase evaluates conservation.
 | --- | --- | --- |
 | [`vector_e2e`](scenarios/vector_e2e/) | One Vector node to the oracle | Memory |
 | [`vector_to_vector_e2e_disk`](scenarios/vector_to_vector_e2e_disk/) | HTTP source to head, Vector protocol to tail, HTTP sink to the oracle | `disk_v2` on head and tail |
+| [`vector_disk_buffer_soundness`](scenarios/vector_disk_buffer_soundness/) | One Vector node with independent ingress and egress paths | `disk_v2` boundedness, accounting, and recovery |
 
 ## Running a Scenario
 

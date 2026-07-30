@@ -972,6 +972,26 @@ where
         self.unflushed_bytes += record_size;
     }
 
+    #[cfg(feature = "antithesis-disk-asserts")]
+    fn assert_logical_buffer_within_capacity(&self, record_id: u64, bytes_written: usize) {
+        #![allow(clippy::disallowed_types)] // once_cell::Lazy
+        let logical_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes;
+        antithesis_sdk::assert_always_less_than_or_equal_to!(
+            logical_buffer_size,
+            self.config.max_buffer_size,
+            "disk buffer logical occupancy never exceeds its internal capacity",
+            &serde_json::json!({
+                "logical_buffer_size": logical_buffer_size,
+                "published_buffer_size": self.ledger.get_total_buffer_size(),
+                "unflushed_bytes": self.unflushed_bytes,
+                "internal_buffer_limit": self.config.max_buffer_size,
+                "max_data_file_size": self.config.max_data_file_size,
+                "record_id": record_id,
+                "bytes_written": bytes_written,
+            })
+        );
+    }
+
     fn publish_flushed_progress(&mut self, flushed_events: u64, flushed_bytes: u64) {
         debug_assert!(
             flushed_events <= self.unflushed_events,
@@ -1960,6 +1980,14 @@ where
             // separate later flush fails.
             record_finalizers.disarm();
         }
+
+        // `can_write_record` admits a record only when the published and
+        // locally-buffered unread bytes, including that record, fit within the
+        // internal capacity. Check the exact accounting value after every
+        // successful write so a wrap or stale recovery value cannot silently
+        // turn backpressure into an overflow.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        self.assert_logical_buffer_within_capacity(record_id, bytes_written);
 
         // A record at or above the write-buffer size forces the buffered writer to
         // flush mid-record, exercising the large-record path that splits a single

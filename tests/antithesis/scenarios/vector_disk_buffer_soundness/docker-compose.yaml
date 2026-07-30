@@ -1,0 +1,78 @@
+name: vector-disk-buffer-soundness
+
+x-node-health: &node-health
+  test: ["CMD", "curl", "-fsS", "http://localhost:9598/metrics"]
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 10s
+
+services:
+  vector:
+    container_name: vector
+    hostname: vector
+    platform: linux/amd64
+    build:
+      context: ../../../..
+      dockerfile: tests/antithesis/scenarios/vector_disk_buffer_soundness/Dockerfile
+      target: vector
+    image: vdbs-vector:${ANTITHESIS_IMAGE_TAG:-dev}
+    environment:
+      NO_COLOR: "1"
+      VECTOR_LOG: "info"
+      # Antithesis-only tuning: small files force frequent rollover and make an
+      # 8MiB public buffer consist of four files.
+      VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "2097152"
+    volumes: ["vdbs-buffer:/var/lib/vector"]
+    healthcheck: *node-health
+
+  oracle:
+    container_name: oracle
+    hostname: oracle
+    platform: linux/amd64
+    init: true
+    build:
+      context: ../../../..
+      dockerfile: tests/antithesis/scenarios/vector_disk_buffer_soundness/Dockerfile
+      target: oracle
+    image: vdbs-oracle:${ANTITHESIS_IMAGE_TAG:-dev}
+    environment:
+      NO_COLOR: "1"
+      SCENARIO_NAME: "vector_disk_buffer_soundness"
+      VECTOR_METRICS_URL: "http://vector:9598/metrics"
+    depends_on:
+      vector: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8686/report"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Test commands run separately from the oracle. This gives ingress
+  # (workload -> vector) and egress (vector -> oracle) independent network
+  # paths, so Antithesis can keep filling the buffer while the sink is cut off.
+  workload:
+    container_name: workload
+    hostname: workload
+    platform: linux/amd64
+    init: true
+    build:
+      context: ../../../..
+      dockerfile: tests/antithesis/scenarios/vector_disk_buffer_soundness/Dockerfile
+      target: workload
+    image: vdbs-workload:${ANTITHESIS_IMAGE_TAG:-dev}
+    environment:
+      NO_COLOR: "1"
+      VECTOR_SOURCE_URL: "http://vector:8080/"
+      VECTOR_METRICS_URL: "http://vector:9598/metrics"
+      VECTOR_BUFFER_DIR: "/sut-data/buffer/v2/out"
+      ORACLE_URL: "http://oracle:8686"
+    # Read-only access lets the terminal command verify actual data-file sizes,
+    # not just Vector's accounting metrics.
+    volumes: ["vdbs-buffer:/sut-data:ro"]
+    depends_on:
+      vector: { condition: service_healthy }
+      oracle: { condition: service_healthy }
+
+volumes:
+  vdbs-buffer:
