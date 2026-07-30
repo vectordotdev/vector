@@ -1,4 +1,3 @@
-#[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
     convert::AsRef,
@@ -15,7 +14,6 @@ use vector_common::{
     request_metadata::GetEventCountTags,
 };
 use vector_config::configurable_component;
-#[cfg(feature = "vrl")]
 use vrl::compiler::value::VrlValueConvert;
 
 use super::{
@@ -540,7 +538,6 @@ pub enum MetricKind {
     Absolute,
 }
 
-#[cfg(feature = "vrl")]
 impl TryFrom<vrl::value::Value> for MetricKind {
     type Error = String;
 
@@ -556,7 +553,6 @@ impl TryFrom<vrl::value::Value> for MetricKind {
     }
 }
 
-#[cfg(feature = "vrl")]
 impl From<MetricKind> for vrl::value::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
