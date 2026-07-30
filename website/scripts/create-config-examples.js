@@ -173,16 +173,19 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     }
   });
 
-  // For required_one_of groups, pick one representative (the first element listed in the group).
-  // This ensures minimal examples include exactly one field from each mutually exclusive group.
+  // For required_one_of groups, pick one representative per group to include in minimal examples.
+  // We prefer the first member that can yield a non-null example value; fall back to [0] if none can.
   const requiredOneOfSelected = new Set();
   const seenGroups = new Set();
   Object.keys(params).forEach((k) => {
     const p = params[k];
     if (Array.isArray(p.required_one_of) && p.required_one_of.length > 0) {
-      const representative = p.required_one_of[0];
-      if (!seenGroups.has(representative)) {
-        seenGroups.add(representative);
+      const groupKey = p.required_one_of[0];
+      if (!seenGroups.has(groupKey)) {
+        seenGroups.add(groupKey);
+        const representative =
+          p.required_one_of.find((m) => params[m] && getExampleValue(params[m], () => false) != null) ??
+          p.required_one_of[0];
         requiredOneOfSelected.add(representative);
       }
     }

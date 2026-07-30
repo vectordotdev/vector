@@ -398,6 +398,22 @@ fn build_named_struct_generate_schema_fn(
                 {
                     let mut s = ::vector_config::schema::SchemaObject::default();
                     s.object().required.insert(#name.to_string());
+                    // Reject explicit null so schema validators treat `{field: null}` the same
+                    // as omitting the field, aligning with serde's Option<T> semantics.
+                    s.object().properties.insert(
+                        #name.to_string(),
+                        ::vector_config::schema::Schema::Object(
+                            ::vector_config::schema::SchemaObject {
+                                subschemas: Some(Box::new(::vector_config::schema::SubschemaValidation {
+                                    not: Some(Box::new(::vector_config::schema::Schema::Object(
+                                        ::vector_config::schema::generate_null_schema()
+                                    ))),
+                                    ..Default::default()
+                                })),
+                                ..Default::default()
+                            }
+                        )
+                    );
                     s
                 }
             }

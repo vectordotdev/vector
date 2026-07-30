@@ -158,8 +158,10 @@ impl SchemaContext {
                 };
                 if let Some(Value::Array(arr)) = schema.get(key) {
                     let is_required_constraint = arr.iter().all(|s| {
-                        s.as_object()
-                            .is_some_and(|o| o.len() == 1 && o.contains_key("required"))
+                        s.as_object().is_some_and(|o| {
+                            o.contains_key("required")
+                                && o.keys().all(|k| k == "required" || k == "properties")
+                        })
                     });
                     if is_required_constraint {
                         return Ok(Value::Null);
