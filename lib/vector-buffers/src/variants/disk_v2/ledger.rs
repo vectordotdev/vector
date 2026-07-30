@@ -505,7 +505,7 @@ where
             .await
             .is_err()
         {
-            trace!("Timed out waiting for reader progress. Rechecking buffer state.");
+            warn!("Timed out waiting for reader progress. Rechecking buffer state.");
         }
     }
 
@@ -522,7 +522,7 @@ where
             .await
             .is_err()
         {
-            trace!("Timed out waiting for writer progress. Rechecking buffer state.");
+            warn!("Timed out waiting for writer progress. Rechecking buffer state.");
         }
     }
 
