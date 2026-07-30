@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tokio::time::timeout;
+use tokio::time::{self, timeout};
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 
@@ -17,6 +17,7 @@ use crate::{
     variants::disk_v2::{
         TryWriteOutcome,
         common::align16,
+        ledger::PROGRESS_RECHECK_INTERVAL,
         tests::{get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload},
     },
 };
@@ -108,6 +109,61 @@ async fn writer_drops_record_that_is_over_the_limit() {
         }
     })
     .await;
+}
+
+#[tokio::test]
+async fn writer_rechecks_after_reader_progress_wait_times_out() {
+    let assertion_registry = install_tracing_helpers();
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let record = SizedRecord::new(96);
+            let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
+            let (mut writer, _reader, _ledger) =
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
+
+            writer
+                .write_record(record.clone())
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let first_reader_wait = assertion_registry
+                .build()
+                .with_name("wait_for_reader")
+                .with_parent_name("writer_rechecks_after_reader_progress_wait_times_out")
+                .was_entered_exactly(1)
+                .finalize();
+            let second_reader_wait = assertion_registry
+                .build()
+                .with_name("wait_for_reader")
+                .with_parent_name("writer_rechecks_after_reader_progress_wait_times_out")
+                .was_entered_at_least(2)
+                .finalize();
+
+            time::pause();
+
+            let mut blocked_write = spawn(writer.write_record(record));
+            while !first_reader_wait.try_assert() {
+                assert_pending!(blocked_write.poll());
+            }
+            assert_pending!(blocked_write.poll());
+            assert!(!blocked_write.is_woken());
+
+            time::advance(PROGRESS_RECHECK_INTERVAL + Duration::from_millis(1)).await;
+
+            assert!(blocked_write.is_woken());
+            while !second_reader_wait.try_assert() {
+                assert_pending!(blocked_write.poll());
+            }
+
+            time::resume();
+        }
+    });
+
+    let parent = trace_span!("writer_rechecks_after_reader_progress_wait_times_out");
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
