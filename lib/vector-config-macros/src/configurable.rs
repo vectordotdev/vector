@@ -521,6 +521,16 @@ fn build_named_struct_generate_schema_fn(
 }
 
 fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::TokenStream {
+    for field in fields.iter() {
+        if field.required_one_of().is_some() {
+            return syn::Error::new(
+                field.span(),
+                "`required_one_of` is not supported on tuple struct fields",
+            )
+            .to_compile_error();
+        }
+    }
+
     let mapped_fields = fields
         .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
@@ -539,6 +549,16 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
 }
 
 fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::TokenStream {
+    for field in fields.iter() {
+        if field.required_one_of().is_some() {
+            return syn::Error::new(
+                field.span(),
+                "`required_one_of` is not supported on newtype struct fields",
+            )
+            .to_compile_error();
+        }
+    }
+
     // Map the fields normally, but we should end up with a single field at the end.
     let mut mapped_fields = fields
         .iter()
