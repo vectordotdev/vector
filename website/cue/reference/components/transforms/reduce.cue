@@ -154,6 +154,7 @@ components: transforms: reduce: {
 	]
 
 	telemetry: metrics: {
-		stale_events_flushed_total: components.sources.internal_metrics.output.metrics.stale_events_flushed_total
+		reduce_max_groups_exceeded_total: components.sources.internal_metrics.output.metrics.reduce_max_groups_exceeded_total
+		stale_events_flushed_total:       components.sources.internal_metrics.output.metrics.stale_events_flushed_total
 	}
 }
