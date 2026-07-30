@@ -443,9 +443,14 @@ fn build_named_struct_generate_schema_fn(
             }
         });
         quote! {
-            flattened_subschemas.push(
-                ::vector_config::schema::generate_one_of_schema(&[#(#required_entries),*])
-            );
+            {
+                let mut constraint = ::vector_config::schema::generate_one_of_schema(&[#(#required_entries),*]);
+                constraint.extensions.insert(
+                    "_required_one_of_constraint".to_string(),
+                    ::serde_json::Value::Bool(true),
+                );
+                flattened_subschemas.push(constraint);
+            }
         }
     });
 
