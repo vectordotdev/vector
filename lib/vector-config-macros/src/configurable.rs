@@ -363,8 +363,16 @@ fn build_named_struct_generate_schema_fn(
     fields: &[Field<'_>],
 ) -> proc_macro2::TokenStream {
     // Validate required_one_of usage before building groups.
-    for field in fields.iter().filter(|f| f.visible()) {
+    // Scan ALL fields (including non-visible) so #[serde(skip)] fields are caught too.
+    for field in fields.iter() {
         if field.required_one_of().is_some() {
+            if !field.visible() {
+                return syn::Error::new(
+                    field.span(),
+                    "`required_one_of` cannot be applied to a `#[serde(skip)]` field",
+                )
+                .to_compile_error();
+            }
             if field.flatten() {
                 return syn::Error::new(
                     field.span(),
@@ -931,11 +939,14 @@ fn generate_enum_newtype_struct_variant_schema(
     variant: &Variant<'_>,
     is_potentially_ambiguous: bool,
 ) -> proc_macro2::TokenStream {
-    // When we only have a single unnamed field, we basically just treat it as a
-    // passthrough, and we generate the schema for that field directly, without any
-    // metadata or anything, since things like defaults can't travel from the enum
-    // container to a specific variant anyways.
     let field = variant.fields().first().expect("must exist");
+    if field.required_one_of().is_some() {
+        return syn::Error::new(
+            field.span(),
+            "`required_one_of` is not supported on enum variant fields",
+        )
+        .to_compile_error();
+    }
     let field_schema = generate_struct_field(field);
     let maybe_fill_discriminant_map = is_potentially_ambiguous.then(|| {
         let variant_name = variant.ident().to_string();
