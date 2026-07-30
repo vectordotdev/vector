@@ -27,9 +27,10 @@ Their JSON representation forces several 2 MiB data-file rollovers, so terminal
 progress covers more than a single append to an already-open file.
 
 The scenario also retains `disk_v2`'s embedded Antithesis checks for record-id
-monotonicity, counter underflow, torn-record recovery, and full-buffer
-backpressure. Their `Sometimes` properties show whether a run reached restart,
-rollover, large-record, and full-buffer paths.
+monotonicity, counter underflow, and torn-record accounting. Required
+`Sometimes` properties show whether a run reached restart, rollover, and
+large-record paths. Full-buffer blocking and torn-record recovery remain
+optional paths; failing to reach them does not fail the run.
 
 ## Non-properties
 

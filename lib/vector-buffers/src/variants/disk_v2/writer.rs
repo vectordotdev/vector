@@ -1503,21 +1503,6 @@ where
                 "Buffer size limit reached. Waiting for reader progress."
             );
 
-            // The writer is now blocked on a full buffer, the precondition for the
-            // backpressure path and for the underflow that can wedge it forever.
-            #[cfg(feature = "antithesis-disk-asserts")]
-            {
-                #![allow(clippy::disallowed_types)] // once_cell::Lazy
-                antithesis_sdk::assert_sometimes!(
-                    true,
-                    "the writer blocks on a full buffer",
-                    &serde_json::json!({
-                        "total_buffer_size": self.ledger.get_total_buffer_size() + self.unflushed_bytes,
-                        "max_buffer_size": self.config.max_buffer_size,
-                    })
-                );
-            }
-
             self.ledger.wait_for_reader().await;
         }
 

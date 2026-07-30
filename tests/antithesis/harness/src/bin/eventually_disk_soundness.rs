@@ -17,7 +17,7 @@ use std::{
 };
 
 use antithesis_harness::{is_progress_probe_payload, payload_field};
-use antithesis_sdk::{antithesis_init, assert_always, assert_reachable};
+use antithesis_sdk::{antithesis_init, assert_always, assert_reachable, assert_unreachable};
 use clap::Parser;
 use serde_json::json;
 use tokio::time;
@@ -178,8 +178,7 @@ fn disk_snapshot(buffer_dir: &Path) -> Result<DiskSnapshot, String> {
 
 fn assert_physical_bounds(snapshot: Result<DiskSnapshot, String>, phase: &str) {
     let Ok(snapshot) = snapshot else {
-        assert_always!(
-            false,
+        assert_unreachable!(
             "the terminal checker can inspect the disk-buffer data files",
             &json!({ "phase": phase, "error": snapshot.unwrap_err() })
         );

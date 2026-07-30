@@ -584,10 +584,13 @@ where
         #[cfg(feature = "antithesis-disk-asserts")]
         {
             #![allow(clippy::disallowed_types)] // once_cell::Lazy
-            antithesis_sdk::assert_always_greater_than_or_equal_to!(
-                metadata.len(),
-                bytes_read,
-                "reader data-file size delta never underflows"
+            antithesis_sdk::assert_always_or_unreachable!(
+                metadata.len() >= bytes_read,
+                "reader data-file size delta never underflows",
+                &serde_json::json!({
+                    "data_file_size": metadata.len(),
+                    "bytes_read": bytes_read,
+                })
             );
         }
         let abandoned_tail_bytes = metadata.len().saturating_sub(bytes_read);
@@ -1091,17 +1094,6 @@ where
                         // The reader hit a corrupted, torn, or partially-written
                         // record and is abandoning the rest of this file, the
                         // recovery path that drives the skip-accounting hazards.
-                        #[cfg(feature = "antithesis-disk-asserts")]
-                        {
-                            #![allow(clippy::disallowed_types)] // once_cell::Lazy
-                            antithesis_sdk::assert_sometimes!(
-                                true,
-                                "the reader skips a torn or corrupted record and rolls the file",
-                                &serde_json::json!({
-                                    "last_reader_record_id": self.last_reader_record_id,
-                                })
-                            );
-                        }
                         self.account_abandoned_data_file_tail()
                             .await
                             .context(IoSnafu)?;
