@@ -103,7 +103,7 @@ fn default_endpoint() -> String {
 }
 
 impl GenerateConfig for PubsubConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             project = "my-project"
             topic = "my-topic"
@@ -253,10 +253,11 @@ mod tests {
 
     #[tokio::test]
     async fn fails_missing_creds() {
-        let config: PubsubConfig = toml::from_str(indoc! {r#"
-                project = "project"
-                topic = "topic"
-                encoding.codec = "json"
+        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
+                project: project
+                topic: topic
+                encoding:
+                  codec: json
             "#})
         .unwrap();
         if config.build(SinkContext::default()).await.is_ok() {

@@ -46,7 +46,7 @@ use crate::{
             service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
-    template::{Template, TemplateParseError},
+    template::{ConfinementConfig, Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -246,6 +246,9 @@ pub struct GcsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 fn default_time_format() -> String {
@@ -277,11 +280,12 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         tls: Default::default(),
         acknowledgements: Default::default(),
         timezone: Default::default(),
+        confinement: ConfinementConfig::default(),
     }
 }
 
 impl GenerateConfig for GcsSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"
@@ -308,8 +312,11 @@ impl SinkConfig for GcsSinkConfig {
         )?;
         auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth, cx)?;
-
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -349,11 +356,10 @@ impl GcsSinkConfig {
     }
 
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        Ok(KeyPartitioner::new(
-            Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
-                .context(KeyPrefixTemplateSnafu)?,
-            None,
-        ))
+        let tpl = Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
+            .context(KeyPrefixTemplateSnafu)?;
+        let tpl = tpl.confine(&self.confinement, Self::NAME, "key_prefix")?;
+        Ok(KeyPartitioner::new(tpl, None))
     }
 }
 
@@ -588,10 +594,12 @@ mod tests {
         partition::Partitioner,
         request_metadata::GroupedCountByteSize,
     };
+    use vrl::event_path;
 
     use super::*;
     use crate::{
         event::LogEvent,
+        template::{ConfinementConfig, Template},
         test_util::{
             components::{SINK_TAGS, run_and_assert_sink_compliance},
             http::{always_200_response, spawn_blackhole_http_server},
@@ -634,7 +642,7 @@ mod tests {
 
         let message = "hello world".to_string();
         let mut event = LogEvent::from(message);
-        event.insert("key", "value");
+        event.insert(event_path!("key"), "value");
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
@@ -1050,7 +1058,7 @@ mod tests {
         let events: Vec<Event> = (0..10)
             .map(|i| {
                 let mut log = LogEvent::from(format!("message_{i}"));
-                log.insert("host", format!("host_{}", i % 3));
+                log.insert(event_path!("host"), format!("host_{}", i % 3));
                 Event::from(log)
             })
             .collect();
@@ -1086,5 +1094,51 @@ mod tests {
             columns.contains(&"host".to_string()),
             "expected a `host` column, got: {columns:?}"
         );
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_key_prefix() {
+        let config = GcsSinkConfig {
+            key_prefix: Some("{{ tenant }}".into()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        match config.key_partitioner() {
+            Err(err) => assert!(
+                err.to_string().contains("no literal string prefix"),
+                "unexpected error: {err}"
+            ),
+            Ok(_) => panic!("expected confinement error"),
+        }
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_key_prefix() {
+        let config = GcsSinkConfig {
+            key_prefix: Some("{{ tenant }}".into()),
+            confinement: ConfinementConfig {
+                dangerously_allow_unconfined_template_resolution: true,
+            },
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        assert!(config.key_partitioner().is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::Event;
+
+        let template: Template = "safe/{{ tenant }}/".try_into().unwrap();
+        let template = template
+            .confine(
+                &ConfinementConfig::default(),
+                "gcp_cloud_storage",
+                "key_prefix",
+            )
+            .unwrap();
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../escape");
+        assert!(template.render_string(&event).is_err());
     }
 }

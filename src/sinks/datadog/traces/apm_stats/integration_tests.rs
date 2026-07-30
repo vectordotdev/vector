@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use http_body::Body as _;
 
@@ -10,7 +10,6 @@ use axum::{
     routing::{get, post},
 };
 use chrono::Utc;
-use flate2::read::GzDecoder;
 use indoc::indoc;
 use rmp_serde;
 use serde::Serialize;
@@ -18,6 +17,7 @@ use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     time::{Duration, sleep},
 };
+use vector_common::decompression::CappedDecoder;
 
 use crate::{
     config::ConfigBuilder,
@@ -130,9 +130,8 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
             .expect("could not decode body into bytes")
             .to_bytes();
 
-        let mut gz = GzDecoder::new(compressed_body_bytes.as_ref());
-        let mut decompressed_body_bytes = vec![];
-        gz.read_to_end(&mut decompressed_body_bytes)
+        let decompressed_body_bytes = CappedDecoder::gzip(compressed_body_bytes.as_ref())
+            .decompress()
             .expect("unable to decompress gzip stats payload");
 
         let payload: StatsPayload = rmp_serde::from_slice(&decompressed_body_bytes).unwrap();
@@ -329,10 +328,10 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
 async fn start_vector() -> (RunningTopology, ShutdownErrorReceiver) {
     let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());
 
-    let source_config = toml::from_str::<DatadogAgentConfig>(&format!(
+    let source_config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
-            address = "{}"
-            multiple_outputs = true
+            address: "{}"
+            multiple_outputs: true
         "#},
         dd_agent_address,
     ))
@@ -344,9 +343,10 @@ async fn start_vector() -> (RunningTopology, ShutdownErrorReceiver) {
     let dd_traces_endpoint = format!("http://127.0.0.1:{}", server_port_for_vector());
     let cfg = format!(
         indoc! { r#"
-            default_api_key = "atoken"
-            endpoint = "{}"
-            batch.max_events = 1
+            default_api_key: "atoken"
+            endpoint: "{}"
+            batch:
+              max_events: 1
         "#},
         dd_traces_endpoint
     );
@@ -356,7 +356,7 @@ async fn start_vector() -> (RunningTopology, ShutdownErrorReceiver) {
     assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
     let cfg = cfg.replace("atoken", &api_key);
 
-    let sink_config = toml::from_str::<DatadogTracesConfig>(&cfg).unwrap();
+    let sink_config = serde_yaml::from_str::<DatadogTracesConfig>(&cfg).unwrap();
 
     builder.add_sink("out", &["in.traces"], sink_config);
 

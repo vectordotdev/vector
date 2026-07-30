@@ -1,4 +1,3 @@
-#[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
     convert::AsRef,
@@ -15,11 +14,10 @@ use vector_common::{
     request_metadata::GetEventCountTags,
 };
 use vector_config::configurable_component;
-#[cfg(feature = "vrl")]
 use vrl::compiler::value::VrlValueConvert;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, MergeFinalizable,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use crate::config::telemetry;
@@ -478,6 +476,12 @@ impl Finalizable for Metric {
     }
 }
 
+impl MergeFinalizable for Metric {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
+    }
+}
+
 impl GetEventCountTags for Metric {
     fn get_tags(&self) -> TaggedEventsSent {
         let source = if telemetry().tags().emit_source {
@@ -520,7 +524,6 @@ pub enum MetricKind {
     Absolute,
 }
 
-#[cfg(feature = "vrl")]
 impl TryFrom<vrl::value::Value> for MetricKind {
     type Error = String;
 
@@ -536,7 +539,6 @@ impl TryFrom<vrl::value::Value> for MetricKind {
     }
 }
 
-#[cfg(feature = "vrl")]
 impl From<MetricKind> for vrl::value::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
