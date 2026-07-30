@@ -7,7 +7,7 @@ use tracing::trace;
 use crate::{
     common::backoff::ExponentialBackoff,
     internal_events::{
-        RedisConnectionDropped, RedisConnectionError, RedisConnectionEstablished,
+        RedisConnectionDroppedError, RedisConnectionError, RedisConnectionEstablished,
         RedisReceiveEventError,
     },
     sources::{
@@ -172,7 +172,7 @@ impl InputHandler {
                         // Redis closed an established connection (e.g. server restart). Record
                         // it as a component error — so alerts fire even if the reconnect
                         // succeeds immediately — and reconnect in the outer loop.
-                        emit!(RedisConnectionDropped);
+                        emit!(RedisConnectionDroppedError);
                         return SessionEnd::Disconnected;
                     }
 

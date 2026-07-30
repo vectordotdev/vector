@@ -74,9 +74,9 @@ impl InternalEvent for RedisConnectionError {
 /// source reconnects automatically, but this records the drop as a component error so that
 /// metric-based alerts still fire even when the following reconnect succeeds immediately.
 #[derive(Debug, NamedInternalEvent)]
-pub struct RedisConnectionDropped;
+pub struct RedisConnectionDroppedError;
 
-impl InternalEvent for RedisConnectionDropped {
+impl InternalEvent for RedisConnectionDroppedError {
     fn emit(self) {
         error!(
             message = "Redis pub/sub connection dropped; will reconnect.",
