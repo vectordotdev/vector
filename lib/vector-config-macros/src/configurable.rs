@@ -382,6 +382,13 @@ fn build_named_struct_generate_schema_fn(
                 )
                 .to_compile_error();
             }
+            if field.skip_deserializing() {
+                return syn::Error::new(
+                    field.span(),
+                    "`required_one_of` cannot be applied to a `#[serde(skip_deserializing)]` field; users cannot set its value",
+                )
+                .to_compile_error();
+            }
         }
     }
 
@@ -817,6 +824,13 @@ fn get_field_schema_ty<'a>(field: &'a Field<'a>) -> &'a syn::Type {
 }
 
 fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
+    if field.required_one_of().is_some() {
+        return syn::Error::new(
+            field.span(),
+            "`required_one_of` is not supported on enum variant fields",
+        )
+        .to_compile_error();
+    }
     let field_name = field.ident().expect("field should be named");
     let field_ty = field.ty();
     let field_already_contained = format!(

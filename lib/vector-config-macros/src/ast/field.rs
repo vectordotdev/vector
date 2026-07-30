@@ -226,6 +226,11 @@ impl<'a> Field<'a> {
         self.attrs.flatten
     }
 
+    /// Whether this field is marked `#[serde(skip_deserializing)]`.
+    pub fn skip_deserializing(&self) -> bool {
+        self.attrs.skip_deserializing
+    }
+
     /// The `required_one_of` group name, if any.
     ///
     /// When set, this field is part of a named group where exactly one member must be provided.
@@ -267,6 +272,8 @@ struct Attributes {
     visible: bool,
     #[darling(skip)]
     flatten: bool,
+    #[darling(skip)]
+    skip_deserializing: bool,
     #[darling(multiple)]
     metadata: Vec<Metadata>,
     #[darling(multiple)]
@@ -287,6 +294,7 @@ impl Attributes {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
         self.flatten = field.attrs.flatten();
+        self.skip_deserializing = field.attrs.skip_deserializing();
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in
