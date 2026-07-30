@@ -266,20 +266,16 @@ fn generate_named_struct_field(
     // Inject docs::required_one_of and docs::required_one_of_group metadata so the CUE doc
     // builder can render the mutual exclusivity constraint and its group name.
     let inject_required_one_of = required_one_of.map(|RequiredOneOf { group, members }| {
-        let members_json = format!(
-            "[{}]",
-            members
-                .iter()
-                .map(|m| format!("\"{}\"", m))
-                .collect::<Vec<_>>()
-                .join(",")
-        );
+        let member_lits: Vec<syn::LitStr> = members
+            .iter()
+            .map(|m| syn::LitStr::new(m, proc_macro2::Span::call_site()))
+            .collect();
         quote! {
             if let Some(meta) = subschema.extensions.get_mut("_metadata") {
                 if let Some(obj) = meta.as_object_mut() {
                     obj.insert(
                         "docs::required_one_of".to_owned(),
-                        ::serde_json::from_str(#members_json).unwrap(),
+                        ::serde_json::Value::Array(vec![#(::serde_json::Value::String(#member_lits.to_owned())),*]),
                     );
                     obj.insert(
                         "docs::required_one_of_group".to_owned(),
@@ -290,7 +286,7 @@ fn generate_named_struct_field(
                 let mut obj = ::serde_json::Map::new();
                 obj.insert(
                     "docs::required_one_of".to_owned(),
-                    ::serde_json::from_str(#members_json).unwrap(),
+                    ::serde_json::Value::Array(vec![#(::serde_json::Value::String(#member_lits.to_owned())),*]),
                 );
                 obj.insert(
                     "docs::required_one_of_group".to_owned(),
@@ -346,6 +342,11 @@ fn generate_named_struct_field(
     }
 }
 
+fn is_option_type(ty: &syn::Type) -> bool {
+    matches!(ty, syn::Type::Path(tp)
+        if tp.path.segments.last().is_some_and(|s| s.ident == "Option"))
+}
+
 fn generate_tuple_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_schema = generate_struct_field(field);
 
@@ -361,6 +362,29 @@ fn build_named_struct_generate_schema_fn(
     container: &Container<'_>,
     fields: &[Field<'_>],
 ) -> proc_macro2::TokenStream {
+    // Validate required_one_of usage before building groups.
+    for field in fields.iter().filter(|f| f.visible()) {
+        if field.required_one_of().is_some() {
+            if field.flatten() {
+                return syn::Error::new(
+                    field.span(),
+                    "`required_one_of` cannot be applied to a `#[serde(flatten)]` field",
+                )
+                .to_compile_error();
+            }
+            if !is_option_type(field.ty())
+                && field.default_value().is_none()
+                && container.default_value().is_none()
+            {
+                return syn::Error::new(
+                    field.span(),
+                    "`required_one_of` requires the field to be optional; use `Option<T>` or add `#[serde(default)]`",
+                )
+                .to_compile_error();
+            }
+        }
+    }
+
     // Collect required_one_of groups at macro-expansion time: group_name -> [serde field names].
     let mut groups: std::collections::BTreeMap<String, Vec<String>> =
         std::collections::BTreeMap::new();

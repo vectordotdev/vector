@@ -202,7 +202,13 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
 
   const obj = {};
   Object.keys(params)
-    .filter((k) => (filter(params[k]) || requiredOneOfSelected.has(k)) && matchesWhen(params[k]))
+    .filter((k) => {
+      const p = params[k];
+      // Non-representative group members are excluded even if the general filter accepts them.
+      const inGroup = Array.isArray(p.required_one_of) && p.required_one_of.length > 0;
+      if (inGroup && !requiredOneOfSelected.has(k)) return false;
+      return (filter(p) || requiredOneOfSelected.has(k)) && matchesWhen(p);
+    })
     .forEach((k) => {
       let value = getExampleValue(params[k], deepFilter);
       if (value != null) {
