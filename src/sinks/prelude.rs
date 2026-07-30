@@ -23,7 +23,10 @@ pub use vector_lib::{
 
 pub use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{
+        DataType, GenerateConfig, SinkConfig, SinkContext, StateValidated, StructureValidated,
+        ValidationContext,
+    },
     event::{Event, LogEvent},
     internal_events::{SinkRequestBuildError, TemplateRenderingError},
     sinks::{

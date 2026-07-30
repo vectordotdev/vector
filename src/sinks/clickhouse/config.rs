@@ -216,71 +216,203 @@ pub struct AsyncInsertSettingsConfig {
 
 impl_generate_config_from_default!(ClickhouseConfig);
 
+/// Phase 1 state: everything derivable from [`ClickhouseConfig`] alone.
+///
+/// The fields are private, so the confined templates the sink renders with can only be obtained by
+/// going through [`SinkConfig::validate_structure`].
+pub struct ClickhouseStructureValidated {
+    config: ClickhouseConfig,
+    endpoint: Uri,
+    auth: Option<Auth>,
+    batch_settings: BatcherSettings,
+    database_template: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
+}
+
+/// Phase 2 state: phase 1 plus the HTTP client, which needs the environment to construct.
+pub struct ClickhouseStateValidated {
+    config: ClickhouseConfig,
+    endpoint: Uri,
+    auth: Option<Auth>,
+    batch_settings: BatcherSettings,
+    database_template: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
+    client: HttpClient,
+}
+
+impl StructureValidated for ClickhouseStructureValidated {
+    fn validate_state(
+        self: Box<Self>,
+        cx: &ValidationContext,
+    ) -> std::result::Result<Box<dyn StateValidated>, Vec<String>> {
+        // Constructing the client reads TLS material from disk, so it cannot happen in phase 1. It
+        // is still inert: no request is sent until `build`.
+        let tls_settings = TlsSettings::from_options(self.config.tls.as_ref())
+            .map_err(|e| vec![format!("tls: {e}")])?;
+        let client =
+            HttpClient::new(tls_settings, &cx.proxy).map_err(|e| vec![format!("client: {e}")])?;
+
+        Ok(Box::new(ClickhouseStateValidated {
+            config: self.config,
+            endpoint: self.endpoint,
+            auth: self.auth,
+            batch_settings: self.batch_settings,
+            database_template: self.database_template,
+            database: self.database,
+            table: self.table,
+            client,
+        }))
+    }
+}
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "clickhouse")]
-impl SinkConfig for ClickhouseConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = self.endpoint.with_default_parts().uri;
-        let auth = self.auth.choose_one(&self.endpoint.auth)?;
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+impl StateValidated for ClickhouseStateValidated {
+    async fn build(self: Box<Self>, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let Self {
+            config,
+            endpoint,
+            auth,
+            batch_settings,
+            database_template,
+            database,
+            table,
+            client,
+        } = *self;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
             endpoint: endpoint.clone(),
-            skip_unknown_fields: self.skip_unknown_fields,
-            date_time_best_effort: self.date_time_best_effort,
-            insert_random_shard: self.insert_random_shard,
-            compression: self.compression,
-            query_settings: self.query_settings,
+            skip_unknown_fields: config.skip_unknown_fields,
+            date_time_best_effort: config.date_time_best_effort,
+            insert_random_shard: config.insert_random_shard,
+            compression: config.compression,
+            query_settings: config.query_settings,
         };
 
         let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
             HttpService::new(client.clone(), clickhouse_service_request_builder);
 
-        let request_limits = self.request.into_settings();
-
         let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
+            .settings(
+                config.request.into_settings(),
+                ClickhouseRetryLogic::default(),
+            )
             .service(service);
 
-        let batch_settings = self.batch.into_batcher_settings()?;
-
-        // Use config templates for introspection in resolve_strategy.
-        let database_template = self.database.clone().unwrap_or_else(|| {
-            "default"
-                .try_into()
-                .expect("'default' should be a valid template")
-        });
-
-        // Resolve the encoding strategy (format + encoder) based on configuration.
-        let (format, encoder_kind) = self
+        // Queries the endpoint for the Arrow schema when so configured, which is why it belongs to
+        // this phase rather than either validation phase.
+        let (format, encoder_kind) = config
             .resolve_strategy(&client, &endpoint, &database_template, auth.as_ref())
             .await?;
 
-        // Confine templates for runtime use in the sink.
-        let confined_table = self
-            .table
-            .clone()
-            .confine(&self.confinement, Self::NAME, "table")?;
-        let database = database_template.confine(&self.confinement, Self::NAME, "database")?;
-
         let request_builder = ClickhouseRequestBuilder {
-            compression: self.compression,
-            encoder: (self.encoding.clone(), encoder_kind),
+            compression: config.compression,
+            encoder: (config.encoding.clone(), encoder_kind),
         };
 
         let sink = ClickhouseSink::new(
             batch_settings,
             service,
             database,
-            confined_table,
+            table,
             format,
             request_builder,
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "clickhouse")]
+impl SinkConfig for ClickhouseConfig {
+    fn validate_structure(&self) -> std::result::Result<Box<dyn StructureValidated>, Vec<String>> {
+        let mut errors = Vec::new();
+
+        let endpoint = self.endpoint.with_default_parts().uri;
+
+        // Kept as a template as well as confined below, for introspection in `resolve_strategy`.
+        let database_template = match self.database.clone() {
+            Some(database) => Some(database),
+            None => Template::try_from("default")
+                .inspect_err(|e| errors.push(format!("database: {e}")))
+                .ok(),
+        };
+
+        if self.batch_encoding.is_some() {
+            if self.format != Format::ArrowStream {
+                errors.push(format!(
+                    "'batch_encoding' is only compatible with 'format: arrow_stream'. Found 'format: {}'.",
+                    self.format
+                ));
+            }
+
+            if self.table.is_dynamic()
+                || database_template.as_ref().is_some_and(Template::is_dynamic)
+            {
+                errors.push(
+                    "Arrow codec requires a static table and database. Dynamic schema inference is not supported."
+                        .to_string(),
+                );
+            }
+        }
+
+        let auth = self
+            .auth
+            .choose_one(&self.endpoint.auth)
+            .inspect_err(|e| errors.push(format!("auth: {e}")))
+            .ok();
+
+        let batch_settings = self
+            .batch
+            .into_batcher_settings()
+            .inspect_err(|e| errors.push(format!("batch: {e}")))
+            .ok();
+
+        let table = self
+            .table
+            .clone()
+            .confine(&self.confinement, Self::NAME, "table")
+            .inspect_err(|e| errors.push(e.to_string()))
+            .ok();
+
+        let database = database_template
+            .clone()
+            .map(|template| template.confine(&self.confinement, Self::NAME, "database"))
+            .transpose()
+            .inspect_err(|e| errors.push(e.to_string()))
+            .ok()
+            .flatten();
+
+        match (
+            errors.is_empty(),
+            auth,
+            batch_settings,
+            database_template,
+            database,
+            table,
+        ) {
+            (
+                true,
+                Some(auth),
+                Some(batch_settings),
+                Some(database_template),
+                Some(database),
+                Some(table),
+            ) => Ok(Box::new(ClickhouseStructureValidated {
+                config: self.clone(),
+                endpoint,
+                auth,
+                batch_settings,
+                database_template,
+                database,
+                table,
+            })),
+            _ => Err(errors),
+        }
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -309,15 +441,8 @@ impl ClickhouseConfig {
         auth: Option<&Auth>,
     ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
         if let Some(batch_encoding) = &self.batch_encoding {
-            // Validate that batch_encoding is only compatible with ArrowStream format
-            if self.format != Format::ArrowStream {
-                return Err(format!(
-                    "'batch_encoding' is only compatible with 'format: arrow_stream'. Found 'format: {}'.",
-                    self.format
-                )
-                .into());
-            }
-
+            // `format` compatibility and static table/database are structural, so
+            // `validate_structure` has already rejected those configs before we get here.
             let ClickhouseBatchEncoding::ArrowStream(arrow_config) = batch_encoding;
             let mut arrow_config = arrow_config.clone();
 
@@ -353,13 +478,6 @@ impl ClickhouseConfig {
         auth: Option<&Auth>,
         config: &mut ArrowStreamSerializerConfig,
     ) -> crate::Result<()> {
-        if self.table.is_dynamic() || database.is_dynamic() {
-            return Err(
-                "Arrow codec requires a static table and database. Dynamic schema inference is not supported."
-                    .into(),
-            );
-        }
-
         let table_str = self.table.get_ref();
         let database_str = database.get_ref();
 
@@ -510,18 +628,10 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_format_selection_with_batch_encoding() {
-        use crate::http::HttpClient;
-        use crate::tls::TlsSettings;
-
-        // Create minimal dependencies for resolve_strategy
-        let tls = TlsSettings::default();
-        let client = HttpClient::new(tls, &Default::default()).unwrap();
-        let endpoint: http::Uri = "http://localhost:8123".parse().unwrap();
-        let database: Template = "test_db".try_into().unwrap();
-
-        // Test incompatible formats - should all return errors
+    #[test]
+    fn test_format_selection_with_batch_encoding() {
+        // `batch_encoding` is only compatible with `format: arrow_stream`. That is a structural
+        // constraint, so it is now rejected in phase 1 without constructing a client.
         let incompatible_formats = vec![
             (Format::JsonEachRow, "json_each_row"),
             (Format::JsonAsObject, "json_as_object"),
@@ -536,14 +646,17 @@ mod tests {
                 )),
             );
 
-            let result = config
-                .resolve_strategy(&client, &endpoint, &database, None)
-                .await;
+            let errors = config.validate_structure().err().unwrap_or_else(|| {
+                panic!(
+                    "Expected error for format {format_name} with batch_encoding, but got success"
+                )
+            });
 
             assert!(
-                result.is_err(),
-                "Expected error for format {} with batch_encoding, but got success",
-                format_name
+                errors
+                    .iter()
+                    .any(|e| e.contains("only compatible with 'format: arrow_stream'")),
+                "Expected format incompatibility error for {format_name}, got {errors:?}"
             );
         }
     }

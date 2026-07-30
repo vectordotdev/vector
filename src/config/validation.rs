@@ -253,6 +253,15 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         }
     }
 
+    // Structural validation for sinks: template confinement, invalid URIs, out-of-range values,
+    // and similar config-level checks. These run during config compilation so errors are
+    // reported on both `vector validate --no-environment` and normal startup/reload.
+    for (key, sink) in config.sinks.iter() {
+        if let Err(errs) = sink.inner.validate_structure() {
+            errors.extend(errs.into_iter().map(|msg| format!("Sink {key} {msg}")));
+        }
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {

@@ -236,16 +236,55 @@ impl From<UriSerde> for SinkHealthcheckOptions {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
+    /// Phase 1: validates structural constraints that do not require environment resources --
+    /// invalid URIs, out-of-range values, duplicate keys, template confinement -- and returns the
+    /// values derived along the way for the later phases to consume.
+    ///
+    /// Most of these checks are really *fallible pure constructors*: [`Template::confine`] yields a
+    /// [`ConfinedTemplate`], `choose_one` yields an `Auth`, `into_batcher_settings` yields
+    /// `BatcherSettings`. Returning them in a [`StructureValidated`] state is what keeps `build`
+    /// from recomputing every check and drifting from this one.
+    ///
+    /// Called during config compilation, so errors are reported on both `vector validate` and
+    /// normal startup/reload.
+    ///
+    /// # Contract
+    ///
+    /// Implementations must be **pure**: no network, no filesystem, no credential resolution, no
+    /// task spawning. Prefer accumulating every error into the returned `Vec` rather than returning
+    /// only the first, so a single `vector validate` run reports all of a sink's problems at once.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    ///
+    /// [`Template::confine`]: crate::template::Template::confine
+    /// [`ConfinedTemplate`]: crate::template::ConfinedTemplate
+    fn validate_structure(&self) -> Result<Box<dyn StructureValidated>, Vec<String>> {
+        Ok(Box::new(UnphasedSink))
+    }
+
     /// Builds the sink with the given context.
     ///
-    /// If the sink is built successfully, `Ok(...)` is returned containing the sink and the sink's
-    /// healthcheck.
+    /// The default implementation drives the three phases in order, which is the path a migrated
+    /// sink takes: it implements [`SinkConfig::validate_structure`] plus the two phase traits and
+    /// does not override this method. Sinks not yet migrated override this directly.
     ///
     /// # Errors
     ///
     /// If an error occurs while building the sink, an error variant explaining the issue is
     /// returned.
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)>;
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let validation_cx = ValidationContext::from_sink_context(&cx);
+        let structure = self
+            .validate_structure()
+            .map_err(|errors| errors.join("; "))?;
+        let state = structure
+            .validate_state(&validation_cx)
+            .map_err(|errors| errors.join("; "))?;
+        state.build(cx).await
+    }
 
     /// Gets the input configuration for this sink.
     fn input(&self) -> Input;
@@ -277,6 +316,76 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
+}
+
+/// The environment available to phase 2, [`StructureValidated::validate_state`].
+///
+/// This deliberately carries only what the *running app* knows and the config cannot: settings
+/// merged from the global config and the process environment. Anything the user wrote in the sink's
+/// own config (TLS options, endpoints, credentials) is already owned by the phase-1 state.
+#[derive(Clone, Debug, Default)]
+pub struct ValidationContext {
+    /// Proxy settings, already merged with the global config and environment.
+    pub proxy: ProxyConfig,
+}
+
+impl ValidationContext {
+    /// Extracts the phase-2 environment from a full [`SinkContext`].
+    pub fn from_sink_context(cx: &SinkContext) -> Self {
+        Self {
+            proxy: cx.proxy.clone(),
+        }
+    }
+}
+
+/// Phase 1 output: a config proven well-formed, carrying the values the later phases need.
+///
+/// Produced by [`SinkConfig::validate_structure`]. Because the only way to reach phase 2 is to hold
+/// one of these, and the only way to reach [`StateValidated::build`] is to hold a phase-2 state,
+/// the compiler enforces the ordering that would otherwise be a documented convention.
+///
+/// # Contract
+///
+/// Phase 2 may resolve settings and open *inert* clients. It must not reach the network and must
+/// not spawn background tasks; anything that talks to a remote endpoint belongs in
+/// [`StateValidated::build`].
+pub trait StructureValidated: Send {
+    /// Advances to phase 2, resolving anything that needs the running app's environment.
+    ///
+    /// # Errors
+    ///
+    /// Returns every error found, not just the first.
+    fn validate_state(
+        self: Box<Self>,
+        cx: &ValidationContext,
+    ) -> Result<Box<dyn StateValidated>, Vec<String>>;
+}
+
+/// Phase 2 output: a state from which the sink can be constructed.
+#[async_trait]
+pub trait StateValidated: Send {
+    /// Final phase: constructs the sink and its healthcheck. Side effects are allowed here,
+    /// including reaching the endpoint. Must not spawn background tasks; those belong in the
+    /// sink's own `run()` future so a rolled-back reload leaves nothing running.
+    async fn build(self: Box<Self>, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)>;
+}
+
+/// Phase-1 state for a sink that has not been migrated to phased validation.
+///
+/// Such sinks override [`SinkConfig::build`] directly, so the default `build` that drives the
+/// phases is never reached and `validate_state` is never called. The error exists only so a sink
+/// that implements *neither* fails loudly instead of silently doing nothing.
+struct UnphasedSink;
+
+impl StructureValidated for UnphasedSink {
+    fn validate_state(
+        self: Box<Self>,
+        _cx: &ValidationContext,
+    ) -> Result<Box<dyn StateValidated>, Vec<String>> {
+        Err(vec![
+            "sink implements neither phased validation nor `build`".to_string(),
+        ])
+    }
 }
 
 dyn_clone::clone_trait_object!(SinkConfig);
