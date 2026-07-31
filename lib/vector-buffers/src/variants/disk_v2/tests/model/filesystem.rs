@@ -14,7 +14,9 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::variants::disk_v2::{
     Filesystem,
+    backed_archive::BackedArchive,
     io::{AsyncFile, Metadata, ReadableMemoryMap, WritableMemoryMap},
+    record::Record,
 };
 
 fn io_err_already_exists() -> io::Error {
@@ -32,6 +34,7 @@ fn io_err_permission_denied() -> io::Error {
 struct FileInner {
     buf: Option<Vec<u8>>,
     return_eof_on_next_read: bool,
+    error_at_eof: bool,
 }
 
 impl FileInner {
@@ -50,6 +53,7 @@ impl Default for FileInner {
         Self {
             buf: Some(Vec::new()),
             return_eof_on_next_read: false,
+            error_at_eof: false,
         }
     }
 }
@@ -64,6 +68,7 @@ impl fmt::Debug for FileInner {
         f.debug_struct("FileInner")
             .field("buf", &buf_debug)
             .field("return_eof_on_next_read", &self.return_eof_on_next_read)
+            .field("error_at_eof", &self.error_at_eof)
             .finish()
     }
 }
@@ -163,14 +168,16 @@ impl AsyncRead for TestFile {
                 return Poll::Ready(Ok(()));
             }
 
-            let src = inner.buf.as_mut().expect("file buf consumed");
-
             let cap = buf.remaining();
             let pos = self.read_pos;
-            let available = src.len() - pos;
+            let available = inner.buf.as_ref().expect("file buf consumed").len() - pos;
+            if available == 0 && inner.error_at_eof {
+                return Poll::Ready(Err(io::Error::other("unexpected read at EOF")));
+            }
             let n = cmp::min(cap, available);
 
             let to = pos + n;
+            let src = inner.buf.as_mut().expect("file buf consumed");
             buf.put_slice(&src[pos..to]);
             to
         };
@@ -347,6 +354,36 @@ impl TestFilesystem {
         let file = inner.files.get(path).expect("file should exist");
         let mut file_inner = file.inner.lock().expect("poisoned");
         file_inner.return_eof_on_next_read = true;
+    }
+
+    /// Makes reads fail at EOF.
+    pub(crate) fn error_at_eof(&self, path: &Path) {
+        let inner = self.inner.lock().expect("poisoned");
+        let file = inner.files.get(path).expect("file should exist");
+        let mut file_inner = file.inner.lock().expect("poisoned");
+        file_inner.error_at_eof = true;
+    }
+
+    /// Corrupts the checksum of the only record in a data file.
+    pub(crate) fn corrupt_record_checksum(&self, path: &Path) {
+        let inner = self.inner.lock().expect("poisoned");
+        let file = inner.files.get(path).expect("file should exist");
+        let mut file_inner = file.inner.lock().expect("poisoned");
+        let buf = file_inner.buf.as_mut().expect("file buf consumed");
+        let mut backed_record = BackedArchive::<_, Record>::from_backing(buf.as_mut_slice())
+            .expect("archive should not fail");
+        let record = backed_record.get_archive_mut();
+        let projected_checksum = unsafe { record.map_unchecked_mut(|record| &mut record.checksum) };
+        *projected_checksum.get_mut() ^= 1 << 15;
+    }
+
+    /// Appends a copy of a file's bytes without publishing writer progress.
+    pub(crate) fn append_unpublished_file_contents(&self, path: &Path) {
+        let inner = self.inner.lock().expect("poisoned");
+        let file = inner.files.get(path).expect("file should exist");
+        let mut file_inner = file.inner.lock().expect("poisoned");
+        let buf = file_inner.buf.as_mut().expect("file buf consumed");
+        buf.extend_from_within(..);
     }
 }
 

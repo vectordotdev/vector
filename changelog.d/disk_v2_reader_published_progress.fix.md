@@ -1,3 +1,3 @@
-Fixed a `disk_v2` buffer stall where a reader could wait indefinitely for another write even though the buffer already contained a published record.
+Fixed `disk_v2` reader coordination that could stall with published data pending or busy-loop after dropping a corrupt record.
 
 authors: fernandol-nvidia

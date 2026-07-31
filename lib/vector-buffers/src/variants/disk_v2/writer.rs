@@ -1049,7 +1049,7 @@ where
 
         let previous_writer_file_id = self.ledger.get_current_writer_file_id();
         self.reset();
-        self.ledger.state().increment_writer_file_id();
+        self.ledger.increment_writer_file_id();
         self.ensure_ready_for_write().await.context(IoSnafu)?;
         self.reconcile_current_data_file_with_checkpoint().await?;
         self.ledger.flush().context(IoSnafu)?;
@@ -1396,19 +1396,15 @@ where
             }
         };
 
-        let recovered_successor = self
+        should_skip_to_next_file &= !self
             .recover_successor_data_file_from_stale_checkpoint()
             .await?;
-        should_skip_to_next_file &= !recovered_successor;
 
-        // Reset our internal state, which closes the initial data file we opened, and mark
-        // ourselves as needing to skip to the next data file.  This is a little convoluted, but we
-        // need to ensure we follow the normal behavior of trying to open the next data file,
-        // waiting for the reader to delete it if it already exists and hasn't been fully read yet,
-        // etc.
-        //
-        // Essentially, we defer the actual skipping to avoid deadlocking here trying to open a
-        // data file we might not be able to open yet.
+        // Recovery removed post-checkpoint and incomplete tails, so all remaining bytes are readable.
+        self.ledger.set_published_file_size(self.data_file_size);
+
+        // Defer rollover to the normal write path, which can wait for the reader without
+        // deadlocking initialization.
         if should_skip_to_next_file {
             self.reset();
             self.mark_for_skip();
@@ -1622,7 +1618,7 @@ where
                 // If we opened the "next" data file, we need to increment the current writer
                 // file ID now to signal that the writer has moved on.
                 if should_open_next {
-                    self.ledger.state().increment_writer_file_id();
+                    self.ledger.increment_writer_file_id();
                     self.ledger.notify_writer_waiters();
 
                     // The writer just rolled to a fresh data file, the boundary the

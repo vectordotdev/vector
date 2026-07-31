@@ -11,7 +11,7 @@ use crate::{
     set_data_file_length,
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
-        Buffer, DiskBufferConfigBuilder,
+        Buffer, DiskBufferConfigBuilder, ReaderError,
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
         tests::{
             create_buffer_v2_with_write_buffer_size, create_default_buffer_v2,
@@ -103,6 +103,7 @@ async fn publishing_writer_progress_updates_ledger_before_waking_reader() {
             assert_eq!(next_record_id, 2);
             assert_eq!(ledger.state().get_next_writer_record_id(), 2);
             assert_eq!(ledger.get_total_buffer_size(), 128);
+            assert_eq!(ledger.get_published_writer_data_file_size(), 128);
             assert!(wait_for_writer.is_woken());
             assert_ready!(wait_for_writer.poll());
         }
@@ -149,6 +150,75 @@ async fn reader_retries_when_published_record_is_not_immediately_visible() {
                 .expect("read should not fail")
                 .expect("read should produce a record");
             assert_eq!(record, SizedRecord::new(64));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn reader_waits_after_dropping_last_published_record() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .filesystem(TestFilesystem::default())
+                .build()
+                .expect("creating buffer config should not fail");
+            let usage_handle = BufferUsageHandle::noop();
+            let (mut writer, mut reader, ledger) =
+                Buffer::<SizedRecord>::from_config_inner(config, usage_handle)
+                    .await
+                    .expect("creating buffer should not fail");
+
+            let bytes_written = writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let data_file_path = ledger.get_current_reader_data_file_path();
+            ledger.filesystem().corrupt_record_checksum(&data_file_path);
+            let dropped_bytes = match reader.next().await {
+                Err(ReaderError::Checksum { record_bytes, .. }) => record_bytes,
+                result => panic!("expected checksum error, got {result:?}"),
+            };
+            assert_eq!(dropped_bytes, bytes_written);
+            assert_eq!(
+                ledger.get_published_writer_data_file_size(),
+                bytes_written as u64
+            );
+
+            // The retry must wait without probing EOF again. Turning that probe into an error
+            // bounds the regression: the old busy loop returns the error instead of hanging this
+            // poll forever.
+            ledger.filesystem().error_at_eof(&data_file_path);
+            let mut blocked_read = spawn(reader.next());
+            assert_pending!(blocked_read.poll());
+            assert!(!blocked_read.is_woken());
+
+            let expected = SizedRecord::new(32);
+            writer
+                .write_record(expected.clone())
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            assert!(blocked_read.is_woken());
+            let actual = assert_ready!(blocked_read.poll())
+                .expect("read should not fail")
+                .expect("read should produce a record");
+            assert_eq!(actual, expected);
+
+            // Model bytes reaching the active file before the writer publishes their boundary.
+            // The recoverable-error retry must not consume them merely because they are visible.
+            drop(blocked_read);
+            ledger
+                .filesystem()
+                .append_unpublished_file_contents(&data_file_path);
+            let mut unpublished_read = spawn(reader.next());
+            assert_pending!(unpublished_read.poll());
+            assert!(!unpublished_read.is_woken());
         }
     })
     .await;
@@ -587,6 +657,10 @@ async fn writer_updates_ledger_when_buffered_writer_reports_implicit_flush() {
             // At this point, the entire write buffer should have been flushed, which means whatever
             // event counts/bytes written they generated should be represented in the ledger state:
             assert_buffer_size!(ledger, total_events_written, total_bytes_written);
+            assert_eq!(
+                ledger.get_published_writer_data_file_size(),
+                total_bytes_written as u64
+            );
 
             // Now, do an explicit flush, which should get us our third write:
             writer.flush().await.expect("flush should not fail");
@@ -594,6 +668,10 @@ async fn writer_updates_ledger_when_buffered_writer_reports_implicit_flush() {
             total_events_written += record_events;
             total_bytes_written += bytes_written;
             assert_buffer_size!(ledger, total_events_written, total_bytes_written);
+            assert_eq!(
+                ledger.get_published_writer_data_file_size(),
+                total_bytes_written as u64
+            );
         }
     })
     .await;

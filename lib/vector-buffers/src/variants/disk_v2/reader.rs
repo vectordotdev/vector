@@ -1045,6 +1045,17 @@ where
 
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
 
+            // A recoverable error is retried immediately by the receiver adapter. Do not let that
+            // retry consume bytes from the active writer file until the writer has published them
+            // as readable; physical file growth happens before shared progress is updated.
+            if self.ready_to_read
+                && reader_file_id == writer_file_id
+                && self.ledger.get_published_writer_data_file_size() <= self.bytes_read
+            {
+                self.ledger.wait_for_writer().await;
+                continue;
+            }
+
             // Essentially: is the writer still writing to this data file or not, and are we
             // actually ready to read (aka initialized)?
             //
@@ -1146,18 +1157,7 @@ where
 
                     self.roll_to_next_data_file();
                     force_check_pending_data_files = true;
-                    continue;
                 }
-
-                // A writer wake-up can be followed by a transient EOF. Since notifications can be
-                // coalesced, do not wait again when the published writer position proves that an
-                // unread record remains.
-                let next_expected_record_id = self.last_reader_record_id + 1;
-                if self.ledger.state().get_next_writer_record_id() > next_expected_record_id {
-                    continue;
-                }
-
-                self.ledger.wait_for_writer().await;
             } else {
                 debug!(
                     bytes_read = self.bytes_read,
