@@ -14,6 +14,7 @@ use crate::{
             create_buffer_v2_with_write_buffer_size, create_default_buffer_v2,
             get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
         },
+        writer::RecordWriter,
     },
 };
 
@@ -105,6 +106,71 @@ async fn publishing_writer_progress_updates_ledger_before_waking_reader() {
     });
 
     let parent = trace_span!("publishing_writer_progress_updates_ledger_before_waking_reader");
+    fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn reader_waits_for_visible_record_to_be_published() {
+    let assertion_registry = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (_writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let config = ledger.config().clone();
+            let data_file = OpenOptions::new()
+                .append(true)
+                .open(ledger.get_current_writer_data_file_path())
+                .await
+                .expect("data file should open");
+            let mut physical_writer = RecordWriter::new(
+                data_file,
+                0,
+                config.write_buffer_size,
+                config.max_data_file_size,
+                config.max_record_size,
+            );
+            let record = SizedRecord::new(64);
+            let (record_bytes, _) = physical_writer
+                .write_record(1, record.clone())
+                .await
+                .expect("physical write should succeed");
+            physical_writer
+                .flush()
+                .await
+                .expect("physical flush should succeed");
+
+            assert_eq!(ledger.state().get_next_writer_record_id(), 1);
+            assert_buffer_is_empty!(ledger);
+
+            let waiting_for_publication = assertion_registry
+                .build()
+                .with_name("wait_for_writer")
+                .with_parent_name("reader_waits_for_visible_record_to_be_published")
+                .was_entered()
+                .finalize();
+            let mut blocked_read = spawn(read_next(&mut reader));
+            while !waiting_for_publication.try_assert() {
+                assert_pending!(blocked_read.poll());
+            }
+            assert_pending!(blocked_read.poll());
+            assert!(!blocked_read.is_woken());
+
+            ledger.notify_writer_waiters();
+
+            assert!(blocked_read.is_woken());
+            assert_pending!(blocked_read.poll());
+
+            ledger.publish_writer_progress(1, record_bytes as u64);
+
+            assert!(blocked_read.is_woken());
+            assert_eq!(assert_ready!(blocked_read.poll()), Some(record));
+        }
+    });
+
+    let parent = trace_span!("reader_waits_for_visible_record_to_be_published");
     fut.instrument(parent.or_current()).await;
 }
 
