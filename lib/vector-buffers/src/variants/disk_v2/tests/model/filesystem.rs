@@ -31,6 +31,7 @@ fn io_err_permission_denied() -> io::Error {
 
 struct FileInner {
     buf: Option<Vec<u8>>,
+    return_eof_on_next_read: bool,
 }
 
 impl FileInner {
@@ -48,6 +49,7 @@ impl Default for FileInner {
     fn default() -> Self {
         Self {
             buf: Some(Vec::new()),
+            return_eof_on_next_read: false,
         }
     }
 }
@@ -61,6 +63,7 @@ impl fmt::Debug for FileInner {
 
         f.debug_struct("FileInner")
             .field("buf", &buf_debug)
+            .field("return_eof_on_next_read", &self.return_eof_on_next_read)
             .finish()
     }
 }
@@ -155,6 +158,11 @@ impl AsyncRead for TestFile {
     ) -> Poll<io::Result<()>> {
         let new_read_pos = {
             let mut inner = self.inner.lock().expect("poisoned");
+            if inner.return_eof_on_next_read {
+                inner.return_eof_on_next_read = false;
+                return Poll::Ready(Ok(()));
+            }
+
             let src = inner.buf.as_mut().expect("file buf consumed");
 
             let cap = buf.remaining();
@@ -329,6 +337,16 @@ impl Default for TestFilesystem {
         Self {
             inner: Arc::new(Mutex::new(FilesystemInner::default())),
         }
+    }
+}
+
+impl TestFilesystem {
+    /// Makes one read report EOF without advancing its file position.
+    pub(crate) fn return_eof_on_next_read(&self, path: &Path) {
+        let inner = self.inner.lock().expect("poisoned");
+        let file = inner.files.get(path).expect("file should exist");
+        let mut file_inner = file.inner.lock().expect("poisoned");
+        file_inner.return_eof_on_next_read = true;
     }
 }
 

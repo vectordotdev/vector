@@ -6,13 +6,17 @@ use super::{create_buffer_v2_with_max_data_file_size, read_next, read_next_some}
 use crate::{
     EventCount, assert_buffer_is_empty, assert_buffer_records, assert_buffer_size,
     assert_enough_bytes_written, assert_reader_last_writer_next_positions,
-    assert_reader_writer_v2_file_positions, set_data_file_length,
+    assert_reader_writer_v2_file_positions,
+    buffer_usage_data::BufferUsageHandle,
+    set_data_file_length,
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
+        Buffer, DiskBufferConfigBuilder,
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
         tests::{
             create_buffer_v2_with_write_buffer_size, create_default_buffer_v2,
             get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
+            model::TestFilesystem,
         },
     },
 };
@@ -106,6 +110,48 @@ async fn publishing_writer_progress_updates_ledger_before_waking_reader() {
 
     let parent = trace_span!("publishing_writer_progress_updates_ledger_before_waking_reader");
     fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn reader_retries_when_published_record_is_not_immediately_visible() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .filesystem(TestFilesystem::default())
+                .build()
+                .expect("creating buffer config should not fail");
+            let usage_handle = BufferUsageHandle::noop();
+            let (mut writer, mut reader, ledger) =
+                Buffer::<SizedRecord>::from_config_inner(config, usage_handle)
+                    .await
+                    .expect("creating buffer should not fail");
+
+            let mut blocked_read = spawn(reader.next());
+            assert_pending!(blocked_read.poll());
+            assert!(!blocked_read.is_woken());
+
+            // Publish one record and wake the reader, then simulate the reader observing EOF once
+            // before the appended record becomes visible.
+            writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            assert_buffer_records!(ledger, 1);
+
+            let data_file_path = ledger.get_current_reader_data_file_path();
+            ledger.filesystem().return_eof_on_next_read(&data_file_path);
+
+            assert!(blocked_read.is_woken());
+            let record = assert_ready!(blocked_read.poll())
+                .expect("read should not fail")
+                .expect("read should produce a record");
+            assert_eq!(record, SizedRecord::new(64));
+        }
+    })
+    .await;
 }
 
 #[tokio::test]

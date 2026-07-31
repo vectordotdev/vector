@@ -1149,6 +1149,14 @@ where
                     continue;
                 }
 
+                // A writer wake-up can be followed by a transient EOF. Since notifications can be
+                // coalesced, do not wait again when the published writer position proves that an
+                // unread record remains.
+                let next_expected_record_id = self.last_reader_record_id + 1;
+                if self.ledger.state().get_next_writer_record_id() > next_expected_record_id {
+                    continue;
+                }
+
                 self.ledger.wait_for_writer().await;
             } else {
                 debug!(
