@@ -1,4 +1,4 @@
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, IntoDeserializer};
 use serde_json::{Map, Number, Value};
 
 use super::Format;
@@ -16,7 +16,15 @@ where
 {
     let value = parse_config_value(content, format)?;
 
-    serde_json::from_value(value).map_err(|error| vec![error.to_string()])
+    deserialize_config_value(value)
+}
+
+pub(super) fn deserialize_config_value<T>(value: Value) -> Result<T, Vec<String>>
+where
+    T: DeserializeOwned,
+{
+    serde_path_to_error::deserialize(value.into_deserializer())
+        .map_err(|error| vec![error.to_string()])
 }
 
 pub(super) fn parse_config_value(content: &str, format: Format) -> Result<Value, Vec<String>> {
@@ -249,6 +257,18 @@ mod tests {
         value: Option<String>,
     }
 
+    #[derive(Debug, Deserialize)]
+    struct NestedValue {
+        #[serde(rename = "outer")]
+        _outer: NestedInnerValue,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct NestedInnerValue {
+        #[serde(rename = "count")]
+        _count: u64,
+    }
+
     fn default_optional_value() -> Option<String> {
         Some("default".to_string())
     }
@@ -295,6 +315,25 @@ mod tests {
         for input in ["null", "~", "--- null", "---\nnull"] {
             assert!(deserialize_config::<ConfigMap>(input, Format::Yaml).is_err());
         }
+    }
+
+    #[test]
+    fn deserialization_errors_include_the_value_path() {
+        let error = deserialize_config::<NestedValue>(
+            indoc! {"
+                outer:
+                  count: not-a-number
+            "},
+            Format::Yaml,
+        )
+        .unwrap_err();
+
+        assert!(
+            error
+                .first()
+                .is_some_and(|error| error.contains("outer.count")),
+            "expected the error to contain the nested value path, got {error:?}"
+        );
     }
 
     #[test]

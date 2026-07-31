@@ -4,7 +4,9 @@ use serde_json::Value;
 
 use super::{
     Format, component_name, open_file, read_dir,
-    representation::{ConfigMap, deserialize_config, merge_into_map, merge_values},
+    representation::{
+        ConfigMap, deserialize_config, deserialize_config_value, merge_into_map, merge_values,
+    },
 };
 
 /// Provides a hint to the loading system of the type of components that should be found
@@ -300,5 +302,5 @@ fn merge_with_value(res: &mut ConfigMap, name: String, value: Value) -> Result<(
 pub(super) fn deserialize_config_map<T: serde::de::DeserializeOwned>(
     map: ConfigMap,
 ) -> Result<T, Vec<String>> {
-    serde_json::from_value(Value::Object(map)).map_err(|error| vec![error.to_string()])
+    deserialize_config_value(Value::Object(map))
 }
