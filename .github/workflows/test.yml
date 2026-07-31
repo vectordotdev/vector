@@ -161,6 +161,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
+          protoc: true
           cargo-cache: true
       - run: cd rust-doc && make ci-docs-build
 
