@@ -200,6 +200,11 @@ components: transforms: tag_cardinality_limit: {
 				- `mode: exact` — every value carries a precise last-seen timestamp.
 				  Eviction is exact to within roughly `ttl_secs / ttl_generations`.
 				  `ttl_generations` controls only the sweep cadence in exact mode.
+				- `mode: exact_fingerprint` — **not supported**. This mode stores only
+				  64-bit hashes, with nowhere to record when a value was last seen, so
+				  nothing could ever expire. Setting `ttl_secs` here is a configuration
+				  error rather than a silently ignored setting. Use `mode: exact` if you
+				  need TTL with per-value precision.
 				- `mode: probabilistic` — the underlying bloom filter is split into
 				  `ttl_generations` rolling shards. Memory cost rises to
 				  `ttl_generations * cache_size_per_key` per (metric, tag-key) pair.

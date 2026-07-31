@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
@@ -113,6 +113,10 @@ pub struct Inner {
     /// `probabilistic` mode the underlying bloom filter is split into
     /// `ttl_generations` rolling shards, so eviction is approximate to within
     /// `ttl_secs / ttl_generations`.
+    ///
+    /// Not supported in `exact_fingerprint` mode, which keeps only hashes and has
+    /// nowhere to record a last-seen time; combining the two is a configuration
+    /// error rather than a silently ignored setting.
     #[serde(default)]
     #[configurable(metadata(docs::human_name = "TTL (seconds)"))]
     pub ttl_secs: Option<u64>,
@@ -384,6 +388,14 @@ pub(crate) const fn default_ttl_generations() -> u8 {
     4
 }
 
+/// Resolve `ttl_secs` to a window, treating both `None` and `0` as "no expiry".
+///
+/// Backend selection and config validation both go through this so they can
+/// never disagree about whether a config has TTL enabled.
+pub(crate) fn ttl_duration(ttl_secs: Option<u64>) -> Option<Duration> {
+    ttl_secs.filter(|secs| *secs > 0).map(Duration::from_secs)
+}
+
 // =============================================================================
 // Transform plumbing
 // =============================================================================
@@ -415,6 +427,13 @@ pub enum BuildError {
          `probabilistic`, where it has no effect. Remove the field or switch to `probabilistic` mode."
     ))]
     CacheSizeRequiresProbabilistic { tag_key: String },
+
+    #[snafu(display(
+        "ttl_secs set on {scope} but mode is `exact_fingerprint`, which stores fingerprints \
+         without last-seen timestamps and so cannot expire them. Remove ttl_secs or switch to \
+         `exact` or `probabilistic` mode."
+    ))]
+    TtlUnsupportedInFingerprintMode { scope: String },
 }
 
 #[async_trait::async_trait]
@@ -477,6 +496,32 @@ impl TransformConfig for Config {
                         );
                     }
                 }
+            }
+        }
+
+        // `exact_fingerprint` keeps only hashes, with nowhere to record a last-seen
+        // time, so a TTL would silently never fire. Reject rather than mislead.
+        if ttl_duration(self.global.ttl_secs).is_some()
+            && matches!(self.global.mode, Mode::ExactFingerprint)
+        {
+            errors.push(
+                BuildError::TtlUnsupportedInFingerprintMode {
+                    scope: "the global configuration".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
+        for (metric_name, per_metric) in &self.per_metric_limits {
+            if ttl_duration(per_metric.config.ttl_secs).is_some()
+                && matches!(per_metric.config.mode, OverrideMode::ExactFingerprint)
+            {
+                errors.push(
+                    BuildError::TtlUnsupportedInFingerprintMode {
+                        scope: format!("`per_metric_limits.{metric_name}`"),
+                    }
+                    .to_string(),
+                );
             }
         }
 

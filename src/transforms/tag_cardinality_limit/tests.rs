@@ -2020,6 +2020,69 @@ fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
     assert!(config.validate_structure().is_err());
 }
 
+/// `exact_fingerprint` stores bare hashes with no last-seen timestamp, so a TTL
+/// would never fire. Reject the combination instead of silently ignoring it.
+#[test]
+fn validation_rejects_ttl_in_global_fingerprint_mode() {
+    let mut config = make_transform_fingerprint(500, LimitExceededAction::DropTag);
+    config.global.ttl_secs = Some(3600);
+
+    let errors = config
+        .validate_structure()
+        .expect_err("ttl_secs with exact_fingerprint must not build");
+    assert!(
+        errors.iter().any(|e| e.contains("exact_fingerprint")),
+        "error should name the offending mode, got: {errors:?}"
+    );
+}
+
+/// The same rejection applies to a per-metric entry, which fully overrides the
+/// global mode and TTL rather than inheriting either.
+#[test]
+fn validation_rejects_ttl_in_per_metric_fingerprint_mode() {
+    let mut per_metric = make_per_metric(10, LimitExceededAction::DropTag, HashMap::new());
+    per_metric.config.mode = OverrideMode::ExactFingerprint;
+    per_metric.config.ttl_secs = Some(3600);
+
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([("metricA".to_string(), per_metric)]),
+    );
+
+    let errors = config
+        .validate_structure()
+        .expect_err("per-metric ttl_secs with exact_fingerprint must not build");
+    assert!(
+        errors.iter().any(|e| e.contains("metricA")),
+        "error should name the offending metric, got: {errors:?}"
+    );
+}
+
+/// `ttl_secs: 0` means "no expiry", so it selects the same backend as `None` and
+/// must stay valid in fingerprint mode.
+#[test]
+fn validation_allows_zero_ttl_in_fingerprint_mode() {
+    let mut config = make_transform_fingerprint(500, LimitExceededAction::DropTag);
+    config.global.ttl_secs = Some(0);
+    assert!(config.validate_structure().is_ok());
+
+    config.global.ttl_secs = None;
+    assert!(config.validate_structure().is_ok());
+}
+
+/// TTL stays valid on the backends that can actually expire values.
+#[test]
+fn validation_allows_ttl_in_exact_and_probabilistic_modes() {
+    let mut exact = make_transform_hashset(500, LimitExceededAction::DropTag);
+    exact.global.ttl_secs = Some(3600);
+    assert!(exact.validate_structure().is_ok());
+
+    let mut probabilistic = make_transform_bloom(500, LimitExceededAction::DropTag);
+    probabilistic.global.ttl_secs = Some(3600);
+    assert!(probabilistic.validate_structure().is_ok());
+}
+
 /// cache_size_per_key in probabilistic mode is valid.
 #[tokio::test]
 async fn validation_allows_cache_size_in_probabilistic_mode() {

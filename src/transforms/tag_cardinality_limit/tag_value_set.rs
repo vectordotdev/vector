@@ -25,8 +25,9 @@ use bloomy::BloomFilter;
 use hash_hasher::HashedSet;
 
 use crate::{
-    event::metric::TagValueSet, internal_events::TagCardinalityTtlExpired,
-    transforms::tag_cardinality_limit::config::Mode,
+    event::metric::TagValueSet,
+    internal_events::TagCardinalityTtlExpired,
+    transforms::tag_cardinality_limit::config::{Mode, ttl_duration},
 };
 
 /// `Instant + Duration` panics outside the platform's representable range.
@@ -386,13 +387,15 @@ impl AcceptedTagValueSet {
     /// behavior — `HashSet` for exact, single `BloomFilter` for probabilistic —
     /// so existing configs see zero behavioral change.
     pub fn new(mode: &Mode, ttl_secs: Option<u64>, ttl_generations: u8) -> Self {
-        let ttl = ttl_secs.and_then(|s| (s > 0).then(|| Duration::from_secs(s)));
+        let ttl = ttl_duration(ttl_secs);
 
         let storage = match (mode, ttl) {
             (Mode::Exact, None) => TagValueSetStorage::Set(HashSet::new()),
             (Mode::Exact, Some(ttl)) => {
                 TagValueSetStorage::TtlSet(TtlExactStorage::new(ttl, ttl_generations))
             }
+            // Fingerprints carry no last-seen timestamp, so there is nothing to
+            // expire against; `validate_structure` rejects TTL for this mode.
             (Mode::ExactFingerprint, _) => {
                 TagValueSetStorage::Fingerprint(FingerprintStorage::default())
             }
