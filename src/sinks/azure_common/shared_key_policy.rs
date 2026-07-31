@@ -13,7 +13,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 
 /// Shared Key authorization policy for Azure Blob Storage requests.
 ///
-/// This policy injects the required headers (x-ms-date, x-ms-version, and a known
+/// This policy injects the required headers (x-ms-date, x-ms-version, and
 /// Content-Length) if missing and adds the `Authorization: SharedKey {account}:{signature}` header. The signature
 /// is computed according to the "Authorize with Shared Key" rules for the Blob service:
 ///
