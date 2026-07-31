@@ -542,7 +542,7 @@ pub async fn build_client(
             .map_err(|e| format!("Failed to create SharedKey policy: {e}"))?;
             options
                 .client_options
-                .per_call_policies
+                .per_try_policies
                 .push(Arc::new(policy));
         }
         (Auth::None, Some(AzureAuthentication::Specific(..))) => {

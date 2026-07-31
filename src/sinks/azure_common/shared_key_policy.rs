@@ -118,9 +118,19 @@ impl SharedKeyAuthorizationPolicy {
         }
         s.push('\n');
 
-        // Content-Length (include value if present; keep "0")
-        if let Some(v) = header("Content-Length") {
-            s.push_str(v);
+        // Azure's Shared Key format represents zero length as an empty field. When the SDK
+        // has not set the header yet, use the known body length that the transport will send.
+        let content_length = header("Content-Length")
+            .filter(|value| *value != "0")
+            .map(str::to_owned)
+            .or_else(|| {
+                req.body()
+                    .len()
+                    .filter(|length| *length != 0)
+                    .map(|length| length.to_string())
+            });
+        if let Some(content_length) = content_length {
+            s.push_str(&content_length);
         }
         s.push('\n');
 
@@ -257,6 +267,69 @@ impl Policy for SharedKeyAuthorizationPolicy {
 }
 
 // ---------- Helpers ----------
+
+#[cfg(test)]
+mod tests {
+    use azure_core::http::Method;
+
+    use super::*;
+
+    fn policy() -> SharedKeyAuthorizationPolicy {
+        SharedKeyAuthorizationPolicy::new(
+            "account".to_owned(),
+            "ZmFrZS10ZXN0LWFjY291bnQta2V5".to_owned(),
+            "2025-11-05".to_owned(),
+        )
+        .expect("test key should be valid base64")
+    }
+
+    fn content_length_field(request: &Request) -> String {
+        policy()
+            .build_string_to_sign(request, "Thu, 30 Jul 2026 16:02:25 GMT", "2025-11-05")
+            .expect("request should be signed")
+            .lines()
+            .nth(3)
+            .expect("string to sign should contain content length")
+            .to_owned()
+    }
+
+    #[test]
+    fn uses_the_body_length_when_content_length_is_missing() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob?comp=blocklist")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.set_body(vec![0_u8; 123]);
+
+        assert_eq!(content_length_field(&request), "123");
+    }
+
+    #[test]
+    fn preserves_a_nonzero_content_length_header() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.insert_header("content-length", "42");
+        request.set_body(vec![0_u8; 123]);
+
+        assert_eq!(content_length_field(&request), "42");
+    }
+
+    #[test]
+    fn canonicalizes_zero_content_length_as_empty() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.insert_header("content-length", "0");
+
+        assert_eq!(content_length_field(&request), "");
+    }
+}
 
 fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> AzureResult<()> {
     // "/{account_name}{path}\n"
