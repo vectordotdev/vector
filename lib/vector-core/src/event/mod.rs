@@ -18,6 +18,7 @@ use vector_common::{
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
 pub use vrl::value::{KeyString, ObjectMap, Value};
+pub use vrl_target::MetricTagMode;
 pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
