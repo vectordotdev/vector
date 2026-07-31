@@ -33,6 +33,7 @@ pub(super) struct StackdriverLogsEncoder {
     label_config: ConfinedStackdriverLabelConfig,
     resource: ConfinedStackdriverResource,
     severity_key: Option<ConfigValuePath>,
+    insert_id_key: Option<ConfigValuePath>,
 }
 
 impl StackdriverLogsEncoder {
@@ -44,6 +45,7 @@ impl StackdriverLogsEncoder {
         label_config: ConfinedStackdriverLabelConfig,
         resource: ConfinedStackdriverResource,
         severity_key: Option<ConfigValuePath>,
+        insert_id_key: Option<ConfigValuePath>,
     ) -> Self {
         Self {
             transformer,
@@ -52,6 +54,7 @@ impl StackdriverLogsEncoder {
             label_config,
             resource,
             severity_key,
+            insert_id_key,
         }
     }
 
@@ -103,6 +106,12 @@ impl StackdriverLogsEncoder {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
+        let insert_id = self
+            .insert_id_key
+            .as_ref()
+            .and_then(|key| log.remove((PathPrefix::Event, &key.0)))
+            .map(|value| value.to_string_lossy().into_owned());
+
         let default_labels_key = default_labels_key();
         let labels_key = self
             .label_config
@@ -141,6 +150,11 @@ impl StackdriverLogsEncoder {
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
         if let Some(timestamp) = log.get_timestamp() {
             entry.insert("timestamp".into(), json!(timestamp));
+        }
+
+        // If we extracted an insertId, add it to the LogEntry
+        if let Some(insert_id) = insert_id {
+            entry.insert("insertId".into(), json!(insert_id));
         }
 
         Some(json!(entry))
