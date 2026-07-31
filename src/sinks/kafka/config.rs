@@ -259,8 +259,8 @@ impl KafkaSinkConfig {
 }
 
 impl GenerateConfig for KafkaSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: Template::try_from("topic-1234".to_owned()).unwrap(),
             healthcheck_topic: None,
@@ -286,12 +286,12 @@ impl GenerateConfig for KafkaSinkConfig {
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.topic = config
+        let topic = self
             .topic
+            .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
-        let sink = KafkaSink::new(config.clone())?;
-        let hc = healthcheck(config, cx.healthcheck.clone()).boxed();
+        let sink = KafkaSink::new(self.clone(), topic.clone())?;
+        let hc = healthcheck(self.clone(), topic, cx.healthcheck.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 

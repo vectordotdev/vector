@@ -7,10 +7,10 @@ use crate::sinks::{
 };
 
 pub struct LogsSinkSetting {
-    pub dbname: Template,
-    pub table: Template,
-    pub pipeline_name: Template,
-    pub pipeline_version: Option<Template>,
+    pub dbname: ConfinedTemplate,
+    pub table: ConfinedTemplate,
+    pub pipeline_name: ConfinedTemplate,
+    pub pipeline_version: Option<ConfinedTemplate>,
 }
 
 /// A sink that ingests logs into GreptimeDB.

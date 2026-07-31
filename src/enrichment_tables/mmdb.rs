@@ -24,8 +24,8 @@ pub struct MmdbConfig {
 }
 
 impl GenerateConfig for MmdbConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             path: "/path/to/GeoLite2-City.mmdb".into(),
         })
         .unwrap()

@@ -75,11 +75,6 @@ impl FilesystemModel {
 
         Some(file)
     }
-
-    fn delete_file(&self, id: u16) -> bool {
-        let mut files = self.files.lock().expect("poisoned");
-        files.remove(&id).is_some()
-    }
 }
 
 /// Models the all-in behavior of for a data file wrapped with a buffered writer.
@@ -361,18 +356,15 @@ impl ReaderModel {
 
         // Now process data file acknowledgements.
         while self.unconsumed_record_acks > 0 && !self.pending_data_file_acks.is_empty() {
-            let (file_id, required_record_acks) =
+            let (_file_id, required_record_acks) =
                 self.pending_data_file_acks.front().copied().unwrap();
             if self.unconsumed_record_acks >= required_record_acks {
                 // We have enough unconsumed record acknowledgements to fully acknowledge this data
-                // file. Remove it, consume the record acknowledgements, and delete the data file.
+                // file. Remove it and consume the record acknowledgements. The real buffer now
+                // performs physical deletion via a background cleanup task, which is disabled for
+                // this deterministic model filesystem, so the model leaves the file in place too.
                 _ = self.pending_data_file_acks.pop_front().unwrap();
                 self.unconsumed_record_acks -= required_record_acks;
-
-                assert!(
-                    self.filesystem.delete_file(file_id),
-                    "invariant violation: tried to delete file id {file_id}, but file does not exist"
-                );
             } else {
                 // Not enough delete acks to proceed, so we can't do anything more.
                 break;
