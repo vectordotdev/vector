@@ -148,6 +148,10 @@ impl FingerprintStorage {
 /// At most once per `sweep_interval` (= `ttl / generations`, after capping),
 /// `retain` drops every entry whose `last_seen` is older than `ttl`. The
 /// sweep runs lazily inside `insert`/`contains`/`len` — no background task.
+///
+/// Reads never pay for that retain: `contains` inspects only the timestamp of
+/// the value it was asked about and drops that single entry when its lease has
+/// lapsed. `len` sweeps unconditionally because it gates `value_limit`.
 struct TtlExactStorage {
     map: HashMap<TagValueSet, Instant>,
     ttl: Duration,
@@ -176,14 +180,7 @@ impl TtlExactStorage {
         self.sweep(now);
     }
 
-    /// Drop entries whose own `last_seen` is outside the TTL window. Runs even
-    /// when `maybe_sweep` is not yet due so a lazy sweep interval cannot leave
-    /// expired values visible to `contains` / `len`.
-    fn purge_expired_entries(&mut self, now: Instant) {
-        self.map
-            .retain(|_, last_seen| now.duration_since(*last_seen) <= self.ttl);
-    }
-
+    /// Drop every entry whose lease has lapsed and report the eviction volume.
     fn sweep(&mut self, now: Instant) {
         let ttl = self.ttl;
         let before = self.map.len();
@@ -194,47 +191,66 @@ impl TtlExactStorage {
         emit!(TagCardinalityTtlExpired { count: expired });
     }
 
+    /// Drop a single lapsed entry found on a read path.
+    ///
+    /// Reads inspect only the value they were asked about, keeping a cache hit
+    /// `O(1)`; retaining over the whole bucket on every hit would make the
+    /// accept path `O(cached values)` per tag.
+    fn expire_one(&mut self, value: &TagValueSet) {
+        self.map.remove(value);
+        emit!(TagCardinalityTtlExpired { count: 1 });
+    }
+
     fn contains(&mut self, value: &TagValueSet) -> bool {
         self.contains_with_now(value, Instant::now())
     }
 
     fn contains_with_now(&mut self, value: &TagValueSet, now: Instant) -> bool {
         self.maybe_sweep(now);
-        self.purge_expired_entries(now);
-        // Refresh lease on every sighting so continuously-seen values don't blink out.
-        if let Some(slot) = self.map.get_mut(value) {
-            *slot = now;
-            true
-        } else {
-            false
+        match self.map.get_mut(value) {
+            None => return false,
+            // Refresh the lease on every sighting so continuously-observed
+            // values don't blink out.
+            Some(last_seen) if now.duration_since(*last_seen) <= self.ttl => {
+                *last_seen = now;
+                return true;
+            }
+            Some(_) => {}
         }
+        self.expire_one(value);
+        false
     }
 
-    /// Read-only membership check: triggers lazy sweep so the answer reflects
-    /// post-expiry state, but does **not** refresh the value's lease. Used in
-    /// `DropEvent` pre-check paths where we must not mutate cache state for
-    /// events that are about to be dropped.
+    /// Read-only membership check: drops the value when its own lease has
+    /// lapsed, but never refreshes it. Used in `DropEvent` pre-check paths
+    /// where we must not extend the lease of an event that is about to be
+    /// dropped.
     fn contains_no_refresh(&mut self, value: &TagValueSet) -> bool {
         self.contains_no_refresh_with_now(value, Instant::now())
     }
 
     fn contains_no_refresh_with_now(&mut self, value: &TagValueSet, now: Instant) -> bool {
         self.maybe_sweep(now);
-        self.purge_expired_entries(now);
-        self.map.contains_key(value)
+        match self.map.get(value) {
+            None => return false,
+            Some(last_seen) if now.duration_since(*last_seen) <= self.ttl => return true,
+            Some(_) => {}
+        }
+        self.expire_one(value);
+        false
     }
 
     fn insert(&mut self, value: TagValueSet) {
         let now = Instant::now();
         self.maybe_sweep(now);
-        self.purge_expired_entries(now);
         self.map.insert(value, now);
     }
 
+    /// Gates `value_limit` and the `max_tracked_keys` bucket reclaim, so this
+    /// sweeps unconditionally: the count must never include lapsed entries.
     fn len(&mut self) -> usize {
         let now = Instant::now();
-        self.maybe_sweep(now);
-        self.purge_expired_entries(now);
+        self.sweep(now);
         self.map.len()
     }
 }
@@ -546,6 +562,35 @@ mod tests {
     }
 
     #[test]
+    fn ttl_exact_contains_does_not_scan_unrelated_entries() {
+        // A cache hit must inspect only the queried value. Guards against
+        // reintroducing a full-bucket retain on the read path, which made
+        // `contains` cost O(cached values) per accepted tag.
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        s.map.insert(v("stale"), t0);
+        s.map.insert(v("hot"), t0 + Duration::from_secs(10));
+
+        // Pin the sweep clock so only the per-value path can run.
+        let t70 = t0 + Duration::from_secs(70);
+        s.last_sweep = t70;
+
+        assert!(s.contains_with_now(&v("hot"), t70), "hot is within ttl");
+        assert!(
+            s.map.contains_key(&v("stale")),
+            "a cache hit must not evict unrelated entries"
+        );
+
+        s.sweep(t70);
+        assert!(
+            !s.map.contains_key(&v("stale")),
+            "the sweep path must still drop lapsed entries"
+        );
+        assert!(s.map.contains_key(&v("hot")), "hot was refreshed to t70");
+    }
+
+    #[test]
     fn ttl_exact_refresh_on_contains_extends_lease() {
         // Short sleep guarantees `Instant::now()` is strictly after `t_insert`
         // on every platform.
@@ -735,7 +780,10 @@ mod tests {
         // to 1 and changing rotation cadence.
         let ttl = Duration::from_secs(4294967296);
         let (generations, slice) = compute_ttl_slices(ttl, 4);
-        assert_eq!(generations, 4, "requested generations must not collapse to 1");
+        assert_eq!(
+            generations, 4,
+            "requested generations must not collapse to 1"
+        );
         assert_eq!(slice * generations, ttl);
 
         let rolling = RollingBloomStorage::new(default_cache_size(), 4, ttl);
@@ -765,7 +813,10 @@ mod tests {
             "after one rotation hot must live in the front shard"
         );
         for i in 0..512 {
-            s.shards.back_mut().unwrap().insert(&v(&format!("pollute-{i}")));
+            s.shards
+                .back_mut()
+                .unwrap()
+                .insert(&v(&format!("pollute-{i}")));
         }
         assert!(s.contains(&hot), "must hit the front shard and refresh");
         assert!(
