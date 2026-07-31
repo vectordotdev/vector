@@ -256,14 +256,25 @@ impl TtlExactStorage {
     }
 }
 
-/// Sliding-window bloom: `generations` shards, each a full `cache_size_per_key`
-/// bloom filter. Front of the deque is the oldest shard; back is the current.
-/// On rotation, the front shard is dropped and a fresh empty one is pushed at the
-/// back. Membership is the OR across shards; refresh-on-sighting writes hits
-/// into the current shard so hot values survive future rotations.
+/// Sliding-window bloom: `generations` closed shards plus the open one being
+/// written, each a full `cache_size_per_key` bloom filter. Front of the deque is
+/// the oldest shard; back is the current. On rotation, the front shard is dropped
+/// and a fresh empty one is pushed at the back. Membership is the OR across
+/// shards; refresh-on-sighting writes hits into the current shard so hot values
+/// survive future rotations.
 struct RollingBloomStorage {
     shards: VecDeque<BloomFilterStorage>,
     generations: u8,
+    /// `generations + 1`: the closed shards spanning the window, plus the open
+    /// one currently accepting writes.
+    ///
+    /// The open shard only covers part of a slice at any moment, so retiring at
+    /// `generations` shards would evict a value inserted just before a rotation
+    /// after only `ttl - slice` (45 minutes on a default 1h/4-generation
+    /// config). Carrying the extra shard keeps retention in `[ttl, ttl + slice)`,
+    /// erring towards over-retention like the exact backend does, so a
+    /// configured TTL is never cut short.
+    max_shards: usize,
     slice: Duration,
     cache_size_per_key: usize,
     /// Boundary at which the next rotation is due. Advances by `slice` on
@@ -276,12 +287,14 @@ impl RollingBloomStorage {
     fn new(cache_size_per_key: usize, generations: u8, ttl: Duration) -> Self {
         // Cap generations so `slice >= 1s` and `slice * generations == ttl`.
         let (generations, slice) = compute_ttl_slices(ttl, generations);
-        let mut shards = VecDeque::with_capacity(generations as usize);
+        let max_shards = generations as usize + 1;
+        let mut shards = VecDeque::with_capacity(max_shards);
         shards.push_back(BloomFilterStorage::new(cache_size_per_key));
         let now = Instant::now();
         Self {
             shards,
             generations: generations as u8,
+            max_shards,
             slice,
             cache_size_per_key,
             next_rotate: saturating_add(now, slice),
@@ -289,11 +302,11 @@ impl RollingBloomStorage {
     }
 
     fn rotate_if_needed(&mut self, now: Instant) {
-        // Catch up if we've been idle for multiple slices. Capped to `generations`
+        // Catch up if we've been idle for multiple slices. Capped to `max_shards`
         // pops because every shard would have rotated out anyway.
-        let mut rotations = 0u8;
-        while now >= self.next_rotate && rotations < self.generations {
-            if self.shards.len() >= self.generations as usize
+        let mut rotations = 0usize;
+        while now >= self.next_rotate && rotations < self.max_shards {
+            if self.shards.len() >= self.max_shards
                 && let Some(dropped) = self.shards.pop_front()
             {
                 // Counted in reclaimed slots, not distinct values: a hot value
@@ -309,7 +322,7 @@ impl RollingBloomStorage {
             self.next_rotate = saturating_add(self.next_rotate, self.slice);
             rotations += 1;
         }
-        // If we needed more rotations than `generations`, the whole window is
+        // If we needed more rotations than `max_shards`, the whole window is
         // stale — fast-forward `next_rotate` to avoid a tight catch-up the next
         // call after a long idle period.
         if now >= self.next_rotate {
@@ -675,7 +688,7 @@ mod tests {
         s.next_rotate = t0 + Duration::from_secs(1);
         s.shards.back_mut().unwrap().insert(&v("old"));
         s.rotate_if_needed(t0 + Duration::from_secs(5));
-        assert_eq!(s.shards.len(), 4);
+        assert_eq!(s.shards.len(), s.max_shards);
         assert!(
             !s.shards.iter().any(|sh| sh.contains(&v("old"))),
             "'old' should have rolled out of the window"
@@ -706,15 +719,50 @@ mod tests {
     }
 
     #[test]
+    fn rolling_bloom_retains_values_for_at_least_ttl() {
+        // A value inserted just before a rotation is the worst case: it occupies
+        // the least of the shard it lands in. Retiring at `generations` shards
+        // would drop it after `ttl - slice`, cutting the configured window short.
+        let ttl = Duration::from_secs(3600);
+        let mut s = RollingBloomStorage::new(default_cache_size(), 4, ttl);
+        assert_eq!(s.slice, Duration::from_secs(900));
+
+        let t0 = Instant::now();
+        // Land `edge` in the open shard one second before the first rotation.
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.shards.back_mut().unwrap().insert(&v("edge"));
+
+        // One second short of the TTL it must still be there.
+        let almost = t0 + ttl - Duration::from_secs(1);
+        s.rotate_if_needed(almost);
+        assert!(
+            s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must survive the full configured ttl_secs"
+        );
+
+        // Its shard may only retire once it is entirely outside the window,
+        // which is one slice later.
+        s.rotate_if_needed(t0 + ttl + s.slice);
+        assert!(
+            !s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must not outlive ttl by more than one slice"
+        );
+    }
+
+    #[test]
     fn rolling_bloom_catch_up_capped_to_generations() {
         // After a long idle gap, `rotate_if_needed` must rotate at most
-        // `generations` times even if elapsed covers many windows.
+        // `max_shards` times even if elapsed covers many windows.
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
         let t0 = Instant::now();
         s.next_rotate = t0 + Duration::from_secs(1);
         s.shards.back_mut().unwrap().insert(&v("stale"));
         s.rotate_if_needed(t0 + Duration::from_secs(3600));
-        assert_eq!(s.shards.len(), 4, "deque size capped at `generations`");
+        assert_eq!(
+            s.shards.len(),
+            s.max_shards,
+            "deque size capped at `max_shards`"
+        );
         assert!(
             !s.shards.iter().any(|sh| sh.contains(&v("stale"))),
             "stale value flushed after long idle"

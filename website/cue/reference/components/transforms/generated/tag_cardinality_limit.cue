@@ -294,10 +294,13 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			`probabilistic` backend.
 
 			Higher values smooth eviction (closer to a true sliding window) at the
-			cost of `ttl_generations * cache_size_per_key` memory per (metric,
-			tag-key) pair. `1` produces a tumbling window: all tracked values are
-			dropped at once every `ttl_secs`. Ignored when `ttl_secs` is unset, or
-			when mode is `exact` (which uses precise per-value timestamps).
+			cost of `(ttl_generations + 1) * cache_size_per_key` memory per (metric,
+			tag-key) pair. The extra shard is the one currently being written: it
+			covers only part of a slice, so retiring without it would expire values
+			after `ttl_secs - (ttl_secs / ttl_generations)` instead of the full TTL.
+			`1` produces a tumbling window: all tracked values are dropped at once
+			every `ttl_secs`. Ignored when `ttl_secs` is unset, or when mode is
+			`exact` (which uses precise per-value timestamps).
 			"""
 		required: false
 		type: uint: default: 4
