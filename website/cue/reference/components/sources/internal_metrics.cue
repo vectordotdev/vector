@@ -992,11 +992,12 @@ components: sources: internal_metrics: {
 		}
 		tag_cardinality_ttl_expirations_total: {
 			description: """
-				The total number of distinct tag values expired by the `tag_cardinality_limit`
-				transform's TTL eviction (only emitted when `ttl_secs` is configured). In
-				`exact` mode this is the number of values whose last sighting was older than
-				`ttl_secs`; in `probabilistic` mode this is the count drained from the oldest
-				rolling-bloom shard at each rotation.
+				The total number of cache slots reclaimed by the `tag_cardinality_limit`
+				transform's TTL eviction, emitted only when `ttl_secs` is configured. In
+				`exact` mode a slot holds one distinct value. In `probabilistic` mode this
+				counts slots reclaimed from the oldest rolling-bloom shard, an upper bound
+				on distinct values, because continuously observed values are copied into
+				newer shards.
 				"""
 			type:              "counter"
 			default_namespace: "vector"

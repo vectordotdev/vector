@@ -295,6 +295,10 @@ impl RollingBloomStorage {
             if self.shards.len() >= self.generations as usize
                 && let Some(dropped) = self.shards.pop_front()
             {
+                // Counted in reclaimed slots, not distinct values: a hot value
+                // refreshed into a newer shard is counted here even though it is
+                // still retained. This matches `len`, which sums the same
+                // per-shard counts to enforce `value_limit`.
                 emit!(TagCardinalityTtlExpired {
                     count: dropped.count() as u64,
                 });

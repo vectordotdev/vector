@@ -214,6 +214,14 @@ components: transforms: tag_cardinality_limit: {
 				  shows up as elevated `tag_value_limit_exceeded_total` without a
 				  matching rise in distinct admitted values, set `ttl_generations: 1`.
 
+				**Reading `tag_cardinality_ttl_expirations_total`**: the counter reports
+				cache slots reclaimed, the same unit `value_limit` is enforced against.
+				In `exact` mode a slot is one distinct value, so the count is exact. In
+				`probabilistic` mode it counts slots reclaimed from the retired shard,
+				an upper bound on distinct values for the same refresh-on-sighting
+				reason described above — treat it as an eviction-pressure signal rather
+				than a precise count of values that left the window.
+
 				**`ttl_secs` shorter than `ttl_generations`**: the effective number of
 				generations is silently capped to `ttl_secs` so the configured TTL
 				window is honored exactly. For example `ttl_secs: 2, ttl_generations: 8`

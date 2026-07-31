@@ -104,12 +104,14 @@ impl InternalEvent for TagCardinalityTrackedKeys {
     }
 }
 
-/// Emitted when a TTL sweep removes tag values from a tracking bucket.
+/// Emitted when TTL eviction reclaims tag values from a tracking bucket.
 ///
-/// The `count` is the number of *distinct* values evicted in that pass.
-/// For the probabilistic backend this is the count drained from the oldest
-/// rolling-bloom shard; for the exact backend it is the number of entries
-/// whose last sighting was older than `ttl_secs`.
+/// The `count` is in cache *slots*, the unit `AcceptedTagValueSet::len`
+/// measures when enforcing `value_limit`. For the exact backend a slot holds
+/// one distinct value, so the count is exact. For the probabilistic backend it
+/// is the slots reclaimed from the retired rolling-bloom shard, an upper bound
+/// on distinct values: refresh-on-sighting copies hot values into newer shards,
+/// so a value counted here may still be retained in the window.
 #[derive(NamedInternalEvent)]
 pub struct TagCardinalityTtlExpired {
     pub count: u64,
