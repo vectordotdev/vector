@@ -593,10 +593,12 @@ generated: components: sinks: aws_sqs: configuration: {
 		description: """
 			The message deduplication ID value to allow AWS to identify duplicate messages.
 
-			This value is a template which should result in a unique string for each event. See the [AWS
-			documentation][deduplication_id_docs] for more about how AWS does message deduplication.
+			This value is a template which should result in a unique string for each event. See the [SQS
+			documentation][sqs_deduplication_id_docs] or [SNS documentation][sns_deduplication_id_docs]
+			for more about how AWS does message deduplication.
 
-			[deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
+			[sqs_deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
+			[sns_deduplication_id_docs]: https://docs.aws.amazon.com/sns/latest/dg/fifo-message-dedup.html
 			"""
 		required: false
 		type: string: examples: ["{{ transaction_id }}"]
@@ -605,7 +607,7 @@ generated: components: sinks: aws_sqs: configuration: {
 		description: """
 			The tag that specifies that a message belongs to a specific message group.
 
-			Can be applied only to FIFO queues.
+			Can be applied only to FIFO queues or FIFO topics.
 			"""
 		required: false
 		type: string: examples: ["vector", "vector-%Y-%m-%d"]
