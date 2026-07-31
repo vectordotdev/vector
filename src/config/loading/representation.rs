@@ -24,14 +24,20 @@ pub(super) fn parse_config_value(content: &str, format: Format) -> Result<Value,
         Format::Toml => toml::from_str(content)
             .map_err(|error| vec![error.to_string()])
             .and_then(toml_to_json)?,
-        Format::Yaml if is_empty_yaml(content) => Value::Object(ConfigMap::new()),
+        Format::Yaml if is_blank_or_comment_only_yaml(content) => Value::Object(ConfigMap::new()),
         Format::Yaml => serde_yaml::from_str::<serde_yaml::Value>(content)
             .and_then(|mut value| {
                 value.apply_merge()?;
                 Ok(value)
             })
             .map_err(|error| vec![error.to_string()])
-            .and_then(yaml_to_json)?,
+            .and_then(|value| {
+                if value.is_null() && is_empty_yaml_document(content) {
+                    Ok(Value::Object(ConfigMap::new()))
+                } else {
+                    yaml_to_json(value)
+                }
+            })?,
         Format::Json => {
             let value = serde_json::from_str(content).map_err(|error| vec![error.to_string()])?;
             validate_json(&value)?;
@@ -42,10 +48,30 @@ pub(super) fn parse_config_value(content: &str, format: Format) -> Result<Value,
     Ok(value)
 }
 
-fn is_empty_yaml(content: &str) -> bool {
+fn is_blank_or_comment_only_yaml(content: &str) -> bool {
     content.lines().all(|line| {
         let line = line.trim();
         line.is_empty() || line.starts_with('#')
+    })
+}
+
+fn is_empty_yaml_document(content: &str) -> bool {
+    let content = content.strip_prefix('\u{feff}').unwrap_or(content);
+
+    content.lines().all(|line| {
+        let line = line.trim();
+        line.is_empty()
+            || line.starts_with('#')
+            || line.starts_with('%')
+            || is_yaml_document_marker(line, "---")
+            || is_yaml_document_marker(line, "...")
+    })
+}
+
+fn is_yaml_document_marker(line: &str, marker: &str) -> bool {
+    line.strip_prefix(marker).is_some_and(|suffix| {
+        let suffix = suffix.trim_start();
+        suffix.is_empty() || suffix.starts_with('#')
     })
 }
 
@@ -246,7 +272,17 @@ mod tests {
 
     #[test]
     fn empty_yaml_parses_as_an_empty_map() {
-        for input in ["", "  \n\t", "# comment", "  # comment\n\n# another"] {
+        for input in [
+            "",
+            "  \n\t",
+            "# comment",
+            "  # comment\n\n# another",
+            "---",
+            "--- # comment",
+            "%YAML 1.2\n---",
+            "---\n...",
+            "\u{feff}",
+        ] {
             assert_eq!(
                 parse_config_value(input, Format::Yaml).unwrap(),
                 Value::Object(ConfigMap::new())
@@ -256,7 +292,7 @@ mod tests {
 
     #[test]
     fn explicit_top_level_yaml_null_is_rejected() {
-        for input in ["null", "~", "--- null"] {
+        for input in ["null", "~", "--- null", "---\nnull"] {
             assert!(deserialize_config::<ConfigMap>(input, Format::Yaml).is_err());
         }
     }
