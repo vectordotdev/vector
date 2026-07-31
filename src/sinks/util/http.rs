@@ -954,7 +954,17 @@ pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     HttpResponse,
 > {
     HttpStatusRetryLogic::new(
-        |req: &HttpResponse| req.http_response.status(),
+        |req: &HttpResponse| {
+            let status = req.http_response.status();
+            if !status.is_success() {
+                debug!(
+                    message = "HTTP response.",
+                    %status,
+                    body = %String::from_utf8_lossy(req.http_response.body()),
+                );
+            }
+            status
+        },
         retry_strategy,
     )
 }
