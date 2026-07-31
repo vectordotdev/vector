@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn signs_sdk_service_version_without_overwriting_it() {
+    fn build_string_to_sign_includes_existing_service_version() {
         let policy = policy();
         let mut request = Request::new(
             Url::parse("https://account.blob.core.windows.net/container/blob").unwrap(),
@@ -309,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_request_without_sdk_service_version() {
+    fn build_string_to_sign_rejects_missing_service_version() {
         let policy = policy();
         let mut request = Request::new(
             Url::parse("https://account.blob.core.windows.net/container/blob").unwrap(),
