@@ -7,13 +7,14 @@ use chrono::{TimeZone, Utc};
 use futures::{future::ready, stream};
 use http::Uri;
 use indoc::indoc;
-use serde::Deserialize;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, value};
 
 use super::{
-    config::{StackdriverConfig, StackdriverResource, default_endpoint},
-    encoder::StackdriverLogsEncoder,
+    config::{StackdriverConfig, default_endpoint},
+    encoder::{
+        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+    },
 };
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -21,8 +22,7 @@ use crate::{
     gcp::GcpAuthenticator,
     sinks::{
         gcp::stackdriver::logs::{
-            config::{StackdriverLabelConfig, StackdriverLogName},
-            encoder::remap_severity,
+            config::StackdriverLogName, encoder::remap_severity,
             service::StackdriverLogsServiceRequestBuilder,
         },
         prelude::*,
@@ -31,11 +31,24 @@ use crate::{
             http::{HttpRequest, HttpServiceRequestBuilder},
         },
     },
+    template::{ConfinementConfig, Template},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };
+
+// Tests exercise the encoder, not confinement; build a checkerless confined template.
+fn confined(s: &str) -> ConfinedTemplate {
+    Template::try_from(s)
+        .unwrap()
+        .confine(
+            &ConfinementConfig::unconfined(),
+            StackdriverConfig::NAME,
+            "template",
+        )
+        .unwrap()
+}
 
 #[test]
 fn generate_config() {
@@ -46,11 +59,9 @@ fn generate_config() {
 async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-    let config = StackdriverConfig::generate_config().to_string();
-    let mut config = StackdriverConfig::deserialize(
-        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-    )
-    .expect("config should be valid");
+    let mut config: StackdriverConfig =
+        serde_json::from_value(StackdriverConfig::generate_config())
+            .expect("config should be valid");
 
     // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
     // Metadata API, which we clearly don't have in unit tests. :)
@@ -78,26 +89,20 @@ fn encode_valid() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("{{ log_id }}").unwrap(),
+        confined("{{ log_id }}"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        ConfinedStackdriverLabelConfig {
             labels_key: None,
             labels: HashMap::from([(
                 "config_user_label_1".to_owned(),
-                Template::try_from("config_user_value_1").unwrap(),
+                confined("config_user_value_1"),
             )]),
         },
-        StackdriverResource {
+        ConfinedStackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([
-                (
-                    "namespace".to_owned(),
-                    Template::try_from("office").unwrap(),
-                ),
-                (
-                    "node_id".to_owned(),
-                    Template::try_from("{{ node_id }}").unwrap(),
-                ),
+                ("namespace".to_owned(), confined("office")),
+                ("node_id".to_owned(), confined("{{ node_id }}")),
             ]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
@@ -142,21 +147,15 @@ fn encode_inserts_timestamp() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        ConfinedStackdriverLabelConfig {
             labels_key: None,
-            labels: HashMap::from([(
-                "config_user_label_1".to_owned(),
-                Template::try_from("value_1").unwrap(),
-            )]),
+            labels: HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
         },
-        StackdriverResource {
+        ConfinedStackdriverResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), confined("office"))]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
@@ -222,21 +221,15 @@ async fn correct_request() {
     let transformer = Transformer::default();
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        ConfinedStackdriverLabelConfig {
             labels_key: None,
-            labels: HashMap::from([(
-                "config_user_label_1".to_owned(),
-                Template::try_from("value_1").unwrap(),
-            )]),
+            labels: HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
         },
-        StackdriverResource {
+        ConfinedStackdriverResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), confined("office"))]),
         },
         None,
     );

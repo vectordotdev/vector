@@ -161,10 +161,54 @@ const getExampleValue = (param, deepFilter) => {
 };
 
 Object.makeExampleParams = (params, filter, deepFilter) => {
-  var obj = {};
+  // First pass: collect selected values for fields used in relevant_when conditions.
+  // Only consider fields that are required/minimal and have no relevant_when themselves
+  // (they are the "discriminators", e.g. mode = "tcp").
+  const discriminators = {};
+  Object.keys(params).forEach((k) => {
+    const p = params[k];
+    if ((p.required || p.minimal) && !p.relevant_when) {
+      const val = getExampleValue(p, () => false);
+      if (val != null) discriminators[k] = String(val);
+    }
+  });
 
+  // For required_one_of groups, pick one representative per group to include in minimal examples.
+  // We prefer the first member that can yield a non-null example value; fall back to [0] if none can.
+  const requiredOneOfSelected = new Set();
+  const seenGroups = new Set();
+  Object.keys(params).forEach((k) => {
+    const p = params[k];
+    if (Array.isArray(p.required_one_of) && p.required_one_of.length > 0) {
+      const groupKey = p.required_one_of[0];
+      if (!seenGroups.has(groupKey)) {
+        seenGroups.add(groupKey);
+        const representative =
+          p.required_one_of.find((m) => params[m] && getExampleValue(params[m], () => false) != null) ??
+          p.required_one_of[0];
+        requiredOneOfSelected.add(representative);
+      }
+    }
+  });
+
+  // Evaluate a relevant_when condition string against the discriminators.
+  // Handles "key = \"value\"" and "key = \"v1\" or key = \"v2\"" by matching the first clause.
+  const matchesWhen = (p) => {
+    if (!p.relevant_when) return true;
+    const m = p.relevant_when.match(/^(\w+)\s*=\s*"([^"]+)"/);
+    if (!m) return true;
+    return discriminators[m[1]] === m[2];
+  };
+
+  const obj = {};
   Object.keys(params)
-    .filter((k) => filter(params[k]))
+    .filter((k) => {
+      const p = params[k];
+      // Non-representative group members are excluded even if the general filter accepts them.
+      const inGroup = Array.isArray(p.required_one_of) && p.required_one_of.length > 0;
+      if (inGroup && !requiredOneOfSelected.has(k)) return false;
+      return (filter(p) || requiredOneOfSelected.has(k)) && matchesWhen(p);
+    })
     .forEach((k) => {
       let value = getExampleValue(params[k], deepFilter);
       if (value != null) {
@@ -370,10 +414,11 @@ const main = () => {
           (p) => p.required || p.minimal,
           (p) => p.required || p.minimal
         );
+        const hasFieldExamples = (p) => Object.values(p.type || {}).some((t) => (t.examples || []).length > 0);
         const advancedParams = Object.makeExampleParams(
           configuration,
           (_) => true,
-          (p) => p.required || p.minimal || p.relevant_when
+          (p) => p.required || p.minimal || p.relevant_when || hasFieldExamples(p)
         );
         const useCaseExamples = makeUseCaseExamples(component);
 

@@ -6,8 +6,12 @@ import chalk from "chalk";
 import YAML from "yaml";
 
 const cueJsonOutput = "data/docs.json";
-const allowlistPath = new URL("./validate-config-examples-allowlist.json", import.meta.url).pathname;
 const VECTOR_BIN = process.env.VECTOR_BIN || "vector";
+
+// Use `cargo run` when running inside the Vector repo and no specific binary is needed.
+// Set VECTOR_BIN to point at an existing binary and skip the cargo build.
+const useCargoRun = !process.env.VECTOR_BIN && fs.existsSync(path.join(import.meta.dirname, "../../Cargo.toml"));
+const vectorCmd = useCargoRun ? "cargo run --" : VECTOR_BIN;
 
 // Pick a source type compatible with the component's accepted input event types.
 // Returns null for trace-only components (no simple trace source available).
@@ -84,7 +88,7 @@ const wrapConfig = (kind, componentYaml, component) => {
 const validateYaml = (yaml, tmpPath) => {
   fs.writeFileSync(tmpPath, yaml, "utf8");
   try {
-    execSync(`${VECTOR_BIN} validate --no-environment --skip-healthchecks ${tmpPath}`, {
+    execSync(`${vectorCmd} validate --no-environment --skip-healthchecks ${tmpPath}`, {
       stdio: "pipe"
     });
     return null;
@@ -102,14 +106,11 @@ const summarizeError = (error) => {
 };
 
 const main = () => {
-  const allowlist = new Set(JSON.parse(fs.readFileSync(allowlistPath, "utf8")));
-
   const data = fs.readFileSync(cueJsonOutput, "utf8");
   const docs = JSON.parse(data);
   const components = docs.components;
 
-  const newFailures = [];
-  const knownFailures = [];
+  const failures = [];
   let total = 0;
   let skipped = 0;
   const tmpFile = path.join(os.tmpdir(), "vector-validate-example.yaml");
@@ -132,13 +133,8 @@ const main = () => {
           try {
             wrapped = wrapConfig(kind, yaml, component);
           } catch (e) {
-            const error = `YAML parse error: ${e.message}`;
-            if (allowlist.has(key)) {
-              knownFailures.push({ key, error });
-            } else {
-              newFailures.push({ key, error });
-              console.error(chalk.red(`NEW FAIL ${key} [parse error]`));
-            }
+            failures.push({ key, error: `YAML parse error: ${e.message}` });
+            console.error(chalk.red(`FAIL ${key} [parse error]`));
             continue;
           }
 
@@ -150,12 +146,9 @@ const main = () => {
           const error = validateYaml(wrapped, tmpFile);
           if (error) {
             const summary = summarizeError(error);
-            if (allowlist.has(key)) {
-              knownFailures.push({ key, error: summary });
-            } else {
-              newFailures.push({ key, error: summary });
-              console.error(chalk.red(`NEW FAIL ${key}: ${summary}`));
-            }
+            failures.push({ key, error: summary });
+            console.error(chalk.red(`FAIL ${key}: ${summary}`));
+            console.error(chalk.gray("--- config ---\n" + wrapped + "---"));
           }
         }
       }
@@ -165,16 +158,12 @@ const main = () => {
   }
 
   const validated = total - skipped;
-  console.log(
-    chalk.gray(`Validated ${validated} examples (${skipped} skipped, ${knownFailures.length} known failures).`)
-  );
+  console.log(chalk.gray(`Validated ${validated} examples (${skipped} skipped).`));
 
-  if (newFailures.length === 0) {
-    console.log(chalk.green("No new validation failures."));
+  if (failures.length === 0) {
+    console.log(chalk.green("All examples passed."));
   } else {
-    console.error(
-      chalk.red(`\n${newFailures.length} new validation failure(s) — update the allowlist if intentional.`)
-    );
+    console.error(chalk.red(`\n${failures.length} validation failure(s).`));
     process.exit(1);
   }
 };

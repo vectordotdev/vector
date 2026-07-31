@@ -21,7 +21,7 @@ use crate::{
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
     },
-    template::{Template, TemplateRenderingError},
+    template::{TemplateRenderingError, UnconfinedTemplate},
 };
 
 const PATH: &str = "/logs/ingest";
@@ -35,7 +35,7 @@ const PATH: &str = "/logs/ingest";
 pub struct LogdnaConfig(MezmoConfig);
 
 impl GenerateConfig for LogdnaConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         <MezmoConfig as GenerateConfig>::generate_config()
     }
 }
@@ -81,7 +81,7 @@ pub struct MezmoConfig {
     /// The hostname that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "${HOSTNAME}"))]
     #[configurable(metadata(docs::examples = "my-local-machine"))]
-    hostname: Template,
+    hostname: UnconfinedTemplate,
 
     /// The MAC address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "my-mac-address"))]
@@ -96,7 +96,7 @@ pub struct MezmoConfig {
     /// The tags that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "tag1"))]
     #[configurable(metadata(docs::examples = "tag2"))]
-    tags: Option<Vec<Template>>,
+    tags: Option<Vec<UnconfinedTemplate>>,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
@@ -145,7 +145,7 @@ fn default_env() -> String {
 }
 
 impl GenerateConfig for MezmoConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"hostname = "hostname"
             api_key = "${LOGDNA_API_KEY}""#,
@@ -200,8 +200,8 @@ pub struct PartitionKey {
 }
 
 pub struct MezmoEventEncoder {
-    hostname: Template,
-    tags: Option<Vec<Template>>,
+    hostname: UnconfinedTemplate,
+    tags: Option<Vec<UnconfinedTemplate>>,
     transformer: Transformer,
     default_app: String,
     default_env: String,

@@ -44,7 +44,6 @@ mod test_util;
 pub mod time;
 pub mod tls;
 pub mod transform;
-#[cfg(feature = "vrl")]
 pub mod vrl;
 
 use std::path::PathBuf;
@@ -52,7 +51,6 @@ use std::path::PathBuf;
 pub use event::EstimatedJsonEncodedSizeOf;
 use float_eq::FloatEq;
 
-#[cfg(feature = "vrl")]
 pub use crate::vrl::compile_vrl;
 
 #[macro_use]

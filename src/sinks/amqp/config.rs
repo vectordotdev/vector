@@ -119,7 +119,7 @@ impl Default for AmqpSinkConfig {
 }
 
 impl GenerateConfig for AmqpSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"connection_string = "amqp://localhost:5672/%2f"
             routing_key = "user_id"
@@ -135,15 +135,16 @@ impl GenerateConfig for AmqpSinkConfig {
 #[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.exchange = config
+        let exchange = self
             .exchange
+            .clone()
             .confine(&self.confinement, Self::NAME, "exchange")?;
-        config.routing_key = config
+        let routing_key = self
             .routing_key
+            .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "routing_key"))
             .transpose()?;
-        let sink = AmqpSink::new(config).await?;
+        let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
         let hc = healthcheck(sink.channels.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }

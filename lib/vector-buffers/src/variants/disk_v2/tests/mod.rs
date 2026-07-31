@@ -17,7 +17,7 @@ use super::{
 };
 use crate::{
     Bufferable, buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable,
-    variants::disk_v2::common::align16,
+    test::with_temp_dir, variants::disk_v2::common::align16,
 };
 
 type FilesystemUnderTest = ProductionFilesystem;
@@ -36,6 +36,17 @@ impl AsyncFile for DuplexStream {
         Ok(Metadata { len: 0 })
     }
 
+    async fn truncate(&self, size: u64) -> io::Result<()> {
+        if size == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot extend a file through the truncation API",
+            ))
+        }
+    }
+
     async fn sync_all(&self) -> io::Result<()> {
         Ok(())
     }
@@ -43,7 +54,20 @@ impl AsyncFile for DuplexStream {
 
 impl AsyncFile for Cursor<Vec<u8>> {
     async fn metadata(&self) -> io::Result<Metadata> {
-        Ok(Metadata { len: 0 })
+        Ok(Metadata {
+            len: u64::try_from(self.get_ref().len()).expect("cursor length should fit in u64"),
+        })
+    }
+
+    async fn truncate(&self, size: u64) -> io::Result<()> {
+        if size > self.metadata().await?.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot extend a file through the truncation API",
+            ));
+        }
+
+        Ok(())
     }
 
     async fn sync_all(&self) -> io::Result<()> {
@@ -426,4 +450,83 @@ pub(crate) async fn set_file_length<P: AsRef<Path>>(
     drop(file);
 
     Ok(())
+}
+
+#[tokio::test]
+async fn async_file_truncate_rejects_extension() {
+    crate::test::with_temp_dir(|dir| {
+        let path = dir.join("truncate-test");
+
+        async move {
+            let mut file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .read(true)
+                .write(true)
+                .open(path)
+                .await
+                .expect("file should open");
+            file.write_all(b"test").await.expect("write should succeed");
+            file.flush().await.expect("flush should succeed");
+
+            file.truncate(2).await.expect("truncation should succeed");
+            assert_eq!(
+                file.metadata().await.expect("metadata should load").len(),
+                2
+            );
+
+            let error = file.truncate(3).await.expect_err("extension should fail");
+            assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+            assert_eq!(
+                file.metadata().await.expect("metadata should load").len(),
+                2
+            );
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn production_filesystem_truncates_with_append_handle_open() {
+    with_temp_dir(|dir| {
+        let path = dir.join("truncate-with-append-handle");
+
+        async move {
+            let filesystem = ProductionFilesystem;
+            filesystem
+                .truncate_file(&path, 0)
+                .await
+                .expect("truncating a missing file to zero should create it");
+            let mut append_file = filesystem
+                .open_file_writable(&path)
+                .await
+                .expect("opening append file should succeed");
+            append_file
+                .write_all(b"abcdef")
+                .await
+                .expect("initial write should succeed");
+            append_file.flush().await.expect("flush should succeed");
+
+            filesystem
+                .truncate_file(&path, 2)
+                .await
+                .expect("truncation should succeed");
+
+            append_file
+                .write_all(b"z")
+                .await
+                .expect("append after truncation should succeed");
+            append_file.flush().await.expect("flush should succeed");
+            drop(append_file);
+
+            assert_eq!(
+                b"abz",
+                tokio::fs::read(path)
+                    .await
+                    .expect("reading truncated file should succeed")
+                    .as_slice()
+            );
+        }
+    })
+    .await;
 }
