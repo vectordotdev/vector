@@ -106,7 +106,7 @@ pub fn init(
         subscriber.with(console_layer)
     };
 
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "allocation-tracing"))]
     let subscriber = {
         let allocation_layer = crate::internal_telemetry::allocations::AllocationLayer::new()
             .with_filter(LevelFilter::ERROR);
