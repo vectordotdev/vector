@@ -24,19 +24,14 @@ pub(super) fn parse_config_value(content: &str, format: Format) -> Result<Value,
         Format::Toml => toml::from_str(content)
             .map_err(|error| vec![error.to_string()])
             .and_then(toml_to_json)?,
+        Format::Yaml if is_empty_yaml(content) => Value::Object(ConfigMap::new()),
         Format::Yaml => serde_yaml::from_str::<serde_yaml::Value>(content)
             .and_then(|mut value| {
                 value.apply_merge()?;
                 Ok(value)
             })
             .map_err(|error| vec![error.to_string()])
-            .and_then(|value| {
-                if value.is_null() {
-                    Ok(Value::Object(ConfigMap::new()))
-                } else {
-                    yaml_to_json(value)
-                }
-            })?,
+            .and_then(yaml_to_json)?,
         Format::Json => {
             let value = serde_json::from_str(content).map_err(|error| vec![error.to_string()])?;
             validate_json(&value)?;
@@ -45,6 +40,13 @@ pub(super) fn parse_config_value(content: &str, format: Format) -> Result<Value,
     };
 
     Ok(value)
+}
+
+fn is_empty_yaml(content: &str) -> bool {
+    content.lines().all(|line| {
+        let line = line.trim();
+        line.is_empty() || line.starts_with('#')
+    })
 }
 
 fn toml_to_json(value: toml::Value) -> Result<Value, Vec<String>> {
@@ -244,10 +246,19 @@ mod tests {
 
     #[test]
     fn empty_yaml_parses_as_an_empty_map() {
-        assert_eq!(
-            parse_config_value("", Format::Yaml).unwrap(),
-            Value::Object(ConfigMap::new())
-        );
+        for input in ["", "  \n\t", "# comment", "  # comment\n\n# another"] {
+            assert_eq!(
+                parse_config_value(input, Format::Yaml).unwrap(),
+                Value::Object(ConfigMap::new())
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_top_level_yaml_null_is_rejected() {
+        for input in ["null", "~", "--- null"] {
+            assert!(deserialize_config::<ConfigMap>(input, Format::Yaml).is_err());
+        }
     }
 
     #[test]
