@@ -3,6 +3,7 @@
 //! Four variants, picked at construction time from `(Mode, ttl_secs)`:
 //!
 //! - `Set` — `HashSet`, no TTL. Original exact-mode behavior.
+//! - `Fingerprint` — `HashedSet<u64>`, no TTL. `ExactFingerprint` mode.
 //! - `Bloom` — single `BloomFilter`, no TTL. Original probabilistic-mode behavior.
 //! - `TtlSet` — `HashMap<value, last_seen>` with periodic sweep. Exact mode + TTL.
 //! - `RollingBloom` — `VecDeque<BloomFilter>` of `ttl_generations` shards, lazily
@@ -14,12 +15,14 @@
 //! `contains()` calls — so there's no background task.
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque, hash_map::RandomState},
     fmt,
+    hash::BuildHasher,
     time::{Duration, Instant},
 };
 
 use bloomy::BloomFilter;
+use hash_hasher::HashedSet;
 
 use crate::{
     event::metric::TagValueSet, internal_events::TagCardinalityTtlExpired,
@@ -71,6 +74,8 @@ pub struct AcceptedTagValueSet {
 enum TagValueSetStorage {
     Set(HashSet<TagValueSet>),
     Bloom(BloomFilterStorage),
+    /// Stores 64-bit hash fingerprints of accepted tag values.
+    Fingerprint(FingerprintStorage),
     TtlSet(TtlExactStorage),
     RollingBloom(RollingBloomStorage),
 }
@@ -109,6 +114,32 @@ impl BloomFilterStorage {
 
     const fn count(&self) -> usize {
         self.count
+    }
+}
+
+#[derive(Default)]
+struct FingerprintStorage {
+    fingerprints: HashedSet<u64>,
+    /// Per-instance randomized hasher state. Each instance gets a distinct seed, making
+    /// pre-computed collision attacks infeasible.
+    seed: RandomState,
+}
+
+impl FingerprintStorage {
+    fn fingerprint(&self, value: &TagValueSet) -> u64 {
+        self.seed.hash_one(value)
+    }
+
+    fn insert(&mut self, value: &TagValueSet) {
+        self.fingerprints.insert(self.fingerprint(value));
+    }
+
+    fn contains(&self, value: &TagValueSet) -> bool {
+        self.fingerprints.contains(&self.fingerprint(value))
+    }
+
+    fn len(&self) -> usize {
+        self.fingerprints.len()
     }
 }
 
@@ -313,6 +344,7 @@ impl fmt::Debug for TagValueSetStorage {
         match self {
             TagValueSetStorage::Set(set) => write!(f, "Set({set:?})"),
             TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
+            TagValueSetStorage::Fingerprint(_) => write!(f, "Fingerprint"),
             TagValueSetStorage::TtlSet(s) => {
                 write!(f, "TtlSet(len={}, ttl={:?})", s.map.len(), s.ttl)
             }
@@ -341,6 +373,9 @@ impl AcceptedTagValueSet {
             (Mode::Exact, Some(ttl)) => {
                 TagValueSetStorage::TtlSet(TtlExactStorage::new(ttl, ttl_generations))
             }
+            (Mode::ExactFingerprint, _) => {
+                TagValueSetStorage::Fingerprint(FingerprintStorage::default())
+            }
             (Mode::Probabilistic(config), None) => {
                 TagValueSetStorage::Bloom(BloomFilterStorage::new(config.cache_size_per_key))
             }
@@ -362,6 +397,7 @@ impl AcceptedTagValueSet {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
+            TagValueSetStorage::Fingerprint(fp) => fp.contains(value),
             TagValueSetStorage::TtlSet(s) => s.contains(value),
             TagValueSetStorage::RollingBloom(s) => s.contains(value),
         }
@@ -377,6 +413,7 @@ impl AcceptedTagValueSet {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
+            TagValueSetStorage::Fingerprint(fp) => fp.contains(value),
             TagValueSetStorage::TtlSet(s) => s.contains_no_refresh(value),
             TagValueSetStorage::RollingBloom(s) => s.contains_no_refresh(value),
         }
@@ -390,6 +427,7 @@ impl AcceptedTagValueSet {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.len(),
             TagValueSetStorage::Bloom(bloom) => bloom.count(),
+            TagValueSetStorage::Fingerprint(fp) => fp.len(),
             TagValueSetStorage::TtlSet(s) => s.len(),
             TagValueSetStorage::RollingBloom(s) => s.len(),
         }
@@ -401,6 +439,7 @@ impl AcceptedTagValueSet {
                 set.insert(value);
             }
             TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
+            TagValueSetStorage::Fingerprint(fp) => fp.insert(&value),
             TagValueSetStorage::TtlSet(s) => s.insert(value),
             TagValueSetStorage::RollingBloom(s) => s.insert(&value),
         };
@@ -825,6 +864,57 @@ mod tests {
             "len() must reach value_limit once enough distinct values are spread \
              across shards; got {} for value_limit={value_limit}",
             s.len(),
+        );
+    }
+
+    #[test]
+    fn test_accepted_tag_value_set_fingerprint() {
+        let mut set = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
+
+        assert!(!set.contains(&TagValueSet::from(["value1".to_string()])));
+        assert_eq!(set.len(), 0);
+
+        set.insert(TagValueSet::from(["value1".to_string()]));
+        assert_eq!(set.len(), 1);
+        assert!(set.contains(&TagValueSet::from(["value1".to_string()])));
+
+        set.insert(TagValueSet::from(["value1".to_string()]));
+        assert_eq!(set.len(), 1);
+
+        set.insert(TagValueSet::from(["value2".to_string()]));
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(&TagValueSet::from(["value2".to_string()])));
+        assert!(!set.contains(&TagValueSet::from(["value3".to_string()])));
+
+        let mut set2 = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
+        set2.insert(TagValueSet::from(["value1".to_string()]));
+        assert!(set2.contains(&TagValueSet::from(["value1".to_string()])));
+        assert!(!set2.contains(&TagValueSet::from(["value3".to_string()])));
+    }
+
+    #[test]
+    fn test_fingerprint_storage_uses_independent_seeds() {
+        let probe = TagValueSet::from(["probe-value".to_string()]);
+        let mut s1 = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
+        let mut s2 = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
+        s1.insert(probe.clone());
+        assert!(
+            !s2.contains(&probe),
+            "distinct FingerprintStorage instances must use independent random seeds"
+        );
+    }
+
+    #[test]
+    fn test_fingerprint_distribution_no_collisions() {
+        let mut set = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
+        let n = 100_000;
+        for i in 0..n {
+            set.insert(TagValueSet::from([format!("tag-value-{i}")]));
+        }
+        assert_eq!(
+            set.len(),
+            n,
+            "distinct values must produce distinct fingerprints"
         );
     }
 }

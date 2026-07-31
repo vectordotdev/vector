@@ -419,6 +419,7 @@ pub fn build_framestream_tcp_source(
             addr,
             listenfd,
             &tls,
+            None, // tls_reloader: not wired for this source
             frame_handler
                 .allowed_origins()
                 .map(|origins| origins.to_vec()),
@@ -1304,7 +1305,7 @@ mod test {
         sock_sink: &mut S,
         frames: Vec<Result<Bytes, std::io::Error>>,
     ) {
-        let mut stream = stream::iter(frames.into_iter());
+        let mut stream = stream::iter(frames);
         //send and send_all consume the sink
         _ = sock_sink.send_all(&mut stream).await;
     }

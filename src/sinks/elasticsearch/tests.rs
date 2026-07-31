@@ -2,6 +2,7 @@ use std::{convert::TryFrom, iter::zip};
 
 use vector_common::sensitive_string::SensitiveString;
 use vector_lib::lookup::PathPrefix;
+use vrl::event_path;
 
 use crate::{
     codecs::Transformer,
@@ -15,12 +16,17 @@ use crate::{
         },
         util::{auth::Auth, encoding::Encoder},
     },
-    template::Template,
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
 
 // helper to unwrap template strings for tests only
 fn parse_template(input: &str) -> Template {
     Template::try_from(input).unwrap()
+}
+
+// `bulk.action` / `bulk.version` are unconfined templates.
+fn parse_unconfined(input: &str) -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from(input).unwrap()
 }
 
 #[tokio::test]
@@ -31,7 +37,7 @@ async fn sets_create_action_when_configured() {
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("{{ action }}te"),
+            action: parse_unconfined("{{ action }}te"),
             index: parse_template("vector"),
             template_fallback_index: None,
             version: None,
@@ -50,7 +56,7 @@ async fn sets_create_action_when_configured() {
             .single()
             .expect("invalid timestamp"),
     );
-    log.insert("action", "crea");
+    log.insert(event_path!("action"), "crea");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -73,7 +79,7 @@ async fn sets_create_action_when_configured() {
 async fn encoding_with_external_versioning_without_version_set_does_not_include_version() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             template_fallback_index: None,
             index: parse_template("vector"),
             version: None,
@@ -96,10 +102,10 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             template_fallback_index: None,
-            version: Some(parse_template("{{ my_field }}")),
+            version: Some(parse_unconfined("{{ my_field }}")),
             version_type: VersionType::External,
         },
         id_key: Some("my_id".into()),
@@ -118,8 +124,8 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
             .single()
             .expect("invalid timestamp"),
     );
-    log.insert("my_field", "1337");
-    log.insert("my_id", "42");
+    log.insert(event_path!("my_field"), "1337");
+    log.insert(event_path!("my_id"), "42");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -146,10 +152,10 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             template_fallback_index: None,
-            version: Some(parse_template("{{ my_field }}")),
+            version: Some(parse_unconfined("{{ my_field }}")),
             version_type: VersionType::ExternalGte,
         },
         id_key: Some("my_id".into()),
@@ -168,8 +174,8 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
             .single()
             .expect("invalid timestamp"),
     );
-    log.insert("my_field", "1337");
-    log.insert("my_id", "42");
+    log.insert(event_path!("my_field"), "1337");
+    log.insert(event_path!("my_id"), "42");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -251,7 +257,7 @@ async fn encode_datastream_mode() {
             .expect("invalid timestamp"),
     );
     log.insert(
-        "data_stream",
+        event_path!("data_stream"),
         data_stream_body(
             Some("synthetics".to_string()),
             Some("testing".to_string()),
@@ -301,7 +307,7 @@ async fn encode_datastream_mode_no_routing() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        "data_stream",
+        event_path!("data_stream"),
         data_stream_body(
             Some("synthetics".to_string()),
             Some("testing".to_string()),
@@ -335,7 +341,7 @@ async fn encode_datastream_mode_no_routing() {
 async fn handle_metrics() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             ..Default::default()
         },
@@ -380,7 +386,7 @@ async fn handle_metrics() {
 async fn decode_bulk_action_error() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("{{ action }}"),
+            action: parse_unconfined("{{ action }}"),
             index: parse_template("vector"),
             ..Default::default()
         },
@@ -391,8 +397,8 @@ async fn decode_bulk_action_error() {
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello world");
-    log.insert("foo", "bar");
-    log.insert("idx", "purple");
+    log.insert(event_path!("foo"), "bar");
+    log.insert(event_path!("idx"), "purple");
     let action = es.mode.bulk_action(&log);
     assert!(action.is_none());
 }
@@ -413,7 +419,7 @@ async fn default_bulk_settings() {
 async fn decode_bulk_action() {
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
-            action: parse_template("create"),
+            action: parse_unconfined("create"),
             index: parse_template("vector"),
             ..Default::default()
         },
@@ -454,7 +460,7 @@ async fn encode_datastream_mode_no_sync() {
 
     let mut log = LogEvent::from("hello there");
     log.insert(
-        "data_stream",
+        event_path!("data_stream"),
         data_stream_body(
             Some("synthetics".to_string()),
             Some("testing".to_string()),
@@ -496,13 +502,16 @@ async fn allows_using_except_fields() {
             .unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
+        // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
+        // exercise field encoding rather than confinement.
+        confinement: ConfinementConfig::unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
-    log.insert("foo", "bar");
-    log.insert("idx", "purple");
+    log.insert(event_path!("foo"), "bar");
+    log.insert(event_path!("idx"), "purple");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -531,13 +540,16 @@ async fn allows_using_only_fields() {
         encoding: Transformer::new(Some(vec!["foo".into()]), None, None).unwrap(),
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
+        // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
+        // exercise field encoding rather than confinement.
+        confinement: ConfinementConfig::unconfined(),
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
-    log.insert("foo", "bar");
-    log.insert("idx", "purple");
+    log.insert(event_path!("foo"), "bar");
+    log.insert(event_path!("idx"), "purple");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -662,7 +674,7 @@ async fn datastream_index_name() {
     for test_case in test_cases {
         let mut log = LogEvent::from("hello there");
         log.insert(
-            "data_stream",
+            event_path!("data_stream"),
             data_stream_body(
                 test_case.dtype.clone(),
                 test_case.dataset.clone(),

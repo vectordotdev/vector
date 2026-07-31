@@ -12,6 +12,7 @@ pub mod http;
 pub mod metadata;
 pub mod normalizer;
 pub mod partitioner;
+pub mod path_confinement;
 pub mod processed_event;
 pub mod request_builder;
 pub mod retries;

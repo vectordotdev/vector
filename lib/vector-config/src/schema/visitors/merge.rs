@@ -262,7 +262,7 @@ where
     K: Clone + Eq + Ord,
     V: Clone + Mergeable,
 {
-    destination.merge(source);
+    Mergeable::merge(destination, source);
 }
 
 fn merge_optional<T: Clone>(destination: &mut Option<T>, source: Option<&T>) {

@@ -217,9 +217,8 @@ impl GlobalOptions {
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
         }
-        let readonly = std::fs::metadata(&data_dir)
-            .map(|meta| meta.permissions().readonly())
-            .unwrap_or(true);
+        let readonly =
+            std::fs::metadata(&data_dir).map_or(true, |meta| meta.permissions().readonly());
         if readonly {
             return Err(DataDirError::NotWritable { data_dir }.into());
         }

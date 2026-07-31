@@ -303,7 +303,7 @@ impl Target for VrlTarget {
                                 metric.remove_tags();
                                 for (field, value) in &value {
                                     set_metric_tag_values(
-                                        field[..].into(),
+                                        field.as_str().into(),
                                         value,
                                         metric,
                                         *multi_value_tags,
