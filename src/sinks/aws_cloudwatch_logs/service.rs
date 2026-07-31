@@ -40,7 +40,7 @@ use vector_lib::{
 use crate::sinks::{
     aws_cloudwatch_logs::{
         CloudwatchKey,
-        config::{CloudwatchLogsSinkConfig, Retention},
+        config::{CloudwatchLogsGroupClass, CloudwatchLogsSinkConfig, Retention},
         request,
         retry::CloudwatchRetryLogic,
         sink::BatchCloudwatchRequest,
@@ -248,6 +248,7 @@ impl CloudwatchLogsSvc {
 
         let kms_key = config.kms_key.clone();
         let tags = config.tags.clone();
+        let group_class = config.group_class;
 
         CloudwatchLogsSvc {
             headers,
@@ -259,6 +260,7 @@ impl CloudwatchLogsSvc {
             retention,
             kms_key,
             tags,
+            group_class,
             token: None,
             token_rx: None,
         }
@@ -335,6 +337,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.retention.clone(),
                 self.kms_key.clone(),
                 self.tags.clone(),
+                self.group_class,
                 event_batches,
                 self.token.take(),
                 tx,
@@ -355,6 +358,7 @@ pub struct CloudwatchLogsSvc {
     retention: Retention,
     kms_key: Option<String>,
     tags: Option<HashMap<String, String>>,
+    group_class: CloudwatchLogsGroupClass,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
