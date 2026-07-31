@@ -375,6 +375,7 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
         if buf.len() >= self.buf.capacity() {
             self.inner.write_all(buf).await?;
+            self.inner.flush().await?;
 
             let flush_result = flush_result.get_or_insert(FlushResult::default());
             flush_result.events_flushed += event_count as u64;
@@ -402,6 +403,7 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
     /// will be returned describing the error.
     async fn flush(&mut self) -> io::Result<Option<FlushResult>> {
         if self.buf.is_empty() {
+            self.inner.flush().await?;
             return Ok(None);
         }
 
@@ -409,6 +411,10 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         let bytes_flushed = self.buf.len() as u64;
 
         let result = self.inner.write_all(&self.buf[..]).await;
+        let result = match result {
+            Ok(()) => self.inner.flush().await,
+            Err(error) => Err(error),
+        };
         self.unflushed_events = 0;
         self.buf.clear();
 
