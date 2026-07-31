@@ -25,7 +25,9 @@ use tokio::time;
 const MAX_BUFFER_SIZE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_DATA_FILE_SIZE_BYTES: u64 = 2 * 1024 * 1024;
 const PROBE_COUNT: usize = 12;
-const EMPTY_POLLS_REQUIRED: usize = 3;
+const RECOVERY_POLLS_REQUIRED: usize = 5;
+const METRICS_POLL_INTERVAL: time::Duration = time::Duration::from_secs(2);
+const DISK_SETTLE_TIMEOUT: time::Duration = time::Duration::from_secs(30);
 
 #[derive(Parser)]
 struct Args {
@@ -49,8 +51,10 @@ struct Args {
 
 #[derive(Clone, Copy, Debug, Default)]
 struct BufferMetrics {
+    max_size_bytes: f64,
     occupancy_events: f64,
     occupancy_bytes: f64,
+    occupancy_reported: bool,
     received_events: f64,
     sent_events: f64,
     discarded_events: f64,
@@ -71,12 +75,13 @@ fn disk_metric_sum(body: &str, metric_name: &str) -> Option<f64> {
             let mut fields = line.split_whitespace();
             let sample = fields.next()?;
             let value = fields.next()?;
-            if sample.starts_with(metric_name)
+            if sample.split('{').next() == Some(metric_name)
                 && sample.contains("buffer_type=\"disk\"")
                 && sample.contains("buffer_id=\"out\"")
             {
+                let value = value.parse::<f64>().ok()?;
                 matches += 1;
-                value.parse::<f64>().ok()
+                Some(value)
             } else {
                 None
             }
@@ -85,25 +90,50 @@ fn disk_metric_sum(body: &str, metric_name: &str) -> Option<f64> {
     (matches > 0).then_some(sum)
 }
 
+fn parse_buffer_metrics(body: &str) -> Option<BufferMetrics> {
+    // The maximum-size gauge is emitted on every buffer-usage reporting tick,
+    // including when an idle buffer has never received an event in this process.
+    // Occupancy gauges are update-driven, so their absence in that case means
+    // zero rather than that the topology or metrics endpoint is unavailable.
+    let max_size_bytes = disk_metric_sum(body, "vector_buffer_max_size_bytes")?;
+    let occupancy_events = disk_metric_sum(body, "vector_buffer_size_events");
+    let occupancy_bytes = disk_metric_sum(body, "vector_buffer_size_bytes");
+    Some(BufferMetrics {
+        max_size_bytes,
+        occupancy_events: occupancy_events.unwrap_or_default(),
+        occupancy_bytes: occupancy_bytes.unwrap_or_default(),
+        occupancy_reported: occupancy_events.is_some() && occupancy_bytes.is_some(),
+        received_events: disk_metric_sum(body, "vector_buffer_received_events_total")
+            .unwrap_or_default(),
+        sent_events: disk_metric_sum(body, "vector_buffer_sent_events_total").unwrap_or_default(),
+        discarded_events: disk_metric_sum(body, "vector_buffer_discarded_events_total")
+            .unwrap_or_default(),
+    })
+}
+
 async fn fetch_metrics(client: &reqwest::Client, metrics_url: &str) -> Option<BufferMetrics> {
-    let body = client
+    let response = client
         .get(metrics_url)
         .timeout(time::Duration::from_secs(3))
         .send()
         .await
         .ok()?
-        .text()
-        .await
+        .error_for_status()
         .ok()?;
-    Some(BufferMetrics {
-        occupancy_events: disk_metric_sum(&body, "vector_buffer_size_events")?,
-        occupancy_bytes: disk_metric_sum(&body, "vector_buffer_size_bytes")?,
-        received_events: disk_metric_sum(&body, "vector_buffer_received_events_total")
-            .unwrap_or_default(),
-        sent_events: disk_metric_sum(&body, "vector_buffer_sent_events_total").unwrap_or_default(),
-        discarded_events: disk_metric_sum(&body, "vector_buffer_discarded_events_total")
-            .unwrap_or_default(),
-    })
+    let body = response.text().await.ok()?;
+    parse_buffer_metrics(&body)
+}
+
+fn observe_logically_empty(metrics: &BufferMetrics, inferred_empty_polls: &mut usize) -> bool {
+    if metrics.occupancy_events != 0.0 || metrics.occupancy_bytes != 0.0 {
+        *inferred_empty_polls = 0;
+        return false;
+    }
+    if metrics.occupancy_reported {
+        return true;
+    }
+    *inferred_empty_polls += 1;
+    *inferred_empty_polls >= 2
 }
 
 async fn wait_for_metrics(
@@ -112,11 +142,17 @@ async fn wait_for_metrics(
     timeout: time::Duration,
 ) -> Option<BufferMetrics> {
     let deadline = time::Instant::now() + timeout;
+    let mut consecutive_polls = 0usize;
     while time::Instant::now() < deadline {
         if let Some(metrics) = fetch_metrics(client, metrics_url).await {
-            return Some(metrics);
+            consecutive_polls += 1;
+            if consecutive_polls >= RECOVERY_POLLS_REQUIRED {
+                return Some(metrics);
+            }
+        } else {
+            consecutive_polls = 0;
         }
-        time::sleep(time::Duration::from_secs(2)).await;
+        time::sleep(METRICS_POLL_INTERVAL).await;
     }
     None
 }
@@ -127,24 +163,18 @@ async fn wait_for_empty_buffer(
     timeout: time::Duration,
 ) -> (bool, Option<BufferMetrics>) {
     let deadline = time::Instant::now() + timeout;
-    let mut stable_empty_polls = 0usize;
+    let mut inferred_empty_polls = 0usize;
     let mut latest = None;
     while time::Instant::now() < deadline {
         if let Some(metrics) = fetch_metrics(client, metrics_url).await {
-            stable_empty_polls =
-                if metrics.occupancy_events == 0.0 && metrics.occupancy_bytes == 0.0 {
-                    stable_empty_polls + 1
-                } else {
-                    0
-                };
             latest = Some(metrics);
-            if stable_empty_polls >= EMPTY_POLLS_REQUIRED {
+            if observe_logically_empty(&metrics, &mut inferred_empty_polls) {
                 return (true, latest);
             }
         } else {
-            stable_empty_polls = 0;
+            inferred_empty_polls = 0;
         }
-        time::sleep(time::Duration::from_secs(2)).await;
+        time::sleep(METRICS_POLL_INTERVAL).await;
     }
     (false, latest)
 }
@@ -174,6 +204,25 @@ fn disk_snapshot(buffer_dir: &Path) -> Result<DiskSnapshot, String> {
         snapshot.largest_data_file_bytes = snapshot.largest_data_file_bytes.max(size);
     }
     Ok(snapshot)
+}
+
+fn snapshot_is_settled(snapshot: &DiskSnapshot) -> bool {
+    snapshot.largest_data_file_bytes <= MAX_DATA_FILE_SIZE_BYTES
+        && snapshot.total_data_file_bytes <= MAX_BUFFER_SIZE_BYTES
+}
+
+async fn wait_for_settled_disk(
+    buffer_dir: &Path,
+    timeout: time::Duration,
+) -> Result<DiskSnapshot, String> {
+    let deadline = time::Instant::now() + timeout;
+    loop {
+        let snapshot = disk_snapshot(buffer_dir);
+        if snapshot.as_ref().is_ok_and(snapshot_is_settled) || time::Instant::now() >= deadline {
+            return snapshot;
+        }
+        time::sleep(time::Duration::from_secs(1)).await;
+    }
 }
 
 fn assert_physical_bounds(snapshot: Result<DiskSnapshot, String>, phase: &str) {
@@ -280,8 +329,9 @@ async fn main() {
     let args = Args::parse();
     let client = reqwest::Client::new();
 
-    // Faults have stopped, but a node restart can still be initializing. Serving
-    // the disk-buffer metrics proves the process and topology came back.
+    // Faults have stopped, but a queued node fault or restart can still overlap
+    // the beginning of this command. Require several consecutive reports from
+    // the configured disk-buffer stage before judging recovery.
     let recovered =
         wait_for_metrics(&client, &args.metrics_url, time::Duration::from_secs(180)).await;
     assert_always!(
@@ -296,6 +346,7 @@ async fn main() {
         recovered_metrics.occupancy_bytes <= MAX_BUFFER_SIZE_BYTES as f64,
         "recovered disk-buffer occupancy is within the configured limit",
         &json!({
+            "reported_max_size_bytes": recovered_metrics.max_size_bytes,
             "occupancy_events": recovered_metrics.occupancy_events,
             "occupancy_bytes": recovered_metrics.occupancy_bytes,
             "max_buffer_size_bytes": MAX_BUFFER_SIZE_BYTES,
@@ -320,9 +371,13 @@ async fn main() {
     if !initially_drained {
         return;
     }
-    // Three empty metric polls span the one-second stale-file cleanup interval,
-    // so the physical snapshot is settled rather than racing normal deletion.
-    assert_physical_bounds(disk_snapshot(&args.buffer_dir), "after recovery drain");
+    // Logical drain is observable immediately, while stale data-file deletion is
+    // asynchronous. Wait for the physical view independently so a final zero
+    // scrape near the logical deadline cannot become a false failure.
+    assert_physical_bounds(
+        wait_for_settled_disk(&args.buffer_dir, DISK_SETTLE_TIMEOUT).await,
+        "after recovery drain",
+    );
 
     // Each selected payload is just over the 256KiB write-buffer size and is
     // hex encoded in JSON. Twelve records therefore force multiple 2MiB data
@@ -383,6 +438,98 @@ async fn main() {
         })
     );
     if finally_drained {
-        assert_physical_bounds(disk_snapshot(&args.buffer_dir), "after fresh progress");
+        assert_physical_bounds(
+            wait_for_settled_disk(&args.buffer_dir, DISK_SETTLE_TIMEOUT).await,
+            "after fresh progress",
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DISK_LABELS: &str = "buffer_id=\"out\",buffer_type=\"disk\",stage=\"0\"";
+
+    #[test]
+    fn idle_buffer_metrics_default_missing_occupancy_to_zero() {
+        let body = format!("vector_buffer_max_size_bytes{{{DISK_LABELS}}} 8388608\n");
+
+        let metrics = parse_buffer_metrics(&body).expect("disk-buffer stage should be present");
+
+        assert_eq!(metrics.max_size_bytes, 8_388_608.0);
+        assert_eq!(metrics.occupancy_events, 0.0);
+        assert_eq!(metrics.occupancy_bytes, 0.0);
+        assert!(!metrics.occupancy_reported);
+    }
+
+    #[test]
+    fn metrics_require_the_continuously_reported_disk_buffer_identity() {
+        let body =
+            format!("vector_buffer_size_bytes{{{DISK_LABELS}}} 42\nvector_started_total 1\n");
+
+        assert!(parse_buffer_metrics(&body).is_none());
+    }
+
+    #[test]
+    fn active_buffer_metrics_preserve_occupancy_and_counters() {
+        let body = format!(
+            "vector_buffer_max_size_bytes{{{DISK_LABELS}}} 8388608\n\
+             vector_buffer_size_events{{{DISK_LABELS}}} 3\n\
+             vector_buffer_size_bytes{{{DISK_LABELS}}} 4096\n\
+             vector_buffer_received_events_total{{{DISK_LABELS}}} 7\n\
+             vector_buffer_sent_events_total{{{DISK_LABELS}}} 4\n\
+             vector_buffer_discarded_events_total{{{DISK_LABELS}}} 0\n"
+        );
+
+        let metrics = parse_buffer_metrics(&body).expect("disk-buffer stage should be present");
+
+        assert_eq!(metrics.occupancy_events, 3.0);
+        assert_eq!(metrics.occupancy_bytes, 4096.0);
+        assert!(metrics.occupancy_reported);
+        assert_eq!(metrics.received_events, 7.0);
+        assert_eq!(metrics.sent_events, 4.0);
+        assert_eq!(metrics.discarded_events, 0.0);
+    }
+
+    #[test]
+    fn similarly_prefixed_metric_does_not_identify_the_buffer() {
+        let body = format!("vector_buffer_max_size_bytes_extra{{{DISK_LABELS}}} 8388608\n");
+
+        assert!(parse_buffer_metrics(&body).is_none());
+    }
+
+    #[test]
+    fn explicit_zero_is_immediate_but_inferred_zero_requires_confirmation() {
+        let explicit = BufferMetrics {
+            occupancy_reported: true,
+            ..BufferMetrics::default()
+        };
+        let inferred = BufferMetrics::default();
+        let nonempty = BufferMetrics {
+            occupancy_events: 1.0,
+            occupancy_bytes: 100.0,
+            occupancy_reported: true,
+            ..BufferMetrics::default()
+        };
+        let mut inferred_empty_polls = 0;
+
+        assert!(observe_logically_empty(
+            &explicit,
+            &mut inferred_empty_polls
+        ));
+        assert!(!observe_logically_empty(
+            &inferred,
+            &mut inferred_empty_polls
+        ));
+        assert!(observe_logically_empty(
+            &inferred,
+            &mut inferred_empty_polls
+        ));
+        assert!(!observe_logically_empty(
+            &nonempty,
+            &mut inferred_empty_polls
+        ));
+        assert_eq!(inferred_empty_polls, 0);
     }
 }
