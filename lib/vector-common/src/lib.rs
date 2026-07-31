@@ -56,6 +56,8 @@ pub mod internal_event;
 
 pub mod request_metadata;
 
+pub mod sampling;
+
 pub mod shutdown;
 
 #[cfg(feature = "sensitive_string")]

@@ -259,7 +259,7 @@ fn chronicle_labels_examples() -> HashMap<String, String> {
 }
 
 impl GenerateConfig for ChronicleUnstructuredConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             credentials_path = "/path/to/credentials.json"
             customer_id = "customer_id"

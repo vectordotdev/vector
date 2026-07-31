@@ -163,8 +163,8 @@ const fn default_endpoint_target() -> EndpointTarget {
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
             host_key: None,

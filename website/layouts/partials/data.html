@@ -22,6 +22,8 @@
 
                 {{ if $v.required }}
                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                {{ else if $v.required_one_of }}
+                  {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                 {{ else }}
                   {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
                 {{ end }}
@@ -38,7 +40,7 @@
                   {{ end }}
 
                   {{ with $v.syntax }}
-                    {{ if eq . "remap_program" }}
+                    {{ if eq . "vrl_program" }}
                       {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
                     {{ else if eq . "template" }}
                       {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
@@ -179,7 +181,7 @@
                 {{ end }}
 
                 {{ with $v.examples }}
-                  {{ template "config-examples" (dict "examples" .) }}
+                  {{ template "config-examples" (dict "examples" . "syntax" $v.syntax) }}
                 {{ end }}
               {{ end }}
 
@@ -519,6 +521,8 @@
 
               {{ if $v.required }}
                 {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+              {{ else if $v.required_one_of }}
+                {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
               {{ else }}
                 {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
               {{ end }}
@@ -625,6 +629,8 @@
 
                   {{ if $v.required }}
                     {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                  {{ else if $v.required_one_of }}
+                    {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                   {{ else }}
                     {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
                   {{ end }}
@@ -663,6 +669,8 @@
                               <span class="flex space-x-1">
                                 {{ if $v.required }}
                                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                                {{ else if $v.required_one_of }}
+                                  {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                                 {{ else }}
                                   {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
                                 {{ end }}
@@ -1743,6 +1751,10 @@
 {{ end }}
 
 {{ define "config-examples" }}
+  {{/* Fields whose value is source code (per their declared `syntax`) render their examples as a
+       highlighted code block so multi-line programs keep their newlines; jsonify would escape them
+       to a literal \n. Every other syntax renders inline as JSON. Map: syntax -> Chroma lexer. */}}
+  {{ $codeLexers := dict "vrl_program" "coffee" "lua" "lua" "yaml" "yaml" "toml" "toml" }}
   <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
     <span class="flex justify-between items-center">
       <span class="text-sm"> Examples </span>
@@ -1751,9 +1763,15 @@
     </span>
 
     <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
+      {{ $lexer := "" }}
+      {{ with $.syntax }}{{ $lexer = index $codeLexers . }}{{ end }}
       {{ range .examples }}
-        {{ $json := . | jsonify (dict "indent" "  ") }}
-        {{ highlight $json "json" "" }}
+        {{ if $lexer }}
+          {{ highlight . $lexer "" }}
+        {{ else }}
+          {{ $json := . | jsonify (dict "indent" "  ") }}
+          {{ highlight $json "json" "" }}
+        {{ end }}
       {{ end }}
     </div>
   </div>
@@ -2035,6 +2053,8 @@
 
             {{ if $v.required }}
               {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+            {{ else if $v.required_one_of }}
+              {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
             {{ else }}
               {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
             {{ end }}
@@ -2051,7 +2071,7 @@
               {{ end }}
 
               {{ with $v.syntax }}
-                {{ if eq . "remap_program" }}
+                {{ if eq . "vrl_program" }}
                   {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
                 {{ else if eq . "template" }}
                   {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/configuration/template-syntax/") }}
@@ -2140,8 +2160,17 @@
             </div>
           {{ end }}
 
+          {{ if eq $k "array" }}
+            {{/* Array examples live on the item type, not the array itself */}}
+            {{ range $k, $v := $v.items.type }}
+              {{ with $v.examples }}
+                {{ template "config-array-examples" (dict "examples" .) }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+
           {{ with $v.examples }}
-            {{ template "config-examples" (dict "examples" .) }}
+            {{ template "config-examples" (dict "examples" . "syntax" $v.syntax) }}
           {{ end }}
 
           {{ if or $v.default (eq $v.default false) }}

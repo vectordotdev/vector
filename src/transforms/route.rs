@@ -111,8 +111,8 @@ fn route_examples() -> IndexMap<String, AnyCondition> {
 }
 
 impl GenerateConfig for RouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             reroute_unmatched: true,
             route: route_examples(),
         })
@@ -132,7 +132,7 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         if self.route.contains_key(UNMATCHED_ROUTE) {
             Err(vec![format!(
                 "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
@@ -142,7 +142,7 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         let errors: Vec<String> = self
             .route
             .iter()
