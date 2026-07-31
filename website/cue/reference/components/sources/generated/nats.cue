@@ -598,6 +598,20 @@ generated: components: sources: nats: configuration: {
 			}
 		}
 	}
+	headers_key: {
+		description: """
+			Enables exposing NATS message headers on each event under the named key.
+
+			By default this is unset and no headers are exposed, preserving backwards
+			compatibility. When set, the message headers are inserted as an object
+			mapping each header name to an array of its string values.
+			"""
+		required: false
+		type: string: {
+			default: ""
+			examples: ["headers"]
+		}
+	}
 	jetstream: {
 		description: "Configuration for NATS JetStream."
 		required:    false
