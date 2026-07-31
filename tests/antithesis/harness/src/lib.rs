@@ -2,33 +2,24 @@
 //! `scenarios/vector_to_vector_e2e_disk`) owns its own test-command bins. When two
 //! scenarios need the same HTTP or oracle helpers, factor them into modules here.
 
-use vector_buffers::WRITE_BUFFER_SIZE_V2;
+/// Largest source payload used by this experiment. Hex encoding doubles this to
+/// a 128 KiB JSON field, leaving substantial headroom below disk_v2's 256 KiB
+/// write buffer after record framing is added.
+const MAX_PAYLOAD_LENGTH: usize = 64 * 1024;
 
-/// Payload lengths in bytes, one per id class. Sized around the disk_v2 write
-/// buffer so the produced records straddle the boundary at which the buffer is
-/// flushed to the data file: empty, a single byte, fractions of, just under, at,
-/// just over, and a record several times larger than the buffer.
-const PAYLOAD_LENGTHS: [usize; 8] = [
-    0,
-    1,
-    WRITE_BUFFER_SIZE_V2 / 4,
-    WRITE_BUFFER_SIZE_V2 / 2,
-    WRITE_BUFFER_SIZE_V2 - 1,
-    WRITE_BUFFER_SIZE_V2,
-    WRITE_BUFFER_SIZE_V2 + 1,
-    768 * 1024,
-];
+/// Payload lengths in bytes, one per id class. Every generated record remains
+/// below the disk_v2 write-buffer size so this workload does not exercise the
+/// large-record path.
+const PAYLOAD_LENGTHS: [usize; 5] = [0, 1, 4 * 1024, 16 * 1024, MAX_PAYLOAD_LENGTH];
 
 /// Payload length selected for an id.
 pub fn payload_length(id: u64) -> usize {
     PAYLOAD_LENGTHS[(id % PAYLOAD_LENGTHS.len() as u64) as usize]
 }
 
-/// True for the payload class used by the terminal progress probe. Its encoded
-/// disk record is large enough that a short sequence crosses data-file
-/// boundaries, while remaining comfortably below the scenario's record limit.
-pub fn is_progress_probe_payload(id: u64) -> bool {
-    payload_length(id) == WRITE_BUFFER_SIZE_V2 + 1
+/// True for the largest small-record class used by the terminal rollover probe.
+pub fn is_rollover_probe_payload(id: u64) -> bool {
+    payload_length(id) == MAX_PAYLOAD_LENGTH
 }
 
 /// One splitmix64 step. A full-avalanche mixer, so flipping any input bit
@@ -108,11 +99,11 @@ mod tests {
     }
 
     #[test]
-    fn progress_probe_uses_the_just_over_write_buffer_class() {
+    fn rollover_probe_uses_the_largest_small_record_class() {
         for id in 0..PAYLOAD_LENGTHS.len() as u64 {
             assert_eq!(
-                is_progress_probe_payload(id),
-                payload_length(id) == WRITE_BUFFER_SIZE_V2 + 1
+                is_rollover_probe_payload(id),
+                payload_length(id) == MAX_PAYLOAD_LENGTH
             );
         }
     }
@@ -121,9 +112,9 @@ mod tests {
     fn distinct_ids_differ_in_content_at_equal_length() {
         // Ids in the same nonzero-length class but different ids must not produce
         // the same bytes, or a swapped-id corruption would slip past the oracle.
-        // Ids 2 and 10 share class 2 (a buffer-quarter of bytes).
+        // Ids 2 and 7 share the same nonempty payload class.
         let a = payload_for(2);
-        let b = payload_for(10);
+        let b = payload_for(7);
         assert_eq!(a.len(), b.len());
         assert!(!a.is_empty());
         assert_ne!(a, b);

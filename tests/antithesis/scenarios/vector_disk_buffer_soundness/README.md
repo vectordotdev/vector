@@ -19,18 +19,19 @@ The scenario makes these universal assertions:
 - no individual data file exceeds the configured 2 MiB limit;
 - after faults stop, Vector becomes healthy and the existing buffer drains to
   zero event and byte occupancy;
-- twelve fresh, fault-free records are accepted and delivered after recovery;
+- twenty fresh, fault-free records are accepted and delivered after recovery;
 - the buffer returns to zero occupancy after those records.
 
-The fresh terminal records are each just over the 256 KiB write-buffer boundary.
-Their JSON representation forces several 2 MiB data-file rollovers, so terminal
-progress covers more than a single append to an already-open file.
+The fresh terminal records each contain a 64 KiB source payload, represented as
+a 128 KiB hex field in JSON. Twenty records force a 2 MiB data-file rollover
+while every individual record remains below the 256 KiB write-buffer boundary.
 
 The scenario also retains `disk_v2`'s embedded Antithesis checks for record-id
 monotonicity, counter underflow, and torn-record accounting. Required
-`Sometimes` properties show whether a run reached restart, rollover, and
-large-record paths. Full-buffer blocking and torn-record recovery remain
-optional paths; failing to reach them does not fail the run.
+`Sometimes` properties show whether a run reached restart and rollover paths.
+Full-buffer blocking and torn-record recovery remain optional paths; failing to
+reach them does not fail the run. This experiment intentionally excludes the
+large-record path.
 
 ## Non-properties
 

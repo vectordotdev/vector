@@ -16,7 +16,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use antithesis_harness::{is_progress_probe_payload, payload_field};
+use antithesis_harness::{is_rollover_probe_payload, payload_field};
 use antithesis_sdk::{antithesis_init, assert_always, assert_reachable, assert_unreachable};
 use clap::Parser;
 use serde_json::json;
@@ -24,7 +24,7 @@ use tokio::time;
 
 const MAX_BUFFER_SIZE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_DATA_FILE_SIZE_BYTES: u64 = 2 * 1024 * 1024;
-const PROBE_COUNT: usize = 12;
+const PROBE_COUNT: usize = 20;
 const EMPTY_POLLS_REQUIRED: usize = 3;
 
 #[derive(Parser)]
@@ -206,7 +206,7 @@ fn assert_physical_bounds(snapshot: Result<DiskSnapshot, String>, phase: &str) {
     );
 }
 
-async fn claim_progress_probe(client: &reqwest::Client, oracle_url: &str) -> Option<u64> {
+async fn claim_rollover_probe(client: &reqwest::Client, oracle_url: &str) -> Option<u64> {
     for _ in 0..8 {
         let response = client
             .post(format!("{oracle_url}/claim"))
@@ -215,7 +215,7 @@ async fn claim_progress_probe(client: &reqwest::Client, oracle_url: &str) -> Opt
             .await
             .ok()?;
         let id = response.text().await.ok()?.trim().parse().ok()?;
-        if is_progress_probe_payload(id) {
+        if is_rollover_probe_payload(id) {
             return Some(id);
         }
     }
@@ -324,13 +324,13 @@ async fn main() {
     // so the physical snapshot is settled rather than racing normal deletion.
     assert_physical_bounds(disk_snapshot(&args.buffer_dir), "after recovery drain");
 
-    // Each selected payload is just over the 256KiB write-buffer size and is
-    // hex encoded in JSON. Twelve records therefore force multiple 2MiB data
-    // file boundaries while staying below the record-size limit.
+    // Each selected source payload is 64 KiB and becomes a 128 KiB hex field.
+    // Twenty individually small records still force a 2 MiB data-file rollover
+    // without exercising the writer's large-record path.
     let mut probe_ids = Vec::with_capacity(PROBE_COUNT);
     let submission_deadline = time::Instant::now() + time::Duration::from_secs(180);
     while probe_ids.len() < PROBE_COUNT && time::Instant::now() < submission_deadline {
-        let Some(id) = claim_progress_probe(&client, &args.oracle_url).await else {
+        let Some(id) = claim_rollover_probe(&client, &args.oracle_url).await else {
             time::sleep(time::Duration::from_secs(1)).await;
             continue;
         };

@@ -5,7 +5,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
     },
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use bytecheck::CheckBytes;
@@ -35,8 +35,6 @@ use super::{
 use crate::buffer_usage_data::BufferUsageHandle;
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
-
-pub(super) const PROGRESS_RECHECK_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
@@ -497,33 +495,19 @@ where
     ///
     /// This will only occur when a record is read, which may allow enough space (below the maximum
     /// configured buffer size) for a write to occur, or similarly, when a data file is deleted.
-    /// This wait also returns periodically so callers recheck the reader's published state even if
-    /// a notification is missed.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_reader(&self) {
-        if tokio::time::timeout(PROGRESS_RECHECK_INTERVAL, self.reader_notify.notified())
-            .await
-            .is_err()
-        {
-            warn!("Timed out waiting for reader progress. Rechecking buffer state.");
-        }
+        self.reader_notify.notified().await;
     }
 
     /// Waits for a signal from the writer that progress has been made.
     ///
     /// This will occur when a record is written, or when a new data file is created.
     ///
-    /// Writer progress is published before this notification is sent. This wait also returns
-    /// periodically so callers recheck the writer's published state even if a notification is
-    /// missed.
+    /// Writer progress is published before this notification is sent.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
-        if tokio::time::timeout(PROGRESS_RECHECK_INTERVAL, self.writer_notify.notified())
-            .await
-            .is_err()
-        {
-            warn!("Timed out waiting for writer progress. Rechecking buffer state.");
-        }
+        self.writer_notify.notified().await;
     }
 
     /// Notifies all tasks waiting on progress by the reader.

@@ -1846,22 +1846,6 @@ where
         #[cfg(feature = "antithesis-disk-asserts")]
         self.assert_logical_buffer_within_capacity(record_id, bytes_written);
 
-        // A record at or above the write-buffer size forces the buffered writer to
-        // flush mid-record, exercising the large-record path that splits a single
-        // record across multiple underlying writes.
-        #[cfg(feature = "antithesis-disk-asserts")]
-        {
-            #![allow(clippy::disallowed_types)] // once_cell::Lazy
-            antithesis_sdk::assert_sometimes!(
-                bytes_written >= self.config.write_buffer_size,
-                "a record at or over the write-buffer size is written",
-                &serde_json::json!({
-                    "bytes_written": bytes_written,
-                    "write_buffer_size": self.config.write_buffer_size,
-                })
-            );
-        }
-
         trace!(
             record_id,
             record_events,

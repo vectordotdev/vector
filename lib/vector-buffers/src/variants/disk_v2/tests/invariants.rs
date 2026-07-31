@@ -1,4 +1,4 @@
-use tokio::{fs::OpenOptions, io::AsyncWriteExt, time};
+use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
 
@@ -10,7 +10,6 @@ use crate::{
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
-        ledger::PROGRESS_RECHECK_INTERVAL,
         tests::{
             create_buffer_v2_with_write_buffer_size, create_default_buffer_v2,
             get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
@@ -106,54 +105,6 @@ async fn publishing_writer_progress_updates_ledger_before_waking_reader() {
     });
 
     let parent = trace_span!("publishing_writer_progress_updates_ledger_before_waking_reader");
-    fut.instrument(parent.or_current()).await;
-}
-
-#[tokio::test]
-async fn reader_rechecks_after_writer_progress_wait_times_out() {
-    let assertion_registry = install_tracing_helpers();
-
-    let fut = with_temp_dir(|dir| {
-        let data_dir = dir.to_path_buf();
-
-        async move {
-            let (_writer, mut reader, _ledger) =
-                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
-
-            let first_writer_wait = assertion_registry
-                .build()
-                .with_name("wait_for_writer")
-                .with_parent_name("reader_rechecks_after_writer_progress_wait_times_out")
-                .was_entered_exactly(1)
-                .finalize();
-            let second_writer_wait = assertion_registry
-                .build()
-                .with_name("wait_for_writer")
-                .with_parent_name("reader_rechecks_after_writer_progress_wait_times_out")
-                .was_entered_at_least(2)
-                .finalize();
-
-            time::pause();
-
-            let mut blocked_read = spawn(read_next(&mut reader));
-            while !first_writer_wait.try_assert() {
-                assert_pending!(blocked_read.poll());
-            }
-            assert_pending!(blocked_read.poll());
-            assert!(!blocked_read.is_woken());
-
-            time::advance(PROGRESS_RECHECK_INTERVAL + std::time::Duration::from_millis(1)).await;
-
-            assert!(blocked_read.is_woken());
-            while !second_writer_wait.try_assert() {
-                assert_pending!(blocked_read.poll());
-            }
-
-            time::resume();
-        }
-    });
-
-    let parent = trace_span!("reader_rechecks_after_writer_progress_wait_times_out");
     fut.instrument(parent.or_current()).await;
 }
 
