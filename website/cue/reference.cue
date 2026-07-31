@@ -348,6 +348,12 @@ _values: {
 	//              relevant_when: 'strategy = "fingerprint" or "inode"'
 	relevant_when?: string
 
+	// `required_one_of` documents that exactly one field from the listed group
+	// must be set. All members share the same list. The field itself is optional
+	// in isolation; the constraint is expressed at the schema level via oneOf.
+	required_one_of?: [...string]
+	required_one_of_group?: string
+
 	// `required` requires the option to be set.
 	required: bool
 
