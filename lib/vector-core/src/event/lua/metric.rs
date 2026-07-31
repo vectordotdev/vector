@@ -126,6 +126,7 @@ impl IntoLua for LuaMetricTags {
 
 impl IntoLua for LuaMetric {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
+    #[allow(clippy::too_many_lines)]
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tbl = lua.create_table()?;
 
@@ -222,6 +223,25 @@ impl IntoLua for LuaMetric {
                 };
 
                 tbl.raw_set("sketch", sketch_tbl)?;
+            }
+            native @ MetricValue::NativeHistogram { .. } => {
+                // Lua scripts operate on classic histograms; expose native histograms via lossy
+                // conversion so existing scripts continue to work.
+                if let Some(MetricValue::AggregatedHistogram {
+                    buckets,
+                    count,
+                    sum,
+                }) = native.native_histogram_to_agg_histogram()
+                {
+                    let aggregated_histogram = lua.create_table()?;
+                    let counts: Vec<_> = buckets.iter().map(|b| b.count).collect();
+                    let limits: Vec<_> = buckets.iter().map(|b| b.upper_limit).collect();
+                    aggregated_histogram.raw_set("buckets", limits)?;
+                    aggregated_histogram.raw_set("counts", counts)?;
+                    aggregated_histogram.raw_set("count", count)?;
+                    aggregated_histogram.raw_set("sum", sum)?;
+                    tbl.raw_set("aggregated_histogram", aggregated_histogram)?;
+                }
             }
         }
 

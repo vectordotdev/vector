@@ -177,6 +177,183 @@ generated: components: sources: static_metrics: configuration: {
 								type: float: {}
 							}
 						}
+						native_histogram: {
+							description: """
+																			A Prometheus-style native (exponential) histogram.
+
+																			Native histograms use exponential bucket boundaries determined by a `schema` parameter, allowing for high
+																			resolution at low cost. Unlike `AggregatedHistogram` which uses fixed bucket boundaries, native histograms use
+																			sparse buckets indexed by integer keys, where adjacent buckets grow by a factor of `2^(2^-schema)`.
+
+																			See <https://prometheus.io/docs/specs/native_histograms/> for details.
+																			"""
+							required: true
+							type: object: options: {
+								count: {
+									description: """
+																							The total number of observations.
+
+																							May be a float to support gauge histograms where resets can cause fractional counts.
+																							"""
+									required: true
+									type: object: options: {
+										float: {
+											description: "Floating-point count value."
+											required:    true
+											type: float: {}
+										}
+										integer: {
+											description: "Integer count value."
+											required:    true
+											type: uint: {}
+										}
+									}
+								}
+								negative_buckets: {
+									description: """
+																							Bucket values for negative buckets.
+
+																							For integer counts, these are deltas from the previous bucket (first is absolute). For float counts, these
+																							are absolute values. The interpretation depends on the `count` type.
+																							"""
+									required: true
+									type: object: options: {
+										float_counts: {
+											description: "Absolute floating-point bucket counts."
+											required:    true
+											type: array: items: type: float: {}
+										}
+										integer_deltas: {
+											description: """
+																											Delta-encoded integer bucket counts.
+
+																											The first value is the absolute count of the first bucket; subsequent values are the delta from the previous
+																											bucket's count.
+																											"""
+											required: true
+											type: array: items: type: int: {}
+										}
+									}
+								}
+								negative_spans: {
+									description: """
+																							A span of consecutive populated buckets in a native histogram.
+
+																							Spans of populated negative buckets.
+																							"""
+									required: true
+									type: array: items: type: object: options: {
+										length: {
+											description: "Number of consecutive buckets in this span."
+											required:    true
+											type: uint: {}
+										}
+										offset: {
+											description: "Gap in bucket indices from the previous span (or from zero for the first span)."
+											required:    true
+											type: int: {}
+										}
+									}
+								}
+								positive_buckets: {
+									description: """
+																							Bucket values for positive buckets.
+
+																							For integer counts, these are deltas from the previous bucket (first is absolute). For float counts, these
+																							are absolute values. The interpretation depends on the `count` type.
+																							"""
+									required: true
+									type: object: options: {
+										float_counts: {
+											description: "Absolute floating-point bucket counts."
+											required:    true
+											type: array: items: type: float: {}
+										}
+										integer_deltas: {
+											description: """
+																											Delta-encoded integer bucket counts.
+
+																											The first value is the absolute count of the first bucket; subsequent values are the delta from the previous
+																											bucket's count.
+																											"""
+											required: true
+											type: array: items: type: int: {}
+										}
+									}
+								}
+								positive_spans: {
+									description: """
+																							A span of consecutive populated buckets in a native histogram.
+
+																							Spans of populated positive buckets.
+																							"""
+									required: true
+									type: array: items: type: object: options: {
+										length: {
+											description: "Number of consecutive buckets in this span."
+											required:    true
+											type: uint: {}
+										}
+										offset: {
+											description: "Gap in bucket indices from the previous span (or from zero for the first span)."
+											required:    true
+											type: int: {}
+										}
+									}
+								}
+								reset_hint: {
+									description: "Hint about whether this represents a counter reset."
+									required:    true
+									type: string: enum: {
+										gauge:   "This histogram is a gauge histogram (no reset semantics)."
+										no:      "This histogram is known not to be the first after a reset."
+										unknown: "No hint; receiver should detect resets from the data."
+										yes:     "This histogram is the first after a reset (or the very first observation)."
+									}
+								}
+								schema: {
+									description: """
+																							The resolution parameter.
+
+																							Valid values are from -4 to 8 for standard exponential schemas. Higher values give finer resolution.
+																							Bucket boundaries are at `(2^(2^-schema))^n` for positive buckets.
+																							"""
+									required: true
+									type: int: {}
+								}
+								sum: {
+									description: "The sum of all observations."
+									required:    true
+									type: float: {}
+								}
+								zero_count: {
+									description: "Count of observations in the zero bucket."
+									required:    true
+									type: object: options: {
+										float: {
+											description: "Floating-point count value."
+											required:    true
+											type: float: {}
+										}
+										integer: {
+											description: "Integer count value."
+											required:    true
+											type: uint: {}
+										}
+									}
+								}
+								zero_threshold: {
+									description: """
+																							The width of the "zero bucket".
+
+																							Observations in `[-zero_threshold, zero_threshold]` are counted in the zero bucket rather than in positive
+																							or negative exponential buckets.
+																							"""
+									required: true
+									type: float: {}
+								}
+							}
+						}
 						set: {
 							description: "A set of (unordered) unique values for a key."
 							required:    true

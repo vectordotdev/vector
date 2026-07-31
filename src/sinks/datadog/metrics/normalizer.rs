@@ -27,6 +27,15 @@ impl MetricNormalize for DatadogMetricsNormalizer {
                 .make_incremental(metric)
                 .filter(|metric| !metric.value().is_empty())
                 .and_then(|metric| AgentDDSketch::transform_to_sketch(metric).ok()),
+            // Native histograms are converted to aggregated histograms first (lossy), then to
+            // sketches. Like sketches, they can't be meaningfully subtracted, so we treat them as
+            // implicitly incremental.
+            MetricValue::NativeHistogram { .. } => metric
+                .value()
+                .native_histogram_to_agg_histogram()
+                .map(|agg| metric.clone().into_incremental().with_value(agg))
+                .filter(|m| !m.value().is_empty())
+                .and_then(|m| AgentDDSketch::transform_to_sketch(m).ok()),
             // Sketches cannot be subtracted from one another, so we treat them as implicitly
             // incremental, and just update the metric type.
             MetricValue::Sketch { .. } => Some(metric.into_incremental()),

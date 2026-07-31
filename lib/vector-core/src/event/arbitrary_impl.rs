@@ -8,7 +8,8 @@ use super::{
     Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
     metric::{
         Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
-        Quantile, Sample,
+        NativeHistogramBuckets, NativeHistogramCount, NativeHistogramResetHint,
+        NativeHistogramSpan, Quantile, Sample,
     },
 };
 use crate::metrics::AgentDDSketch;
@@ -194,14 +195,74 @@ impl Arbitrary for MetricKind {
     }
 }
 
+fn arbitrary_native_histogram(g: &mut Gen) -> MetricValue {
+    // Prometheus native histograms are either integer-typed (counter histograms) or
+    // float-typed (gauge histograms); count and bucket storage must agree on type
+    // for proto roundtrips to be lossless.
+    let is_float = bool::arbitrary(g);
+    let make_count = |g: &mut Gen| {
+        if is_float {
+            NativeHistogramCount::Float((f64::arbitrary(g) % MAX_F64_SIZE).abs())
+        } else {
+            NativeHistogramCount::Integer(u64::arbitrary(g) % 10_000)
+        }
+    };
+    // Generate 0..=2 spans and the matching number of bucket values.
+    let make_spans_buckets = |g: &mut Gen| {
+        let span_count = u8::arbitrary(g) % 3;
+        let mut spans = Vec::with_capacity(span_count as usize);
+        let mut total_len = 0usize;
+        for _ in 0..span_count {
+            let length = 1 + u32::arbitrary(g) % 4;
+            spans.push(NativeHistogramSpan {
+                offset: i32::arbitrary(g) % 8,
+                length,
+            });
+            total_len += length as usize;
+        }
+        let buckets = if is_float {
+            NativeHistogramBuckets::FloatCounts(
+                iter::repeat_with(|| (f64::arbitrary(g) % MAX_F64_SIZE).abs())
+                    .take(total_len)
+                    .collect(),
+            )
+        } else {
+            NativeHistogramBuckets::IntegerDeltas(
+                iter::repeat_with(|| i64::arbitrary(g) % 100)
+                    .take(total_len)
+                    .collect(),
+            )
+        };
+        (spans, buckets)
+    };
+    let (positive_spans, positive_buckets) = make_spans_buckets(g);
+    let (negative_spans, negative_buckets) = make_spans_buckets(g);
+    let reset_hint = match u8::arbitrary(g) % 4 {
+        0 => NativeHistogramResetHint::Unknown,
+        1 => NativeHistogramResetHint::Yes,
+        2 => NativeHistogramResetHint::No,
+        _ => NativeHistogramResetHint::Gauge,
+    };
+    MetricValue::NativeHistogram {
+        count: make_count(g),
+        sum: f64::arbitrary(g) % MAX_F64_SIZE,
+        schema: (i32::arbitrary(g) % 13) - 4,
+        zero_threshold: (f64::arbitrary(g) % 1.0).abs(),
+        zero_count: make_count(g),
+        positive_spans,
+        positive_buckets,
+        negative_spans,
+        negative_buckets,
+        reset_hint,
+    }
+}
+
 impl Arbitrary for MetricValue {
     fn arbitrary(g: &mut Gen) -> Self {
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98.  The magical
-        // constant here are the number of fields in `MetricValue`. Because the
-        // field total is not a power of two we introduce a bias into choice
-        // here toward `MetricValue::Counter` and `MetricValue::Gauge`.
-        match u8::arbitrary(g) % 7 {
+        // constant here are the number of fields in `MetricValue`.
+        match u8::arbitrary(g) % 8 {
             0 => MetricValue::Counter {
                 value: f64_for_arbitrary(g),
             },
@@ -249,6 +310,7 @@ impl Arbitrary for MetricValue {
                     sketch: MetricSketch::AgentDDSketch(sketch),
                 }
             }
+            7 => arbitrary_native_histogram(g),
 
             _ => unreachable!(),
         }
@@ -386,6 +448,10 @@ impl Arbitrary for MetricValue {
             MetricValue::Sketch { sketch } => Box::new(iter::once(MetricValue::Sketch {
                 sketch: sketch.clone(),
             })),
+            // Similar to sketches, native histograms have tightly coupled internal invariants
+            // (spans must match bucket counts, deltas encode running totals) that don't lend
+            // themselves to naive shrinking.
+            native @ MetricValue::NativeHistogram { .. } => Box::new(iter::once(native.clone())),
         }
     }
 }

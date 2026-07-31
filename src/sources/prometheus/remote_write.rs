@@ -377,6 +377,7 @@ mod test {
                     value: 42.0,
                     timestamp: chrono::Utc::now().timestamp_millis(),
                 }],
+                histograms: vec![],
             }],
         };
 
@@ -415,6 +416,7 @@ mod test {
                     value: 42.0,
                     timestamp: chrono::Utc::now().timestamp_millis(),
                 }],
+                histograms: vec![],
             }],
         };
 
@@ -552,6 +554,7 @@ mod test {
                             value: 42.0,
                             timestamp: chrono::Utc::now().timestamp_millis(),
                         }],
+                        histograms: vec![],
                     },
                     proto::TimeSeries {
                         labels: vec![proto::Label {
@@ -562,6 +565,7 @@ mod test {
                             value: f64::NAN,
                             timestamp: chrono::Utc::now().timestamp_millis(),
                         }],
+                        histograms: vec![],
                     },
                 ],
             };
@@ -623,6 +627,7 @@ mod test {
                             value: 42.0,
                             timestamp: chrono::Utc::now().timestamp_millis(),
                         }],
+                        histograms: vec![],
                     },
                     proto::TimeSeries {
                         labels: vec![proto::Label {
@@ -633,6 +638,7 @@ mod test {
                             value: f64::NAN,
                             timestamp: chrono::Utc::now().timestamp_millis(),
                         }],
+                        histograms: vec![],
                     },
                 ],
             };
