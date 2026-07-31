@@ -99,6 +99,11 @@ generated: components: sinks: redis: configuration: {
 					This resembles a priority queue, where messages can be pushed and popped with an
 					associated score.
 					"""
+				string: """
+					The Redis `string` type.
+
+					This resembles a sequence of bytes.
+					"""
 			}
 		}
 	}
