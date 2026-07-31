@@ -53,6 +53,11 @@ export CURRENT_DIR = $(shell pwd)
 # via .github/actions/setup; falling back to `cargo vdev` recompiles vdev).
 VDEV ?= cargo vdev
 
+# Cargo writes artifacts to CARGO_TARGET_DIR when it is set, so recipes that run
+# a freshly built binary have to resolve the same directory rather than assume
+# `target` — otherwise they silently execute a stale binary from a previous build.
+CARGO_TARGET_DIR ?= target
+
 # Set dummy AWS credentials if not present - used for AWS and ES integration tests
 export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
@@ -513,7 +518,7 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	cargo build $(if $(findstring true,$(CI)),--quiet,)
-	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
+	$(CARGO_TARGET_DIR)/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	$(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
