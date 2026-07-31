@@ -270,6 +270,38 @@ impl Policy for SharedKeyAuthorizationPolicy {
 
 // ---------- Helpers ----------
 
+fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> AzureResult<()> {
+    // "/{account_name}{path}\n"
+    s.push('/');
+    s.push_str(account);
+    // Append the URL path exactly as-is (per spec).
+    s.push_str(url.path());
+
+    // Canonicalized query: lowercase names, sort by name, join multi-values by comma, each line "name:value\n"
+    // https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#shared-key-format-for-2009-09-19-and-later
+    if url.query().is_some() {
+        let mut qp_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (name, value) in url.query_pairs() {
+            let key_l = name.to_ascii_lowercase();
+            let v = value.to_string();
+            if v.is_empty() {
+                continue;
+            }
+            qp_map.entry(key_l).or_default().push(v);
+        }
+        for (k, mut vals) in qp_map {
+            vals.sort();
+            let mut line = String::new();
+            write!(&mut line, "\n{}:", k).ok();
+            let joined = vals.join(",");
+            line.push_str(&joined);
+            s.push_str(&line);
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use azure_core::http::Method;
@@ -346,36 +378,4 @@ mod tests {
         assert_eq!(content_length_field(&mut request), "");
         assert_eq!(content_length_header(&request), Some("0"));
     }
-}
-
-fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> AzureResult<()> {
-    // "/{account_name}{path}\n"
-    s.push('/');
-    s.push_str(account);
-    // Append the URL path exactly as-is (per spec).
-    s.push_str(url.path());
-
-    // Canonicalized query: lowercase names, sort by name, join multi-values by comma, each line "name:value\n"
-    // https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#shared-key-format-for-2009-09-19-and-later
-    if url.query().is_some() {
-        let mut qp_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
-        for (name, value) in url.query_pairs() {
-            let key_l = name.to_ascii_lowercase();
-            let v = value.to_string();
-            if v.is_empty() {
-                continue;
-            }
-            qp_map.entry(key_l).or_default().push(v);
-        }
-        for (k, mut vals) in qp_map {
-            vals.sort();
-            let mut line = String::new();
-            write!(&mut line, "\n{}:", k).ok();
-            let joined = vals.join(",");
-            line.push_str(&joined);
-            s.push_str(&line);
-        }
-    }
-
-    Ok(())
 }
