@@ -115,7 +115,7 @@ pub struct AzureBlobSinkConfig {
     /// services that do not support the SDK's default version. The configured version must support
     /// every operation and option used by this sink.
     #[configurable(metadata(docs::examples = "2021-08-06"))]
-    pub api_version: Option<String>,
+    pub(super) api_version: Option<String>,
 
     /// The Azure Blob Storage Account container name.
     #[configurable(metadata(docs::examples = "my-logs"))]
