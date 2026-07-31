@@ -35,9 +35,27 @@ const VALID_METRIC_PATHS_GET: &str =
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
-// See `metric_tag_mode` for rationale. The canonical public path is
-// `crate::event::MetricTagMode`.
-use super::metric_tag_mode::MetricTagMode;
+/// How metric tags are exposed to and accepted from VRL or Lua.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum MetricTagMode {
+    /// Tags are exposed as single strings (last value wins for multi-value
+    /// tags); writes always produce single-value tags.
+    #[default]
+    Single,
+    /// Tags are always exposed as arrays; writes always produce multi-value
+    /// tags regardless of whether the assigned value is scalar or array.
+    Full,
+    /// Tags are exposed using their underlying shape: single-value tags as
+    /// strings, multi-value tags as arrays. Writes: scalar values produce
+    /// single-value tags; arrays of length >= 2 produce multi-value tags.
+    ///
+    /// A length-1 array is normalised to a single-value tag by the metric
+    /// storage layer (`TagValueSet::Set` is never reduced below 2 elements),
+    /// so an assignment like `.tags.region = ["us-east-1"]` round-trips as
+    /// a scalar on the next read. Use `Full` to force array shape regardless
+    /// of length.
+    Auto,
+}
 
 /// An adapter to turn `Event`s into `vrl_lib::Target`s.
 #[allow(clippy::large_enum_variant)]

@@ -9,7 +9,6 @@ pub use finalization::{
 pub use log_event::LogEvent;
 pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
-pub use metric_tag_mode::MetricTagMode;
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
@@ -19,6 +18,7 @@ use vector_common::{
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
 pub use vrl::value::{KeyString, ObjectMap, Value};
+pub use vrl_target::MetricTagMode;
 pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
@@ -34,7 +34,6 @@ pub mod lua;
 pub mod merge_state;
 mod metadata;
 pub mod metric;
-mod metric_tag_mode;
 pub mod proto;
 mod r#ref;
 mod ser;
