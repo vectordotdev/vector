@@ -24,7 +24,7 @@ inputs:
   protoc:
     required: false
     default: false
-    description: "Install protoc (uses prepare.sh protoc module)."
+    description: "Install protoc."
   cue:
     required: false
     default: false
