@@ -6,7 +6,12 @@ use vector_lib::{
     request_metadata::GroupedCountByteSize,
 };
 
-use super::{config::RedisSinkConfig, request_builder::encode_event};
+use super::{
+    DataType,
+    config::{ListMethod, RedisSinkConfig, SortedSetMethod},
+    request_builder::encode_event,
+    service::RedisResponse,
+};
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
@@ -123,4 +128,40 @@ fn redis_log_scoring() {
     .score;
 
     assert_eq!(result, Some(64));
+}
+
+// Redis PUBLISH returns the number of subscribers that received the message as an integer.
+// redis-rs deserializes integer 0 as bool false, which would cause is_successful() to return
+// false and trigger an infinite retry loop when no subscribers are connected.
+#[test]
+fn redis_channel_publish_zero_subscribers_is_successful() {
+    let response = RedisResponse {
+        event_status: vec![false], // 0 subscribers → redis-rs deserializes as false
+        data_type: DataType::Channel,
+        events_byte_size: GroupedCountByteSize::new_untagged(),
+        byte_size: 0,
+    };
+    assert!(
+        response.is_successful(),
+        "Channel publish with 0 subscribers should be treated as success"
+    );
+}
+
+#[test]
+fn redis_list_and_sorted_set_still_check_event_status() {
+    for data_type in [
+        DataType::List(ListMethod::RPush),
+        DataType::SortedSet(SortedSetMethod::ZAdd),
+    ] {
+        let response = RedisResponse {
+            event_status: vec![false],
+            data_type,
+            events_byte_size: GroupedCountByteSize::new_untagged(),
+            byte_size: 0,
+        };
+        assert!(
+            !response.is_successful(),
+            "{data_type:?} with false event_status should not be successful"
+        );
+    }
 }
