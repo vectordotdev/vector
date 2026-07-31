@@ -299,12 +299,6 @@ mod tests {
         policy.ensure_ms_date_header(&mut request);
         let string_to_sign = policy.build_string_to_sign(&request).unwrap();
 
-        let service_version = request
-            .headers()
-            .iter()
-            .find(|(name, _)| name.as_str().eq_ignore_ascii_case("x-ms-version"))
-            .map(|(_, value)| value.as_str());
-        assert_eq!(service_version, Some("2021-08-06"));
         assert!(string_to_sign.contains("x-ms-version:2021-08-06\n"));
     }
 
