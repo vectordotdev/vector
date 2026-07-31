@@ -10,7 +10,9 @@ license = "MPL-2.0"
 workspace = true
 
 [dependencies]
+chrono.workspace = true
 indoc.workspace = true
+syslog_loose = { version = "0.23", default-features = false }
 vrl.workspace = true
 enrichment = { path = "../enrichment" }
 vector-vrl-metrics = { path = "../metrics", optional = true }
