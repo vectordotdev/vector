@@ -544,6 +544,10 @@ async fn shutdown_query(
 /// case and expects the callee to emit). A timeout is reported by SourceSender as timed out, but
 /// must also be reported as dropped when a tracking checkpoint makes retry impossible. Therefore,
 /// the returned count excludes a closed failed chunk but includes a timed-out failed chunk.
+///
+/// On shutdown while `send_batch` is in flight, cancelling that future already makes
+/// `UnsentEventCount` emit `ComponentEventsDropped` for the current chunk, so the returned
+/// shutdown count excludes that chunk and only covers events not yet handed to SourceSender.
 enum BatchSendError {
     Shutdown {
         dropped_events: usize,
@@ -570,7 +574,11 @@ async fn send_enriched_batch(
         let mut out = out.clone();
         let send_result = select! {
             _ = &mut *shutdown => {
-                return Err(BatchSendError::Shutdown { dropped_events: unsent_events });
+                // SourceSender already emits ComponentEventsDropped for this chunk via
+                // UnsentEventCount::drop when the cancelled send_batch future is dropped.
+                return Err(BatchSendError::Shutdown {
+                    dropped_events: unsent_events - count,
+                });
             }
             send_result = out.send_batch(events) => send_result,
         };
@@ -1498,7 +1506,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn send_enriched_batch_reports_all_unsent_events_on_shutdown() {
+    async fn send_enriched_batch_excludes_in_flight_chunk_from_shutdown_drops() {
         let (mut out, _recv) = crate::SourceSender::new_test_sender_with_options(1, None);
         out.send_batch(vec![Event::Log(LogEvent::from("already buffered"))])
             .await
@@ -1507,6 +1515,9 @@ mod tests {
         let (trigger_shutdown, mut shutdown, _) = ShutdownSignal::new_wired();
         drop(trigger_shutdown);
 
+        // Both events fit in one SourceSender chunk. Cancelling the blocked send_batch
+        // already drops that in-flight chunk via UnsentEventCount, so the shutdown error
+        // must report 0 additional drops.
         let result = send_enriched_batch(
             &out,
             vec![
@@ -1519,7 +1530,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(BatchSendError::Shutdown { dropped_events: 2 })
+            Err(BatchSendError::Shutdown { dropped_events: 0 })
         ));
     }
 
