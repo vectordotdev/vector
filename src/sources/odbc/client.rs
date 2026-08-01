@@ -27,7 +27,8 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tokio::select;
 use vector_common::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, ComponentEventsDropped, CountByteSize, InternalEventHandle as _,
+    Protocol, Registered, UNINTENTIONAL,
 };
 use vector_common::json_size::JsonSize;
 use vector_lib::EstimatedJsonEncodedSizeOf;
@@ -100,6 +101,8 @@ pub enum OdbcError {
     SendFailedAfterCheckpoint {
         source: SendError,
         next_params: Vec<OdbcStatementParam>,
+        /// Events permanently skipped after the checkpoint was committed.
+        dropped_events: usize,
     },
 
     #[snafu(display("ODBC source shutting down"))]
@@ -188,10 +191,17 @@ impl Context {
                         Err(OdbcError::SendFailedAfterCheckpoint {
                             source,
                             next_params,
+                            dropped_events,
                         }) => {
                             // Checkpoint was committed before emit; advance in-memory overlay
                             // so the next tick does not replay rows already handed to the pipeline.
                             prev_params = Some(next_params);
+                            if dropped_events > 0 {
+                                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                                    count: dropped_events,
+                                    reason: "ODBC tracking checkpoint was committed before downstream delivery failed.",
+                                });
+                            }
                             emit!(OdbcFailedError {
                                 statement: &self.cfg.statement.clone().unwrap_or_default(),
                                 error: OdbcError::SendError { source },
@@ -369,11 +379,11 @@ impl Context {
 
             match send_enriched_batch(&out, events, &mut shutdown).await {
                 Ok(()) => {}
-                Err(OdbcError::Shutdown) => {
+                Err(BatchSendError::Shutdown) => {
                     return shutdown_query(rx, blocking).await;
                 }
-                Err(error) => {
-                    stream_error = Some(error);
+                Err(BatchSendError::Send { source, .. }) => {
+                    stream_error = Some(OdbcError::SendError { source });
                     break;
                 }
             }
@@ -409,20 +419,29 @@ impl Context {
             _ => None,
         };
 
-        for events in pending_batches {
+        let mut pending_batches = pending_batches.into_iter();
+        while let Some(events) = pending_batches.next() {
             match send_enriched_batch(&out, events, &mut shutdown).await {
                 Ok(()) => {}
-                Err(error) => {
+                Err(BatchSendError::Shutdown) => return Err(OdbcError::Shutdown),
+                Err(BatchSendError::Send {
+                    source,
+                    dropped_events,
+                }) => {
                     // Checkpoint is already committed. Advance in-memory tracking on send
                     // failure so the next tick cannot replay rows already emitted.
-                    return match (next_params, error) {
-                        (Some(next_params), OdbcError::SendError { source }) => {
-                            Err(OdbcError::SendFailedAfterCheckpoint {
-                                source,
-                                next_params,
-                            })
-                        }
-                        (_, error) => Err(error),
+                    return match next_params {
+                        Some(next_params) => Err(OdbcError::SendFailedAfterCheckpoint {
+                            source,
+                            next_params,
+                            dropped_events: dropped_events
+                                + pending_batches
+                                    .as_slice()
+                                    .iter()
+                                    .map(Vec::len)
+                                    .sum::<usize>(),
+                        }),
+                        None => Err(OdbcError::SendError { source }),
                     };
                 }
             }
@@ -468,14 +487,24 @@ async fn shutdown_query(
 ///
 /// On `SendError::Closed`, emits `StreamClosedError` for the failed chunk so
 /// `ComponentEventsDropped` is recorded (SourceSender discards its unsent count in that
-/// case and expects the callee to emit). `SendError::Timeout` must not emit
-/// `StreamClosedError`; SourceSender already accounts for those drops.
+/// case and expects the callee to emit). A timeout is reported by SourceSender as timed out, but
+/// must also be reported as dropped when a tracking checkpoint makes retry impossible. Therefore,
+/// the returned count excludes a closed failed chunk but includes a timed-out failed chunk.
+enum BatchSendError {
+    Shutdown,
+    Send {
+        source: SendError,
+        dropped_events: usize,
+    },
+}
+
 async fn send_enriched_batch(
     out: &crate::SourceSender,
     events: Vec<Event>,
     shutdown: &mut ShutdownSignal,
-) -> Result<(), OdbcError> {
+) -> Result<(), BatchSendError> {
     let mut events = events.into_iter();
+    let mut unsent_events = events.len();
     loop {
         let events: Vec<_> = events.by_ref().take(chunk_size_events()).collect();
         if events.is_empty() {
@@ -485,18 +514,24 @@ async fn send_enriched_batch(
         let mut out = out.clone();
         let send_result = select! {
             _ = &mut *shutdown => {
-                return Err(OdbcError::Shutdown);
+                return Err(BatchSendError::Shutdown);
             }
             send_result = out.send_batch(events) => send_result,
         };
         match send_result {
-            Ok(()) => {}
+            Ok(()) => unsent_events -= count,
             Err(SendError::Closed) => {
                 emit!(StreamClosedError { count });
-                return Err(SendError::Closed).context(SendSnafu);
+                return Err(BatchSendError::Send {
+                    source: SendError::Closed,
+                    dropped_events: unsent_events - count,
+                });
             }
-            Err(source) => {
-                return Err(source).context(SendSnafu);
+            Err(SendError::Timeout) => {
+                return Err(BatchSendError::Send {
+                    source: SendError::Timeout,
+                    dropped_events: unsent_events,
+                });
             }
         }
     }
@@ -876,8 +911,8 @@ where
     // A capped row-set buffer is safe only if no result column can outgrow it. For
     // variable-width/unknown columns, read cells through SQLGetData instead of accepting a
     // truncation error after the forward-only cursor has already advanced.
-    if let Some(limit) = max_str_limit {
-        if columns
+    if let Some(limit) = max_str_limit
+        && columns
             .iter()
             .any(|column| requires_streaming_fetch(&column.column_type, limit))
         {
@@ -890,7 +925,6 @@ where
                 on_batch,
             );
         }
-    }
 
     let descs = buffer_descs_for_columns(&mut cursor, &columns, max_str_limit, batch_size)?;
     let buffer = ColumnarAnyBuffer::try_from_descs(batch_size, descs).context(DbSnafu)?;
@@ -1268,12 +1302,17 @@ fn map_value(data_type: &DataType, value: Option<&[u8]>, tz: Tz) -> Value {
         }
 
         // Convert to boolean.
+        // Some ODBC drivers return a non-NULL BIT with an empty buffer; treat that as null
+        // instead of panicking on an empty slice.
         DataType::Bit => {
             let Some(value) = value else {
                 return Value::Null;
             };
 
-            Value::Boolean(value[0] == 1 || value[0] == b'1')
+            match value.first().copied() {
+                Some(b) => Value::Boolean(b == 1 || b == b'1'),
+                None => Value::Null,
+            }
         }
     }
 }
@@ -1407,6 +1446,34 @@ mod tests {
         let rows = vec![Value::Integer(1)];
         let error = rows_to_events(rows).expect_err("expected error");
         assert!(matches!(error, OdbcError::InvalidResultRow));
+    }
+
+    #[test]
+    fn map_value_bit_binary_and_text() {
+        assert_eq!(
+            map_value(&odbc_api::DataType::Bit, Some(&[1]), chrono_tz::UTC),
+            Value::Boolean(true)
+        );
+        assert_eq!(
+            map_value(&odbc_api::DataType::Bit, Some(&[0]), chrono_tz::UTC),
+            Value::Boolean(false)
+        );
+        assert_eq!(
+            map_value(&odbc_api::DataType::Bit, Some(b"1"), chrono_tz::UTC),
+            Value::Boolean(true)
+        );
+        assert_eq!(
+            map_value(&odbc_api::DataType::Bit, Some(b"0"), chrono_tz::UTC),
+            Value::Boolean(false)
+        );
+    }
+
+    #[test]
+    fn map_value_bit_empty_buffer_maps_to_null() {
+        assert_eq!(
+            map_value(&odbc_api::DataType::Bit, Some(&[]), chrono_tz::UTC),
+            Value::Null
+        );
     }
 
     #[test]
