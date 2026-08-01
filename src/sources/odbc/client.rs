@@ -915,16 +915,9 @@ where
         && columns
             .iter()
             .any(|column| requires_streaming_fetch(&column.column_type, limit))
-        {
-            return execute_streaming_query(
-                cursor,
-                &columns,
-                tz,
-                batch_size,
-                limit.min(256),
-                on_batch,
-            );
-        }
+    {
+        return execute_streaming_query(cursor, &columns, tz, batch_size, limit.min(256), on_batch);
+    }
 
     let descs = buffer_descs_for_columns(&mut cursor, &columns, max_str_limit, batch_size)?;
     let buffer = ColumnarAnyBuffer::try_from_descs(batch_size, descs).context(DbSnafu)?;
