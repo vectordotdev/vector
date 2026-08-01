@@ -224,11 +224,12 @@ impl Context {
     ///
     /// When `tracking_columns` is set, batches are buffered until the query finishes, the
     /// final-row checkpoint is validated, overlaid onto `statement_init_params`, persisted,
-    /// and only then are events emitted. That preserves at-most-once tracking semantics: a
-    /// missing/unbindable tracking value fails the poll before any emit (avoiding infinite
-    /// replay), while a send failure after a successful checkpoint save may skip those rows
-    /// on the next run. When `last_run_metadata_path` is unset, the in-memory overlay is still
-    /// advanced after a post-checkpoint send failure so already-emitted rows are not replayed.
+    /// and only then are events sent downstream. That preserves at-most-once tracking
+    /// semantics: a missing/unbindable tracking value fails the poll before any pipeline
+    /// emit (avoiding infinite replay), while a send failure after a successful checkpoint
+    /// save may skip those rows on the next run. When `last_run_metadata_path` is unset, the
+    /// in-memory overlay is still advanced after a post-checkpoint send failure so
+    /// already-sent rows are not replayed.
     ///
     /// Without tracking, batches are streamed to the pipeline as they arrive.
     ///
@@ -313,25 +314,18 @@ impl Context {
         });
 
         // With tracking enabled, hold converted batches and the final row until the query
-        // completes so checkpoint validation can run before any emit.
+        // completes so checkpoint validation can run before any pipeline emit.
+        // Received-event metrics are recorded at conversion time (before enrichment /
+        // buffering / send) so checkpoint, shutdown, or downstream failures cannot hide
+        // already-created input.
         let mut pending_batches = Vec::new();
         let mut final_row = None;
-        let mut total_payload_byte_size = 0;
-        let mut total_events = CountByteSize(0, JsonSize::zero());
         let mut stream_error = None;
 
         loop {
             let batch_rows = select! {
                 _ = &mut shutdown => {
-                    return shutdown_query(
-                        rx,
-                        blocking,
-                        bytes_received,
-                        events_received,
-                        total_payload_byte_size,
-                        total_events,
-                    )
-                    .await;
+                    return shutdown_query(rx, blocking).await;
                 }
                 batch = rx.recv() => batch,
             };
@@ -355,37 +349,27 @@ impl Context {
                 }
             };
 
-            self.enrich_events(&mut events);
-
             if events.is_empty() {
                 continue;
             }
+
+            // Count/size unenriched events immediately after creation, matching
+            // ComponentEventsReceived (docs/specs/component.md).
+            let event_count = events.len();
+            let byte_size = events.estimated_json_encoded_size_of();
+            record_received(bytes_received, events_received, event_count, byte_size);
+
+            self.enrich_events(&mut events);
 
             if tracking_enabled {
                 pending_batches.push(events);
                 continue;
             }
 
-            match send_enriched_batch(
-                &out,
-                events,
-                &mut shutdown,
-                &mut total_payload_byte_size,
-                &mut total_events,
-            )
-            .await
-            {
+            match send_enriched_batch(&out, events, &mut shutdown).await {
                 Ok(()) => {}
                 Err(OdbcError::Shutdown) => {
-                    return shutdown_query(
-                        rx,
-                        blocking,
-                        bytes_received,
-                        events_received,
-                        total_payload_byte_size,
-                        total_events,
-                    )
-                    .await;
+                    return shutdown_query(rx, blocking).await;
                 }
                 Err(error) => {
                     stream_error = Some(error);
@@ -400,33 +384,19 @@ impl Context {
         if let Some(error) = stream_error {
             // Prefer the stream conversion/send error over a later join outcome.
             drop(join_result);
-            return fail_with_received_metrics(
-                bytes_received,
-                events_received,
-                total_payload_byte_size,
-                total_events,
-                error,
-            );
+            return Err(error);
         }
 
-        // Emit sent-rows metrics before surfacing a fetch/join failure so partial
-        // batches already handed to the pipeline are not under-counted.
         match join_result {
             Ok(Ok(())) => {}
             Ok(Err(error)) | Err(error) => {
-                return fail_with_received_metrics(
-                    bytes_received,
-                    events_received,
-                    total_payload_byte_size,
-                    total_events,
-                    error,
-                );
+                return Err(error);
             }
         }
 
         // Tracking path: validate + overlay + persist the final-row checkpoint before any
-        // emit so a missing/null tracking value cannot replay forever, and an overlay
-        // failure cannot leave a persisted checkpoint that would skip unsent rows.
+        // pipeline emit so a missing/null tracking value cannot replay forever, and an
+        // overlay failure cannot leave a persisted checkpoint that would skip unsent rows.
         let next_params = match (final_row, cfg.tracking_columns.as_ref()) {
             (Some(last), Some(tracking_columns)) => Some(prepare_tracking_checkpoint(
                 cfg.last_run_metadata_path.as_deref(),
@@ -439,23 +409,9 @@ impl Context {
         };
 
         for events in pending_batches {
-            match send_enriched_batch(
-                &out,
-                events,
-                &mut shutdown,
-                &mut total_payload_byte_size,
-                &mut total_events,
-            )
-            .await
-            {
+            match send_enriched_batch(&out, events, &mut shutdown).await {
                 Ok(()) => {}
                 Err(error) => {
-                    emit_received_metrics(
-                        bytes_received,
-                        events_received,
-                        total_payload_byte_size,
-                        total_events,
-                    );
                     // Checkpoint is already committed. Advance in-memory tracking on send
                     // failure so the next tick cannot replay rows already emitted.
                     return match (next_params, error) {
@@ -470,13 +426,6 @@ impl Context {
                 }
             }
         }
-
-        emit_received_metrics(
-            bytes_received,
-            events_received,
-            total_payload_byte_size,
-            total_events,
-        );
 
         Ok(next_params)
     }
@@ -495,46 +444,30 @@ impl Context {
     }
 }
 
-/// Closes the batch channel, waits for the blocking ODBC task, and emits metrics
-/// for rows already sent before returning `OdbcError::Shutdown`.
+/// Closes the batch channel, waits for the blocking ODBC task, then returns
+/// `OdbcError::Shutdown`. Received metrics for converted batches were already emitted
+/// at conversion time.
 async fn shutdown_query(
     rx: tokio::sync::mpsc::Receiver<Rows>,
     blocking: tokio::task::JoinHandle<Result<(), OdbcError>>,
-    bytes_received: &Registered<BytesReceived>,
-    events_received: &Registered<EventsReceived>,
-    total_payload_byte_size: usize,
-    total_events: CountByteSize,
 ) -> Result<Option<Vec<OdbcStatementParam>>, OdbcError> {
     drop(rx);
     let join_result = blocking.await.context(BlockingTaskSnafu);
 
-    // Emit sent-rows metrics even when the blocking task fails to join, so a join error
-    // does not under-count rows already handed to the pipeline.
-    emit_received_metrics(
-        bytes_received,
-        events_received,
-        total_payload_byte_size,
-        total_events,
-    );
     // Join errors are fatal. The query outcome is ignored on shutdown because the poll is
-    // ending and any rows already sent were counted above.
+    // ending; converted rows were already counted at creation time.
     match join_result {
         Ok(_) => Err(OdbcError::Shutdown),
         Err(error) => Err(error),
     }
 }
 
-/// Sends an enriched batch to the pipeline in source-sender-sized chunks, racing against shutdown.
-///
-/// Metrics are recorded after every accepted chunk. This is necessary because
-/// `SourceSender::send_batch` can accept earlier chunks before an error occurs on a
-/// later one.
+/// Sends an enriched batch to the pipeline in source-sender-sized chunks, racing against
+/// shutdown between chunks so a large batch can stop promptly.
 async fn send_enriched_batch(
     out: &crate::SourceSender,
     events: Vec<Event>,
     shutdown: &mut ShutdownSignal,
-    total_payload_byte_size: &mut usize,
-    total_events: &mut CountByteSize,
 ) -> Result<(), OdbcError> {
     let mut events = events.into_iter();
     loop {
@@ -542,8 +475,6 @@ async fn send_enriched_batch(
         if events.is_empty() {
             break;
         }
-        let event_count = events.len();
-        let byte_size = events.estimated_json_encoded_size_of();
         let mut out = out.clone();
         let send_result = select! {
             _ = &mut *shutdown => {
@@ -552,54 +483,22 @@ async fn send_enriched_batch(
             send_result = out.send_batch(events) => send_result,
         };
         send_result.context(SendSnafu)?;
-        record_sent(
-            total_payload_byte_size,
-            total_events,
-            byte_size,
-            event_count,
-        );
     }
     Ok(())
 }
 
-fn record_sent(
-    total_payload_byte_size: &mut usize,
-    total_events: &mut CountByteSize,
-    byte_size: JsonSize,
+/// Records `BytesReceived` / `EventsReceived` for a converted batch before enrichment.
+fn record_received(
+    bytes_received: &Registered<BytesReceived>,
+    events_received: &Registered<EventsReceived>,
     event_count: usize,
+    byte_size: JsonSize,
 ) {
-    *total_payload_byte_size += byte_size.get();
-    *total_events += CountByteSize(event_count, byte_size);
-}
-
-fn fail_with_received_metrics(
-    bytes_received: &Registered<BytesReceived>,
-    events_received: &Registered<EventsReceived>,
-    total_payload_byte_size: usize,
-    total_events: CountByteSize,
-    error: OdbcError,
-) -> Result<Option<Vec<OdbcStatementParam>>, OdbcError> {
-    emit_received_metrics(
-        bytes_received,
-        events_received,
-        total_payload_byte_size,
-        total_events,
-    );
-    Err(error)
-}
-
-fn emit_received_metrics(
-    bytes_received: &Registered<BytesReceived>,
-    events_received: &Registered<EventsReceived>,
-    total_payload_byte_size: usize,
-    total_events: CountByteSize,
-) {
-    if total_payload_byte_size > 0 {
-        bytes_received.emit(ByteSize(total_payload_byte_size));
+    if event_count == 0 {
+        return;
     }
-    if total_events.0 > 0 {
-        events_received.emit(total_events);
-    }
+    bytes_received.emit(ByteSize(byte_size.get()));
+    events_received.emit(CountByteSize(event_count, byte_size));
 }
 
 /// Converts ODBC result rows into log events without a JSON round-trip so typed
