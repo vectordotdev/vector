@@ -111,7 +111,7 @@ impl RunningTopology {
     /// initializes the pending reload set.
     pub fn extend_reload_set(&mut self, new_set: HashSet<ComponentKey>) {
         match &mut self.pending_reload {
-            None => self.pending_reload = Some(new_set.clone()),
+            None => self.pending_reload = Some(new_set),
             Some(existing) => existing.extend(new_set),
         }
     }
@@ -302,11 +302,8 @@ impl RunningTopology {
         // spawning the new version of the component.
         //
         // We also shutdown any component that is simply being removed entirely.
-        let diff = if let Some(components) = &self.pending_reload {
-            ConfigDiff::new(&self.config, &new_config, components.clone())
-        } else {
-            ConfigDiff::new(&self.config, &new_config, HashSet::new())
-        };
+        let components_to_reload = self.pending_reload.take().unwrap_or_default();
+        let diff = ConfigDiff::new(&self.config, &new_config, components_to_reload);
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
@@ -1520,4 +1517,51 @@ fn enrichment_table_sink_buffer(
         .filter_map(|(table_key, table)| table.as_sink(table_key))
         .find(|(key, _)| key == sink_key)
         .map(|(_, sink)| sink.buffer)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use tokio::sync::mpsc;
+    use vector_lib::config::ComponentKey;
+
+    use super::RunningTopology;
+    use crate::{
+        config::Config,
+        test_util::mock::{basic_sink, basic_source},
+    };
+
+    #[tokio::test]
+    async fn pending_component_reloads_are_consumed_after_reload() {
+        let config = || {
+            let mut config = Config::builder();
+            config.add_source("in", basic_source().1);
+            config.add_sink("out", &["in"], basic_sink(1).1);
+            config.build().unwrap()
+        };
+        let (abort_tx, _) = mpsc::unbounded_channel();
+        let mut topology = RunningTopology::new(config(), abort_tx);
+        let component = ComponentKey::from("component");
+
+        topology.extend_reload_set(HashSet::from([component.clone()]));
+        topology
+            .reload_config_and_respawn(config(), Default::default())
+            .await
+            .unwrap();
+        assert!(topology.pending_reload.is_none());
+
+        topology
+            .reload_config_and_respawn(config(), Default::default())
+            .await
+            .unwrap();
+        assert!(topology.pending_reload.is_none());
+
+        topology.extend_reload_set(HashSet::from([component]));
+        topology
+            .reload_config_and_respawn(config(), Default::default())
+            .await
+            .unwrap();
+        assert!(topology.pending_reload.is_none());
+    }
 }
