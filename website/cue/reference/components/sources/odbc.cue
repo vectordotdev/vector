@@ -15,7 +15,7 @@ components: sources: odbc: {
 		auto_generated:   true
 		acknowledgements: false
 		collect: {
-			checkpoint: enabled: false
+			checkpoint: enabled: true
 			from: {
 				service: services.odbc
 			}
