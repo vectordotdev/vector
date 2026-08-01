@@ -10,7 +10,6 @@ use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
 use futures_util::StreamExt;
-use itertools::Itertools;
 use odbc_api::buffers::{AnySlice, BufferDesc, ColumnarAnyBuffer};
 use odbc_api::parameter::VarCharBox;
 use odbc_api::{
@@ -863,8 +862,8 @@ where
     ensure_unique_column_names(&names)?;
 
     let types = (1..=names.len())
-        .map(|col_index| cursor.col_data_type(col_index as u16).unwrap_or_default())
-        .collect_vec();
+        .map(|col_index| cursor.col_data_type(col_index as u16).context(DbSnafu))
+        .collect::<Result<Vec<_>, _>>()?;
     let columns = names
         .into_iter()
         .zip(types)
