@@ -105,6 +105,12 @@ pub enum OdbcError {
         dropped_events: usize,
     },
 
+    /// Shutdown interrupted delivery after an on-disk tracking checkpoint was committed.
+    #[snafu(display(
+        "Shutdown interrupted delivery after tracking checkpoint was committed ({dropped_events} events dropped)"
+    ))]
+    ShutdownAfterCheckpoint { dropped_events: usize },
+
     #[snafu(display("ODBC source shutting down"))]
     Shutdown,
 }
@@ -206,6 +212,19 @@ impl Context {
                                 statement: &self.cfg.statement.clone().unwrap_or_default(),
                                 error: OdbcError::SendError { source },
                             });
+                        }
+                        Err(OdbcError::ShutdownAfterCheckpoint { dropped_events }) => {
+                            if dropped_events > 0 {
+                                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                                    count: dropped_events,
+                                    reason: "ODBC tracking checkpoint was committed before shutdown completed downstream delivery.",
+                                });
+                            }
+                            debug!(
+                                message =
+                                    "Shutdown signal received after ODBC tracking checkpoint was committed. Shutting down ODBC source."
+                            );
+                            break;
                         }
                         Err(error) => {
                             emit!(OdbcFailedError {
@@ -379,7 +398,7 @@ impl Context {
 
             match send_enriched_batch(&out, events, &mut shutdown).await {
                 Ok(()) => {}
-                Err(BatchSendError::Shutdown) => {
+                Err(BatchSendError::Shutdown { .. }) => {
                     return shutdown_query(rx, blocking).await;
                 }
                 Err(BatchSendError::Send { source, .. }) => {
@@ -423,7 +442,23 @@ impl Context {
         while let Some(events) = pending_batches.next() {
             match send_enriched_batch(&out, events, &mut shutdown).await {
                 Ok(()) => {}
-                Err(BatchSendError::Shutdown) => return Err(OdbcError::Shutdown),
+                Err(BatchSendError::Shutdown { dropped_events }) => {
+                    let dropped_events = dropped_events
+                        + pending_batches
+                            .as_slice()
+                            .iter()
+                            .map(Vec::len)
+                            .sum::<usize>();
+
+                    // An on-disk checkpoint prevents these rows from being replayed after
+                    // restart, so they must be accounted for as dropped. Without one, a
+                    // restart re-reads the rows and this shutdown does not lose them.
+                    return if cfg.last_run_metadata_path.is_some() {
+                        Err(OdbcError::ShutdownAfterCheckpoint { dropped_events })
+                    } else {
+                        Err(OdbcError::Shutdown)
+                    };
+                }
                 Err(BatchSendError::Send {
                     source,
                     dropped_events,
@@ -491,7 +526,9 @@ async fn shutdown_query(
 /// must also be reported as dropped when a tracking checkpoint makes retry impossible. Therefore,
 /// the returned count excludes a closed failed chunk but includes a timed-out failed chunk.
 enum BatchSendError {
-    Shutdown,
+    Shutdown {
+        dropped_events: usize,
+    },
     Send {
         source: SendError,
         dropped_events: usize,
@@ -514,7 +551,7 @@ async fn send_enriched_batch(
         let mut out = out.clone();
         let send_result = select! {
             _ = &mut *shutdown => {
-                return Err(BatchSendError::Shutdown);
+                return Err(BatchSendError::Shutdown { dropped_events: unsent_events });
             }
             send_result = out.send_batch(events) => send_result,
         };
@@ -1439,6 +1476,32 @@ mod tests {
         let rows = vec![Value::Integer(1)];
         let error = rows_to_events(rows).expect_err("expected error");
         assert!(matches!(error, OdbcError::InvalidResultRow));
+    }
+
+    #[tokio::test]
+    async fn send_enriched_batch_reports_all_unsent_events_on_shutdown() {
+        let (mut out, _recv) = crate::SourceSender::new_test_sender_with_options(1, None);
+        out.send_batch(vec![Event::Log(LogEvent::from("already buffered"))])
+            .await
+            .expect("first batch should fill the output buffer");
+
+        let (trigger_shutdown, mut shutdown, _) = ShutdownSignal::new_wired();
+        drop(trigger_shutdown);
+
+        let result = send_enriched_batch(
+            &out,
+            vec![
+                Event::Log(LogEvent::from("unsent one")),
+                Event::Log(LogEvent::from("unsent two")),
+            ],
+            &mut shutdown,
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(BatchSendError::Shutdown { dropped_events: 2 })
+        ));
     }
 
     #[test]
