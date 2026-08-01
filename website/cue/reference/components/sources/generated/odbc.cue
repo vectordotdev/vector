@@ -18,7 +18,7 @@ generated: components: sources: odbc: configuration: {
 			If this is not set or the file at that path does not exist, the `connection_string` field is used instead.
 			"""
 		required: false
-		type: string: examples: ["driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"]
+		type: string: examples: ["/path/to/connection_string.txt"]
 	}
 	last_run_metadata_path: {
 		description: """

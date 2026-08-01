@@ -62,9 +62,7 @@ pub struct OdbcConfig {
 
     /// The path to the file that contains the connection string.
     /// If this is not set or the file at that path does not exist, the `connection_string` field is used instead.
-    #[configurable(metadata(
-        docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
-    ))]
+    #[configurable(metadata(docs::examples = "/path/to/connection_string.txt"))]
     pub connection_string_filepath: Option<String>,
 
     /// The SQL statement to execute.
