@@ -4,8 +4,7 @@ components: sources: odbc: {
 	title: "ODBC"
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["daemon", "sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "batch"

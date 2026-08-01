@@ -1070,12 +1070,20 @@ fn sql_timestamp_text_has_offset(text: &str) -> bool {
         return false;
     }
 
-    let Some(sign_idx) = text[10..].rfind(['+', '-']) else {
+    let Some(tail) = text.get(10..) else {
+        return false;
+    };
+    let Some(sign_idx) = tail.rfind(['+', '-']) else {
         return false;
     };
 
-    let offset = &text[10 + sign_idx..];
-    offset.len() >= 2 && offset[1..].chars().all(|c| c.is_ascii_digit() || c == ':')
+    let Some(offset) = text.get(10 + sign_idx..) else {
+        return false;
+    };
+    offset.len() >= 2
+        && offset
+            .get(1..)
+            .is_some_and(|rest| rest.chars().all(|c| c.is_ascii_digit() || c == ':'))
 }
 
 /// Returns true when timestamp text carries an explicit zone that must be preserved

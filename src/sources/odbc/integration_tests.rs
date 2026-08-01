@@ -82,7 +82,7 @@ fn connect_when_ready<'a>(
             Ok(conn) => {
                 debug!(
                     elapsed = ?start.elapsed(),
-                    "ODBC database accepted connection"
+                    "ODBC database accepted connection."
                 );
                 return conn;
             }
@@ -93,7 +93,7 @@ fn connect_when_ready<'a>(
                         %err,
                         ?elapsed,
                         ?TIMEOUT,
-                        "ODBC database not ready before timeout"
+                        "ODBC database not ready before timeout."
                     );
                     panic!("ODBC database not ready after {TIMEOUT:?}: {err}");
                 }
@@ -101,7 +101,7 @@ fn connect_when_ready<'a>(
                     %err,
                     ?elapsed,
                     ?INTERVAL,
-                    "ODBC database not ready, retrying"
+                    "ODBC database not ready, retrying."
                 );
                 std::thread::sleep(INTERVAL);
             }
@@ -145,7 +145,7 @@ async fn parse_odbc_config() {
 async fn scheduled_query_executed() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    drop(connect_when_ready(&env, &conn_str));
+    drop(connect_when_ready(env, &conn_str));
 
     let events = run_and_assert_source_compliance(
         OdbcConfig {
@@ -172,7 +172,7 @@ async fn query_executed_with_init_params() {
 
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = connect_when_ready(&env, &conn_str);
+    let conn = connect_when_ready(env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS odbc_table;", (), Some(3))
         .unwrap();
@@ -223,13 +223,15 @@ INSERT INTO odbc_table (name, datetime) VALUES
         value: "0".to_string(),
     }];
 
-    let _ = fs::remove_file(LAST_RUN_METADATA_PATH);
+    fs::remove_file(LAST_RUN_METADATA_PATH).ok();
 
     let events = run_and_assert_source_compliance(
         OdbcConfig {
             connection_string: SensitiveString::from(conn_str),
             schedule: "*/1 * * * * *".into(),
-            statement: Some("SELECT * FROM odbc_table WHERE id > ? ORDER BY id ASC LIMIT 1;".to_string()),
+            statement: Some(
+                "SELECT * FROM odbc_table WHERE id > ? ORDER BY id ASC LIMIT 1;".to_string(),
+            ),
             statement_init_params: Some(params),
             tracking_columns: Some(vec!["id".to_string()]),
             last_run_metadata_path: Some(LAST_RUN_METADATA_PATH.to_string()),
@@ -272,7 +274,7 @@ async fn query_executed_with_filepath() {
 
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = connect_when_ready(&env, &conn_str);
+    let conn = connect_when_ready(env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS odbc_table;", (), Some(3))
         .unwrap();
@@ -327,7 +329,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
         "SELECT * FROM odbc_table WHERE id > ? ORDER BY id ASC LIMIT 1;",
     )
     .unwrap();
-    let _ = fs::remove_file(LAST_RUN_METADATA_PATH);
+    fs::remove_file(LAST_RUN_METADATA_PATH).ok();
 
     let events = run_and_assert_source_compliance(
         OdbcConfig {
@@ -372,7 +374,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
 async fn query_number_types() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = connect_when_ready(&env, &conn_str);
+    let conn = connect_when_ready(env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS number_columns;", (), Some(3))
         .unwrap();
@@ -607,7 +609,7 @@ INSERT INTO number_columns (
 async fn query_string_types() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = connect_when_ready(&env, &conn_str);
+    let conn = connect_when_ready(env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS string_columns;", (), Some(3))
         .unwrap();
@@ -723,29 +725,33 @@ INSERT INTO string_columns (
 async fn query_binary_columns_emit_raw_bytes_not_hex_text() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = connect_when_ready(&env, &conn_str);
+    let conn = connect_when_ready(env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS binary_columns;", (), Some(3))
         .unwrap();
     let _ = conn
         .execute(
             match get_db_type() {
-                DbType::MariaDb => r#"
+                DbType::MariaDb => {
+                    r#"
 CREATE TABLE binary_columns (
     id INT PRIMARY KEY,
     bin_col BINARY(3) NULL,
     varbin_col VARBINARY(16) NULL,
     blob_col BLOB NULL
 );
-                "#,
-                DbType::Postgres => r#"
+                "#
+                }
+                DbType::Postgres => {
+                    r#"
 CREATE TABLE binary_columns (
     id INT PRIMARY KEY,
     bin_col BYTEA,
     varbin_col BYTEA,
     blob_col BYTEA
 );
-                "#,
+                "#
+                }
             },
             (),
             Some(3),
@@ -791,7 +797,9 @@ CREATE TABLE binary_columns (
     let hex_text_regression = Bytes::from_static(b"00FF10");
 
     for column in ["bin_col", "varbin_col", "blob_col"] {
-        let value = row.get(column).unwrap_or_else(|| panic!("missing {column}"));
+        let value = row
+            .get(column)
+            .unwrap_or_else(|| panic!("missing {column}"));
         assert_eq!(
             value,
             &Value::Bytes(expected.clone()),
@@ -809,7 +817,7 @@ CREATE TABLE binary_columns (
 async fn query_timestamp_columns() {
     let conn_str = get_conn_str();
     let env = odbc_api::environment().unwrap();
-    let conn = connect_when_ready(&env, &conn_str);
+    let conn = connect_when_ready(env, &conn_str);
     let _ = conn
         .execute("DROP TABLE IF EXISTS timestamp_columns;", (), Some(3))
         .unwrap();

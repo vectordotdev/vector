@@ -16,6 +16,7 @@ Refs
 - MariaDB Connector/ODBC: <https://mariadb.com/kb/en/about-mariadb-connector-odbc/>
   - Homebrew mariadb-connector-odbc: <https://formulae.brew.sh/formula/mariadb-connector-odbc>
   - ODBC Configuration: <https://mariadb.com/kb/en/creating-a-data-source-with-mariadb-connectorodbc/>
+
     ```shell
     cat << EOF >> /opt/homebrew/etc/odbcinst.ini
 
@@ -24,6 +25,7 @@ Refs
     Driver = /opt/homebrew/Cellar/mariadb-connector-odbc/3.2.6/lib/mariadb/libmaodbc.dylib
     EOF
     ```
+
 - MSSQL
   Connector/ODBC: <https://learn.microsoft.com/ko-kr/sql/connect/odbc/linux-mac/install-microsoft-odbc-driver-sql-server-macos?view=sql-server-ver16>
 
