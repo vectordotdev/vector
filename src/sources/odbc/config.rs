@@ -169,9 +169,10 @@ pub struct OdbcConfig {
     #[serde(default = "default_odbc_batch_size")]
     pub odbc_batch_size: usize,
 
-    /// Maximum bytes per cell when allocating ODBC text and binary fetch buffers.
-    /// Caps driver-reported sizes. Set to `0` to omit the upper bound and use
-    /// driver-reported sizes instead.
+    /// Maximum bytes per cell when sizing ODBC text and binary row-set fetch buffers.
+    /// Columns that may exceed this limit are fetched individually and grow to their
+    /// full value size. Set to `0` to omit the upper bound and use driver-reported
+    /// sizes for row-set buffers instead.
     /// The default is 4096.
     #[configurable(metadata(docs::examples = 4096))]
     #[serde(default = "default_odbc_max_str_limit")]

@@ -101,9 +101,10 @@ generated: components: sources: odbc: configuration: {
 	}
 	odbc_max_str_limit: {
 		description: """
-			Maximum bytes per cell when allocating ODBC text and binary fetch buffers.
-			Caps driver-reported sizes. Set to `0` to omit the upper bound and use
-			driver-reported sizes instead.
+			Maximum bytes per cell when sizing ODBC text and binary row-set fetch buffers.
+			Columns that may exceed this limit are fetched individually and grow to their
+			full value size. Set to `0` to omit the upper bound and use driver-reported
+			sizes for row-set buffers instead.
 			The default is 4096.
 			"""
 		required: false

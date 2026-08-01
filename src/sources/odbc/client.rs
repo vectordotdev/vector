@@ -12,7 +12,8 @@ use itertools::Itertools;
 use odbc_api::buffers::{AnySlice, BufferDesc, ColumnarAnyBuffer};
 use odbc_api::parameter::VarCharBox;
 use odbc_api::{
-    ConnectionOptions, Cursor, DataType, Environment, IntoParameter, ResultSetMetadata, environment,
+    ConnectionOptions, Cursor, CursorRow, DataType, Environment, IntoParameter, ResultSetMetadata,
+    environment,
 };
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
@@ -535,8 +536,12 @@ async fn send_enriched_batch(
     total_payload_byte_size: &mut usize,
     total_events: &mut CountByteSize,
 ) -> Result<(), OdbcError> {
-    for events in &events.into_iter().chunks(chunk_size_events()) {
-        let events: Vec<_> = events.collect();
+    let mut events = events.into_iter();
+    loop {
+        let events: Vec<_> = events.by_ref().take(chunk_size_events()).collect();
+        if events.is_empty() {
+            break;
+        }
         let event_count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
         let mut out = out.clone();
@@ -789,6 +794,94 @@ fn buffer_descs_for_columns(
         .collect()
 }
 
+/// Returns whether a column needs the row-by-row `SQLGetData` path when fetch buffers are capped.
+///
+/// A row-set buffer cannot be enlarged after a forward-only cursor has fetched a truncated row.
+/// Variable-width values therefore use `CursorRow::{get_text,get_binary}`, which grow their
+/// destination buffer until the complete value has been read.
+fn requires_streaming_fetch(data_type: &DataType, max_str_limit: usize) -> bool {
+    match data_type {
+        DataType::Char { .. }
+        | DataType::WChar { .. }
+        | DataType::Varchar { .. }
+        | DataType::WVarchar { .. } => data_type
+            .utf8_len()
+            .map(NonZeroUsize::get)
+            .is_none_or(|length| length > max_str_limit),
+        DataType::Varbinary { length } | DataType::Binary { length } => length
+            .map(NonZeroUsize::get)
+            .is_none_or(|length| length > max_str_limit),
+        // Long data types may have an imprecise driver-reported size, so never bind them to a
+        // capped row-set buffer.
+        DataType::LongVarchar { .. }
+        | DataType::WLongVarchar { .. }
+        | DataType::LongVarbinary { .. }
+        | DataType::Unknown
+        | DataType::Other { .. } => true,
+        _ => false,
+    }
+}
+
+/// Reads one cell through `SQLGetData`, growing the vector until the full cell is available.
+fn read_streamed_cell(
+    row: &mut CursorRow<'_>,
+    column_index: u16,
+    data_type: &DataType,
+    initial_capacity: usize,
+) -> Result<Option<Vec<u8>>, OdbcError> {
+    let mut value = Vec::with_capacity(initial_capacity);
+    let is_not_null = if is_binary_data_type(data_type) {
+        row.get_binary(column_index, &mut value).context(DbSnafu)?
+    } else {
+        row.get_text(column_index, &mut value).context(DbSnafu)?
+    };
+    Ok(is_not_null.then_some(value))
+}
+
+/// Executes a result set one row at a time when any bound row-set buffer could truncate a cell.
+fn execute_streaming_query<F>(
+    mut cursor: impl Cursor,
+    columns: &Columns,
+    tz: Tz,
+    batch_size: usize,
+    initial_cell_capacity: usize,
+    mut on_batch: F,
+) -> Result<(), OdbcError>
+where
+    F: FnMut(Rows) -> Result<bool, OdbcError>,
+{
+    let mut batch_rows = Rows::with_capacity(batch_size);
+
+    while let Some(mut row) = cursor.next_row().context(DbSnafu)? {
+        let mut cols = ObjectMap::new();
+        for (index, column) in columns.iter().enumerate() {
+            let value = read_streamed_cell(
+                &mut row,
+                (index + 1) as u16,
+                &column.column_type,
+                initial_cell_capacity,
+            )?;
+            cols.insert(
+                KeyString::from(column.column_name.as_str()),
+                map_value(&column.column_type, value.as_deref(), tz),
+            );
+        }
+        batch_rows.push(Value::Object(cols));
+
+        if batch_rows.len() == batch_size {
+            if !on_batch(mem::take(&mut batch_rows))? {
+                return Ok(());
+            }
+            batch_rows.reserve(batch_size);
+        }
+    }
+
+    if !batch_rows.is_empty() {
+        on_batch(batch_rows)?;
+    }
+    Ok(())
+}
+
 /// Reads one cell from a columnar batch as optional bytes.
 ///
 /// Only text and binary column buffers are allocated by [`buffer_descs_for_columns`].
@@ -864,6 +957,25 @@ where
             column_type,
         })
         .collect::<Columns>();
+
+    // A capped row-set buffer is safe only if no result column can outgrow it. For
+    // variable-width/unknown columns, read cells through SQLGetData instead of accepting a
+    // truncation error after the forward-only cursor has already advanced.
+    if let Some(limit) = max_str_limit {
+        if columns
+            .iter()
+            .any(|column| requires_streaming_fetch(&column.column_type, limit))
+        {
+            return execute_streaming_query(
+                cursor,
+                &columns,
+                tz,
+                batch_size,
+                limit.min(256),
+                on_batch,
+            );
+        }
+    }
 
     let descs = buffer_descs_for_columns(&mut cursor, &columns, max_str_limit, batch_size)?;
     let buffer = ColumnarAnyBuffer::try_from_descs(batch_size, descs).context(DbSnafu)?;
@@ -1510,6 +1622,39 @@ mod tests {
         }));
         assert!(!is_binary_data_type(&DataType::Unknown));
         assert!(!is_binary_data_type(&DataType::Integer));
+    }
+
+    #[test]
+    fn variable_width_columns_use_streaming_fetch_with_a_buffer_limit() {
+        assert!(requires_streaming_fetch(
+            &DataType::LongVarchar { length: None },
+            4096
+        ));
+        assert!(!requires_streaming_fetch(
+            &DataType::Varbinary {
+                length: NonZeroUsize::new(16),
+            },
+            4096
+        ));
+        assert!(requires_streaming_fetch(
+            &DataType::Varbinary {
+                length: NonZeroUsize::new(4097),
+            },
+            4096
+        ));
+        assert!(!requires_streaming_fetch(&DataType::Integer, 4096));
+        assert!(!requires_streaming_fetch(
+            &DataType::Char {
+                length: NonZeroUsize::new(16),
+            },
+            4096
+        ));
+        assert!(requires_streaming_fetch(
+            &DataType::Char {
+                length: NonZeroUsize::new(2048),
+            },
+            4096
+        ));
     }
 
     #[test]

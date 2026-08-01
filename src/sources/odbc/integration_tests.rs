@@ -5,7 +5,7 @@ use crate::test_util::components::run_and_assert_source_compliance;
 use bytes::Bytes;
 use chrono::TimeZone;
 use chrono_tz::Tz;
-use odbc_api::ConnectionOptions;
+use odbc_api::{ConnectionOptions, IntoParameter};
 use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::fs;
@@ -367,6 +367,51 @@ INSERT INTO odbc_table (name, datetime) VALUES
     assert_eq!(
         get_value_from_event(&events[4], "name"),
         Some("test5".into())
+    );
+}
+
+#[tokio::test]
+async fn query_fetches_text_larger_than_rowset_buffer() {
+    let conn_str = get_conn_str();
+    let env = odbc_api::environment().unwrap();
+    let conn = connect_when_ready(env, &conn_str);
+    let _ = conn
+        .execute("DROP TABLE IF EXISTS large_text_column;", (), Some(3))
+        .unwrap();
+    let _ = conn
+        .execute(
+            "CREATE TABLE large_text_column (content VARCHAR(8192) NOT NULL);",
+            (),
+            Some(3),
+        )
+        .unwrap();
+
+    let content = "x".repeat(8192);
+    let _ = conn
+        .execute(
+            "INSERT INTO large_text_column (content) VALUES (?);",
+            &content.as_str().into_parameter(),
+            Some(3),
+        )
+        .unwrap();
+
+    let rows = collect_query_rows(
+        env,
+        &conn_str,
+        "SELECT content FROM large_text_column;",
+        Vec::new(),
+        Duration::from_secs(3),
+        Duration::from_secs(3),
+        chrono_tz::UTC,
+        100,
+        Some(4096),
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows[0].as_object().unwrap().get("content"),
+        Some(&Value::Bytes(Bytes::from(content)))
     );
 }
 
