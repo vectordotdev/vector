@@ -97,6 +97,8 @@ pub enum OdbcError {
     ///
     /// The schedule must still advance `prev_params` with `next_params` so in-memory
     /// tracking (no `last_run_metadata_path`) does not re-emit rows already handed off.
+    /// `SendError::Closed` is terminal for the schedule loop; `SendError::Timeout` remains
+    /// retryable on the next tick.
     #[snafu(display("Send failed after tracking checkpoint was committed: {source}"))]
     SendFailedAfterCheckpoint {
         source: SendError,
@@ -208,10 +210,16 @@ impl Context {
                                     reason: "ODBC tracking checkpoint was committed before downstream delivery failed.",
                                 });
                             }
+                            // Closed is terminal: SourceSender never reopens. Timeout stays
+                            // retryable on the next schedule tick.
+                            let closed = matches!(source, SendError::Closed);
                             emit!(OdbcFailedError {
                                 statement: &self.cfg.statement.clone().unwrap_or_default(),
                                 error: OdbcError::SendError { source },
                             });
+                            if closed {
+                                break;
+                            }
                         }
                         Err(OdbcError::ShutdownAfterCheckpoint { dropped_events }) => {
                             if dropped_events > 0 {
@@ -227,10 +235,21 @@ impl Context {
                             break;
                         }
                         Err(error) => {
+                            // Closed is terminal for the same reason as above; other errors
+                            // (including send timeout) remain retryable.
+                            let closed = matches!(
+                                error,
+                                OdbcError::SendError {
+                                    source: SendError::Closed
+                                }
+                            );
                             emit!(OdbcFailedError {
                                 statement: &self.cfg.statement.clone().unwrap_or_default(),
                                 error,
                             });
+                            if closed {
+                                break;
+                            }
                         }
                     }
 
