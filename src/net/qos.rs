@@ -52,7 +52,7 @@ pub fn set_stream_tos(stream: &TcpStream, tos: u8) -> io::Result<()> {
     #[cfg(any(unix, windows))]
     {
         let sref = SockRef::from(stream);
-        return sref.set_tos(tos);
+        return sref.set_tos(u32::from(tos));
     }
     #[allow(unreachable_code)]
     Ok(())
@@ -63,7 +63,7 @@ pub fn set_udp_tos(sock: &UdpSocket, tos: u8) -> io::Result<()> {
     #[cfg(any(unix, windows))]
     {
         let sref = SockRef::from(sock);
-        return sref.set_tos(tos);
+        return sref.set_tos(u32::from(tos));
     }
     #[allow(unreachable_code)]
     Ok(())
