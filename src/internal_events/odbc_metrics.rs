@@ -1,4 +1,5 @@
 use vector_common::internal_event::{CounterName, InternalEvent, error_stage, error_type};
+use vector_lib::source_sender::SendError;
 use vector_lib::{NamedInternalEvent, counter};
 
 use crate::sources::odbc::OdbcError;
@@ -41,6 +42,23 @@ impl InternalEvent for OdbcFailedError<'_> {
                     "stage" => error_stage::RECEIVING,
                 )
                 .increment(1);
+            }
+            // `StreamClosedError` already incremented ComponentErrorsTotal and recorded
+            // ComponentEventsDropped for the failed chunk. Keep the ODBC-context log only.
+            OdbcError::SendError {
+                source: SendError::Closed,
+            }
+            | OdbcError::SendFailedAfterCheckpoint {
+                source: SendError::Closed,
+                ..
+            } => {
+                error!(
+                    message = "Unable to execute statement.",
+                    statement = %self.statement,
+                    error = %self.error,
+                    error_type = error_type::WRITER_FAILED,
+                    stage = error_stage::SENDING,
+                );
             }
             OdbcError::SendError { .. } | OdbcError::SendFailedAfterCheckpoint { .. } => {
                 error!(

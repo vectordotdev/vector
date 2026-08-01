@@ -1,6 +1,8 @@
 use crate::config::{LogNamespace, SourceContext};
 use crate::event::{Event, LogEvent};
-use crate::internal_events::{EventsReceived, OdbcFailedError, OdbcQueryExecuted};
+use crate::internal_events::{
+    EventsReceived, OdbcFailedError, OdbcQueryExecuted, StreamClosedError,
+};
 use crate::shutdown::ShutdownSignal;
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::{OdbcConfig, OdbcStatementParam};
@@ -464,6 +466,11 @@ async fn shutdown_query(
 
 /// Sends an enriched batch to the pipeline in source-sender-sized chunks, racing against
 /// shutdown between chunks so a large batch can stop promptly.
+///
+/// On `SendError::Closed`, emits `StreamClosedError` for the failed chunk so
+/// `ComponentEventsDropped` is recorded (SourceSender discards its unsent count in that
+/// case and expects the callee to emit). `SendError::Timeout` must not emit
+/// `StreamClosedError`; SourceSender already accounts for those drops.
 async fn send_enriched_batch(
     out: &crate::SourceSender,
     events: Vec<Event>,
@@ -475,6 +482,7 @@ async fn send_enriched_batch(
         if events.is_empty() {
             break;
         }
+        let count = events.len();
         let mut out = out.clone();
         let send_result = select! {
             _ = &mut *shutdown => {
@@ -482,7 +490,16 @@ async fn send_enriched_batch(
             }
             send_result = out.send_batch(events) => send_result,
         };
-        send_result.context(SendSnafu)?;
+        match send_result {
+            Ok(()) => {}
+            Err(SendError::Closed) => {
+                emit!(StreamClosedError { count });
+                return Err(SendError::Closed).context(SendSnafu);
+            }
+            Err(source) => {
+                return Err(source).context(SendSnafu);
+            }
+        }
     }
     Ok(())
 }
