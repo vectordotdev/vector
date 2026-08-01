@@ -30,7 +30,7 @@ use vector_common::internal_event::{
 use vector_common::json_size::JsonSize;
 use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::emit;
-use vector_lib::source_sender::SendError;
+use vector_lib::source_sender::{SendError, chunk_size_events};
 use vrl::prelude::*;
 
 const TIMESTAMP_FORMATS: &[&str] = &[
@@ -365,15 +365,16 @@ impl Context {
                 continue;
             }
 
-            match send_enriched_batch(&out, events, &mut shutdown).await {
-                Ok((byte_size, event_count)) => {
-                    record_sent(
-                        &mut total_payload_byte_size,
-                        &mut total_events,
-                        byte_size,
-                        event_count,
-                    );
-                }
+            match send_enriched_batch(
+                &out,
+                events,
+                &mut shutdown,
+                &mut total_payload_byte_size,
+                &mut total_events,
+            )
+            .await
+            {
+                Ok(()) => {}
                 Err(OdbcError::Shutdown) => {
                     return shutdown_query(
                         rx,
@@ -437,15 +438,16 @@ impl Context {
         };
 
         for events in pending_batches {
-            match send_enriched_batch(&out, events, &mut shutdown).await {
-                Ok((byte_size, event_count)) => {
-                    record_sent(
-                        &mut total_payload_byte_size,
-                        &mut total_events,
-                        byte_size,
-                        event_count,
-                    );
-                }
+            match send_enriched_batch(
+                &out,
+                events,
+                &mut shutdown,
+                &mut total_payload_byte_size,
+                &mut total_events,
+            )
+            .await
+            {
+                Ok(()) => {}
                 Err(error) => {
                     emit_received_metrics(
                         bytes_received,
@@ -521,26 +523,38 @@ async fn shutdown_query(
     }
 }
 
-/// Sends one enriched batch to the pipeline, racing against shutdown.
+/// Sends an enriched batch to the pipeline in source-sender-sized chunks, racing against shutdown.
 ///
-/// Returns `(json_size, event_count)` using the post-enrichment JSON size so
-/// received-bytes and events metrics stay consistent.
+/// Metrics are recorded after every accepted chunk. This is necessary because
+/// `SourceSender::send_batch` can accept earlier chunks before an error occurs on a
+/// later one.
 async fn send_enriched_batch(
     out: &crate::SourceSender,
     events: Vec<Event>,
     shutdown: &mut ShutdownSignal,
-) -> Result<(JsonSize, usize), OdbcError> {
-    let event_count = events.len();
-    let byte_size = events.estimated_json_encoded_size_of();
-    let mut out = out.clone();
-    let send_result = select! {
-        _ = &mut *shutdown => {
-            return Err(OdbcError::Shutdown);
-        }
-        send_result = out.send_batch(events) => send_result,
-    };
-    send_result.context(SendSnafu)?;
-    Ok((byte_size, event_count))
+    total_payload_byte_size: &mut usize,
+    total_events: &mut CountByteSize,
+) -> Result<(), OdbcError> {
+    for events in &events.into_iter().chunks(chunk_size_events()) {
+        let events: Vec<_> = events.collect();
+        let event_count = events.len();
+        let byte_size = events.estimated_json_encoded_size_of();
+        let mut out = out.clone();
+        let send_result = select! {
+            _ = &mut *shutdown => {
+                return Err(OdbcError::Shutdown);
+            }
+            send_result = out.send_batch(events) => send_result,
+        };
+        send_result.context(SendSnafu)?;
+        record_sent(
+            total_payload_byte_size,
+            total_events,
+            byte_size,
+            event_count,
+        );
+    }
+    Ok(())
 }
 
 fn record_sent(
