@@ -27,6 +27,7 @@ use crate::{
 fn generate_source_config(url: &str, subject: &str) -> NatsSourceConfig {
     NatsSourceConfig {
         url: url.to_string(),
+        connection_name: format!("vector-test-{}", subject),
         subject: subject.to_string(),
         framing: default_framing_message_based(),
         decoding: default_decoding(),
@@ -592,4 +593,136 @@ async fn nats_shutdown_drain_messages() {
     // Verify the source has completed its work and the shutdown is fully done.
     source_handle.await.unwrap().expect("Source task failed");
     shutdown_done.await;
+}
+
+#[tokio::test]
+async fn nats_slow_consumer_event() {
+    use futures::StreamExt;
+    use tokio::time::{Duration, sleep};
+
+    vector_lib::metrics::init_test();
+
+    let subject = format!("test-slow-consumer-{}", random_string(10));
+    let url =
+        std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+    let mut conf = generate_source_config(&url, &subject);
+    // Set subscriber capacity to 1 to trigger slow consumer events quickly
+    conf.subscriber_capacity = 1;
+
+    let (nc, sub) = create_subscription(&conf).await.unwrap();
+    let nc_pub = nc.clone();
+    let (tx, mut rx) = SourceSender::new_test();
+    let decoder = DecodingConfig::new(
+        conf.framing.clone(),
+        conf.decoding.clone(),
+        LogNamespace::Legacy,
+    )
+    .build()
+    .unwrap();
+
+    let (shutdown_trigger, shutdown_signal, shutdown_done) = ShutdownSignal::new_wired();
+
+    let source_handle = tokio::spawn(run_nats_core(
+        conf.clone(),
+        nc,
+        sub,
+        decoder,
+        LogNamespace::Legacy,
+        shutdown_signal,
+        tx,
+    ));
+
+    // Publish many messages rapidly to overwhelm the subscriber buffer (capacity = 1)
+    for i in 0..100 {
+        nc_pub
+            .publish(subject.clone(), Bytes::from(format!("msg{}", i)))
+            .await
+            .unwrap();
+    }
+    nc_pub.flush().await.unwrap();
+
+    // Give the source time to process and trigger slow consumer events
+    sleep(Duration::from_millis(200)).await;
+
+    // Drain messages from the receiver with a timeout to prevent blocking
+    let mut message_count = 0;
+    let drain_timeout = Duration::from_secs(2);
+    let start = tokio::time::Instant::now();
+
+    while message_count < 50 && start.elapsed() < drain_timeout {
+        if tokio::time::timeout(Duration::from_millis(50), rx.next())
+            .await
+            .is_ok()
+        {
+            message_count += 1;
+        } else {
+            break;
+        }
+    }
+
+    // Check that the slow consumer metric was incremented
+    let controller = vector_lib::metrics::Controller::get()
+        .expect("Metrics controller should be initialized");
+    let metrics = controller.capture_metrics();
+    let slow_consumer_metric = metrics
+        .iter()
+        .find(|m| m.name() == "nats_slow_consumer_events_total");
+
+    assert!(
+        slow_consumer_metric.is_some(),
+        "Expected nats_slow_consumer_events_total metric to be emitted"
+    );
+
+    if let Some(metric) = slow_consumer_metric {
+        // Check the counter value
+        let value = match metric.value() {
+            vector_lib::event::MetricValue::Counter { value } => value,
+            _ => panic!("Expected counter metric"),
+        };
+        assert!(
+            *value > 0.0,
+            "Expected nats_slow_consumer_events_total to be > 0, got {}",
+            value
+        );
+        println!("Slow consumer events recorded: {}", value);
+
+        // Verify component_id label is present and correct
+        let tags = metric.tags().expect("Metric should have tags");
+        let component_id_tag = tags.get("component_id");
+        assert!(
+            component_id_tag.is_some(),
+            "Expected component_id tag in metric"
+        );
+        assert_eq!(
+            component_id_tag.unwrap(),
+            &conf.connection_name,
+            "component_id should match connection_name"
+        );
+        println!(
+            "Component ID correctly set to: {}",
+            component_id_tag.unwrap()
+        );
+
+        // Verify subscription_id label is present
+        let subscription_id_tag = tags.get("subscription_id");
+        assert!(
+            subscription_id_tag.is_some(),
+            "Expected subscription_id tag in metric"
+        );
+        println!(
+            "Subscription ID captured: {}",
+            subscription_id_tag.unwrap()
+        );
+    }
+
+    // Cleanup with timeout to prevent test from hanging
+    shutdown_trigger.cancel();
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        source_handle.await.unwrap().expect("Source task failed");
+        shutdown_done.await;
+    })
+    .await
+    .expect("Test timed out during cleanup");
 }
