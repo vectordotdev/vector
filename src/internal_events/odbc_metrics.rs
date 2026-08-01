@@ -124,6 +124,6 @@ impl InternalEvent for OdbcQueryExecuted<'_> {
             statement = %self.statement,
             elapsedMs = %self.elapsed
         );
-        counter!(CounterName::ComponentExecutedEventsTotal).increment(1);
+        counter!(CounterName::CollectCompletedTotal).increment(1);
     }
 }
