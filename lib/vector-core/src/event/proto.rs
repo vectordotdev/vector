@@ -624,6 +624,7 @@ impl From<OutputId> for crate::config::OutputId {
 
 impl From<EventMetadata> for Metadata {
     fn from(value: EventMetadata) -> Self {
+        let aggregated_histogram_sum_missing = value.aggregated_histogram_sum_missing;
         let super::metadata::Inner {
             value,
             secrets,
@@ -645,6 +646,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
+            aggregated_histogram_sum_missing,
         }
     }
 }
@@ -659,6 +661,7 @@ impl From<Metadata> for EventMetadata {
             secrets,
             datadog_origin_metadata,
             source_event_id,
+            aggregated_histogram_sum_missing,
         } = value;
 
         let metadata_value = metadata_value.and_then(decode_value);
@@ -697,6 +700,7 @@ impl From<Metadata> for EventMetadata {
                 source_event_id,
             }),
             last_transform_timestamp: None,
+            aggregated_histogram_sum_missing,
         }
     }
 }
@@ -775,5 +779,30 @@ fn encode_map(fields: ObjectMap) -> ValueMap {
 fn encode_array(items: Vec<super::Value>) -> ValueArray {
     ValueArray {
         items: items.into_iter().map(encode_value).collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Metadata;
+    use crate::event::EventMetadata;
+
+    #[test]
+    fn metadata_proto_round_trip_preserves_aggregated_histogram_sum_missing() {
+        // The flag must survive the protobuf boundary (disk buffers, Vector-to-Vector) so that
+        // buffered OTLP histograms that omitted their sum keep the interpolation fallback.
+        let mut metadata = EventMetadata::default();
+        metadata.set_aggregated_histogram_sum_missing(true);
+
+        let proto: Metadata = metadata.into();
+        assert!(proto.aggregated_histogram_sum_missing);
+
+        let decoded: EventMetadata = proto.into();
+        assert!(decoded.aggregated_histogram_sum_missing());
+
+        // The default (authoritative) also round-trips.
+        let default_proto: Metadata = EventMetadata::default().into();
+        let default_decoded: EventMetadata = default_proto.into();
+        assert!(!default_decoded.aggregated_histogram_sum_missing());
     }
 }

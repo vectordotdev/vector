@@ -1,0 +1,5 @@
+The `datadog_metrics` sink now preserves the exact `sum` (and the average derived from it) carried by aggregated histograms when converting them to Datadog sketches. Previously both were re-approximated by uniformly interpolating each bucket's count across the bucket's bounds, so the reported `sum`/`avg` of histograms ingested via e.g. the `opentelemetry` or `prometheus_scrape` sources drifted from the true values by up to the relative bucket width — orders of magnitude for values far smaller than the first bucket boundary.
+
+The exact `sum` is only restored when the source actually reported one and every observation is represented in the histogram's buckets, so histograms whose overflow (`+Inf`) bucket was dropped upstream (e.g. `prometheus_scrape`) and OpenTelemetry histograms that omit the optional `sum` field keep their interpolated statistics instead of reporting an inflated or zeroed average. This is scoped to the `datadog_metrics` sink; other sinks observe the histogram `sum` unchanged.
+
+authors: Ziv-Wenrix
