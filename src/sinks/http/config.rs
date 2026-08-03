@@ -37,7 +37,7 @@ use crate::{
             },
         },
     },
-    template::{ConfinementConfig, UriTemplate},
+    template::{ConfineUri, ConfinementConfig, UriTemplate},
 };
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -560,7 +560,7 @@ mod tests {
 
     use super::*;
     use crate::components::validation::prelude::*;
-    use crate::template::{ConfinementConfig, UriTemplate};
+    use crate::template::{ConfineUri, ConfinementConfig, UriTemplate};
 
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {

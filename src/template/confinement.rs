@@ -183,7 +183,9 @@ impl ConfinementChecker {
     /// Returns the field list and literal prefix if the template is dynamic
     /// and requires confinement. Returns `Ok(None)` if the template is static
     /// and needs no confinement.
-    fn validate_common(tpl: &Template) -> Result<Option<(Vec<String>, String)>, BuildError> {
+    fn validate_common<const URI: bool>(
+        tpl: &Template<URI>,
+    ) -> Result<Option<(Vec<String>, String)>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
             None => return Ok(None),
@@ -207,7 +209,7 @@ impl ConfinementChecker {
     /// Errors:
     /// - `NoDerivableBase`: template has field references but no literal prefix
     /// - `DerivedBaseIsRoot`: prefix is exactly `"/"` (trivial confinement)
-    pub(crate) fn for_prefix_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
+    pub(crate) fn for_prefix_template(tpl: &Template<false>) -> Result<Option<Self>, BuildError> {
         match Self::validate_common(tpl)? {
             Some((_fields, prefix)) => {
                 // Reject root-only prefix to avoid trivial confinement.
@@ -243,7 +245,7 @@ impl ConfinementChecker {
     /// - `DynamicUriQueryOrFragment`: `?` or `#` with field references
     /// - `EncodedSeparatorInUriPrefix`: `%2F`, `%5C`, or backslash in prefix
     /// - `UnsupportedUriScheme`: non-HTTP(S) scheme like ftp://
-    pub(crate) fn for_uri_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
+    pub(crate) fn for_uri_template(tpl: &UriTemplate) -> Result<Option<Self>, BuildError> {
         match Self::validate_common(tpl)? {
             Some((_fields, prefix)) => {
                 // Reject URI templates that have field references AND `?` or `#`.
@@ -279,7 +281,7 @@ impl ConfinementChecker {
     ///
     /// This prevents `UriTemplate::confine` from accepting `ftp://`, relative `/path`,
     /// or schemeless `//host` URIs even when static.
-    fn validate_static_uri(tpl: &Template) -> Result<(), BuildError> {
+    fn validate_static_uri(tpl: &UriTemplate) -> Result<(), BuildError> {
         let src = tpl.get_ref();
         let uri = src
             .parse::<Uri>()

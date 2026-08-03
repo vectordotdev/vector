@@ -16,10 +16,17 @@ use chrono::{
 use http::Uri;
 use regex::Regex;
 
+use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::warn;
 use vector_lib::{
-    configurable::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component},
+    configurable::{
+        Configurable, ConfigurableNumber, ConfigurableString, GenerateError, Metadata, NumberClass,
+        ToValue,
+        attributes::CustomAttribute,
+        configurable_component,
+        schema::{SchemaGenerator, SchemaObject, get_or_generate_schema},
+    },
     lookup::lookup_v2::parse_target_path,
 };
 
@@ -28,6 +35,7 @@ use crate::{
     event::{EventRef, Metric, Value},
 };
 
+pub use configurable::ConfineUri;
 use confinement::ConfinementChecker;
 use parsing::Part;
 use unsigned::UnsignedIntTemplateSource;
@@ -190,15 +198,7 @@ pub struct ConfinedUriTemplate {
 ///
 /// This makes URI confinement unavoidable for URI config fields. For non-URI fields
 /// (object-store keys, Kafka topics, Redis keys, tenant IDs), use [`Template`] instead.
-#[configurable_component]
-#[configurable(metadata(docs::templateable))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[serde(try_from = "String", into = "String")]
-pub struct UriTemplate {
-    /// Inner template
-    #[serde(skip)]
-    inner: Template,
-}
+pub type UriTemplate = Template<true>;
 
 /// The templated field type stored in sink config structs for non-URI fields.
 ///
@@ -213,14 +213,73 @@ pub struct UriTemplate {
 /// This makes confinement unavoidable: there is no way to render a sink's configured
 /// template without going through confinement first. Transforms and sources, which have no
 /// confinement boundary, should store [`UnconfinedTemplate`] directly instead.
-#[configurable_component]
-#[configurable(metadata(docs::templateable))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+///
+/// # The `URI` marker
+///
+/// The `URI` const parameter selects which confinement flavor is reachable from a
+/// given template, and therefore which confined type it produces:
+///
+/// - `Template<false>` (the default, spelled `Template`) → [`Template::confine`] →
+///   [`ConfinedTemplate`]
+/// - `Template<true>` (aliased as [`UriTemplate`]) → [`UriTemplate::confine`] →
+///   [`ConfinedUriTemplate`]
+///
+/// The marker exists purely to keep those two confinement flavors from being mixed up
+/// at compile time. It has no bearing on parsing, rendering, serialization, or the
+/// generated configuration schema: both instantiations (de)serialize as a plain string
+/// and share a single schema definition. See the hand-written [`Configurable`] impl
+/// below, which deliberately ignores `URI`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
-pub struct Template {
-    /// Inner template
-    #[serde(skip)]
+pub struct Template<const URI: bool = false> {
     inner: UnconfinedTemplate,
+}
+
+// `Configurable` is implemented by hand rather than through `#[configurable_component]`
+// because the derive cannot see through a const generic parameter: it would emit one
+// schema definition per instantiation (named after `std::any::type_name`, which includes
+// the `URI` value) even though `URI` is a pure compile-time marker with no schema
+// meaning.
+//
+// Ignoring the marker means both `Template<false>` and `Template<true>` report the same
+// referenceable name and the same schema, so the generator emits a single shared
+// definition. Everything else mirrors what the derive would have produced for a
+// `#[serde(try_from = "String", into = "String")]` "virtual newtype": the schema is
+// String's, plus the `docs::templateable` metadata flag that documentation generation
+// keys off of.
+impl<const URI: bool> Configurable for Template<URI> {
+    fn referenceable_name() -> Option<&'static str> {
+        // Deliberately not `std::any::type_name::<Self>()`: that would render as
+        // `Template<false>`/`Template<true>` and split one logical config type into two
+        // identical schema definitions.
+        Some(concat!(module_path!(), "::Template"))
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_title("A templated field.");
+        metadata.set_description(
+            "In many cases, components can be configured so that part of the component's \
+             functionality can be customized on a per-event basis. For example, you can use \
+             a templated string to refer to fields in an event that is used as the input data \
+             when rendering the template.",
+        );
+        metadata.add_custom_attribute(CustomAttribute::flag("docs::templateable"));
+        metadata
+    }
+
+    fn generate_schema(
+        generator: &std::cell::RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        // Defer to `String`, which is what this type (de)serializes as.
+        get_or_generate_schema(&String::as_configurable_ref(), generator, None)
+    }
+}
+
+impl<const URI: bool> ToValue for Template<URI> {
+    fn to_value(&self) -> serde_json::Value {
+        serde_json::Value::String(self.inner.src.clone())
+    }
 }
 
 /// Unsigned integer template.
