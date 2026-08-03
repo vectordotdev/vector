@@ -1,0 +1,13 @@
+sources:
+  my_source_id:
+    type: static_metrics
+    interval_secs: 1
+    metrics:
+      - kind: absolute
+        name: my-metric
+        tags:
+          env: production
+        value:
+          gauge:
+            value: 1
+    namespace: static

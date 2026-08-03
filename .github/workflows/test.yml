@@ -149,6 +149,7 @@ jobs:
           cue: true
           libsasl2: true
           cargo-cache: true
+      - run: cd website && yarn install --frozen-lockfile
       - run: make check-generated-docs
 
   check-rust-docs:

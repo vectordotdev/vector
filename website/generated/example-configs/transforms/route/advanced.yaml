@@ -1,0 +1,14 @@
+transforms:
+  my_transform_id:
+    type: route
+    inputs:
+      - my-source-or-transform-id
+    measure_cpu_usage: false
+    reroute_unmatched: true
+    route:
+      foo-does-not-exist:
+        source: "!exists(.foo)"
+        type: vrl
+      foo-exists:
+        source: exists(.foo)
+        type: vrl
