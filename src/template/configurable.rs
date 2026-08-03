@@ -1,6 +1,6 @@
 use super::*;
 
-impl Template<false> {
+impl Template<PrefixKind> {
     /// Confine this template to its literal prefix for **non-URI fields**, returning
     /// a [`ConfinedTemplate`] that enforces prefix confinement at render time.
     ///
@@ -41,7 +41,7 @@ impl Template<false> {
     }
 }
 
-impl<const URI: bool> Template<URI> {
+impl<K: TemplateKind> Template<K> {
     /// Set the tz offset used when rendering strftime specifiers.
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.inner.tz_offset = tz_offset;
@@ -81,63 +81,66 @@ impl<const URI: bool> Template<URI> {
     }
 }
 
-impl<const URI: bool> fmt::Display for Template<URI> {
+impl<K: TemplateKind> fmt::Display for Template<K> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)
     }
 }
 
-impl<const URI: bool> From<UnconfinedTemplate> for Template<URI> {
+impl<K: TemplateKind> From<UnconfinedTemplate> for Template<K> {
     fn from(inner: UnconfinedTemplate) -> Self {
-        Template { inner }
+        Template {
+            inner,
+            kind: PhantomData,
+        }
     }
 }
 
-impl<const URI: bool> TryFrom<String> for Template<URI> {
+impl<K: TemplateKind> TryFrom<String> for Template<K> {
     type Error = TemplateParseError;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(s).map(|inner| Template { inner })
+        UnconfinedTemplate::try_from(s).map(Self::from)
     }
 }
 
-impl<const URI: bool> TryFrom<&str> for Template<URI> {
+impl<K: TemplateKind> TryFrom<&str> for Template<K> {
     type Error = TemplateParseError;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(s).map(|inner| Template { inner })
+        UnconfinedTemplate::try_from(s).map(Self::from)
     }
 }
 
-impl<const URI: bool> TryFrom<PathBuf> for Template<URI> {
+impl<K: TemplateKind> TryFrom<PathBuf> for Template<K> {
     type Error = TemplateParseError;
 
     fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(p).map(|inner| Template { inner })
+        UnconfinedTemplate::try_from(p).map(Self::from)
     }
 }
 
-impl<const URI: bool> From<Template<URI>> for String {
-    fn from(t: Template<URI>) -> String {
+impl<K: TemplateKind> From<Template<K>> for String {
+    fn from(t: Template<K>) -> String {
         t.inner.src
     }
 }
 
 // This is safe because we literally defer to `String` for the schema of `Template`.
-impl<const URI: bool> ConfigurableString for Template<URI> {}
+impl<K: TemplateKind> ConfigurableString for Template<K> {}
 
 /// URI-specific confinement, implemented only for [`UriTemplate`] (that is,
-/// `Template<true>`).
+/// `Template<UriKind>`).
 ///
 /// This lives in a trait rather than in an `impl UriTemplate` block on purpose.
 /// `Template::confine` (prefix confinement) is an inherent method on
-/// `Template<false>`, and a second *inherent* `confine` on `Template<true>` would make
-/// every `Template::try_from(..).confine(..)` call ambiguous: a const generic parameter
-/// default is not applied during inference, so the receiver is `Template<_>` and both
-/// inherent candidates would apply. Inherent methods take priority over trait methods
-/// during probing, so keeping this one in a trait means `Template<_>` resolves to the
-/// inherent (prefix) method and infers `URI = false`, while a receiver already known to
-/// be `UriTemplate` falls through to this impl.
+/// `Template<PrefixKind>`, and a second *inherent* `confine` on `Template<UriKind>`
+/// would make every `Template::try_from(..).confine(..)` call ambiguous: a type
+/// parameter default is not applied during inference, so the receiver is `Template<_>`
+/// and both inherent candidates would apply. Inherent methods take priority over trait
+/// methods during probing, so keeping this one in a trait means `Template<_>` resolves
+/// to the inherent (prefix) method and infers `K = PrefixKind`, while a receiver already
+/// known to be `UriTemplate` falls through to this impl.
 pub trait ConfineUri {
     /// Confine this URI template for **HTTP/HTTPS URI fields**, returning a
     /// [`ConfinedUriTemplate`] that enforces URI-specific confinement checks.

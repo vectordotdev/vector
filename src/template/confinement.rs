@@ -183,8 +183,8 @@ impl ConfinementChecker {
     /// Returns the field list and literal prefix if the template is dynamic
     /// and requires confinement. Returns `Ok(None)` if the template is static
     /// and needs no confinement.
-    fn validate_common<const URI: bool>(
-        tpl: &Template<URI>,
+    fn validate_common<K: TemplateKind>(
+        tpl: &Template<K>,
     ) -> Result<Option<(Vec<String>, String)>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
@@ -209,7 +209,9 @@ impl ConfinementChecker {
     /// Errors:
     /// - `NoDerivableBase`: template has field references but no literal prefix
     /// - `DerivedBaseIsRoot`: prefix is exactly `"/"` (trivial confinement)
-    pub(crate) fn for_prefix_template(tpl: &Template<false>) -> Result<Option<Self>, BuildError> {
+    pub(crate) fn for_prefix_template(
+        tpl: &Template<PrefixKind>,
+    ) -> Result<Option<Self>, BuildError> {
         match Self::validate_common(tpl)? {
             Some((_fields, prefix)) => {
                 // Reject root-only prefix to avoid trivial confinement.
