@@ -41,7 +41,7 @@ jobs:
           branch: "vector"
           remote-repository-name: cla-signatures
           remote-organization-name: DataDog
-          allowlist: step-security-bot
+          allowlist: step-security-bot,datadog-vectordotdev
 
           custom-notsigned-prcomment: |
             Thank you for your contribution! Before we can merge this PR, please sign our [Contributor License Agreement](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618).
