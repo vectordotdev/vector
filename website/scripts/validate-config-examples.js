@@ -1,17 +1,21 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { execSync } from "child_process";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import chalk from "chalk";
 import YAML from "yaml";
 
 const cueJsonOutput = "data/docs.json";
+const generatedExamplesDir = "generated/example-configs";
 const VECTOR_BIN = process.env.VECTOR_BIN || "vector";
+const validationConcurrency = Math.max(1, Number.parseInt(process.env.VALIDATE_CONFIG_EXAMPLES_JOBS || "4", 10) || 4);
+const execFileAsync = promisify(execFile);
 
 // Use `cargo run` when running inside the Vector repo and no specific binary is needed.
 // Set VECTOR_BIN to point at an existing binary and skip the cargo build.
 const useCargoRun = !process.env.VECTOR_BIN && fs.existsSync(path.join(import.meta.dirname, "../../Cargo.toml"));
-const vectorCmd = useCargoRun ? "cargo run --" : VECTOR_BIN;
+const vectorCommand = useCargoRun ? "cargo" : VECTOR_BIN;
 
 // Pick a source type compatible with the component's accepted input event types.
 // Returns null for trace-only components (no simple trace source available).
@@ -85,15 +89,20 @@ const wrapConfig = (kind, componentYaml, component) => {
   return componentYaml;
 };
 
-const validateYaml = (yaml, tmpPath) => {
+const validateYaml = async (yaml, tmpPath) => {
   fs.writeFileSync(tmpPath, yaml, "utf8");
   try {
-    execSync(`${vectorCmd} validate --no-environment --skip-healthchecks ${tmpPath}`, {
-      stdio: "pipe"
+    const args = ["validate", "--no-environment", "--skip-healthchecks", tmpPath];
+    if (useCargoRun) args.unshift("run", "--");
+
+    await execFileAsync(vectorCommand, args, {
+      maxBuffer: 1024 * 1024
     });
     return null;
   } catch (err) {
     return (err.stderr?.toString() || err.stdout?.toString() || err.message).trim();
+  } finally {
+    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
   }
 };
 
@@ -105,57 +114,71 @@ const summarizeError = (error) => {
   return (errorLine || lines[0] || error).trim().replace(/^x /, "");
 };
 
-const main = () => {
+const main = async () => {
   const data = fs.readFileSync(cueJsonOutput, "utf8");
   const docs = JSON.parse(data);
   const components = docs.components;
 
   const failures = [];
+  const validationCases = [];
   let total = 0;
   let skipped = 0;
-  const tmpFile = path.join(os.tmpdir(), "vector-validate-example.yaml");
 
-  try {
-    for (const kind in components) {
-      for (const componentType in components[kind]) {
-        const component = components[kind][componentType];
-        const exampleConfigs = component.example_configs;
-        if (!exampleConfigs) continue;
+  for (const kind in components) {
+    for (const componentType in components[kind]) {
+      const component = components[kind][componentType];
 
-        for (const variant of ["minimal", "advanced"]) {
-          const yaml = exampleConfigs[variant]?.yaml;
-          if (!yaml) continue;
+      for (const variant of ["minimal", "advanced"]) {
+        total++;
+        const key = `${kind}/${componentType} (${variant})`;
+        const examplePath = path.join(generatedExamplesDir, kind, componentType, `${variant}.yaml`);
 
-          total++;
-          const key = `${kind}/${componentType} (${variant})`;
-
-          let wrapped;
-          try {
-            wrapped = wrapConfig(kind, yaml, component);
-          } catch (e) {
-            failures.push({ key, error: `YAML parse error: ${e.message}` });
-            console.error(chalk.red(`FAIL ${key} [parse error]`));
-            continue;
-          }
-
-          if (wrapped === null) {
-            skipped++;
-            continue;
-          }
-
-          const error = validateYaml(wrapped, tmpFile);
-          if (error) {
-            const summary = summarizeError(error);
-            failures.push({ key, error: summary });
-            console.error(chalk.red(`FAIL ${key}: ${summary}`));
-            console.error(chalk.gray("--- config ---\n" + wrapped + "---"));
-          }
+        let yaml;
+        try {
+          yaml = fs.readFileSync(examplePath, "utf8");
+        } catch (err) {
+          failures.push({ key, error: `Could not read ${examplePath}: ${err.message}` });
+          console.error(chalk.red(`FAIL ${key}: Could not read ${examplePath}`));
+          continue;
         }
+
+        let wrapped;
+        try {
+          wrapped = wrapConfig(kind, yaml, component);
+        } catch (e) {
+          failures.push({ key, error: `YAML parse error: ${e.message}` });
+          console.error(chalk.red(`FAIL ${key} [parse error]`));
+          continue;
+        }
+
+        if (wrapped === null) {
+          skipped++;
+          continue;
+        }
+
+        validationCases.push({ key, wrapped });
       }
     }
-  } finally {
-    if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
   }
+
+  let nextCase = 0;
+  const validateNext = async () => {
+    while (nextCase < validationCases.length) {
+      const caseIndex = nextCase++;
+      const { key, wrapped } = validationCases[caseIndex];
+      const tmpFile = path.join(os.tmpdir(), `vector-validate-example-${process.pid}-${caseIndex}.yaml`);
+      const error = await validateYaml(wrapped, tmpFile);
+
+      if (error) {
+        const summary = summarizeError(error);
+        failures.push({ key, error: summary });
+        console.error(chalk.red(`FAIL ${key}: ${summary}`));
+        console.error(chalk.gray("--- config ---\n" + wrapped + "---"));
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(validationConcurrency, validationCases.length) }, validateNext));
 
   const validated = total - skipped;
   console.log(chalk.gray(`Validated ${validated} examples (${skipped} skipped).`));
@@ -168,4 +191,7 @@ const main = () => {
   }
 };
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

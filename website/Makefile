@@ -10,6 +10,7 @@ export SERVER_PORT ?= 1313
 clean:
 	rm -rf public resources data/cargo-lock.toml data/docs.json
 
+.PHONY: setup
 setup:
 	yarn
 
@@ -21,11 +22,25 @@ cargo-data:
 cue-%:
 	${CUE} $*
 
-config-examples:
+.PHONY: config-examples
+config-examples: setup cue-build
 	yarn config-examples
 
-validate-config-examples: cue-build config-examples
-	yarn validate-config-examples
+CARGO_TARGET_DIR ?= ../target
+
+ifeq ($(origin VECTOR_BIN), undefined)
+VALIDATE_VECTOR_BIN := $(abspath $(CARGO_TARGET_DIR)/debug/vector)
+VALIDATE_VECTOR_BUILD := true
+else
+VALIDATE_VECTOR_BIN := $(VECTOR_BIN)
+endif
+
+.PHONY: validate-config-examples
+validate-config-examples: config-examples
+ifeq ($(VALIDATE_VECTOR_BUILD),true)
+	CARGO_TARGET_DIR="$(abspath $(CARGO_TARGET_DIR))" cargo build --manifest-path ../Cargo.toml
+endif
+	VECTOR_BIN="$(VALIDATE_VECTOR_BIN)" yarn validate-config-examples
 
 VDEV ?= cargo vdev
 
@@ -36,7 +51,7 @@ generate-vrl-docs:
 generate-deprecations-json:
 	$(VDEV) deprecation generate
 
-structured-data: generate-vrl-docs generate-deprecations-json cue-build config-examples
+structured-data: generate-vrl-docs generate-deprecations-json config-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \

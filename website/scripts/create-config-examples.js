@@ -1,9 +1,12 @@
 import fs from "fs";
+import path from "path";
 import chalk from "chalk";
 import * as TOML from "@iarna/toml";
 import YAML from "yaml";
 
 const cueJsonOutput = "data/docs.json";
+const generatedExamplesDir = "generated/example-configs";
+const generatedExamplesTmpDir = `${generatedExamplesDir}.tmp`;
 
 // Helper functions
 const getExampleValue = (param, deepFilter) => {
@@ -226,12 +229,20 @@ const toToml = (obj) => {
 
 // Convert object to YAML string
 const toYaml = (obj) => {
-  return `${YAML.stringify(obj)}`;
+  // Tabs in multiline example strings (for example, Lua code) are valid YAML
+  // content, but fail Git's whitespace check. Use spaces in generated examples.
+  return `${YAML.stringify(obj)}`.replaceAll("\t", "  ");
 };
 
 // Convert object to JSON string (indented)
 const toJson = (obj) => {
   return JSON.stringify(obj, null, 2);
+};
+
+const writeYamlExample = (kind, componentType, variant, yaml) => {
+  const componentDir = path.join(generatedExamplesTmpDir, kind, componentType);
+  fs.mkdirSync(componentDir, { recursive: true });
+  fs.writeFileSync(path.join(componentDir, `${variant}.yaml`), yaml, "utf8");
 };
 
 // Set the example value for a given config parameter
@@ -389,14 +400,19 @@ const makeUseCaseExamples = (component) => {
   }
 };
 
+const debug = process.env.DEBUG === "true" || false;
+
 const main = () => {
   try {
-    const debug = process.env.DEBUG === "true" || false;
     const data = fs.readFileSync(cueJsonOutput, "utf8");
     const docs = JSON.parse(data);
     const components = docs.components;
 
     console.log(chalk.blue("Creating example configurations for all Vector components..."));
+
+    if (!debug) {
+      fs.rmSync(generatedExamplesTmpDir, { recursive: true, force: true });
+    }
 
     // Sources, transforms, sinks
     for (const kind in components) {
@@ -469,18 +485,26 @@ const main = () => {
 
         docs["components"][kind][componentType]["examples"] = useCaseExamples;
 
+        const minimalYaml = toYaml(minimalExampleConfig);
+        const advancedYaml = toYaml(advancedExampleConfig);
+
         docs["components"][kind][componentType]["example_configs"] = {
           minimal: {
             toml: toToml(minimalExampleConfig),
-            yaml: toYaml(minimalExampleConfig),
+            yaml: minimalYaml,
             json: toJson(minimalExampleConfig)
           },
           advanced: {
             toml: toToml(advancedExampleConfig),
-            yaml: toYaml(advancedExampleConfig),
+            yaml: advancedYaml,
             json: toJson(advancedExampleConfig)
           }
         };
+
+        if (!debug) {
+          writeYamlExample(kind, componentType, "minimal", minimalYaml);
+          writeYamlExample(kind, componentType, "advanced", advancedYaml);
+        }
       }
     }
 
@@ -490,16 +514,22 @@ const main = () => {
     }
 
     console.log(chalk.green("Success. Finished generating examples for all components."));
-    console.log(chalk.blue(`Writing generated examples as JSON to ${cueJsonOutput}...`));
+    console.log(chalk.blue(`Writing generated YAML examples to ${generatedExamplesDir}...`));
 
-    // Write back to the JSON file only when not in debug mode
+    // Write generated examples only when not in debug mode.
     if (!debug) {
+      fs.rmSync(generatedExamplesDir, { recursive: true, force: true });
+      fs.renameSync(generatedExamplesTmpDir, generatedExamplesDir);
       fs.writeFileSync(cueJsonOutput, JSON.stringify(docs), "utf8");
     }
 
-    console.log(chalk.green(`Success. Finished writing example configs to ${cueJsonOutput}.`));
+    console.log(chalk.green(`Success. Finished writing example configs to ${generatedExamplesDir}.`));
   } catch (err) {
+    if (!debug) {
+      fs.rmSync(generatedExamplesTmpDir, { recursive: true, force: true });
+    }
     console.error(err);
+    process.exitCode = 1;
   }
 };
 

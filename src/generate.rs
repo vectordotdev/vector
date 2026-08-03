@@ -91,22 +91,6 @@ pub struct Config {
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
-/// Controls how the resulting transform topology is wired up. This is not
-/// user-configurable.
-pub(crate) enum TransformInputsStrategy {
-    /// Default.
-    ///
-    /// The first transform generated will consume from all sources and
-    /// subsequent transforms will consume from their predecessor.
-    Auto,
-    /// Used for property testing `vector config`.
-    ///
-    /// All transforms use a list of all sources as inputs.
-    #[cfg(test)]
-    #[allow(dead_code)]
-    All,
-}
-
 #[derive(Serialize, Default)]
 struct FullConfig {
     #[serde(flatten)]
@@ -128,10 +112,7 @@ pub(crate) fn strip_nulls(value: Value) -> Value {
     }
 }
 
-pub(crate) fn generate_example(
-    opts: &Opts,
-    transform_inputs_strategy: TransformInputsStrategy,
-) -> Result<String, Vec<String>> {
+pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
         .split(['|', '/'])
@@ -211,21 +192,15 @@ pub(crate) fn generate_example(
             };
             transform_names.push(name.clone());
 
-            let targets = match transform_inputs_strategy {
-                TransformInputsStrategy::Auto => {
-                    if i == 0 {
-                        source_names.clone()
-                    } else {
-                        vec![
-                            transform_names
-                                .get(i - 1)
-                                .unwrap_or(&"component-id".to_owned())
-                                .to_owned(),
-                        ]
-                    }
-                }
-                #[cfg(test)]
-                TransformInputsStrategy::All => source_names.clone(),
+            let targets = if i == 0 {
+                source_names.clone()
+            } else {
+                vec![
+                    transform_names
+                        .get(i - 1)
+                        .unwrap_or(&"component-id".to_owned())
+                        .to_owned(),
+                ]
             };
 
             let mut example = match TransformDescription::example(&transform_type) {
@@ -360,7 +335,7 @@ pub(crate) fn generate_example(
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    match generate_example(opts, TransformInputsStrategy::Auto) {
+    match generate_example(opts) {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
             {
@@ -406,7 +381,7 @@ mod tests {
             file: None,
             format,
         };
-        let cfg_string = generate_example(&opts, TransformInputsStrategy::Auto).unwrap();
+        let cfg_string = generate_example(&opts).unwrap();
         if let Err(error) = format::deserialize::<ConfigBuilder>(&cfg_string, opts.format) {
             panic!(
                 "Failed to generate example for {} with error: {error:?})",
@@ -450,7 +425,7 @@ mod tests {
             format: Format::Toml,
         };
 
-        let cfg = generate_example(&opts, TransformInputsStrategy::Auto);
+        let cfg = generate_example(&opts);
         let filecontents = fs::read_to_string(
             fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
         )
@@ -470,7 +445,7 @@ mod tests {
         };
 
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -510,7 +485,7 @@ mod tests {
 
         opts.expression = "stdin|test_basic|console".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -550,7 +525,7 @@ mod tests {
 
         opts.expression = "stdin//console".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -584,7 +559,7 @@ mod tests {
 
         opts.expression = "//console".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
@@ -611,7 +586,7 @@ mod tests {
 
         opts.expression = "/test_basic,test_basic,test_basic".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [transforms.transform0]
@@ -638,7 +613,7 @@ mod tests {
         opts.fragment = true;
         opts.expression = "/test_basic,test_basic,test_basic".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"
                 [transforms.transform0]
                 inputs = []
@@ -677,7 +652,7 @@ mod tests {
         };
 
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
+            generate_example(&opts).unwrap(),
             indoc::indoc! {r"
             data_dir: /var/lib/vector/
             sources:
@@ -736,7 +711,7 @@ mod tests {
         };
 
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
+            generate_example(&opts).unwrap(),
             indoc::indoc! {r#"
             {
               "data_dir": "/var/lib/vector/",

@@ -149,6 +149,7 @@ jobs:
           cue: true
           libsasl2: true
           cargo-cache: true
+      - run: cd website && yarn install --frozen-lockfile
       - run: make check-generated-docs
 
   check-rust-docs:
@@ -161,6 +162,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
+          protoc: true
           cargo-cache: true
       - run: cd rust-doc && make ci-docs-build
 

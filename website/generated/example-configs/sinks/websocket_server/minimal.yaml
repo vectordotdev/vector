@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: websocket_server
+    inputs:
+      - my-source-or-transform-id
+    address: 0.0.0.0:80
+    encoding:
+      codec: json

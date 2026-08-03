@@ -1,0 +1,13 @@
+sinks:
+  my_sink_id:
+    type: http
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    method: post
+    payload_prefix: '{"data":'
+    payload_suffix: "}"
+    uri: https://10.22.212.22:9000/endpoint
