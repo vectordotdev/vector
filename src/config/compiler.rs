@@ -1,9 +1,11 @@
 use indexmap::{IndexMap, IndexSet};
+use std::collections::HashMap as StdHashMap;
+use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, OutputId, builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids,
-    validation,
+    Config, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
+    transform::get_transform_output_ids, validation,
 };
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -99,7 +101,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them
     // here before adding to the final config (the types require this).
-    let sinks = sinks
+    let sinks: IndexMap<ComponentKey, SinkOuter<OutputId>> = sinks
         .into_iter()
         .map(|(key, sink)| {
             let inputs = graph.inputs_for(&key);
@@ -139,7 +141,18 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             secret,
             graceful_shutdown_duration,
+            prepared_sinks: Default::default(),
         };
+
+        // Prepare sinks and store in config
+        let prepare_errors = prepare_sinks(&mut config);
+        if !prepare_errors.is_empty() {
+            errors.extend(prepare_errors);
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
 
         config.propagate_acknowledgements()?;
 
@@ -178,6 +191,45 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     for (id, sink) in config.sinks.iter_mut() {
         expand_globs_inner(&mut sink.inputs, &id.to_string(), &candidates);
     }
+}
+
+/// Prepare all sinks (direct and enrichment-table-derived) and store in config.
+///
+/// Returns a list of errors for sinks that failed preparation. An empty Vec means success.
+fn prepare_sinks(config: &mut Config) -> Vec<String> {
+    let mut prepared = StdHashMap::new();
+    let mut errors = Vec::new();
+
+    // Prepare direct sinks
+    for (key, sink) in &config.sinks {
+        match sink.inner.prepare_sink() {
+            Ok(entry) => {
+                prepared.insert(key.clone(), entry);
+            }
+            Err(e) => {
+                errors.push(format!("Failed to prepare sink \"{}\": {}", key, e));
+            }
+        }
+    }
+
+    // Prepare enrichment table sinks with resolved inputs.
+    for (key, table) in &config.enrichment_tables {
+        if let Some((sink_key, sink)) = table.as_sink(key) {
+            match sink.inner.prepare_sink() {
+                Ok(entry) => {
+                    prepared.insert(sink_key, entry);
+                }
+                Err(error) => {
+                    errors.push(format!(
+                        "Failed to prepare enrichment table sink \"{key}\": {error}"
+                    ));
+                }
+            }
+        }
+    }
+
+    config.prepared_sinks = prepared;
+    errors
 }
 
 enum InputMatcher {

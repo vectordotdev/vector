@@ -13,6 +13,7 @@ mod arrow;
 pub mod config;
 #[cfg(all(test, feature = "clickhouse-integration-tests"))]
 mod integration_tests;
+mod prepared;
 mod request_builder;
 mod service;
 mod sink;

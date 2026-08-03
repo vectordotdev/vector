@@ -277,9 +277,33 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
+
+    /// Attempts to prepare the sink natively.
+    ///
+    /// Returns `None` by default for legacy sinks. Sinks that implement native preparation
+    /// should override this method to return `Some(result)`.
+    ///
+    /// This method is called during config compilation. Errors propagate to compilation.
+    fn try_prepare(&self) -> Option<crate::Result<super::PreparedSinkEntry>> {
+        None
+    }
 }
 
 dyn_clone::clone_trait_object!(SinkConfig);
+
+impl dyn SinkConfig {
+    /// Prepares the sink for building.
+    ///
+    /// Returns an error if native preparation fails. Legacy sinks return Ok with a legacy adapter.
+    pub fn prepare_sink(&self) -> crate::Result<super::PreparedSinkEntry> {
+        // Try native preparation first (returns None by default)
+        if let Some(result) = self.try_prepare() {
+            return result;
+        }
+        // Fall back to legacy adapter using dyn_clone
+        Ok(super::PreparedSinkEntry::legacy(dyn_clone::clone_box(self)))
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct SinkContext {

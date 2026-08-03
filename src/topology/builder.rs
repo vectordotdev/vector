@@ -671,8 +671,20 @@ impl<'a> Builder<'a> {
         let enable_healthcheck = healthcheck.enabled && self.config.healthchecks.enabled;
         let healthcheck_timeout = healthcheck.timeout;
 
-        let typetag = sink.inner.get_component_name();
-        let input_type = sink.inner.input().data_type();
+        // Get the prepared sink from config if available, otherwise use raw sink
+        let prepared = match self.config.prepared_sink(key) {
+            Some(p) => p,
+            None => {
+                self.errors.push(format!(
+                    "Internal error: sink \"{}\" has no prepared entry. \
+                         This indicates a bug in config compilation.",
+                    key
+                ));
+                return;
+            }
+        };
+        let typetag = prepared.prepared().get_type_name();
+        let input_type = prepared.prepared().input().data_type();
 
         // At this point, we've validated that all transforms are valid, including any
         // transform that mutates the schema provided by their sources. We can now validate the
@@ -721,7 +733,10 @@ impl<'a> Builder<'a> {
             extra_context: self.extra_context.clone(),
         };
 
-        let (sink, healthcheck) = match sink.inner.build(cx).await {
+        // Use prepared sink from config (required).
+        let built_sink = prepared.prepared().build(cx).await;
+
+        let (sink, healthcheck) = match built_sink {
             Err(error) => {
                 self.errors.push(format!("Sink \"{key}\": {error}"));
                 return;

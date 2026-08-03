@@ -2,8 +2,7 @@
 
 use std::fmt;
 
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use http::Uri;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::{
@@ -11,17 +10,12 @@ use vector_lib::codecs::{
     encoding::{BatchSerializerConfig, Framer},
 };
 
-use super::{
-    arrow,
-    request_builder::ClickhouseRequestBuilder,
-    service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
-    sink::{ClickhouseSink, PartitionKey},
-};
+use super::{arrow, prepared::ValidatedClickhouse};
 use crate::{
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde},
     },
     template::ConfinementConfig,
 };
@@ -220,67 +214,9 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = self.endpoint.with_default_parts().uri;
-        let auth = self.auth.choose_one(&self.endpoint.auth)?;
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
-
-        let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
-            auth: auth.clone(),
-            endpoint: endpoint.clone(),
-            skip_unknown_fields: self.skip_unknown_fields,
-            date_time_best_effort: self.date_time_best_effort,
-            insert_random_shard: self.insert_random_shard,
-            compression: self.compression,
-            query_settings: self.query_settings,
-        };
-
-        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), clickhouse_service_request_builder);
-
-        let request_limits = self.request.into_settings();
-
-        let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
-            .service(service);
-
-        let batch_settings = self.batch.into_batcher_settings()?;
-
-        // Use config templates for introspection in resolve_strategy.
-        let database_template = self.database.clone().unwrap_or_else(|| {
-            "default"
-                .try_into()
-                .expect("'default' should be a valid template")
-        });
-
-        // Resolve the encoding strategy (format + encoder) based on configuration.
-        let (format, encoder_kind) = self
-            .resolve_strategy(&client, &endpoint, &database_template, auth.as_ref())
-            .await?;
-
-        // Confine templates for runtime use in the sink.
-        let confined_table = self
-            .table
-            .clone()
-            .confine(&self.confinement, Self::NAME, "table")?;
-        let database = database_template.confine(&self.confinement, Self::NAME, "database")?;
-
-        let request_builder = ClickhouseRequestBuilder {
-            compression: self.compression,
-            encoder: (self.encoding.clone(), encoder_kind),
-        };
-
-        let sink = ClickhouseSink::new(
-            batch_settings,
-            service,
-            database,
-            confined_table,
-            format,
-            request_builder,
-        );
-
-        let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+        // Delegate to prepared sink build
+        let prepared = ValidatedClickhouse::from_config(self)?;
+        crate::config::PreparedSink::build(&prepared, cx).await
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -294,6 +230,12 @@ impl SinkConfig for ClickhouseConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+
+    fn try_prepare(&self) -> Option<crate::Result<crate::config::PreparedSinkEntry>> {
+        Some(crate::config::ValidateSink::prepare(self).map(|validated| {
+            crate::config::PreparedSinkEntry::new(Box::new(self.clone()), Box::new(validated))
+        }))
+    }
 }
 
 impl ClickhouseConfig {
@@ -301,7 +243,7 @@ impl ClickhouseConfig {
     ///
     /// This method determines the appropriate ClickHouse format and Vector encoder
     /// based on the user's configuration, ensuring they are consistent.
-    async fn resolve_strategy(
+    pub(super) async fn resolve_strategy(
         &self,
         client: &HttpClient,
         endpoint: &Uri,
@@ -396,36 +338,19 @@ impl ClickhouseConfig {
     }
 }
 
-fn get_healthcheck_uri(endpoint: &Uri) -> String {
-    let mut uri = endpoint.to_string();
-    if !uri.ends_with('/') {
-        uri.push('/');
-    }
-    uri.push_str("?query=SELECT%201");
-    uri
-}
-
-async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
-    let uri = get_healthcheck_uri(&endpoint);
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
-
-    if let Some(auth) = auth {
-        auth.apply(&mut request);
-    }
-
-    let response = client.send(request).await?;
-
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::template::{ConfinementConfig, Template};
-    use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
+    use crate::template::ConfinementConfig;
+
+    fn get_healthcheck_uri(endpoint: &Uri) -> String {
+        let mut uri = endpoint.to_string();
+        if !uri.ends_with('/') {
+            uri.push('/');
+        }
+        uri.push_str("?query=SELECT%201");
+        uri
+    }
 
     #[test]
     fn generate_config() {
@@ -510,44 +435,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_format_selection_with_batch_encoding() {
-        use crate::http::HttpClient;
-        use crate::tls::TlsSettings;
-
-        // Create minimal dependencies for resolve_strategy
-        let tls = TlsSettings::default();
-        let client = HttpClient::new(tls, &Default::default()).unwrap();
-        let endpoint: http::Uri = "http://localhost:8123".parse().unwrap();
-        let database: Template = "test_db".try_into().unwrap();
-
-        // Test incompatible formats - should all return errors
-        let incompatible_formats = vec![
-            (Format::JsonEachRow, "json_each_row"),
-            (Format::JsonAsObject, "json_as_object"),
-            (Format::JsonAsString, "json_as_string"),
-        ];
-
-        for (format, format_name) in incompatible_formats {
-            let config = create_test_config(
-                format,
-                Some(ClickhouseBatchEncoding::ArrowStream(
-                    ArrowStreamSerializerConfig::default(),
-                )),
-            );
-
-            let result = config
-                .resolve_strategy(&client, &endpoint, &database, None)
-                .await;
-
-            assert!(
-                result.is_err(),
-                "Expected error for format {} with batch_encoding, but got success",
-                format_name
-            );
-        }
-    }
-
     #[test]
     fn test_format_selection_without_batch_encoding() {
         // When batch_encoding is None, the configured format should be used
@@ -571,5 +458,32 @@ mod tests {
                 "format should match configured value"
             );
         }
+    }
+
+    #[test]
+    fn preparation_error_on_invalid_batch_encoding_combination() {
+        use crate::config::ValidateSink;
+
+        let config = ClickhouseConfig {
+            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            table: "test_table".try_into().unwrap(),
+            format: Format::JsonEachRow, // Incompatible with batch_encoding
+            batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+                vector_lib::codecs::encoding::ArrowStreamSerializerConfig::default(),
+            )),
+            ..Default::default()
+        };
+
+        let result = config.prepare();
+        assert!(
+            result.is_err(),
+            "Preparation should fail for incompatible format/batch_encoding"
+        );
+        let error = result.unwrap_err().to_string();
+        assert!(
+            error.contains("'batch_encoding' is only compatible"),
+            "Error message should mention incompatibility: {}",
+            error
+        );
     }
 }
