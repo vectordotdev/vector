@@ -128,12 +128,22 @@ pub struct UnconfinedTemplate {
     tz_offset: Option<FixedOffset>,
 }
 
-/// A template that has passed through confinement via [`Template::confine`].
+/// A template that has passed through prefix-based confinement via [`Template::confine`].
 ///
-/// This is the only render-capable, confinement-enforcing template type. It is deliberately **not**
-/// deserializable: the sole way to obtain one is by confining a [`Template`] or an
-/// [`UnconfinedTemplate`], so a rendered value can never escape its confinement boundary. The
-/// `render` methods enforce the attached confinement checker (if any).
+/// This is for **non-URI fields** (object-store keys, Kafka topics, Redis keys,
+/// tenant IDs, filesystem paths). The template's literal prefix becomes the
+/// confinement boundary, with runtime checks for:
+/// - Prefix match (rendered value must start with the literal prefix)
+/// - No `..` path segments
+///
+/// For HTTP/HTTPS URI fields, use [`ConfinedUriTemplate`] instead, which is
+/// obtained via [`UriTemplate::confine`] and enforces URI-specific checks
+/// (authority, path-prefix, query/fragment rejection, encoded separator protection).
+///
+/// This type is deliberately **not** deserializable: the sole way to obtain one
+/// is by confining a [`Template`], so a rendered value can never escape its
+/// confinement boundary. The `render` methods enforce the attached confinement
+/// checker (if any).
 ///
 /// Both fields are private to this module, so a `ConfinedTemplate` can
 /// never be constructed (or deserialized) without going through confinement.
@@ -143,16 +153,66 @@ pub struct ConfinedTemplate {
     checker: Option<ConfinementChecker>,
 }
 
-/// The templated field type stored in sink config structs.
+/// A template that has passed through URI-specific confinement via [`UriTemplate::confine`].
+///
+/// This is for **HTTP/HTTPS URI fields only** (e.g., the HTTP sink's `uri` field).
+/// URI-specific confinement enforces:
+/// - Static authority (host) required
+/// - Authority match at render time (catches `@`-injection and host-extension)
+/// - Path-prefix match
+/// - No `..` segments or encoded variants
+/// - No query (`?`) or fragment (`#`) injection
+/// - No encoded separators (`%2F`, `%5C`, `%25`) or raw backslashes
+///
+/// For non-URI fields (object-store keys, Kafka topics, Redis keys, tenant IDs),
+/// use [`ConfinedTemplate`] via [`Template::confine`] instead, which enforces
+/// prefix-based confinement without URI-specific semantics.
+///
+/// This type is deliberately **not** deserializable and cannot be constructed from
+/// a [`ConfinedTemplate`]. The sole way to obtain one is via [`UriTemplate::confine`],
+/// which enforces URI-specific confinement checks.
+///
+/// This type-level separation prevents accidental URI confinement of non-URI fields
+/// like object-store key prefixes that happen to start with `http://` (e.g.,
+/// `key_prefix: "http://logs-{{ region }}/"` must use prefix confinement, not URI
+/// confinement).
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ConfinedUriTemplate {
+    inner: ConfinedTemplate,
+}
+
+/// The templated field type for HTTP/HTTPS URI config fields.
+///
+/// `UriTemplate` is serde-able and appears as a plain string in generated configuration
+/// schemas, but it exposes **no** `render` method. To render it, a sink must first confine it:
+///
+/// - Call [`UriTemplate::confine`] → [`ConfinedUriTemplate`] for URI-specific confinement.
+///
+/// This makes URI confinement unavoidable for URI config fields. For non-URI fields
+/// (object-store keys, Kafka topics, Redis keys, tenant IDs), use [`Template`] instead.
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[serde(try_from = "String", into = "String")]
+pub struct UriTemplate {
+    /// Inner template
+    #[serde(skip)]
+    inner: Template,
+}
+
+/// The templated field type stored in sink config structs for non-URI fields.
 ///
 /// `Template` is serde-able and appears as a plain string in generated configuration schemas, but
-/// it exposes **no** `render` method. To render it a sink must first call [`Template::confine`] in
-/// its `build()`, which yields a [`ConfinedTemplate`] that enforces the confinement invariant at
-/// render time. This makes confinement unavoidable: there is no way to render a sink's configured
-/// template without going through confinement first.
+/// it exposes **no** `render` method. To render it a sink must first confine it:
 ///
-/// Transforms and sources, which have no confinement boundary, should store
-/// [`UnconfinedTemplate`] directly instead.
+/// - **Non-URI fields** (object-store keys, Kafka topics, Redis keys, tenant IDs, filesystem paths):
+///   call [`Template::confine`] → [`ConfinedTemplate`] for prefix-based confinement.
+/// - **HTTP/HTTPS URI fields** (e.g., HTTP sink `uri`):
+///   use [`UriTemplate`] instead, which confines to [`ConfinedUriTemplate`].
+///
+/// This makes confinement unavoidable: there is no way to render a sink's configured
+/// template without going through confinement first. Transforms and sources, which have no
+/// confinement boundary, should store [`UnconfinedTemplate`] directly instead.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -184,8 +244,10 @@ pub struct UnsignedIntTemplate {
 /// Serializable config fragment for template confinement.
 ///
 /// Embed this in a component config with `#[serde(flatten)]` to get the
-/// `dangerously_allow_unconfined_template_resolution` field. Pass it to
-/// [`Template::confine`] on each template the component owns.
+/// `dangerously_allow_unconfined_template_resolution` field. Pass it to:
+///
+/// - [`Template::confine`] for non-URI fields (object-store keys, Kafka topics, etc.)
+/// - [`UriTemplate::confine`] for HTTP/HTTPS URI fields
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct ConfinementConfig {
