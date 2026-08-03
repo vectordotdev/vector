@@ -58,7 +58,8 @@
     "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v2.0.0.tgz"
   },
   "browserslist": [
-    "since 2017-06"
+    "defaults",
+    "not op_mini all"
   ],
   "devDependencies": {
     "prettier": "^3.9.6",
