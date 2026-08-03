@@ -16,7 +16,7 @@ const clearLocalStorageOnNewGeneration = () => {
 
   if ((storedGeneration != null) && (storedGeneration < currentGeneration)) {
     Object.keys(localStorage)
-      .filter((item) => item === '__spruce:global' || item.startsWith('__alpine:global:'))
+      .filter((item) => item.startsWith('__alpine:global:'))
       .forEach((item) => localStorage.removeItem(item));
   }
 
@@ -27,16 +27,8 @@ const clearLocalStorageOnNewGeneration = () => {
 const manageState = () => {
   // Detect the user's dark mode preference and set that to the default
   const darkModeDefault = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  let legacyState = {};
-
-  try {
-    const parsedState = JSON.parse(localStorage.getItem('__spruce:global') || '{}');
-    legacyState = parsedState && typeof parsedState === 'object' ? parsedState : {};
-  } catch {
-    // Ignore malformed legacy state and use the defaults below.
-  }
   const persistValue = (key, defaultValue) =>
-    Alpine.$persist(legacyState[key] ?? defaultValue)
+    Alpine.$persist(defaultValue)
       .using(localStorage)
       .as(`__alpine:global:${key}`);
 
@@ -113,7 +105,6 @@ const manageState = () => {
     },
   });
 
-  localStorage.removeItem('__spruce:global');
 }
 
 const main = () => {
