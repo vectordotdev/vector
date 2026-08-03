@@ -154,7 +154,7 @@ async-compression = { version = "0.4.42", default-features = false, features = [
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 axum = { version = "0.6.20", default-features = false }
-base64 = { version = "0.22.1", default-features = false }
+base64 = { version = "0.23.0", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
 chrono = { version = "0.4.44", default-features = false, features = ["clock", "serde"] }
@@ -163,11 +163,11 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.6.5"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
-convert_case = { version = "0.8", default-features = false }
+convert_case = { version = "0.10", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 cuckoo-clock = { version = "0.2.7" , default-features = false }
-darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
+darling = { version = "0.23.0", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
@@ -180,28 +180,28 @@ humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
-itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
-metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
+metrics-util = { version = "0.20.4", default-features = false, features = ["registry"] }
 mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
-ordered-float = { version = "4.6.0", default-features = false }
+ordered-float = { version = "5.3.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.11" }
-proptest-derive = { version = "0.6.0" }
-prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-build = { version = "0.12", default-features = false }
-prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
-prost-types = { version = "0.12", default-features = false }
+proptest-derive = { version = "0.8.0" }
+prost = { version = "0.14", default-features = false, features = ["std"] }
+prost-build = { version = "0.14", default-features = false }
+prost-reflect = { version = "0.16", features = ["serde"], default-features = false }
+prost-types = { version = "0.14", default-features = false }
 quickcheck = { version = "1.1.0" }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
-rand_distr = { version = "0.5.1", default-features = false }
+rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 rust_decimal = { version = "1.40.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
@@ -210,20 +210,20 @@ serde_path_to_error = "0.1.14"
 serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
-socket2 = { version = "0.5.10", default-features = false }
+socket2 = { version = "0.6.3", default-features = false }
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
-tokio-tungstenite = { version = "0.20.1", default-features = false }
+tokio-tungstenite = { version = "0.29.0", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
-syn = { version = "2", default-features = false }
+syn = { version = "3", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-tonic-health = { version = "0.11", default-features = false }
-tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
+tonic-health = { version = "0.14", default-features = false }
+tonic-reflection = { version = "0.14", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -239,7 +239,7 @@ vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = f
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
 zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
-serial_test = { version = "3.4" }
+serial_test = { version = "4.0" }
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
