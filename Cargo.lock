@@ -2627,6 +2627,7 @@ dependencies = [
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
+ "zstd 0.13.2",
 ]
 
 [[package]]

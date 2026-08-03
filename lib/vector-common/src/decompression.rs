@@ -14,6 +14,7 @@
 //! let data = CappedDecoder::gzip(reader).decompress()?;
 //! let data = CappedDecoder::zlib(reader).decompress()?;
 //! let data = CappedDecoder::zstd(reader)?.decompress()?;
+//! let data = CappedDecoder::zstd_with_dictionary(reader, &dictionary)?.decompress()?;
 //! ```
 //!
 //! The constructors enforce the global decompressed-size cap so that a compression bomb cannot
@@ -32,6 +33,10 @@ use std::{
 };
 
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
+
+// Re-exported so downstream crates can prepare a zstd dictionary for
+// [`CappedDecoder::zstd_with_dictionary`] without depending on `zstd` directly.
+pub use zstd::dict::DecoderDictionary;
 
 /// Default cap on the size of any decompressed payload.
 ///
@@ -335,6 +340,43 @@ impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S
         Self::zstd_with_window_log(reader, limit, http_zstd_window_log_max(limit))
     }
 
+    /// Creates a capped zstd decoder that decompresses using a prepared dictionary, using the
+    /// global decompressed-size cap.
+    ///
+    /// The dictionary must be the same as the one used during compression. Prepare it once (e.g.
+    /// at config build time) with [`DecoderDictionary::copy`] and reuse it across payloads;
+    /// parsing a dictionary is much more expensive than referencing a prepared one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the zstd decoder cannot be initialized with the dictionary.
+    pub fn zstd_with_dictionary(
+        reader: S,
+        dictionary: &DecoderDictionary<'static>,
+    ) -> io::Result<Self> {
+        Self::zstd_with_dictionary_and_limit(reader, dictionary, max_decompressed_size_bytes())
+    }
+
+    /// Creates a capped zstd decoder that decompresses using a prepared dictionary, using an
+    /// explicit decompressed-size cap. See [`zstd_with_dictionary`](Self::zstd_with_dictionary).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the zstd decoder cannot be initialized with the dictionary.
+    pub fn zstd_with_dictionary_and_limit(
+        reader: S,
+        dictionary: &DecoderDictionary<'static>,
+        limit: usize,
+    ) -> io::Result<Self> {
+        let buffered = io::BufReader::with_capacity(zstd::zstd_safe::DCtx::in_size(), reader);
+        let mut decoder =
+            zstd::stream::read::Decoder::with_prepared_dictionary(buffered, dictionary)?;
+        if let Some(window_log_max) = zstd_window_log_max(limit) {
+            decoder.window_log_max(window_log_max)?;
+        }
+        Ok(Self::with_limit(decoder, limit))
+    }
+
     fn zstd_with_window_log(
         reader: S,
         limit: usize,
@@ -345,5 +387,92 @@ impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S
             decoder.window_log_max(window_log_max)?;
         }
         Ok(Self::with_limit(decoder, limit))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    fn train_dictionary(seed: u64) -> Vec<u8> {
+        let samples: Vec<Vec<u8>> = (0..100)
+            .map(|i| {
+                format!(r#"{{"seed":{seed},"id":{i},"message":"sample event {i}"}}"#).into_bytes()
+            })
+            .collect();
+        zstd::dict::from_samples(&samples, 4 * 1024).expect("dictionary training failed")
+    }
+
+    fn compress_with_dictionary(data: &[u8], dictionary: &[u8]) -> Vec<u8> {
+        zstd::bulk::Compressor::with_dictionary(3, dictionary)
+            .expect("compressor init failed")
+            .compress(data)
+            .expect("compression failed")
+    }
+
+    #[test]
+    fn zstd_dictionary_round_trip() {
+        let dictionary = train_dictionary(42);
+        let payload = br#"{"id":123,"message":"hello dictionary"}"#;
+        let compressed = compress_with_dictionary(payload, &dictionary);
+
+        let prepared = DecoderDictionary::copy(&dictionary);
+        let decompressed = CappedDecoder::zstd_with_dictionary(Cursor::new(compressed), &prepared)
+            .expect("decoder init failed")
+            .decompress()
+            .expect("decompression failed");
+
+        assert_eq!(decompressed, payload);
+    }
+
+    #[test]
+    fn zstd_dictionary_payload_rejected_without_dictionary() {
+        let dictionary = train_dictionary(42);
+        let payload = br#"{"id":123,"message":"hello dictionary"}"#;
+        let compressed = compress_with_dictionary(payload, &dictionary);
+
+        // A trained dictionary embeds a dictionary ID in the frame header, so decoding without
+        // the dictionary must fail rather than produce garbage.
+        let result = CappedDecoder::zstd(Cursor::new(compressed))
+            .expect("decoder init failed")
+            .decompress();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn zstd_dictionary_payload_rejected_with_wrong_dictionary() {
+        let dictionary = train_dictionary(42);
+        let other_dictionary = train_dictionary(43);
+        let payload = br#"{"id":123,"message":"hello dictionary"}"#;
+        let compressed = compress_with_dictionary(payload, &dictionary);
+
+        let prepared = DecoderDictionary::copy(&other_dictionary);
+        let result = CappedDecoder::zstd_with_dictionary(Cursor::new(compressed), &prepared)
+            .expect("decoder init failed")
+            .decompress();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn zstd_dictionary_respects_size_cap() {
+        let dictionary = train_dictionary(42);
+        let payload = vec![b'a'; 8 * 1024];
+        let compressed = compress_with_dictionary(&payload, &dictionary);
+
+        // A cap of 7 KiB derives a 8 KiB decoder window (2^13), so the frame passes the window
+        // guard and it is the decompressed-size cap itself that trips.
+        let prepared = DecoderDictionary::copy(&dictionary);
+        let error = CappedDecoder::zstd_with_dictionary_and_limit(
+            Cursor::new(compressed),
+            &prepared,
+            7 * 1024,
+        )
+        .expect("decoder init failed")
+        .decompress()
+        .expect_err("decompression should exceed the cap");
+
+        assert!(is_decompressed_size_limit_error(&error));
     }
 }
