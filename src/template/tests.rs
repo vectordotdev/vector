@@ -16,6 +16,42 @@ use crate::event::{Event, LogEvent, MetricKind, MetricValue};
 // =============================================================================
 
 #[test]
+fn template_marker_is_ignored_by_configurable() {
+    // The `URI` const parameter is a compile-time marker only: both instantiations must
+    // report the same referenceable name (so the generator emits a single shared schema
+    // definition) and generate an identical schema.
+    assert_eq!(
+        <Template<false> as Configurable>::referenceable_name(),
+        <Template<true> as Configurable>::referenceable_name(),
+    );
+    assert_eq!(
+        <Template as Configurable>::referenceable_name(),
+        Some("vector::template::Template"),
+    );
+
+    let prefix_schema = serde_json::to_value(generate_root_schema::<Template>().unwrap()).unwrap();
+    let uri_schema = serde_json::to_value(generate_root_schema::<UriTemplate>().unwrap()).unwrap();
+    assert_eq!(prefix_schema, uri_schema);
+}
+
+#[test]
+fn template_schema_is_templateable() {
+    // Documentation generation keys off the `docs::templateable` metadata flag, so it must
+    // survive the hand-written `Configurable` impl for both markers.
+    for schema in [
+        generate_root_schema::<Template>().unwrap(),
+        generate_root_schema::<UriTemplate>().unwrap(),
+    ] {
+        let metadata = serde_json::to_value(&schema.schema).unwrap();
+        assert_eq!(
+            metadata.pointer("/_metadata/docs::templateable"),
+            Some(&serde_json::json!(true)),
+            "schema must carry the docs::templateable flag: {metadata}"
+        );
+    }
+}
+
+#[test]
 fn uri_template_schema_is_string() {
     // UriTemplate must generate a plain string schema (same as Template).
     let root_schema = generate_root_schema::<UriTemplate>().unwrap();

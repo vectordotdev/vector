@@ -278,7 +278,8 @@ impl S3SinkConfig {
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
+        let key_prefix: Template =
+            Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
         let key_prefix = key_prefix.confine(&self.confinement, Self::NAME, "key_prefix")?;
 
         let ssekms_key_id = self
@@ -286,7 +287,7 @@ impl S3SinkConfig {
             .ssekms_key_id
             .as_ref()
             .cloned()
-            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .map(|ssekms_key_id| Template::<false>::try_from(ssekms_key_id.as_str()))
             .transpose()?
             .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
             .transpose()?;
