@@ -111,6 +111,20 @@ fn parse_buffer_metrics(body: &str) -> Option<BufferMetrics> {
     })
 }
 
+fn buffer_metrics_details(metrics: Option<BufferMetrics>) -> serde_json::Value {
+    metrics.map_or(serde_json::Value::Null, |metrics| {
+        json!({
+            "max_size_bytes": metrics.max_size_bytes,
+            "occupancy_events": metrics.occupancy_events,
+            "occupancy_bytes": metrics.occupancy_bytes,
+            "occupancy_reported": metrics.occupancy_reported,
+            "received_events": metrics.received_events,
+            "sent_events": metrics.sent_events,
+            "discarded_events": metrics.discarded_events,
+        })
+    })
+}
+
 async fn fetch_metrics(client: &reqwest::Client, metrics_url: &str) -> Option<BufferMetrics> {
     let response = client
         .get(metrics_url)
@@ -395,10 +409,15 @@ async fn main() {
             time::sleep(time::Duration::from_secs(1)).await;
         }
     }
+    let accepted_metrics = fetch_metrics(&client, &args.metrics_url).await;
     assert_always!(
         probe_ids.len() == PROBE_COUNT,
         "the recovered disk buffer accepts a full fresh probe sequence",
-        &json!({ "accepted_count": probe_ids.len(), "probe_ids": probe_ids })
+        &json!({
+            "accepted_count": probe_ids.len(),
+            "probe_ids": probe_ids,
+            "buffer_metrics": buffer_metrics_details(accepted_metrics),
+        })
     );
     if probe_ids.len() != PROBE_COUNT {
         return;
@@ -411,10 +430,15 @@ async fn main() {
         time::Duration::from_secs(180),
     )
     .await;
+    let delivery_metrics = fetch_metrics(&client, &args.metrics_url).await;
     assert_always!(
         missing.is_empty(),
         "every fault-free post-recovery probe traverses the disk buffer",
-        &json!({ "probe_ids": probe_ids, "missing_ids": missing })
+        &json!({
+            "probe_ids": probe_ids,
+            "missing_ids": missing,
+            "buffer_metrics": buffer_metrics_details(delivery_metrics),
+        })
     );
     if !missing.is_empty() {
         return;

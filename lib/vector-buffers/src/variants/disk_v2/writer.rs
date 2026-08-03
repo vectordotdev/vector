@@ -42,6 +42,9 @@ use crate::{
 };
 use vector_common::finalization::{EventFinalizerGroups, EventStatus};
 
+#[cfg(feature = "antithesis-disk-asserts")]
+use super::DIAGNOSTIC_LOG_TARGET;
+
 /// Error that occurred during calls to [`BufferWriter`].
 #[derive(Debug, Snafu)]
 pub enum WriterError<T>
@@ -919,8 +922,14 @@ where
         }
     }
 
-    fn get_next_record_id(&mut self) -> u64 {
+    fn get_next_record_id(&self) -> u64 {
         self.next_record_id + self.unflushed_events
+    }
+
+    fn current_writer_mut(&mut self) -> &mut RecordWriter<FS::File, T> {
+        self.writer
+            .as_mut()
+            .expect("writer should exist after `ensure_ready_for_write`")
     }
 
     fn track_write(&mut self, event_count: usize, record_size: u64) {
@@ -946,6 +955,62 @@ where
                 "record_id": record_id,
                 "bytes_written": bytes_written,
             })
+        );
+    }
+
+    #[cfg(feature = "antithesis-disk-asserts")]
+    fn log_write_blocked_before_encoding(&self) {
+        let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
+        debug!(
+            target: DIAGNOSTIC_LOG_TARGET,
+            diagnostic = "write_blocked",
+            reason = "buffer_full_before_encoding",
+            next_record_id = self.get_next_record_id(),
+            published_buffer_size = self.ledger.get_total_buffer_size(),
+            unflushed_bytes = self.unflushed_bytes,
+            logical_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes,
+            max_buffer_size = self.config.max_buffer_size,
+            reader_file_id,
+            writer_file_id,
+            "Disk buffer write cannot proceed."
+        );
+    }
+
+    #[cfg(feature = "antithesis-disk-asserts")]
+    fn log_write_blocked_for_capacity(&self, record_id: u64, serialized_len: usize) {
+        let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
+        debug!(
+            target: DIAGNOSTIC_LOG_TARGET,
+            diagnostic = "write_blocked",
+            reason = "record_would_exceed_capacity",
+            record_id,
+            serialized_len,
+            published_buffer_size = self.ledger.get_total_buffer_size(),
+            unflushed_bytes = self.unflushed_bytes,
+            logical_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes,
+            max_buffer_size = self.config.max_buffer_size,
+            reader_file_id,
+            writer_file_id,
+            "Disk buffer write cannot proceed."
+        );
+    }
+
+    #[cfg(feature = "antithesis-disk-asserts")]
+    fn log_large_record_written(&self, record_id: u64, record_events: usize, bytes_written: usize) {
+        let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
+        debug!(
+            target: DIAGNOSTIC_LOG_TARGET,
+            diagnostic = "large_record_written",
+            record_id,
+            record_events,
+            bytes_written,
+            published_buffer_size = self.ledger.get_total_buffer_size(),
+            unflushed_bytes = self.unflushed_bytes,
+            next_writer_record_id = self.ledger.state().get_next_writer_record_id(),
+            last_reader_record_id = self.ledger.state().get_last_reader_record_id(),
+            reader_file_id,
+            writer_file_id,
+            "Large disk buffer record was written."
         );
     }
 
@@ -1701,6 +1766,8 @@ where
     ) -> Result<Result<usize, T>, WriterError<T>> {
         // If the buffer is already full, we definitely can't complete this write.
         if self.is_buffer_full() {
+            #[cfg(feature = "antithesis-disk-asserts")]
+            self.log_write_blocked_before_encoding();
             return Ok(Err(record));
         }
 
@@ -1801,20 +1868,19 @@ where
         //
         // Otherwise, we proceed with flushing like we normally would.
         let can_write_record = self.can_write_record(token.serialized_len());
-        let writer = self
-            .writer
-            .as_mut()
-            .expect("writer should exist after `ensure_ready_for_write`");
 
         let (bytes_written, flush_result) = if can_write_record {
             // We always return errors here because flushing the record won't return a recoverable
             // error like `DataFileFull`, as that gets checked during archiving. The guard fires
             // Errored automatically on `?` exit.
-            let result = writer.flush_record(token).await?;
+            let result = self.current_writer_mut().flush_record(token).await?;
             // Record is durable on disk; disarm so finalizers resolve as Delivered.
             record_finalizers.disarm();
             result
         } else {
+            #[cfg(feature = "antithesis-disk-asserts")]
+            self.log_write_blocked_for_capacity(record_id, token.serialized_len());
+
             // The record would not fit given the current size of the buffer, so we need to recover it from the
             // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
             // errors if we encounter them, but if we recover the record successfully, we're returning
@@ -1824,7 +1890,7 @@ where
             // record path, but this record is being returned for retry (block mode) or overflow.
             // `into_inner` extracts from the guard without resolving status; the finalizers will
             // be resolved only when the returned record is eventually written or dropped.
-            let mut record = writer.recover_archived_record(&token)?;
+            let mut record = self.current_writer_mut().recover_archived_record(&token)?;
             record.merge_finalizer_groups(record_finalizers.into_inner());
             return Ok(Err(record));
         };
@@ -1842,6 +1908,11 @@ where
         // reader, after all shared state reflects the readable bytes.
         if let Some(flush_result) = flush_result {
             self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
+        }
+
+        #[cfg(feature = "antithesis-disk-asserts")]
+        if bytes_written >= self.config.write_buffer_size {
+            self.log_large_record_written(record_id, record_events.get(), bytes_written);
         }
 
         // `can_write_record` admits a record only when the published and

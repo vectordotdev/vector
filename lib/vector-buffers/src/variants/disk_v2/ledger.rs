@@ -8,6 +8,9 @@ use std::{
     time::Instant,
 };
 
+#[cfg(feature = "antithesis-disk-asserts")]
+use std::time::Duration;
+
 use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
@@ -35,6 +38,9 @@ use super::{
 use crate::buffer_usage_data::BufferUsageHandle;
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
+
+#[cfg(feature = "antithesis-disk-asserts")]
+const PROGRESS_WAIT_DIAGNOSTIC_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
@@ -497,6 +503,10 @@ where
     /// configured buffer size) for a write to occur, or similarly, when a data file is deleted.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_reader(&self) {
+        #[cfg(feature = "antithesis-disk-asserts")]
+        self.wait_for_progress(&self.reader_notify, "reader").await;
+
+        #[cfg(not(feature = "antithesis-disk-asserts"))]
         self.reader_notify.notified().await;
     }
 
@@ -507,7 +517,79 @@ where
     /// Writer progress is published before this notification is sent.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
+        #[cfg(feature = "antithesis-disk-asserts")]
+        self.wait_for_progress(&self.writer_notify, "writer").await;
+
+        #[cfg(not(feature = "antithesis-disk-asserts"))]
         self.writer_notify.notified().await;
+    }
+
+    /// Waits without periodically returning to the caller, but reports a state snapshot when the
+    /// wait lasts long enough to be suspicious. Keeping one pinned `Notified` future across every
+    /// diagnostic interval preserves the normal coordination behavior instead of applying the
+    /// progress-recheck workaround that this instrumentation is intended to evaluate.
+    #[cfg(feature = "antithesis-disk-asserts")]
+    async fn wait_for_progress(&self, notify: &Notify, progress_source: &'static str) {
+        let notified = notify.notified();
+        tokio::pin!(notified);
+
+        let mut waited = Duration::ZERO;
+        loop {
+            tokio::select! {
+                () = &mut notified => {
+                    if !waited.is_zero() {
+                        self.log_progress_wait_state(progress_source, waited, "completed");
+                    }
+                    return;
+                }
+                () = tokio::time::sleep(PROGRESS_WAIT_DIAGNOSTIC_INTERVAL) => {
+                    waited += PROGRESS_WAIT_DIAGNOSTIC_INTERVAL;
+                    self.log_progress_wait_state(progress_source, waited, "still_waiting");
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "antithesis-disk-asserts")]
+    fn log_progress_wait_state(
+        &self,
+        progress_source: &'static str,
+        waited: Duration,
+        outcome: &'static str,
+    ) {
+        let (reader_file_id, writer_file_id) = self.get_current_reader_writer_file_id();
+        let total_buffer_size = self.get_total_buffer_size();
+        let pending_acks = self.pending_acks.load(Ordering::Acquire);
+        let next_writer_record_id = self.state().get_next_writer_record_id();
+        let last_reader_record_id = self.state().get_last_reader_record_id();
+        let writer_done = self.is_writer_done();
+
+        // Waiting for a writer while the live buffer is completely idle is expected. Suppress
+        // that steady state so the targeted debug filter only reports waits with outstanding work.
+        if progress_source == "writer"
+            && total_buffer_size == 0
+            && pending_acks == 0
+            && next_writer_record_id == last_reader_record_id.saturating_add(1)
+            && !writer_done
+        {
+            return;
+        }
+
+        debug!(
+            target: super::DIAGNOSTIC_LOG_TARGET,
+            diagnostic = "progress_wait",
+            progress_source,
+            outcome,
+            waited_ms = u64::try_from(waited.as_millis()).unwrap_or(u64::MAX),
+            total_buffer_size,
+            pending_acks,
+            next_writer_record_id,
+            last_reader_record_id,
+            reader_file_id,
+            writer_file_id,
+            writer_done,
+            "Disk buffer progress wait state."
+        );
     }
 
     /// Notifies all tasks waiting on progress by the reader.
@@ -571,6 +653,11 @@ where
     /// Increments the pending acknowledgement counter by the given amount.
     pub fn increment_pending_acks(&self, amount: u64) {
         self.pending_acks.fetch_add(amount, Ordering::AcqRel);
+    }
+
+    #[cfg(feature = "antithesis-disk-asserts")]
+    pub(super) fn get_pending_acks(&self) -> u64 {
+        self.pending_acks.load(Ordering::Acquire)
     }
 
     /// Consumes the full amount of pending acknowledgements, and resets the counter to zero.

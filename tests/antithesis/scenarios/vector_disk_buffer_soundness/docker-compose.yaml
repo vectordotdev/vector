@@ -19,9 +19,9 @@ services:
     image: vdbs-vector:${ANTITHESIS_IMAGE_TAG:-dev}
     environment:
       NO_COLOR: "1"
-      # Assertions carry the test diagnostics; routine Vector lifecycle logs
-      # only consume the Antithesis output budget.
-      VECTOR_LOG: "warn"
+      # Keep routine Vector output at warn while enabling only the disk_v2
+      # coordination diagnostics needed to localize a stalled record.
+      VECTOR_LOG: "warn,vector_buffers::disk_v2::diagnostics=debug"
       # Antithesis-only tuning: small files force frequent rollover and make an
       # 8MiB public buffer consist of four files.
       VECTOR_DISK_V2_MAX_DATA_FILE_SIZE: "2097152"

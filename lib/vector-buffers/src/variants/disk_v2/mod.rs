@@ -182,6 +182,9 @@ use snafu::{ResultExt, Snafu};
 use tracing::debug;
 use vector_common::finalization::Finalizable;
 
+#[cfg(feature = "antithesis-disk-asserts")]
+pub(super) const DIAGNOSTIC_LOG_TARGET: &str = "vector_buffers::disk_v2::diagnostics";
+
 mod backed_archive;
 mod checkpoint_recovery;
 pub(crate) mod common;

@@ -12,6 +12,9 @@ use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 
+#[cfg(feature = "antithesis-disk-asserts")]
+use super::DIAGNOSTIC_LOG_TARGET;
+
 use super::{
     Filesystem,
     common::create_crc32c_hasher,
@@ -687,6 +690,28 @@ where
 
                 self.data_file_acks
                     .add_acknowledgements(records_acknowledged);
+
+                #[cfg(feature = "antithesis-disk-asserts")]
+                if bytes_acknowledged >= self.ledger.config().write_buffer_size as u64 {
+                    let (reader_file_id, writer_file_id) =
+                        self.ledger.get_current_reader_writer_file_id();
+                    debug!(
+                        target: DIAGNOSTIC_LOG_TARGET,
+                        diagnostic = "large_record_acknowledged",
+                        consumed_acks,
+                        records_acknowledged,
+                        events_acknowledged,
+                        events_skipped,
+                        bytes_acknowledged,
+                        total_buffer_size = self.ledger.get_total_buffer_size(),
+                        pending_acks = self.ledger.get_pending_acks(),
+                        next_writer_record_id = self.ledger.state().get_next_writer_record_id(),
+                        last_reader_record_id = self.ledger.state().get_last_reader_record_id(),
+                        reader_file_id,
+                        writer_file_id,
+                        "Large disk buffer record acknowledgement released capacity."
+                    );
+                }
             }
 
             // If any events were skipped, do our logging/metrics for that.
@@ -1229,6 +1254,25 @@ where
             return Err(ReaderError::EmptyRecord);
         };
         self.track_read(record_id, record_bytes, record_events);
+
+        #[cfg(feature = "antithesis-disk-asserts")]
+        if record_bytes >= self.ledger.config().write_buffer_size as u64 {
+            let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
+            debug!(
+                target: DIAGNOSTIC_LOG_TARGET,
+                diagnostic = "large_record_read",
+                record_id,
+                record_events = record_events.get(),
+                record_bytes,
+                total_buffer_size = self.ledger.get_total_buffer_size(),
+                pending_acks = self.ledger.get_pending_acks(),
+                next_writer_record_id = self.ledger.state().get_next_writer_record_id(),
+                last_reader_record_id = self.ledger.state().get_last_reader_record_id(),
+                reader_file_id,
+                writer_file_id,
+                "Large disk buffer record was read."
+            );
+        }
 
         let (batch, receiver) = BatchNotifier::new_with_receiver();
         record.add_batch_notifier(batch);
