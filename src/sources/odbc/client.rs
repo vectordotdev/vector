@@ -418,9 +418,21 @@ impl Context {
             match send_enriched_batch(&out, events, &mut shutdown).await {
                 Ok(()) => {}
                 Err(BatchSendError::Shutdown { .. }) => {
+                    // Remaining chunks are re-read after restart; in-flight is via UnsentEventCount.
                     return shutdown_query(rx, blocking).await;
                 }
-                Err(BatchSendError::Send { source, .. }) => {
+                Err(BatchSendError::Send {
+                    source,
+                    dropped_events,
+                }) => {
+                    // Closed: emit chunks never handed to SourceSender (in-flight via StreamClosedError).
+                    // Timeout is retryable — do not discard.
+                    if dropped_events > 0 && matches!(source, SendError::Closed) {
+                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            count: dropped_events,
+                            reason: "Source stream closed before remaining ODBC batch chunks were sent.",
+                        });
+                    }
                     stream_error = Some(OdbcError::SendError { source });
                     break;
                 }
