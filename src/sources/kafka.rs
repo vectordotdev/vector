@@ -1039,9 +1039,9 @@ fn parse_stream<'a>(
                     topic: msg.topic(),
                     partition: msg.partition(),
                 });
-                // Skip messages that cannot be decompressed; decompression failures are
-                // deterministic, so there is no point in retrying them.
-                return None;
+                // Skip messages that cannot be decompressed, but still return an (empty) stream to commit the offset.
+                // Decompression failures are generally deterministic, so redelivery doesn't help.
+                return Some((0, futures::stream::empty().boxed()));
             }
         },
         None => Bytes::copy_from_slice(payload),
@@ -1792,6 +1792,50 @@ mod integration_test {
         send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
     }
 
+    fn train_test_dictionary() -> Vec<u8> {
+        let samples: Vec<Vec<u8>> = (0..100)
+            .map(|i| format!("{TEXT} sample {i:04}").into_bytes())
+            .collect();
+        zstd::dict::from_samples(&samples, 4 * 1024).expect("failed to train dictionary")
+    }
+
+    /// Writes the dictionary to a temporary file that is deleted on drop, even if the test panics.
+    fn write_test_dictionary(dictionary: &[u8]) -> tempfile::NamedTempFile {
+        let file = tempfile::NamedTempFile::new().expect("failed to create dictionary file");
+        std::fs::write(file.path(), dictionary).expect("failed to write dictionary");
+        file
+    }
+
+    /// Produces `count` messages whose payloads are compressed with `dictionary`, except for the
+    /// message at `corrupt_index`, whose payload is not valid zstd data.
+    async fn send_dictionary_compressed_events(
+        topic: &str,
+        dictionary: &[u8],
+        count: usize,
+        corrupt_index: usize,
+    ) {
+        create_topic(topic, 1).await;
+
+        let mut compressor = zstd::bulk::Compressor::with_dictionary(3, dictionary)
+            .expect("failed to create compressor");
+        let producer: &FutureProducer = &client_config(None);
+        for i in 0..count {
+            let text = format!("{TEXT} {i:03}");
+            let payload = if i == corrupt_index {
+                b"definitely not zstd".to_vec()
+            } else {
+                compressor
+                    .compress(text.as_bytes())
+                    .expect("failed to compress payload")
+            };
+            let key = format!("{KEY} {i}");
+            let record = FutureRecord::to(topic).payload(&payload).key(&key);
+            if let Err(error) = producer.send(record, Timeout::Never).await {
+                panic!("Cannot send event to Kafka: {error:?}");
+            }
+        }
+    }
+
     #[tokio::test]
     async fn consumes_zstd_dictionary_compressed_payloads() {
         const SEND_COUNT: usize = 5;
@@ -1800,44 +1844,18 @@ mod integration_test {
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
 
-        // Train a dictionary and write it to a file, as the source would consume it.
-        let samples: Vec<Vec<u8>> = (0..1000)
-            .map(|i| format!("{TEXT} sample {i:04}").into_bytes())
-            .collect();
-        let dictionary =
-            zstd::dict::from_samples(&samples, 16 * 1024).expect("failed to train dictionary");
-        let dictionary_path =
-            std::env::temp_dir().join(format!("vector-kafka-dict-{}", random_string(10)));
-        std::fs::write(&dictionary_path, &dictionary).expect("failed to write dictionary");
+        let dictionary = train_test_dictionary();
+        let dictionary_file = write_test_dictionary(&dictionary);
 
         let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
         config.decompression = Some(DecompressionConfig {
             algorithm: vector_lib::codecs::DecompressionAlgorithm::Zstd,
-            dictionary_path: Some(dictionary_path.clone()),
+            dictionary_path: Some(dictionary_file.path().to_path_buf()),
         });
-
-        create_topic(&topic, 1).await;
 
         // Produce messages whose payloads are compressed with the dictionary, plus one corrupt
         // payload that must be skipped without stalling the partition.
-        let mut compressor = zstd::bulk::Compressor::with_dictionary(3, &dictionary)
-            .expect("failed to create compressor");
-        let producer: &FutureProducer = &client_config(None);
-        for i in 0..SEND_COUNT {
-            let text = format!("{TEXT} {i:03}");
-            let payload = if i == CORRUPT_INDEX {
-                b"definitely not zstd".to_vec()
-            } else {
-                compressor
-                    .compress(text.as_bytes())
-                    .expect("failed to compress payload")
-            };
-            let key = format!("{KEY} {i}");
-            let record = FutureRecord::to(&topic).payload(&payload).key(&key);
-            if let Err(error) = producer.send(record, Timeout::Never).await {
-                panic!("Cannot send event to Kafka: {error:?}");
-            }
-        }
+        send_dictionary_compressed_events(&topic, &dictionary, SEND_COUNT, CORRUPT_INDEX).await;
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
@@ -1851,8 +1869,6 @@ mod integration_test {
             events
         })
         .await;
-
-        std::fs::remove_file(&dictionary_path).ok();
 
         assert_eq!(events.len(), SEND_COUNT - 1);
         let messages: HashSet<String> = events
@@ -1868,6 +1884,47 @@ mod integration_test {
             .map(|i| format!("{TEXT} {i:03}"))
             .collect();
         assert_eq!(messages, expected);
+    }
+
+    #[tokio::test]
+    async fn advances_offset_past_poison_messages() {
+        const SEND_COUNT: usize = 5;
+
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+
+        let dictionary = train_test_dictionary();
+        let dictionary_file = write_test_dictionary(&dictionary);
+
+        let mut opts = HashMap::new();
+        opts.insert("enable.partition.eof".into(), "true".into());
+        let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts));
+        config.decompression = Some(DecompressionConfig {
+            algorithm: vector_lib::codecs::DecompressionAlgorithm::Zstd,
+            dictionary_path: Some(dictionary_file.path().to_path_buf()),
+        });
+
+        // Corrupt message is last on the partition to ensure a later good message doesn't commit past it.
+        send_dictionary_compressed_events(&topic, &dictionary, SEND_COUNT, SEND_COUNT - 1).await;
+
+        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
+            // With `eof` enabled the source exits by itself once the partition is fully consumed.
+            let events = rx.collect::<Vec<Event>>().await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        })
+        .await;
+
+        assert_eq!(events.len(), SEND_COUNT - 1);
+        assert_eq!(
+            fetch_tpl_offset(&group_id, &topic, 0),
+            Offset::from_raw(SEND_COUNT as i64)
+        );
     }
 
     async fn send_receive(
