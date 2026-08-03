@@ -32,6 +32,7 @@ use vector_lib::{
         },
     },
     enrichment::Table,
+    event::EventArray,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
@@ -55,7 +56,7 @@ use crate::{
         TransformOuter, TransformOutput,
     },
     cpu_time::{CpuTimedExt, spawn_timed},
-    event::{EventArray, EventContainer},
+    event::EventContainer,
     extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
@@ -142,6 +143,7 @@ struct Builder<'a> {
     extra_context: ExtraContext,
     utilization_emitter: Option<UtilizationEmitter>,
     utilization_registry: UtilizationRegistry,
+    pending_task_transforms: HashMap<ComponentKey, PendingTaskTransform>,
 }
 
 impl<'a> Builder<'a> {
@@ -174,6 +176,7 @@ impl<'a> Builder<'a> {
             extra_context,
             utilization_emitter: emitter,
             utilization_registry: registry,
+            pending_task_transforms: HashMap::new(),
         }
     }
 
@@ -197,6 +200,7 @@ impl<'a> Builder<'a> {
                 source_tasks,
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
+                pending_task_transforms: self.pending_task_transforms,
                 detach_triggers: self.detach_triggers,
                 metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
@@ -822,7 +826,7 @@ impl<'a> Builder<'a> {
     }
 
     fn build_transform(
-        &self,
+        &mut self,
         transform: Transform,
         node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
@@ -909,47 +913,22 @@ impl<'a> Builder<'a> {
     }
 
     fn build_task_transform(
-        &self,
+        &mut self,
         t: Box<dyn TaskTransform<EventArray>>,
         node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-        let TransformNode {
-            key,
-            typetag,
-            input_details,
-            outputs,
-            cpu_ns,
-            ..
-        } = node;
-        let input_type = input_details.data_type();
+        let key = node.key.clone();
 
-        let (mut fanout, control) = Fanout::new(key.clone());
+        let (fanout, control) = Fanout::new(key.clone());
 
         let sender = self
             .utilization_registry
             .add_component(key.clone(), gauge!(GaugeName::Utilization));
-        let output_sender = sender.clone();
-        let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
-
-        let events_received = register!(EventsReceived);
-        let filtered = input_rx
-            .filter(move |events| ready(filter_events_type(events, input_type)))
-            .inspect(move |events| {
-                events_received.emit(CountByteSize(
-                    events.len(),
-                    events.estimated_json_encoded_size_of(),
-                ))
-            });
-        let events_sent = register!(EventsSent::from(internal_event::Output(None)));
-        let output_id = Arc::new(OutputId {
-            component: key.clone(),
-            port: None,
-        });
-        let latency_recorder = LatencyRecorder::new(self.config.global.latency_ewma_alpha);
 
         // Task transforms can only write to the default output, so only a single schema def map is needed
-        let schema_definition_map = outputs
+        let schema_definition_map = node
+            .outputs
             .iter()
             .find(|x| x.port.is_none())
             .expect("output for default port required for task transforms")
@@ -959,51 +938,125 @@ impl<'a> Builder<'a> {
             .map(|(key, value)| (key, Arc::new(value)))
             .collect();
 
-        let stream = t
-            .transform(Box::pin(filtered))
-            .map(move |mut events| {
-                for event in events.iter_events_mut() {
-                    update_runtime_schema_definition(event, &output_id, &schema_definition_map);
-                }
-                let now = Instant::now();
-                latency_recorder.on_send(&mut events, now);
-                (events, now)
-            })
-            .inspect(move |(events, _): &(EventArray, Instant)| {
-                events_sent.emit(CountByteSize(
-                    events.len(),
-                    events.estimated_json_encoded_size_of(),
-                ));
-            });
-        let stream = OutputUtilization::new(output_sender, stream);
-        let transform = async move {
-            debug!("Task transform starting.");
-
-            match fanout.send_stream(stream).await {
-                Ok(()) => {
-                    debug!("Task transform finished normally.");
-                    Ok(TaskOutput::Transform)
-                }
-                Err(e) => {
-                    debug!("Task transform finished with an error.");
-                    Err(TaskError::wrapped(e))
-                }
-            }
+        // Store the pending transform for later finalization at spawn time.
+        // This defers calling `t.transform()` until post-commit, preventing
+        // background task leaks if the configuration reload is rolled back.
+        let pending = PendingTaskTransform {
+            inner: t,
+            node,
+            input_rx,
+            utilization_sender: sender,
+            schema_definition_map,
+            fanout,
         };
+        self.pending_task_transforms.insert(key.clone(), pending);
 
-        let transform = if let Some(cpu_ns) = cpu_ns {
-            transform.cpu_timed(cpu_ns).boxed()
-        } else {
-            transform.boxed()
-        };
+        // Create a placeholder task. The actual transform logic will be
+        // finalized in `RunningTopology::spawn_transform`.
+        let placeholder = std::future::pending();
+        let task = Task::new(key.clone(), "task_transform_placeholder", placeholder);
 
         let mut outputs = HashMap::new();
-        outputs.insert(OutputId::from(&key), control);
-
-        let task = Task::new(key, typetag, transform);
+        outputs.insert(OutputId::from(key), control);
 
         (task, outputs)
     }
+}
+
+/// Finalizes a pending task transform at spawn time.
+///
+/// This function is called post-commit during `spawn_transform` to actually
+/// invoke `TaskTransform::transform()` and build the final task. By deferring
+/// this call to spawn time, we prevent background task leaks if a config
+/// reload is rolled back.
+pub(crate) fn finalize_task_transform(
+    pending: PendingTaskTransform,
+    latency_ewma_alpha: Option<f64>,
+) -> Task {
+    let PendingTaskTransform {
+        inner: t,
+        node,
+        input_rx,
+        utilization_sender,
+        schema_definition_map,
+        mut fanout,
+    } = pending;
+
+    let TransformNode {
+        key,
+        typetag,
+        input_details,
+        cpu_ns,
+        ..
+    } = node;
+    let input_type = input_details.data_type();
+
+    let input_rx = Utilization::new(
+        utilization_sender.clone(),
+        key.clone(),
+        input_rx.into_stream(),
+    );
+
+    let events_received = register!(EventsReceived);
+    let filtered = input_rx
+        .filter(move |events| ready(filter_events_type(events, input_type)))
+        .inspect(move |events| {
+            events_received.emit(CountByteSize(
+                events.len(),
+                events.estimated_json_encoded_size_of(),
+            ))
+        });
+    let events_sent = register!(EventsSent::from(internal_event::Output(None)));
+    let output_id = Arc::new(OutputId {
+        component: key.clone(),
+        port: None,
+    });
+    // Create the latency recorder lazily inside the stream processing.
+    // The recorder's histogram captures span labels at creation time, so we need
+    // to create it when the span is active (during task execution).
+    let latency_recorder = std::cell::OnceCell::new();
+
+    let stream = t
+        .transform(Box::pin(filtered))
+        .map(move |mut events| {
+            for event in events.iter_events_mut() {
+                update_runtime_schema_definition(event, &output_id, &schema_definition_map);
+            }
+            let now = Instant::now();
+            latency_recorder
+                .get_or_init(|| LatencyRecorder::new(latency_ewma_alpha))
+                .on_send(&mut events, now);
+            (events, now)
+        })
+        .inspect(move |(events, _): &(EventArray, Instant)| {
+            events_sent.emit(CountByteSize(
+                events.len(),
+                events.estimated_json_encoded_size_of(),
+            ));
+        });
+    let stream = OutputUtilization::new(utilization_sender, stream);
+    let transform = async move {
+        debug!("Task transform starting.");
+
+        match fanout.send_stream(stream).await {
+            Ok(()) => {
+                debug!("Task transform finished normally.");
+                Ok(TaskOutput::Transform)
+            }
+            Err(e) => {
+                debug!("Task transform finished with an error.");
+                Err(TaskError::wrapped(e))
+            }
+        }
+    };
+
+    let transform = if let Some(cpu_ns) = cpu_ns {
+        transform.cpu_timed(cpu_ns).boxed()
+    } else {
+        transform.boxed()
+    };
+
+    Task::new(key, typetag, transform)
 }
 
 async fn run_source_output_pump(
@@ -1108,6 +1161,26 @@ pub async fn reload_enrichment_tables(config: &Config) {
     ENRICHMENT_TABLES.finish_load();
 }
 
+/// Holds the components needed to finalize a task transform at spawn time.
+///
+/// Task transforms have their `transform()` method called post-commit (during spawn)
+/// to ensure that any background tasks spawned by the transform don't leak if the
+/// configuration reload is rolled back.
+pub(crate) struct PendingTaskTransform {
+    /// The task transform implementation.
+    pub(crate) inner: Box<dyn TaskTransform<EventArray>>,
+    /// Metadata about the transform node.
+    pub(crate) node: TransformNode,
+    /// The input receiver for the transform.
+    pub(crate) input_rx: BufferReceiver<EventArray>,
+    /// Utilization sender for metrics.
+    pub(crate) utilization_sender: UtilizationComponentSender,
+    /// Schema definition map for output events.
+    pub(crate) schema_definition_map: HashMap<OutputId, Arc<Definition>>,
+    /// The fanout for sending output events.
+    pub(crate) fanout: Fanout,
+}
+
 pub struct TopologyPieces {
     pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
@@ -1115,6 +1188,10 @@ pub struct TopologyPieces {
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    /// Task transforms that have been built but not yet finalized.
+    /// The actual `TaskTransform::transform()` call is deferred until spawn time
+    /// to prevent background task leaks on rollback.
+    pub(crate) pending_task_transforms: HashMap<ComponentKey, PendingTaskTransform>,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
@@ -1244,14 +1321,14 @@ const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
 }
 
 #[derive(Debug, Clone)]
-struct TransformNode {
-    key: ComponentKey,
-    typetag: &'static str,
-    inputs: Inputs<OutputId>,
-    input_details: Input,
-    outputs: Vec<TransformOutput>,
-    enable_concurrency: bool,
-    cpu_ns: Option<Counter>,
+pub(crate) struct TransformNode {
+    pub(crate) key: ComponentKey,
+    pub(crate) typetag: &'static str,
+    pub(crate) inputs: Inputs<OutputId>,
+    pub(crate) input_details: Input,
+    pub(crate) outputs: Vec<TransformOutput>,
+    pub(crate) enable_concurrency: bool,
+    pub(crate) cpu_ns: Option<Counter>,
 }
 
 impl TransformNode {

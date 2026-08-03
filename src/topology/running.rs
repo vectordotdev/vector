@@ -1251,7 +1251,15 @@ impl RunningTopology {
     }
 
     fn spawn_transform(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
-        let task = new_pieces.tasks.remove(key).unwrap();
+        // Check if this is a pending task transform that needs finalization.
+        // Task transforms defer calling `transform()` until spawn time (post-commit)
+        // to prevent background task leaks if the config reload is rolled back.
+        let task = if let Some(pending) = new_pieces.pending_task_transforms.remove(key) {
+            builder::finalize_task_transform(pending, self.config.global.latency_ewma_alpha)
+        } else {
+            new_pieces.tasks.remove(key).unwrap()
+        };
+
         let span = error_span!(
             "transform",
             component_kind = "transform",
