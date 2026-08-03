@@ -41,6 +41,20 @@ pub(crate) enum BuildError {
         prefix: String,
     },
 
+    /// The template has a URI scheme other than HTTP or HTTPS, which are not
+    /// supported for URI confinement.
+    #[snafu(display(
+        "URI template {prefix:?} uses unsupported scheme {scheme:?}. \
+         Only HTTP and HTTPS are supported for URI confinement, or set \
+         `dangerously_allow_unconfined_template_resolution: true` to opt out."
+    ))]
+    UnsupportedUriScheme {
+        /// The literal prefix with the unsupported scheme.
+        prefix: String,
+        /// The unsupported scheme.
+        scheme: String,
+    },
+
     /// The operator-authored URI prefix contains a percent-encoded path separator
     /// (`%2f` or `%5c`) or a raw backslash. These would cause every rendered
     /// event to be dropped at runtime; reject at build time instead.
@@ -150,9 +164,13 @@ pub(crate) enum ConfineError {
 
 /// Confinement checker stored on a [`Template`] at build time.
 ///
-/// Dispatches to `PrefixChecker` for non-URI fields (Kafka topics, Redis
-/// keys, tenant IDs, …) or `UriChecker` for HTTP/HTTPS URI fields. Common
-/// guards (NUL bytes, length limit) run before dispatching.
+/// Use [`ConfinementChecker::for_prefix_template`] for non-URI fields (object-store
+/// keys, Kafka topics, Redis keys, tenant IDs) and [`ConfinementChecker::for_uri_template`]
+/// for HTTP/HTTPS URI fields. The checker type is determined by caller intent, not by
+/// inspecting template content.
+///
+/// Common guards (NUL bytes, length limit) run at render time before dispatching
+/// to the specific checker.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ConfinementChecker {
     Prefix(PrefixChecker),
@@ -160,7 +178,12 @@ pub(crate) enum ConfinementChecker {
 }
 
 impl ConfinementChecker {
-    pub(crate) fn for_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
+    /// Validate common constraints for both prefix and URI confinement.
+    ///
+    /// Returns the field list and literal prefix if the template is dynamic
+    /// and requires confinement. Returns `Ok(None)` if the template is static
+    /// and needs no confinement.
+    fn validate_common(tpl: &Template) -> Result<Option<(Vec<String>, String)>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
             None => return Ok(None),
@@ -169,35 +192,120 @@ impl ConfinementChecker {
         if prefix.is_empty() {
             return Err(BuildError::NoDerivableBase { fields });
         }
-        if prefix == "/" {
-            return Err(BuildError::DerivedBaseIsRoot {
-                prefix: prefix.to_string(),
-            });
-        }
-        // Only treat as a URI if the prefix literally starts with http:// or https://.
-        // Testing for the scheme token alone (without "://") would misfire on
-        // templates like `http_{{tenant}}` whose prefix is `http_`.
-        let lp = prefix.to_ascii_lowercase();
-        if lp.starts_with("http://") || lp.starts_with("https://") {
-            // Reject URI templates that have field references AND `?` or `#`.
-            // A static query/fragment is safe (fixed value, not
-            // event-controlled). But once a `{{ field }}` is present, the
-            // rendered path segment can smuggle either:
-            //   - a `?extra=...` query string, or
-            //   - a `#frag` that `http::Uri` truncates before our checker
-            //     sees the path, silently dropping any operator-authored
-            //     suffix like `/ingest`.
-            let src = tpl.get_ref();
-            if src.contains('?') || src.contains('#') {
-                return Err(BuildError::DynamicUriQueryOrFragment {
-                    template: src.to_string(),
-                });
+        Ok(Some((fields, prefix.to_string())))
+    }
+
+    /// Build a prefix-based confinement checker for **non-URI fields**.
+    ///
+    /// Used for object-store keys, Kafka topics, Redis keys, tenant IDs, etc.
+    /// The template's literal prefix becomes the confinement base. A template
+    /// starting with `http://` or `https://` is treated as a non-URI string
+    /// prefix (e.g., object-store key `"http://logs-{{ region }}/"`).
+    ///
+    /// Returns `Ok(None)` for static templates that need no confinement.
+    ///
+    /// Errors:
+    /// - `NoDerivableBase`: template has field references but no literal prefix
+    /// - `DerivedBaseIsRoot`: prefix is exactly `"/"` (trivial confinement)
+    pub(crate) fn for_prefix_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
+        match Self::validate_common(tpl)? {
+            Some((_fields, prefix)) => {
+                // Reject root-only prefix to avoid trivial confinement.
+                if prefix == "/" {
+                    return Err(BuildError::DerivedBaseIsRoot { prefix });
+                }
+                Ok(Some(Self::Prefix(PrefixChecker { base: prefix })))
             }
-            UriChecker::from_prefix(prefix).map(|c| Some(Self::Uri(c)))
-        } else {
-            Ok(Some(Self::Prefix(PrefixChecker {
-                base: prefix.to_string(),
-            })))
+            None => Ok(None),
+        }
+    }
+
+    /// Build a URI-specific confinement checker for **HTTP/HTTPS URI fields**.
+    ///
+    /// The template must start with `http://` or `https://` and include a static
+    /// authority (host), regardless of whether it has dynamic field references.
+    /// URI templates with `?` or `#` combined with field references are rejected
+    /// (query/fragment injection).
+    ///
+    /// **All URI templates** (static and dynamic) are validated for:
+    /// - HTTP/HTTPS scheme (rejects ftp://, relative paths, schemeless URIs)
+    /// - Valid URI structure and non-empty authority
+    ///
+    /// **Static URI templates** (no `{{ }}` field references) return `Ok(None)`
+    /// because they have no event-controlled content to confine at runtime.
+    ///
+    /// **Dynamic URI templates** return `Ok(Some(checker))` for runtime confinement.
+    ///
+    /// Errors:
+    /// - `NoDerivableBase`: template has field references but no literal prefix
+    /// - `NoStaticUriAuthority`: URI is malformed, relative, schemeless, or lacks a static host
+    /// - `PartialUriAuthority`: field reference inside the authority component
+    /// - `DynamicUriQueryOrFragment`: `?` or `#` with field references
+    /// - `EncodedSeparatorInUriPrefix`: `%2F`, `%5C`, or backslash in prefix
+    /// - `UnsupportedUriScheme`: non-HTTP(S) scheme like ftp://
+    pub(crate) fn for_uri_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
+        match Self::validate_common(tpl)? {
+            Some((_fields, prefix)) => {
+                // Reject URI templates that have field references AND `?` or `#`.
+                // A static query/fragment is safe (fixed value, not
+                // event-controlled). But once a `{{ field }}` is present, the
+                // rendered path segment can smuggle either:
+                //   - a `?extra=...` query string, or
+                //   - a `#frag` that `http::Uri` truncates before our checker
+                //     sees the path, silently dropping any operator-authored
+                //     suffix like `/ingest`.
+                let src = tpl.get_ref();
+                if src.contains('?') || src.contains('#') {
+                    return Err(BuildError::DynamicUriQueryOrFragment {
+                        template: src.to_string(),
+                    });
+                }
+                UriChecker::from_prefix(&prefix).map(|c| Some(Self::Uri(c)))
+            }
+            None => {
+                // Static template (no field references). Validate URI structure
+                // even though no runtime checker is needed, to enforce the
+                // HTTP/HTTPS + authority requirement uniformly.
+                Self::validate_static_uri(tpl).map(|()| None)
+            }
+        }
+    }
+
+    /// Validate a static URI template for structure and scheme.
+    ///
+    /// Static templates don't need a runtime checker, but we still enforce:
+    /// - Must be HTTP or HTTPS scheme
+    /// - Must have valid URI structure with non-empty authority
+    ///
+    /// This prevents `UriTemplate::confine` from accepting `ftp://`, relative `/path`,
+    /// or schemeless `//host` URIs even when static.
+    fn validate_static_uri(tpl: &Template) -> Result<(), BuildError> {
+        let src = tpl.get_ref();
+        let uri = src
+            .parse::<Uri>()
+            .map_err(|_| BuildError::NoStaticUriAuthority {
+                prefix: src.to_string(),
+            })?;
+
+        // Validate HTTP/HTTPS scheme
+        let scheme = uri.scheme_str();
+        match scheme {
+            Some(s) if s.eq_ignore_ascii_case("http") || s.eq_ignore_ascii_case("https") => Ok(()),
+            Some(s) => Err(BuildError::UnsupportedUriScheme {
+                prefix: src.to_string(),
+                scheme: s.to_string(),
+            }),
+            None => Err(BuildError::NoStaticUriAuthority {
+                prefix: src.to_string(),
+            }),
+        }?;
+
+        // Validate non-empty authority
+        match uri.authority() {
+            Some(auth) if !auth.as_str().is_empty() => Ok(()),
+            _ => Err(BuildError::NoStaticUriAuthority {
+                prefix: src.to_string(),
+            }),
         }
     }
 
@@ -250,29 +358,37 @@ impl PrefixChecker {
 /// Confinement for HTTP/HTTPS URI templates.
 ///
 /// At build time the operator-authored static prefix is parsed with
-/// `http::Uri` and its scheme, authority, and path are stored normalised
-/// (lowercased). At render time the rendered value is also parsed with
-/// `http::Uri` and the structured fields are compared, which avoids all the
-/// pitfalls of raw-string heuristics (case sensitivity, percent-encoding,
+/// `http::Uri` and its scheme, authority, and path are stored. Scheme and
+/// authority are normalized to lowercase; the path prefix remains case-sensitive.
+/// At render time the rendered value is also parsed with `http::Uri` and the
+/// structured fields are compared, which avoids all the pitfalls of raw-string
+/// heuristics (case sensitivity in scheme/authority, percent-encoding,
 /// `@`-injection inside the authority component, etc.).
 ///
-/// Three checks run on every render:
+/// Build-time validation:
+/// - Rejects relative URIs, schemeless URIs, and non-HTTP/HTTPS schemes
+/// - Rejects templates with `?` or `#` combined with field references
+/// - Rejects encoded path separators (`%2F`, `%5C`) in static prefix
+/// - Requires static authority (host)
 ///
-/// 1. **Authority check** — the rendered URI's scheme and authority must match
-///    the operator-authored values exactly. This catches `@`-userinfo injection
-///    (`trusted.host@evil.com`) and host-extension attacks
-///    (`trusted.host.evil.com`).
+/// Render-time checks:
 ///
-/// 2. **Path-prefix check** — the rendered URI's path must start with the
-///    static path portion derived from the template prefix.
+/// 1. **Fragment rejection** — rejects raw `#` before parsing to prevent
+///    `http::Uri` truncation from hiding operator-authored suffixes.
 ///
-/// 3. **Dot-dot segment check** — no path segment may be `..`, `.%2e`,
-///    `%2e.`, or `%2e%2e` (case-insensitive). This catches path traversal
-///    within the same host even when the prefix check passes.
+/// 2. **Authority check** — scheme and authority must match the operator-authored
+///    values (case-insensitive). Catches `@`-userinfo injection and host-extension.
 ///
-/// URI templates containing `?` are rejected at build time — query parameters
-/// cannot be safely confined to a static boundary and must not appear in
-/// dynamic URI templates.
+/// 3. **Path-prefix check** — the rendered URI's path must start with the
+///    static path portion (case-sensitive).
+///
+/// 4. **Dot-dot segment check** — no path segment may be `..`, `.%2e`,
+///    `%2e.`, or `%2e%2e` (case-insensitive). Catches path traversal.
+///
+/// 5. **Encoded separator check** — rejects `%2f`, `%5c`, `%25`, and raw `\`
+///    in the path (double-decoding and Windows path separator vectors).
+///
+/// 6. **Query rejection** — rejects any rendered query string (field-smuggled `?`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct UriChecker {
     /// Lowercased scheme, e.g. `"https"`.
@@ -290,15 +406,32 @@ impl UriChecker {
             .map_err(|_| BuildError::NoStaticUriAuthority {
                 prefix: prefix.to_string(),
             })?;
-        let scheme = uri
-            .scheme_str()
-            .expect("scheme present because prefix starts with http(s)://")
-            .to_ascii_lowercase();
+
+        // Explicitly validate HTTP/HTTPS scheme - reject relative, schemeless,
+        // and non-HTTP schemes like ftp://
+        let scheme = uri.scheme_str();
+        let scheme = match scheme {
+            Some(s) if s.eq_ignore_ascii_case("http") || s.eq_ignore_ascii_case("https") => {
+                s.to_ascii_lowercase()
+            }
+            Some(s) => {
+                return Err(BuildError::UnsupportedUriScheme {
+                    prefix: prefix.to_string(),
+                    scheme: s.to_string(),
+                });
+            }
+            None => {
+                return Err(BuildError::NoStaticUriAuthority {
+                    prefix: prefix.to_string(),
+                });
+            }
+        };
         let path = uri.path().to_ascii_lowercase();
         // Reject encoded path separators, encoded percents, and raw
         // backslashes in the operator-authored prefix. Any of these would
         // cause every rendered URI to fail the render-time check, silently
         // dropping all events; detect at build time instead.
+        //
         if path.contains("%2f")
             || path.contains("%5c")
             || path.contains("%25")
@@ -323,7 +456,9 @@ impl UriChecker {
         let after_scheme = prefix
             .split_once("://")
             .map(|(_, rest)| rest)
-            .expect("\"://\" present because prefix starts with http(s)://");
+            .ok_or_else(|| BuildError::NoStaticUriAuthority {
+                prefix: prefix.to_string(),
+            })?;
         if !after_scheme.contains('/') {
             return Err(BuildError::PartialUriAuthority {
                 prefix: prefix.to_string(),
@@ -337,6 +472,21 @@ impl UriChecker {
     }
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {
+        // 1. Reject raw fragment injection BEFORE parsing.
+        //    `http::Uri` strips fragments server-side, which would hide the
+        //    operator-authored suffix in templates like:
+        //      `https://api.internal/base/{{ tenant }}/ingest`
+        //    where tenant = "ok#evil" renders as:
+        //      `https://api.internal/base/ok#evil`
+        //    and the parser discards `/ingest` (never checked).
+        //    Checking the raw string catches this before truncation.
+        if rendered.contains('#') {
+            return Err(ConfineError::OutsideBase {
+                rendered: rendered.to_string(),
+                base: format!("{}://{}{}", self.scheme, self.authority, self.path_prefix),
+            });
+        }
+
         // Parse with http::Uri so all structural checks use the same tokeniser
         // that built the baseline — no raw-string heuristics.
         let uri = rendered
@@ -345,9 +495,9 @@ impl UriChecker {
                 rendered: rendered.to_string(),
             })?;
 
-        // 1. Authority check: scheme + host must exactly match the base.
+        // 2. Authority check: scheme + host must exactly match the base.
         //    Catches @-userinfo injection and host-extension attacks.
-        //    Both sides are lowercased so the comparison is case-insensitive.
+        //    Scheme/authority are normalized to lowercase; path-prefix is case-sensitive.
         let actual_scheme = uri.scheme_str().unwrap_or("").to_ascii_lowercase();
         let actual_authority = uri
             .authority()
@@ -361,7 +511,7 @@ impl UriChecker {
             });
         }
 
-        // 2. Path-prefix check: catches path escape when the template includes
+        // 3. Path-prefix check: catches path escape when the template includes
         //    a static path (e.g. `https://api.internal/ingest/{{ tenant }}`).
         let path = uri.path();
         if !path.starts_with(&self.path_prefix) {
@@ -371,7 +521,7 @@ impl UriChecker {
             });
         }
 
-        // 3. Dot-dot segment check: catches within-prefix path traversal.
+        // 4. Dot-dot segment check: catches within-prefix path traversal.
         //    Also rejects percent-encoded variants that some servers decode
         //    before resolving the path (e.g. `/ingest/%2e%2e/admin`).
         for segment in path.split('/') {
@@ -386,7 +536,7 @@ impl UriChecker {
             }
         }
 
-        // 4. Reject encoded path separators, raw backslashes, and encoded
+        // 5. Reject encoded path separators, raw backslashes, and encoded
         //    percent signs.
         //    `%2f` (encoded `/`) and `%5c` (encoded `\`) are decoded by many
         //    servers before path normalization, turning an otherwise-safe
@@ -408,7 +558,7 @@ impl UriChecker {
             });
         }
 
-        // 4. Reject any rendered query. URI templates containing `?` are
+        // 6. Reject any rendered query. URI templates containing `?` are
         //    rejected at build time, so a query at render time means a field
         //    value smuggled `?...` into the path — e.g. tenant value
         //    `ok?tenant=evil` renders `.../ingest/ok?tenant=evil`: same
@@ -419,6 +569,7 @@ impl UriChecker {
                 base: format!("{}://{}{}", self.scheme, self.authority, self.path_prefix),
             });
         }
+
         Ok(())
     }
 }
