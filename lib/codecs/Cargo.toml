@@ -71,6 +71,7 @@ indoc.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
 similar-asserts = "1.7.0"
+tempfile.workspace = true
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
 rstest = "0.26.1"
 tracing-test = "0.2.6"

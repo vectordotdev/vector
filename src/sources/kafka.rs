@@ -1799,7 +1799,6 @@ mod integration_test {
         zstd::dict::from_samples(&samples, 4 * 1024).expect("failed to train dictionary")
     }
 
-    /// Writes the dictionary to a temporary file that is deleted on drop, even if the test panics.
     fn write_test_dictionary(dictionary: &[u8]) -> tempfile::NamedTempFile {
         let file = tempfile::NamedTempFile::new().expect("failed to create dictionary file");
         std::fs::write(file.path(), dictionary).expect("failed to write dictionary");

@@ -174,10 +174,10 @@ mod tests {
         zstd::dict::from_samples(&samples, 4 * 1024).expect("dictionary training failed")
     }
 
-    fn write_temp_dictionary(contents: &[u8]) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("vector-test-dict-{}", uuid::Uuid::new_v4()));
-        std::fs::write(&path, contents).unwrap();
-        path
+    fn write_temp_dictionary(contents: &[u8]) -> tempfile::NamedTempFile {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), contents).unwrap();
+        file
     }
 
     fn config(
@@ -241,10 +241,13 @@ mod tests {
     #[test]
     fn zstd_dictionary_round_trip() {
         let dictionary = train_dictionary();
-        let path = write_temp_dictionary(&dictionary);
-        let decompressor = config(DecompressionAlgorithm::Zstd, Some(path.clone()))
-            .build()
-            .unwrap();
+        let dictionary_file = write_temp_dictionary(&dictionary);
+        let decompressor = config(
+            DecompressionAlgorithm::Zstd,
+            Some(dictionary_file.path().to_path_buf()),
+        )
+        .build()
+        .unwrap();
 
         let payload = br#"{"id":123,"message":"hello dictionary"}"#;
         let compressed = zstd::bulk::Compressor::with_dictionary(3, &dictionary)
@@ -253,7 +256,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(decompressor.decompress(&compressed).unwrap(), payload);
-        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
