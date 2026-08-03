@@ -6,7 +6,10 @@ mod parsing;
 mod unconfined;
 mod unsigned;
 
-use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
+use std::{
+    borrow::Cow, convert::TryFrom, fmt, hash::Hash, marker::PhantomData, path::PathBuf,
+    sync::LazyLock,
+};
 
 use bytes::Bytes;
 use chrono::{
@@ -36,6 +39,7 @@ use crate::{
 };
 
 pub use configurable::ConfineUri;
+
 use confinement::ConfinementChecker;
 use parsing::Part;
 use unsigned::UnsignedIntTemplateSource;
@@ -198,7 +202,50 @@ pub struct ConfinedUriTemplate {
 ///
 /// This makes URI confinement unavoidable for URI config fields. For non-URI fields
 /// (object-store keys, Kafka topics, Redis keys, tenant IDs), use [`Template`] instead.
-pub type UriTemplate = Template<true>;
+pub type UriTemplate = Template<UriKind>;
+
+mod sealed {
+    pub trait Sealed {}
+}
+
+/// The confinement flavor of a [`Template`], as a type-level marker.
+///
+/// Sealed on purpose: the only two flavors are [`PrefixKind`] and [`UriKind`], and each
+/// one has a matching confinement implementation ([`Template::confine`] and
+/// [`ConfineUri::confine`] respectively). A third marker would be a template that cannot
+/// be confined at all.
+///
+/// The supertraits are what the derives on [`Template`] need: `#[derive(Clone)]` and
+/// friends generate `impl<K: Clone> Clone for Template<K>`-style bounds even though the
+/// marker is only held as [`PhantomData`], so requiring them here keeps `Template<K>`
+/// usable without repeating the bounds at every use site. `'static` is required by
+/// [`Configurable::as_configurable_ref`].
+pub trait TemplateKind:
+    sealed::Sealed + Clone + fmt::Debug + Default + PartialEq + Eq + Hash + 'static
+{
+}
+
+/// Marker for prefix-based confinement: the default flavor, used for non-URI fields
+/// (object-store keys, Kafka topics, Redis keys, tenant IDs, filesystem paths).
+///
+/// `Template<PrefixKind>` is spelled just `Template` thanks to the type parameter default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct PrefixKind;
+
+/// Marker for URI-specific confinement, used for HTTP/HTTPS URI fields.
+///
+/// `Template<UriKind>` is spelled [`UriTemplate`].
+//
+// Named `UriKind` rather than `Uri` to avoid colliding with `http::Uri`, which this
+// module imports and uses for URI structure validation.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct UriKind;
+
+impl sealed::Sealed for PrefixKind {}
+impl sealed::Sealed for UriKind {}
+
+impl TemplateKind for PrefixKind {}
+impl TemplateKind for UriKind {}
 
 /// The templated field type stored in sink config structs for non-URI fields.
 ///
@@ -214,44 +261,48 @@ pub type UriTemplate = Template<true>;
 /// template without going through confinement first. Transforms and sources, which have no
 /// confinement boundary, should store [`UnconfinedTemplate`] directly instead.
 ///
-/// # The `URI` marker
+/// # The `K` marker
 ///
-/// The `URI` const parameter selects which confinement flavor is reachable from a
-/// given template, and therefore which confined type it produces:
+/// The [`TemplateKind`] type parameter selects which confinement flavor is reachable
+/// from a given template, and therefore which confined type it produces:
 ///
-/// - `Template<false>` (the default, spelled `Template`) → [`Template::confine`] →
+/// - `Template<PrefixKind>` (the default, spelled `Template`) → [`Template::confine`] →
 ///   [`ConfinedTemplate`]
-/// - `Template<true>` (aliased as [`UriTemplate`]) → [`UriTemplate::confine`] →
+/// - `Template<UriKind>` (aliased as [`UriTemplate`]) → [`ConfineUri::confine`] →
 ///   [`ConfinedUriTemplate`]
 ///
-/// The marker exists purely to keep those two confinement flavors from being mixed up
-/// at compile time. It has no bearing on parsing, rendering, serialization, or the
-/// generated configuration schema: both instantiations (de)serialize as a plain string
-/// and share a single schema definition. See the hand-written [`Configurable`] impl
-/// below, which deliberately ignores `URI`.
+/// The marker is [`PhantomData`] only: it exists to keep those two confinement flavors
+/// from being mixed up at compile time, and has no bearing on parsing, rendering,
+/// serialization, or the generated configuration schema. Both instantiations
+/// (de)serialize as a plain string and share a single schema definition. See the
+/// hand-written [`Configurable`] impl below, which deliberately ignores `K`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
-pub struct Template<const URI: bool = false> {
+#[serde(try_from = "String", into = "String", bound = "")]
+pub struct Template<K: TemplateKind = PrefixKind> {
     inner: UnconfinedTemplate,
+
+    #[serde(skip)]
+    kind: PhantomData<K>,
 }
 
 // `Configurable` is implemented by hand rather than through `#[configurable_component]`
-// because the derive cannot see through a const generic parameter: it would emit one
-// schema definition per instantiation (named after `std::any::type_name`, which includes
-// the `URI` value) even though `URI` is a pure compile-time marker with no schema
-// meaning.
+// because the derive cannot see through the marker type parameter: it names each schema
+// definition after `std::any::type_name`, so it would emit one definition per
+// instantiation (`Template<PrefixKind>`, `Template<UriKind>`) even though `K` is a pure
+// compile-time marker with no schema meaning. It would also require `K` itself to be
+// `Configurable`, which is meaningless for a `PhantomData` marker.
 //
-// Ignoring the marker means both `Template<false>` and `Template<true>` report the same
-// referenceable name and the same schema, so the generator emits a single shared
-// definition. Everything else mirrors what the derive would have produced for a
+// Ignoring the marker means both instantiations report the same referenceable name and
+// the same schema, so the generator emits a single shared definition. Everything else
+// mirrors what the derive would have produced for a
 // `#[serde(try_from = "String", into = "String")]` "virtual newtype": the schema is
 // String's, plus the `docs::templateable` metadata flag that documentation generation
 // keys off of.
-impl<const URI: bool> Configurable for Template<URI> {
+impl<K: TemplateKind> Configurable for Template<K> {
     fn referenceable_name() -> Option<&'static str> {
         // Deliberately not `std::any::type_name::<Self>()`: that would render as
-        // `Template<false>`/`Template<true>` and split one logical config type into two
-        // identical schema definitions.
+        // `Template<PrefixKind>`/`Template<UriKind>` and split one logical config type
+        // into two identical schema definitions.
         Some(concat!(module_path!(), "::Template"))
     }
 
@@ -276,7 +327,7 @@ impl<const URI: bool> Configurable for Template<URI> {
     }
 }
 
-impl<const URI: bool> ToValue for Template<URI> {
+impl<K: TemplateKind> ToValue for Template<K> {
     fn to_value(&self) -> serde_json::Value {
         serde_json::Value::String(self.inner.src.clone())
     }

@@ -21,8 +21,8 @@ fn template_marker_is_ignored_by_configurable() {
     // report the same referenceable name (so the generator emits a single shared schema
     // definition) and generate an identical schema.
     assert_eq!(
-        <Template<false> as Configurable>::referenceable_name(),
-        <Template<true> as Configurable>::referenceable_name(),
+        <Template<PrefixKind> as Configurable>::referenceable_name(),
+        <Template<UriKind> as Configurable>::referenceable_name(),
     );
     assert_eq!(
         <Template as Configurable>::referenceable_name(),
