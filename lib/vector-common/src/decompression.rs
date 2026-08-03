@@ -369,12 +369,8 @@ impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S
         limit: usize,
     ) -> io::Result<Self> {
         let buffered = io::BufReader::with_capacity(zstd::zstd_safe::DCtx::in_size(), reader);
-        let mut decoder =
-            zstd::stream::read::Decoder::with_prepared_dictionary(buffered, dictionary)?;
-        if let Some(window_log_max) = zstd_window_log_max(limit) {
-            decoder.window_log_max(window_log_max)?;
-        }
-        Ok(Self::with_limit(decoder, limit))
+        let decoder = zstd::stream::read::Decoder::with_prepared_dictionary(buffered, dictionary)?;
+        Self::capped_zstd(decoder, limit, zstd_window_log_max(limit))
     }
 
     fn zstd_with_window_log(
@@ -382,7 +378,19 @@ impl<S: Read> CappedDecoder<zstd::stream::read::Decoder<'static, io::BufReader<S
         limit: usize,
         window_log_max: Option<u32>,
     ) -> io::Result<Self> {
-        let mut decoder = zstd::stream::read::Decoder::new(reader)?;
+        Self::capped_zstd(
+            zstd::stream::read::Decoder::new(reader)?,
+            limit,
+            window_log_max,
+        )
+    }
+
+    /// Applies the window allocation clamp to a raw zstd decoder and wraps it in the size cap.
+    fn capped_zstd(
+        mut decoder: zstd::stream::read::Decoder<'static, io::BufReader<S>>,
+        limit: usize,
+        window_log_max: Option<u32>,
+    ) -> io::Result<Self> {
         if let Some(window_log_max) = window_log_max {
             decoder.window_log_max(window_log_max)?;
         }
