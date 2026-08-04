@@ -2595,7 +2595,7 @@ dependencies = [
  "memchr",
  "metrics",
  "opentelemetry-proto",
- "ordered-float 4.6.0",
+ "ordered-float 5.3.0",
  "parquet",
  "pin-project",
  "prost 0.12.6",
@@ -7844,7 +7844,7 @@ dependencies = [
  "chrono",
  "glob",
  "hex",
- "ordered-float 4.6.0",
+ "ordered-float 5.3.0",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "tonic 0.11.0",
@@ -7875,6 +7875,15 @@ name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "ordered-float"
+version = "5.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7d950ca161dc355eaf28f82b11345ed76c6e1f6eb1f4f4479e0323b9e2fbd0e"
 dependencies = [
  "num-traits",
 ]
@@ -13056,7 +13065,7 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "openssl-src",
- "ordered-float 4.6.0",
+ "ordered-float 5.3.0",
  "parquet",
  "pastey",
  "percent-encoding",
@@ -13193,7 +13202,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "num-traits",
- "ordered-float 4.6.0",
+ "ordered-float 5.3.0",
  "pastey",
  "proptest",
  "quickcheck",
@@ -13342,7 +13351,7 @@ dependencies = [
  "no-proxy",
  "noisy_float",
  "openssl",
- "ordered-float 4.6.0",
+ "ordered-float 5.3.0",
  "parking_lot",
  "pin-project",
  "proptest",
@@ -13588,7 +13597,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.34.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#3158cbafb4ffed840dbced6a0dec906c31aeb864"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=pront-ordered-float-5#995680d4f1f47bf1d7c8728d15b6d0e8616fdeef"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",
@@ -13647,7 +13656,7 @@ dependencies = [
  "nu-ansi-term",
  "ofb",
  "onig",
- "ordered-float 4.6.0",
+ "ordered-float 5.3.0",
  "parse-size",
  "peeking_take_while",
  "percent-encoding",

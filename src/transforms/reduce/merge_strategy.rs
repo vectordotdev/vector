@@ -420,7 +420,12 @@ impl ReduceValueMerger for AddNumbersMerger {
                 }
             },
             Value::Float(f) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
+                NumberMergerValue::Int(j) => {
+                    self.v = NumberMergerValue::Float(
+                        NotNan::new(f + j as f64)
+                            .expect("adding an integer to a non-NaN float cannot produce NaN"),
+                    )
+                }
                 NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
             },
             _ => {
@@ -826,6 +831,10 @@ mod test {
         assert_eq!(
             merge(21.into(), 21.into(), &MergeStrategy::Sum),
             Ok(42.into())
+        );
+        assert_eq!(
+            merge(21.into(), 21.0.into(), &MergeStrategy::Sum),
+            Ok(42.0.into())
         );
         assert_eq!(
             merge(41.into(), 42.into(), &MergeStrategy::Max),
