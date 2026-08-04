@@ -11,7 +11,10 @@ use snafu::{ResultExt, Snafu};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
+    event::{
+        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue,
+        metric::{MetricSketch, TagValue},
+    },
     metrics::AgentDDSketch,
     request_metadata::GroupedCountByteSize,
 };
@@ -636,11 +639,18 @@ fn series_to_proto_message(
             .collect();
 
         for (tag, resource_type) in resource_tags {
-            if let Some(name) = tags.remove(&tag) {
-                resources.push(ddmetric_proto::metric_payload::Resource {
-                    r#type: resource_type,
-                    name,
-                });
+            if let Some(values) = tags.remove_set(&tag) {
+                for value in values {
+                    match value {
+                        TagValue::Value(name) => {
+                            resources.push(ddmetric_proto::metric_payload::Resource {
+                                r#type: resource_type.clone(),
+                                name,
+                            });
+                        }
+                        TagValue::Bare => tags.insert(tag.clone(), TagValue::Bare),
+                    }
+                }
             }
         }
     }
@@ -1277,6 +1287,50 @@ mod tests {
         assert_eq!(
             series_proto.tags,
             vec!["abc.def.ghi:database_name:mongo_potatoes"]
+        );
+    }
+
+    #[test]
+    fn encode_datadog_agent_multi_value_resource_tags_and_preserve_bare_tags() {
+        let mut tags = MetricTags::default();
+        tags.insert(
+            "resource.database_instance".into(),
+            TagValue::Value("mongo-repro-01".into()),
+        );
+        tags.insert(
+            "resource.database_instance".into(),
+            TagValue::Value("mongo-repro-02".into()),
+        );
+        tags.insert("resource.database_instance".into(), TagValue::Bare);
+        tags.insert("resource.bare_only".into(), TagValue::Bare);
+
+        let mut metric = get_simple_counter().with_tags(Some(tags));
+        metric.metadata_mut().set_source_type("datadog_agent");
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        let database_instances: Vec<_> = series_proto
+            .resources
+            .iter()
+            .filter(|resource| resource.r#type == "database_instance")
+            .map(|resource| resource.name.as_str())
+            .collect();
+        assert_eq!(database_instances, vec!["mongo-repro-01", "mongo-repro-02"]);
+        assert!(
+            !series_proto
+                .resources
+                .iter()
+                .any(|resource| resource.r#type == "bare_only")
+        );
+        assert_eq!(
+            series_proto.tags,
+            vec!["resource.bare_only", "resource.database_instance"]
         );
     }
 
