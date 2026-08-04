@@ -25,19 +25,16 @@ impl Template<PrefixKind> {
             return Ok(ConfinedTemplate {
                 inner: self.inner,
                 checker: None,
+                kind: PhantomData,
             });
         }
-        match ConfinementChecker::for_prefix_template(&self) {
-            Ok(Some(checker)) => Ok(ConfinedTemplate {
+        ConfinementChecker::for_prefix_template(&self)
+            .map(|checker| ConfinedTemplate {
                 inner: self.inner,
-                checker: Some(checker),
-            }),
-            Ok(None) => Ok(ConfinedTemplate {
-                inner: self.inner,
-                checker: None,
-            }),
-            Err(e) => Err(e.into()),
-        }
+                checker,
+                kind: PhantomData,
+            })
+            .map_err(Into::into)
     }
 }
 
@@ -192,26 +189,17 @@ impl ConfineUri for UriTemplate {
         if config.dangerously_allow_unconfined_template_resolution {
             ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
             return Ok(ConfinedUriTemplate {
-                inner: ConfinedTemplate {
-                    inner: self.inner,
-                    checker: None,
-                },
+                inner: self.inner,
+                checker: None,
+                kind: PhantomData,
             });
         }
-        match ConfinementChecker::for_uri_template(&self) {
-            Ok(Some(checker)) => Ok(ConfinedUriTemplate {
-                inner: ConfinedTemplate {
-                    inner: self.inner,
-                    checker: Some(checker),
-                },
-            }),
-            Ok(None) => Ok(ConfinedUriTemplate {
-                inner: ConfinedTemplate {
-                    inner: self.inner,
-                    checker: None,
-                },
-            }),
-            Err(e) => Err(e.into()),
-        }
+        ConfinementChecker::for_uri_template(&self)
+            .map(|checker| ConfinedUriTemplate {
+                inner: self.inner,
+                checker,
+                kind: PhantomData,
+            })
+            .map_err(Into::into)
     }
 }

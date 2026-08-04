@@ -180,12 +180,10 @@ pub(crate) enum ConfinementChecker {
 impl ConfinementChecker {
     /// Validate common constraints for both prefix and URI confinement.
     ///
-    /// Returns the field list and literal prefix if the template is dynamic
-    /// and requires confinement. Returns `Ok(None)` if the template is static
-    /// and needs no confinement.
-    fn validate_common<K: TemplateKind>(
-        tpl: &Template<K>,
-    ) -> Result<Option<(Vec<String>, String)>, BuildError> {
+    /// Returns the literal prefix if the template is dynamic and requires
+    /// confinement. Returns `Ok(None)` if the template is static and needs no
+    /// confinement.
+    fn validate_common<K: TemplateKind>(tpl: &Template<K>) -> Result<Option<String>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
             None => return Ok(None),
@@ -194,7 +192,7 @@ impl ConfinementChecker {
         if prefix.is_empty() {
             return Err(BuildError::NoDerivableBase { fields });
         }
-        Ok(Some((fields, prefix.to_string())))
+        Ok(Some(prefix.to_string()))
     }
 
     /// Build a prefix-based confinement checker for **non-URI fields**.
@@ -213,7 +211,7 @@ impl ConfinementChecker {
         tpl: &Template<PrefixKind>,
     ) -> Result<Option<Self>, BuildError> {
         match Self::validate_common(tpl)? {
-            Some((_fields, prefix)) => {
+            Some(prefix) => {
                 // Reject root-only prefix to avoid trivial confinement.
                 if prefix == "/" {
                     return Err(BuildError::DerivedBaseIsRoot { prefix });
@@ -249,7 +247,7 @@ impl ConfinementChecker {
     /// - `UnsupportedUriScheme`: non-HTTP(S) scheme like ftp://
     pub(crate) fn for_uri_template(tpl: &UriTemplate) -> Result<Option<Self>, BuildError> {
         match Self::validate_common(tpl)? {
-            Some((_fields, prefix)) => {
+            Some(prefix) => {
                 // Reject URI templates that have field references AND `?` or `#`.
                 // A static query/fragment is safe (fixed value, not
                 // event-controlled). But once a `{{ field }}` is present, the
@@ -284,33 +282,9 @@ impl ConfinementChecker {
     /// This prevents `UriTemplate::confine` from accepting `ftp://`, relative `/path`,
     /// or schemeless `//host` URIs even when static.
     fn validate_static_uri(tpl: &UriTemplate) -> Result<(), BuildError> {
-        let src = tpl.get_ref();
-        let uri = src
-            .parse::<Uri>()
-            .map_err(|_| BuildError::NoStaticUriAuthority {
-                prefix: src.to_string(),
-            })?;
-
-        // Validate HTTP/HTTPS scheme
-        let scheme = uri.scheme_str();
-        match scheme {
-            Some(s) if s.eq_ignore_ascii_case("http") || s.eq_ignore_ascii_case("https") => Ok(()),
-            Some(s) => Err(BuildError::UnsupportedUriScheme {
-                prefix: src.to_string(),
-                scheme: s.to_string(),
-            }),
-            None => Err(BuildError::NoStaticUriAuthority {
-                prefix: src.to_string(),
-            }),
-        }?;
-
-        // Validate non-empty authority
-        match uri.authority() {
-            Some(auth) if !auth.as_str().is_empty() => Ok(()),
-            _ => Err(BuildError::NoStaticUriAuthority {
-                prefix: src.to_string(),
-            }),
-        }
+        // Static templates don't need a runtime checker, but we still enforce
+        // HTTP/HTTPS scheme and a non-empty authority (host) uniformly.
+        UriChecker::parse_http_uri(tpl.get_ref()).map(|_| ())
     }
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {
@@ -404,7 +378,10 @@ pub(crate) struct UriChecker {
 }
 
 impl UriChecker {
-    pub(crate) fn from_prefix(prefix: &str) -> Result<Self, BuildError> {
+    /// Parse `prefix` as an HTTP(S) URI, validating the scheme and that a
+    /// non-empty authority (host) is present. Returns the parsed `Uri` plus the
+    /// lowercased scheme and authority.
+    fn parse_http_uri(prefix: &str) -> Result<(Uri, String, String), BuildError> {
         let uri = prefix
             .parse::<Uri>()
             .map_err(|_| BuildError::NoStaticUriAuthority {
@@ -413,8 +390,7 @@ impl UriChecker {
 
         // Explicitly validate HTTP/HTTPS scheme - reject relative, schemeless,
         // and non-HTTP schemes like ftp://
-        let scheme = uri.scheme_str();
-        let scheme = match scheme {
+        let scheme = match uri.scheme_str() {
             Some(s) if s.eq_ignore_ascii_case("http") || s.eq_ignore_ascii_case("https") => {
                 s.to_ascii_lowercase()
             }
@@ -430,12 +406,26 @@ impl UriChecker {
                 });
             }
         };
+
+        let authority = match uri.authority() {
+            Some(auth) if !auth.as_str().is_empty() => auth.as_str().to_ascii_lowercase(),
+            _ => {
+                return Err(BuildError::NoStaticUriAuthority {
+                    prefix: prefix.to_string(),
+                });
+            }
+        };
+
+        Ok((uri, scheme, authority))
+    }
+
+    pub(crate) fn from_prefix(prefix: &str) -> Result<Self, BuildError> {
+        let (uri, scheme, authority) = Self::parse_http_uri(prefix)?;
         let path = uri.path().to_ascii_lowercase();
         // Reject encoded path separators, encoded percents, and raw
         // backslashes in the operator-authored prefix. Any of these would
         // cause every rendered URI to fail the render-time check, silently
         // dropping all events; detect at build time instead.
-        //
         if path.contains("%2f")
             || path.contains("%5c")
             || path.contains("%25")
@@ -445,14 +435,6 @@ impl UriChecker {
                 prefix: prefix.to_string(),
             });
         }
-        let authority = match uri.authority() {
-            Some(auth) if !auth.as_str().is_empty() => auth.as_str().to_ascii_lowercase(),
-            _ => {
-                return Err(BuildError::NoStaticUriAuthority {
-                    prefix: prefix.to_string(),
-                });
-            }
-        };
         // `http::Uri` normalises a missing path to `"/"`, so `uri.path()` can't
         // tell us whether the prefix actually had a `/` closing off the host. Check
         // the raw prefix instead: no `/` after `://` means the `{{ field }}`

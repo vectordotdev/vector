@@ -140,17 +140,23 @@ pub struct UnconfinedTemplate {
     tz_offset: Option<FixedOffset>,
 }
 
-/// A template that has passed through prefix-based confinement via [`Template::confine`].
+/// A template that has passed through confinement via [`Template::confine`] or
+/// [`ConfineUri::confine`].
 ///
-/// This is for **non-URI fields** (object-store keys, Kafka topics, Redis keys,
-/// tenant IDs, filesystem paths). The template's literal prefix becomes the
-/// confinement boundary, with runtime checks for:
-/// - Prefix match (rendered value must start with the literal prefix)
-/// - No `..` path segments
+/// The [`TemplateKind`] marker `K` selects which confinement flavor was applied:
 ///
-/// For HTTP/HTTPS URI fields, use [`ConfinedUriTemplate`] instead, which is
-/// obtained via [`UriTemplate::confine`] and enforces URI-specific checks
-/// (authority, path-prefix, query/fragment rejection, encoded separator protection).
+/// - `ConfinedTemplate<PrefixKind>` (the default, spelled `ConfinedTemplate`) —
+///   prefix confinement for **non-URI fields** (object-store keys, Kafka topics,
+///   Redis keys, tenant IDs, filesystem paths). Runtime checks: prefix match,
+///   no `..` path segments.
+/// - `ConfinedTemplate<UriKind>` (aliased as [`ConfinedUriTemplate`]) — URI-specific
+///   confinement for **HTTP/HTTPS URI fields**. Runtime checks: authority match,
+///   path-prefix, no `..`/encoded variants, no query/fragment injection, no encoded
+///   separators.
+///
+/// The marker is [`PhantomData`] only: it exists to keep the two confinement flavors
+/// from being mixed up at compile time (e.g. wiring a prefix-confined template into a
+/// URI field), and has no bearing on rendering or serialization.
 ///
 /// This type is deliberately **not** deserializable: the sole way to obtain one
 /// is by confining a [`Template`], so a rendered value can never escape its
@@ -160,38 +166,15 @@ pub struct UnconfinedTemplate {
 /// Both fields are private to this module, so a `ConfinedTemplate` can
 /// never be constructed (or deserialized) without going through confinement.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ConfinedTemplate {
+pub struct ConfinedTemplate<K: TemplateKind = PrefixKind> {
     inner: UnconfinedTemplate,
     checker: Option<ConfinementChecker>,
+    kind: PhantomData<K>,
 }
 
-/// A template that has passed through URI-specific confinement via [`UriTemplate::confine`].
-///
-/// This is for **HTTP/HTTPS URI fields only** (e.g., the HTTP sink's `uri` field).
-/// URI-specific confinement enforces:
-/// - Static authority (host) required
-/// - Authority match at render time (catches `@`-injection and host-extension)
-/// - Path-prefix match
-/// - No `..` segments or encoded variants
-/// - No query (`?`) or fragment (`#`) injection
-/// - No encoded separators (`%2F`, `%5C`, `%25`) or raw backslashes
-///
-/// For non-URI fields (object-store keys, Kafka topics, Redis keys, tenant IDs),
-/// use [`ConfinedTemplate`] via [`Template::confine`] instead, which enforces
-/// prefix-based confinement without URI-specific semantics.
-///
-/// This type is deliberately **not** deserializable and cannot be constructed from
-/// a [`ConfinedTemplate`]. The sole way to obtain one is via [`UriTemplate::confine`],
-/// which enforces URI-specific confinement checks.
-///
-/// This type-level separation prevents accidental URI confinement of non-URI fields
-/// like object-store key prefixes that happen to start with `http://` (e.g.,
-/// `key_prefix: "http://logs-{{ region }}/"` must use prefix confinement, not URI
-/// confinement).
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ConfinedUriTemplate {
-    inner: ConfinedTemplate,
-}
+/// A [`ConfinedTemplate`] that has passed through URI-specific confinement via
+/// [`UriTemplate::confine`], for HTTP/HTTPS URI fields (e.g., the HTTP sink's `uri`).
+pub type ConfinedUriTemplate = ConfinedTemplate<UriKind>;
 
 /// The templated field type for HTTP/HTTPS URI config fields.
 ///
