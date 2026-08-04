@@ -119,6 +119,7 @@ pub struct KafkaPayloadDecompressionError<'a> {
     pub error: &'a std::io::Error,
     pub topic: &'a str,
     pub partition: i32,
+    pub offset: i64,
 }
 
 impl InternalEvent for KafkaPayloadDecompressionError<'_> {
@@ -131,6 +132,7 @@ impl InternalEvent for KafkaPayloadDecompressionError<'_> {
             stage = error_stage::RECEIVING,
             topic = self.topic,
             partition = %self.partition,
+            offset = %self.offset,
         );
         counter!(
             CounterName::ComponentErrorsTotal,

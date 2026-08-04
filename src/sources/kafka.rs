@@ -1038,6 +1038,7 @@ fn parse_stream<'a>(
                     error: &error,
                     topic: msg.topic(),
                     partition: msg.partition(),
+                    offset: msg.offset(),
                 });
                 // Skip messages that cannot be decompressed, but still return an (empty) stream to commit the offset.
                 // Decompression failures are generally deterministic, so redelivery doesn't help.
