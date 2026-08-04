@@ -27,3 +27,5 @@ Discovered targets are scraped on the source's configured interval and emitted
 with `namespace`, `pod`, `node`, `container`, `instance`, and `endpoint` tags.
 Pod labels and annotations can be opted-in as additional metric tags via the
 `pod_label_tags` and `pod_annotation_tags` allowlists.
+
+authors: leeteng2001
