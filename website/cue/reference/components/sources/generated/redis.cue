@@ -13,6 +13,12 @@ generated: components: sources: redis: configuration: {
 					This is based on Redis' Pub/Sub capabilities.
 					"""
 				list: "The `list` data type."
+				pchannel: """
+					The `pchannel` data type.
+
+					Pattern-based Pub/Sub subscription using Redis `PSUBSCRIBE`. The `key` is interpreted
+					as a glob-style channel pattern (for example, `news.*`).
+					"""
 			}
 		}
 	}
@@ -534,6 +540,18 @@ generated: components: sources: redis: configuration: {
 				rpop: "Pop messages from the tail of the list."
 			}
 		}
+	}
+	redis_channel: {
+		description: """
+			Sets the name of the log field to use to add the matched channel to each event.
+
+			The value is the concrete Redis channel that matched the subscribed pattern.
+			Only applies to the `pchannel` data type.
+
+			By default, this is not set and the field is not automatically added.
+			"""
+		required: false
+		type: string: examples: ["redis_channel"]
 	}
 	redis_key: {
 		description: """
