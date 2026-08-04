@@ -166,6 +166,8 @@ enum ConfigError {
     EndpointsAndTargetsConflict,
     #[snafu(display("at least one endpoint or target must be specified"))]
     NoEndpointsOrTargets,
+    #[snafu(display("only one Kubernetes target group is currently supported"))]
+    MultipleKubernetesTargetGroups,
 }
 
 #[async_trait::async_trait]
@@ -220,9 +222,11 @@ impl SourceConfig for PrometheusScrapeConfig {
                 })
                 .collect();
 
-            if !kubernetes_cfgs.is_empty() {
-                let k8s_cfg = kubernetes_cfgs[0];
+            if kubernetes_cfgs.len() > 1 {
+                return Err(Box::new(ConfigError::MultipleKubernetesTargetGroups));
+            }
 
+            if let Some(k8s_cfg) = kubernetes_cfgs.first() {
                 let client =
                     kubernetes_sd::build_kube_client(k8s_cfg.kube_config_file.as_ref()).await?;
 
@@ -248,8 +252,7 @@ impl SourceConfig for PrometheusScrapeConfig {
                     self_node_name.as_deref(),
                     &k8s_cfg.extra_field_selector,
                 );
-                let label_selector =
-                    kubernetes_sd::build_label_selector(&k8s_cfg.extra_label_selector);
+                let label_selector = kubernetes_sd::build_label_selector(&k8s_cfg.label_selector);
 
                 let parser_cfg = kubernetes_sd::AnnotationParserConfig {
                     prefix: k8s_cfg.annotation_prefix.clone(),
@@ -266,6 +269,7 @@ impl SourceConfig for PrometheusScrapeConfig {
                     endpoint_tag: self.endpoint_tag.clone(),
                     honor_labels: self.honor_labels,
                     auth: self.auth.clone(),
+                    query: self.query.clone(),
                 };
 
                 let delay_deletion = Duration::from_millis(k8s_cfg.delay_deletion_ms);

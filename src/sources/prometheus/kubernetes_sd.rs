@@ -45,6 +45,7 @@ use crate::{
         PrometheusKubernetesSdTargetsDiscovered, PrometheusParseError, StreamClosedError,
     },
     kubernetes::{custom_reflector, meta_cache::MetaCache},
+    sources::util::http_client::build_url,
     tls::TlsSettings,
 };
 
@@ -150,9 +151,12 @@ pub struct KubernetesScrapeConfig {
     #[configurable(metadata(docs::examples = "metadata.namespace=monitoring"))]
     pub(crate) extra_field_selector: String,
 
-    /// Additional label selector merged with the built-in `vector.dev/exclude!=true` filter.
+    /// Kubernetes label selector merged with the built-in `vector.dev/exclude!=true` filter.
+    ///
+    /// `extra_label_selector` is accepted as a backwards-compatible alias.
     #[configurable(metadata(docs::examples = "tier=frontend"))]
-    pub(crate) extra_label_selector: String,
+    #[serde(alias = "extra_label_selector")]
+    pub(crate) label_selector: String,
 
     /// Restrict discovery to specific namespaces.
     ///
@@ -199,7 +203,7 @@ impl Default for KubernetesScrapeConfig {
             use_self_node_only: false,
             self_node_name: None,
             extra_field_selector: String::new(),
-            extra_label_selector: String::new(),
+            label_selector: String::new(),
             namespaces: Vec::new(),
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
@@ -285,6 +289,7 @@ pub(crate) struct ScrapeConfig {
     pub(crate) endpoint_tag: Option<String>,
     pub(crate) honor_labels: bool,
     pub(crate) auth: Option<Auth>,
+    pub(crate) query: crate::http::QueryParameters,
 }
 
 /// Top-level scrape loop. Owns the reflector spawn and the periodic scraper.
@@ -704,8 +709,12 @@ fn build_target_uri(
 /// Perform a single scrape and return the resulting events. Emits all the
 /// usual HTTP-client internal events on the way.
 async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) -> Vec<Event> {
-    let endpoint = target.uri.to_string();
-    let mut request = match Request::get(&target.uri).body(Body::empty()) {
+    // Keep `query` behavior consistent across static and discovered targets.
+    // The discovered URI can already contain annotation-derived parameters;
+    // `build_url` preserves them and appends the source-level parameters.
+    let url = build_url(&target.uri, &cfg.query);
+    let endpoint = url.to_string();
+    let mut request = match Request::get(&url).body(Body::empty()) {
         Ok(r) => r,
         Err(error) => {
             emit!(HttpClientHttpError {
@@ -763,7 +772,7 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
     });
 
     if parts.status != hyper::StatusCode::OK {
-        on_http_response_error(&target.uri, &parts);
+        on_http_response_error(&url, &parts);
         emit!(HttpClientHttpResponseError {
             code: parts.status,
             url: endpoint,
@@ -777,7 +786,7 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
         Err(error) => {
             emit!(PrometheusParseError {
                 error,
-                url: target.uri.clone(),
+                url: url.clone(),
                 body: body_str,
             });
             return Vec::new();
@@ -795,6 +804,8 @@ async fn scrape_target(client: &HttpClient, cfg: &ScrapeConfig, target: Target) 
         url: endpoint,
     });
 
+    let mut target = target;
+    target.uri = url;
     enrich_events(&mut events, &target, cfg);
     events
 }
