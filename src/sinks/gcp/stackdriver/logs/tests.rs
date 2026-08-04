@@ -31,7 +31,7 @@ use crate::{
             http::{HttpRequest, HttpServiceRequestBuilder},
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, PrefixKind, Template},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -40,7 +40,7 @@ use crate::{
 
 // Tests exercise the encoder, not confinement; build a checkerless confined template.
 fn confined(s: &str) -> ConfinedTemplate {
-    Template::try_from(s)
+    Template::<PrefixKind>::try_from(s)
         .unwrap()
         .confine(
             &ConfinementConfig::unconfined(),

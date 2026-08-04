@@ -15,6 +15,7 @@ use vector_lib::{
 };
 
 use super::sink::S3RequestOptions;
+use crate::template::PrefixKind;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
@@ -287,7 +288,7 @@ impl S3SinkConfig {
             .ssekms_key_id
             .as_ref()
             .cloned()
-            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .map(|ssekms_key_id| Template::<PrefixKind>::try_from(ssekms_key_id.as_str()))
             .transpose()?
             .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
             .transpose()?;

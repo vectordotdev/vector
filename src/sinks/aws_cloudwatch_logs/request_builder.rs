@@ -143,10 +143,10 @@ mod tests {
     use vector_lib::{config::log_schema, event::LogEvent};
 
     use super::{CloudwatchRequestBuilder, MAX_MESSAGE_SIZE};
-    use crate::template::{ConfinedTemplate, ConfinementConfig, Template};
+    use crate::template::{ConfinedTemplate, ConfinementConfig, PrefixKind, Template};
 
     fn confined(src: &str, field: &'static str) -> ConfinedTemplate {
-        Template::try_from(src)
+        Template::<PrefixKind>::try_from(src)
             .unwrap()
             .confine(&ConfinementConfig::default(), "aws_cloudwatch_logs", field)
             .unwrap()

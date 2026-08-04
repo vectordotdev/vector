@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_tenant_id() {
-        let template = Template::try_from("{{ tenant }}").unwrap();
+        let template: Template = Template::try_from("{{ tenant }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "loki", "tenant_id");
         assert!(
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_tenant_id() {
-        let template = Template::try_from("{{ tenant }}").unwrap();
+        let template: Template = Template::try_from("{{ tenant }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -337,7 +337,7 @@ mod tests {
         use vrl::event_path;
         // "team-{{ org }}" has literal prefix "team-"; an attacker controlling `org`
         // cannot steer the rendered value to an org outside the "team-" namespace.
-        let template = Template::try_from("team-{{ org }}").unwrap();
+        let template: Template = Template::try_from("team-{{ org }}").unwrap();
         let config = ConfinementConfig::default();
         let confined = template.confine(&config, "loki", "tenant_id").unwrap();
         let mut event = LogEvent::default();

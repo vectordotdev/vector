@@ -38,8 +38,6 @@ use crate::{
     event::{EventRef, Metric, Value},
 };
 
-pub use configurable::ConfineUri;
-
 use confinement::ConfinementChecker;
 use parsing::Part;
 use unsigned::UnsignedIntTemplateSource;
@@ -140,8 +138,7 @@ pub struct UnconfinedTemplate {
     tz_offset: Option<FixedOffset>,
 }
 
-/// A template that has passed through confinement via [`Template::confine`] or
-/// [`ConfineUri::confine`].
+/// A template that has passed through confinement via [`Template::confine`].
 ///
 /// The [`TemplateKind`] marker `K` selects which confinement flavor was applied:
 ///
@@ -194,9 +191,7 @@ mod sealed {
 /// The confinement flavor of a [`Template`], as a type-level marker.
 ///
 /// Sealed on purpose: the only two flavors are [`PrefixKind`] and [`UriKind`], and each
-/// one has a matching confinement implementation ([`Template::confine`] and
-/// [`ConfineUri::confine`] respectively). A third marker would be a template that cannot
-/// be confined at all.
+/// one has a matching confinement implementation.
 ///
 /// The supertraits are what the derives on [`Template`] need: `#[derive(Clone)]` and
 /// friends generate `impl<K: Clone> Clone for Template<K>`-style bounds even though the
@@ -251,7 +246,7 @@ impl TemplateKind for UriKind {}
 ///
 /// - `Template<PrefixKind>` (the default, spelled `Template`) → [`Template::confine`] →
 ///   [`ConfinedTemplate`]
-/// - `Template<UriKind>` (aliased as [`UriTemplate`]) → [`ConfineUri::confine`] →
+/// - `Template<UriKind>` (aliased as [`UriTemplate`]) → [`UriTemplate::confine`] →
 ///   [`ConfinedUriTemplate`]
 ///
 /// The marker is [`PhantomData`] only: it exists to keep those two confinement flavors
