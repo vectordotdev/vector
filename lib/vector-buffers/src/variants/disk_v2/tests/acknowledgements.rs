@@ -1,12 +1,16 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
+use tokio::time::timeout;
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use vector_common::finalization::{BatchNotifier, EventFinalizer, EventStatus};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     test::with_temp_dir,
-    variants::disk_v2::{DiskBufferConfigBuilder, ledger::Ledger},
+    variants::disk_v2::{
+        DiskBufferConfigBuilder,
+        ledger::{Ledger, PROGRESS_WAIT_TIMEOUT},
+    },
 };
 
 pub(crate) async fn acknowledge(batch: BatchNotifier) {
@@ -79,6 +83,38 @@ async fn ack_wakes_reader() {
 
             assert!(wait_for_writer.is_woken());
             assert_ready!(wait_for_writer.poll());
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn progress_waits_return_for_periodic_state_rechecks() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let usage_handle = BufferUsageHandle::noop();
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .build()
+                .expect("creating buffer should not fail");
+            let ledger = Ledger::load_or_create(config, usage_handle)
+                .await
+                .expect("ledger should not fail to load/create");
+            let wait_deadline = PROGRESS_WAIT_TIMEOUT + Duration::from_millis(1);
+
+            assert!(
+                timeout(wait_deadline, ledger.wait_for_writer())
+                    .await
+                    .is_ok(),
+                "writer-progress wait should return so the reader can recheck its state"
+            );
+            assert!(
+                timeout(wait_deadline, ledger.wait_for_reader())
+                    .await
+                    .is_ok(),
+                "reader-progress wait should return so the writer can recheck its state"
+            );
         }
     })
     .await;

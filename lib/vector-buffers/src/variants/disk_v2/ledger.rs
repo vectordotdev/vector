@@ -5,11 +5,8 @@ use std::{
         Arc,
         atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
-
-#[cfg(feature = "antithesis-disk-asserts")]
-use std::time::Duration;
 
 use bytecheck::CheckBytes;
 use bytes::BytesMut;
@@ -39,8 +36,7 @@ use crate::buffer_usage_data::BufferUsageHandle;
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 
-#[cfg(feature = "antithesis-disk-asserts")]
-const PROGRESS_WAIT_DIAGNOSTIC_INTERVAL: Duration = Duration::from_millis(500);
+pub(super) const PROGRESS_WAIT_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
@@ -497,56 +493,40 @@ where
         Ok(deleted_files)
     }
 
-    /// Waits for a signal from the reader that progress has been made.
+    /// Waits for a signal from the reader that progress has been made, or until the caller should
+    /// recheck the state it is waiting on.
     ///
     /// This will only occur when a record is read, which may allow enough space (below the maximum
     /// configured buffer size) for a write to occur, or similarly, when a data file is deleted.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_reader(&self) {
-        #[cfg(feature = "antithesis-disk-asserts")]
         self.wait_for_progress(&self.reader_notify, "reader").await;
-
-        #[cfg(not(feature = "antithesis-disk-asserts"))]
-        self.reader_notify.notified().await;
     }
 
-    /// Waits for a signal from the writer that progress has been made.
+    /// Waits for a signal from the writer that progress has been made, or until the caller should
+    /// recheck the state it is waiting on.
     ///
     /// This will occur when a record is written, or when a new data file is created.
     ///
     /// Writer progress is published before this notification is sent.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
-        #[cfg(feature = "antithesis-disk-asserts")]
         self.wait_for_progress(&self.writer_notify, "writer").await;
-
-        #[cfg(not(feature = "antithesis-disk-asserts"))]
-        self.writer_notify.notified().await;
     }
 
-    /// Waits without periodically returning to the caller, but reports a state snapshot when the
-    /// wait lasts long enough to be suspicious. Keeping one pinned `Notified` future across every
-    /// diagnostic interval preserves the normal coordination behavior instead of applying the
-    /// progress-recheck workaround that this instrumentation is intended to evaluate.
-    #[cfg(feature = "antithesis-disk-asserts")]
+    /// Notifications are an optimization rather than the sole source of progress. Returning
+    /// periodically makes every reader and writer wait loop re-evaluate its authoritative state,
+    /// which prevents a missed or coalesced wake-up from parking the buffer indefinitely.
     async fn wait_for_progress(&self, notify: &Notify, progress_source: &'static str) {
-        let notified = notify.notified();
-        tokio::pin!(notified);
+        #[cfg(not(feature = "antithesis-disk-asserts"))]
+        let _ = progress_source;
 
-        let mut waited = Duration::ZERO;
-        loop {
-            tokio::select! {
-                () = &mut notified => {
-                    if !waited.is_zero() {
-                        self.log_progress_wait_state(progress_source, waited, "completed");
-                    }
-                    return;
-                }
-                () = tokio::time::sleep(PROGRESS_WAIT_DIAGNOSTIC_INTERVAL) => {
-                    waited += PROGRESS_WAIT_DIAGNOSTIC_INTERVAL;
-                    self.log_progress_wait_state(progress_source, waited, "still_waiting");
-                }
-            }
+        if tokio::time::timeout(PROGRESS_WAIT_TIMEOUT, notify.notified())
+            .await
+            .is_err()
+        {
+            #[cfg(feature = "antithesis-disk-asserts")]
+            self.log_progress_wait_state(progress_source, PROGRESS_WAIT_TIMEOUT, "timed_out");
         }
     }
 

@@ -1,4 +1,4 @@
-use tokio::{fs::OpenOptions, io::AsyncWriteExt};
+use tokio::{fs::OpenOptions, io::AsyncWriteExt, time::timeout};
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
 
@@ -10,6 +10,7 @@ use crate::{
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
+        ledger::PROGRESS_WAIT_TIMEOUT,
         tests::{
             create_buffer_v2_with_write_buffer_size, create_default_buffer_v2,
             get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
@@ -171,6 +172,69 @@ async fn reader_waits_for_visible_record_to_be_published() {
     });
 
     let parent = trace_span!("reader_waits_for_visible_record_to_be_published");
+    fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn reader_rechecks_for_published_data_after_missed_notification() {
+    let assertion_registry = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (_writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+
+            let waiting_for_writer = assertion_registry
+                .build()
+                .with_name("wait_for_writer")
+                .with_parent_name("reader_rechecks_for_published_data_after_missed_notification")
+                .was_entered()
+                .finalize();
+            let mut blocked_read = spawn(read_next(&mut reader));
+            while !waiting_for_writer.try_assert() {
+                assert_pending!(blocked_read.poll());
+            }
+            assert_pending!(blocked_read.poll());
+            assert!(!blocked_read.is_woken());
+
+            // Model the state observed in Antithesis: the complete record and its publication
+            // checkpoint are visible, but the corresponding writer notification was missed.
+            let config = ledger.config().clone();
+            let data_file = OpenOptions::new()
+                .append(true)
+                .open(ledger.get_current_writer_data_file_path())
+                .await
+                .expect("data file should open");
+            let mut physical_writer = RecordWriter::new(
+                data_file,
+                0,
+                config.write_buffer_size,
+                config.max_data_file_size,
+                config.max_record_size,
+            );
+            let record = SizedRecord::new(64);
+            let (record_bytes, _) = physical_writer
+                .write_record(1, record.clone())
+                .await
+                .expect("physical write should succeed");
+            physical_writer
+                .flush()
+                .await
+                .expect("physical flush should succeed");
+            ledger.increment_total_buffer_size(record_bytes as u64);
+            ledger.state().increment_next_writer_record_id(1);
+
+            assert!(!blocked_read.is_woken());
+            let read = timeout(PROGRESS_WAIT_TIMEOUT * 2, blocked_read)
+                .await
+                .expect("reader should recheck published data after its progress wait times out");
+            assert_eq!(read, Some(record));
+        }
+    });
+
+    let parent = trace_span!("reader_rechecks_for_published_data_after_missed_notification");
     fut.instrument(parent.or_current()).await;
 }
 
