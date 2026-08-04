@@ -330,7 +330,7 @@ azure_identity = { version = "1.0", default-features = false, features = ["clien
 azure_storage_blob = { version = "1.0", default-features = false, optional = true }
 
 # OpenDAL
-opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
+opendal = { version = "0.58.1", default-features = false, features = ["services-webhdfs", "layers-logging", "executors-tokio", "http-transport-reqwest", "auto-register-services"], optional = true }
 
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
