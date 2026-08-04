@@ -15,6 +15,9 @@
 /* Render-time admonition colors must be available before Hugo writes stats. */
 @source inline("border-blue-400 text-blue-400 border-green-400 text-green-400 border-red-400 text-red-400 border-yellow-400 text-yellow-400 border-violet-400 text-violet-400 border-gray-400 text-gray-400");
 
+/* Social-link colors are assembled from menu data at render time. */
+@source inline("text-black text-gray-300 text-discord-purple text-rss-orange dark:text-white hover:text-black hover:text-gray-500 dark:hover:text-gray-500");
+
 /* Class-based dark mode via Alpine JS toggling .dark on <html> */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -208,6 +211,13 @@
 .hover\:underline:hover {
   text-decoration: none;
   border-bottom: 1px solid var(--secondary);
+}
+
+.social-buttons a.text-discord-purple {
+  color: var(--color-discord-purple, #7289da);
+}
+.social-buttons a.text-rss-orange {
+  color: var(--color-rss-orange, #f26522);
 }
 
 [x-cloak] {
