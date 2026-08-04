@@ -18,7 +18,9 @@ use vector_lib::{
 };
 use vector_vrl_metrics::MetricsStorage;
 
-use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use super::{
+    ComponentKey, PreparedSinkErased, ProxyConfig, Resource, dot_graph::GraphConfig, schema,
+};
 use crate::{
     extra_context::ExtraContext,
     sinks::{Healthcheck, util::UriSerde},
@@ -278,32 +280,18 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
 
-    /// Attempts to prepare the sink natively.
+    /// Returns this sink as a `PreparedSinkErased` if it has been migrated to the
+    /// prepared lifecycle, or `None` for legacy sinks.
     ///
-    /// Returns `None` by default for legacy sinks. Sinks that implement native preparation
-    /// should override this method to return `Some(result)`.
-    ///
-    /// This method is called during config compilation. Errors propagate to compilation.
-    fn try_prepare(&self) -> Option<crate::Result<super::PreparedSinkEntry>> {
+    /// Migrated sinks implement `PreparedSink` (working with their concrete validated
+    /// type) and override this to return `Some(self)`. The framework then routes
+    /// preparation and building through the erased boundary automatically.
+    fn as_prepared(&self) -> Option<&dyn PreparedSinkErased> {
         None
     }
 }
 
 dyn_clone::clone_trait_object!(SinkConfig);
-
-impl dyn SinkConfig {
-    /// Prepares the sink for building.
-    ///
-    /// Returns an error if native preparation fails. Legacy sinks return Ok with a legacy adapter.
-    pub fn prepare_sink(&self) -> crate::Result<super::PreparedSinkEntry> {
-        // Try native preparation first (returns None by default)
-        if let Some(result) = self.try_prepare() {
-            return result;
-        }
-        // Fall back to legacy adapter using dyn_clone
-        Ok(super::PreparedSinkEntry::legacy(dyn_clone::clone_box(self)))
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct SinkContext {

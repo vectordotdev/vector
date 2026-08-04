@@ -63,9 +63,7 @@ pub use loading::{
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
-pub use sink_prepared::{
-    BoxedPreparedSink, LegacyPreparedSink, PreparedSink, PreparedSinkEntry, ValidateSink,
-};
+pub use sink_prepared::{PreparedSink, PreparedSinkEntry, PreparedSinkErased};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,

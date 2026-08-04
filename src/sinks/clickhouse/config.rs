@@ -12,6 +12,7 @@ use vector_lib::codecs::{
 
 use super::{arrow, prepared::ValidatedClickhouse};
 use crate::{
+    config::{PreparedSink, PreparedSinkErased},
     http::{Auth, HttpClient},
     sinks::{
         prelude::*,
@@ -214,9 +215,14 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Delegate to prepared sink build
+        // Fallback path: prepare then build. The topology normally calls
+        // `build_prepared` with the state produced by `prepare`.
         let prepared = ValidatedClickhouse::from_config(self)?;
-        crate::config::PreparedSink::build(&prepared, cx).await
+        prepared.build(cx).await
+    }
+
+    fn as_prepared(&self) -> Option<&dyn PreparedSinkErased> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -230,11 +236,22 @@ impl SinkConfig for ClickhouseConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+}
 
-    fn try_prepare(&self) -> Option<crate::Result<crate::config::PreparedSinkEntry>> {
-        Some(crate::config::ValidateSink::prepare(self).map(|validated| {
-            crate::config::PreparedSinkEntry::new(Box::new(self.clone()), Box::new(validated))
-        }))
+#[async_trait::async_trait]
+impl PreparedSink for ClickhouseConfig {
+    type Prepared = ValidatedClickhouse;
+
+    fn validate_structure(&self) -> crate::Result<ValidatedClickhouse> {
+        ValidatedClickhouse::from_config(self)
+    }
+
+    async fn build_prepared(
+        &self,
+        prepared: &ValidatedClickhouse,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        prepared.build(cx).await
     }
 }
 
@@ -341,6 +358,7 @@ impl ClickhouseConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PreparedSink;
     use crate::template::ConfinementConfig;
 
     fn get_healthcheck_uri(endpoint: &Uri) -> String {
@@ -462,8 +480,6 @@ mod tests {
 
     #[test]
     fn preparation_error_on_invalid_batch_encoding_combination() {
-        use crate::config::ValidateSink;
-
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
             table: "test_table".try_into().unwrap(),
@@ -474,7 +490,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = config.prepare();
+        let result = config.validate_structure();
         assert!(
             result.is_err(),
             "Preparation should fail for incompatible format/batch_encoding"

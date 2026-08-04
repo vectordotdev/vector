@@ -4,7 +4,7 @@ use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
+    Config, OutputId, PreparedSinkEntry, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
     transform::get_transform_output_ids, validation,
 };
 
@@ -202,12 +202,18 @@ fn prepare_sinks(config: &mut Config) -> Vec<String> {
 
     // Prepare direct sinks
     for (key, sink) in &config.sinks {
-        match sink.inner.prepare_sink() {
-            Ok(entry) => {
-                prepared.insert(key.clone(), entry);
-            }
-            Err(e) => {
-                errors.push(format!("Failed to prepare sink \"{}\": {}", key, e));
+        let raw = dyn_clone::clone_box(&*sink.inner);
+        match sink.inner.as_prepared() {
+            Some(erased) => match erased.validate_structure_erased() {
+                Ok(state) => {
+                    prepared.insert(key.clone(), PreparedSinkEntry::new(raw, state));
+                }
+                Err(e) => {
+                    errors.push(format!("Failed to prepare sink \"{}\": {}", key, e));
+                }
+            },
+            None => {
+                prepared.insert(key.clone(), PreparedSinkEntry::legacy(raw));
             }
         }
     }
@@ -215,14 +221,20 @@ fn prepare_sinks(config: &mut Config) -> Vec<String> {
     // Prepare enrichment table sinks with resolved inputs.
     for (key, table) in &config.enrichment_tables {
         if let Some((sink_key, sink)) = table.as_sink(key) {
-            match sink.inner.prepare_sink() {
-                Ok(entry) => {
-                    prepared.insert(sink_key, entry);
-                }
-                Err(error) => {
-                    errors.push(format!(
-                        "Failed to prepare enrichment table sink \"{key}\": {error}"
-                    ));
+            let raw = dyn_clone::clone_box(&*sink.inner);
+            match sink.inner.as_prepared() {
+                Some(erased) => match erased.validate_structure_erased() {
+                    Ok(state) => {
+                        prepared.insert(sink_key, PreparedSinkEntry::new(raw, state));
+                    }
+                    Err(error) => {
+                        errors.push(format!(
+                            "Failed to prepare enrichment table sink \"{key}\": {error}"
+                        ));
+                    }
+                },
+                None => {
+                    prepared.insert(sink_key, PreparedSinkEntry::legacy(raw));
                 }
             }
         }

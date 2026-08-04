@@ -683,8 +683,8 @@ impl<'a> Builder<'a> {
                 return;
             }
         };
-        let typetag = prepared.prepared().get_type_name();
-        let input_type = prepared.prepared().input().data_type();
+        let typetag = prepared.raw().get_component_name();
+        let input_type = prepared.raw().input().data_type();
 
         // At this point, we've validated that all transforms are valid, including any
         // transform that mutates the schema provided by their sources. We can now validate the
@@ -734,7 +734,7 @@ impl<'a> Builder<'a> {
         };
 
         // Use prepared sink from config (required).
-        let built_sink = prepared.prepared().build(cx).await;
+        let built_sink = prepared.build(cx).await;
 
         let (sink, healthcheck) = match built_sink {
             Err(error) => {

@@ -6,7 +6,6 @@
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use vector_lib::config::AcknowledgementsConfig;
 use vector_lib::stream::BatcherSettings;
 
 use super::{
@@ -16,10 +15,10 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    config::{Input, SinkContext, ValidateSink},
+    config::SinkContext,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{prelude::*, util::http::HttpService},
-    template::{ConfinedTemplate, ConfinementConfig, Template},
+    template::{ConfinedTemplate, Template},
 };
 
 /// Purely validated ClickHouse sink configuration.
@@ -95,13 +94,13 @@ impl ValidatedClickhouse {
     }
 }
 
-#[async_trait::async_trait]
-impl crate::config::PreparedSink for ValidatedClickhouse {
-    fn get_type_name(&self) -> &'static str {
-        "clickhouse"
-    }
-
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+impl ValidatedClickhouse {
+    /// Builds the sink from the validated state.
+    ///
+    /// Consumes the pre-computed validation results without recomputing them.
+    /// This method may perform environment-dependent construction (HTTP clients,
+    /// Arrow schema fetching, etc.).
+    pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.config.endpoint.with_default_parts().uri;
         let tls_settings = TlsSettings::from_options(self.config.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
@@ -150,26 +149,6 @@ impl crate::config::PreparedSink for ValidatedClickhouse {
         let healthcheck = Box::pin(healthcheck(client, endpoint, self.auth.clone()));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn confinement_config(&self) -> Option<&ConfinementConfig> {
-        Some(&self.config.confinement)
-    }
-
-    fn acknowledgements(&self) -> AcknowledgementsConfig {
-        self.config.acknowledgements
-    }
-}
-
-impl ValidateSink for ClickhouseConfig {
-    type Validated = ValidatedClickhouse;
-
-    fn prepare(&self) -> crate::Result<Self::Validated> {
-        ValidatedClickhouse::from_config(self)
-    }
 }
 
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
@@ -200,6 +179,7 @@ fn get_healthcheck_uri(endpoint: &Uri) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PreparedSink;
     use crate::sinks::clickhouse::config::Format;
 
     #[test]
@@ -212,7 +192,9 @@ mod tests {
             ..Default::default()
         };
 
-        let validated = config.prepare().expect("preparation should succeed");
+        let validated = config
+            .validate_structure()
+            .expect("preparation should succeed");
         assert_eq!(validated.database.get_ref(), "test_db");
         assert!(validated.auth.is_none()); // Default has no auth
         // Verify the confined templates retained the validated values.
@@ -232,7 +214,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = config.prepare();
+        let result = config.validate_structure();
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("'batch_encoding' is only compatible"));
@@ -247,7 +229,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = config.prepare();
+        let result = config.validate_structure();
         assert!(
             result.is_err(),
             "Expected preparation to reject unconfined template"
