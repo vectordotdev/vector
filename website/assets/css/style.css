@@ -12,6 +12,9 @@
 /* Classes injected by JS at runtime, absent from hugo_stats.json */
 @source inline("search-input search-results-list search-result code-sample-filename type block border-gray-200 border-gray-300 border-r border-t font-medium h-2 h-3 h-full inline leading-relaxed mb-1 ml-1 mr-1 p-2 p-4 pl-2 py-4 text-gray-600 text-gray-800 text-sm w-2 w-3");
 
+/* Render-time admonition colors must be available before Hugo writes stats. */
+@source inline("border-blue-400 text-blue-400 border-green-400 text-green-400 border-red-400 text-red-400 border-yellow-400 text-yellow-400 border-violet-400 text-violet-400 border-gray-400 text-gray-400");
+
 /* Class-based dark mode via Alpine JS toggling .dark on <html> */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -42,8 +45,8 @@
   --border-width-2\.5: 2.5px;
 
   /* Custom max-widths */
-  --max-width-xxs: 16rem;
-  --max-width-1\/4: 25%;
+  --container-xxs: 16rem;
+  --container-1\/4: 25%;
 
   /* Custom grid template columns */
   --grid-template-columns-16: repeat(16, minmax(0, 1fr));
