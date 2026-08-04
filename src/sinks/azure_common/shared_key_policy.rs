@@ -129,6 +129,7 @@ impl SharedKeyAuthorizationPolicy {
         }
         s.push('\n');
 
+        // Content-Length
         // Azure's Shared Key format represents zero length as an empty field.
         let content_length = header("Content-Length").filter(|value| *value != "0");
         if let Some(content_length) = content_length {
