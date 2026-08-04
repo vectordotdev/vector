@@ -1,3 +1,4 @@
+mod changelog_fragments;
 mod component_features;
 mod deny;
 mod events;
@@ -11,6 +12,7 @@ mod scripts;
 
 crate::cli_subcommands! {
     "Check parts of the Vector code base..."
+    changelog_fragments,
     generated_docs,
     component_features,
     deny,

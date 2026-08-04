@@ -21,6 +21,7 @@ use crate::{
         HealthcheckError,
         util::{BatchConfig, Compression, SinkBatchSettings, auth::Auth},
     },
+    template::Template,
     test_util::{
         components::{
             COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,

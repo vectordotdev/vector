@@ -44,7 +44,7 @@ There's a variety of helper commands available for working with CUE. Run `make c
 
 For the most part, vector.dev uses the [Alpine] framework for interactive functionality. If you see directives like `x-show`, `x-data`, `@click`, and `:class` in HTML templates, those are Alpine directives. Alpine was chosen over jQuery and other frameworks for the sake of maintainability. Alpine directives live inside your HTML rather than in separate JavaScript files, which enables you to see how a component behaves without referring to an external `.js` file.
 
-The [Spruce] library is used for all JavaScript state management. It stores things like light/dark mode preferences in `localStorage` and makes those values available in Alpine-wired components. See the [`app.js`](./assets/js/app.js) for managed state values.
+Alpine's persistence plugin stores global JavaScript state, such as light/dark-mode preferences, in `localStorage` and makes it available in Alpine-wired components. See [`app.js`](./assets/js/app.js) for managed state values.
 
 The [Tocbot] library is used to auto-generate documentation table of contents on each page. The TOC is generated at page load time.
 
@@ -243,7 +243,6 @@ description: """
 [react.js]: https://reactjs.org
 [reference documentation]: https://vector.dev/docs/reference
 [sass]: https://sass-lang.com
-[spruce]: https://spruce.ryangjchandler.co.uk
 [tailwind]: https://tailwindcss.com
 [tocbot]: https://tscanlin.github.io/tocbot
 [typescript]: https://www.typescriptlang.org

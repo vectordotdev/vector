@@ -49,7 +49,9 @@ components: sinks: amqp: {
 
 	support: components._amqp.support
 
-	configuration: generated.components.sinks.amqp.configuration
+	configuration: generated.components.sinks.amqp.configuration & {
+		exchange: type: string: examples: ["my-exchange"]
+	}
 
 	input: {
 		logs:    true

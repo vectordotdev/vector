@@ -66,6 +66,7 @@ async fn cloudwatch_insert_log_event() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -119,6 +120,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -197,6 +199,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -276,6 +279,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -344,6 +348,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             "key".to_string(),
             "value".to_string(),
         )])),
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -418,6 +423,7 @@ async fn cloudwatch_insert_log_event_batched() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -471,6 +477,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -566,6 +573,7 @@ async fn cloudwatch_healthcheck() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let client = config.create_client(&ProxyConfig::default()).await.unwrap();

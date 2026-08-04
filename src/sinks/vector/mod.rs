@@ -62,6 +62,7 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+    use vector_common::decompression::CappedDecoder;
     use vector_lib::{
         config::{Tags, Telemetry, init_telemetry},
         event::{BatchNotifier, BatchStatus},
@@ -933,22 +934,14 @@ mod tests {
             let compressed = body[0] == 1;
             let proto_body = body.slice(GRPC_HEADER_SIZE..);
             let proto_body = if compressed {
-                use std::io::Read;
-                let mut out = Vec::new();
-                match encoding.as_deref() {
-                    Some("gzip") => {
-                        flate2::read::GzDecoder::new(&proto_body[..])
-                            .read_to_end(&mut out)
-                            .unwrap();
-                    }
-                    Some("zstd") => {
-                        zstd::stream::read::Decoder::new(&proto_body[..])
-                            .unwrap()
-                            .read_to_end(&mut out)
-                            .unwrap();
-                    }
+                let out = match encoding.as_deref() {
+                    Some("gzip") => CappedDecoder::gzip(&proto_body[..]).decompress().unwrap(),
+                    Some("zstd") => CappedDecoder::zstd(&proto_body[..])
+                        .unwrap()
+                        .decompress()
+                        .unwrap(),
                     other => panic!("unexpected grpc-encoding for compressed frame: {other:?}"),
-                }
+                };
                 Bytes::from(out)
             } else {
                 proto_body

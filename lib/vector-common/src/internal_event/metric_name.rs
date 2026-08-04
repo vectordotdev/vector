@@ -98,6 +98,7 @@ pub enum CounterName {
     MemoryEnrichmentTableFlushesTotal,
     MemoryEnrichmentTableInsertionsTotal,
     MemoryEnrichmentTableReadsTotal,
+    MemoryEnrichmentTableRemovedTotal,
     MemoryEnrichmentTableTtlExpirations,
     ComponentCpuUsageNsTotal,
     DatadogLogsReservedAttributeConflictsTotal,
@@ -210,6 +211,7 @@ pub enum GaugeName {
     MemoryEnrichmentTableObjectsCount,
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
+    SecurityConfinementDisabled,
 }
 
 impl GaugeName {
@@ -253,6 +255,7 @@ impl GaugeName {
             Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
+            Self::SecurityConfinementDisabled => "security_confinement_disabled",
         }
     }
 }
@@ -365,6 +368,7 @@ impl CounterName {
                 "memory_enrichment_table_insertions_total"
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
+            Self::MemoryEnrichmentTableRemovedTotal => "memory_enrichment_table_removed_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
             Self::DatadogLogsReservedAttributeConflictsTotal => {

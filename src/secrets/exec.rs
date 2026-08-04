@@ -54,8 +54,8 @@ impl ExecVersion {
 }
 
 impl GenerateConfig for ExecVersion {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(ExecVersion::V1).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(ExecVersion::V1).unwrap()
     }
 }
 
@@ -78,8 +78,8 @@ pub struct ExecBackend {
 }
 
 impl GenerateConfig for ExecBackend {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(ExecBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(ExecBackend {
             command: vec![String::from("/path/to/script")],
             timeout: 5,
             protocol: ExecVersion::V1,
