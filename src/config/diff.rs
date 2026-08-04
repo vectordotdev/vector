@@ -66,6 +66,18 @@ impl ConfigDiff {
             || self.sinks.is_removed(key)
             || self.enrichment_tables.contains(key)
     }
+
+    /// Returns true when no components need to be added, changed, or removed.
+    ///
+    /// Forced reloads via `components_to_reload` are already reflected in each
+    /// [`Difference`]'s `to_change` set, so an empty diff means topology rebuild
+    /// can be skipped.
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+            && self.transforms.is_empty()
+            && self.sinks.is_empty()
+            && self.enrichment_tables.is_empty()
+    }
 }
 
 #[derive(Debug)]
@@ -157,6 +169,11 @@ impl Difference {
         }
     }
 
+    /// Returns true when there are no additions, changes, or removals.
+    pub fn is_empty(&self) -> bool {
+        self.to_add.is_empty() && self.to_change.is_empty() && self.to_remove.is_empty()
+    }
+
     /// Checks whether or not any components are being changed or added.
     pub fn any_changed_or_added(&self) -> bool {
         !(self.to_change.is_empty() && self.to_add.is_empty())
@@ -223,6 +240,68 @@ fn extract_table_component_keys(
         })
         .flatten()
         .collect()
+}
+
+#[cfg(test)]
+mod is_empty_tests {
+    use crate::config::ConfigBuilder;
+    use indoc::indoc;
+
+    use super::*;
+
+    fn basic_config() -> Config {
+        serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap()
+    }
+
+    #[test]
+    fn is_empty_when_configs_are_identical() {
+        let config = basic_config();
+        let diff = ConfigDiff::new(&config, &config, HashSet::new());
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn is_not_empty_when_sink_changes() {
+        let old = basic_config();
+        let new: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+              other_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn is_not_empty_when_component_forced_to_reload() {
+        let config = basic_config();
+        let forced = HashSet::from([ComponentKey::from("test_sink")]);
+        let diff = ConfigDiff::new(&config, &config, forced);
+        assert!(!diff.is_empty());
+        assert!(diff.sinks.is_changed(&ComponentKey::from("test_sink")));
+    }
 }
 
 #[cfg(all(test, feature = "enrichment-tables-memory"))]

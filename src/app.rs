@@ -408,19 +408,11 @@ async fn handle_signal(
             .await;
 
             if let Ok(ref config) = new_config {
-                // Find all transforms that have external files to watch
-                let transform_keys_to_reload = config.transform_keys_with_external_files();
-
-                // Add these transforms to reload set
-                if !transform_keys_to_reload.is_empty() {
-                    info!(
-                        message = "Reloading transforms with external files.",
-                        count = transform_keys_to_reload.len()
-                    );
-                    topology_controller
-                        .topology
-                        .extend_reload_set(transform_keys_to_reload);
-                }
+                // SIGHUP / ReloadFromDisk must still restart transforms with external files
+                // even when the parsed Vector config is unchanged (#23898).
+                topology_controller
+                    .topology
+                    .prepare_reload_from_disk(config);
             }
 
             reload_config_from_result(topology_controller, new_config).await

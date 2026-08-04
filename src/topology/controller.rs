@@ -106,12 +106,13 @@ impl TopologyController {
             .reload_config_and_respawn(new_config, self.extra_context.clone())
             .await
         {
-            Ok(()) => {
+            Ok(true) => {
                 emit!(VectorReloaded {
                     config_paths: &self.config_paths
                 });
                 ReloadOutcome::Success
             }
+            Ok(false) => ReloadOutcome::Success,
             Err(ReloadError::GlobalOptionsChanged { changed_fields }) => {
                 error!(
                     message = "Config reload rejected due to non-reloadable global options.",
