@@ -196,6 +196,25 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						}
 					}
 				}
+				ttl_generations: {
+					description: "Per-metric override for `ttl_generations`. See [`Inner::ttl_generations`]."
+					required:    false
+					type: uint: default: 4
+				}
+				ttl_secs: {
+					description: """
+						Per-metric TTL for tracked tag values. See [`Inner::ttl_secs`] for the
+						full description.
+
+						Per-metric TTL is a **full override** of the global TTL — it does not
+						inherit. Leaving this unset means "no TTL for this metric", *not*
+						"fall back to the global `ttl_secs`". This mirrors how a per-metric
+						`value_limit` fully shadows the global one. If you want a metric to
+						share the global TTL, copy the value explicitly.
+						"""
+					required: false
+					type: uint: {}
+				}
 				value_limit: {
 					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
 					required:    false
@@ -268,6 +287,46 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					"""
 			}
 		}
+	}
+	ttl_generations: {
+		description: """
+			Number of time-slices the TTL window is split into for the
+			`probabilistic` backend.
+
+			Higher values smooth eviction (closer to a true sliding window) at the
+			cost of `(ttl_generations + 1) * cache_size_per_key` memory per (metric,
+			tag-key) pair. The extra shard is the one currently being written: it
+			covers only part of a slice, so retiring without it would expire values
+			after `ttl_secs - (ttl_secs / ttl_generations)` instead of the full TTL.
+			`1` produces a tumbling window: all tracked values are dropped at once
+			every `ttl_secs`. Ignored when `ttl_secs` is unset, or when mode is
+			`exact` (which uses precise per-value timestamps).
+			"""
+		required: false
+		type: uint: default: 4
+	}
+	ttl_secs: {
+		description: """
+			Expire tracked tag values after this many seconds since they were last seen.
+
+			When unset (default) or set to `0`, values persist for the lifetime of the
+			process — the historical behavior. When set to a positive value, the
+			transform behaves like a sliding window: any tag value not observed within
+			the TTL is dropped, freeing room under `value_limit` for fresh values.
+			Useful for bounding cost on backends (e.g. Datadog custom metrics) that
+			bill on a rolling unique-series window.
+
+			In `exact` mode every value carries a precise last-seen timestamp; in
+			`probabilistic` mode the underlying bloom filter is split into
+			`ttl_generations` rolling shards, so eviction is approximate to within
+			`ttl_secs / ttl_generations`.
+
+			Not supported in `exact_fingerprint` mode, which keeps only hashes and has
+			nowhere to record a last-seen time; combining the two is a configuration
+			error rather than a silently ignored setting.
+			"""
+		required: false
+		type: uint: {}
 	}
 	value_limit: {
 		description: "How many distinct values to accept for any given key."
