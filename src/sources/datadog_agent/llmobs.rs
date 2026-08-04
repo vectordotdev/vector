@@ -19,6 +19,7 @@ use crate::{
     common::http::ErrorMessage,
     event::{Event, LogEvent},
     internal_events::DatadogAgentJsonParseError,
+    sources::util::http::capped_body,
 };
 
 pub(super) fn build_warp_filter(
@@ -31,7 +32,7 @@ pub(super) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             let handler = handler.clone();
             let source = source.clone();
@@ -65,7 +66,7 @@ pub(super) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then(
             move |path: FullPath,
                   encoding_header: Option<String>,
