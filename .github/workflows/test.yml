@@ -151,6 +151,7 @@ jobs:
           libsasl2: true
           cargo-cache: true
           unixodbc: true
+      - run: cd website && yarn install --frozen-lockfile
       - run: make check-generated-docs
 
   check-rust-docs:
@@ -163,10 +164,9 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          cargo-cache: true
-          # `docs` enables sources-dnstap and sources-odbc.
           protoc: true
           unixodbc: true
+          cargo-cache: true
       - run: cd rust-doc && make ci-docs-build
 
   test-vrl:

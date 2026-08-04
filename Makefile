@@ -449,8 +449,14 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ve
 	$(VDEV) check events
 
 .PHONY: check-generated-docs
-check-generated-docs: generate-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+check-generated-docs: generate-docs ## Checks that machine-generated component docs and examples are up-to-date.
 	$(VDEV) check generated-docs
+	@if test -n "$$(git status --porcelain -- website/generated/example-configs)"; then \
+		echo "Generated component examples are out of date. Run 'make generate-example-configs' and commit the changes."; \
+		git status --short -- website/generated/example-configs; \
+		exit 1; \
+	fi
+	VECTOR_BIN=$(abspath $(CARGO_TARGET_DIR)/debug/vector) $(MAKE) -C website validate-config-examples
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -539,8 +545,12 @@ generate-vector-vrl-docs: ## Generate VRL function documentation from Rust sourc
 generate-vrl-docs: ## Generate combined VRL function documentation for the website.
 	$(MAKE) -C website generate-vrl-docs
 
+.PHONY: generate-example-configs
+generate-example-configs: generate-component-docs ## Generate committed component configuration examples.
+	$(MAKE) -C website config-examples
+
 .PHONY: generate-docs
-generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs
+generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs generate-example-configs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

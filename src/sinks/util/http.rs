@@ -9,6 +9,9 @@ use http::{HeaderValue, Request, Response, StatusCode, header};
 use http_body::Body as _;
 use tracing::debug;
 
+/// Maximum number of response body bytes to include in a non-retriable error's reason.
+const MAX_ERROR_BODY_BYTES: usize = 1024;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
 
@@ -954,7 +957,19 @@ pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     HttpResponse,
 > {
     HttpStatusRetryLogic::new(
-        |req: &HttpResponse| req.http_response.status(),
+        |req: &HttpResponse| {
+            let status = req.http_response.status();
+            let body = req.http_response.body();
+            let truncated = &body[..body.len().min(MAX_ERROR_BODY_BYTES)];
+            if !status.is_success() {
+                debug!(
+                    message = "HTTP response.",
+                    %status,
+                    body = %String::from_utf8_lossy(truncated),
+                );
+            }
+            status
+        },
         retry_strategy,
     )
 }
