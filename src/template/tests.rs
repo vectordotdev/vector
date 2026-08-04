@@ -997,7 +997,7 @@ fn confined_template_renders_with_check() {
     event.as_mut_log().insert(event_path!("tenant"), "acme");
 
     let config = ConfinementConfig::default();
-    let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
+    let tpl: Template = Template::try_from("safe/{{ tenant }}/").unwrap();
     let confined = tpl.confine(&config, "test_sink", "key").unwrap();
 
     assert_eq!(Ok(Bytes::from("safe/acme/")), confined.render(&event));
@@ -1011,7 +1011,7 @@ fn confined_template_rejects_escape() {
         .insert(event_path!("tenant"), "../../etc");
 
     let config = ConfinementConfig::default();
-    let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
+    let tpl: Template = Template::try_from("safe/{{ tenant }}/").unwrap();
     let confined = tpl.confine(&config, "test_sink", "key").unwrap();
 
     assert!(matches!(
@@ -1035,7 +1035,7 @@ fn http_prefix_treated_as_non_uri_for_confine() {
         .insert(event_path!("region"), "us-east-1");
 
     let config = ConfinementConfig::default();
-    let tpl = Template::try_from("http://logs-{{ region }}/").unwrap();
+    let tpl: Template = Template::try_from("http://logs-{{ region }}/").unwrap();
 
     // Should succeed - this is prefix confinement, not URI confinement
     let confined = tpl.confine(&config, "test_sink", "key_prefix").unwrap();

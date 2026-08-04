@@ -126,19 +126,7 @@ impl<K: TemplateKind> From<Template<K>> for String {
 // This is safe because we literally defer to `String` for the schema of `Template`.
 impl<K: TemplateKind> ConfigurableString for Template<K> {}
 
-/// URI-specific confinement, implemented only for [`UriTemplate`] (that is,
-/// `Template<UriKind>`).
-///
-/// This lives in a trait rather than in an `impl UriTemplate` block on purpose.
-/// `Template::confine` (prefix confinement) is an inherent method on
-/// `Template<PrefixKind>`, and a second *inherent* `confine` on `Template<UriKind>`
-/// would make every `Template::try_from(..).confine(..)` call ambiguous: a type
-/// parameter default is not applied during inference, so the receiver is `Template<_>`
-/// and both inherent candidates would apply. Inherent methods take priority over trait
-/// methods during probing, so keeping this one in a trait means `Template<_>` resolves
-/// to the inherent (prefix) method and infers `K = PrefixKind`, while a receiver already
-/// known to be `UriTemplate` falls through to this impl.
-pub trait ConfineUri {
+impl UriTemplate {
     /// Confine this URI template for **HTTP/HTTPS URI fields**, returning a
     /// [`ConfinedUriTemplate`] that enforces URI-specific confinement checks.
     ///
@@ -153,30 +141,7 @@ pub trait ConfineUri {
     /// by inspecting template content. The return type [`ConfinedUriTemplate`] is
     /// distinct from [`ConfinedTemplate`], making it impossible to accidentally wire
     /// a prefix-confined template into a URI field.
-    fn confine(
-        self,
-        config: &ConfinementConfig,
-        component_name: &'static str,
-        field_name: &'static str,
-    ) -> crate::Result<ConfinedUriTemplate>;
-}
-
-impl ConfineUri for UriTemplate {
-    /// Confine this URI template for **HTTP/HTTPS URI fields**, returning a
-    /// [`ConfinedUriTemplate`] that enforces URI-specific confinement checks.
-    ///
-    /// URI confinement enforces:
-    /// - Authority (scheme + host) must match the operator-configured prefix
-    /// - Path must start with the static path prefix
-    /// - No `..` path traversal, percent-encoded or otherwise
-    /// - No injected query strings or fragments via field values
-    /// - Template must start with `http://` or `https://` and include a static host
-    ///
-    /// The confinement semantics are determined by the type (URI confinement), not
-    /// by inspecting template content. The return type [`ConfinedUriTemplate`] is
-    /// distinct from [`ConfinedTemplate`], making it impossible to accidentally wire
-    /// a prefix-confined template into a URI field.
-    fn confine(
+    pub fn confine(
         self,
         config: &ConfinementConfig,
         component_name: &'static str,

@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_tenant_id() {
-        let template = Template::try_from("{{ tenant }}").unwrap();
+        let template: Template = Template::try_from("{{ tenant }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "prometheus_remote_write", "tenant_id");
         assert!(
@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_tenant_id() {
-        let template = Template::try_from("{{ tenant }}").unwrap();
+        let template: Template = Template::try_from("{{ tenant }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -401,7 +401,7 @@ mod tests {
     fn confinement_prefixed_tenant_id_locks_org_prefix() {
         use crate::event::{Event, LogEvent};
         use vrl::event_path;
-        let template = Template::try_from("team-{{ org }}").unwrap();
+        let template: Template = Template::try_from("team-{{ org }}").unwrap();
         let config = ConfinementConfig::default();
         let confined = template
             .confine(&config, "prometheus_remote_write", "tenant_id")
