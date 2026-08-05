@@ -44,7 +44,7 @@ There's a variety of helper commands available for working with CUE. Run `make c
 
 For the most part, vector.dev uses the [Alpine] framework for interactive functionality. If you see directives like `x-show`, `x-data`, `@click`, and `:class` in HTML templates, those are Alpine directives. Alpine was chosen over jQuery and other frameworks for the sake of maintainability. Alpine directives live inside your HTML rather than in separate JavaScript files, which enables you to see how a component behaves without referring to an external `.js` file.
 
-The [Spruce] library is used for all JavaScript state management. It stores things like light/dark mode preferences in `localStorage` and makes those values available in Alpine-wired components. See the [`app.js`](./assets/js/app.js) for managed state values.
+Alpine's persistence plugin stores global JavaScript state, such as light/dark-mode preferences, in `localStorage` and makes it available in Alpine-wired components. See [`app.js`](./assets/js/app.js) for managed state values.
 
 The [Tocbot] library is used to auto-generate documentation table of contents on each page. The TOC is generated at page load time.
 
@@ -54,7 +54,7 @@ All JavaScript for the site is built using [Hugo Pipes] rather than tools like W
 
 ### CSS
 
-Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. The Tailwind configuration is in [`tailwind.config.js`](./tailwind.config.js); it mostly consists of default values but there are some custom colors, sizes, and other attributes provided there. Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
+Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. Tailwind configuration, including custom colors, sizes, and other attributes, is defined in [`assets/css/style.css`](./assets/css/style.css). Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
 
 In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files are in [`assets/sass`](./assets/sass)):
 
@@ -181,7 +181,7 @@ here for reference:
 
 ## Known issues
 
-* Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
+* Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in [`assets/css/style.css`](./assets/css/style.css), but it will take some time to iron all of these issues out.
 
 ## CUE pro tips
 
@@ -243,7 +243,6 @@ description: """
 [react.js]: https://reactjs.org
 [reference documentation]: https://vector.dev/docs/reference
 [sass]: https://sass-lang.com
-[spruce]: https://spruce.ryangjchandler.co.uk
 [tailwind]: https://tailwindcss.com
 [tocbot]: https://tscanlin.github.io/tocbot
 [typescript]: https://www.typescriptlang.org

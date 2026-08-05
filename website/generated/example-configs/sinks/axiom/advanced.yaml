@@ -1,0 +1,12 @@
+sinks:
+  my_sink_id:
+    type: axiom
+    inputs:
+      - my-source-or-transform-id
+    compression: zstd
+    dangerously_allow_unconfined_template_resolution: false
+    dataset: ${AXIOM_DATASET}
+    org_id: ${AXIOM_ORG_ID}
+    region: ${AXIOM_REGION}
+    token: ${AXIOM_TOKEN}
+    url: https://api.eu.axiom.co

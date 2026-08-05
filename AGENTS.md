@@ -102,8 +102,10 @@ cargo nextest run --workspace --no-default-features --features "${FEATURES}"
 
 ```bash
 # See available integration tests:
-# cargo vdev int show
-./scripts/run-integration-test.sh <integration-name>
+cargo vdev int show
+
+# Run a specific integration test
+cargo vdev integration run <integration-name>
 ```
 
 See [Integration Tests](#integration-tests) section below for more details.
@@ -116,7 +118,7 @@ make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
 make check-generated-docs     # Check generated documentation
-./scripts/check_changelog_fragments.sh  # Verify changelog
+make check-changelog-fragments  # Verify changelog
 ```
 
 ### Website/Docs Development (Separate Process)
@@ -184,8 +186,7 @@ make check-fmt
 make check-clippy
 make check-markdown
 make check-generated-docs
-
-./scripts/check_changelog_fragments.sh
+make check-changelog-fragments
 ```
 
 Then: `chmod +x .git/hooks/pre-push`

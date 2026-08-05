@@ -36,12 +36,13 @@ CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
 CARGO_LLVM_COV_VERSION="0.8.4"
-WASM_PACK_VERSION="0.13.1"
+WASM_PACK_VERSION="0.15.0"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
 
 ALL_MODULES=(
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -82,6 +83,7 @@ Usage: $0 [--modules=mod1,mod2,...]
 
 Modules:
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -311,6 +313,21 @@ if contains_module rustup; then
   fi
 fi
 set -e -o verbose
+
+if contains_module protoc; then
+  if [[ -n "${CI:-}" ]]; then
+    protoc_dir="${RUNNER_TEMP:?RUNNER_TEMP must be set when CI is enabled}/protoc-bin"
+  else
+    protoc_dir="${HOME}/.local/bin"
+  fi
+
+  bash "${SCRIPT_DIR}/install-protoc.sh" "${protoc_dir}"
+  export PATH="${protoc_dir}:${PATH}"
+
+  if [[ -n "${GITHUB_PATH:-}" ]]; then
+    echo "${protoc_dir}" >> "${GITHUB_PATH}"
+  fi
+fi
 
 maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
 maybe_install_cargo_tool cross "${CROSS_VERSION}"

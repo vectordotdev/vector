@@ -1,0 +1,3 @@
+sources:
+  my_source_id:
+    type: internal_logs

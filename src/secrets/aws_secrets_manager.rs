@@ -41,8 +41,8 @@ pub struct AwsSecretsManagerBackend {
 }
 
 impl GenerateConfig for AwsSecretsManagerBackend {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(AwsSecretsManagerBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(AwsSecretsManagerBackend {
             secret_id: String::from("secret-id"),
             region: Default::default(),
             auth: Default::default(),

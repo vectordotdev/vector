@@ -7,31 +7,9 @@ use std::{
     time::Duration,
 };
 
+use super::S3SinkConfig;
 #[cfg(feature = "codecs-parquet")]
 use super::config::S3BatchEncoding;
-use aws_sdk_s3::{
-    Client as S3Client,
-    operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
-    types::{
-        DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
-        ObjectLockRule,
-    },
-};
-use aws_smithy_runtime_api::client::result::SdkError;
-use bytes::Buf;
-use flate2::read::MultiGzDecoder;
-use futures::{Stream, stream};
-use similar_asserts::assert_eq;
-use tempfile::TempDir;
-use tokio_stream::StreamExt;
-use vector_lib::{
-    buffers::{BufferConfig, BufferType, WhenFull},
-    codecs::{TextSerializerConfig, encoding::FramingConfig},
-    config::{ComponentKey, proxy::ProxyConfig},
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
-};
-
-use super::S3SinkConfig;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     common::s3::S3ClientBuilder,
@@ -50,6 +28,27 @@ use crate::{
         mock::basic_source,
         random_lines_with_stream, random_string, start_topology,
     },
+};
+use aws_sdk_s3::{
+    Client as S3Client,
+    operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
+    types::{
+        DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
+        ObjectLockRule,
+    },
+};
+use aws_smithy_runtime_api::client::result::SdkError;
+use bytes::Buf;
+use futures::{Stream, stream};
+use similar_asserts::assert_eq;
+use tempfile::TempDir;
+use tokio_stream::StreamExt;
+use vector_common::decompression::CappedDecoder;
+use vector_lib::{
+    buffers::{BufferConfig, BufferType, WhenFull},
+    codecs::{TextSerializerConfig, encoding::FramingConfig},
+    config::{ComponentKey, proxy::ProxyConfig},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
 };
 
 fn s3_address() -> String {
@@ -199,7 +198,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 
@@ -453,7 +452,7 @@ async fn s3_flush_on_exhaustion() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 
@@ -490,6 +489,7 @@ async fn s3_parquet_insert_message() {
     use vector_lib::codecs::encoding::format::{
         ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
     };
+    use vrl::event_path;
 
     let cx = SinkContext::default();
     let bucket = uuid::Uuid::new_v4().to_string();
@@ -514,7 +514,7 @@ async fn s3_parquet_insert_message() {
     let events: Vec<Event> = (0..10)
         .map(|i| {
             let mut log = LogEvent::from(format!("message_{}", i));
-            log.insert("host", format!("host_{}", i % 3));
+            log.insert(event_path!("host"), format!("host_{}", i % 3));
             Event::from(log).with_batch_notifier(&batch_notifier)
         })
         .collect();
@@ -736,6 +736,7 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
         timezone: Default::default(),
         force_path_style: true,
         retry_strategy: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -815,14 +816,17 @@ async fn get_lines(obj: GetObjectOutput) -> Vec<String> {
 
 async fn get_gzipped_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
-    let buf_read = BufReader::new(MultiGzDecoder::new(body));
+    let buf_read = BufReader::new(CappedDecoder::gzip(body).into_reader());
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 
 async fn get_zstd_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
-    let decoder = zstd::Decoder::new(body).expect("zstd decoder initialization failed");
-    let buf_read = BufReader::new(decoder);
+    let buf_read = BufReader::new(
+        CappedDecoder::zstd(body)
+            .expect("zstd decoder initialization failed")
+            .into_reader(),
+    );
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 

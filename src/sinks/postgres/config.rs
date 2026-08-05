@@ -81,7 +81,7 @@ pub struct PostgresConfig {
 }
 
 impl GenerateConfig for PostgresConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"endpoint = "postgres://user:password@localhost/default"
             table = "table"
@@ -146,13 +146,12 @@ mod tests {
 
     #[test]
     fn parse_config() {
-        let cfg = toml::from_str::<PostgresConfig>(
-            r#"
-            endpoint = "postgres://user:password@localhost/default"
-            table = "mytable"
-            columns = ["column1", "column2"]
-        "#,
-        )
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+            columns: ["column1", "column2"]
+        "#})
+
         .unwrap();
         assert_eq!(cfg.endpoint, "postgres://user:password@localhost/default");
         assert_eq!(cfg.table, "mytable");

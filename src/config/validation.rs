@@ -9,7 +9,6 @@ use super::{
     ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
     transform::get_transform_output_ids,
 };
-use crate::config::schema;
 
 /// Minimum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly greater than this value.
@@ -234,10 +233,10 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        // use the most general definition possible, since the real value isn't known yet.
-        let definition = schema::Definition::any();
-
-        if let Err(errs) = transform.inner.validate(&definition) {
+        // Structural validation: reserved names, duplicate routes, invalid sample rates.
+        // These checks run during config compilation. Transforms that need the schema/enrichment
+        // context must implement validate_with_context(), called later in validate.rs.
+        if let Err(errs) = transform.inner.validate_structure() {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 

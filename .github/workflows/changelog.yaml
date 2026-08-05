@@ -44,14 +44,19 @@ jobs:
           echo "merge_group event – passing without running changelog validation."
           exit 0
 
-      # Checkout PR branch (includes script and changelog.d/)
+      # Checkout PR branch (includes changelog.d/ and vdev sources)
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: env.SHOULD_RUN == 'true'
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/setup
+        if: env.SHOULD_RUN == 'true'
+        with:
+          vdev: true
+          mold: false
+          cargo-cache: false
+
       - name: Run changelog fragment checker
         if: env.SHOULD_RUN == 'true'
-        run: |
-          # Compare against origin/master
-          ./scripts/check_changelog_fragments.sh
+        run: vdev check changelog-fragments

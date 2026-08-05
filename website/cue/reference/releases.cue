@@ -1,7 +1,7 @@
 package metadata
 
 releases: {
-	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status" | "deprecation" | "revert"
+	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "security" | "status" | "deprecation" | "revert"
 
 	#Commit: {
 		author:           string
@@ -26,6 +26,17 @@ releases: {
 		description: string
 		pr_numbers: [uint, ...uint] | *[]
 		contributors: [string, ...string] | *[]
+	}
+
+	#DeprecationEntry: {
+		what:             string
+		deprecated_since: string
+		description:      string
+	}
+
+	#EnactedDeprecationEntry: {
+		#DeprecationEntry
+		removed_in: string
 	}
 
 	#Release: {

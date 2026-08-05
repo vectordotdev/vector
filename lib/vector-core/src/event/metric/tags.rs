@@ -470,6 +470,11 @@ impl MetricTags {
         self.0.iter().map(|(key, value)| (key.as_str(), value))
     }
 
+    /// Iterates over all the tag value sets, consuming the tags.
+    pub fn into_iter_sets(self) -> impl Iterator<Item = (String, TagValueSet)> {
+        self.0.into_iter()
+    }
+
     /// Iterate over references to all values of each tag.
     pub fn iter_all(&self) -> impl Iterator<Item = (&str, TagValueRef<'_>)> {
         self.0

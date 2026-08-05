@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use chrono::Utc;
 use vector_lib::config::LogNamespace;
-use vrl::value::Value;
+use vrl::{event_path, value::Value};
 
 use super::{config::*, error::*, parser::*, xml_parser::*};
 use crate::{
@@ -300,27 +300,42 @@ mod parser_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Check core fields
-        assert_eq!(log_event.get("event_id"), Some(&Value::Integer(4624)));
-        assert_eq!(log_event.get("record_id"), Some(&Value::Integer(12345)));
         assert_eq!(
-            log_event.get("level"),
+            log_event.get(event_path!("event_id")),
+            Some(&Value::Integer(4624))
+        );
+        assert_eq!(
+            log_event.get(event_path!("record_id")),
+            Some(&Value::Integer(12345))
+        );
+        assert_eq!(
+            log_event.get(event_path!("level")),
             Some(&Value::Bytes("Information".into()))
         );
-        assert_eq!(log_event.get("level_value"), Some(&Value::Integer(4)));
         assert_eq!(
-            log_event.get("channel"),
+            log_event.get(event_path!("level_value")),
+            Some(&Value::Integer(4))
+        );
+        assert_eq!(
+            log_event.get(event_path!("channel")),
             Some(&Value::Bytes("Security".into()))
         );
         assert_eq!(
-            log_event.get("provider_name"),
+            log_event.get(event_path!("provider_name")),
             Some(&Value::Bytes("Microsoft-Windows-Security-Auditing".into()))
         );
         assert_eq!(
-            log_event.get("computer"),
+            log_event.get(event_path!("computer")),
             Some(&Value::Bytes("WIN-SERVER-01".into()))
         );
-        assert_eq!(log_event.get("process_id"), Some(&Value::Integer(716)));
-        assert_eq!(log_event.get("thread_id"), Some(&Value::Integer(796)));
+        assert_eq!(
+            log_event.get(event_path!("process_id")),
+            Some(&Value::Integer(716))
+        );
+        assert_eq!(
+            log_event.get(event_path!("thread_id")),
+            Some(&Value::Integer(796))
+        );
     }
 
     #[test]
@@ -334,8 +349,8 @@ mod parser_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // XML should be included
-        assert!(log_event.get("xml").is_some());
-        if let Some(Value::Bytes(xml_bytes)) = log_event.get("xml") {
+        assert!(log_event.get(event_path!("xml")).is_some());
+        if let Some(Value::Bytes(xml_bytes)) = log_event.get(event_path!("xml")) {
             let xml_string = String::from_utf8_lossy(xml_bytes);
             assert!(xml_string.contains("<Event xmlns"));
             assert!(xml_string.contains("EventID>4624<"));
@@ -353,7 +368,7 @@ mod parser_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Event data should be included
-        if let Some(Value::Object(event_data)) = log_event.get("event_data") {
+        if let Some(Value::Object(event_data)) = log_event.get(event_path!("event_data")) {
             assert_eq!(
                 event_data.get("TargetUserName"),
                 Some(&Value::Bytes("admin".into()))
@@ -381,12 +396,12 @@ mod parser_tests {
 
         // event_id should be formatted as string
         assert_eq!(
-            log_event.get("event_id"),
+            log_event.get(event_path!("event_id")),
             Some(&Value::Bytes("4624".into()))
         );
 
         // process_id should be formatted as float
-        if let Some(Value::Float(process_id)) = log_event.get("process_id") {
+        if let Some(Value::Float(process_id)) = log_event.get(event_path!("process_id")) {
             assert_eq!(process_id.into_inner(), 716.0);
         } else {
             panic!("process_id should be formatted as float");
@@ -1180,6 +1195,8 @@ mod fault_tolerance_tests {
 
 #[cfg(test)]
 mod acknowledgement_tests {
+    use indoc::indoc;
+
     use super::*;
     use crate::config::{SourceAcknowledgementsConfig, SourceConfig};
 
@@ -1237,37 +1254,40 @@ mod acknowledgement_tests {
 
     #[test]
     fn test_acknowledgements_toml_parsing() {
-        // Test parsing from TOML with acknowledgements enabled
-        let toml_with_acks = r#"
-            channels = ["System"]
-            acknowledgements = true
-        "#;
+        // Test parsing from YAML with acknowledgements enabled
+        let yaml_with_acks = indoc! {r#"
+            channels:
+              - System
+            acknowledgements: true
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_acks).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_acks).expect("YAML parsing should succeed");
         assert!(
             config.acknowledgements.enabled(),
-            "Acknowledgements should be enabled from TOML"
+            "Acknowledgements should be enabled from YAML"
         );
 
         // Test parsing with acknowledgements as struct
-        let toml_with_acks_struct = r#"
-            channels = ["System"]
-            [acknowledgements]
-            enabled = true
-        "#;
+        let yaml_with_acks_struct = indoc! {r#"
+            channels:
+              - System
+            acknowledgements:
+              enabled: true
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_acks_struct).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_acks_struct).expect("YAML parsing should succeed");
         assert!(
             config.acknowledgements.enabled(),
-            "Acknowledgements should be enabled from TOML struct"
+            "Acknowledgements should be enabled from YAML struct"
         );
 
         // Test parsing without acknowledgements (default)
-        let toml_without_acks = r#"
-            channels = ["System"]
-        "#;
+        let yaml_without_acks = indoc! {r#"
+            channels:
+              - System
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_without_acks).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_without_acks).expect("YAML parsing should succeed");
         assert!(
             !config.acknowledgements.enabled(),
             "Acknowledgements should be disabled by default"
@@ -1281,6 +1301,8 @@ mod acknowledgement_tests {
 
 #[cfg(test)]
 mod rate_limiting_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1305,15 +1327,16 @@ mod rate_limiting_tests {
 
     #[test]
     fn test_rate_limiting_toml_parsing() {
-        let toml_with_rate_limit = r#"
-            channels = ["System"]
-            events_per_second = 50
-        "#;
+        let yaml_with_rate_limit = indoc! {r#"
+            channels:
+              - System
+            events_per_second: 50
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_rate_limit).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_rate_limit).expect("YAML parsing should succeed");
         assert_eq!(
             config.events_per_second, 50,
-            "Rate limiting should be parsed from TOML"
+            "Rate limiting should be parsed from YAML"
         );
     }
 
@@ -1343,6 +1366,8 @@ mod rate_limiting_tests {
 
 #[cfg(test)]
 mod checkpoint_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1357,15 +1382,16 @@ mod checkpoint_tests {
 
     #[test]
     fn test_checkpoint_toml_parsing() {
-        let toml_with_data_dir = r#"
-            channels = ["System"]
-            data_dir = "/var/lib/vector/wineventlog"
-        "#;
+        let yaml_with_data_dir = indoc! {r#"
+            channels:
+              - System
+            data_dir: /var/lib/vector/wineventlog
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_data_dir).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_data_dir).expect("YAML parsing should succeed");
         assert!(
             config.data_dir.is_some(),
-            "data_dir should be parsed from TOML"
+            "data_dir should be parsed from YAML"
         );
     }
 
@@ -1383,6 +1409,8 @@ mod checkpoint_tests {
 
 #[cfg(test)]
 mod message_rendering_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1396,15 +1424,16 @@ mod message_rendering_tests {
 
     #[test]
     fn test_render_message_config_enabled() {
-        let toml_with_render = r#"
-            channels = ["System"]
-            render_message = true
-        "#;
+        let yaml_with_render = indoc! {r#"
+            channels:
+              - System
+            render_message: true
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_render).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_render).expect("YAML parsing should succeed");
         assert!(
             config.render_message,
-            "render_message should be enabled from TOML"
+            "render_message should be enabled from YAML"
         );
     }
 
@@ -1426,7 +1455,7 @@ mod message_rendering_tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Should have fallback message format: "Event ID X from Provider on Computer"
-        if let Some(message) = log_event.get("message") {
+        if let Some(message) = log_event.get(event_path!("message")) {
             let msg_str = message.to_string_lossy();
             assert!(
                 msg_str.contains("Event ID") || msg_str.contains(&event.event_id.to_string()),
@@ -1451,7 +1480,7 @@ mod message_rendering_tests {
 
         let log_event = parser.parse_event(event).unwrap();
 
-        if let Some(message) = log_event.get("message") {
+        if let Some(message) = log_event.get(event_path!("message")) {
             let msg_str = message.to_string_lossy();
             assert_eq!(
                 msg_str, "The service started successfully.",
@@ -1486,6 +1515,8 @@ mod message_rendering_tests {
 
 #[cfg(test)]
 mod truncation_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -1500,15 +1531,16 @@ mod truncation_tests {
 
     #[test]
     fn test_max_event_data_length_toml_parsing() {
-        let toml_with_truncation = r#"
-            channels = ["System"]
-            max_event_data_length = 256
-        "#;
+        let yaml_with_truncation = indoc! {r#"
+            channels:
+              - System
+            max_event_data_length: 256
+        "#};
         let config: WindowsEventLogConfig =
-            toml::from_str(toml_with_truncation).expect("TOML parsing should succeed");
+            serde_yaml::from_str(yaml_with_truncation).expect("YAML parsing should succeed");
         assert_eq!(
             config.max_event_data_length, 256,
-            "max_event_data_length should be parsed from TOML"
+            "max_event_data_length should be parsed from YAML"
         );
     }
 
@@ -1529,7 +1561,7 @@ mod truncation_tests {
         let log_event = parser.parse_event(event).unwrap();
 
         let inserts = log_event
-            .get("string_inserts")
+            .get(event_path!("string_inserts"))
             .expect("string_inserts should be present");
         if let Value::Array(arr) = inserts {
             assert!(!arr.is_empty(), "string_inserts should not be empty");
@@ -1558,7 +1590,7 @@ mod truncation_tests {
 
         let log_event = parser.parse_event(event).unwrap();
 
-        if let Some(Value::Bytes(xml)) = log_event.get("xml") {
+        if let Some(Value::Bytes(xml)) = log_event.get(event_path!("xml")) {
             // XML should be truncated or limited
             assert!(
                 xml.len() <= 40000,
