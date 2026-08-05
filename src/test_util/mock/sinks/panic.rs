@@ -13,7 +13,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{DynValidatedSink, SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -30,9 +30,8 @@ impl_generate_config_from_default!(PanicSinkConfig);
 #[async_trait]
 #[typetag::serde(name = "test_panic")]
 impl SinkConfig for PanicSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        #[allow(deprecated)]
-        Ok((VectorSink::from_event_sink(PanicSink), ok(()).boxed()))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -41,6 +40,24 @@ impl SinkConfig for PanicSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for PanicSinkConfig {
+    type Validated = Self;
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(self.clone())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        #[allow(deprecated)]
+        Ok((VectorSink::from_event_sink(PanicSink), ok(()).boxed()))
     }
 }
 

@@ -33,11 +33,8 @@ impl GenerateConfig for GreptimeDBConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "greptimedb")]
 impl SinkConfig for GreptimeDBConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        warn!(
-            "DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
-        );
-        SinkConfig::build(&self.0, cx).await
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -46,6 +43,26 @@ impl SinkConfig for GreptimeDBConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.0.acknowledgements()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for GreptimeDBConfig {
+    type Validated = ValidatedGreptimeDBMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedGreptimeDBMetrics> {
+        self.0.validate()
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedGreptimeDBMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        warn!(
+            "DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
+        );
+        ValidatedSink::build(&self.0, validated, cx).await
     }
 }
 
