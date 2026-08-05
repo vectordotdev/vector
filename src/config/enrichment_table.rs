@@ -1,3 +1,8 @@
+#![allow(clippy::let_underscore_must_use)]
+
+use std::{any::Any, sync::Arc};
+
+use derivative::Derivative;
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use vector_lib::{
@@ -11,7 +16,8 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct EnrichmentTableOuter<T>
 where
     T: Configurable + Serialize + 'static + ToValue + Clone,
@@ -27,6 +33,15 @@ where
         skip_serializing_if = "Inputs::is_empty"
     )]
     pub inputs: Inputs<T>,
+
+    /// Validated/prepared sink state, filled in during config compilation.
+    ///
+    /// Mirrors `SinkOuter::prepared` for enrichment tables that double as sinks. It is
+    /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
+    /// the derived `SinkOuter` without cloning the underlying value.
+    #[serde(skip)]
+    #[derivative(Debug = "ignore")]
+    pub(crate) prepared: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> EnrichmentTableOuter<T>
@@ -42,6 +57,7 @@ where
             inner: inner.into(),
             graph: Default::default(),
             inputs: Inputs::from_iter(inputs),
+            prepared: None,
         }
     }
 
@@ -69,6 +85,7 @@ where
                     buffer: Default::default(),
                     proxy: Default::default(),
                     inner: sink,
+                    prepared: self.prepared.clone(),
                 },
             )
         })
@@ -105,6 +122,7 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             graph: self.graph,
+            prepared: self.prepared,
         }
     }
 }

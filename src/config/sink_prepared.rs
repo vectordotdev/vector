@@ -9,7 +9,10 @@
 //! - `PreparedSinkErased`: the object-safe boundary the framework actually crosses.
 //!   A blanket impl derives it from any `PreparedSink`, performing the `Box<dyn Any>`
 //!   erasure and downcast automatically.
-//! - `PreparedSinkEntry`: pairs a sink's raw config with its erased prepared state.
+//!
+//! The erased prepared state is stored on `SinkOuter` (see `SinkOuter::prepared`) and
+//! consumed at build time by `SinkOuter::build`, which dispatches through
+//! `PreparedSinkErased::build_prepared_erased`.
 //!
 //! `PreparedSink::validate_structure` is the same phase as the RFC's
 //! `SinkConfig::validate_structure` (pure structural validation owned by config
@@ -119,88 +122,5 @@ where
             .downcast_ref::<T::Prepared>()
             .expect("prepared state type mismatch");
         self.build_prepared(prepared, cx).await
-    }
-}
-
-/// A sink that has been validated/prepared at config-compile time.
-///
-/// Pairs the original raw config (preserved for serialization, reload diffing, and
-/// metadata access) with the erased prepared state produced by `SinkConfig::prepare`.
-/// The prepared state is downcast by the concrete sink's `SinkConfig::build_prepared`.
-pub struct PreparedSinkEntry {
-    /// The raw sink config, preserved for serialization and diffing.
-    raw: super::BoxedSink,
-    /// The erased prepared state from `SinkConfig::prepare`.
-    prepared: Box<dyn Any + Send + Sync>,
-}
-
-impl core::fmt::Debug for PreparedSinkEntry {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("PreparedSinkEntry")
-            .field("raw", &self.raw)
-            .field(
-                "prepared_type",
-                &std::any::type_name_of_val(self.prepared.as_ref()),
-            )
-            .finish()
-    }
-}
-
-impl PreparedSinkEntry {
-    /// Creates a new prepared sink entry from a prepared state and its raw config.
-    pub fn new(raw: super::BoxedSink, prepared: Box<dyn Any + Send + Sync>) -> Self {
-        Self { raw, prepared }
-    }
-
-    /// Creates a legacy entry that wraps the raw config without native preparation.
-    ///
-    /// The prepared state is empty; `SinkConfig::build_prepared`'s default ignores it
-    /// and builds directly from the raw config.
-    pub fn legacy(raw: super::BoxedSink) -> Self {
-        Self {
-            raw,
-            prepared: Box::new(()),
-        }
-    }
-
-    /// Returns a reference to the raw sink config.
-    pub fn raw(&self) -> &super::BoxedSink {
-        &self.raw
-    }
-
-    /// Returns the erased prepared state.
-    pub fn prepared(&self) -> &dyn Any {
-        self.prepared.as_ref()
-    }
-
-    /// Builds the sink, dispatching through the erased prepared boundary when the
-    /// sink has been migrated, or falling back to the raw config for legacy sinks.
-    pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        match self.raw.as_prepared() {
-            Some(p) => p.build_prepared_erased(self.prepared.as_ref(), cx).await,
-            None => self.raw.build(cx).await,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::sinks::clickhouse::config::{ClickhouseConfig, Format};
-
-    #[test]
-    fn legacy_entry_builds_from_raw() {
-        let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
-            table: "test_table".try_into().unwrap(),
-            database: Some("test_db".try_into().unwrap()),
-            format: Format::JsonEachRow,
-            ..Default::default()
-        };
-
-        let entry = PreparedSinkEntry::legacy(Box::new(config));
-        assert_eq!(entry.raw().get_component_name(), "clickhouse");
-        // The prepared state for a legacy entry is the unit type.
-        assert!(entry.prepared().is::<()>());
     }
 }

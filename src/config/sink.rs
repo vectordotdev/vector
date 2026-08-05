@@ -1,6 +1,9 @@
-use std::{cell::RefCell, path::PathBuf, time::Duration};
+#![allow(clippy::let_underscore_must_use)]
+
+use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use derivative::Derivative;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
@@ -57,7 +60,8 @@ impl<T: SinkConfig + 'static> From<T> for BoxedSink {
 /// Fully resolved sink component.
 #[configurable_component]
 #[configurable(metadata(docs::component_base_type = "sink"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct SinkOuter<T>
 where
     T: Configurable + Serialize + 'static,
@@ -91,12 +95,36 @@ where
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
     pub inner: BoxedSink,
+
+    /// Validated/prepared state, filled in during config compilation.
+    ///
+    /// This is the erased state produced by `PreparedSink::validate_structure`, retained so
+    /// the topology builder can build the sink without re-validating. It is never serialized
+    /// or diffed (see `#[serde(skip)]`), and is shared (via `Arc`) so enrichment-table-derived
+    /// sinks can carry it without cloning the underlying value.
+    #[serde(skip)]
+    #[derivative(Debug = "ignore")]
+    pub(crate) prepared: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> SinkOuter<T>
 where
     T: Configurable + Serialize,
 {
+    /// Builds the sink, dispatching through the erased prepared boundary when the sink
+    /// has been migrated, or falling back to the raw config for legacy sinks.
+    pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        match self.inner.as_prepared() {
+            Some(p) => {
+                let prepared = self
+                    .prepared
+                    .as_ref()
+                    .expect("prepared state missing for migrated sink");
+                p.build_prepared_erased(prepared.as_ref(), cx).await
+            }
+            None => self.inner.build(cx).await,
+        }
+    }
     pub fn new<I, IS>(inputs: I, inner: IS) -> SinkOuter<T>
     where
         I: IntoIterator<Item = T>,
@@ -110,6 +138,7 @@ where
             inner: inner.into(),
             proxy: Default::default(),
             graph: Default::default(),
+            prepared: None,
         }
     }
 
@@ -169,6 +198,7 @@ where
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
             graph: self.graph,
+            prepared: self.prepared,
         }
     }
 }

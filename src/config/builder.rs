@@ -94,7 +94,6 @@ impl From<Config> for ConfigBuilder {
             sources,
             sinks,
             transforms,
-            prepared_sinks: _, // Discard prepared sinks on conversion back to builder
             tests,
             secret,
             graceful_shutdown_duration,

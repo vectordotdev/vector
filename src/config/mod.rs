@@ -11,7 +11,6 @@ use std::{
 
 use indexmap::IndexMap;
 use serde::Serialize;
-use std::collections::HashMap as StdHashMap;
 use vector_config::configurable_component;
 pub use vector_lib::{
     config::{
@@ -63,7 +62,7 @@ pub use loading::{
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
-pub use sink_prepared::{PreparedSink, PreparedSinkEntry, PreparedSinkErased};
+pub use sink_prepared::{PreparedSink, PreparedSinkErased};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
@@ -158,12 +157,6 @@ pub struct Config {
     sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
     transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
-    /// Prepared sinks indexed by component key.
-    ///
-    /// This map stores validated/prepared sinks that the topology builds from.
-    /// Raw configs are preserved in the prepared entries for serialization.
-    #[serde(skip)]
-    prepared_sinks: StdHashMap<ComponentKey, PreparedSinkEntry>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
     pub graceful_shutdown_duration: Option<Duration>,
@@ -275,16 +268,6 @@ impl Config {
                 }
             })
             .collect()
-    }
-
-    /// Gets the prepared sink for a given component key.
-    pub fn prepared_sink(&self, key: &ComponentKey) -> Option<&PreparedSinkEntry> {
-        self.prepared_sinks.get(key)
-    }
-
-    /// Returns an iterator over all prepared sinks.
-    pub fn prepared_sinks(&self) -> impl Iterator<Item = (&ComponentKey, &PreparedSinkEntry)> {
-        self.prepared_sinks.iter()
     }
 }
 

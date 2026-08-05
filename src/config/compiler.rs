@@ -1,10 +1,10 @@
 use indexmap::{IndexMap, IndexSet};
-use std::collections::HashMap as StdHashMap;
+use std::sync::Arc;
 use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, OutputId, PreparedSinkEntry, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
+    Config, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
     transform::get_transform_output_ids, validation,
 };
 
@@ -141,7 +141,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             secret,
             graceful_shutdown_duration,
-            prepared_sinks: Default::default(),
         };
 
         // Prepare sinks and store in config
@@ -193,54 +192,38 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     }
 }
 
-/// Prepare all sinks (direct and enrichment-table-derived) and store in config.
+/// Prepare all sinks (direct and enrichment-table-derived) in place.
 ///
-/// Returns a list of errors for sinks that failed preparation. An empty Vec means success.
+/// Fills the `prepared` field on each sink's `SinkOuter` (and on enrichment tables that
+/// double as sinks) with the erased validated state. Returns a list of errors for sinks
+/// that failed preparation. An empty Vec means success.
 fn prepare_sinks(config: &mut Config) -> Vec<String> {
-    let mut prepared = StdHashMap::new();
     let mut errors = Vec::new();
 
     // Prepare direct sinks
-    for (key, sink) in &config.sinks {
-        let raw = dyn_clone::clone_box(&*sink.inner);
-        match sink.inner.as_prepared() {
-            Some(erased) => match erased.validate_structure_erased() {
-                Ok(state) => {
-                    prepared.insert(key.clone(), PreparedSinkEntry::new(raw, state));
-                }
-                Err(e) => {
-                    errors.push(format!("Failed to prepare sink \"{}\": {}", key, e));
-                }
-            },
-            None => {
-                prepared.insert(key.clone(), PreparedSinkEntry::legacy(raw));
+    for (key, sink) in config.sinks.iter_mut() {
+        if let Some(erased) = sink.inner.as_prepared() {
+            match erased.validate_structure_erased() {
+                Ok(state) => sink.prepared = Some(Arc::from(state)),
+                Err(e) => errors.push(format!("Failed to prepare sink \"{}\": {}", key, e)),
             }
         }
     }
 
     // Prepare enrichment table sinks with resolved inputs.
-    for (key, table) in &config.enrichment_tables {
-        if let Some((sink_key, sink)) = table.as_sink(key) {
-            let raw = dyn_clone::clone_box(&*sink.inner);
-            match sink.inner.as_prepared() {
-                Some(erased) => match erased.validate_structure_erased() {
-                    Ok(state) => {
-                        prepared.insert(sink_key, PreparedSinkEntry::new(raw, state));
-                    }
-                    Err(error) => {
-                        errors.push(format!(
-                            "Failed to prepare enrichment table sink \"{key}\": {error}"
-                        ));
-                    }
-                },
-                None => {
-                    prepared.insert(sink_key, PreparedSinkEntry::legacy(raw));
-                }
+    for (key, table) in config.enrichment_tables.iter_mut() {
+        if let Some((_, sink)) = table.as_sink(key)
+            && let Some(erased) = sink.inner.as_prepared()
+        {
+            match erased.validate_structure_erased() {
+                Ok(state) => table.prepared = Some(Arc::from(state)),
+                Err(error) => errors.push(format!(
+                    "Failed to prepare enrichment table sink \"{key}\": {error}"
+                )),
             }
         }
     }
 
-    config.prepared_sinks = prepared;
     errors
 }
 
