@@ -107,7 +107,7 @@ build=(docker compose -f "$SCENARIO_DIR/docker-compose.yaml" build)
 # Launch from a rendered copy so the image tag is concrete. snouty ships the compose
 # uninterpolated, so an `${ANTITHESIS_IMAGE_TAG:-dev}` tag reaches the platform as the
 # never-pushed `:dev`; `docker compose config` bakes in the tag snouty actually pushed.
-LAUNCH_DIR="$SCENARIO_DIR/.launch"
+LAUNCH_DIR="$ANTITHESIS_DIR/.launch/$SCENARIO"
 render=(docker compose -f "$SCENARIO_DIR/docker-compose.yaml" config)
 
 cmd=(snouty launch
