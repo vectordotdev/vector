@@ -279,7 +279,6 @@ impl ValidatedSink for ClickhouseConfig {
                 .confine(&self.confinement, ClickhouseConfig::NAME, "database")?;
 
         Ok(ValidatedClickhouse {
-            config: self.clone(),
             database,
             auth,
             batch_settings,
@@ -294,31 +293,30 @@ impl ValidatedSink for ClickhouseConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedClickhouse {
-            config,
             database,
             auth,
             batch_settings,
             confined_table,
             confined_database,
         } = validated;
-        let endpoint = config.endpoint.with_default_parts().uri;
-        let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
+        let endpoint = self.endpoint.with_default_parts().uri;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
             endpoint: endpoint.clone(),
-            skip_unknown_fields: config.skip_unknown_fields,
-            date_time_best_effort: config.date_time_best_effort,
-            insert_random_shard: config.insert_random_shard,
-            compression: config.compression,
-            query_settings: config.query_settings,
+            skip_unknown_fields: self.skip_unknown_fields,
+            date_time_best_effort: self.date_time_best_effort,
+            insert_random_shard: self.insert_random_shard,
+            compression: self.compression,
+            query_settings: self.query_settings,
         };
 
         let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
             HttpService::new(client.clone(), clickhouse_service_request_builder);
 
-        let request_limits = config.request.into_settings();
+        let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, ClickhouseRetryLogic::default())
@@ -326,13 +324,13 @@ impl ValidatedSink for ClickhouseConfig {
 
         // Resolve the encoding strategy (format + encoder) based on configuration.
         // This happens here in build because Arrow schema fetching requires network access.
-        let (format, encoder_kind) = config
+        let (format, encoder_kind) = self
             .resolve_strategy(&client, &endpoint, database, auth.as_ref())
             .await?;
 
         let request_builder = ClickhouseRequestBuilder {
-            compression: config.compression,
-            encoder: (config.encoding.clone(), encoder_kind),
+            compression: self.compression,
+            encoder: (self.encoding.clone(), encoder_kind),
         };
 
         // Use pre-computed batch settings and confined templates
@@ -457,8 +455,6 @@ impl ClickhouseConfig {
 /// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedClickhouse {
-    /// Validated configuration derived from the original config.
-    config: ClickhouseConfig,
     /// The database template, validated.
     database: Template,
     /// Resolved auth (pure validation without network).
