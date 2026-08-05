@@ -239,6 +239,7 @@ jobs:
             cue:
               - 'website/cue/**'
               - "vdev/Cargo.toml"
+              - 'vdev/src/commands/build/docs_json.rs'
               - ".github/workflows/changes.yml"
             component_docs:
               - 'Makefile'
@@ -247,8 +248,10 @@ jobs:
               - 'website/package.json'
               - 'website/yarn.lock'
               - 'website/generated/example-configs/**'
-              - 'website/scripts/create-config-examples.js'
-              - 'website/scripts/validate-config-examples.js'
+              - 'vdev/src/commands/build/component_docs/**'
+              - 'vdev/src/commands/build/component_examples.rs'
+              - 'vdev/src/commands/build/docs_json.rs'
+              - 'vdev/src/commands/check/component_examples.rs'
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'
               # If changes to the VRL sha is made the combined generated cue file will change which
