@@ -721,10 +721,7 @@ impl<'a> Builder<'a> {
             extra_context: self.extra_context.clone(),
         };
 
-        // Build the sink from its validated state (or the raw config for legacy sinks).
-        let built_sink = sink.build(cx).await;
-
-        let (sink, healthcheck) = match built_sink {
+        let (sink, healthcheck) = match sink.build(cx).await {
             Err(error) => {
                 self.errors.push(format!("Sink \"{key}\": {error}"));
                 return;
