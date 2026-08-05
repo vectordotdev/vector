@@ -243,14 +243,14 @@ impl ValidatedSink for ClickhouseConfig {
     type Validated = ValidatedClickhouse;
 
     fn validate_structure(&self) -> crate::Result<ValidatedClickhouse> {
-        // Validate templates can be parsed (this is pure)
+        // Validate templates can be parsed
         let database = self.database.clone().unwrap_or_else(|| {
             "default"
                 .try_into()
                 .expect("'default' should be a valid template")
         });
 
-        // For batch_encoding with ArrowStream, validate compatibility (pure check)
+        // For batch_encoding with ArrowStream, validate compatibility
         if let Some(batch_encoding) = &self.batch_encoding {
             if self.format != Format::ArrowStream {
                 return Err(format!(
@@ -262,13 +262,13 @@ impl ValidatedSink for ClickhouseConfig {
             let ClickhouseBatchEncoding::ArrowStream(_) = batch_encoding;
         }
 
-        // Resolve auth choice (pure validation)
+        // Resolve auth choice
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
 
-        // Compute batch settings (pure validation)
+        // Compute batch settings
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        // Confine templates (pure validation)
+        // Confine templates
         let confined_table =
             self.table
                 .clone()
