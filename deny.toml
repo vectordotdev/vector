@@ -49,7 +49,7 @@ ignore = [
   { id = "RUSTSEC-2024-0436", reason = "paste crate is unmaintained - transitive dependency via parquet v56.2.0, no safe upgrade available" },
   { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.102/0.101 CRL parsing panic - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179); 0.103 already patched to 0.103.13" },
   { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is unmaintained - transitive dep via mlua_derive v0.11.0; unblocked when mlua upgrades its derive macro" },
-  { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic-time duplicate attribute check - affected versions still in the tree are 0.31 (direct dep, sources-windows_event_log) and 0.37.4 (via opendal); typespec is already on the fixed 0.41" },
-  { id = "RUSTSEC-2026-0195", reason = "quick-xml unbounded namespace-declaration allocation in NsReader - affected versions still in the tree are 0.31 (direct dep, sources-windows_event_log) and 0.37.4 (via opendal); typespec is already on the fixed 0.41" },
+  { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic-time duplicate attribute check - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
+  { id = "RUSTSEC-2026-0195", reason = "quick-xml unbounded namespace-declaration allocation in NsReader - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
   { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7 is vulnerable but unmaintained; upgrading vector-buffers to rkyv 0.8 requires a breaking serialization migration" },
 ]
