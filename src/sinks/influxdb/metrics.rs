@@ -7,10 +7,13 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     event::metric::{MetricSketch, MetricTags, Quantile},
+    sensitive_string::SensitiveString,
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
@@ -24,7 +27,7 @@ use crate::{
             healthcheck, influx_line_protocol, influxdb_settings,
         },
         util::{
-            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
@@ -117,18 +120,8 @@ impl_generate_config_from_default!(InfluxDbConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(
-            self.clone().endpoint,
-            self.clone().influxdb1_settings,
-            self.clone().influxdb2_settings,
-            client.clone(),
-        )?;
-        validate_quantiles(&self.quantiles)?;
-        let sink = InfluxDbSvc::new(self.clone(), client)?;
-        Ok((sink, healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -140,27 +133,101 @@ impl SinkConfig for InfluxDbConfig {
     }
 }
 
-impl InfluxDbSvc {
-    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
+/// Purely validated `influxdb_metrics` sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone)]
+pub struct ValidatedInfluxDbMetrics {
+    uri: http::Uri,
+    token: SensitiveString,
+    protocol_version: ProtocolVersion,
+    batch: BatchSettings<MetricsBuffer>,
+}
+
+impl std::fmt::Debug for ValidatedInfluxDbMetrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidatedInfluxDbMetrics")
+            .field("uri", &self.uri)
+            .field("token", &self.token)
+            .field("protocol_version", &self.protocol_version)
+            .finish_non_exhaustive()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for InfluxDbConfig {
+    type Validated = ValidatedInfluxDbMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedInfluxDbMetrics> {
+        validate_quantiles(&self.quantiles)?;
+
         let settings = influxdb_settings(
-            config.influxdb1_settings.clone(),
-            config.influxdb2_settings.clone(),
+            self.influxdb1_settings.clone(),
+            self.influxdb2_settings.clone(),
         )?;
 
-        let endpoint = config.endpoint.clone();
+        let endpoint = self.endpoint.clone();
+        let uri = settings.write_uri(endpoint)?;
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = config.batch.into_batch_settings()?;
+        let batch = self.batch.into_batch_settings()?;
+
+        Ok(ValidatedInfluxDbMetrics {
+            uri,
+            token,
+            protocol_version,
+            batch,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedInfluxDbMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let healthcheck = healthcheck(
+            self.clone().endpoint,
+            self.clone().influxdb1_settings,
+            self.clone().influxdb2_settings,
+            client.clone(),
+        )?;
+        let sink = InfluxDbSvc::from_validated(self.clone(), validated, client)?;
+        Ok((sink, healthcheck))
+    }
+}
+
+impl InfluxDbSvc {
+    #[cfg(all(test, feature = "influxdb-integration-tests"))]
+    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
+        let validated = config.validate()?;
+        Self::from_validated(config, &validated, client)
+    }
+
+    fn from_validated(
+        config: InfluxDbConfig,
+        validated: &ValidatedInfluxDbMetrics,
+        client: HttpClient,
+    ) -> crate::Result<VectorSink> {
+        let ValidatedInfluxDbMetrics {
+            uri,
+            token,
+            protocol_version,
+            batch,
+        } = validated;
+
         let request = config.request.into_settings();
 
-        let uri = settings.write_uri(endpoint)?;
-
-        let http_service = HttpBatchService::new(client, create_build_request(uri, token.inner()));
+        let http_service =
+            HttpBatchService::new(client, create_build_request(uri.clone(), token.inner()));
 
         let influxdb_http_service = InfluxDbSvc {
             config,
-            protocol_version,
+            protocol_version: *protocol_version,
             inner: http_service,
         };
         let mut normalizer = MetricNormalizer::<InfluxMetricNormalize>::default();
@@ -437,6 +504,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::ValidatedSink,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts},
     };
@@ -456,6 +524,26 @@ mod tests {
         "#};
 
         serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
+    }
+
+    #[test]
+    fn prepares_valid_config() {
+        let config = InfluxDbConfig {
+            endpoint: "http://localhost:9999".to_string(),
+            influxdb2_settings: Some(InfluxDb2Settings {
+                org: "my-org".to_string(),
+                bucket: "my-bucket".to_string(),
+                token: "my-token".to_string().into(),
+            }),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert!(matches!(validated.protocol_version, ProtocolVersion::V2));
+        assert_eq!(
+            validated.uri.to_string(),
+            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
+        );
     }
 
     #[test]

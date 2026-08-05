@@ -10,6 +10,7 @@ use super::{
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
 };
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::HttpClient,
     sinks::{
         UriParseSnafu,
@@ -190,11 +191,45 @@ fn validate_headers(
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
 
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::metric()
+    }
+}
+
+/// Purely validated Prometheus remote write sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedRemoteWrite {
+    /// The confined tenant id template, if any.
+    tenant_id: Option<ConfinedTemplate>,
+    /// The parsed endpoint URI.
+    endpoint: Uri,
+    /// The validated custom headers.
+    validated_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for RemoteWriteConfig {
+    type Validated = ValidatedRemoteWrite;
+
+    fn validate(&self) -> crate::Result<ValidatedRemoteWrite> {
         let tenant_id = self
             .tenant_id
             .clone()
@@ -204,12 +239,38 @@ impl SinkConfig for RemoteWriteConfig {
             .transpose()?;
 
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let request_settings = self.request.tower.into_settings();
         let validated_headers = Arc::new(validate_headers(
             &self.request.headers,
             self.auth.is_some(),
         )?);
+        let batch_settings = self
+            .batch
+            .batch_settings
+            .validate()?
+            .into_batcher_settings()?;
+
+        Ok(ValidatedRemoteWrite {
+            tenant_id,
+            endpoint,
+            validated_headers,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedRemoteWrite,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedRemoteWrite {
+            tenant_id,
+            endpoint,
+            validated_headers,
+            batch_settings,
+        } = validated;
+
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let request_settings = self.request.tower.into_settings();
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();
@@ -256,16 +317,16 @@ impl SinkConfig for RemoteWriteConfig {
             healthcheck_endpoint,
             self.compression,
             auth.clone(),
-            Arc::clone(&validated_headers),
+            Arc::clone(validated_headers),
         )
         .boxed();
 
         let service = RemoteWriteService {
-            endpoint,
+            endpoint: endpoint.clone(),
             client,
             auth,
             compression: self.compression,
-            headers: validated_headers,
+            headers: Arc::clone(validated_headers),
         };
         let service = ServiceBuilder::new()
             .settings(
@@ -275,14 +336,10 @@ impl SinkConfig for RemoteWriteConfig {
             .service(service);
 
         let sink = RemoteWriteSink {
-            tenant_id,
+            tenant_id: tenant_id.clone(),
             compression: self.compression,
             aggregate: self.batch.aggregate,
-            batch_settings: self
-                .batch
-                .batch_settings
-                .validate()?
-                .into_batcher_settings()?,
+            batch_settings: *batch_settings,
             buckets,
             quantiles,
             default_namespace,
@@ -290,14 +347,6 @@ impl SinkConfig for RemoteWriteConfig {
             service,
         };
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::metric()
     }
 }
 
@@ -374,5 +423,22 @@ mod tests {
             rendered.starts_with("team-"),
             "operator-controlled prefix must be preserved in rendered tenant_id"
         );
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = RemoteWriteConfig {
+            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            tenant_id: Some("team-{{ org }}".try_into().unwrap()),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint.to_string(),
+            "http://localhost:8087/api/v1/write"
+        );
+        assert!(validated.tenant_id.is_some());
+        assert!(validated.validated_headers.is_empty());
     }
 }

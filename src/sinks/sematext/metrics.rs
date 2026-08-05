@@ -14,7 +14,10 @@ use vector_lib::{
 use super::Region;
 use crate::{
     Result,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     event::{
         Event, KeyString,
         metric::{Metric, MetricValue},
@@ -25,7 +28,7 @@ use crate::{
         Healthcheck, HealthcheckError, VectorSink,
         influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
-            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
         },
@@ -125,19 +128,8 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
-    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(None, cx.proxy())?;
-
-        let endpoint = match (&self.endpoint, &self.region) {
-            (Some(endpoint), _) => endpoint.clone(),
-            (None, Region::Us) => US_ENDPOINT.to_owned(),
-            (None, Region::Eu) => EU_ENDPOINT.to_owned(),
-        };
-
-        let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
-        let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, client)?;
-
-        Ok((sink, healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -146,6 +138,64 @@ impl SinkConfig for SematextMetricsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated `sematext_metrics` sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone)]
+pub struct ValidatedSematextMetrics {
+    endpoint: String,
+    uri: Uri,
+    batch: BatchSettings<MetricsBuffer>,
+}
+
+impl std::fmt::Debug for ValidatedSematextMetrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidatedSematextMetrics")
+            .field("endpoint", &self.endpoint)
+            .field("uri", &self.uri)
+            .finish_non_exhaustive()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for SematextMetricsConfig {
+    type Validated = ValidatedSematextMetrics;
+
+    fn validate(&self) -> Result<ValidatedSematextMetrics> {
+        let endpoint = match (&self.endpoint, &self.region) {
+            (Some(endpoint), _) => endpoint.clone(),
+            (None, Region::Us) => US_ENDPOINT.to_owned(),
+            (None, Region::Eu) => EU_ENDPOINT.to_owned(),
+        };
+
+        let uri = write_uri(&endpoint)?;
+        let batch = self.batch.into_batch_settings()?;
+
+        Ok(ValidatedSematextMetrics {
+            endpoint,
+            uri,
+            batch,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedSematextMetrics,
+        cx: SinkContext,
+    ) -> Result<(VectorSink, Healthcheck)> {
+        let ValidatedSematextMetrics { endpoint, .. } = validated;
+
+        let client = HttpClient::new(None, cx.proxy())?;
+
+        let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
+        let sink = SematextMetricsService::from_validated(self.clone(), validated, client)?;
+
+        Ok((sink, healthcheck))
     }
 }
 
@@ -162,14 +212,14 @@ fn write_uri(endpoint: &str) -> Result<Uri> {
 }
 
 impl SematextMetricsService {
-    pub fn new(
+    fn from_validated(
         config: SematextMetricsConfig,
-        endpoint: http::Uri,
+        validated: &ValidatedSematextMetrics,
         client: HttpClient,
     ) -> Result<VectorSink> {
-        let batch = config.batch.into_batch_settings()?;
+        let ValidatedSematextMetrics { uri, batch, .. } = validated;
         let request = config.request.into_settings();
-        let http_service = HttpBatchService::new(client, create_build_request(endpoint));
+        let http_service = HttpBatchService::new(client, create_build_request(uri.clone()));
         let sematext_service = SematextMetricsService {
             config,
             inner: http_service,
@@ -313,6 +363,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::ValidatedSink,
         event::{Event, metric::MetricKind},
         sinks::util::test::{build_test_server, load_sink},
         test_util::{
@@ -325,6 +376,28 @@ mod tests {
     #[test]
     fn generate_config() {
         test_generate_config::<SematextMetricsConfig>();
+    }
+
+    #[test]
+    fn prepares_valid_config() {
+        let config = SematextMetricsConfig {
+            default_namespace: "ns".to_string(),
+            region: Region::Us,
+            endpoint: Some("http://localhost:9999".to_string()),
+            token: "atoken".to_string().into(),
+            batch: Default::default(),
+            request: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.endpoint, "http://localhost:9999");
+        assert!(
+            validated
+                .uri
+                .to_string()
+                .starts_with("http://localhost:9999/write?db=metrics&v=vector-")
+        );
     }
 
     #[test]
@@ -422,7 +495,7 @@ mod tests {
         let endpoint = format!("http://{addr}");
         config.endpoint = Some(endpoint.clone());
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);

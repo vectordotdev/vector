@@ -11,11 +11,12 @@ use super::{
     service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::HttpClient,
     sinks::{
         prelude::*,
         util::{
-            BatchConfig, BoxedRawValue,
+            BatchConfig, BoxedRawValue, TowerRequestSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
@@ -103,8 +104,62 @@ impl GenerateConfig for HoneycombConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
+    fn input(&self) -> Input {
+        let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated `honeycomb` sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedHoneycomb {
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// The endpoint URI built from `endpoint` and `dataset`.
+    uri: Uri,
+    /// Tower request settings.
+    request_limits: TowerRequestSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HoneycombConfig {
+    type Validated = ValidatedHoneycomb;
+
+    fn validate(&self) -> crate::Result<ValidatedHoneycomb> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+        let uri = self.build_uri()?;
+        let request_limits = self.request.into_settings();
+
+        Ok(ValidatedHoneycomb {
+            batch_settings,
+            uri,
+            request_limits,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHoneycomb,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedHoneycomb {
+            batch_settings,
+            uri,
+            request_limits,
+        } = validated;
 
         let request_builder = HoneycombRequestBuilder {
             encoder: HoneycombEncoder {
@@ -112,8 +167,6 @@ impl SinkConfig for HoneycombConfig {
             },
             compression: self.compression,
         };
-
-        let uri = self.build_uri()?;
 
         let honeycomb_service_request_builder = HoneycombSvcRequestBuilder {
             uri: uri.clone(),
@@ -125,30 +178,18 @@ impl SinkConfig for HoneycombConfig {
 
         let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
 
-        let request_limits = self.request.into_settings();
-
         let service = ServiceBuilder::new()
             .settings(
-                request_limits,
+                request_limits.clone(),
                 http_response_retry_logic(self.retry_strategy.clone()),
             )
             .service(service);
 
-        let sink = HoneycombSink::new(service, batch_settings, request_builder);
+        let sink = HoneycombSink::new(service, *batch_settings, request_builder);
 
-        let healthcheck = healthcheck(uri, self.api_key.clone(), client).boxed();
+        let healthcheck = healthcheck(uri.clone(), self.api_key.clone(), client).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
-
-        Input::log().with_schema_requirement(requirement)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -196,5 +237,27 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
         let body = String::from_utf8_lossy(&body[..]);
 
         Err(format!("Server returned unexpected error status: {status} body: {body}").into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config: HoneycombConfig = serde_json::from_value(HoneycombConfig::generate_config())
+            .expect("config should be valid");
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.uri.to_string(),
+            "https://api.honeycomb.io/1/batch/my-honeycomb-dataset"
+        );
+        // Default batch settings from `HoneycombDefaultBatchSettings`.
+        assert_eq!(
+            validated.batch_settings.timeout,
+            std::time::Duration::from_secs(1)
+        );
     }
 }

@@ -5,6 +5,7 @@ use vector_lib::{
     config::AcknowledgementsConfig,
     configurable::{component::GenerateConfig, configurable_component},
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use super::{
@@ -12,12 +13,12 @@ use super::{
     sink::PostgresSink,
 };
 use crate::{
-    config::{Input, SinkConfig, SinkContext},
+    config::{DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         util::{
             BatchConfig, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, UriSerde,
+            TowerRequestConfig, TowerRequestSettings, UriSerde,
         },
     },
 };
@@ -88,29 +89,8 @@ impl GenerateConfig for PostgresConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "postgres")]
 impl SinkConfig for PostgresConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let connection_pool = PgPoolOptions::new()
-            .max_connections(self.pool_size)
-            .connect_lazy(&self.endpoint)?;
-
-        let healthcheck = healthcheck(connection_pool.clone()).boxed();
-
-        let batch_settings = self.batch.into_batcher_settings()?;
-        let request_settings = self.request.into_settings();
-
-        let endpoint_uri: UriSerde = self.endpoint.parse()?;
-        let service = PostgresService::new(
-            connection_pool,
-            self.table.clone(),
-            endpoint_uri.to_string(),
-        );
-        let service = ServiceBuilder::new()
-            .settings(request_settings, PostgresRetryLogic)
-            .service(service);
-
-        let sink = PostgresSink::new(service, batch_settings);
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -119,6 +99,69 @@ impl SinkConfig for PostgresConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated PostgreSQL sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedPostgres {
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// Request settings computed during validation.
+    request_settings: TowerRequestSettings,
+    /// The parsed endpoint URI, validated.
+    endpoint_uri: UriSerde,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PostgresConfig {
+    type Validated = ValidatedPostgres;
+
+    fn validate(&self) -> crate::Result<ValidatedPostgres> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let request_settings = self.request.into_settings();
+        let endpoint_uri: UriSerde = self.endpoint.parse()?;
+
+        Ok(ValidatedPostgres {
+            batch_settings,
+            request_settings,
+            endpoint_uri,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedPostgres,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedPostgres {
+            batch_settings,
+            request_settings,
+            endpoint_uri,
+        } = validated;
+
+        let connection_pool = PgPoolOptions::new()
+            .max_connections(self.pool_size)
+            .connect_lazy(&self.endpoint)?;
+
+        let healthcheck = healthcheck(connection_pool.clone()).boxed();
+
+        let service = PostgresService::new(
+            connection_pool,
+            self.table.clone(),
+            endpoint_uri.to_string(),
+        );
+        let service = ServiceBuilder::new()
+            .settings(request_settings.clone(), PostgresRetryLogic)
+            .service(service);
+
+        let sink = PostgresSink::new(service, *batch_settings);
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -145,5 +188,20 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.endpoint, "postgres://user:password@localhost/default");
         assert_eq!(cfg.table, "mytable");
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let validated = cfg.validate().expect("validation should succeed");
+        // The parsed endpoint URI redacts the password in its Display output.
+        assert_eq!(validated.endpoint_uri.uri.host(), Some("localhost"));
+        assert_eq!(validated.endpoint_uri.uri.path(), "/default");
     }
 }

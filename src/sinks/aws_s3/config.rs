@@ -12,13 +12,17 @@ use vector_lib::{
     },
     configurable::configurable_component,
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use super::sink::S3RequestOptions;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
+    },
     sinks::{
         Healthcheck,
         s3_common::{
@@ -33,7 +37,7 @@ use crate::{
             TowerRequestConfig, timezone_to_offset,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -228,11 +232,8 @@ impl GenerateConfig for S3SinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = self.create_service(&cx.proxy).await?;
-        let healthcheck = self.build_healthcheck(service.client())?;
-        let sink = self.build_processor(service, cx)?;
-        Ok((sink, healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -254,11 +255,69 @@ impl SinkConfig for S3SinkConfig {
     }
 }
 
+/// Purely validated `aws_s3` sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedAwsS3 {
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// Confined key prefix template.
+    key_prefix: ConfinedTemplate,
+    /// Confined SSE-KMS key id template, if configured.
+    ssekms_key_id: Option<ConfinedTemplate>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for S3SinkConfig {
+    type Validated = ValidatedAwsS3;
+
+    fn validate(&self) -> crate::Result<ValidatedAwsS3> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        let key_prefix = Template::try_from(self.key_prefix.clone())?.confine(
+            &self.confinement,
+            Self::NAME,
+            "key_prefix",
+        )?;
+
+        let ssekms_key_id = self
+            .options
+            .ssekms_key_id
+            .as_ref()
+            .cloned()
+            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .transpose()?
+            .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
+            .transpose()?;
+
+        Ok(ValidatedAwsS3 {
+            batch_settings,
+            key_prefix,
+            ssekms_key_id,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAwsS3,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let service = self.create_service(&cx.proxy).await?;
+        let healthcheck = self.build_healthcheck(service.client())?;
+        let sink = self.build_processor(service, cx, validated)?;
+        Ok((sink, healthcheck))
+    }
+}
+
 impl S3SinkConfig {
     pub fn build_processor(
         &self,
         service: S3Service,
         cx: SinkContext,
+        validated: &ValidatedAwsS3,
     ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
@@ -276,20 +335,13 @@ impl S3SinkConfig {
             .and_then(timezone_to_offset);
 
         // Configure our partitioning/batching.
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let batch_settings = validated.batch_settings;
 
-        let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
-        let key_prefix = key_prefix.confine(&self.confinement, Self::NAME, "key_prefix")?;
-
-        let ssekms_key_id = self
-            .options
+        let key_prefix = validated.key_prefix.clone().with_tz_offset(offset);
+        let ssekms_key_id = validated
             .ssekms_key_id
-            .as_ref()
-            .cloned()
-            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
-            .transpose()?
-            .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
-            .transpose()?;
+            .clone()
+            .map(|t| t.with_tz_offset(offset));
 
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
 
@@ -381,7 +433,23 @@ impl S3SinkConfig {
 #[cfg(test)]
 mod tests {
     use super::S3SinkConfig;
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn prepares_valid_config() {
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+        "#})
+        .unwrap();
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.key_prefix.to_string(), "date=%F");
+        assert!(validated.ssekms_key_id.is_none());
+    }
 
     #[test]
     fn generate_config() {

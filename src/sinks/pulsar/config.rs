@@ -18,6 +18,7 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     schema,
     sinks::{
         prelude::*,
@@ -393,20 +394,8 @@ impl GenerateConfig for PulsarSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let topic = self
-            .topic
-            .clone()
-            .confine(&self.confinement, Self::NAME, "topic")?;
-
-        let client = self
-            .create_pulsar_client()
-            .await
-            .map_err(|e| super::sink::BuildError::CreatePulsarSink { source: e })?;
-
-        let sink = PulsarSink::new(client, self.clone(), topic.clone())?;
-        let hc = healthcheck(self.clone(), topic).boxed();
-        Ok((VectorSink::from_event_streamsink(sink), hc))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -426,9 +415,62 @@ impl SinkConfig for PulsarSinkConfig {
     }
 }
 
+/// Purely validated Pulsar sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedPulsarSink {
+    /// The confined topic template.
+    topic: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PulsarSinkConfig {
+    type Validated = ValidatedPulsarSink;
+
+    fn validate(&self) -> crate::Result<ValidatedPulsarSink> {
+        let topic = self
+            .topic
+            .clone()
+            .confine(&self.confinement, Self::NAME, "topic")?;
+        Ok(ValidatedPulsarSink { topic })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedPulsarSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedPulsarSink { topic } = validated;
+
+        let client = self
+            .create_pulsar_client()
+            .await
+            .map_err(|e| super::sink::BuildError::CreatePulsarSink { source: e })?;
+
+        let sink = PulsarSink::new(client, self.clone(), topic.clone())?;
+        let hc = healthcheck(self.clone(), topic.clone()).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn validate_returns_confined_topic() {
+        let config = PulsarSinkConfig {
+            topic: Template::try_from("test-topic").unwrap(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.topic.to_string(), "test-topic");
+    }
 
     #[test]
     fn confinement_rejects_unconfined_topic() {

@@ -8,6 +8,7 @@ use tower::ServiceBuilder;
 use vector_lib::{
     config::{AcknowledgementsConfig, proxy::ProxyConfig},
     configurable::configurable_component,
+    stream::BatcherSettings,
 };
 
 use super::{
@@ -16,7 +17,7 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
         Healthcheck, UriParseSnafu, VectorSink,
@@ -133,17 +134,11 @@ impl DatadogTracesConfig {
         &self,
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
+        batcher_settings: BatcherSettings,
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.into_settings();
         let endpoints = self.generate_traces_endpoint_configuration(dd_common)?;
-
-        let batcher_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(BATCH_GOAL_BYTES)?
-            .limit_max_events(BATCH_MAX_EVENTS)?
-            .into_batcher_settings()?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, TraceApiRetry)
@@ -217,14 +212,8 @@ impl DatadogTracesConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_traces")]
 impl SinkConfig for DatadogTracesConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
-        let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(&dd_common, client)?;
-
-        Ok((sink, healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -233,6 +222,43 @@ impl SinkConfig for DatadogTracesConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
+    }
+}
+
+/// Purely validated Datadog traces sink configuration.
+#[derive(Clone, Debug)]
+pub struct ValidatedTraces {
+    /// Batcher settings computed during validation.
+    batcher_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatadogTracesConfig {
+    type Validated = ValidatedTraces;
+
+    fn validate(&self) -> crate::Result<ValidatedTraces> {
+        let batcher_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(BATCH_GOAL_BYTES)?
+            .limit_max_events(BATCH_MAX_EVENTS)?
+            .into_batcher_settings()?;
+
+        Ok(ValidatedTraces { batcher_settings })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedTraces,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.build_client(&cx.proxy)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.local_dd_common.with_globals(global)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(&dd_common, client, validated.batcher_settings)?;
+
+        Ok((sink, healthcheck))
     }
 }
 
@@ -245,10 +271,19 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
 
 #[cfg(test)]
 mod test {
-    use super::DatadogTracesConfig;
+    use super::{BATCH_GOAL_BYTES, BATCH_MAX_EVENTS, DatadogTracesConfig};
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogTracesConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_batch_settings() {
+        let config = DatadogTracesConfig::default();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batcher_settings.size_limit, BATCH_GOAL_BYTES);
+        assert_eq!(validated.batcher_settings.item_limit, BATCH_MAX_EVENTS);
     }
 }

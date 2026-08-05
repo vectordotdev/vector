@@ -5,7 +5,10 @@ use serde_with::serde_as;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     sinks::{Healthcheck, VectorSink, blackhole::sink::BlackholeSink},
 };
 
@@ -51,11 +54,8 @@ pub struct BlackholeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = BlackholeSink::new(self.clone());
-        let healthcheck = future::ok(()).boxed();
-
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -67,6 +67,26 @@ impl SinkConfig for BlackholeConfig {
     }
 }
 
+#[async_trait::async_trait]
+impl ValidatedSink for BlackholeConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<()> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &(),
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = BlackholeSink::new(self.clone());
+        let healthcheck = future::ok(()).boxed();
+
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+    }
+}
+
 impl GenerateConfig for BlackholeConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self::default()).unwrap()
@@ -75,10 +95,17 @@ impl GenerateConfig for BlackholeConfig {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::ValidatedSink;
     use crate::sinks::blackhole::config::BlackholeConfig;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<BlackholeConfig>();
+    }
+
+    #[test]
+    fn validate_ok() {
+        let config = BlackholeConfig::default();
+        config.validate().expect("validation should succeed");
     }
 }

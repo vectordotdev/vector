@@ -13,7 +13,7 @@ use vector_lib::{
 
 use super::WebHdfsConfig;
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::util::{BatchConfig, Compression},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
@@ -54,7 +54,8 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     config.prefix = "logs/%F-{{ .i }}-".to_string();
 
     let op = config.build_operator().unwrap();
-    let sink = config.build_processor(op.clone()).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(op.clone(), &validated).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 30, None);
 

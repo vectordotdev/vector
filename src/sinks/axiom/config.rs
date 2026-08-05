@@ -9,7 +9,10 @@ use vector_lib::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
+        SinkContext, ValidatedSink,
+    },
     http::Auth as HttpAuthConfig,
     sinks::{
         Healthcheck, VectorSink,
@@ -19,7 +22,7 @@ use crate::{
             http::{RequestConfig, RetryStrategy},
         },
     },
-    template::ConfinementConfig,
+    template::{ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -150,10 +153,52 @@ impl GenerateConfig for AxiomConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "axiom")]
 impl SinkConfig for AxiomConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::new(DataType::Metric | DataType::Log | DataType::Trace)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated Axiom sink configuration.
+///
+/// Captures the pure validation results (endpoint URL/region exclusivity and
+/// the resolved ingest URI) so `build` does not recompute them.
+#[derive(Clone, Debug)]
+pub struct ValidatedAxiom {
+    /// The resolved ingest endpoint URI template.
+    uri: Template,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AxiomConfig {
+    type Validated = ValidatedAxiom;
+
+    fn validate(&self) -> crate::Result<ValidatedAxiom> {
         // Validate that url and region are not both set
         self.endpoint.validate()?;
 
+        // Resolve and parse the ingest endpoint up front (pure, no I/O).
+        let uri: Template = self.build_endpoint().try_into()?;
+
+        Ok(ValidatedAxiom { uri })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAxiom,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut request = self.request.clone();
         if let Some(org_id) = &self.org_id {
             // NOTE: Only add the org id header if an org id is provided
@@ -169,7 +214,7 @@ impl SinkConfig for AxiomConfig {
         // and maintenance of the vector axiom sink to a minimum.
         //
         let http_sink_config = HttpSinkConfig {
-            uri: self.build_endpoint().try_into()?,
+            uri: validated.uri.clone(),
             compression: self.compression,
             auth: Some(HttpAuthConfig::Bearer {
                 token: self.token.clone(),
@@ -199,18 +244,6 @@ impl SinkConfig for AxiomConfig {
         http_sink_config
             .build_with_component_type(cx, Self::NAME)
             .await
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log | DataType::Trace)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -321,6 +354,20 @@ mod test {
         };
         let endpoint = config.build_endpoint();
         assert_eq!(endpoint, "https://api.eu.axiom.co/v1/datasets/qoo/ingest");
+    }
+
+    #[test]
+    fn validate_produces_usable_uri() {
+        use crate::config::ValidatedSink;
+        let config = super::AxiomConfig {
+            dataset: "foo".to_string(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.uri.get_ref(),
+            "https://api.axiom.co/v1/datasets/foo/ingest"
+        );
     }
 
     #[test]

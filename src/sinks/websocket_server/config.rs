@@ -1,14 +1,19 @@
 use std::{collections::HashMap, net::SocketAddr};
 
-use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component};
+use vector_lib::{
+    codecs::{JsonSerializerConfig, encoding::Serializer},
+    configurable::configurable_component,
+};
 
 use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
-    codecs::EncodingConfig,
+    codecs::{EncodingConfig, Transformer},
     common::http::server_auth::HttpServerAuthConfig,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     sinks::{Healthcheck, VectorSink},
-    tls::TlsEnableableConfig,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 /// Configuration for the `websocket_server` sink.
@@ -144,13 +149,8 @@ impl Default for WebSocketListenerSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket_server")]
 impl SinkConfig for WebSocketListenerSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ws_sink = WebSocketListenerSink::new(self.clone(), cx)?;
-
-        Ok((
-            VectorSink::from_event_streamsink(ws_sink),
-            Box::pin(async move { Ok(()) }),
-        ))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -162,14 +162,67 @@ impl SinkConfig for WebSocketListenerSinkConfig {
     }
 }
 
+/// Purely validated `websocket_server` sink configuration.
+///
+/// Holds the resolved TLS settings and the built encoding components so `build`
+/// does not redo the (pure) structural validation. The server auth matcher is
+/// NOT retained here: it is built from `cx.enrichment_tables` /
+/// `cx.metrics_storage` in `build`, which is context-dependent.
+#[derive(Clone, Debug)]
+pub struct ValidatedWebSocketListenerSink {
+    pub(super) transformer: Transformer,
+    pub(super) serializer: Serializer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for WebSocketListenerSinkConfig {
+    type Validated = ValidatedWebSocketListenerSink;
+
+    fn validate(&self) -> crate::Result<ValidatedWebSocketListenerSink> {
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.build()?;
+        Ok(ValidatedWebSocketListenerSink {
+            transformer,
+            serializer,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedWebSocketListenerSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        // TLS settings may read certificate files from disk, so they are
+        // resolved at build time rather than during pure validation.
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
+        let ws_sink = WebSocketListenerSink::from_validated(self.clone(), validated, tls, cx)?;
+
+        Ok((
+            VectorSink::from_event_streamsink(ws_sink),
+            Box::pin(async move { Ok(()) }),
+        ))
+    }
+}
+
 impl_generate_config_from_default!(WebSocketListenerSinkConfig);
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<WebSocketListenerSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert!(matches!(validated.serializer, Serializer::Json(_)));
     }
 }

@@ -16,11 +16,15 @@ use vector_lib::{
     configurable::configurable_component,
     event::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
+    stream::BatcherSettings,
 };
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
+        SinkContext, ValidatedSink,
+    },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::{HttpClient, get_http_scheme_from_uri},
@@ -42,7 +46,7 @@ use crate::{
             service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
-    template::{ConfinementConfig, Template, TemplateParseError},
+    template::{ConfinedTemplate, ConfinementConfig, Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -268,20 +272,8 @@ impl GenerateConfig for GcsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
-        let base_url = format!("{}/{}/", self.endpoint, self.bucket);
-        let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
-        let healthcheck = build_healthcheck(
-            self.bucket.clone(),
-            client.clone(),
-            base_url.clone(),
-            auth.clone(),
-        )?;
-        auth.spawn_regenerate_token();
-        let sink = self.build_sink(client, base_url, auth, cx)?;
-        Ok((sink, healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -297,6 +289,59 @@ impl SinkConfig for GcsSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
+impl ValidatedSink for GcsSinkConfig {
+    type Validated = ValidatedGcsSink;
+
+    fn validate(&self) -> crate::Result<ValidatedGcsSink> {
+        let base_url = format!("{}/{}/", self.endpoint, self.bucket);
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let key_prefix_template = self.key_prefix_template()?;
+
+        Ok(ValidatedGcsSink {
+            base_url,
+            batch_settings,
+            key_prefix_template,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedGcsSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedGcsSink { base_url, .. } = validated;
+
+        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls, cx.proxy())?;
+        let healthcheck = build_healthcheck(
+            self.bucket.clone(),
+            client.clone(),
+            base_url.clone(),
+            auth.clone(),
+        )?;
+        auth.spawn_regenerate_token();
+        let sink = self.build_sink(client, base_url.clone(), auth, cx, validated)?;
+        Ok((sink, healthcheck))
+    }
+}
+
+/// Purely validated GCS sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedGcsSink {
+    /// The resolved object base URL (`endpoint/bucket/`).
+    base_url: String,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// The confined key-prefix template.
+    key_prefix_template: ConfinedTemplate,
+}
+
 impl GcsSinkConfig {
     fn build_sink(
         &self,
@@ -304,12 +349,11 @@ impl GcsSinkConfig {
         base_url: String,
         auth: GcpAuthenticator,
         cx: SinkContext,
+        validated: &ValidatedGcsSink,
     ) -> crate::Result<VectorSink> {
         let request = self.request.into_settings();
 
-        let batch_settings = self.batch.into_batcher_settings()?;
-
-        let partitioner = self.key_partitioner()?;
+        let partitioner = KeyPartitioner::new(validated.key_prefix_template.clone(), None);
 
         let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
 
@@ -319,16 +363,27 @@ impl GcsSinkConfig {
 
         let request_settings = RequestSettings::new(self, cx)?;
 
-        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
+        let sink = GcsSink::new(
+            svc,
+            request_settings,
+            partitioner,
+            validated.batch_settings,
+            protocol,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
+    #[cfg(test)]
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
+        let tpl = self.key_prefix_template()?;
+        Ok(KeyPartitioner::new(tpl, None))
+    }
+
+    fn key_prefix_template(&self) -> crate::Result<ConfinedTemplate> {
         let tpl = Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
             .context(KeyPrefixTemplateSnafu)?;
-        let tpl = tpl.confine(&self.confinement, Self::NAME, "key_prefix")?;
-        Ok(KeyPartitioner::new(tpl, None))
+        tpl.confine(&self.confinement, Self::NAME, "key_prefix")
     }
 }
 
@@ -524,6 +579,20 @@ mod tests {
         crate::test_util::test_generate_config::<GcsSinkConfig>();
     }
 
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config = GcsSinkConfig {
+            bucket: "my-bucket".into(),
+            key_prefix: Some("date=%F/".into()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.base_url, "/my-bucket/");
+        assert_eq!(validated.key_prefix_template.to_string(), "date=%F/");
+    }
+
     #[tokio::test]
     async fn component_spec_compliance() {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
@@ -536,12 +605,14 @@ mod tests {
 
         let config =
             default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into());
+        let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
                 mock_endpoint.to_string(),
                 GcpAuthenticator::None,
                 context,
+                &validated,
             )
             .expect("failed to build sink");
 

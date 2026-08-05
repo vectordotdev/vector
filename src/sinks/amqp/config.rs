@@ -6,7 +6,12 @@ use vector_lib::{
 };
 
 use super::{channel::AmqpSinkChannels, sink::AmqpSink};
-use crate::{amqp::AmqpConfig, sinks::prelude::*, template::ConfinementConfig};
+use crate::{
+    amqp::AmqpConfig,
+    config::{DynValidatedSink, ValidatedSink},
+    sinks::prelude::*,
+    template::ConfinementConfig,
+};
 
 /// AMQP properties configuration.
 #[configurable_component]
@@ -134,19 +139,8 @@ impl GenerateConfig for AmqpSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let exchange = self
-            .exchange
-            .clone()
-            .confine(&self.confinement, Self::NAME, "exchange")?;
-        let routing_key = self
-            .routing_key
-            .clone()
-            .map(|t| t.confine(&self.confinement, Self::NAME, "routing_key"))
-            .transpose()?;
-        let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
-        let hc = healthcheck(sink.channels.clone()).boxed();
-        Ok((VectorSink::from_event_streamsink(sink), hc))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -159,6 +153,54 @@ impl SinkConfig for AmqpSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated AMQP sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedAmqpSink {
+    /// The confined exchange template.
+    exchange: ConfinedTemplate,
+    /// The confined routing key template.
+    routing_key: Option<ConfinedTemplate>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AmqpSinkConfig {
+    type Validated = ValidatedAmqpSink;
+
+    fn validate(&self) -> crate::Result<ValidatedAmqpSink> {
+        let exchange = self
+            .exchange
+            .clone()
+            .confine(&self.confinement, Self::NAME, "exchange")?;
+        let routing_key = self
+            .routing_key
+            .clone()
+            .map(|t| t.confine(&self.confinement, Self::NAME, "routing_key"))
+            .transpose()?;
+        Ok(ValidatedAmqpSink {
+            exchange,
+            routing_key,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAmqpSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedAmqpSink {
+            exchange,
+            routing_key,
+        } = validated;
+        let sink = AmqpSink::new(self.clone(), exchange.clone(), routing_key.clone()).await?;
+        let hc = healthcheck(sink.channels.clone()).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 }
 
@@ -181,6 +223,7 @@ pub(super) async fn healthcheck(channels: AmqpSinkChannels) -> crate::Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ValidatedSink;
     use crate::config::format::{Format, deserialize};
     use crate::template::{ConfinementConfig, Template};
     use vrl::event_path;
@@ -188,6 +231,21 @@ mod tests {
     #[test]
     pub fn generate_config() {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
+    }
+
+    #[test]
+    fn validate_returns_confined_templates() {
+        let config = AmqpSinkConfig {
+            exchange: Template::try_from("test-exchange").unwrap(),
+            routing_key: Some(Template::try_from("test-key").unwrap()),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.exchange.to_string(), "test-exchange");
+        assert_eq!(
+            validated.routing_key.as_ref().unwrap().to_string(),
+            "test-key"
+        );
     }
 
     #[test]

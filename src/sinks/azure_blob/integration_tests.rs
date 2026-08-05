@@ -19,6 +19,7 @@ use vector_lib::{
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
+    config::ValidatedSink,
     event::{Event, EventArray, LogEvent},
     sinks::{
         VectorSink, azure_blob, azure_common,
@@ -344,7 +345,9 @@ impl AzureBlobSinkConfig {
 
     async fn to_sink(&self) -> VectorSink {
         let client = self.build_test_client().await;
-        self.build_processor(client).expect("Failed to create sink")
+        let validated = self.validate().expect("Failed to validate config");
+        self.build_processor(client, &validated)
+            .expect("Failed to create sink")
     }
 
     async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {

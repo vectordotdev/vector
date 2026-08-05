@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
+use http::Uri;
 
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
@@ -135,21 +137,15 @@ impl AzureLogsIngestionConfig {
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
-        endpoint: UriSerde,
+        validated: &ValidatedAzureLogsIngestion,
+        endpoint: Uri,
         dcr_immutable_id: String,
         stream_name: String,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
         timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = endpoint.with_default_parts().uri;
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
-
-        let batch_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(MAX_BATCH_SIZE)?
-            .into_batcher_settings()?;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
@@ -174,7 +170,7 @@ impl AzureLogsIngestionConfig {
             .service(service);
 
         let sink = AzureLogsIngestionSink::new(
-            batch_settings,
+            validated.batch_settings,
             self.encoding.clone(),
             service,
             timestamp_field,
@@ -187,24 +183,24 @@ impl AzureLogsIngestionConfig {
 
 impl_generate_config_from_default!(AzureLogsIngestionConfig);
 
+/// Purely validated Azure Logs Ingestion sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedAzureLogsIngestion {
+    /// The parsed endpoint URI.
+    endpoint: Uri,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint: UriSerde = self.endpoint.parse()?;
-
-        let credential: Arc<dyn TokenCredential> = self.auth.credential().await?;
-
-        self.build_inner(
-            cx,
-            endpoint,
-            self.dcr_immutable_id.clone(),
-            self.stream_name.clone(),
-            credential,
-            self.token_scope.clone(),
-            self.timestamp_field.clone(),
-        )
-        .await
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -216,5 +212,46 @@ impl SinkConfig for AzureLogsIngestionConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AzureLogsIngestionConfig {
+    type Validated = ValidatedAzureLogsIngestion;
+
+    fn validate(&self) -> crate::Result<ValidatedAzureLogsIngestion> {
+        let endpoint: UriSerde = self.endpoint.parse()?;
+        let endpoint = endpoint.with_default_parts().uri;
+
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_SIZE)?
+            .into_batcher_settings()?;
+
+        Ok(ValidatedAzureLogsIngestion {
+            endpoint,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAzureLogsIngestion,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let credential: Arc<dyn TokenCredential> = self.auth.credential().await?;
+
+        self.build_inner(
+            cx,
+            validated,
+            validated.endpoint.clone(),
+            self.dcr_immutable_id.clone(),
+            self.stream_name.clone(),
+            credential,
+            self.token_scope.clone(),
+            self.timestamp_field.clone(),
+        )
+        .await
     }
 }

@@ -4,6 +4,7 @@ use super::sink::DorisSink;
 
 use crate::{
     codecs::EncodingConfigWithFraming,
+    config::{DynValidatedSink, ValidatedSink},
     http::{Auth, HttpClient},
     sinks::{
         doris::{
@@ -11,7 +12,10 @@ use crate::{
             retry::DorisRetryLogic, service::DorisService,
         },
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, service::HealthConfig},
+        util::{
+            RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
+            service::HealthConfig,
+        },
     },
     template::ConfinementConfig,
 };
@@ -149,21 +153,91 @@ impl_generate_config_from_default!(DorisConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "doris")]
 impl SinkConfig for DorisConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoints = self.endpoints.clone();
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
 
-        if endpoints.is_empty() {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated Doris sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedDoris {
+    /// Per-endpoint parsed commons (base URL, auth, request builder, TLS).
+    commons: Vec<DorisCommon>,
+    /// Request settings computed during preparation.
+    request_settings: TowerRequestSettings,
+    /// Endpoint health settings computed during preparation.
+    health_config: HealthConfig,
+    /// Batch settings computed during preparation.
+    batch_settings: BatcherSettings,
+    /// Confined database template.
+    database: ConfinedTemplate,
+    /// Confined table template.
+    table: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DorisConfig {
+    type Validated = ValidatedDoris;
+
+    fn validate(&self) -> crate::Result<ValidatedDoris> {
+        if self.endpoints.is_empty() {
             return Err("No endpoints configured.'.".into());
         }
-        let commons = DorisCommon::parse_many(self).await?;
-        let common = commons[0].clone();
+        let commons = DorisCommon::parse_many(self)?;
+        let request_settings = self.request.into_settings();
+        let health_config = self.endpoint_health.clone().unwrap_or_default();
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let database = self
+            .database
+            .clone()
+            .confine(&self.confinement, Self::NAME, "database")?;
+        let table = self
+            .table
+            .clone()
+            .confine(&self.confinement, Self::NAME, "table")?;
+
+        Ok(ValidatedDoris {
+            commons,
+            request_settings,
+            health_config,
+            batch_settings,
+            database,
+            table,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedDoris,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedDoris {
+            commons,
+            request_settings,
+            health_config,
+            batch_settings,
+            database,
+            table,
+        } = validated;
+        let common = &commons[0];
 
         let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
-
-        // Setup retry logic using the configured request settings
-        let request_settings = self.request.into_settings();
-
-        let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         let services_futures = commons
             .iter()
@@ -207,16 +281,22 @@ impl SinkConfig for DorisConfig {
             .filter_map(Result::ok)
             .collect::<Vec<_>>();
 
-        let service = request_settings.distributed_service(
+        let service = request_settings.clone().distributed_service(
             DorisRetryLogic {},
             services,
-            health_config,
+            health_config.clone(),
             DorisHealthLogic,
             1, // Buffer bound is hardcoded to 1 for sinks
         );
 
-        // Create DorisSink with the configured service
-        let sink = DorisSink::new(service, self, &common)?;
+        // Create DorisSink with the pre-validated settings
+        let sink = DorisSink::new(
+            service,
+            *batch_settings,
+            database.clone(),
+            table.clone(),
+            common.request_builder.clone(),
+        );
 
         let sink = VectorSink::from_event_streamsink(sink);
 
@@ -235,25 +315,13 @@ impl SinkConfig for DorisConfig {
         };
 
         // Use the previously saved client for health check, no need to create a new instance
-        let healthcheck = futures::future::select_ok(commons.into_iter().map(move |common| {
+        let healthcheck = futures::future::select_ok(commons.iter().cloned().map(move |common| {
             let client = Arc::clone(&healthcheck_doris_client);
             async move { common.healthcheck(client).await }.boxed()
         }))
         .map_ok(|((), _)| ())
         .boxed();
         Ok((sink, healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -264,6 +332,21 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DorisConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+        let config = DorisConfig {
+            endpoints: vec!["http://127.0.0.1:8030".parse::<http::Uri>().unwrap().into()],
+            database: Template::try_from("mydatabase").unwrap(),
+            table: Template::try_from("mytable").unwrap(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.commons.len(), 1);
+        assert_eq!(validated.database.to_string(), "mydatabase");
+        assert_eq!(validated.table.to_string(), "mytable");
     }
 
     #[test]

@@ -10,7 +10,9 @@ use vector_lib::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     sinks::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
@@ -77,16 +79,8 @@ impl GenerateConfig for OpenTelemetryConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "opentelemetry")]
 impl SinkConfig for OpenTelemetryConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        match &self.protocol {
-            Protocol::Http(config) => {
-                warn_on_invalid_otlp_batching(config);
-                // Delegate to the HTTP sink, but thread through `opentelemetry`
-                // as the component type so security warnings carry the outer
-                // sink type rather than `http`.
-                config.build_with_component_type(cx, Self::NAME).await
-            }
-        }
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -104,6 +98,35 @@ impl SinkConfig for OpenTelemetryConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         match self.protocol {
             Protocol::Http(ref config) => config.acknowledgements(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for OpenTelemetryConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<()> {
+        // All pure structural validation is delegated to the underlying HTTP sink
+        // config (`HttpSinkConfig::build_with_component_type`), which is not yet
+        // migrated to the validated lifecycle. Nothing here produces a value that
+        // `build` needs, so the validated state is the unit type.
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &(),
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        match &self.protocol {
+            Protocol::Http(config) => {
+                warn_on_invalid_otlp_batching(config);
+                // Delegate to the HTTP sink, but thread through `opentelemetry`
+                // as the component type so security warnings carry the outer
+                // sink type rather than `http`.
+                config.build_with_component_type(cx, Self::NAME).await
+            }
         }
     }
 }

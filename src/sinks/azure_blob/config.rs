@@ -1,3 +1,4 @@
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
@@ -19,14 +20,16 @@ use vector_lib::{
     configurable::configurable_component,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     sensitive_string::SensitiveString,
-    stream::DriverResponse,
+    stream::{BatcherSettings, DriverResponse},
 };
 
 use super::request_builder::AzureBlobRequestOptions;
 use crate::{
-    Result,
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
+        SinkContext, ValidatedSink,
+    },
     event::{EventFinalizers, EventStatus, Finalizable},
     sinks::{
         Healthcheck, VectorSink,
@@ -43,7 +46,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -221,7 +224,65 @@ impl GenerateConfig for AzureBlobSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
-    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated Azure Blob sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone)]
+pub struct ValidatedAzureBlob {
+    /// Resolved connection string (pure validation without network).
+    connection_string: String,
+    /// Batch settings computed during validation.
+    batcher_settings: BatcherSettings,
+    /// Blob key timestamp format (defaulted).
+    blob_time_format: String,
+    /// Whether to append a UUID to blob keys (defaulted).
+    blob_append_uuid: bool,
+    /// Encoder built from the encoding configuration.
+    encoder: Encoder<Framer>,
+    /// Confined blob prefix template.
+    confined_blob_prefix: ConfinedTemplate,
+}
+
+impl fmt::Debug for ValidatedAzureBlob {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ValidatedAzureBlob")
+            .field("connection_string", &self.connection_string)
+            .field("batcher_settings", &self.batcher_settings)
+            .field("blob_time_format", &self.blob_time_format)
+            .field("blob_append_uuid", &self.blob_append_uuid)
+            .field("encoder", &self.encoder)
+            .field(
+                "confined_blob_prefix",
+                &self.confined_blob_prefix.to_string(),
+            )
+            .finish()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AzureBlobSinkConfig {
+    type Validated = ValidatedAzureBlob;
+
+    fn validate(&self) -> crate::Result<ValidatedAzureBlob> {
         let connection_string: String = match (
             &self.connection_string,
             &self.account_name,
@@ -264,45 +325,6 @@ impl SinkConfig for AzureBlobSinkConfig {
             }
         };
 
-        let client = build_client(
-            self.auth.clone(),
-            connection_string.clone(),
-            self.container_name.clone(),
-            cx.proxy(),
-            self.tls.clone(),
-        )
-        .await?;
-
-        let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
-        let sink = self.build_processor(client)?;
-        Ok((sink, healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type() & DataType::Log)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
-}
-
-const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
-const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
-const DEFAULT_FILENAME_APPEND_UUID: bool = true;
-
-impl AzureBlobSinkConfig {
-    pub fn build_processor(&self, client: Arc<BlobContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self.request.into_settings();
-        let service = ServiceBuilder::new()
-            .settings(request_limits, AzureBlobRetryLogic)
-            .service(AzureBlobService::new(client));
-
-        // Configure our partitioning/batching.
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         let blob_time_format = self
@@ -314,34 +336,83 @@ impl AzureBlobSinkConfig {
             .blob_append_uuid
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
-        let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        let request_options = AzureBlobRequestOptions {
-            container_name: self.container_name.clone(),
+        let confined_blob_prefix = self.confined_blob_prefix()?;
+
+        Ok(ValidatedAzureBlob {
+            connection_string,
+            batcher_settings,
             blob_time_format,
             blob_append_uuid,
-            encoder: (transformer, encoder),
+            encoder,
+            confined_blob_prefix,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAzureBlob,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = build_client(
+            self.auth.clone(),
+            validated.connection_string.clone(),
+            self.container_name.clone(),
+            cx.proxy(),
+            self.tls.clone(),
+        )
+        .await?;
+
+        let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
+        let sink = self.build_processor(client, validated)?;
+        Ok((sink, healthcheck))
+    }
+}
+
+const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
+const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
+const DEFAULT_FILENAME_APPEND_UUID: bool = true;
+
+impl AzureBlobSinkConfig {
+    pub fn build_processor(
+        &self,
+        client: Arc<BlobContainerClient>,
+        validated: &ValidatedAzureBlob,
+    ) -> crate::Result<VectorSink> {
+        let request_limits = self.request.into_settings();
+        let service = ServiceBuilder::new()
+            .settings(request_limits, AzureBlobRetryLogic)
+            .service(AzureBlobService::new(client));
+
+        let request_options = AzureBlobRequestOptions {
+            container_name: self.container_name.clone(),
+            blob_time_format: validated.blob_time_format.clone(),
+            blob_append_uuid: validated.blob_append_uuid,
+            encoder: (self.encoding.transformer(), validated.encoder.clone()),
             compression: self.compression,
         };
 
         let sink = AzureBlobSink::new(
             service,
             request_options,
-            self.key_partitioner()?,
-            batcher_settings,
+            KeyPartitioner::new(validated.confined_blob_prefix.clone(), None),
+            validated.batcher_settings,
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        let tpl = self
-            .blob_prefix
-            .clone()
-            .confine(&self.confinement, Self::NAME, "blob_prefix")?;
+        let tpl = self.confined_blob_prefix()?;
         Ok(KeyPartitioner::new(tpl, None))
+    }
+
+    fn confined_blob_prefix(&self) -> crate::Result<ConfinedTemplate> {
+        self.blob_prefix
+            .clone()
+            .confine(&self.confinement, Self::NAME, "blob_prefix")
     }
 }
 
@@ -391,6 +462,37 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("tenant"), "../../escape");
         assert!(template.render_string(&event).is_err());
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        let config = AzureBlobSinkConfig {
+            auth: None,
+            connection_string: Some("AccountName=mylogstorage".to_string().into()),
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "my-logs".to_string(),
+            blob_prefix: "blob".try_into().unwrap(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+            compression: Compression::gzip_default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+            tls: None,
+            confinement: ConfinementConfig::default(),
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.connection_string, "AccountName=mylogstorage");
+        assert_eq!(validated.blob_time_format, "%s");
+        assert!(validated.blob_append_uuid);
+        assert_eq!(validated.confined_blob_prefix.to_string(), "blob");
     }
 }
 

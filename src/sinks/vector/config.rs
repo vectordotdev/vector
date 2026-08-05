@@ -17,6 +17,7 @@ use tokio::sync::Semaphore;
 use tonic::body::BoxBody;
 use tower::{Service, ServiceBuilder};
 use vector_lib::configurable::configurable_component;
+use vector_lib::stream::BatcherSettings;
 
 use super::{
     VectorSinkError,
@@ -26,8 +27,8 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
-        SinkHealthcheckOptions,
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, SinkHealthcheckOptions, ValidatedSink,
     },
     http::build_proxy_connector,
     proto::vector as proto,
@@ -225,7 +226,60 @@ fn default_config(address: &str) -> VectorConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated `vector` sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedVector {
+    /// Tower request settings.
+    request_settings: TowerRequestSettings,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for VectorConfig {
+    type Validated = ValidatedVector;
+
+    fn validate(&self) -> crate::Result<ValidatedVector> {
+        // Endpoint options are validated here (a pure structural check). The
+        // URI list itself is computed in `build` because the default scheme
+        // depends on the TLS settings, which require reading certificate
+        // files from disk.
+        self.validate_endpoint_options()?;
+        let request_settings = self.request.into_settings();
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedVector {
+            request_settings,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedVector,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSinkType, Healthcheck)> {
+        let ValidatedVector {
+            request_settings,
+            batch_settings,
+        } = validated;
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uris = self.uris(tls.is_tls())?;
         let endpoint_strategy = self
@@ -236,8 +290,7 @@ impl SinkConfig for VectorConfig {
         let client = new_client(&tls, cx.proxy(), self.keepalive)?;
 
         let healthcheck = healthchecks(client.clone(), &uris, cx.healthcheck, endpoint_strategy);
-        let request_settings = self.request.into_settings();
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let request_settings = request_settings.clone();
 
         let services = uris
             .into_iter()
@@ -255,7 +308,7 @@ impl SinkConfig for VectorConfig {
                     .service(services.into_iter().next().expect("one service").1);
 
                 VectorSinkType::from_event_streamsink(VectorSink {
-                    batch_settings,
+                    batch_settings: *batch_settings,
                     service,
                 })
             }
@@ -272,7 +325,7 @@ impl SinkConfig for VectorConfig {
                 );
 
                 VectorSinkType::from_event_streamsink(VectorSink {
-                    batch_settings,
+                    batch_settings: *batch_settings,
                     service,
                 })
             }
@@ -303,21 +356,13 @@ impl SinkConfig for VectorConfig {
                     ));
 
                 VectorSinkType::from_event_streamsink(VectorSink {
-                    batch_settings,
+                    batch_settings: *batch_settings,
                     service,
                 })
             }
         };
 
         Ok((sink, Box::pin(healthcheck)))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -682,8 +727,8 @@ impl VectorConfig {
     }
 
     fn uris(&self, tls: bool) -> crate::Result<Vec<Uri>> {
-        self.validate_endpoint_options()?;
-
+        // Endpoint option validation is performed in `ValidatedSink::validate`,
+        // which always runs before `build` in the validated lifecycle.
         if let Some(address) = self.address.as_ref() {
             Ok(vec![with_default_scheme(address, tls)?])
         } else {
@@ -1432,6 +1477,33 @@ mod tests {
         assert_eq!(
             healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::FailoverPrimary),
             vec![endpoints[0].clone()]
+        );
+    }
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config = VectorConfig::from_address("http://127.0.0.1:6000".parse().unwrap());
+
+        let validated = config.validate().expect("validation should succeed");
+        assert!(validated.request_settings.timeout > Duration::ZERO);
+        assert!(validated.batch_settings.timeout > Duration::ZERO);
+    }
+
+    #[test]
+    fn validate_rejects_conflicting_endpoint_options() {
+        let config = VectorConfig {
+            address: Some("127.0.0.1:6000".to_owned()),
+            routing: Some(RoutingConfig {
+                endpoints: vec!["127.0.0.1:6001".to_owned()],
+                ..Default::default()
+            }),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let err = config.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("mutually exclusive"),
+            "unexpected error: {err}"
         );
     }
 }

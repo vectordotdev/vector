@@ -8,6 +8,7 @@ use vector_lib::{
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::HttpClient,
     sinks::{
         prelude::*,
@@ -189,15 +190,14 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    /// Confinement + sink construction. `component_name` is threaded into the
+    /// Pure structural validation. `component_name` is threaded into the
     /// per-template security warnings emitted from `Template::confine`, so
     /// wrapping sinks (Humio) see their own type in logs rather than the
     /// delegated `splunk_hec_logs`.
-    pub(crate) fn build_with_component_type(
+    pub(crate) fn validate_with_component_name(
         &self,
-        cx: SinkContext,
         component_name: &'static str,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+    ) -> crate::Result<ValidatedHecLogsSink> {
         if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
@@ -218,6 +218,26 @@ impl HecLogsSinkConfig {
             .map(|t| t.confine(&self.confinement, component_name, "sourcetype"))
             .transpose()?;
 
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let encoder = Encoder::<()>::new(self.encoding.build()?);
+
+        Ok(ValidatedHecLogsSink {
+            index,
+            source,
+            sourcetype,
+            batch_settings,
+            encoder,
+        })
+    }
+
+    /// Build the sink from validated state. Only environment-dependent work
+    /// (client creation, healthcheck) happens here; the validated state is
+    /// consumed without recomputing any pure validation.
+    pub(crate) fn build_from_validated(
+        &self,
+        cx: SinkContext,
+        validated: &ValidatedHecLogsSink,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
@@ -225,7 +245,7 @@ impl HecLogsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = self.build_processor(client, cx, sourcetype, source, index)?;
+        let sink = self.build_processor(client, cx, validated)?;
 
         Ok((sink, healthcheck))
     }
@@ -234,8 +254,8 @@ impl HecLogsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.build_with_component_type(cx, Self::NAME)
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -251,14 +271,47 @@ impl SinkConfig for HecLogsSinkConfig {
     }
 }
 
+/// Purely validated Splunk HEC logs sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+#[derive(Clone, Debug)]
+pub struct ValidatedHecLogsSink {
+    /// Confined index template.
+    index: Option<ConfinedTemplate>,
+    /// Confined source template.
+    source: Option<ConfinedTemplate>,
+    /// Confined sourcetype template.
+    sourcetype: Option<ConfinedTemplate>,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// Encoder built during validation.
+    encoder: Encoder<()>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HecLogsSinkConfig {
+    type Validated = ValidatedHecLogsSink;
+
+    fn validate(&self) -> crate::Result<ValidatedHecLogsSink> {
+        self.validate_with_component_name(Self::NAME)
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHecLogsSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_from_validated(cx, validated)
+    }
+}
+
 impl HecLogsSinkConfig {
     pub fn build_processor(
         &self,
         client: HttpClient,
         _: SinkContext,
-        sourcetype: Option<ConfinedTemplate>,
-        source: Option<ConfinedTemplate>,
-        index: Option<ConfinedTemplate>,
+        validated: &ValidatedHecLogsSink,
     ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
@@ -267,11 +320,9 @@ impl HecLogsSinkConfig {
         };
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
         let encoder = HecLogsEncoder {
             transformer,
-            encoder,
+            encoder: validated.encoder.clone(),
             auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
         let request_builder = HecLogsRequestBuilder {
@@ -302,15 +353,13 @@ impl HecLogsSinkConfig {
             self.acknowledgements.clone(),
         );
 
-        let batch_settings = self.batch.into_batcher_settings()?;
-
         let sink = HecLogsSink {
             service,
             request_builder,
-            batch_settings,
-            sourcetype,
-            source,
-            index,
+            batch_settings: validated.batch_settings,
+            sourcetype: validated.sourcetype.clone(),
+            source: validated.source.clone(),
+            index: validated.index.clone(),
             indexed_fields: self
                 .indexed_fields
                 .iter()
@@ -341,6 +390,40 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HecLogsSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        use crate::config::ValidatedSink;
+
+        let config = HecLogsSinkConfig {
+            default_token: "token".to_string().into(),
+            endpoint: "http://localhost:8088".to_string(),
+            host_key: None,
+            indexed_fields: vec![],
+            index: Some("custom_index".try_into().unwrap()),
+            sourcetype: None,
+            source: None,
+            encoding: JsonSerializerConfig::default().into(),
+            compression: Compression::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            timestamp_nanos_key: None,
+            timestamp_key: None,
+            auto_extract_timestamp: None,
+            endpoint_target: EndpointTarget::Event,
+            confinement: Default::default(),
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.index.as_ref().unwrap().to_string(),
+            "custom_index"
+        );
+        assert!(validated.source.is_none());
+        assert!(validated.sourcetype.is_none());
     }
 
     #[test]

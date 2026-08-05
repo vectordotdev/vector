@@ -7,6 +7,7 @@ use vector_lib::{
 };
 
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
@@ -136,7 +137,43 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated `greptimedb_logs` sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedGreptimeDBLogs {
+    confined_table: ConfinedTemplate,
+    confined_dbname: ConfinedTemplate,
+    confined_pipeline_name: ConfinedTemplate,
+    confined_pipeline_version: Option<ConfinedTemplate>,
+    auth: Option<Auth>,
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for GreptimeDBLogsConfig {
+    type Validated = ValidatedGreptimeDBLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedGreptimeDBLogs> {
         let confined_table = self
             .table
             .clone()
@@ -154,8 +191,6 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "pipeline_version"))
             .transpose()?;
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let auth = match (self.username.clone(), self.password.clone()) {
             (Some(username), Some(password)) => Some(Auth::Basic {
@@ -164,6 +199,36 @@ impl SinkConfig for GreptimeDBLogsConfig {
             }),
             _ => None,
         };
+
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedGreptimeDBLogs {
+            confined_table,
+            confined_dbname,
+            confined_pipeline_name,
+            confined_pipeline_version,
+            auth,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedGreptimeDBLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedGreptimeDBLogs {
+            confined_table,
+            confined_dbname,
+            confined_pipeline_name,
+            confined_pipeline_version,
+            auth,
+            batch_settings,
+        } = validated;
+
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
             endpoint: self.endpoint.clone(),
             auth: auth.clone(),
@@ -189,14 +254,14 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {
-            dbname: confined_dbname,
-            table: confined_table,
-            pipeline_name: confined_pipeline_name,
-            pipeline_version: confined_pipeline_version,
+            dbname: confined_dbname.clone(),
+            table: confined_table.clone(),
+            pipeline_name: confined_pipeline_name.clone(),
+            pipeline_version: confined_pipeline_version.clone(),
         };
 
         let sink = GreptimeDBLogsHttpSink::new(
-            self.batch.into_batcher_settings()?,
+            *batch_settings,
             service,
             request_builder,
             logs_sink_setting,
@@ -209,23 +274,35 @@ impl SinkConfig for GreptimeDBLogsConfig {
         ));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::template::{ConfinementConfig, Template};
+    use super::*;
+    use crate::{
+        config::ValidatedSink,
+        template::{ConfinementConfig, Template},
+    };
+
+    #[test]
+    fn prepares_valid_config() {
+        let config = GreptimeDBLogsConfig {
+            endpoint: "http://localhost:4000".to_string(),
+            table: "mytable".try_into().unwrap(),
+            dbname: "public".try_into().unwrap(),
+            pipeline_name: "greptime_identity".try_into().unwrap(),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.confined_table.to_string(), "mytable");
+        assert_eq!(validated.confined_dbname.to_string(), "public");
+        assert_eq!(
+            validated.confined_pipeline_name.to_string(),
+            "greptime_identity"
+        );
+        assert!(validated.auth.is_none());
+    }
 
     #[test]
     fn confinement_rejects_unconfined_table() {

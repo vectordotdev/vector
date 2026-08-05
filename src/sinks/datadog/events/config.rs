@@ -9,7 +9,10 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
@@ -89,14 +92,8 @@ impl DatadogEventsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(cx.proxy())?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.dd_common.with_globals(global)?;
-        let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(&dd_common, client)?;
-
-        Ok((sink, healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -110,6 +107,32 @@ impl SinkConfig for DatadogEventsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.dd_common.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatadogEventsConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<()> {
+        // This sink has no cx-independent pure checks: client/TLS construction, global-options
+        // resolution, and endpoint URI parsing all require `SinkContext` or a built client, so
+        // they remain in `build`.
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &(),
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.build_client(cx.proxy())?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.dd_common.with_globals(global)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(&dd_common, client)?;
+
+        Ok((sink, healthcheck))
     }
 }
 

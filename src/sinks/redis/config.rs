@@ -9,6 +9,7 @@ use super::{
     sink::{RedisConnection, RedisSink},
 };
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -200,18 +201,8 @@ impl GenerateConfig for RedisSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "redis")]
 impl SinkConfig for RedisSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.key.is_empty() {
-            return Err("`key` cannot be empty.".into());
-        }
-        let key = self
-            .key
-            .clone()
-            .confine(&self.confinement, Self::NAME, "key")?;
-        let conn = self.build_connection().await?;
-        let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = RedisSink::new(self, conn, key)?;
-        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -224,6 +215,45 @@ impl SinkConfig for RedisSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated Redis sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedRedisSink {
+    /// The confined key template.
+    key: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for RedisSinkConfig {
+    type Validated = ValidatedRedisSink;
+
+    fn validate(&self) -> crate::Result<ValidatedRedisSink> {
+        if self.key.is_empty() {
+            return Err("`key` cannot be empty.".into());
+        }
+        let key = self
+            .key
+            .clone()
+            .confine(&self.confinement, Self::NAME, "key")?;
+        Ok(ValidatedRedisSink { key })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedRedisSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedRedisSink { key } = validated;
+        let conn = self.build_connection().await?;
+        let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
+        let sink = RedisSink::new(self, conn, key.clone())?;
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -371,7 +401,24 @@ impl From<RedisProtocolVersion> for ProtocolVersion {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn validate_returns_confined_key() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "redis://127.0.0.1:6379/0"
+            key: "test-key"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.key.to_string(), "test-key");
+    }
 
     #[test]
     fn confinement_rejects_unconfined_key() {

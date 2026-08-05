@@ -1,16 +1,19 @@
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use crate::sinks::{
-    greptimedb::{
-        GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
-        metrics::{
-            request::GreptimeDBGrpcRetryLogic,
-            request_builder::RequestBuilderOptions,
-            service::{GreptimeDBGrpcService, healthcheck},
-            sink,
+use crate::{
+    config::{DynValidatedSink, ValidatedSink},
+    sinks::{
+        greptimedb::{
+            GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
+            metrics::{
+                request::GreptimeDBGrpcRetryLogic,
+                request_builder::RequestBuilderOptions,
+                service::{GreptimeDBGrpcService, healthcheck},
+                sink,
+            },
         },
+        prelude::*,
     },
-    prelude::*,
 };
 
 /// Configuration for the `greptimedb` sink.
@@ -34,7 +37,7 @@ impl SinkConfig for GreptimeDBConfig {
         warn!(
             "DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
         );
-        self.0.build(cx).await
+        SinkConfig::build(&self.0, cx).await
     }
 
     fn input(&self) -> Input {
@@ -133,21 +136,8 @@ impl_generate_config_from_default!(GreptimeDBMetricsConfig);
 #[typetag::serde(name = "greptimedb_metrics")]
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBMetricsConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let request_settings = self.request.into_settings();
-        let service = ServiceBuilder::new()
-            .settings(request_settings, GreptimeDBGrpcRetryLogic)
-            .service(GreptimeDBGrpcService::try_new(self)?);
-        let sink = sink::GreptimeDBGrpcSink {
-            service,
-            batch_settings: self.batch.into_batcher_settings()?,
-            request_builder_options: RequestBuilderOptions {
-                use_new_naming: self.new_naming.unwrap_or(false),
-            },
-        };
-
-        let healthcheck = healthcheck(self)?;
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -159,11 +149,62 @@ impl SinkConfig for GreptimeDBMetricsConfig {
     }
 }
 
+/// Purely validated `greptimedb_metrics` sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedGreptimeDBMetrics {
+    batch_settings: BatcherSettings,
+    use_new_naming: bool,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for GreptimeDBMetricsConfig {
+    type Validated = ValidatedGreptimeDBMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedGreptimeDBMetrics> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+        Ok(ValidatedGreptimeDBMetrics {
+            batch_settings,
+            use_new_naming: self.new_naming.unwrap_or(false),
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedGreptimeDBMetrics,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedGreptimeDBMetrics {
+            batch_settings,
+            use_new_naming,
+        } = validated;
+
+        let request_settings = self.request.into_settings();
+        let service = ServiceBuilder::new()
+            .settings(request_settings, GreptimeDBGrpcRetryLogic)
+            .service(GreptimeDBGrpcService::try_new(self)?);
+        let sink = sink::GreptimeDBGrpcSink {
+            service,
+            batch_settings: *batch_settings,
+            request_builder_options: RequestBuilderOptions {
+                use_new_naming: *use_new_naming,
+            },
+        };
+
+        let healthcheck = healthcheck(self)?;
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
 
     use super::*;
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
@@ -178,5 +219,16 @@ mod tests {
         "#};
 
         serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+    }
+
+    #[test]
+    fn prepares_valid_config() {
+        let config = GreptimeDBMetricsConfig {
+            endpoint: "example.com:4001".to_string(),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert!(!validated.use_new_naming);
     }
 }

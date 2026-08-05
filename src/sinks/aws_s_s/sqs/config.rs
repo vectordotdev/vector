@@ -1,3 +1,5 @@
+use std::fmt;
+
 use aws_sdk_sqs::Client as SqsClient;
 use vector_lib::configurable::configurable_component;
 
@@ -9,8 +11,8 @@ use crate::{
     aws::{RegionOrEndpoint, create_client},
     common::sqs::SqsClientBuilder,
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
+        SinkConfig, SinkContext, ValidatedSink,
     },
 };
 
@@ -65,35 +67,8 @@ impl SqsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
-
-        let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
-
-        let healthcheck = Box::pin(healthcheck(client.clone(), self.queue_url.clone()));
-        let message_group_id = message_group_id(
-            self.base_config.message_group_id.clone(),
-            self.queue_url.ends_with(".fifo"),
-        );
-        let message_deduplication_id =
-            message_deduplication_id(self.base_config.message_deduplication_id.clone());
-
-        let sink = SSSink::new(
-            SSRequestBuilder::new(
-                message_group_id?,
-                message_deduplication_id?,
-                self.base_config.encoding.clone(),
-            )?,
-            self.base_config.request,
-            publisher,
-        )?;
-        Ok((
-            crate::sinks::VectorSink::from_event_streamsink(sink),
-            healthcheck,
-        ))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn input(&self) -> Input {
@@ -105,6 +80,63 @@ impl SinkConfig for SqsSinkConfig {
     }
 }
 
+/// Purely validated SQS sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+#[derive(Clone)]
+pub struct ValidatedSqsSink {
+    /// Request builder constructed from the validated encoding.
+    request_builder: SSRequestBuilder,
+}
+
+impl fmt::Debug for ValidatedSqsSink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ValidatedSqsSink").finish_non_exhaustive()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for SqsSinkConfig {
+    type Validated = ValidatedSqsSink;
+
+    fn validate(&self) -> crate::Result<ValidatedSqsSink> {
+        let message_group_id = message_group_id(
+            self.base_config.message_group_id.clone(),
+            self.queue_url.ends_with(".fifo"),
+        )?;
+        let message_deduplication_id =
+            message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
+        let request_builder = SSRequestBuilder::new(
+            message_group_id.clone(),
+            message_deduplication_id.clone(),
+            self.base_config.encoding.clone(),
+        )?;
+
+        Ok(ValidatedSqsSink { request_builder })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedSqsSink,
+        cx: SinkContext,
+    ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
+        let client = self.create_client(&cx.proxy).await?;
+        let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
+        let healthcheck = Box::pin(healthcheck(client.clone(), self.queue_url.clone()));
+
+        let sink = SSSink::new(
+            validated.request_builder.clone(),
+            self.base_config.request,
+            publisher,
+        )?;
+        Ok((
+            crate::sinks::VectorSink::from_event_streamsink(sink),
+            healthcheck,
+        ))
+    }
+}
+
 pub(super) async fn healthcheck(client: SqsClient, queue_url: String) -> crate::Result<()> {
     client
         .get_queue_attributes()
@@ -113,4 +145,43 @@ pub(super) async fn healthcheck(client: SqsClient, queue_url: String) -> crate::
         .await
         .map(|_| ())
         .map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vector_lib::codecs::TextSerializerConfig;
+
+    fn test_config(queue_url: &str) -> SqsSinkConfig {
+        SqsSinkConfig {
+            region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
+            queue_url: queue_url.to_string(),
+            base_config: BaseSSSinkConfig {
+                encoding: TextSerializerConfig::default().into(),
+                message_group_id: None,
+                message_deduplication_id: None,
+                request: Default::default(),
+                tls: Default::default(),
+                assume_role: None,
+                auth: Default::default(),
+                acknowledgements: Default::default(),
+            },
+        }
+    }
+
+    #[test]
+    fn validate_rejects_fifo_without_message_group_id() {
+        let config = test_config("https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue.fifo");
+        let err = config.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("message_group_id"),
+            "expected error to mention message_group_id, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_produces_validated_state() {
+        let config = test_config("https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue");
+        config.validate().expect("validation should succeed");
+    }
 }

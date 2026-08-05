@@ -25,11 +25,12 @@ use crate::aws::AwsAuthentication;
 use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
+    config::{DynValidatedSink, ValidatedSink},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
             http::{
                 HttpService, OrderedHeaderName, RequestConfig, RetryStrategy,
                 http_response_retry_logic,
@@ -240,8 +241,8 @@ pub(super) fn validate_payload_wrapper(
 #[async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.build_with_component_type(cx, Self::NAME).await
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -270,16 +271,46 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-impl HttpSinkConfig {
-    /// Confinement + sink construction. `component_name` is threaded through so
-    /// per-template security warnings carry the outer sink type — `http` when
-    /// this is the top-level sink, `opentelemetry` when
-    /// [`OpenTelemetryConfig::build`] delegates here.
-    pub(crate) async fn build_with_component_type(
-        &self,
-        cx: SinkContext,
-        component_name: &'static str,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+/// Purely validated `http` sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+///
+/// Confinement of the URI and templated headers is intentionally NOT performed
+/// here: the `http` sink is shared with the `opentelemetry` and `axiom` sinks
+/// (via [`HttpSinkConfig::build_with_component_type`]), which thread their own
+/// component type through confinement so per-template security warnings carry
+/// the outer sink name.
+#[derive(Clone, Debug)]
+pub struct ValidatedHttp {
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// Message encoder built from the framing/serializer configuration.
+    encoder: Encoder<Framer>,
+    /// Event transformer from the encoding configuration.
+    transformer: Transformer,
+    /// Templated (dynamic) request headers, confined at build time.
+    template_headers: BTreeMap<String, Template>,
+    /// Validated payload prefix.
+    payload_prefix: String,
+    /// Validated payload suffix.
+    payload_suffix: String,
+    /// Content type derived from the encoder.
+    content_type: Option<String>,
+    /// Content encoding derived from compression.
+    content_encoding: Option<String>,
+    /// Static headers converted to HTTP header name/value pairs.
+    converted_static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
+    /// Tower request settings.
+    request_limits: TowerRequestSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HttpSinkConfig {
+    type Validated = ValidatedHttp;
+
+    fn validate(&self) -> crate::Result<ValidatedHttp> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let encoder = self.build_encoder()?;
@@ -292,15 +323,6 @@ impl HttpSinkConfig {
 
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
-
-        let client = self.build_http_client(&cx)?;
-
-        let healthcheck = match cx.healthcheck.uri {
-            Some(healthcheck_uri) => {
-                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
-            }
-            None => future::ok(()).boxed(),
-        };
 
         let content_type = {
             use Framer::*;
@@ -315,11 +337,6 @@ impl HttpSinkConfig {
                 (Otlp(_), _) => Some("application/x-protobuf".to_owned()),
                 _ => None,
             }
-        };
-
-        let request_builder = HttpRequestBuilder {
-            encoder: HttpEncoder::new(encoder, transformer, payload_prefix, payload_suffix),
-            compression: self.compression,
         };
 
         let content_encoding = self.compression.is_compressed().then(|| {
@@ -339,12 +356,94 @@ impl HttpSinkConfig {
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
 
+        let request_limits = self.request.tower.into_settings();
+
+        Ok(ValidatedHttp {
+            batch_settings,
+            encoder,
+            transformer,
+            template_headers,
+            payload_prefix,
+            payload_suffix,
+            content_type,
+            content_encoding,
+            converted_static_headers,
+            request_limits,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHttp,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_from_validated(validated, cx, Self::NAME).await
+    }
+}
+
+impl HttpSinkConfig {
+    /// Confinement + sink construction. `component_name` is threaded through so
+    /// per-template security warnings carry the outer sink type — `http` when
+    /// this is the top-level sink, `opentelemetry` when
+    /// [`OpenTelemetryConfig::build`] delegates here.
+    pub(crate) async fn build_with_component_type(
+        &self,
+        cx: SinkContext,
+        component_name: &'static str,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let validated = self.validate()?;
+        self.build_from_validated(&validated, cx, component_name)
+            .await
+    }
+
+    /// Builds the sink from the validated state. Confinement of the URI and
+    /// templated headers happens here (not in `validate`) because the
+    /// `component_name` threaded from the `opentelemetry`/`axiom` delegations
+    /// must appear in per-template security warnings.
+    async fn build_from_validated(
+        &self,
+        validated: &ValidatedHttp,
+        cx: SinkContext,
+        component_name: &'static str,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedHttp {
+            batch_settings,
+            encoder,
+            transformer,
+            template_headers,
+            payload_prefix,
+            payload_suffix,
+            content_type,
+            content_encoding,
+            converted_static_headers,
+            request_limits,
+        } = validated;
+
+        let client = self.build_http_client(&cx)?;
+
+        let healthcheck = match cx.healthcheck.uri {
+            Some(healthcheck_uri) => {
+                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+            }
+            None => future::ok(()).boxed(),
+        };
+
+        let request_builder = HttpRequestBuilder {
+            encoder: HttpEncoder::new(
+                encoder.clone(),
+                transformer.clone(),
+                payload_prefix.clone(),
+                payload_suffix.clone(),
+            ),
+            compression: self.compression,
+        };
+
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
             self.method,
             self.auth.clone(),
-            converted_static_headers,
-            content_type,
-            content_encoding,
+            converted_static_headers.clone(),
+            content_type.clone(),
+            content_encoding.clone(),
         );
 
         let service = match &self.auth {
@@ -377,11 +476,9 @@ impl HttpSinkConfig {
             _ => HttpService::new(client, http_sink_request_builder),
         };
 
-        let request_limits = self.request.tower.into_settings();
-
         let service = ServiceBuilder::new()
             .settings(
-                request_limits,
+                request_limits.clone(),
                 http_response_retry_logic(self.retry_strategy.clone()),
             )
             .service(service);
@@ -396,6 +493,7 @@ impl HttpSinkConfig {
         // routing — an event that controls the header field picks the
         // destination tenant unless we confine the header template too.
         let template_headers = template_headers
+            .clone()
             .into_iter()
             .map(|(name, tpl)| {
                 tpl.confine(&self.confinement, component_name, "request.headers")
@@ -407,7 +505,7 @@ impl HttpSinkConfig {
             service,
             uri,
             template_headers,
-            batch_settings,
+            *batch_settings,
             request_builder,
         );
 
@@ -519,5 +617,25 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("tenant"), "../../evil.com/steal?data=");
         assert!(template.render_string(&event).is_err());
+    }
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://127.0.0.1:9000/endpoint"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        // JSON + newline-delimited framing maps to the NDJSON content type.
+        assert_eq!(validated.content_type.as_deref(), Some(CONTENT_TYPE_JSON));
+        assert_eq!(validated.payload_prefix, "");
+        assert_eq!(validated.payload_suffix, "");
+        assert!(validated.template_headers.is_empty());
+        assert!(validated.converted_static_headers.is_empty());
     }
 }

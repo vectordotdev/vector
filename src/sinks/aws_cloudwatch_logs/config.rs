@@ -4,15 +4,18 @@ use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
 use serde::{Deserialize, Deserializer, de};
 use tower::ServiceBuilder;
-use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component, schema};
+use vector_lib::{
+    codecs::JsonSerializerConfig, configurable::configurable_component, schema,
+    stream::BatcherSettings,
+};
 use vrl::value::Kind;
 
 use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     codecs::{Encoder, EncodingConfig},
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
+        SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -24,7 +27,7 @@ use crate::{
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, http::RequestConfig,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -206,41 +209,8 @@ impl CloudwatchLogsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let group_template =
-            self.group_name
-                .clone()
-                .confine(&self.confinement, Self::NAME, "group_name")?;
-        let stream_template =
-            self.stream_name
-                .clone()
-                .confine(&self.confinement, Self::NAME, "stream_name")?;
-
-        let batcher_settings = self.batch.into_batcher_settings()?;
-        let request_settings = self.request.tower.into_settings();
-        let client = self.create_client(cx.proxy()).await?;
-        let svc = ServiceBuilder::new()
-            .settings(request_settings, CloudwatchRetryLogic::new())
-            .service(CloudwatchLogsPartitionSvc::new(
-                self.clone(),
-                client.clone(),
-            )?);
-        let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
-        let healthcheck = healthcheck(self.clone(), client).boxed();
-        let sink = CloudwatchSink {
-            batcher_settings,
-            request_builder: CloudwatchRequestBuilder {
-                group_template,
-                stream_template,
-                transformer,
-                encoder,
-            },
-
-            service: svc,
-        };
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -257,6 +227,80 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated `aws_cloudwatch_logs` sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedCloudwatchLogs {
+    /// Confined group name template.
+    group_template: ConfinedTemplate,
+    /// Confined stream name template.
+    stream_template: ConfinedTemplate,
+    /// Batch settings computed during validation.
+    batcher_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for CloudwatchLogsSinkConfig {
+    type Validated = ValidatedCloudwatchLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedCloudwatchLogs> {
+        let group_template =
+            self.group_name
+                .clone()
+                .confine(&self.confinement, Self::NAME, "group_name")?;
+        let stream_template =
+            self.stream_name
+                .clone()
+                .confine(&self.confinement, Self::NAME, "stream_name")?;
+        let batcher_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedCloudwatchLogs {
+            group_template,
+            stream_template,
+            batcher_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedCloudwatchLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedCloudwatchLogs {
+            group_template,
+            stream_template,
+            batcher_settings,
+        } = validated;
+        let request_settings = self.request.tower.into_settings();
+        let client = self.create_client(cx.proxy()).await?;
+        let svc = ServiceBuilder::new()
+            .settings(request_settings, CloudwatchRetryLogic::new())
+            .service(CloudwatchLogsPartitionSvc::new(
+                self.clone(),
+                client.clone(),
+            )?);
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+        let healthcheck = healthcheck(self.clone(), client).boxed();
+        let sink = CloudwatchSink {
+            batcher_settings: *batcher_settings,
+            request_builder: CloudwatchRequestBuilder {
+                group_template: group_template.clone(),
+                stream_template: stream_template.clone(),
+                transformer,
+                encoder,
+            },
+
+            service: svc,
+        };
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -299,8 +343,22 @@ impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::ValidatedSink;
     use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
     use crate::template::{ConfinementConfig, Template};
+    use vector_lib::codecs::JsonSerializerConfig;
+
+    #[test]
+    fn prepares_valid_config() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group-{{ file }}".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.group_template.to_string(), "group-{{ file }}");
+        assert_eq!(validated.stream_template.to_string(), "stream");
+        assert_eq!(validated.batcher_settings.item_limit, 10_000);
+    }
 
     #[test]
     fn test_generate_config() {

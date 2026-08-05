@@ -116,6 +116,30 @@ fn generate_config() {
 }
 
 #[test]
+fn validate_rejects_unconfined_template() {
+    use crate::config::ValidatedSink;
+
+    let config = HecMetricsSinkConfig {
+        default_token: "token".to_owned().into(),
+        endpoint: "http://localhost:8088".to_owned(),
+        host_key: config_host_key(),
+        index: Some("{{ index }}".try_into().unwrap()),
+        sourcetype: None,
+        source: None,
+        compression: Compression::None,
+        batch: Default::default(),
+        request: Default::default(),
+        tls: None,
+        acknowledgements: Default::default(),
+        default_namespace: None,
+        confinement: Default::default(),
+    };
+
+    let result = config.validate();
+    assert!(result.is_err());
+}
+
+#[test]
 fn test_process_metric() {
     let sourcetype = Template::try_from("{{ tags.template_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ tags.template_source }}".to_string()).ok();

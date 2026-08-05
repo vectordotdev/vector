@@ -13,7 +13,10 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, DynValidatedSink, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     event::{EventRef, LogEvent, Value},
     http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
@@ -28,8 +31,8 @@ use crate::{
             sink::ElasticsearchSink,
         },
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
-            service::HealthConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings,
+            http::RequestConfig, service::HealthConfig,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
@@ -728,18 +731,69 @@ fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::new(DataType::Metric | DataType::Log).with_schema_requirement(requirements)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated Elasticsearch sink configuration.
+///
+/// Captures the pure validation results (request limits and endpoint health
+/// settings) so `build` does not recompute them. The active mode's template
+/// confinement and per-endpoint parsing remain inside
+/// [`ElasticsearchCommon::parse_many`] because that parse performs I/O (AWS
+/// credential resolution and API-version autodetection).
+#[derive(Clone, Debug)]
+pub struct ValidatedElasticsearch {
+    /// Request settings computed during preparation.
+    request_limits: TowerRequestSettings,
+    /// Endpoint health settings computed during preparation.
+    health_config: HealthConfig,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for ElasticsearchConfig {
+    type Validated = ValidatedElasticsearch;
+
+    fn validate(&self) -> crate::Result<ValidatedElasticsearch> {
+        let request_limits = self.request.tower.into_settings();
+        let health_config = self.endpoint_health.clone().unwrap_or_default();
+
+        Ok(ValidatedElasticsearch {
+            request_limits,
+            health_config,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedElasticsearch,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         // Confinement of the active mode's routing templates happens in
         // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
-        // parsing. There is therefore nothing to confine up front here.
+        // parsing (which performs I/O: AWS credential resolution and API-version autodetection).
+        // The pure request/health settings were resolved during `validate`.
         let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
-        let request_limits = self.request.tower.into_settings();
-
-        let health_config = self.endpoint_health.clone().unwrap_or_default();
+        let health_config = validated.health_config.clone();
 
         let services = commons
             .iter()
@@ -753,7 +807,7 @@ impl SinkConfig for ElasticsearchConfig {
             })
             .collect::<Vec<_>>();
 
-        let service = request_limits.distributed_service(
+        let service = validated.request_limits.clone().distributed_service(
             ElasticsearchRetryLogic {
                 retry_partial: self.request_retry_partial,
             },
@@ -775,20 +829,6 @@ impl SinkConfig for ElasticsearchConfig {
         .map_ok(|((), _)| ())
         .boxed();
         Ok((stream, healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
-
-        Input::new(DataType::Metric | DataType::Log).with_schema_requirement(requirements)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -916,6 +956,20 @@ mod tests {
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "elasticsearch", "bulk.index");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_produces_request_limits_and_health() {
+        use crate::config::ValidatedSink;
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        // Default request limits and health settings are resolved during validation.
+        assert_eq!(validated.request_limits.concurrency, None);
+        assert!(validated.request_limits.timeout.as_secs() > 0);
+        assert!(validated.health_config.retry_initial_backoff_secs > 0);
     }
 
     #[test]

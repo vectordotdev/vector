@@ -22,7 +22,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{
         TextSerializerConfig,
-        encoding::{Framer, FramingConfig},
+        encoding::{Framer, FramingConfig, Serializer},
     },
     configurable::configurable_component,
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
@@ -30,7 +30,10 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{
@@ -243,15 +246,8 @@ impl OutFile {
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx)?;
-        Ok((
-            super::VectorSink::from_event_streamsink(sink),
-            future::ok(()).boxed(),
-        ))
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
@@ -264,6 +260,47 @@ impl SinkConfig for FileSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated `file` sink configuration.
+///
+/// Holds the built encoding components so `build` does not redo the (pure)
+/// encoding construction. Path confinement is intentionally NOT retained here:
+/// `PathConfinement` is not `Clone`, and `build` receives the validated state by
+/// reference, so the confinement is constructed (from the same pure inputs) in
+/// `build`.
+#[derive(Clone, Debug)]
+pub struct ValidatedFileSink {
+    transformer: Transformer,
+    framer: Framer,
+    serializer: Serializer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for FileSinkConfig {
+    type Validated = ValidatedFileSink;
+
+    fn validate(&self) -> crate::Result<ValidatedFileSink> {
+        let transformer = self.encoding.transformer();
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+        Ok(ValidatedFileSink {
+            transformer,
+            framer,
+            serializer,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedFileSink,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let sink = FileSink::from_validated(self, validated, cx)?;
+        Ok((
+            super::VectorSink::from_event_streamsink(sink),
+            future::ok(()).boxed(),
+        ))
     }
 }
 
@@ -282,10 +319,18 @@ pub struct FileSink {
 
 impl FileSink {
     pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
-        let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let validated = config.validate()?;
+        Self::from_validated(config, &validated, cx)
+    }
 
+    /// Constructs the sink from the validated state, performing only the
+    /// environment-dependent (non-`validate`) work: timezone offset resolution
+    /// and path confinement construction.
+    fn from_validated(
+        config: &FileSinkConfig,
+        validated: &ValidatedFileSink,
+        cx: SinkContext,
+    ) -> crate::Result<Self> {
         let offset = config
             .timezone
             .or(cx.globals.timezone)
@@ -314,9 +359,12 @@ impl FileSink {
                 .map_err(Box::new)?
         };
 
+        let encoder =
+            Encoder::<Framer>::new(validated.framer.clone(), validated.serializer.clone());
+
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
-            transformer,
+            transformer: validated.transformer.clone(),
             encoder,
             idle_timeout: config.idle_timeout,
             files: ExpiringHashMap::default(),
@@ -766,6 +814,13 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<FileSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = base_config("/tmp/vector-test.log");
+        let validated = config.validate().expect("validation should succeed");
+        assert!(matches!(validated.serializer, Serializer::Text(_)));
     }
 
     #[tokio::test]

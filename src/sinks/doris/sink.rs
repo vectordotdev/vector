@@ -1,7 +1,5 @@
 use crate::sinks::{
-    doris::{DorisConfig, common::DorisCommon, request_builder::DorisRequestBuilder},
-    prelude::*,
-    util::http::HttpRequest,
+    doris::request_builder::DorisRequestBuilder, prelude::*, util::http::HttpRequest,
 };
 
 pub struct DorisSink<S> {
@@ -19,25 +17,26 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub fn new(service: S, config: &DorisConfig, common: &DorisCommon) -> crate::Result<Self> {
-        let batch_settings = config.batch.into_batcher_settings()?;
-        let database =
-            config
-                .database
-                .clone()
-                .confine(&config.confinement, DorisConfig::NAME, "database")?;
-        let table =
-            config
-                .table
-                .clone()
-                .confine(&config.confinement, DorisConfig::NAME, "table")?;
-        Ok(DorisSink {
+    /// Creates a new `DorisSink` from pre-validated values.
+    ///
+    /// Batch settings and confined templates are computed during the
+    /// `ValidatedSink::validate` phase and passed in here, so `build` does not
+    /// recompute them.
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn new(
+        service: S,
+        batch_settings: BatcherSettings,
+        database: ConfinedTemplate,
+        table: ConfinedTemplate,
+        request_builder: DorisRequestBuilder,
+    ) -> Self {
+        DorisSink {
             batch_settings,
             service,
-            request_builder: common.request_builder.clone(),
+            request_builder,
             database,
             table,
-        })
+        }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
