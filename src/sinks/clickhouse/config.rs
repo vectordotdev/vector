@@ -287,7 +287,7 @@ impl ValidatedSink for ClickhouseConfig {
         })
     }
 
-    async fn build_validated(
+    async fn build(
         &self,
         validated: &ValidatedClickhouse,
         cx: SinkContext,

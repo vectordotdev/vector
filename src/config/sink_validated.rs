@@ -5,7 +5,7 @@
 //!
 //! - `ValidatedSink`: a generic, implementor-facing trait. A migrated sink implements
 //!   this and works entirely with its own concrete validated type `T` — it returns `T`
-//!   from `validate_structure` and receives `&T` back in `build_validated`. No `Any` in sight.
+//!   from `validate_structure` and receives `&T` back in `build`. No `Any` in sight.
 //! - `ValidatedSinkErased`: the object-safe boundary the framework actually crosses.
 //!   A blanket impl derives it from any `ValidatedSink`, performing the `Box<dyn Any>`
 //!   erasure and downcast automatically.
@@ -16,7 +16,7 @@
 //!
 //! `ValidatedSink::validate_structure` is the same phase as the RFC's
 //! `SinkConfig::validate_structure` (pure structural validation owned by config
-//! compilation), but it retains the validated state so `build_validated` does not
+//! compilation), but it retains the validated state so `build` does not
 //! redo it.
 //!
 //! Design goals:
@@ -47,7 +47,7 @@ use crate::sinks::Healthcheck;
 ///         ValidatedMySink::from_config(self)
 ///     }
 ///
-///     async fn build_validated(
+///     async fn build(
 ///         &self,
 ///         validated: &Self::Validated,
 ///         cx: SinkContext,
@@ -61,25 +61,25 @@ use crate::sinks::Healthcheck;
 /// it at build time via `ValidatedSinkErased`, so no `Any` appears in implementor code.
 #[async_trait]
 pub trait ValidatedSink {
-    /// The concrete validated state produced by `validate_structure` and consumed by `build_validated`.
+    /// The concrete validated state produced by `validate_structure` and consumed by `build`.
     type Validated: Send + Sync + 'static;
 
     /// Performs pure structural validation, returning the validated state.
     ///
     /// This is the same phase as the RFC's `SinkConfig::validate_structure`, but it
-    /// retains the validated state so `build_validated` does not redo it.
+    /// retains the validated state so `build` does not redo it.
     ///
     /// # Purity Guarantees
     ///
     /// This method must be pure: no filesystem access, no network operations, no
     /// credential resolution, no spawning, and no async/await. All such environment-
-    /// dependent operations belong in `build_validated`.
+    /// dependent operations belong in `build`.
     fn validate_structure(&self) -> crate::Result<Self::Validated>;
 
     /// Builds the sink from the validated state, without redoing pure validation.
     ///
     /// May perform environment-dependent construction (HTTP clients, schema fetching, etc.).
-    async fn build_validated(
+    async fn build(
         &self,
         validated: &Self::Validated,
         cx: SinkContext,
@@ -121,6 +121,6 @@ where
         let validated = validated
             .downcast_ref::<T::Validated>()
             .expect("validated state type mismatch");
-        self.build_validated(validated, cx).await
+        self.build(validated, cx).await
     }
 }
