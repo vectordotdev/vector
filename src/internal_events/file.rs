@@ -113,6 +113,10 @@ pub struct FilePathOutsideBaseDirError<'a> {
     pub path: &'a std::path::Path,
     pub base_dir: &'a std::path::Path,
     pub error: ConfineError,
+    /// Number of events discarded because of this rejection. One for the
+    /// per-event streaming path; the whole batch for the columnar path, where
+    /// a single rendered path carries many events.
+    pub dropped_events: usize,
 }
 
 impl InternalEvent for FilePathOutsideBaseDirError<'_> {
@@ -131,10 +135,12 @@ impl InternalEvent for FilePathOutsideBaseDirError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
-            count: 1,
-            reason: "Rendered path outside base_dir.",
-        });
+        if self.dropped_events > 0 {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: self.dropped_events,
+                reason: "Rendered path outside base_dir.",
+            });
+        }
     }
 }
 
