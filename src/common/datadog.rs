@@ -24,6 +24,8 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 pub const DDTAGS: &str = "ddtags";
 /// The datadog message event path.
 pub const MESSAGE: &str = "message";
+const DATADOG_AGENT_METADATA_NAMESPACE: &str = "datadog_agent";
+const V2_RESOURCES_METADATA_KEY: &str = "v2_resources";
 
 /// Records v2 resources so the sink can distinguish them from ordinary `resource.*` tags.
 pub(crate) fn set_datadog_agent_v2_resources(
@@ -52,17 +54,17 @@ pub(crate) fn set_datadog_agent_v2_resources(
 
     if !resources.is_empty() {
         metadata.value_mut().insert(
-            vrl::path!("datadog_agent", "v2_resources"),
+            vrl::path!(DATADOG_AGENT_METADATA_NAMESPACE, V2_RESOURCES_METADATA_KEY),
             Value::Object(resources),
         );
     }
 }
 
 pub(crate) fn datadog_agent_v2_resources(metadata: &EventMetadata) -> Option<&ObjectMap> {
-    match metadata
-        .value()
-        .get(vrl::path!("datadog_agent", "v2_resources"))
-    {
+    match metadata.value().get(vrl::path!(
+        DATADOG_AGENT_METADATA_NAMESPACE,
+        V2_RESOURCES_METADATA_KEY
+    )) {
         Some(Value::Object(resources)) => Some(resources),
         _ => None,
     }
