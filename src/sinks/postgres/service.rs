@@ -50,14 +50,21 @@ pub struct PostgresService {
     connection_pool: Pool<Postgres>,
     table: String,
     endpoint: String,
+    columns: Vec<String>,
 }
 
 impl PostgresService {
-    pub const fn new(connection_pool: Pool<Postgres>, table: String, endpoint: String) -> Self {
+    pub const fn new(
+        connection_pool: Pool<Postgres>,
+        table: String,
+        endpoint: String,
+        columns: Vec<String>,
+    ) -> Self {
         Self {
             connection_pool,
             table,
             endpoint,
+            columns,
         }
     }
 }
@@ -142,6 +149,7 @@ impl Service<PostgresRequest> for PostgresService {
         let service = self.clone();
         let future = async move {
             let table = service.table;
+            let columns = service.columns;
             let metadata = request.metadata;
             let json_serializer = JsonSerializerConfig::default().build();
             let serialized_values = request
@@ -151,13 +159,23 @@ impl Service<PostgresRequest> for PostgresService {
                 .collect::<Result<Vec<_>, _>>()
                 .context(VectorCommonSnafu)?;
 
-            sqlx::query(&format!(
-                "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"
-            ))
-            .bind(Json(serialized_values))
-            .execute(&service.connection_pool)
-            .await
-            .context(PostgresSnafu)?;
+            let query = if columns.is_empty() {
+                format!(
+                    "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"
+                )
+            } else {
+                let columns_str = columns.join(", ");
+                format!(
+                    "INSERT INTO {table} ({}) SELECT {} FROM jsonb_populate_recordset(NULL::{table}, $1)",
+                    columns_str, columns_str
+                )
+            };
+
+            sqlx::query(&query)
+                .bind(Json(serialized_values))
+                .execute(&service.connection_pool)
+                .await
+                .context(PostgresSnafu)?;
 
             emit!(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
