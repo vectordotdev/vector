@@ -419,7 +419,7 @@ impl EventCount for HecProcessedEvent {
 #[cfg(test)]
 mod pre_check_tests {
     use super::*;
-    use crate::template::{ConfinementConfig, PrefixKind, Template};
+    use crate::template::{ConfinementConfig, Template};
     use vector_lib::event::LogEvent;
     use vrl::event_path;
 
@@ -432,7 +432,7 @@ mod pre_check_tests {
     /// original event before any mutation.
     #[test]
     fn confinement_detects_attack_before_process_log_mutates_event() {
-        let index_template = Template::<PrefixKind>::try_from("idx-{{ timestamp }}")
+        let index_template = Template::try_from("idx-{{ timestamp }}")
             .unwrap()
             .confine(&ConfinementConfig::default(), "splunk_hec_logs", "index")
             .unwrap();

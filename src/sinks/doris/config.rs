@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_database_template() {
-        let template: Template = Template::try_from("{{ tenant }}").unwrap();
+        let template = Template::try_from("{{ tenant }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "doris", "database");
         assert!(
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_database_template() {
-        let template: Template = Template::try_from("{{ tenant }}").unwrap();
+        let template = Template::try_from("{{ tenant }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -297,7 +297,7 @@ mod tests {
     fn confinement_blocks_dotdot_escape_at_render() {
         use crate::event::LogEvent;
         use vrl::event_path;
-        let template: Template = Template::try_from("mydb_{{ tenant }}").unwrap();
+        let template = Template::try_from("mydb_{{ tenant }}").unwrap();
         let config = ConfinementConfig::default();
         let confined = template.confine(&config, "doris", "database").unwrap();
         let mut event = LogEvent::default();

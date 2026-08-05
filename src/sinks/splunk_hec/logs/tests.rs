@@ -26,13 +26,13 @@ use crate::{
             test::build_test_server,
         },
     },
-    template::{ConfinedTemplate, ConfinementConfig, PrefixKind, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     test_util::addr::next_addr,
 };
 
 // Tests exercise the sink, not confinement; build a checkerless confined template.
 fn confined(s: &str) -> ConfinedTemplate {
-    Template::<PrefixKind>::try_from(s)
+    Template::try_from(s)
         .unwrap()
         .confine(
             &ConfinementConfig::unconfined(),

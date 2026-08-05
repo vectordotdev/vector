@@ -183,7 +183,7 @@ impl ConfinementChecker {
     /// Returns the literal prefix if the template is dynamic and requires
     /// confinement. Returns `Ok(None)` if the template is static and needs no
     /// confinement.
-    fn validate_common<K: TemplateKind>(tpl: &Template<K>) -> Result<Option<String>, BuildError> {
+    fn validate_common(tpl: &UnconfinedTemplate) -> Result<Option<String>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
             None => return Ok(None),
@@ -207,10 +207,8 @@ impl ConfinementChecker {
     /// Errors:
     /// - `NoDerivableBase`: template has field references but no literal prefix
     /// - `DerivedBaseIsRoot`: prefix is exactly `"/"` (trivial confinement)
-    pub(crate) fn for_prefix_template(
-        tpl: &Template<PrefixKind>,
-    ) -> Result<Option<Self>, BuildError> {
-        match Self::validate_common(tpl)? {
+    pub(crate) fn for_prefix_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
+        match Self::validate_common(&tpl.inner)? {
             Some(prefix) => {
                 // Reject root-only prefix to avoid trivial confinement.
                 if prefix == "/" {
@@ -246,7 +244,7 @@ impl ConfinementChecker {
     /// - `EncodedSeparatorInUriPrefix`: `%2F`, `%5C`, or backslash in prefix
     /// - `UnsupportedUriScheme`: non-HTTP(S) scheme like ftp://
     pub(crate) fn for_uri_template(tpl: &UriTemplate) -> Result<Option<Self>, BuildError> {
-        match Self::validate_common(tpl)? {
+        match Self::validate_common(&tpl.inner)? {
             Some(prefix) => {
                 // Reject URI templates that have field references AND `?` or `#`.
                 // A static query/fragment is safe (fixed value, not

@@ -1,6 +1,6 @@
 use super::*;
 
-impl Template<PrefixKind> {
+impl Template {
     /// Confine this template to its literal prefix for **non-URI fields**, returning
     /// a [`ConfinedTemplate`] that enforces prefix confinement at render time.
     ///
@@ -25,106 +25,16 @@ impl Template<PrefixKind> {
             return Ok(ConfinedTemplate {
                 inner: self.inner,
                 checker: None,
-                kind: PhantomData,
             });
         }
         ConfinementChecker::for_prefix_template(&self)
             .map(|checker| ConfinedTemplate {
                 inner: self.inner,
                 checker,
-                kind: PhantomData,
             })
             .map_err(Into::into)
     }
 }
-
-impl<K: TemplateKind> Template<K> {
-    /// Set the tz offset used when rendering strftime specifiers.
-    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.inner.tz_offset = tz_offset;
-        self
-    }
-
-    /// Returns the names of the fields referenced by this template, if any.
-    ///
-    /// This is a read-only inspection that does not render, so it is available before confinement
-    /// (e.g. for topology field detection).
-    pub fn get_fields(&self) -> Option<Vec<String>> {
-        self.inner.get_fields()
-    }
-
-    /// Longest leading substring of the template source that is rendered
-    /// verbatim — no `{{ field }}` reference and no strftime specifier.
-    ///
-    /// Sinks use this to derive a confinement boundary from the
-    /// operator-authored portion of the template.
-    pub fn literal_prefix(&self) -> &str {
-        self.inner.literal_prefix()
-    }
-
-    /// Returns a reference to the template source string.
-    pub fn get_ref(&self) -> &str {
-        self.inner.get_ref()
-    }
-
-    /// Returns `true` if the template source is empty.
-    pub const fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    /// Returns `true` if the template depends on the input event or time.
-    pub const fn is_dynamic(&self) -> bool {
-        self.inner.is_dynamic()
-    }
-}
-
-impl<K: TemplateKind> fmt::Display for Template<K> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
-impl<K: TemplateKind> From<UnconfinedTemplate> for Template<K> {
-    fn from(inner: UnconfinedTemplate) -> Self {
-        Template {
-            inner,
-            kind: PhantomData,
-        }
-    }
-}
-
-impl<K: TemplateKind> TryFrom<String> for Template<K> {
-    type Error = TemplateParseError;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(s).map(Self::from)
-    }
-}
-
-impl<K: TemplateKind> TryFrom<&str> for Template<K> {
-    type Error = TemplateParseError;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(s).map(Self::from)
-    }
-}
-
-impl<K: TemplateKind> TryFrom<PathBuf> for Template<K> {
-    type Error = TemplateParseError;
-
-    fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
-        UnconfinedTemplate::try_from(p).map(Self::from)
-    }
-}
-
-impl<K: TemplateKind> From<Template<K>> for String {
-    fn from(t: Template<K>) -> String {
-        t.inner.src
-    }
-}
-
-// This is safe because we literally defer to `String` for the schema of `Template`.
-impl<K: TemplateKind> ConfigurableString for Template<K> {}
 
 impl UriTemplate {
     /// Confine this URI template for **HTTP/HTTPS URI fields**, returning a
@@ -156,15 +66,108 @@ impl UriTemplate {
             return Ok(ConfinedUriTemplate {
                 inner: self.inner,
                 checker: None,
-                kind: PhantomData,
             });
         }
         ConfinementChecker::for_uri_template(&self)
             .map(|checker| ConfinedUriTemplate {
                 inner: self.inner,
                 checker,
-                kind: PhantomData,
             })
             .map_err(Into::into)
     }
 }
+
+// `Template` and `UriTemplate` are concrete newtypes over `UnconfinedTemplate` that share
+// every behavior except the `confine` method (which selects the confinement flavor by type).
+// Generate the shared parsing/rendering/serialization impls once per type.
+macro_rules! impl_template_common {
+    ($ty:ident) => {
+        impl $ty {
+            /// Set the tz offset used when rendering strftime specifiers.
+            pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+                self.inner.tz_offset = tz_offset;
+                self
+            }
+
+            /// Returns the names of the fields referenced by this template, if any.
+            ///
+            /// This is a read-only inspection that does not render, so it is available before confinement
+            /// (e.g. for topology field detection).
+            pub fn get_fields(&self) -> Option<Vec<String>> {
+                self.inner.get_fields()
+            }
+
+            /// Longest leading substring of the template source that is rendered
+            /// verbatim — no `{{ field }}` reference and no strftime specifier.
+            ///
+            /// Sinks use this to derive a confinement boundary from the
+            /// operator-authored portion of the template.
+            pub fn literal_prefix(&self) -> &str {
+                self.inner.literal_prefix()
+            }
+
+            /// Returns a reference to the template source string.
+            pub fn get_ref(&self) -> &str {
+                self.inner.get_ref()
+            }
+
+            /// Returns `true` if the template source is empty.
+            pub const fn is_empty(&self) -> bool {
+                self.inner.is_empty()
+            }
+
+            /// Returns `true` if the template depends on the input event or time.
+            pub const fn is_dynamic(&self) -> bool {
+                self.inner.is_dynamic()
+            }
+        }
+
+        impl fmt::Display for $ty {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.inner.fmt(f)
+            }
+        }
+
+        impl From<UnconfinedTemplate> for $ty {
+            fn from(inner: UnconfinedTemplate) -> Self {
+                $ty { inner }
+            }
+        }
+
+        impl TryFrom<String> for $ty {
+            type Error = TemplateParseError;
+
+            fn try_from(s: String) -> Result<Self, Self::Error> {
+                UnconfinedTemplate::try_from(s).map(Self::from)
+            }
+        }
+
+        impl TryFrom<&str> for $ty {
+            type Error = TemplateParseError;
+
+            fn try_from(s: &str) -> Result<Self, Self::Error> {
+                UnconfinedTemplate::try_from(s).map(Self::from)
+            }
+        }
+
+        impl TryFrom<PathBuf> for $ty {
+            type Error = TemplateParseError;
+
+            fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
+                UnconfinedTemplate::try_from(p).map(Self::from)
+            }
+        }
+
+        impl From<$ty> for String {
+            fn from(t: $ty) -> String {
+                t.inner.src
+            }
+        }
+
+        // This is safe because we literally defer to `String` for the schema of the template.
+        impl ConfigurableString for $ty {}
+    };
+}
+
+impl_template_common!(Template);
+impl_template_common!(UriTemplate);

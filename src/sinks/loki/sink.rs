@@ -661,13 +661,13 @@ mod tests {
         codecs::Encoder,
         config::log_schema,
         sinks::loki::config::{LokiConfig, OutOfOrderAction},
-        template::{ConfinedTemplate, ConfinementConfig, PrefixKind, Template},
+        template::{ConfinedTemplate, ConfinementConfig, Template},
         test_util::random_lines,
     };
 
     // Tests exercise the encoder, not confinement; build a checkerless confined label template.
     fn confined_label(s: &str) -> ConfinedTemplate {
-        Template::<PrefixKind>::try_from(s)
+        Template::try_from(s)
             .unwrap()
             .confine(&ConfinementConfig::unconfined(), LokiConfig::NAME, "labels")
             .unwrap()

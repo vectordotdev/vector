@@ -325,7 +325,7 @@ impl GcsSinkConfig {
     }
 
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        let tpl: Template = Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
+        let tpl = Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
             .context(KeyPrefixTemplateSnafu)?;
         let tpl = tpl.confine(&self.confinement, Self::NAME, "key_prefix")?;
         Ok(KeyPartitioner::new(tpl, None))

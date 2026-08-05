@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_blob_prefix() {
-        let template: Template = Template::try_from("{{ tenant }}").unwrap();
+        let template = Template::try_from("{{ tenant }}").unwrap();
         let err = template
             .confine(&ConfinementConfig::default(), "azure_blob", "blob_prefix")
             .unwrap_err();
@@ -372,7 +372,7 @@ mod tests {
         let cfg = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
-        let template: Template = Template::try_from("{{ tenant }}").unwrap();
+        let template = Template::try_from("{{ tenant }}").unwrap();
         assert!(template.confine(&cfg, "azure_blob", "blob_prefix").is_ok());
     }
 
@@ -382,7 +382,7 @@ mod tests {
         use vector_lib::event::LogEvent;
         use vrl::event_path;
 
-        let template: Template = Template::try_from("safe/{{ tenant }}/").unwrap();
+        let template = Template::try_from("safe/{{ tenant }}/").unwrap();
         let template = template
             .confine(&ConfinementConfig::default(), "azure_blob", "blob_prefix")
             .unwrap();
