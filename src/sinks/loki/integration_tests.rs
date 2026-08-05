@@ -390,13 +390,13 @@ async fn interpolate_stream_key() {
 
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
-            labels = {"key-{{ stream_key }}" = "placeholder"}
+            labels = {"key_{{ stream_key }}" = "placeholder"}
             encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.labels.insert(
-        Template::try_from("key-{{ stream_key }}").unwrap(),
+        Template::try_from("key_{{ stream_key }}").unwrap(),
         Template::try_from(stream.to_string()).unwrap(),
     );
 
@@ -419,7 +419,7 @@ async fn interpolate_stream_key() {
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
-    let (_, outputs) = fetch_stream_with_key("key-test_name", stream.to_string(), "default").await;
+    let (_, outputs) = fetch_stream_with_key("key_test_name", stream.to_string(), "default").await;
 
     assert_eq!(outputs.len(), lines.len());
 
