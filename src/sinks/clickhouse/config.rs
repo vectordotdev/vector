@@ -221,13 +221,6 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Fallback path: prepare then build. The topology normally calls
-        // `build_prepared` with the state produced by `prepare`.
-        let prepared = ValidatedClickhouse::from_config(self)?;
-        prepared.build(cx).await
-    }
-
     fn as_prepared(&self) -> Option<&dyn PreparedSinkErased> {
         Some(self)
     }
@@ -250,7 +243,49 @@ impl PreparedSink for ClickhouseConfig {
     type Prepared = ValidatedClickhouse;
 
     fn validate_structure(&self) -> crate::Result<ValidatedClickhouse> {
-        ValidatedClickhouse::from_config(self)
+        // Validate templates can be parsed (this is pure)
+        let database = self.database.clone().unwrap_or_else(|| {
+            "default"
+                .try_into()
+                .expect("'default' should be a valid template")
+        });
+
+        // For batch_encoding with ArrowStream, validate compatibility (pure check)
+        if let Some(batch_encoding) = &self.batch_encoding {
+            if self.format != Format::ArrowStream {
+                return Err(format!(
+                    "'batch_encoding' is only compatible with 'format: arrow_stream'. Found 'format: {}'.",
+                    self.format
+                )
+                .into());
+            }
+            let ClickhouseBatchEncoding::ArrowStream(_) = batch_encoding;
+        }
+
+        // Resolve auth choice (pure validation)
+        let auth = self.auth.choose_one(&self.endpoint.auth)?;
+
+        // Compute batch settings (pure validation)
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        // Confine templates (pure validation)
+        let confined_table =
+            self.table
+                .clone()
+                .confine(&self.confinement, ClickhouseConfig::NAME, "table")?;
+        let confined_database =
+            database
+                .clone()
+                .confine(&self.confinement, ClickhouseConfig::NAME, "database")?;
+
+        Ok(ValidatedClickhouse {
+            config: self.clone(),
+            database,
+            auth,
+            batch_settings,
+            confined_table,
+            confined_database,
+        })
     }
 
     async fn build_prepared(
@@ -258,7 +293,60 @@ impl PreparedSink for ClickhouseConfig {
         prepared: &ValidatedClickhouse,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        prepared.build(cx).await
+        let ValidatedClickhouse {
+            config,
+            database,
+            auth,
+            batch_settings,
+            confined_table,
+            confined_database,
+        } = prepared;
+        let endpoint = config.endpoint.with_default_parts().uri;
+        let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
+        let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
+            auth: auth.clone(),
+            endpoint: endpoint.clone(),
+            skip_unknown_fields: config.skip_unknown_fields,
+            date_time_best_effort: config.date_time_best_effort,
+            insert_random_shard: config.insert_random_shard,
+            compression: config.compression,
+            query_settings: config.query_settings,
+        };
+
+        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
+            HttpService::new(client.clone(), clickhouse_service_request_builder);
+
+        let request_limits = config.request.into_settings();
+
+        let service = ServiceBuilder::new()
+            .settings(request_limits, ClickhouseRetryLogic::default())
+            .service(service);
+
+        // Resolve the encoding strategy (format + encoder) based on configuration.
+        // This happens here in build because Arrow schema fetching requires network access.
+        let (format, encoder_kind) = config
+            .resolve_strategy(&client, &endpoint, database, auth.as_ref())
+            .await?;
+
+        let request_builder = ClickhouseRequestBuilder {
+            compression: config.compression,
+            encoder: (config.encoding.clone(), encoder_kind),
+        };
+
+        // Use pre-computed batch settings and confined templates
+        let sink = ClickhouseSink::new(
+            *batch_settings,
+            service,
+            confined_database.clone(),
+            confined_table.clone(),
+            format,
+            request_builder,
+        );
+
+        let healthcheck = Box::pin(healthcheck(client, endpoint, auth.clone()));
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -381,115 +469,6 @@ pub struct ValidatedClickhouse {
     confined_table: ConfinedTemplate,
     /// Confined database template.
     confined_database: ConfinedTemplate,
-}
-
-impl ValidatedClickhouse {
-    /// Creates a new validated ClickHouse sink.
-    ///
-    /// This method performs pure validation without side effects.
-    pub fn from_config(config: &ClickhouseConfig) -> crate::Result<Self> {
-        // Validate templates can be parsed (this is pure)
-        let database = config.database.clone().unwrap_or_else(|| {
-            "default"
-                .try_into()
-                .expect("'default' should be a valid template")
-        });
-
-        // For batch_encoding with ArrowStream, validate compatibility (pure check)
-        if let Some(batch_encoding) = &config.batch_encoding {
-            if config.format != Format::ArrowStream {
-                return Err(format!(
-                    "'batch_encoding' is only compatible with 'format: arrow_stream'. Found 'format: {}'.",
-                    config.format
-                )
-                .into());
-            }
-            let ClickhouseBatchEncoding::ArrowStream(_) = batch_encoding;
-        }
-
-        // Resolve auth choice (pure validation)
-        let auth = config.auth.choose_one(&config.endpoint.auth)?;
-
-        // Compute batch settings (pure validation)
-        let batch_settings = config.batch.into_batcher_settings()?;
-
-        // Confine templates (pure validation)
-        let confined_table =
-            config
-                .table
-                .clone()
-                .confine(&config.confinement, ClickhouseConfig::NAME, "table")?;
-        let confined_database =
-            database
-                .clone()
-                .confine(&config.confinement, ClickhouseConfig::NAME, "database")?;
-
-        Ok(Self {
-            config: config.clone(),
-            database,
-            auth,
-            batch_settings,
-            confined_table,
-            confined_database,
-        })
-    }
-}
-
-impl ValidatedClickhouse {
-    /// Builds the sink from the validated state.
-    ///
-    /// Consumes the pre-computed validation results without recomputing them.
-    /// This method may perform environment-dependent construction (HTTP clients,
-    /// Arrow schema fetching, etc.).
-    pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = self.config.endpoint.with_default_parts().uri;
-        let tls_settings = TlsSettings::from_options(self.config.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
-
-        let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
-            auth: self.auth.clone(),
-            endpoint: endpoint.clone(),
-            skip_unknown_fields: self.config.skip_unknown_fields,
-            date_time_best_effort: self.config.date_time_best_effort,
-            insert_random_shard: self.config.insert_random_shard,
-            compression: self.config.compression,
-            query_settings: self.config.query_settings,
-        };
-
-        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), clickhouse_service_request_builder);
-
-        let request_limits = self.config.request.into_settings();
-
-        let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
-            .service(service);
-
-        // Resolve the encoding strategy (format + encoder) based on configuration.
-        // This happens here in build because Arrow schema fetching requires network access.
-        let (format, encoder_kind) = self
-            .config
-            .resolve_strategy(&client, &endpoint, &self.database, self.auth.as_ref())
-            .await?;
-
-        let request_builder = ClickhouseRequestBuilder {
-            compression: self.config.compression,
-            encoder: (self.config.encoding.clone(), encoder_kind),
-        };
-
-        // Use pre-computed batch settings and confined templates
-        let sink = ClickhouseSink::new(
-            self.batch_settings,
-            service,
-            self.confined_database.clone(),
-            self.confined_table.clone(),
-            format,
-            request_builder,
-        );
-
-        let healthcheck = Box::pin(healthcheck(client, endpoint, self.auth.clone()));
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
 }
 
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {

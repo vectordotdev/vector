@@ -240,14 +240,23 @@ impl From<UriSerde> for SinkHealthcheckOptions {
 pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the sink with the given context.
     ///
-    /// If the sink is built successfully, `Ok(...)` is returned containing the sink and the sink's
-    /// healthcheck.
+    /// Migrated sinks route through the prepared lifecycle: this default validates
+    /// the structure and builds from the retained state. Legacy sinks override this
+    /// with their own build logic.
     ///
     /// # Errors
     ///
     /// If an error occurs while building the sink, an error variant explaining the issue is
     /// returned.
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)>;
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        match self.as_prepared() {
+            Some(erased) => {
+                let prepared = erased.validate_structure_erased()?;
+                erased.build_prepared_erased(&*prepared, cx).await
+            }
+            None => Err("sink does not implement a build method".into()),
+        }
+    }
 
     /// Gets the input configuration for this sink.
     fn input(&self) -> Input;
