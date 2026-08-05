@@ -346,7 +346,7 @@ impl ValidatedSink for HttpSinkConfig {
             }
         }
 
-        // `Template::default()` — produced by delegating sinks such as
+        // `UriTemplate::default()` — produced by delegating sinks such as
         // `opentelemetry` before the user supplies a URI — yields an empty
         // template whose `is_static` is false, so `is_dynamic()` reports true
         // even though there is nothing to render. Reject the empty URI up
@@ -672,7 +672,7 @@ mod tests {
     #[test]
     fn validate_rejects_empty_default_uri() {
         use crate::config::ValidatedSink;
-        // `Template::default()` — produced by delegating sinks such as
+        // `UriTemplate::default()` — produced by delegating sinks such as
         // `opentelemetry` before the user supplies a URI — is empty but reports
         // `is_dynamic() == true` (the derived default leaves `is_static` false),
         // so it must be rejected explicitly rather than deferred as a dynamic
@@ -685,7 +685,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        config.uri = Template::default();
+        config.uri = UriTemplate::default();
         assert!(
             config.validate().is_err(),
             "empty default uri should fail validation"

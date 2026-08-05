@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_group_name() {
-        let template: Template = Template::try_from("{{ group }}").unwrap();
+        let template = Template::try_from("{{ group }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
         assert!(result.is_err());
@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_group_name() {
-        let template: Template = Template::try_from("{{ group }}").unwrap();
+        let template = Template::try_from("{{ group }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -404,7 +404,7 @@ mod tests {
 
     #[test]
     fn confinement_allows_prefixed_group_name() {
-        let template: Template = Template::try_from("events-{{ env }}").unwrap();
+        let template = Template::try_from("events-{{ env }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
         assert!(result.is_ok());

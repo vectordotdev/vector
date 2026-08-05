@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn confinement_rejects_unconfined_subject() {
-        let template: Template = Template::try_from("{{ subject }}").unwrap();
+        let template = Template::try_from("{{ subject }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "nats", "subject");
         assert!(result.is_err());
@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn confinement_opt_out_allows_unconfined_subject() {
-        let template: Template = Template::try_from("{{ subject }}").unwrap();
+        let template = Template::try_from("{{ subject }}").unwrap();
         let config = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
@@ -505,7 +505,7 @@ mod tests {
 
     #[test]
     fn confinement_allows_prefixed_subject() {
-        let template: Template = Template::try_from("events-{{ env }}").unwrap();
+        let template = Template::try_from("events-{{ env }}").unwrap();
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "nats", "subject");
         assert!(result.is_ok());
