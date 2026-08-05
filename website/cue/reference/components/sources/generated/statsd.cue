@@ -89,6 +89,17 @@ generated: components: sources: statsd: configuration: {
 			unit:    "seconds"
 		}
 	}
+	socket_file_mode: {
+		description: """
+			Unix file mode bits to be applied to th Unix socket file.
+
+			Note: The file mode value can be specified in any numeric format supported by your
+			configuration language. Octal notation is common for file permissions (for example, 0o777 or 0o600).
+			"""
+		relevant_when: "mode = \"unix\""
+		required:      false
+		type: uint: examples: [511, 384]
+	}
 	tls: {
 		description:   "`TlsEnableableConfig` for `sources`, adding metadata from the client certificate."
 		relevant_when: "mode = \"tcp\""
@@ -196,6 +207,18 @@ generated: components: sources: statsd: configuration: {
 					"""
 				required: false
 				type: bool: {}
+			}
+		}
+	}
+	unix_mode: {
+		description:   "The Unix socket mode to use."
+		relevant_when: "mode = \"unix\""
+		required:      false
+		type: string: {
+			default: "stream"
+			enum: {
+				datagram: "Datagram-oriented (`SOCK_DGRAM`)."
+				stream:   "Stream-oriented (`SOCK_STREAM`)."
 			}
 		}
 	}
