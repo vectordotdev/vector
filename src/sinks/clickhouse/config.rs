@@ -19,7 +19,7 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    config::{SinkContext, ValidatedSink, ValidatedSinkErased},
+    config::{DynValidatedSink, SinkContext, ValidatedSink},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -221,7 +221,7 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn as_validated(&self) -> Option<&dyn ValidatedSinkErased> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
         Some(self)
     }
 

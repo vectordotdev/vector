@@ -6,13 +6,13 @@
 //! - `ValidatedSink`: a generic, implementor-facing trait. A migrated sink implements
 //!   this and works entirely with its own concrete validated type `T` — it returns `T`
 //!   from `validate` and receives `&T` back in `build`. No `Any` in sight.
-//! - `ValidatedSinkErased`: the object-safe boundary the framework actually crosses.
+//! - `DynValidatedSink`: the object-safe boundary the framework actually crosses.
 //!   A blanket impl derives it from any `ValidatedSink`, performing the `Box<dyn Any>`
 //!   erasure and downcast automatically.
 //!
 //! The erased validated state is stored on `SinkOuter` (see `SinkOuter::validated`) and
 //! consumed at build time by `SinkOuter::build`, which dispatches through
-//! `ValidatedSinkErased::build_erased`.
+//! `DynValidatedSink::build_dyn`.
 //!
 //! `ValidatedSink::validate` is the same phase as the RFC's
 //! `SinkConfig::validate_structure` (pure structural validation owned by config
@@ -58,7 +58,7 @@ use crate::sinks::Healthcheck;
 /// ```
 ///
 /// The framework automatically erases `Self::Validated` to `Box<dyn Any>` and restores
-/// it at build time via `ValidatedSinkErased`, so no `Any` appears in implementor code.
+/// it at build time via `DynValidatedSink`, so no `Any` appears in implementor code.
 #[async_trait]
 pub trait ValidatedSink {
     /// The concrete validated state produced by `validate` and consumed by `build`.
@@ -86,18 +86,18 @@ pub trait ValidatedSink {
     ) -> crate::Result<(VectorSink, Healthcheck)>;
 }
 
-/// Object-safe erased boundary used by the framework.
+/// Object-safe `dyn` boundary used by the framework.
 ///
 /// This is what actually crosses the `Box<dyn SinkConfig>` boundary. It is derived
 /// automatically from any `ValidatedSink` by the blanket impl below, which owns the
 /// `Box<dyn Any>` erasure and the downcast back to the concrete validated type.
 #[async_trait]
-pub trait ValidatedSinkErased {
+pub trait DynValidatedSink {
     /// Erases the validated state into a `Box<dyn Any>`.
-    fn validate_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
+    fn validate_dyn(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
 
     /// Restores the validated state from `&dyn Any` and builds the sink.
-    async fn build_erased(
+    async fn build_dyn(
         &self,
         validated: &(dyn Any + Send + Sync),
         cx: SinkContext,
@@ -105,15 +105,15 @@ pub trait ValidatedSinkErased {
 }
 
 #[async_trait]
-impl<T> ValidatedSinkErased for T
+impl<T> DynValidatedSink for T
 where
     T: ValidatedSink + Send + Sync + 'static,
 {
-    fn validate_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>> {
+    fn validate_dyn(&self) -> crate::Result<Box<dyn Any + Send + Sync>> {
         Ok(Box::new(self.validate()?))
     }
 
-    async fn build_erased(
+    async fn build_dyn(
         &self,
         validated: &(dyn Any + Send + Sync),
         cx: SinkContext,

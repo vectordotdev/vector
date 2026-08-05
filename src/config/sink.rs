@@ -22,7 +22,7 @@ use vector_lib::{
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{
-    ComponentKey, ProxyConfig, Resource, ValidatedSinkErased, dot_graph::GraphConfig, schema,
+    ComponentKey, DynValidatedSink, ProxyConfig, Resource, dot_graph::GraphConfig, schema,
 };
 use crate::{
     extra_context::ExtraContext,
@@ -114,13 +114,13 @@ where
     /// Builds the sink, dispatching through the erased validated boundary when the sink
     /// has been migrated, or falling back to the raw config for legacy sinks.
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        match self.inner.as_validated() {
+        match self.inner.as_dyn_validated() {
             Some(p) => {
                 let validated = self
                     .validated
                     .as_ref()
                     .expect("validated state missing for migrated sink");
-                p.build_erased(validated.as_ref(), cx).await
+                p.build_dyn(validated.as_ref(), cx).await
             }
             None => self.inner.build(cx).await,
         }
@@ -279,10 +279,10 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// If an error occurs while building the sink, an error variant explaining the issue is
     /// returned.
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        match self.as_validated() {
-            Some(erased) => {
-                let validated = erased.validate_erased()?;
-                erased.build_erased(&*validated, cx).await
+        match self.as_dyn_validated() {
+            Some(dyn_sink) => {
+                let validated = dyn_sink.validate_dyn()?;
+                dyn_sink.build_dyn(&*validated, cx).await
             }
             None => Err("sink does not implement a build method".into()),
         }
@@ -319,13 +319,13 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
 
-    /// Returns this sink as a `ValidatedSinkErased` if it has been migrated to the
+    /// Returns this sink as a `DynValidatedSink` if it has been migrated to the
     /// validated lifecycle, or `None` for legacy sinks.
     ///
     /// Migrated sinks implement `ValidatedSink` (working with their concrete validated
     /// type) and override this to return `Some(self)`. The framework then routes
-    /// validation and building through the erased boundary automatically.
-    fn as_validated(&self) -> Option<&dyn ValidatedSinkErased> {
+    /// validation and building through the dynamic boundary automatically.
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
         None
     }
 }
