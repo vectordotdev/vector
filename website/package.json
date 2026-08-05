@@ -5,8 +5,6 @@
     "typesense-index": "tsx scripts/typesense-index.ts",
     "typesense-sync:preview": "NODE_ENV=preview tsx scripts/typesense-sync.ts",
     "typesense-sync:production": "NODE_ENV=production tsx scripts/typesense-sync.ts",
-    "config-examples": "node scripts/create-config-examples.js",
-    "validate-config-examples": "node scripts/validate-config-examples.js",
     "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
   },
   "dependencies": {
@@ -21,7 +19,6 @@
     "@babel/runtime": "^8.0.0",
     "@datadog/browser-logs": "^7.0.0",
     "@datadog/browser-rum": "^7.0.0",
-    "@iarna/toml": "^2.2.5",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/postcss": "^4.2.4",
     "@tailwindcss/typography": "^0.5.16",

@@ -171,14 +171,14 @@ maybe_install_cargo_tool() {
     local should_install=true
     # Outside CI, preserve a newer-than-pin version the user already has.
     # `cargo install --force` would otherwise silently downgrade them.
-    if [[ -z "${CI:-}" ]]; then
+    if [[ "${CI:-}" != "true" ]]; then
       local current
       current=$($version_cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
       if [[ -n "$current" ]] && [[ "$current" != "$version" ]]; then
         local newest
         newest=$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)
         if [[ "$newest" == "$current" ]]; then
-          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=1 to force the pin."
+          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=true to force the pin."
           should_install=false
         fi
       fi
@@ -240,7 +240,7 @@ maybe_install_npm_tools() {
   # Outside CI, skip the global symlink to avoid a sudo write to /usr/local/bin
   # (or equivalent). The Makefile prepends this directory to PATH, so `make`
   # recipes find the tools automatically.
-  if [[ -z "${CI:-}" ]]; then
+  if [[ "${CI:-}" != "true" ]]; then
     echo "npm tools installed under ${npm_tools_dir}/node_modules/.bin"
     echo "Make recipes discover them automatically. To invoke directly from a"
     echo "shell, add the directory to your PATH:"
@@ -262,7 +262,7 @@ maybe_install_npm_tools() {
 # Set git safe.directory in CI where the repo may be checked out by a different
 # uid than the user running git. Skipped on workstations: the contributor owns
 # the checkout and a global config write is unnecessary.
-if [[ -n "${CI:-}" ]]; then
+if [[ "${CI:-}" == "true" ]]; then
   git config --global --add safe.directory "$(pwd)"
 fi
 
@@ -302,7 +302,7 @@ fi
 set -e -o verbose
 
 if contains_module protoc; then
-  if [[ -n "${CI:-}" ]]; then
+  if [[ "${CI:-}" == "true" ]]; then
     protoc_dir="${RUNNER_TEMP:?RUNNER_TEMP must be set when CI is enabled}/protoc-bin"
   else
     protoc_dir="${HOME}/.local/bin"
