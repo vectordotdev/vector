@@ -9,4 +9,8 @@ with no gRPC status, so load balancers and `grpc-health-probe` had no usable hea
 to probe an `Export` method instead. Each such probe also logged a `Grpc error` at `ERROR` level for
 the source.
 
+Health checks are also excluded from `component_received_bytes_total` on all gRPC sources, since a
+probe carries no events. This also affects the `vector` source, where frequent probes previously
+inflated that metric by a few bytes each.
+
 authors: stigglor
