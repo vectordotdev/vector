@@ -83,17 +83,17 @@ pub fn get_git_sha() -> Result<String> {
 
 /// Get a list of files that have been modified, as a vector of strings
 pub fn get_modified_files() -> Result<Vec<String>> {
-    let args = vec![
-        "ls-files",
-        "--full-name",
-        "--modified",
-        "--others",
-        "--exclude-standard",
-    ];
-    Ok(run_and_check_output(&args)?
-        .lines()
-        .map(str::to_owned)
-        .collect())
+    let mut files = HashSet::new();
+
+    let output = run_and_check_output(&["diff", "--name-only", "HEAD"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let output = run_and_check_output(&["ls-files", "--others", "--exclude-standard"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let mut files = Vec::from_iter(files);
+    files.sort();
+    Ok(files)
 }
 
 pub fn set_config_value(key: &str, value: &str) -> Result<String> {

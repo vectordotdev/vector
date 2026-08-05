@@ -449,7 +449,7 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ve
 	$(VDEV) check events
 
 .PHONY: check-generated-docs
-check-generated-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs ## Checks that machine-generated component docs and examples are up-to-date.
+check-generated-docs: generate-docs ## Checks that machine-generated component docs and examples are up-to-date.
 	$(VDEV) check generated-docs
 	$(VDEV) check component-examples
 

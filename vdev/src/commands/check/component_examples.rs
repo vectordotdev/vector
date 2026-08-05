@@ -10,16 +10,16 @@ use anyhow::{Context, Result, anyhow, bail};
 use clap::Args;
 use serde_json::Value;
 use serde_yaml::{Mapping, Value as YamlValue};
-use tempfile::{Builder, tempdir};
+use tempfile::Builder;
 
 use crate::{
-    commands::build::{component_examples, docs_json},
-    utils::paths::find_repo_root,
+    commands::build::docs_json,
+    utils::{git, paths::find_repo_root},
 };
 
 const EXAMPLES_DIR: &str = "website/generated/example-configs";
 
-/// Check that committed component configuration examples match the final CUE documentation model.
+/// Check that generated component configuration examples are up-to-date and valid.
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {}
@@ -27,22 +27,33 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let repo_root = find_repo_root()?;
+        check_generated_examples()?;
         let docs = docs_json::render_docs(&repo_root)?;
-        let mut docs: Value =
+        let docs: Value =
             serde_json::from_slice(&docs).context("CUE did not produce valid JSON")?;
-        let temporary = tempdir().context("Failed to create a temporary directory")?;
-        component_examples::generate(&mut docs, temporary.path())?;
-        component_examples::format_examples(&repo_root, temporary.path())?;
 
-        let committed = repo_root.join(EXAMPLES_DIR);
-        if !directories_match(temporary.path(), &committed)? {
-            bail!(
-                "Generated component examples are out of date. Run `cargo vdev build component-examples {EXAMPLES_DIR}` and commit the changes."
-            )
-        }
-
-        validate_examples(&repo_root, &committed, &docs)
+        validate_examples(&repo_root, &repo_root.join(EXAMPLES_DIR), &docs)
     }
+}
+
+fn check_generated_examples() -> Result<()> {
+    let changed_examples = component_example_changes(git::get_modified_files()?);
+    if changed_examples.is_empty() {
+        return Ok(());
+    }
+
+    println!("Found out-of-sync component examples in this branch:");
+    for file in changed_examples {
+        println!(" - {file}");
+    }
+    bail!("Run `make generate-docs` locally to update your branch and commit the changes.")
+}
+
+fn component_example_changes(files: Vec<String>) -> Vec<String> {
+    files
+        .into_iter()
+        .filter(|file| file.starts_with(EXAMPLES_DIR))
+        .collect()
 }
 
 struct ValidationCase {
@@ -461,58 +472,26 @@ fn summarize_error(error: &str) -> &str {
         .trim_start_matches("x ")
 }
 
-fn directories_match(generated: &Path, committed: &Path) -> Result<bool> {
-    let generated_files = files(generated)?;
-    let committed_files = files(committed)?;
-    if generated_files != committed_files {
-        return Ok(false);
-    }
-    for file in generated_files {
-        let generated = fs::read(generated.join(&file))?;
-        let committed = fs::read(committed.join(file))?;
-        if generated != committed {
-            return Ok(false);
-        }
-    }
-    Ok(true)
-}
-
-fn files(directory: &Path) -> Result<Vec<PathBuf>> {
-    let mut files = Vec::new();
-    collect_files(directory, directory, &mut files)?;
-    files.sort();
-    Ok(files)
-}
-
-fn collect_files(directory: &Path, root: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
-    for entry in fs::read_dir(directory)
-        .with_context(|| format!("Failed to read {}", directory.display()))?
-    {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect_files(&path, root, files)?;
-        } else if path.is_file() {
-            files.push(path.strip_prefix(root)?.to_owned());
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn directories_match_requires_identical_yaml_bytes() {
-        let temporary = tempdir().unwrap();
-        let generated = temporary.path().join("generated");
-        let committed = temporary.path().join("committed");
-        fs::create_dir(&generated).unwrap();
-        fs::create_dir(&committed).unwrap();
-        fs::write(generated.join("example.yaml"), "key: value\n").unwrap();
-        fs::write(committed.join("example.yaml"), "key: \"value\"\n").unwrap();
+    fn component_example_changes_are_detected() {
+        let changes = [
+            "website/generated/example-configs/sources/file/minimal.yaml",
+            "website/generated/example-configs/transforms/lua/advanced.yaml",
+            "website/cue/reference/components/sources/file.cue",
+        ];
 
-        assert!(!directories_match(&generated, &committed).unwrap());
+        let examples = component_example_changes(changes.into_iter().map(str::to_owned).collect());
+
+        assert_eq!(
+            examples,
+            [
+                "website/generated/example-configs/sources/file/minimal.yaml",
+                "website/generated/example-configs/transforms/lua/advanced.yaml",
+            ]
+        );
     }
 }
