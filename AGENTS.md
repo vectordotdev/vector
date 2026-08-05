@@ -280,7 +280,7 @@ gh pr list --head "$(git branch --show-current)" --state open --json number,url
 
 If `gh` is unavailable or the check fails, assume an open pull request exists.
 
-When an open pull request exists, never rewrite published commits or force-push the branch. Push additional commits normally to preserve incremental review. The commits will be squashed when the pull request is merged.
+When an open pull request exists, never rewrite published commits or force-push the branch. Push additional commits normally to preserve incremental review.
 
 ## Creating Pull Requests
 
