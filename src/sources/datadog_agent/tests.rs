@@ -37,7 +37,9 @@ use vrl::{
 
 use crate::{
     SourceSender,
-    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    common::datadog::{
+        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, datadog_agent_v2_resource_types,
+    },
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
@@ -2672,6 +2674,10 @@ async fn series_v2_resources_preserved_as_tags() {
                     r#type: "database_instance".to_string(),
                     name: "mongo-repro-01".to_string(),
                 },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "database_instance".to_string(),
+                    name: "mongo-repro-02".to_string(),
+                },
             ],
             metric: "system.disk.free".to_string(),
             tags: vec!["env:prod".to_string()],
@@ -2711,11 +2717,21 @@ async fn series_v2_resources_preserved_as_tags() {
             tags.get("resource.device").is_none(),
             "device should not be prefixed with 'resource.'"
         );
+        let database_instances: Vec<_> = tags
+            .iter_all()
+            .filter_map(|(name, value)| (name == "resource.database_instance").then_some(value))
+            .collect();
         assert_eq!(
-            tags.get("resource.database_instance"),
-            Some("mongo-repro-01")
+            database_instances,
+            vec![Some("mongo-repro-01"), Some("mongo-repro-02")]
         );
         assert_eq!(tags.get("env"), Some("prod"));
+
+        let v2_resources = datadog_agent_v2_resource_types(metric.metadata())
+            .expect("v2 resource provenance should be present");
+        assert!(v2_resources.contains_key("database_instance"));
+        assert!(!v2_resources.contains_key("host"));
+        assert!(!v2_resources.contains_key("device"));
     })
     .await;
 }

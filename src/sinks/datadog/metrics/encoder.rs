@@ -28,6 +28,7 @@ use super::config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApi
 use crate::{
     common::datadog::{
         DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
+        datadog_agent_v2_resource_types,
     },
     proto::fds::protobuf_descriptors,
     sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
@@ -36,8 +37,6 @@ use crate::{
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
-
-const DATADOG_AGENT_SOURCE_TYPE: &str = "datadog_agent";
 
 pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
@@ -628,13 +627,16 @@ fn series_to_proto_message(
     }
 
     let event_metadata = metric.metadata();
-    if event_metadata.source_type() == Some(DATADOG_AGENT_SOURCE_TYPE) {
-        let resource_tags: Vec<_> = tags
+    // Only rebuild resources that the v2 source explicitly recorded. Source type alone is not
+    // enough because v1 payloads and transforms can contain ordinary `resource.*` tags.
+    if let Some(v2_resource_types) = datadog_agent_v2_resource_types(event_metadata) {
+        let resource_tags: Vec<_> = v2_resource_types
             .keys()
-            .filter_map(|tag| {
-                tag.strip_prefix("resource.")
-                    .filter(|resource_type| !resource_type.is_empty())
-                    .map(|resource_type| (tag.to_string(), resource_type.to_string()))
+            .map(|resource_type| {
+                (
+                    format!("resource.{resource_type}"),
+                    resource_type.to_string(),
+                )
             })
             .collect();
 
@@ -1041,7 +1043,7 @@ mod tests {
         write_payload_footer, write_payload_header,
     };
     use crate::{
-        common::datadog::DatadogMetricType,
+        common::datadog::{DatadogMetricType, set_datadog_agent_v2_resource_types},
         sinks::{
             datadog::metrics::{
                 config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApiVersion},
@@ -1063,6 +1065,16 @@ mod tests {
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
         Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
+    }
+
+    fn mark_datadog_agent_v2_resources(metric: &mut Metric, resource_types: &[&str]) {
+        metric.metadata_mut().set_source_type("datadog_agent");
+        set_datadog_agent_v2_resource_types(
+            metric.metadata_mut(),
+            resource_types
+                .iter()
+                .map(|resource_type| resource_type.to_string()),
+        );
     }
 
     fn get_simple_counter_with_metadata(metadata: EventMetadata) -> Metric {
@@ -1266,9 +1278,10 @@ mod tests {
         let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
             "resource.database_instance" => "mongo-repro-01",
             "resource.aws_docdb_cluster" => "docdb-cluster",
+            "resource.owner" => "payments",
             "abc.def.ghi" => "database_name:mongo_potatoes",
         }));
-        metric.metadata_mut().set_source_type("datadog_agent");
+        mark_datadog_agent_v2_resources(&mut metric, &["database_instance", "aws_docdb_cluster"]);
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1286,7 +1299,10 @@ mod tests {
         }));
         assert_eq!(
             series_proto.tags,
-            vec!["abc.def.ghi:database_name:mongo_potatoes"]
+            vec![
+                "abc.def.ghi:database_name:mongo_potatoes",
+                "resource.owner:payments",
+            ]
         );
     }
 
@@ -1305,7 +1321,7 @@ mod tests {
         tags.insert("resource.bare_only".into(), TagValue::Bare);
 
         let mut metric = get_simple_counter().with_tags(Some(tags));
-        metric.metadata_mut().set_source_type("datadog_agent");
+        mark_datadog_agent_v2_resources(&mut metric, &["database_instance", "bare_only"]);
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1335,10 +1351,11 @@ mod tests {
     }
 
     #[test]
-    fn encode_non_datadog_agent_resource_tag_as_tag() {
-        let metric = get_simple_counter().with_tags(Some(metric_tags! {
+    fn encode_unmarked_datadog_agent_resource_tag_as_tag() {
+        let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
             "resource.database_instance" => "mongo-repro-01",
         }));
+        metric.metadata_mut().set_source_type("datadog_agent");
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1362,7 +1379,7 @@ mod tests {
         let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
             "resource.database_instance" => "mongo-repro-01",
         }));
-        metric.metadata_mut().set_source_type("datadog_agent");
+        mark_datadog_agent_v2_resources(&mut metric, &["database_instance"]);
 
         let series = generate_series_metrics(
             &metric,

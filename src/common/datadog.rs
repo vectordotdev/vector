@@ -9,7 +9,9 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use vector_lib::{
-    event::DatadogMetricOriginMetadata, schema::meaning, sensitive_string::SensitiveString,
+    event::{DatadogMetricOriginMetadata, EventMetadata, ObjectMap, Value},
+    schema::meaning,
+    sensitive_string::SensitiveString,
 };
 
 pub(crate) const DD_US_SITE: &str = "datadoghq.com";
@@ -19,6 +21,39 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 pub const DDTAGS: &str = "ddtags";
 /// The datadog message event path.
 pub const MESSAGE: &str = "message";
+
+/// Records the resource types decoded from a Datadog Agent v2 series payload.
+///
+/// The metrics model represents arbitrary resources as `resource.<type>` tags. Keeping their
+/// provenance in event metadata lets the v2 sink distinguish them from ordinary tags that happen
+/// to use the same prefix.
+pub(crate) fn set_datadog_agent_v2_resource_types(
+    metadata: &mut EventMetadata,
+    resource_types: impl IntoIterator<Item = String>,
+) {
+    let resource_types: ObjectMap = resource_types
+        .into_iter()
+        .filter(|resource_type| !resource_type.is_empty())
+        .map(|resource_type| (resource_type.into(), Value::Boolean(true)))
+        .collect();
+
+    if !resource_types.is_empty() {
+        metadata.value_mut().insert(
+            vrl::path!("datadog_agent", "v2_resource_types"),
+            Value::Object(resource_types),
+        );
+    }
+}
+
+pub(crate) fn datadog_agent_v2_resource_types(metadata: &EventMetadata) -> Option<&ObjectMap> {
+    match metadata
+        .value()
+        .get(vrl::path!("datadog_agent", "v2_resource_types"))
+    {
+        Some(Value::Object(resource_types)) => Some(resource_types),
+        _ => None,
+    }
+}
 
 /// Mapping of the semantic meaning of well known Datadog reserved attributes
 /// to the field name that Datadog intake expects.
