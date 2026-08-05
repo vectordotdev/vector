@@ -353,7 +353,7 @@ impl ClickhouseConfig {
     ///
     /// This method determines the appropriate ClickHouse format and Vector encoder
     /// based on the user's configuration, ensuring they are consistent.
-    pub(super) async fn resolve_strategy(
+    async fn resolve_strategy(
         &self,
         client: &HttpClient,
         endpoint: &Uri,
