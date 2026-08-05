@@ -203,7 +203,7 @@ fn validate_sinks(config: &mut Config) -> Vec<String> {
     // Validate direct sinks
     for (key, sink) in config.sinks.iter_mut() {
         if let Some(erased) = sink.inner.as_validated() {
-            match erased.validate_erased() {
+            match erased.validate() {
                 Ok(state) => sink.validated = Some(Arc::from(state)),
                 Err(e) => errors.push(format!("Failed to validate sink \"{}\": {}", key, e)),
             }
@@ -215,7 +215,7 @@ fn validate_sinks(config: &mut Config) -> Vec<String> {
         if let Some((_, sink)) = table.as_sink(key)
             && let Some(erased) = sink.inner.as_validated()
         {
-            match erased.validate_erased() {
+            match erased.validate() {
                 Ok(state) => table.validated = Some(Arc::from(state)),
                 Err(error) => errors.push(format!(
                     "Failed to validate enrichment table sink \"{key}\": {error}"

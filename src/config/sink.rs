@@ -120,7 +120,7 @@ where
                     .validated
                     .as_ref()
                     .expect("validated state missing for migrated sink");
-                p.build_erased(validated.as_ref(), cx).await
+                p.build(validated.as_ref(), cx).await
             }
             None => self.inner.build(cx).await,
         }
@@ -281,8 +281,8 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         match self.as_validated() {
             Some(erased) => {
-                let validated = erased.validate_erased()?;
-                erased.build_erased(&*validated, cx).await
+                let validated = erased.validate()?;
+                erased.build(&*validated, cx).await
             }
             None => Err("sink does not implement a build method".into()),
         }

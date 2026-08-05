@@ -94,10 +94,10 @@ pub trait ValidatedSink {
 #[async_trait]
 pub trait ValidatedSinkErased {
     /// Erases the validated state into a `Box<dyn Any>`.
-    fn validate_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
+    fn validate(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
 
     /// Restores the validated state from `&dyn Any` and builds the sink.
-    async fn build_erased(
+    async fn build(
         &self,
         validated: &(dyn Any + Send + Sync),
         cx: SinkContext,
@@ -109,11 +109,11 @@ impl<T> ValidatedSinkErased for T
 where
     T: ValidatedSink + Send + Sync + 'static,
 {
-    fn validate_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>> {
+    fn validate(&self) -> crate::Result<Box<dyn Any + Send + Sync>> {
         Ok(Box::new(self.validate()?))
     }
 
-    async fn build_erased(
+    async fn build(
         &self,
         validated: &(dyn Any + Send + Sync),
         cx: SinkContext,
