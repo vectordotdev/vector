@@ -40,6 +40,7 @@ impl Cli {
 
         generate(&mut docs, &output)?;
         format_examples(&repo_root, &output)?;
+        sync_formatted_yaml_examples(&mut docs, &output)?;
         let rendered =
             serde_json::to_vec(&docs).context("Failed to serialize documentation JSON")?;
         docs_json::write_docs(&repo_root.join(DEFAULT_DOCS_OUTPUT), &rendered)
@@ -87,6 +88,41 @@ pub(crate) fn format_examples(repo_root: &Path, output: &Path) -> Result<()> {
         ],
         true,
     )
+}
+
+fn sync_formatted_yaml_examples(docs: &mut Value, output: &Path) -> Result<()> {
+    let components = object_mut(docs, "documentation model")?
+        .get_mut("components")
+        .ok_or_else(|| anyhow!("Documentation model has no components"))?;
+    let components = object_mut(components, "components")?;
+
+    for (kind, components_of_kind) in components {
+        let components_of_kind = object_mut(components_of_kind, "component kind")?;
+        for (component_type, component) in components_of_kind {
+            let component = object_mut(component, "component")?;
+            let example_configs = component
+                .get_mut("example_configs")
+                .ok_or_else(|| anyhow!("{kind}/{component_type} has no example configs"))?;
+            let example_configs = object_mut(example_configs, "example configs")?;
+
+            for variant in ["minimal", "advanced"] {
+                let path = output
+                    .join(kind)
+                    .join(component_type)
+                    .join(format!("{variant}.yaml"));
+                let yaml = fs::read_to_string(&path).with_context(|| {
+                    format!("Failed to read formatted example {}", path.display())
+                })?;
+                let formats = example_configs
+                    .get_mut(variant)
+                    .ok_or_else(|| anyhow!("{kind}/{component_type} has no {variant} example"))?;
+                object_mut(formats, "example formats")?
+                    .insert("yaml".to_owned(), Value::String(yaml));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn generate_into(docs: &mut Value, output: &Path) -> Result<()> {
@@ -719,6 +755,52 @@ fn object_mut<'a>(value: &'a mut Value, description: &str) -> Result<&'a mut Map
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn docs_embed_formatted_yaml_examples() {
+        let temporary = tempdir().unwrap();
+        let output = temporary.path().join("examples");
+        let example_dir = output.join("sources/demo");
+        fs::create_dir_all(&example_dir).unwrap();
+        fs::write(
+            example_dir.join("minimal.yaml"),
+            "sources:\n  demo: minimal\n",
+        )
+        .unwrap();
+        fs::write(
+            example_dir.join("advanced.yaml"),
+            "sources:\n  demo: advanced\n",
+        )
+        .unwrap();
+        let mut docs = serde_json::json!({
+            "components": {
+                "sources": {
+                    "demo": {
+                        "example_configs": {
+                            "minimal": { "toml": "minimal", "yaml": "unformatted", "json": "{}" },
+                            "advanced": { "toml": "advanced", "yaml": "unformatted", "json": "{}" }
+                        }
+                    }
+                }
+            }
+        });
+
+        sync_formatted_yaml_examples(&mut docs, &output).unwrap();
+
+        assert_eq!(
+            docs["components"]["sources"]["demo"]["example_configs"]["minimal"]["yaml"],
+            "sources:\n  demo: minimal\n"
+        );
+        assert_eq!(
+            docs["components"]["sources"]["demo"]["example_configs"]["advanced"]["yaml"],
+            "sources:\n  demo: advanced\n"
+        );
+        assert_eq!(
+            docs["components"]["sources"]["demo"]["example_configs"]["minimal"]["toml"],
+            "minimal"
+        );
+    }
 
     #[test]
     fn yaml_preserves_control_only_strings() {
