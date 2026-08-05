@@ -3,12 +3,12 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
 
 use super::{
     create_buffer_v2_with_data_file_count_limit, create_buffer_v2_with_max_data_file_size,
     create_buffer_v2_with_max_record_size_and_usage, read_next, read_next_some,
 };
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
 
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
@@ -132,7 +132,8 @@ async fn writer_waits_when_buffer_is_full() {
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2, false)
+                    .await;
 
             assert_buffer_is_empty!(ledger);
 
@@ -447,7 +448,8 @@ async fn writer_try_write_returns_when_buffer_is_full() {
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
             let (mut writer, _, ledger) =
-                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2, false)
+                    .await;
 
             assert_buffer_is_empty!(ledger);
 
@@ -465,6 +467,58 @@ async fn writer_try_write_returns_when_buffer_is_full() {
                 .await
                 .expect("write should not fail");
             assert!(matches!(second_write_result, TryWriteOutcome::Full(_)));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writer_marks_shed_record_errored_when_reject() {
+    let _a = install_tracing_helpers();
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Same setup as `writer_can_validate_last_write_when_buffer_is_full`, but as a `reject`
+            // buffer (`error_on_full = true`). When the second record is shed, its finalizers must be
+            // marked `Errored`; if they defaulted to `Dropped`, the ack rollup would treat the shed
+            // event as delivered and the source would acknowledge an event that was never buffered.
+            let write_size = 96;
+            let first_record = SizedRecord::new(write_size);
+            let mut second_record = SizedRecord::new(write_size);
+
+            let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
+            let (mut writer, _reader, ledger) =
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2, true)
+                    .await;
+
+            assert_buffer_is_empty!(ledger);
+
+            // First write fits exactly, filling the buffer.
+            let first_write_result = writer
+                .try_write_record(first_record)
+                .await
+                .expect("write should not fail");
+            assert!(matches!(first_write_result, TryWriteOutcome::Written));
+            writer.flush().await.expect("flush should not fail");
+
+            // Attach a batch notifier so we can observe the second record's acknowledgement status.
+            let (batch, status) = BatchNotifier::new_with_receiver();
+            second_record.add_batch_notifier(batch);
+
+            // The buffer is full, so the record is shed and handed back. Because this is a `reject`
+            // buffer, the writer resolves its finalizers as errored rather than delivered.
+            let second_write_result = writer
+                .try_write_record(second_record)
+                .await
+                .expect("write should not fail");
+            assert!(
+                matches!(second_write_result, TryWriteOutcome::Full(_)),
+                "record should have been shed when the buffer is full"
+            );
+            drop(second_write_result);
+
+            assert_eq!(status.await, BatchStatus::Errored);
         }
     })
     .await;
@@ -489,6 +543,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
                 data_dir.clone(),
                 max_data_file_size,
                 2,
+                false,
             )
             .await;
 
@@ -519,6 +574,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
                 data_dir,
                 max_data_file_size,
                 2,
+                false,
             )
             .await;
             assert_buffer_records!(ledger, 1);

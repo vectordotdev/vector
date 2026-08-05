@@ -7,6 +7,7 @@ use async_recursion::async_recursion;
 use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
+use vector_common::finalization::EventStatus;
 use vector_common::internal_event::{InternalEventHandle, Registered, register};
 
 use super::limited_queue::LimitedSender;
@@ -261,6 +262,19 @@ impl<T: Bufferable> BufferSender<T> {
             WhenFull::DropNewest => match self.base.try_send(item).await? {
                 TryWriteOutcome::Written => UsageAccounting::Accepted,
                 TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
+                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+            },
+            WhenFull::Reject => match self.base.try_send(item).await? {
+                TryWriteOutcome::Written => UsageAccounting::Accepted,
+                TryWriteOutcome::Full(mut item) => {
+                    // Shed event: mark its finalizers errored so the source observes a delivery
+                    // failure (e.g. `http_server` returns 500) rather than a success. Memory buffers
+                    // still carry the finalizers here; disk buffers have already errored and detached
+                    // them in the writer, so this is a no-op there.
+                    item.take_finalizer_groups()
+                        .update_status(EventStatus::Errored);
+                    UsageAccounting::DroppedNewest
+                }
                 TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
             },
             WhenFull::Overflow => match self.base.try_send(item).await? {

@@ -186,6 +186,18 @@ continually) or is generally not high-value, such as trace or debug logging. It 
 effectively shed load, by lowering the number of events in-flight for a topology, while
 simultaneously avoiding the blocking of upstream components.
 
+### Reject the event (`reject`)
+
+When configured to "reject", Vector drops an event if the buffer is currently full, exactly like
+`drop_newest`, but it acknowledges the dropped event as an _error_ rather than a success. Sources
+that translate acknowledgements into a client response then signal the failure: for example, the
+`http_server` source returns `500 Internal Server Error` instead of its configured success code. This
+applies to both `disk` and `memory` buffers.
+
+This is useful when you accept data from clients that can retry, and you would rather have them
+resend during transient buffer pressure than believe Vector accepted data it actually dropped. It
+differs from `drop_newest`, which remains best-effort and acknowledges dropped events as delivered.
+
 ### Overflow to another buffer (`overflow`)
 
 {{< danger >}}
