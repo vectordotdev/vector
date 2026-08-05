@@ -6,8 +6,11 @@ services:
     volumes:
       - ..:/app
       - website_node_modules:/app/website/node_modules
+      - website_cargo_target:/target
     environment:
       - CI=false
+      - CARGO_TARGET_DIR=/target
 
 volumes:
   website_node_modules:
+  website_cargo_target:

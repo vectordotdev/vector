@@ -7,7 +7,7 @@ ARG NODE_VERSION=24
 ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential ca-certificates curl git libssl-dev make pkg-config \
+    build-essential ca-certificates curl git libssl-dev make pkg-config unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Hugo extended (required for Sass/PostCSS processing)

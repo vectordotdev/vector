@@ -37,7 +37,7 @@ impl Cli {
 }
 
 fn check_generated_examples() -> Result<()> {
-    let changed_examples = component_example_changes(git::get_modified_files()?);
+    let changed_examples = component_example_changes(git::get_files_changed_from_head()?);
     if changed_examples.is_empty() {
         return Ok(());
     }

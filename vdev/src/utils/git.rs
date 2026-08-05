@@ -83,6 +83,21 @@ pub fn get_git_sha() -> Result<String> {
 
 /// Get a list of files that have been modified, as a vector of strings
 pub fn get_modified_files() -> Result<Vec<String>> {
+    let args = vec![
+        "ls-files",
+        "--full-name",
+        "--modified",
+        "--others",
+        "--exclude-standard",
+    ];
+    Ok(run_and_check_output(&args)?
+        .lines()
+        .map(str::to_owned)
+        .collect())
+}
+
+/// Get a list of files that differ from HEAD, including staged and untracked files.
+pub fn get_files_changed_from_head() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
     let output = run_and_check_output(&["diff", "--name-only", "HEAD"])?;
