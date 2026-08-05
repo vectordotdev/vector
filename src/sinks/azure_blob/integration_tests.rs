@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use vrl::event_path;
 
-use azure_core::http::StatusCode;
+use azure_core::http::{RequestContent, StatusCode};
 use azure_storage_blob::BlobContainerClient;
 
 use bytes::{Buf, BytesMut};
@@ -30,6 +30,34 @@ use crate::{
     },
     tls,
 };
+
+#[tokio::test]
+async fn azure_blob_uploads_one_shot_with_shared_key() {
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let client = config.build_test_client().await;
+    let blob_name = format!("one-shot/{}.blob", random_string(10));
+    let payload = vec![b'x'; 3 * 1024 * 1024];
+
+    client
+        .blob_client(&blob_name)
+        .upload(RequestContent::from(payload), None)
+        .await
+        .expect("one-shot upload should succeed");
+}
+
+#[tokio::test]
+async fn azure_blob_uploads_multipart_with_shared_key() {
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let client = config.build_test_client().await;
+    let blob_name = format!("multipart/{}.blob", random_string(10));
+    let payload = vec![b'x'; 5 * 1024 * 1024];
+
+    client
+        .blob_client(&blob_name)
+        .upload(RequestContent::from(payload), None)
+        .await
+        .expect("multipart upload should commit the block list");
+}
 
 #[tokio::test]
 async fn azure_blob_healthcheck_passed() {
