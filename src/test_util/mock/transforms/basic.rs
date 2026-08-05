@@ -25,7 +25,7 @@ pub struct BasicTransformConfig {
     /// Amount to increase any metric by.
     increase: f64,
 
-    /// Optional external files that should trigger transform reload (test helper).
+    /// Test helper: external files that force transform reload.
     #[serde(skip)]
     files: Vec<PathBuf>,
 }

@@ -111,9 +111,7 @@ impl RunningTopology {
         }
     }
 
-    /// Applies [`SignalTo::ReloadFromDisk`](crate::signal::SignalTo::ReloadFromDisk) side effects:
-    /// force-restart transforms that reference external files (for example remap VRL files)
-    /// so SIGHUP picks up on-disk changes even when the Vector config itself is unchanged.
+    /// Force-reload transforms with external files (SIGHUP / `#23898`).
     pub fn prepare_reload_from_disk(&mut self, config: &Config) {
         let transform_keys_to_reload = config.transform_keys_with_external_files();
         if !transform_keys_to_reload.is_empty() {
@@ -283,15 +281,9 @@ impl RunningTopology {
 
     /// Attempts to load a new configuration and update this running topology.
     ///
-    /// Returns `Ok(true)` when components were rebuilt, and `Ok(false)` when the
-    /// parsed configuration was unchanged so component reload was skipped.
-    /// Enrichment tables may still be refreshed in the unchanged case.
-    ///
-    /// If the new configuration is not valid, or not all of the changes in the new configuration
-    /// were able to be made, then this method will attempt to undo the changes made and bring the
-    /// topology back to its previous state, returning the appropriate error.
-    ///
-    /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
+    /// Returns `Ok(true)` if components were rebuilt, `Ok(false)` if skipped (unchanged).
+    /// Enrichment tables may still refresh on skip. On failure, attempts restore;
+    /// restore failure yields `ReloadError::FailedToRestore`.
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
@@ -306,22 +298,14 @@ impl RunningTopology {
             };
         }
 
-        // Calculate the change between the current configuration and the new configuration, and
-        // shutdown any components that are changing so that we can reclaim their buffers before
-        // spawning the new version of the component.
-        //
-        // We also shutdown any component that is simply being removed entirely.
-        // Take pending_reload for this attempt. On success it stays consumed; on failure it is
-        // restored so force-reload intent (TLS / external files) is not lost.
+        // Consume pending_reload for this attempt; restore on failure so force-reload is not lost.
         let components = self.pending_reload.take().unwrap_or_default();
         let diff = ConfigDiff::new(&self.config, &new_config, components.clone());
 
         if diff.is_empty() {
-            // Config file touches (or concurrent enrichment CSV updates paired with an
-            // unchanged Vector config) must not force a topology rebuild. Still refresh
-            // enrichment tables so data-file changes are not dropped.
-            self.reload_enrichment_tables().await;
+            // Skip rebuild; adopt config then refresh enrichment (new tables need the new config).
             self.config = new_config;
+            self.reload_enrichment_tables().await;
             info!("Configuration unchanged; skipping component reload.");
             return Ok(false);
         }

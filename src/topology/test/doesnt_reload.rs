@@ -1,10 +1,15 @@
-use std::{collections::HashSet, path::{Path, PathBuf}};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use vector_lib::config::ComponentKey;
 
 use crate::{
     SourceSender,
     config::Config,
+    enrichment_tables::file::{FileConfig, FileSettings},
     sources::prometheus::PrometheusRemoteWriteConfig,
     test_util::{
         addr::next_addr,
@@ -112,20 +117,14 @@ async fn topology_force_reloads_unchanged_config_via_reload_set() {
         .await
         .unwrap();
 
-    assert!(
-        reloaded,
-        "explicit reload set must force component restart even when config is unchanged"
-    );
+    assert!(reloaded, "reload set should force restart");
 
-    // pending_reload must be consumed; a follow-up identical reload should skip.
+    // Consumed keys should not force the next identical reload.
     let reloaded_again = topology
         .reload_config_and_respawn(config.build().unwrap(), Default::default())
         .await
         .unwrap();
-    assert!(
-        !reloaded_again,
-        "forced reload keys must not linger and keep forcing subsequent reloads"
-    );
+    assert!(!reloaded_again, "reload set should be cleared after success");
 }
 
 #[tokio::test]
@@ -138,9 +137,7 @@ async fn topology_preserves_reload_set_after_failed_reload() {
     old_config.add_source("in", prom_remote_write_source(address));
     old_config.add_sink("out", &["in"], basic_sink_with_data(1, "v1").1);
 
-    // Prometheus remote_write binds when the source task runs, not during build, so a
-    // port conflict cannot produce TopologyBuildFailed here. Use a parsed config change
-    // plus a required unhealthy healthcheck instead (same pattern as healthcheck reload tests).
+    // Fail via required unhealthy healthcheck (bind conflicts won't fail at build).
     let mut failing_config = Config::builder();
     failing_config.add_source("in", prom_remote_write_source(address));
     failing_config.add_sink(
@@ -163,16 +160,12 @@ async fn topology_preserves_reload_set_after_failed_reload() {
         "expected TopologyBuildFailed, got {failed:?}"
     );
 
-    // Force intent from the failed attempt must survive so a subsequent identical
-    // reload still restarts the component (e.g. TLS material / external file change).
+    // Failed reload should restore pending_reload.
     let reloaded = topology
         .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
         .await
         .unwrap();
-    assert!(
-        reloaded,
-        "pending_reload must be restored after a failed reload so force intent is not lost"
-    );
+    assert!(reloaded, "pending_reload should survive failed reload");
 }
 
 #[tokio::test]
@@ -205,8 +198,166 @@ async fn topology_reload_from_disk_forces_external_file_transforms() {
         .reload_config_and_respawn(new_config, Default::default())
         .await
         .unwrap();
+    assert!(reloaded, "external-file transforms should reload on ReloadFromDisk");
+}
+
+fn file_enrichment_table(path: PathBuf) -> FileConfig {
+    FileConfig {
+        file: FileSettings {
+            path,
+            encoding: Default::default(),
+        },
+        schema: Default::default(),
+    }
+}
+
+#[tokio::test]
+async fn topology_reloads_when_standalone_file_enrichment_table_added() {
+    trace_init();
+
+    let dir = tempfile::tempdir().unwrap();
+    let csv_path = dir.path().join("table.csv");
+    fs::write(&csv_path, "name,value\naaa,111\n").unwrap();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", basic_source().1);
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let mut new_config = old_config.clone();
+    new_config.add_enrichment_table("geo", &[], file_enrichment_table(csv_path));
+
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
+
+    let reloaded = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    assert!(reloaded, "enrichment table add should rebuild");
     assert!(
-        reloaded,
-        "ReloadFromDisk must restart transforms with external files even when parsed config is unchanged"
+        topology
+            .config()
+            .enrichment_tables()
+            .any(|(key, _)| key == &ComponentKey::from("geo"))
+    );
+}
+
+#[tokio::test]
+async fn topology_reloads_when_standalone_file_enrichment_table_changed() {
+    trace_init();
+
+    let dir = tempfile::tempdir().unwrap();
+    let old_csv = dir.path().join("old.csv");
+    let new_csv = dir.path().join("new.csv");
+    fs::write(&old_csv, "name,value\naaa,111\n").unwrap();
+    fs::write(&new_csv, "name,value\nbbb,222\n").unwrap();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", basic_source().1);
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
+    old_config.add_enrichment_table("geo", &[], file_enrichment_table(old_csv));
+
+    let mut new_config = Config::builder();
+    new_config.add_source("in", basic_source().1);
+    new_config.add_sink("out", &["in"], basic_sink(1).1);
+    new_config.add_enrichment_table("geo", &[], file_enrichment_table(new_csv.clone()));
+
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
+
+    let reloaded = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    assert!(reloaded, "enrichment table path change should rebuild");
+    let geo = topology
+        .config()
+        .enrichment_tables()
+        .find(|(key, _)| *key == &ComponentKey::from("geo"))
+        .map(|(_, table)| table);
+    assert!(geo.is_some());
+}
+
+#[tokio::test]
+async fn topology_reloads_when_standalone_file_enrichment_table_removed() {
+    trace_init();
+
+    let dir = tempfile::tempdir().unwrap();
+    let csv_path = dir.path().join("table.csv");
+    fs::write(&csv_path, "name,value\naaa,111\n").unwrap();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", basic_source().1);
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
+    old_config.add_enrichment_table("geo", &[], file_enrichment_table(csv_path));
+
+    let mut new_config = Config::builder();
+    new_config.add_source("in", basic_source().1);
+    new_config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
+
+    let reloaded = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    assert!(reloaded, "enrichment table remove should rebuild");
+    assert!(
+        topology
+            .config()
+            .enrichment_tables()
+            .all(|(key, _)| key != &ComponentKey::from("geo"))
+    );
+}
+
+#[tokio::test]
+async fn topology_reloads_when_sink_content_changes() {
+    trace_init();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", basic_source().1);
+    old_config.add_sink("out", &["in"], basic_sink_with_data(1, "v1").1);
+
+    let mut new_config = Config::builder();
+    new_config.add_source("in", basic_source().1);
+    new_config.add_sink("out", &["in"], basic_sink_with_data(1, "v2").1);
+
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
+
+    let reloaded = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    assert!(reloaded, "sink content change should rebuild");
+}
+
+#[tokio::test]
+async fn topology_reloads_when_transform_added() {
+    trace_init();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in", basic_source().1);
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let mut new_config = Config::builder();
+    new_config.add_source("in", basic_source().1);
+    new_config.add_transform("xform", &["in"], basic_transform("-x", 0.0));
+    new_config.add_sink("out", &["xform"], basic_sink(1).1);
+
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
+
+    let reloaded = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    assert!(reloaded, "transform add should rebuild");
+    assert!(
+        topology
+            .config()
+            .transform(&ComponentKey::from("xform"))
+            .is_some()
     );
 }

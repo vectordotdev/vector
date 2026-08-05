@@ -408,8 +408,7 @@ async fn handle_signal(
             .await;
 
             if let Ok(ref config) = new_config {
-                // SIGHUP / ReloadFromDisk must still restart transforms with external files
-                // even when the parsed Vector config is unchanged (#23898).
+                // #23898: force-reload transforms with external files on SIGHUP.
                 topology_controller
                     .topology
                     .prepare_reload_from_disk(config);
