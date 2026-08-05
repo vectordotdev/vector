@@ -4,7 +4,7 @@ ARG HUGO_VERSION=0.154.5
 ARG CUE_VERSION=0.16.1
 ARG NODE_VERSION=24
 
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential ca-certificates curl git libssl-dev make pkg-config \
@@ -33,10 +33,10 @@ EXPOSE 1313
 
 # `prepare.sh` installs the matching vdev release or builds the checkout when it is unreleased.
 ENTRYPOINT ["/bin/bash", "-lc", \
-  "cd /app && scripts/environment/prepare.sh --modules=vdev,prettier && \
+  "cd /app && git config --global --replace-all safe.directory /app && \
+   scripts/environment/prepare.sh --modules=vdev,prettier,protoc && \
    make generate-docs && \
    cd /app/website && \
    yarn && \
    cp -f ../Cargo.lock data/cargo-lock.toml && \
-   make cue-build && \
    hugo server --bind 0.0.0.0 --port 1313 --buildDrafts --buildFuture --environment development"]
