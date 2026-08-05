@@ -98,7 +98,7 @@ where
 
     /// Validated state, filled in during config compilation.
     ///
-    /// This is the erased state produced by `ValidatedSink::validate_structure`, retained so
+    /// This is the erased state produced by `ValidatedSink::validate`, retained so
     /// the topology builder can build the sink without re-validating. It is never serialized
     /// or diffed (see `#[serde(skip)]`), and is shared (via `Arc`) so enrichment-table-derived
     /// sinks can carry it without cloning the underlying value.

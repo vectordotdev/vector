@@ -242,7 +242,7 @@ impl SinkConfig for ClickhouseConfig {
 impl ValidatedSink for ClickhouseConfig {
     type Validated = ValidatedClickhouse;
 
-    fn validate_structure(&self) -> crate::Result<ValidatedClickhouse> {
+    fn validate(&self) -> crate::Result<ValidatedClickhouse> {
         // Validate templates can be parsed
         let database = self.database.clone().unwrap_or_else(|| {
             "default"
@@ -618,7 +618,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = config.validate_structure();
+        let result = config.validate();
         assert!(
             result.is_err(),
             "Preparation should fail for incompatible format/batch_encoding"
@@ -642,7 +642,7 @@ mod tests {
         };
 
         let validated = config
-            .validate_structure()
+            .validate()
             .expect("preparation should succeed");
         assert_eq!(validated.database.get_ref(), "test_db");
         assert!(validated.auth.is_none()); // Default has no auth
@@ -663,7 +663,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = config.validate_structure();
+        let result = config.validate();
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("'batch_encoding' is only compatible"));
@@ -678,7 +678,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = config.validate_structure();
+        let result = config.validate();
         assert!(
             result.is_err(),
             "Expected preparation to reject unconfined template"

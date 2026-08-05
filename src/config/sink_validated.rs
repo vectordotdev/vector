@@ -5,7 +5,7 @@
 //!
 //! - `ValidatedSink`: a generic, implementor-facing trait. A migrated sink implements
 //!   this and works entirely with its own concrete validated type `T` — it returns `T`
-//!   from `validate_structure` and receives `&T` back in `build`. No `Any` in sight.
+//!   from `validate` and receives `&T` back in `build`. No `Any` in sight.
 //! - `ValidatedSinkErased`: the object-safe boundary the framework actually crosses.
 //!   A blanket impl derives it from any `ValidatedSink`, performing the `Box<dyn Any>`
 //!   erasure and downcast automatically.
@@ -14,7 +14,7 @@
 //! consumed at build time by `SinkOuter::build`, which dispatches through
 //! `ValidatedSinkErased::build_validated_erased`.
 //!
-//! `ValidatedSink::validate_structure` is the same phase as the RFC's
+//! `ValidatedSink::validate` is the same phase as the RFC's
 //! `SinkConfig::validate_structure` (pure structural validation owned by config
 //! compilation), but it retains the validated state so `build` does not
 //! redo it.
@@ -43,7 +43,7 @@ use crate::sinks::Healthcheck;
 /// impl ValidatedSink for MySinkConfig {
 ///     type Validated = ValidatedMySink;
 ///
-///     fn validate_structure(&self) -> crate::Result<Self::Validated> {
+///     fn validate(&self) -> crate::Result<Self::Validated> {
 ///         ValidatedMySink::from_config(self)
 ///     }
 ///
@@ -61,7 +61,7 @@ use crate::sinks::Healthcheck;
 /// it at build time via `ValidatedSinkErased`, so no `Any` appears in implementor code.
 #[async_trait]
 pub trait ValidatedSink {
-    /// The concrete validated state produced by `validate_structure` and consumed by `build`.
+    /// The concrete validated state produced by `validate` and consumed by `build`.
     type Validated: Send + Sync + 'static;
 
     /// Performs pure structural validation, returning the validated state.
@@ -74,7 +74,7 @@ pub trait ValidatedSink {
     /// This method must be pure: no filesystem access, no network operations, no
     /// credential resolution, no spawning, and no async/await. All such environment-
     /// dependent operations belong in `build`.
-    fn validate_structure(&self) -> crate::Result<Self::Validated>;
+    fn validate(&self) -> crate::Result<Self::Validated>;
 
     /// Builds the sink from the validated state, without redoing pure validation.
     ///
@@ -110,7 +110,7 @@ where
     T: ValidatedSink + Send + Sync + 'static,
 {
     fn validate_structure_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>> {
-        Ok(Box::new(self.validate_structure()?))
+        Ok(Box::new(self.validate()?))
     }
 
     async fn build_validated_erased(
