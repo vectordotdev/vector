@@ -143,10 +143,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             graceful_shutdown_duration,
         };
 
-        // Prepare sinks and store in config
-        let prepare_errors = prepare_sinks(&mut config);
-        if !prepare_errors.is_empty() {
-            errors.extend(prepare_errors);
+        // Validate sinks in place
+        let validate_errors = validate_sinks(&mut config);
+        if !validate_errors.is_empty() {
+            errors.extend(validate_errors);
         }
 
         if !errors.is_empty() {
@@ -192,33 +192,33 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     }
 }
 
-/// Prepare all sinks (direct and enrichment-table-derived) in place.
+/// Validate all sinks (direct and enrichment-table-derived) in place.
 ///
-/// Fills the `prepared` field on each sink's `SinkOuter` (and on enrichment tables that
+/// Fills the `validated` field on each sink's `SinkOuter` (and on enrichment tables that
 /// double as sinks) with the erased validated state. Returns a list of errors for sinks
-/// that failed preparation. An empty Vec means success.
-fn prepare_sinks(config: &mut Config) -> Vec<String> {
+/// that failed validation. An empty Vec means success.
+fn validate_sinks(config: &mut Config) -> Vec<String> {
     let mut errors = Vec::new();
 
-    // Prepare direct sinks
+    // Validate direct sinks
     for (key, sink) in config.sinks.iter_mut() {
-        if let Some(erased) = sink.inner.as_prepared() {
+        if let Some(erased) = sink.inner.as_validated() {
             match erased.validate_structure_erased() {
-                Ok(state) => sink.prepared = Some(Arc::from(state)),
-                Err(e) => errors.push(format!("Failed to prepare sink \"{}\": {}", key, e)),
+                Ok(state) => sink.validated = Some(Arc::from(state)),
+                Err(e) => errors.push(format!("Failed to validate sink \"{}\": {}", key, e)),
             }
         }
     }
 
-    // Prepare enrichment table sinks with resolved inputs.
+    // Validate enrichment table sinks with resolved inputs.
     for (key, table) in config.enrichment_tables.iter_mut() {
         if let Some((_, sink)) = table.as_sink(key)
-            && let Some(erased) = sink.inner.as_prepared()
+            && let Some(erased) = sink.inner.as_validated()
         {
             match erased.validate_structure_erased() {
-                Ok(state) => table.prepared = Some(Arc::from(state)),
+                Ok(state) => table.validated = Some(Arc::from(state)),
                 Err(error) => errors.push(format!(
-                    "Failed to prepare enrichment table sink \"{key}\": {error}"
+                    "Failed to validate enrichment table sink \"{key}\": {error}"
                 )),
             }
         }

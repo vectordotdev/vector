@@ -34,14 +34,14 @@ where
     )]
     pub inputs: Inputs<T>,
 
-    /// Validated/prepared sink state, filled in during config compilation.
+    /// Validated sink state, filled in during config compilation.
     ///
-    /// Mirrors `SinkOuter::prepared` for enrichment tables that double as sinks. It is
+    /// Mirrors `SinkOuter::validated` for enrichment tables that double as sinks. It is
     /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
     /// the derived `SinkOuter` without cloning the underlying value.
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
-    pub(crate) prepared: Option<Arc<dyn Any + Send + Sync>>,
+    pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> EnrichmentTableOuter<T>
@@ -57,7 +57,7 @@ where
             inner: inner.into(),
             graph: Default::default(),
             inputs: Inputs::from_iter(inputs),
-            prepared: None,
+            validated: None,
         }
     }
 
@@ -85,7 +85,7 @@ where
                     buffer: Default::default(),
                     proxy: Default::default(),
                     inner: sink,
-                    prepared: self.prepared.clone(),
+                    validated: self.validated.clone(),
                 },
             )
         })
@@ -122,7 +122,7 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             graph: self.graph,
-            prepared: self.prepared,
+            validated: self.validated,
         }
     }
 }

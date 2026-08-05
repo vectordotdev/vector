@@ -19,7 +19,7 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    config::{PreparedSink, PreparedSinkErased, SinkContext},
+    config::{SinkContext, ValidatedSink, ValidatedSinkErased},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -221,7 +221,7 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn as_prepared(&self) -> Option<&dyn PreparedSinkErased> {
+    fn as_validated(&self) -> Option<&dyn ValidatedSinkErased> {
         Some(self)
     }
 
@@ -239,8 +239,8 @@ impl SinkConfig for ClickhouseConfig {
 }
 
 #[async_trait::async_trait]
-impl PreparedSink for ClickhouseConfig {
-    type Prepared = ValidatedClickhouse;
+impl ValidatedSink for ClickhouseConfig {
+    type Validated = ValidatedClickhouse;
 
     fn validate_structure(&self) -> crate::Result<ValidatedClickhouse> {
         // Validate templates can be parsed (this is pure)
@@ -288,9 +288,9 @@ impl PreparedSink for ClickhouseConfig {
         })
     }
 
-    async fn build_prepared(
+    async fn build_validated(
         &self,
-        prepared: &ValidatedClickhouse,
+        validated: &ValidatedClickhouse,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedClickhouse {
@@ -300,7 +300,7 @@ impl PreparedSink for ClickhouseConfig {
             batch_settings,
             confined_table,
             confined_database,
-        } = prepared;
+        } = validated;
         let endpoint = config.endpoint.with_default_parts().uri;
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
@@ -499,7 +499,7 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::PreparedSink;
+    use crate::config::ValidatedSink;
     use crate::template::ConfinementConfig;
 
     #[test]

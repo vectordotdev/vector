@@ -41,7 +41,7 @@ pub mod provider;
 pub mod schema;
 mod secret;
 mod sink;
-mod sink_prepared;
+mod sink_validated;
 mod source;
 mod transform;
 pub mod unit_test;
@@ -62,7 +62,7 @@ pub use loading::{
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
-pub use sink_prepared::{PreparedSink, PreparedSinkErased};
+pub use sink_validated::{ValidatedSink, ValidatedSinkErased};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,

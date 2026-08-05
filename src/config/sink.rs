@@ -22,7 +22,7 @@ use vector_lib::{
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{
-    ComponentKey, PreparedSinkErased, ProxyConfig, Resource, dot_graph::GraphConfig, schema,
+    ComponentKey, ProxyConfig, Resource, ValidatedSinkErased, dot_graph::GraphConfig, schema,
 };
 use crate::{
     extra_context::ExtraContext,
@@ -96,31 +96,31 @@ where
     #[configurable(metadata(docs::hidden))]
     pub inner: BoxedSink,
 
-    /// Validated/prepared state, filled in during config compilation.
+    /// Validated state, filled in during config compilation.
     ///
-    /// This is the erased state produced by `PreparedSink::validate_structure`, retained so
+    /// This is the erased state produced by `ValidatedSink::validate_structure`, retained so
     /// the topology builder can build the sink without re-validating. It is never serialized
     /// or diffed (see `#[serde(skip)]`), and is shared (via `Arc`) so enrichment-table-derived
     /// sinks can carry it without cloning the underlying value.
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
-    pub(crate) prepared: Option<Arc<dyn Any + Send + Sync>>,
+    pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> SinkOuter<T>
 where
     T: Configurable + Serialize,
 {
-    /// Builds the sink, dispatching through the erased prepared boundary when the sink
+    /// Builds the sink, dispatching through the erased validated boundary when the sink
     /// has been migrated, or falling back to the raw config for legacy sinks.
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        match self.inner.as_prepared() {
+        match self.inner.as_validated() {
             Some(p) => {
-                let prepared = self
-                    .prepared
+                let validated = self
+                    .validated
                     .as_ref()
-                    .expect("prepared state missing for migrated sink");
-                p.build_prepared_erased(prepared.as_ref(), cx).await
+                    .expect("validated state missing for migrated sink");
+                p.build_validated_erased(validated.as_ref(), cx).await
             }
             None => self.inner.build(cx).await,
         }
@@ -138,7 +138,7 @@ where
             inner: inner.into(),
             proxy: Default::default(),
             graph: Default::default(),
-            prepared: None,
+            validated: None,
         }
     }
 
@@ -198,7 +198,7 @@ where
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
             graph: self.graph,
-            prepared: self.prepared,
+            validated: self.validated,
         }
     }
 }
@@ -270,7 +270,7 @@ impl From<UriSerde> for SinkHealthcheckOptions {
 pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the sink with the given context.
     ///
-    /// Migrated sinks route through the prepared lifecycle: this default validates
+    /// Migrated sinks route through the validated lifecycle: this default validates
     /// the structure and builds from the retained state. Legacy sinks override this
     /// with their own build logic.
     ///
@@ -279,10 +279,10 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// If an error occurs while building the sink, an error variant explaining the issue is
     /// returned.
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        match self.as_prepared() {
+        match self.as_validated() {
             Some(erased) => {
-                let prepared = erased.validate_structure_erased()?;
-                erased.build_prepared_erased(&*prepared, cx).await
+                let validated = erased.validate_structure_erased()?;
+                erased.build_validated_erased(&*validated, cx).await
             }
             None => Err("sink does not implement a build method".into()),
         }
@@ -319,13 +319,13 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// Gets the acknowledgements configuration for this sink.
     fn acknowledgements(&self) -> &AcknowledgementsConfig;
 
-    /// Returns this sink as a `PreparedSinkErased` if it has been migrated to the
-    /// prepared lifecycle, or `None` for legacy sinks.
+    /// Returns this sink as a `ValidatedSinkErased` if it has been migrated to the
+    /// validated lifecycle, or `None` for legacy sinks.
     ///
-    /// Migrated sinks implement `PreparedSink` (working with their concrete validated
+    /// Migrated sinks implement `ValidatedSink` (working with their concrete validated
     /// type) and override this to return `Some(self)`. The framework then routes
-    /// preparation and building through the erased boundary automatically.
-    fn as_prepared(&self) -> Option<&dyn PreparedSinkErased> {
+    /// validation and building through the erased boundary automatically.
+    fn as_validated(&self) -> Option<&dyn ValidatedSinkErased> {
         None
     }
 }
