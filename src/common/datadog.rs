@@ -4,7 +4,10 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 
-use std::sync::LazyLock;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::LazyLock,
+};
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -22,35 +25,45 @@ pub const DDTAGS: &str = "ddtags";
 /// The datadog message event path.
 pub const MESSAGE: &str = "message";
 
-/// Records the resource types decoded from a Datadog Agent v2 series payload.
-///
-/// The metrics model represents arbitrary resources as `resource.<type>` tags. Keeping their
-/// provenance in event metadata lets the v2 sink distinguish them from ordinary tags that happen
-/// to use the same prefix.
-pub(crate) fn set_datadog_agent_v2_resource_types(
+/// Records v2 resources so the sink can distinguish them from ordinary `resource.*` tags.
+pub(crate) fn set_datadog_agent_v2_resources(
     metadata: &mut EventMetadata,
-    resource_types: impl IntoIterator<Item = String>,
+    resources: impl IntoIterator<Item = (String, String)>,
 ) {
-    let resource_types: ObjectMap = resource_types
+    let mut resources_by_type: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for (resource_type, resource_name) in resources {
+        if !resource_type.is_empty() {
+            resources_by_type
+                .entry(resource_type)
+                .or_default()
+                .insert(resource_name);
+        }
+    }
+
+    let resources: ObjectMap = resources_by_type
         .into_iter()
-        .filter(|resource_type| !resource_type.is_empty())
-        .map(|resource_type| (resource_type.into(), Value::Boolean(true)))
+        .map(|(resource_type, resource_names)| {
+            (
+                resource_type.into(),
+                Value::Array(resource_names.into_iter().map(Value::from).collect()),
+            )
+        })
         .collect();
 
-    if !resource_types.is_empty() {
+    if !resources.is_empty() {
         metadata.value_mut().insert(
-            vrl::path!("datadog_agent", "v2_resource_types"),
-            Value::Object(resource_types),
+            vrl::path!("datadog_agent", "v2_resources"),
+            Value::Object(resources),
         );
     }
 }
 
-pub(crate) fn datadog_agent_v2_resource_types(metadata: &EventMetadata) -> Option<&ObjectMap> {
+pub(crate) fn datadog_agent_v2_resources(metadata: &EventMetadata) -> Option<&ObjectMap> {
     match metadata
         .value()
-        .get(vrl::path!("datadog_agent", "v2_resource_types"))
+        .get(vrl::path!("datadog_agent", "v2_resources"))
     {
-        Some(Value::Object(resource_types)) => Some(resource_types),
+        Some(Value::Object(resources)) => Some(resources),
         _ => None,
     }
 }

@@ -12,7 +12,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
     event::{
-        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue,
+        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, Value,
         metric::{MetricSketch, TagValue},
     },
     metrics::AgentDDSketch,
@@ -28,7 +28,7 @@ use super::config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApi
 use crate::{
     common::datadog::{
         DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
-        datadog_agent_v2_resource_types,
+        datadog_agent_v2_resources,
     },
     proto::fds::protobuf_descriptors,
     sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
@@ -627,30 +627,27 @@ fn series_to_proto_message(
     }
 
     let event_metadata = metric.metadata();
-    // Only rebuild resources that the v2 source explicitly recorded. Source type alone is not
-    // enough because v1 payloads and transforms can contain ordinary `resource.*` tags.
-    if let Some(v2_resource_types) = datadog_agent_v2_resource_types(event_metadata) {
-        let resource_tags: Vec<_> = v2_resource_types
-            .keys()
-            .map(|resource_type| {
-                (
-                    format!("resource.{resource_type}"),
-                    resource_type.to_string(),
-                )
-            })
-            .collect();
-
-        for (tag, resource_type) in resource_tags {
+    // Only promote values recorded by the v2 source.
+    if let Some(v2_resources) = datadog_agent_v2_resources(event_metadata) {
+        for (resource_type, resource_names) in v2_resources {
+            let Value::Array(resource_names) = resource_names else {
+                continue;
+            };
+            let tag = format!("resource.{resource_type}");
             if let Some(values) = tags.remove_set(&tag) {
                 for value in values {
                     match value {
-                        TagValue::Value(name) => {
+                        TagValue::Value(name)
+                            if resource_names.iter().any(|resource_name| {
+                                matches!(resource_name, Value::Bytes(resource_name) if resource_name.as_ref() == name.as_bytes())
+                            }) =>
+                        {
                             resources.push(ddmetric_proto::metric_payload::Resource {
-                                r#type: resource_type.clone(),
+                                r#type: resource_type.to_string(),
                                 name,
                             });
                         }
-                        TagValue::Bare => tags.insert(tag.clone(), TagValue::Bare),
+                        value => tags.insert(tag.clone(), value),
                     }
                 }
             }
@@ -1043,7 +1040,7 @@ mod tests {
         write_payload_footer, write_payload_header,
     };
     use crate::{
-        common::datadog::{DatadogMetricType, set_datadog_agent_v2_resource_types},
+        common::datadog::{DatadogMetricType, set_datadog_agent_v2_resources},
         sinks::{
             datadog::metrics::{
                 config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApiVersion},
@@ -1067,13 +1064,13 @@ mod tests {
         Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
     }
 
-    fn mark_datadog_agent_v2_resources(metric: &mut Metric, resource_types: &[&str]) {
+    fn mark_datadog_agent_v2_resources(metric: &mut Metric, resources: &[(&str, &str)]) {
         metric.metadata_mut().set_source_type("datadog_agent");
-        set_datadog_agent_v2_resource_types(
+        set_datadog_agent_v2_resources(
             metric.metadata_mut(),
-            resource_types
-                .iter()
-                .map(|resource_type| resource_type.to_string()),
+            resources.iter().map(|(resource_type, resource_name)| {
+                (resource_type.to_string(), resource_name.to_string())
+            }),
         );
     }
 
@@ -1281,7 +1278,18 @@ mod tests {
             "resource.owner" => "payments",
             "abc.def.ghi" => "database_name:mongo_potatoes",
         }));
-        mark_datadog_agent_v2_resources(&mut metric, &["database_instance", "aws_docdb_cluster"]);
+        mark_datadog_agent_v2_resources(
+            &mut metric,
+            &[
+                ("database_instance", "mongo-repro-01"),
+                ("aws_docdb_cluster", "docdb-cluster"),
+            ],
+        );
+        // Simulate a transform-added value with the same key.
+        metric
+            .tags_mut()
+            .unwrap()
+            .insert("resource.database_instance".into(), "custom");
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1301,6 +1309,7 @@ mod tests {
             series_proto.tags,
             vec![
                 "abc.def.ghi:database_name:mongo_potatoes",
+                "resource.database_instance:custom",
                 "resource.owner:payments",
             ]
         );
@@ -1321,7 +1330,13 @@ mod tests {
         tags.insert("resource.bare_only".into(), TagValue::Bare);
 
         let mut metric = get_simple_counter().with_tags(Some(tags));
-        mark_datadog_agent_v2_resources(&mut metric, &["database_instance", "bare_only"]);
+        mark_datadog_agent_v2_resources(
+            &mut metric,
+            &[
+                ("database_instance", "mongo-repro-01"),
+                ("database_instance", "mongo-repro-02"),
+            ],
+        );
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1379,7 +1394,7 @@ mod tests {
         let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
             "resource.database_instance" => "mongo-repro-01",
         }));
-        mark_datadog_agent_v2_resources(&mut metric, &["database_instance"]);
+        mark_datadog_agent_v2_resources(&mut metric, &[("database_instance", "mongo-repro-01")]);
 
         let series = generate_series_metrics(
             &metric,

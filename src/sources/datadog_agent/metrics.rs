@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, num::NonZeroU32, sync::Arc};
+use std::{num::NonZeroU32, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -17,7 +17,7 @@ use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_paylo
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
-        datadog::{DatadogMetricType, DatadogSeriesMetric, set_datadog_agent_v2_resource_types},
+        datadog::{DatadogMetricType, DatadogSeriesMetric, set_datadog_agent_v2_resources},
         http::ErrorMessage,
     },
     config::log_schema,
@@ -282,7 +282,7 @@ pub(crate) fn decode_ddseries_v2(
                 None
             };
 
-            let mut v2_resource_types = BTreeSet::new();
+            let mut v2_resources = Vec::new();
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/965622d50073913d95176606ebcbd0f7553627b6/pkg/serializer/internal/metrics/iterable_series.go#L201-L264
                 // MetricSeries::resources can contain host, device, and other series resources.
@@ -295,14 +295,13 @@ pub(crate) fn decode_ddseries_v2(
                     // and must be preserved as a plain `device` tag to match the v1 series behavior.
                     tags.replace("device".into(), r.name);
                 } else {
-                    // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
-                    tags.insert(format!("resource.{}", r.r#type), r.name);
-                    v2_resource_types.insert(r.r#type);
+                    // Preserve other resources in the generic metric tags.
+                    tags.insert(format!("resource.{}", r.r#type), r.name.clone());
+                    v2_resources.push((r.r#type, r.name));
                 }
             });
-            // Preserve the origin of these tags so the v2 sink does not have to infer it from the
-            // `resource.` prefix, which can also be used by ordinary v1 or transform-added tags.
-            set_datadog_agent_v2_resource_types(&mut event_metadata, v2_resource_types);
+            // Track which values actually came from v2 resources.
+            set_datadog_agent_v2_resources(&mut event_metadata, v2_resources);
             (!serie.source_type_name.is_empty())
                 .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
