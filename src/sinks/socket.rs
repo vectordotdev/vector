@@ -99,7 +99,7 @@ pub struct UnixSinkConfig {
 }
 
 impl GenerateConfig for SocketSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"address = "92.12.333.224:5000"
             mode = "tcp"

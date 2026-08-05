@@ -8,8 +8,13 @@ branding:
 inputs:
   cargo-cache:
     required: false
-    default: true
+    default: false
     description: "Cache Cargo registry, index, and git DB. Enabled automatically if any Rust tools are requested."
+
+  cache-save:
+    required: false
+    default: "false"
+    description: "Whether this job is allowed to write the shared cache. Only warm-cache.yml opts in."
 
   mold:
     required: false
@@ -19,7 +24,7 @@ inputs:
   protoc:
     required: false
     default: false
-    description: "Install protoc (uses scripts/environment/install-protoc.sh)."
+    description: "Install protoc."
   cue:
     required: false
     default: false
@@ -73,7 +78,7 @@ inputs:
   vdev:
     required: false
     default: true
-    description: "Install vdev CLI tool via cargo binstall (uses VDEV_VERSION pinned in prepare.sh)."
+    description: "Install vdev CLI tool via cargo binstall (version from vdev/Cargo.toml)."
 
   # prepare.sh - npm
   markdownlint-cli2:
@@ -134,18 +139,6 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
-    - name: Cache Cargo registry, index, and git DB
-      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-
     - name: Install mold
       if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
       shell: bash
@@ -193,17 +186,6 @@ runs:
         rustc-wrapper = "$RUSTC_WRAPPER"
         EOF
 
-    - name: Install protoc
-      if: ${{ inputs.protoc == 'true' }}
-      shell: bash
-      run: |
-        echo "Installing protoc"
-        if [[ "${{ runner.os }}" == "macOS" ]]; then
-          sudo bash ./scripts/environment/install-protoc.sh /usr/local/bin
-        else
-          sudo bash ./scripts/environment/install-protoc.sh
-        fi
-
     - name: Install cue
       if: ${{ inputs.cue == 'true' }}
       shell: bash
@@ -222,7 +204,7 @@ runs:
     - name: Install libsasl2
       if: ${{ inputs.libsasl2 == 'true' }}
       shell: bash
-      run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      run: timeout 30m sudo apt-get update && timeout 30m sudo apt-get install -y libsasl2-dev
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries
@@ -239,7 +221,7 @@ runs:
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
           ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh', 'vdev/Cargo.toml') }}
         restore-keys: |
           ${{ runner.os }}-cargo-binaries-
 
@@ -257,6 +239,7 @@ runs:
       run: |
         mods=()
         [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
+        [[ "${{ inputs.protoc }}" == "true" ]] && mods+=("protoc")
         [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
         [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
@@ -284,3 +267,18 @@ runs:
       if: ${{ inputs.vdev == 'true' }}
       shell: bash
       run: echo "VDEV=$(which vdev)" >> "$GITHUB_ENV"
+
+    # Runs after prepare.sh so Swatinem can invoke rustc/cargo (fresh
+    # self-hosted runners install rustup there). Only warm-cache.yml
+    # opts in to saving; other master-ref workflows may dispatch with
+    # a user-supplied ref and must not poison the shared cache.
+    - name: Cache Cargo + target/
+      if: ${{ inputs.cargo-cache == 'true' && env.NEEDS_RUST == 'true' }}
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      with:
+        prefix-key: "v1-vector"
+        shared-key: "workspace"
+        # Rotate the key when cache mechanics change so the warmer can save a fresh entry.
+        key: ${{ hashFiles('.github/actions/setup/action.yml', '.github/workflows/warm-cache.yml') }}
+        cache-bin: "false"
+        save-if: ${{ inputs.cache-save == 'true' && github.ref == 'refs/heads/master' }}

@@ -20,7 +20,7 @@ pub(super) struct NatsSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     publisher: Arc<NatsPublisher>,
-    subject: Template,
+    subject: ConfinedTemplate,
     headers: Option<NatsHeaderConfig>,
 }
 
@@ -41,13 +41,15 @@ impl NatsSink {
         Some(NatsEvent { event, subject })
     }
 
-    pub(super) async fn new(config: NatsSinkConfig) -> Result<Self, NatsError> {
+    pub(super) async fn new(
+        config: NatsSinkConfig,
+        subject: ConfinedTemplate,
+    ) -> Result<Self, NatsError> {
         let publisher = Arc::new(config.publisher().await?);
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);
         let request = config.request;
-        let subject = config.subject;
         let headers = config.jetstream.headers;
 
         Ok(NatsSink {

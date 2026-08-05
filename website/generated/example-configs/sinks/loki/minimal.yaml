@@ -1,0 +1,13 @@
+sinks:
+  my_sink_id:
+    type: loki
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    endpoint: http://localhost:3100
+    labels:
+      '"*"': "{{ metadata }}"
+      '"pod_labels_*"': "{{ kubernetes.pod_labels }}"
+      source: vector
+      "{{ event_field }}": "{{ some_other_event_field }}"

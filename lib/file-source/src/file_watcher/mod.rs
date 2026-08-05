@@ -1,4 +1,3 @@
-use async_compression::tokio::bufread::GzipDecoder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use std::{
@@ -18,6 +17,7 @@ use file_source_common::{
     AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
+use vector_common::compression::gzip_multiple_decoder;
 
 const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
@@ -132,7 +132,7 @@ impl FileWatcher {
                     (Box::new(null_reader()), 0)
                 }
                 (true, false, ReadFrom::Beginning) => {
-                    (Box::new(BufReader::new(GzipDecoder::new(reader))), 0)
+                    (Box::new(BufReader::new(gzip_multiple_decoder(reader))), 0)
                 }
                 (false, true, _) => {
                     let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
@@ -189,7 +189,7 @@ impl FileWatcher {
                 if self.file_position != 0 {
                     Box::new(null_reader())
                 } else {
-                    Box::new(BufReader::new(GzipDecoder::new(reader)))
+                    Box::new(BufReader::new(gzip_multiple_decoder(reader)))
                 }
             } else {
                 reader.seek(io::SeekFrom::Start(self.file_position)).await?;

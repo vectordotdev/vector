@@ -7,6 +7,7 @@ use chrono::Duration;
 use futures::{StreamExt, stream};
 use similar_asserts::assert_eq;
 use vector_lib::{codecs::TextSerializerConfig, lookup};
+use vrl::event_path;
 
 use super::*;
 use crate::{
@@ -65,6 +66,7 @@ async fn cloudwatch_insert_log_event() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -118,6 +120,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -196,6 +199,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -275,6 +279,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -343,6 +348,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             "key".to_string(),
             "value".to_string(),
         )])),
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -417,6 +423,7 @@ async fn cloudwatch_insert_log_event_batched() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -470,6 +477,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -485,7 +493,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .map(|(i, e)| {
             let mut event = LogEvent::from(e);
             let stream = (i % 2).to_string();
-            event.insert("key", stream);
+            event.insert(event_path!("key"), stream);
             Event::Log(event)
         })
         .collect::<Vec<_>>();
@@ -565,6 +573,7 @@ async fn cloudwatch_healthcheck() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let client = config.create_client(&ProxyConfig::default()).await.unwrap();

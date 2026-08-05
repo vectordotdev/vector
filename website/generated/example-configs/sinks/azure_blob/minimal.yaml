@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: azure_blob
+    inputs:
+      - my-source-or-transform-id
+    container_name: my-logs
+    encoding:
+      codec: json

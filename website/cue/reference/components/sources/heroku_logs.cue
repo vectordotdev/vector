@@ -9,8 +9,6 @@ components: sources: heroku_logs: {
 		Receives log data from Heroku log drains via Heroku's logplex system.
 		"""
 
-	alias: "logplex"
-
 	classes: {
 		delivery: "at_least_once"
 		deployment_roles: ["aggregator"]
