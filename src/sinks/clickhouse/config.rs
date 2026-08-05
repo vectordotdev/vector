@@ -471,6 +471,15 @@ pub struct ValidatedClickhouse {
     confined_database: ConfinedTemplate,
 }
 
+fn get_healthcheck_uri(endpoint: &Uri) -> String {
+    let mut uri = endpoint.to_string();
+    if !uri.ends_with('/') {
+        uri.push('/');
+    }
+    uri.push_str("?query=SELECT%201");
+    uri
+}
+
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
     let uri = get_healthcheck_uri(&endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
@@ -485,15 +494,6 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
         StatusCode::OK => Ok(()),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
     }
-}
-
-fn get_healthcheck_uri(endpoint: &Uri) -> String {
-    let mut uri = endpoint.to_string();
-    if !uri.ends_with('/') {
-        uri.push('/');
-    }
-    uri.push_str("?query=SELECT%201");
-    uri
 }
 
 #[cfg(test)]
