@@ -18,10 +18,12 @@ use tonic::body::BoxBody;
 use tower::{Service, ServiceBuilder};
 use vector_lib::configurable::configurable_component;
 
+use crate::dns::{DnsAddressSelection, HyperResolver};
+
 use super::{
     VectorSinkError,
     compression::VectorCompression,
-    service::{VectorRequest, VectorResponse, VectorService},
+    service::{VectorProxyConnector, VectorRequest, VectorResponse, VectorService},
     sink::VectorSink,
 };
 use crate::{
@@ -29,7 +31,6 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions,
     },
-    http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
@@ -115,6 +116,15 @@ pub struct VectorConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     keepalive: Option<VectorKeepaliveConfig>,
+
+    /// Controls how resolved DNS addresses are selected when a hostname resolves
+    /// to multiple addresses.
+    ///
+    /// - `first`: use the first address returned by the system resolver (default)
+    /// - `random`: pick a single random address from the resolved set
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(in crate::sinks::vector) dns_address_selection: DnsAddressSelection,
 
     #[configurable(derived)]
     #[serde(
@@ -218,6 +228,7 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         keepalive: None,
+        dns_address_selection: DnsAddressSelection::default(),
         acknowledgements: Default::default(),
     }
 }
@@ -233,7 +244,7 @@ impl SinkConfig for VectorConfig {
             .as_ref()
             .map_or_else(EndpointStrategy::default, |routing| routing.strategy);
 
-        let client = new_client(&tls, cx.proxy(), self.keepalive)?;
+        let client = new_client(&tls, cx.proxy(), self.keepalive, self.dns_address_selection)?;
 
         let healthcheck = healthchecks(client.clone(), &uris, cx.healthcheck, endpoint_strategy);
         let request_settings = self.request.into_settings();
@@ -725,7 +736,7 @@ async fn healthcheck(
 }
 
 fn healthchecks(
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    client: hyper::Client<VectorProxyConnector, BoxBody>,
     uris: &[Uri],
     options: SinkHealthcheckOptions,
     endpoint_strategy: EndpointStrategy,
@@ -826,8 +837,9 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
-) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
-    let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
+    dns_address_selection: DnsAddressSelection,
+) -> crate::Result<hyper::Client<VectorProxyConnector, BoxBody>> {
+    let proxy = build_vector_proxy_connector(tls_settings.clone(), proxy_config, dns_address_selection)?;
 
     let mut builder = hyper::Client::builder();
     builder.http2_only(true);
@@ -844,6 +856,38 @@ fn new_client(
     }
 
     Ok(builder.build(proxy))
+}
+
+fn build_vector_proxy_connector(
+    tls_settings: MaybeTlsSettings,
+    proxy_config: &ProxyConfig,
+    dns_address_selection: DnsAddressSelection,
+) -> crate::Result<VectorProxyConnector> {
+    use crate::tls::tls_connector_builder;
+
+    let resolver = HyperResolver {
+        selection: dns_address_selection,
+    };
+    let mut http = HttpConnector::new_with_resolver(resolver);
+    http.enforce_http(false);
+
+    let tls = tls_connector_builder(&tls_settings)?;
+    let mut https = HttpsConnector::with_connector(http, tls)?;
+
+    let settings = tls_settings.tls().cloned();
+    https.set_callback(move |c, _uri| {
+        if let Some(settings) = &settings {
+            settings.apply_connect_configuration(c)
+        } else {
+            Ok(())
+        }
+    });
+
+    let tls_for_proxy = tls_connector_builder(&tls_settings)?.build();
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy.set_tls(Some(tls_for_proxy));
+    proxy_config.configure(&mut proxy)?;
+    Ok(proxy)
 }
 
 #[derive(Debug, Clone)]
@@ -1432,6 +1476,33 @@ mod tests {
         assert_eq!(
             healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::FailoverPrimary),
             vec![endpoints[0].clone()]
+        );
+    }
+
+    #[test]
+    fn parse_dns_address_selection_random() {
+        let config: VectorConfig = toml::from_str(
+            r#"
+                address = "http://127.0.0.1:6000"
+                dns_address_selection = "random"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            config.dns_address_selection,
+            crate::dns::DnsAddressSelection::Random
+        );
+    }
+
+    #[test]
+    fn dns_address_selection_defaults_to_first() {
+        let config: VectorConfig =
+            toml::from_str(r#"address = "http://127.0.0.1:6000""#).unwrap();
+
+        assert_eq!(
+            config.dns_address_selection,
+            crate::dns::DnsAddressSelection::First
         );
     }
 }

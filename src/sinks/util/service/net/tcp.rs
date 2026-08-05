@@ -67,7 +67,7 @@ impl TcpConnector {
     pub(super) async fn connect(
         &self,
     ) -> Result<(SocketAddr, MaybeTlsStream<TcpStream>), NetError> {
-        let ip = dns::Resolver
+        let ip = dns::Resolver::default()
             .lookup_ip(self.address.host.clone())
             .await
             .context(FailedToResolve)?
