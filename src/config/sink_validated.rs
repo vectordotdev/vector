@@ -12,7 +12,7 @@
 //!
 //! The erased validated state is stored on `SinkOuter` (see `SinkOuter::validated`) and
 //! consumed at build time by `SinkOuter::build`, which dispatches through
-//! `ValidatedSinkErased::build_validated_erased`.
+//! `ValidatedSinkErased::build_erased`.
 //!
 //! `ValidatedSink::validate` is the same phase as the RFC's
 //! `SinkConfig::validate_structure` (pure structural validation owned by config
@@ -94,10 +94,10 @@ pub trait ValidatedSink {
 #[async_trait]
 pub trait ValidatedSinkErased {
     /// Erases the validated state into a `Box<dyn Any>`.
-    fn validate_structure_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
+    fn validate_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
 
     /// Restores the validated state from `&dyn Any` and builds the sink.
-    async fn build_validated_erased(
+    async fn build_erased(
         &self,
         validated: &(dyn Any + Send + Sync),
         cx: SinkContext,
@@ -109,11 +109,11 @@ impl<T> ValidatedSinkErased for T
 where
     T: ValidatedSink + Send + Sync + 'static,
 {
-    fn validate_structure_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>> {
+    fn validate_erased(&self) -> crate::Result<Box<dyn Any + Send + Sync>> {
         Ok(Box::new(self.validate()?))
     }
 
-    async fn build_validated_erased(
+    async fn build_erased(
         &self,
         validated: &(dyn Any + Send + Sync),
         cx: SinkContext,

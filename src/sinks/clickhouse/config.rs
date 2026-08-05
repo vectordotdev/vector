@@ -641,9 +641,7 @@ mod tests {
             ..Default::default()
         };
 
-        let validated = config
-            .validate()
-            .expect("preparation should succeed");
+        let validated = config.validate().expect("preparation should succeed");
         assert_eq!(validated.database.get_ref(), "test_db");
         assert!(validated.auth.is_none()); // Default has no auth
         // Verify the confined templates retained the validated values.
