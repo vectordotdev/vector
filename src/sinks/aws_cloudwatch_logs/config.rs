@@ -8,7 +8,7 @@ use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_compon
 use vrl::value::Kind;
 
 use crate::{
-    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, AwsTimeout, ClientBuilder, RegionOrEndpoint, create_client},
     codecs::{Encoder, EncodingConfig},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
@@ -157,6 +157,15 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
+    /// Client timeout configuration for AWS requests.
+    ///
+    /// These settings bound how long the client waits when connecting to and reading from the
+    /// AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+    /// `read_timeout_seconds = 30`).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub timeout: AwsTimeout,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -197,7 +206,7 @@ impl CloudwatchLogsSinkConfig {
             self.region.endpoint(),
             proxy,
             self.tls.as_ref(),
-            None,
+            &self.timeout,
         )
         .await
     }
@@ -281,6 +290,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         tls: Default::default(),
         assume_role: Default::default(),
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: Default::default(),
         tags: Default::default(),

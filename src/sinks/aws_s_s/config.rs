@@ -4,7 +4,7 @@ use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    aws::AwsAuthentication,
+    aws::{AwsAuthentication, AwsTimeout},
     codecs::EncodingConfig,
     config::AcknowledgementsConfig,
     sinks::util::TowerRequestConfig,
@@ -63,6 +63,15 @@ pub(super) struct BaseSSSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub(super) auth: AwsAuthentication,
+
+    /// Client timeout configuration for AWS requests.
+    ///
+    /// These settings bound how long the client waits when connecting to and reading from the
+    /// AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+    /// `read_timeout_seconds = 30`).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) timeout: AwsTimeout,
 
     #[configurable(derived)]
     #[serde(

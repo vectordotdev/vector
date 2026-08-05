@@ -15,7 +15,7 @@ use vector_lib::configurable::configurable_component;
 
 use super::service::{S3Request, S3Response, S3Service};
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint, create_client, is_retriable_error},
+    aws::{AwsAuthentication, AwsTimeout, RegionOrEndpoint, create_client, is_retriable_error},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
     http::status,
@@ -431,6 +431,7 @@ pub async fn create_service(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     force_path_style: impl Into<bool>,
+    timeout: &AwsTimeout,
 ) -> crate::Result<S3Service> {
     let endpoint = region.endpoint();
     let region = region.region();
@@ -444,7 +445,7 @@ pub async fn create_service(
         endpoint,
         proxy,
         tls_options,
-        None,
+        timeout,
     )
     .await?;
     Ok(S3Service::new(client))

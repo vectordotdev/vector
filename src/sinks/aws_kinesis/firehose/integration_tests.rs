@@ -8,7 +8,7 @@ use vrl::event_path;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{AwsAuthentication, ImdsAuthentication, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, AwsTimeout, ImdsAuthentication, RegionOrEndpoint, create_client},
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         elasticsearch::{
@@ -59,6 +59,7 @@ async fn firehose_put_records_without_partition_key() {
         },
         tls: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: None,
@@ -160,6 +161,7 @@ async fn firehose_put_records_with_partition_key() {
         },
         tls: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: Some(partition_key.clone()),
@@ -261,7 +263,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
         region_endpoint.endpoint(),
         &proxy,
         None,
-        None,
+        &AwsTimeout::default(),
     )
     .await
     .unwrap()

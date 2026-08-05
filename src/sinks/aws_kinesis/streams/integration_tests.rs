@@ -10,7 +10,7 @@ use vrl::event_path;
 
 use super::{config::KinesisClientBuilder, *};
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, AwsTimeout, RegionOrEndpoint, create_client},
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::util::{BatchConfig, Compression},
     test_util::{
@@ -44,6 +44,7 @@ async fn kinesis_put_records_with_partition_key() {
         request: Default::default(),
         tls: Default::default(),
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: Some(partition_key.clone()),
@@ -103,6 +104,7 @@ async fn kinesis_put_records_without_partition_key() {
         request: Default::default(),
         tls: Default::default(),
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: None,
@@ -182,7 +184,7 @@ async fn client() -> aws_sdk_kinesis::Client {
         region.endpoint(),
         &proxy,
         None,
-        None,
+        &AwsTimeout::default(),
     )
     .await
     .unwrap()
@@ -231,6 +233,7 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
         request: Default::default(),
         tls: Default::default(),
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: true, // Enable partial failure retry
         partition_key_field: Some(ConfigValuePath::try_from("partition_key".to_string()).unwrap()),
@@ -304,6 +307,7 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
         request: Default::default(),
         tls: Default::default(),
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: false, // Disable partial failure retry
         partition_key_field: None,

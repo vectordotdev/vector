@@ -11,7 +11,7 @@ use super::S3SinkConfig;
 #[cfg(feature = "codecs-parquet")]
 use super::config::S3BatchEncoding;
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, AwsTimeout, RegionOrEndpoint, create_client},
     common::s3::S3ClientBuilder,
     config::{Config, SinkContext},
     sinks::{
@@ -705,7 +705,7 @@ async fn client() -> S3Client {
         region.endpoint(),
         &proxy,
         tls_options.as_ref(),
-        None,
+        &AwsTimeout::default(),
     )
     .await
     .unwrap()
@@ -732,6 +732,7 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
         request: TowerRequestConfig::default(),
         tls: Default::default(),
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         timezone: Default::default(),
         force_path_style: true,

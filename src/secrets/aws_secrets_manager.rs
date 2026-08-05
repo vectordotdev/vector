@@ -4,7 +4,7 @@ use aws_sdk_secretsmanager::{Client, config};
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
 use crate::{
-    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, AwsTimeout, ClientBuilder, RegionOrEndpoint, create_client},
     config::{ProxyConfig, SecretBackend},
     signal,
     tls::TlsConfig,
@@ -38,6 +38,15 @@ pub struct AwsSecretsManagerBackend {
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    /// Client timeout configuration for AWS requests.
+    ///
+    /// These settings bound how long the client waits when connecting to and reading from the
+    /// AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+    /// `read_timeout_seconds = 30`).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub client_timeout: AwsTimeout,
 }
 
 impl GenerateConfig for AwsSecretsManagerBackend {
@@ -47,6 +56,7 @@ impl GenerateConfig for AwsSecretsManagerBackend {
             region: Default::default(),
             auth: Default::default(),
             tls: None,
+            client_timeout: Default::default(),
         })
         .unwrap()
     }
@@ -65,7 +75,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
             self.region.endpoint(),
             &ProxyConfig::default(),
             self.tls.as_ref(),
-            None,
+            &self.client_timeout,
         )
         .await?;
 

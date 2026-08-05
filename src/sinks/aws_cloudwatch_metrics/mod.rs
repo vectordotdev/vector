@@ -24,7 +24,8 @@ use vector_lib::{
 use super::util::service::TowerRequestConfigDefaults;
 use crate::{
     aws::{
-        ClientBuilder, RegionOrEndpoint, auth::AwsAuthentication, create_client, is_retriable_error,
+        AwsTimeout, ClientBuilder, RegionOrEndpoint, auth::AwsAuthentication, create_client,
+        is_retriable_error,
     },
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     event::{
@@ -106,6 +107,15 @@ pub struct CloudWatchMetricsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    /// Client timeout configuration for AWS requests.
+    ///
+    /// These settings bound how long the client waits when connecting to and reading from the
+    /// AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+    /// `read_timeout_seconds = 30`).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub timeout: AwsTimeout,
 
     #[configurable(derived)]
     #[serde(
@@ -191,7 +201,7 @@ impl CloudWatchMetricsSinkConfig {
             self.region.endpoint(),
             proxy,
             self.tls.as_ref(),
-            None,
+            &self.timeout,
         )
         .await
     }

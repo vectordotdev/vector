@@ -11,7 +11,7 @@ use super::{
     config::{SnsClientBuilder, SnsSinkConfig, healthcheck},
 };
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, AwsTimeout, RegionOrEndpoint, create_client},
     common::sqs::SqsClientBuilder,
     config::{ProxyConfig, SinkConfig, SinkContext},
     test_util::{
@@ -36,7 +36,7 @@ async fn create_sns_test_client() -> SnsClient {
         Some(endpoint),
         &proxy,
         None,
-        None,
+        &AwsTimeout::default(),
     )
     .await
     .unwrap()
@@ -58,7 +58,7 @@ async fn create_sqs_test_client() -> SqsClient {
         Some(endpoint),
         &proxy,
         None,
-        None,
+        &AwsTimeout::default(),
     )
     .await
     .unwrap()
@@ -83,6 +83,7 @@ async fn sns_send_message_batch() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
     };
 
