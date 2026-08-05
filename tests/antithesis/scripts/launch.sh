@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Generic Antithesis launcher shared by every scenario.
 #
-#   ./launch.sh <scenario> [extra snouty flags]
+#   ./scripts/launch.sh <scenario> [extra snouty flags]
 #
-# <scenario> is a sibling directory holding a docker-compose.yaml and a launch.env.
+# <scenario> names a directory under scenarios/ holding docker-compose.yaml and
+# launch.env.
 # launch.env supplies the per-scenario bits; everything else — image tagging,
 # property-history key, the fault profile shape, build-before-submit — is common
 # and lives here so every shot is identical and comparable and no fault flag is
@@ -31,11 +32,11 @@
 #   DRY_RUN=1               print the exact command and exit without submitting
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ANTITHESIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-SCENARIO="${1:?usage: launch.sh <scenario> [extra snouty flags]}"
+SCENARIO="${1:?usage: scripts/launch.sh <scenario> [extra snouty flags]}"
 shift
-SCENARIO_DIR="$SCRIPT_DIR/$SCENARIO"
+SCENARIO_DIR="$ANTITHESIS_DIR/scenarios/$SCENARIO"
 [ -d "$SCENARIO_DIR" ] || { echo "error: no scenario directory $SCENARIO_DIR" >&2; exit 1; }
 [ -f "$SCENARIO_DIR/docker-compose.yaml" ] || { echo "error: $SCENARIO_DIR/docker-compose.yaml not found" >&2; exit 1; }
 [ -f "$SCENARIO_DIR/launch.env" ] || { echo "error: $SCENARIO_DIR/launch.env not found" >&2; exit 1; }
@@ -52,8 +53,8 @@ SCENARIO_WEBHOOK=""
 # tree has uncommitted changes so the tag never claims to be a clean commit it is
 # not. Images are tagged by this, never :latest, so a shot can never reuse a stale
 # mutable tag and every pushed image traces back to the source it was built from.
-GIT_SHA="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-if [[ -n "$(git -C "$SCRIPT_DIR" status --porcelain 2>/dev/null)" ]]; then
+GIT_SHA="$(git -C "$ANTITHESIS_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [[ -n "$(git -C "$ANTITHESIS_DIR" status --porcelain 2>/dev/null)" ]]; then
   GIT_SHA="${GIT_SHA}-dirty"
 fi
 export ANTITHESIS_IMAGE_TAG="$GIT_SHA"
@@ -68,7 +69,7 @@ FAULT_NODES="${FAULT_NODES:-${SCENARIO_FAULT_NODES:?launch.env must set SCENARIO
 # so findings are produced and each property's history is grouped by this key.
 # Default to the branch so history follows the branch; without it snouty runs
 # ephemeral and no findings are available to triage.
-SOURCE="${SOURCE:-$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)}"
+SOURCE="${SOURCE:-$(git -C "$ANTITHESIS_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)}"
 
 # Pinned fault profile shape, common to every scenario. The SUT nodes
 # (SCENARIO_FAULT_NODES) take node termination, hang, and throttle: that is the
