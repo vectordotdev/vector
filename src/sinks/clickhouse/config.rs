@@ -260,6 +260,14 @@ impl ValidatedSink for ClickhouseConfig {
                 .into());
             }
             let ClickhouseBatchEncoding::ArrowStream(_) = batch_encoding;
+
+            // ArrowStream requires static table and database.
+            if self.table.is_dynamic() || database.is_dynamic() {
+                return Err(
+                    "Arrow codec requires a static table and database. Dynamic schema inference is not supported."
+                        .into(),
+                );
+            }
         }
 
         // Resolve auth choice
@@ -665,6 +673,72 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("'batch_encoding' is only compatible"));
+    }
+
+    #[test]
+    fn rejects_dynamic_targets_with_arrow_batch_encoding() {
+        // Dynamic table (with a static prefix, so it passes confinement)
+        let config = ClickhouseConfig {
+            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            table: "events-{{ tenant }}".try_into().unwrap(),
+            format: Format::ArrowStream,
+            batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+                vector_lib::codecs::encoding::ArrowStreamSerializerConfig::default(),
+            )),
+            ..Default::default()
+        };
+
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "Expected validation to reject dynamic table with ArrowStream"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("static table and database"),
+            "Error should mention static requirement: {}",
+            err
+        );
+
+        // Dynamic database
+        let config = ClickhouseConfig {
+            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            table: "test_table".try_into().unwrap(),
+            database: Some("events-{{ tenant }}".try_into().unwrap()),
+            format: Format::ArrowStream,
+            batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+                vector_lib::codecs::encoding::ArrowStreamSerializerConfig::default(),
+            )),
+            ..Default::default()
+        };
+
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "Expected validation to reject dynamic database with ArrowStream"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("static table and database"),
+            "Error should mention static requirement: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn accepts_static_targets_with_arrow_batch_encoding() {
+        let config = ClickhouseConfig {
+            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            table: "test_table".try_into().unwrap(),
+            database: Some("test_db".try_into().unwrap()),
+            format: Format::ArrowStream,
+            batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+                vector_lib::codecs::encoding::ArrowStreamSerializerConfig::default(),
+            )),
+            ..Default::default()
+        };
+
+        config.validate().expect("static targets should validate");
     }
 
     #[test]
