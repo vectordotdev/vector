@@ -146,27 +146,14 @@ maybe_install_cargo_tool() {
   # --manifest-path, so vdev/Cargo.toml is the single source of truth.
   # `--disable-strategies compile` skips binstall's own crates.io compile
   # fallback (which would fail anyway on an unpublished version, and
-  # silently slow-paths a cache flake into a multi-minute build). If
-  # binstall fails for any reason — missing prebuilt for a freshly bumped
-  # version, or a transient cache/network issue — we fall back to building
-  # from the working tree. That gives PRs that bump vdev's version a
-  # working binary built from their own changes, and keeps master CI green
-  # in the gap between merging a vdev version bump and pushing the tag.
+  # silently slow-paths a cache flake into a multi-minute build). We always
+  # force the install because the version alone cannot identify the source
+  # code of an unmerged checkout. If no prebuilt binary exists, build the
+  # current checkout instead.
   if [[ "$tool" == "vdev" ]]; then
-    # Skip the install entirely when the cached binary already matches the
-    # version in vdev/Cargo.toml (the setup workflow restores ~/.cargo/bin/vdev
-    # from cache, but not binstall's resolution metadata, so without this check
-    # every job with `vdev: true` would re-hit GitHub releases).
-    local cargo_toml_version
-    cargo_toml_version=$(grep -E '^version = ' vdev/Cargo.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-    if vdev --version 2>/dev/null | grep -q "^vdev ${cargo_toml_version}$"; then
-      echo "vdev ${cargo_toml_version} already installed"
-      return 0
-    fi
-
     local installer=("${install[@]}")
     if [[ "${installer[0]}" == "binstall" ]]; then
-      installer+=(--disable-strategies compile)
+      installer+=(--force --disable-strategies compile)
       if ! cargo "${installer[@]}" --manifest-path vdev/Cargo.toml vdev; then
         echo "binstall failed; building vdev from the working tree..."
         cargo install -f --path vdev --locked
