@@ -1582,7 +1582,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
@@ -1620,7 +1622,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
@@ -1677,7 +1681,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 

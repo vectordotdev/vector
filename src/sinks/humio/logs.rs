@@ -351,7 +351,7 @@ mod integration_tests {
 
         let config = config(&repo.default_ingest_token);
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
@@ -396,7 +396,7 @@ mod integration_tests {
         let mut config = config(&repo.default_ingest_token);
         config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let message = random_string(100);
         let event = LogEvent::from(message.clone());
@@ -425,7 +425,9 @@ mod integration_tests {
             let mut config = config(&repo.default_ingest_token);
             config.event_type = Template::try_from("json".to_string()).ok();
 
-            let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+            let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+                .await
+                .unwrap();
 
             let message = random_string(100);
             let mut event = LogEvent::from(message.clone());
@@ -451,7 +453,9 @@ mod integration_tests {
         {
             let config = config(&repo.default_ingest_token);
 
-            let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+            let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+                .await
+                .unwrap();
 
             let message = random_string(100);
             let event = LogEvent::from(message.clone());

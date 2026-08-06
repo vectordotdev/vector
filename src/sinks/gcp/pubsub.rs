@@ -374,7 +374,9 @@ mod integration_tests {
 
     async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
         let cx = SinkContext::default();
-        config(topic).build(cx).await.expect("Building sink failed")
+        SinkConfig::build(&config(topic), cx)
+            .await
+            .expect("Building sink failed")
     }
 
     #[tokio::test]

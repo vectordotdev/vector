@@ -1018,7 +1018,7 @@ mod integration_tests {
             source_type_key: None,
         };
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
