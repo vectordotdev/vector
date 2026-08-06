@@ -286,18 +286,6 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
                 .iter()
                 .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), id))
         })
-        .chain(
-            config
-                .enrichment_tables()
-                .filter_map(|(id, table)| table.as_sink(id))
-                .flat_map(|(id, sink)| {
-                    sink.buffer
-                        .stages()
-                        .iter()
-                        .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), &id))
-                        .collect::<Vec<_>>()
-                }),
-        )
         .collect::<Vec<_>>();
 
     if let Some(global_data_dir) = global_data_dir.as_deref() {
@@ -445,9 +433,20 @@ fn find_orphaned_disk_buffers(
 
     let mut pending = Vec::new();
     for entry in entries {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() {
-            pending.push(entry.path());
+        match entry {
+            Ok(entry) => match entry.file_type() {
+                Ok(file_type) if file_type.is_dir() => pending.push(entry.path()),
+                Ok(_) => {}
+                Err(error) => warn!(
+                    path = entry.path().to_string_lossy().as_ref(),
+                    %error,
+                    message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+                ),
+            },
+            Err(error) => warn!(
+                %error,
+                message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+            ),
         }
     }
 
@@ -457,20 +456,67 @@ fn find_orphaned_disk_buffers(
             continue;
         }
 
-        if path.join("buffer.db").is_file() {
-            orphaned_buffers.push(path);
-            continue;
-        }
-
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                pending.push(entry.path());
+        let entries = match fs::read_dir(&path) {
+            Ok(entries) => entries,
+            Err(error) => {
+                warn!(
+                    path = path.to_string_lossy().as_ref(),
+                    %error,
+                    message = "Failed to inspect a directory while scanning for orphaned disk buffers.",
+                );
+                continue;
             }
+        };
+        let mut child_directories = Vec::new();
+        let mut has_disk_buffer_file = false;
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    warn!(
+                        path = path.to_string_lossy().as_ref(),
+                        %error,
+                        message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+                    );
+                    continue;
+                }
+            };
+            let file_type = match entry.file_type() {
+                Ok(file_type) => file_type,
+                Err(error) => {
+                    warn!(
+                        path = entry.path().to_string_lossy().as_ref(),
+                        %error,
+                        message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+                    );
+                    continue;
+                }
+            };
+            if file_type.is_dir() {
+                child_directories.push(entry.path());
+            } else if file_type.is_file() && is_disk_buffer_file(&entry.file_name()) {
+                has_disk_buffer_file = true;
+            }
+        }
+        if has_disk_buffer_file {
+            orphaned_buffers.push(path);
+        } else {
+            pending.extend(child_directories);
         }
     }
     orphaned_buffers.sort();
     Ok(orphaned_buffers)
+}
+
+fn is_disk_buffer_file(file_name: &std::ffi::OsStr) -> bool {
+    if file_name == "buffer.db" {
+        return true;
+    }
+    file_name
+        .to_str()
+        .and_then(|name| name.strip_prefix("buffer-data-"))
+        .and_then(|name| name.strip_suffix(".dat"))
+        .is_some_and(|file_id| file_id.parse::<u16>().is_ok())
 }
 
 pub fn warnings(config: &Config) -> Vec<String> {
@@ -561,18 +607,21 @@ mod tests {
         let namespace = buffer_root.join("namespace");
         let configured = namespace.join("configured");
         let orphaned = namespace.join("orphaned");
+        let damaged = namespace.join("damaged");
         let unrelated = buffer_root.join("unrelated");
         fs::create_dir_all(&configured).unwrap();
         fs::create_dir(&orphaned).unwrap();
+        fs::create_dir(&damaged).unwrap();
         fs::create_dir(&unrelated).unwrap();
         fs::write(orphaned.join("buffer.db"), b"ledger").unwrap();
+        fs::write(damaged.join("buffer-data-42.dat"), b"data").unwrap();
         fs::write(unrelated.join("other.db"), b"unrelated").unwrap();
         fs::write(buffer_root.join("not-a-buffer"), b"ignored").unwrap();
 
         let configured_paths = HashSet::from([configured]);
         let actual = find_orphaned_disk_buffers(data_dir.path(), &configured_paths).unwrap();
 
-        assert_eq!(actual, vec![orphaned]);
+        assert_eq!(actual, vec![damaged, orphaned]);
     }
 
     #[test]

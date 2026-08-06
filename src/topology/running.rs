@@ -681,7 +681,6 @@ impl RunningTopology {
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
             let old_buffer = sink_buffer(&self.config, key);
-            let new_buffer = sink_buffer(new_config, key);
             if old_buffer
                 .as_ref()
                 .is_some_and(BufferConfig::has_disk_stage)
@@ -702,21 +701,13 @@ impl RunningTopology {
                         buffered_bytes = usage.byte_size,
                         message = "Reusing the existing disk buffer during configuration reload. Buffered data remains available to the replacement sink.",
                     );
-                } else if new_buffer.is_some_and(|buffer| buffer.has_disk_stage()) {
-                    info!(
-                        component_id = %key,
-                        ?buffer_dirs,
-                        buffered_events = usage.event_count,
-                        buffered_bytes = usage.byte_size,
-                        message = "Reopening the existing disk buffer during configuration reload. Buffered data remains associated with the same component ID and will be reused.",
-                    );
                 } else {
-                    warn!(
+                    info!(
                         component_id = %key,
                         ?buffer_dirs,
                         remaining_events = usage.event_count,
                         remaining_bytes = usage.byte_size,
-                        message = "Replacing a sink without its disk buffer. The existing buffer will not be drained by the replacement and its directory will become orphaned; restore the disk-buffered component if the buffered data must be delivered.",
+                        message = "Changing a sink with a disk buffer. Vector will wait for the existing buffer to drain before starting the replacement sink.",
                     );
                 }
             }
