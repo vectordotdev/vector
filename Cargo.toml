@@ -826,6 +826,7 @@ transforms-logs = [
   "transforms-trace_to_log"
 ]
 transforms-metrics = [
+  "transforms-absolute_to_incremental",
   "transforms-aggregate",
   "transforms-filter",
   "transforms-incremental_to_absolute",
@@ -838,6 +839,7 @@ transforms-metrics = [
   "transforms-delay",
 ]
 
+transforms-absolute_to_incremental = []
 transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["transforms-impl-dedupe"]
