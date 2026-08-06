@@ -301,6 +301,7 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
         .collect::<Vec<_>>();
 
     if let Some(global_data_dir) = global_data_dir.as_deref() {
+        let disk_buffer_root = global_data_dir.join("buffer").join("v2");
         let configured_buffer_paths = configured_disk_buffers
             .iter()
             .map(|usage| usage.data_dir().to_path_buf())
@@ -309,7 +310,11 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
         match find_orphaned_disk_buffers(global_data_dir, &configured_buffer_paths) {
             Ok(orphaned_buffers) => {
                 for orphaned_buffer in orphaned_buffers {
+                    let orphaned_buffer_id = orphaned_buffer
+                        .strip_prefix(&disk_buffer_root)
+                        .expect("orphaned buffer must be under the disk buffer root");
                     warn!(
+                        orphaned_buffer_id = orphaned_buffer_id.to_string_lossy().as_ref(),
                         buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
                         message = "Found a disk buffer not referenced by the new configuration. It may still be draining from the previous configuration during reload, but Vector will not reopen it on the next startup unless its component is restored.",
                     );
