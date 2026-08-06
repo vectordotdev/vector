@@ -273,11 +273,12 @@ impl SinkConfig for HttpSinkConfig {
 /// configuration without network/filesystem/credentials/async operations.
 /// The actual sink building consumes these values without recomputing them.
 ///
-/// Confinement of the URI and templated headers is intentionally NOT performed
-/// here: the `http` sink is shared with the `opentelemetry` and `axiom` sinks
-/// (via [`HttpSinkConfig::build_with_component_type`]), which thread their own
-/// component type through confinement so per-template security warnings carry
-/// the outer sink name.
+/// Confinement of the URI and templated headers is performed in
+/// `build_from_validated` (not retained here) because the `http` sink is shared
+/// with the `opentelemetry` and `axiom` sinks, which thread their own component
+/// type through confinement so per-template security warnings carry the outer
+/// sink name. `validate` still runs the pure confinement checks so
+/// `vector validate --no-environment` catches unconfined routing templates.
 #[derive(Clone, Debug)]
 pub struct ValidatedHttp {
     /// Batch settings computed during validation.
@@ -316,6 +317,25 @@ impl ValidatedSink for HttpSinkConfig {
 
         validate_headers(&request.headers, self.auth.is_some())?;
         let (static_headers, template_headers) = request.split_headers();
+
+        // Pure confinement checks for the URI and templated headers. The actual
+        // confinement (with the component name threaded from the
+        // `opentelemetry`/`axiom` delegations) happens in `build_from_validated`;
+        // running the checks here lets `vector validate --no-environment` catch
+        // unconfined routing templates. Skipped under the full opt-out, where
+        // `confine` only emits a warning.
+        if !self
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            self.uri
+                .clone()
+                .confine(&self.confinement, Self::NAME, "uri")?;
+            for tpl in template_headers.values() {
+                tpl.clone()
+                    .confine(&self.confinement, Self::NAME, "request.headers")?;
+            }
+        }
 
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
@@ -378,20 +398,6 @@ impl ValidatedSink for HttpSinkConfig {
 }
 
 impl HttpSinkConfig {
-    /// Confinement + sink construction. `component_name` is threaded through so
-    /// per-template security warnings carry the outer sink type — `http` when
-    /// this is the top-level sink, `opentelemetry` when
-    /// [`OpenTelemetryConfig::build`] delegates here.
-    pub(crate) async fn build_with_component_type(
-        &self,
-        cx: SinkContext,
-        component_name: &'static str,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let validated = self.validate()?;
-        self.build_from_validated(&validated, cx, component_name)
-            .await
-    }
-
     /// Builds the sink from the validated state. Confinement of the URI and
     /// templated headers happens here (not in `validate`) because the
     /// `component_name` threaded from the `opentelemetry`/`axiom` delegations

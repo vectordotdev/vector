@@ -170,11 +170,11 @@ impl SinkConfig for DorisConfig {
 ///
 /// Captures all validation results that can be computed purely from
 /// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
+/// Per-endpoint `DorisCommon` parsing (which loads TLS certificates from disk)
+/// is deferred to `build`; only the pure endpoint/template/batch checks run
+/// during `validate`.
 #[derive(Clone, Debug)]
 pub struct ValidatedDoris {
-    /// Per-endpoint parsed commons (base URL, auth, request builder, TLS).
-    commons: Vec<DorisCommon>,
     /// Request settings computed during preparation.
     request_settings: TowerRequestSettings,
     /// Endpoint health settings computed during preparation.
@@ -195,7 +195,16 @@ impl ValidatedSink for DorisConfig {
         if self.endpoints.is_empty() {
             return Err("No endpoints configured.'.".into());
         }
-        let commons = DorisCommon::parse_many(self)?;
+        // Pure endpoint checks only — `DorisCommon`/TLS loading reads
+        // certificate files from disk, so it is deferred to `build` to keep
+        // `vector validate --no-environment` filesystem-free.
+        for endpoint in &self.endpoints {
+            if endpoint.uri.host().is_none() {
+                return Err(
+                    format!("Invalid host: {}, host must include hostname", endpoint.uri).into(),
+                );
+            }
+        }
         let request_settings = self.request.into_settings();
         let health_config = self.endpoint_health.clone().unwrap_or_default();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -209,7 +218,6 @@ impl ValidatedSink for DorisConfig {
             .confine(&self.confinement, Self::NAME, "table")?;
 
         Ok(ValidatedDoris {
-            commons,
             request_settings,
             health_config,
             batch_settings,
@@ -224,13 +232,16 @@ impl ValidatedSink for DorisConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedDoris {
-            commons,
             request_settings,
             health_config,
             batch_settings,
             database,
             table,
         } = validated;
+        // `DorisCommon` parsing performs environment-dependent work (TLS
+        // certificate loading from disk), so it happens here at build time
+        // rather than during `validate`.
+        let commons = DorisCommon::parse_many(self)?;
         let common = &commons[0];
 
         let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
@@ -340,7 +351,6 @@ mod tests {
             ..Default::default()
         };
         let validated = config.validate().expect("validation should succeed");
-        assert_eq!(validated.commons.len(), 1);
         assert_eq!(validated.database.to_string(), "mydatabase");
         assert_eq!(validated.table.to_string(), "mytable");
     }

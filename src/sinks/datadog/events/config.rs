@@ -55,6 +55,15 @@ impl GenerateConfig for DatadogEventsConfig {
 }
 
 impl DatadogEventsConfig {
+    /// Resolve the events API endpoint URI from the given endpoint/site.
+    fn events_endpoint(endpoint: Option<&str>, site: &str) -> crate::Result<Uri> {
+        let base = datadog::get_api_base_endpoint(endpoint, site);
+        [&base, "/api/v1/events"]
+            .join("")
+            .parse()
+            .map_err(Into::into)
+    }
+
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls = MaybeTlsSettings::from_config(self.dd_common.tls.as_ref(), false)?;
         let client = HttpClient::new(tls, proxy)?;
@@ -66,12 +75,10 @@ impl DatadogEventsConfig {
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
         validated: &ValidatedEvents,
+        endpoint: Uri,
     ) -> crate::Result<VectorSink> {
-        let service = DatadogEventsService::new(
-            validated.endpoint.clone(),
-            dd_common.default_api_key.clone(),
-            client,
-        );
+        let service =
+            DatadogEventsService::new(endpoint, dd_common.default_api_key.clone(), client);
 
         let request_settings = validated.request_settings.clone();
         let retry_logic = HttpStatusRetryLogic::new(
@@ -108,15 +115,15 @@ impl SinkConfig for DatadogEventsConfig {
 
 /// Purely validated `datadog_events` sink configuration.
 ///
-/// Holds the API endpoint URI (parsed from the locally-configured endpoint/site) and the
-/// request settings, so `build` does not redo the (pure) structural validation. The API key
-/// is NOT resolved here: it is a credential that may come from global `datadog::Options`
-/// (`DD_API_KEY` env var) via `SinkContext`, and credential resolution is excluded from
+/// Holds the request settings so `build` does not redo the (pure) structural
+/// validation. The delivery endpoint is derived in `build` after global
+/// `datadog::Options` are applied (via `SinkContext`), so a global site is
+/// honored consistently with the healthcheck. The API key is NOT resolved here:
+/// it is a credential that may come from global `datadog::Options` (`DD_API_KEY`
+/// env var) via `SinkContext`, and credential resolution is excluded from
 /// `validate`.
 #[derive(Clone, Debug)]
 pub struct ValidatedEvents {
-    /// The API endpoint URI for the events API.
-    endpoint: Uri,
     /// Request settings computed during validation.
     request_settings: TowerRequestSettings,
 }
@@ -126,18 +133,19 @@ impl ValidatedSink for DatadogEventsConfig {
     type Validated = ValidatedEvents;
 
     fn validate(&self) -> crate::Result<ValidatedEvents> {
+        // Pure structural check: the locally-configured endpoint/site must form
+        // a parseable events URI. The endpoint actually used for delivery is
+        // derived in `build` after global Datadog options are applied, so a
+        // global site (via `SinkContext.extra_context`) is honored consistently
+        // with the healthcheck.
         let site = self
             .dd_common
             .site
             .clone()
             .unwrap_or_else(datadog::default_site);
-        let endpoint = datadog::get_api_base_endpoint(self.dd_common.endpoint.as_deref(), &site);
-        let endpoint = format!("{endpoint}/api/v1/events").parse::<Uri>()?;
+        Self::events_endpoint(self.dd_common.endpoint.as_deref(), &site)?;
         let request_settings = self.request.into_settings();
-        Ok(ValidatedEvents {
-            endpoint,
-            request_settings,
-        })
+        Ok(ValidatedEvents { request_settings })
     }
 
     async fn build(
@@ -149,7 +157,8 @@ impl ValidatedSink for DatadogEventsConfig {
         let global = cx.extra_context.get_or_default::<datadog::Options>();
         let dd_common = self.dd_common.with_globals(global)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(&dd_common, client, validated)?;
+        let endpoint = Self::events_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)?;
+        let sink = self.build_sink(&dd_common, client, validated, endpoint)?;
 
         Ok((sink, healthcheck))
     }
@@ -174,9 +183,16 @@ mod tests {
             ),
             ..Default::default()
         };
-        let validated = config.validate().expect("validation should succeed");
+        config.validate().expect("validation should succeed");
+        // The delivery endpoint is derived at build time after globals; the
+        // pure endpoint resolution still produces the expected events URI.
         assert_eq!(
-            validated.endpoint.to_string(),
+            DatadogEventsConfig::events_endpoint(
+                Some("http://127.0.0.1:8080"),
+                &datadog::default_site(),
+            )
+            .expect("endpoint should parse")
+            .to_string(),
             "http://127.0.0.1:8080/api/v1/events"
         );
     }

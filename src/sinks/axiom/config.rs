@@ -16,7 +16,7 @@ use crate::{
     http::Auth as HttpAuthConfig,
     sinks::{
         Healthcheck, VectorSink,
-        http::config::{HttpMethod, HttpSinkConfig},
+        http::config::{HttpMethod, HttpSinkConfig, ValidatedHttp},
         util::{
             BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
             http::{RequestConfig, RetryStrategy},
@@ -174,6 +174,8 @@ impl SinkConfig for AxiomConfig {
 pub struct ValidatedAxiom {
     /// The resolved ingest endpoint URI template.
     uri: Template,
+    /// The validated derived HTTP sink configuration.
+    http: ValidatedHttp,
 }
 
 #[async_trait::async_trait]
@@ -187,7 +189,14 @@ impl ValidatedSink for AxiomConfig {
         // Resolve and parse the ingest endpoint up front (pure, no I/O).
         let uri: Template = self.build_endpoint().try_into()?;
 
-        Ok(ValidatedAxiom { uri })
+        // Construct and validate the derived HTTP config up front so
+        // `vector validate --no-environment` catches pure HTTP sink errors
+        // (invalid batch settings, invalid `X-Axiom-Org-Id` header value, ...)
+        // that the delegated HTTP sink would otherwise only reject at build.
+        let http_sink_config = self.http_sink_config(uri.clone())?;
+        let http = http_sink_config.validate()?;
+
+        Ok(ValidatedAxiom { uri, http })
     }
 
     async fn build(
@@ -195,6 +204,22 @@ impl ValidatedSink for AxiomConfig {
         validated: &ValidatedAxiom,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Route through the HTTP builder threaded with our own component type,
+        // so per-template security warnings carry `component_type=axiom` rather
+        // than `http`. The derived HTTP config was already constructed and
+        // validated during `validate`, so we build from the retained state.
+        let http_sink_config = self.http_sink_config(validated.uri.clone())?;
+        http_sink_config
+            .build_from_validated(&validated.http, cx, Self::NAME)
+            .await
+    }
+}
+
+impl AxiomConfig {
+    /// Build the derived HTTP sink configuration. The org-id header is added
+    /// here so the derived config (including the header value) is validated
+    /// during `validate`.
+    fn http_sink_config(&self, uri: Template) -> crate::Result<HttpSinkConfig> {
         let mut request = self.request.clone();
         if let Some(org_id) = &self.org_id {
             // NOTE: Only add the org id header if an org id is provided
@@ -209,8 +234,8 @@ impl ValidatedSink for AxiomConfig {
         // to Axiom, whilst keeping the configuration simple and easy to use
         // and maintenance of the vector axiom sink to a minimum.
         //
-        let http_sink_config = HttpSinkConfig {
-            uri: validated.uri.clone(),
+        Ok(HttpSinkConfig {
+            uri,
             compression: self.compression,
             auth: Some(HttpAuthConfig::Bearer {
                 token: self.token.clone(),
@@ -232,18 +257,9 @@ impl ValidatedSink for AxiomConfig {
             payload_suffix: "".into(), // Always newline delimited JSON
             retry_strategy: self.retry_strategy.clone(),
             confinement: self.confinement.clone(),
-        };
-
-        // Route through the HTTP builder threaded with our own component type,
-        // so per-template security warnings carry `component_type=axiom` rather
-        // than `http`.
-        http_sink_config
-            .build_with_component_type(cx, Self::NAME)
-            .await
+        })
     }
-}
 
-impl AxiomConfig {
     fn build_endpoint(&self) -> String {
         // Priority: url > region > default cloud endpoint
 

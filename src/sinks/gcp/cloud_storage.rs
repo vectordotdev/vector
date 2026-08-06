@@ -290,7 +290,9 @@ impl ValidatedSink for GcsSinkConfig {
     type Validated = ValidatedGcsSink;
 
     fn validate(&self) -> crate::Result<ValidatedGcsSink> {
-        let base_url = format!("{}/{}/", self.endpoint, self.bucket);
+        // Parse the base URL up front so `vector validate --no-environment`
+        // rejects a malformed endpoint instead of panicking at build time.
+        let base_url = format!("{}/{}/", self.endpoint, self.bucket).parse::<Uri>()?;
         let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix_template = self.key_prefix_template()?;
 
@@ -314,7 +316,7 @@ impl ValidatedSink for GcsSinkConfig {
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
             client.clone(),
-            base_url.clone(),
+            base_url.to_string(),
             auth.clone(),
         )?;
         auth.spawn_regenerate_token();
@@ -331,7 +333,7 @@ impl ValidatedSink for GcsSinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedGcsSink {
     /// The resolved object base URL (`endpoint/bucket/`).
-    base_url: String,
+    base_url: Uri,
     /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
     /// The confined key-prefix template.
@@ -342,7 +344,7 @@ impl GcsSinkConfig {
     fn build_sink(
         &self,
         client: HttpClient,
-        base_url: String,
+        base_url: Uri,
         auth: GcpAuthenticator,
         cx: SinkContext,
         validated: &ValidatedGcsSink,
@@ -351,11 +353,11 @@ impl GcsSinkConfig {
 
         let partitioner = KeyPartitioner::new(validated.key_prefix_template.clone(), None);
 
-        let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
+        let protocol = get_http_scheme_from_uri(&base_url);
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
-            .service(GcsService::new(client, base_url, auth));
+            .service(GcsService::new(client, base_url.to_string(), auth));
 
         let request_settings = RequestSettings::new(self, cx)?;
 
@@ -605,7 +607,7 @@ mod tests {
         let sink = config
             .build_sink(
                 client,
-                mock_endpoint.to_string(),
+                mock_endpoint,
                 GcpAuthenticator::None,
                 context,
                 &validated,

@@ -264,7 +264,9 @@ impl SinkConfig for FileSinkConfig {
 /// encoding construction. Path confinement is intentionally NOT retained here:
 /// `PathConfinement` is not `Clone`, and `build` receives the validated state by
 /// reference, so the confinement is constructed (from the same pure inputs) in
-/// `build`.
+/// `build`. The pure confinement checks (relative `base_dir`, unconfined path
+/// template) run during `validate` so `vector validate --no-environment` catches
+/// them.
 #[derive(Clone, Debug)]
 pub struct ValidatedFileSink {
     transformer: Transformer,
@@ -279,6 +281,29 @@ impl ValidatedSink for FileSinkConfig {
     fn validate(&self) -> crate::Result<ValidatedFileSink> {
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+
+        // Pure path-confinement checks. `PathConfinement` itself is not
+        // retained (it is not `Clone`), so `build` reconstructs it from the
+        // same inputs; running the checks here lets `vector validate
+        // --no-environment` catch invalid routing paths and relative
+        // `base_dir`s.
+        if let Some(base) = self.base_dir.as_ref()
+            && base.is_relative()
+        {
+            return Err(Box::new(
+                crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
+                    path: base.clone(),
+                },
+            ));
+        }
+        if !self
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            PathConfinement::for_template(&self.path, self.base_dir.as_deref())
+                .map_err(Box::new)?;
+        }
+
         Ok(ValidatedFileSink {
             transformer,
             framer,

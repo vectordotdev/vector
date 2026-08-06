@@ -745,11 +745,11 @@ impl SinkConfig for ElasticsearchConfig {
 
 /// Purely validated Elasticsearch sink configuration.
 ///
-/// Captures the pure validation results (request limits and endpoint health
-/// settings) so `build` does not recompute them. The active mode's template
-/// confinement and per-endpoint parsing remain inside
-/// [`ElasticsearchCommon::parse_many`] because that parse performs I/O (AWS
-/// credential resolution and API-version autodetection).
+/// Captures the pure validation results (request limits, endpoint health
+/// settings, and the active mode's routing-template confinement check) so
+/// `build` does not recompute them. The full per-endpoint parsing remains
+/// inside [`ElasticsearchCommon::parse_many`] because that parse performs I/O
+/// (AWS credential resolution and API-version autodetection).
 #[derive(Clone, Debug)]
 pub struct ValidatedElasticsearch {
     /// Request settings computed during preparation.
@@ -763,6 +763,12 @@ impl ValidatedSink for ElasticsearchConfig {
     type Validated = ValidatedElasticsearch;
 
     fn validate(&self) -> crate::Result<ValidatedElasticsearch> {
+        // Run the pure routing-template confinement check for the active mode
+        // so `vector validate --no-environment` catches unconfined `bulk.index`
+        // / `data_stream.*` templates. The confined mode itself is
+        // reconstructed during build (inside `ElasticsearchCommon::parse_many`).
+        self.common_mode()?;
+
         let request_limits = self.request.tower.into_settings();
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 

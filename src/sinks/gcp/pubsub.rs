@@ -133,10 +133,14 @@ impl ValidatedSink for PubsubConfig {
     type Validated = ValidatedPubsub;
 
     fn validate(&self) -> crate::Result<ValidatedPubsub> {
+        // Parse the assembled publish URI up front so `vector validate
+        // --no-environment` rejects a malformed endpoint/project/topic
+        // combination instead of failing (or panicking) at build time.
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
             self.endpoint, self.project, self.topic,
-        );
+        )
+        .parse::<Uri>()?;
 
         let batch_settings = self
             .batch
@@ -207,7 +211,7 @@ impl ValidatedSink for PubsubConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedPubsub {
     /// The resolved Pub/Sub topic URI base.
-    uri_base: String,
+    uri_base: Uri,
     /// Batch settings computed during validation.
     batch_settings: BatchSettings<JsonArrayBuffer>,
     /// The configured transformer.
@@ -218,7 +222,7 @@ pub struct ValidatedPubsub {
 
 struct PubsubSink {
     auth: GcpAuthenticator,
-    uri_base: String,
+    uri_base: Uri,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
@@ -308,7 +312,7 @@ mod tests {
 
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(
-            validated.uri_base,
+            validated.uri_base.to_string(),
             "https://pubsub.googleapis.com/v1/projects/project/topics/topic"
         );
     }
