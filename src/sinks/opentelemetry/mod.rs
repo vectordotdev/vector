@@ -101,10 +101,10 @@ impl ValidatedSink for OpenTelemetryConfig {
     type Validated = ();
 
     fn validate(&self) -> crate::Result<()> {
-        // All pure structural validation is delegated to the underlying HTTP sink
-        // config (`HttpSinkConfig::build_with_component_type`), which is not yet
-        // migrated to the validated lifecycle. Nothing here produces a value that
-        // `build` needs, so the validated state is the unit type.
+        // All validation is delegated to `HttpSinkConfig::build_with_component_type`,
+        // which validates internally at build time (confinement needs the
+        // `opentelemetry` component name for security warnings). Nothing here
+        // produces a value `build` needs, so the validated state is the unit type.
         Ok(())
     }
 
