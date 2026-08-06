@@ -13,7 +13,10 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_lib::{
-    buffers::topology::channel::BufferSender,
+    buffers::{
+        BufferConfig, DiskBufferUsageHandle, DiskBufferUsageSnapshot,
+        topology::channel::BufferSender,
+    },
     gauge,
     internal_event::GaugeName,
     shutdown::ShutdownSignal,
@@ -635,8 +638,28 @@ impl RunningTopology {
             .iter()
             .chain(diff.enrichment_tables.sinks.to_remove.iter())
             .collect::<Vec<_>>();
+        let mut removed_disk_buffer_drains = HashMap::new();
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
+
+            if sink_buffer(&self.config, key).is_some_and(|buffer| buffer.has_disk_stage()) {
+                let usage_handles = self
+                    .inputs
+                    .get(*key)
+                    .expect("removed sink input must exist")
+                    .disk_usage_handles();
+                let usage = disk_buffer_usage(&usage_handles);
+                let buffer_dirs = disk_buffer_directories(&self.config, key);
+                warn!(
+                    component_id = %key,
+                    ?buffer_dirs,
+                    remaining_events = usage.event_count,
+                    remaining_bytes = usage.byte_size,
+                    message = "Removing a sink with a disk buffer. Vector will stop accepting new events and drain the buffer in the background; its directory becomes orphaned if Vector stops before draining completes. A disk-buffered component with the same ID cannot be started until this drain finishes.",
+                );
+                removed_disk_buffer_drains.insert((*key).clone(), usage_handles);
+            }
+
             self.remove_inputs(key, diff, new_config).await;
 
             if let Some(registry) = self.utilization_registry.as_ref() {
@@ -657,6 +680,47 @@ impl RunningTopology {
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
+            let old_buffer = sink_buffer(&self.config, key);
+            let new_buffer = sink_buffer(new_config, key);
+            if old_buffer
+                .as_ref()
+                .is_some_and(BufferConfig::has_disk_stage)
+            {
+                let usage_handles = self
+                    .inputs
+                    .get(*key)
+                    .expect("changed sink input must exist")
+                    .disk_usage_handles();
+                let usage = disk_buffer_usage(&usage_handles);
+                let buffer_dirs = disk_buffer_directories(&self.config, key);
+
+                if reuse_buffers.contains(key) {
+                    info!(
+                        component_id = %key,
+                        ?buffer_dirs,
+                        buffered_events = usage.event_count,
+                        buffered_bytes = usage.byte_size,
+                        message = "Reusing the existing disk buffer during configuration reload. Buffered data remains available to the replacement sink.",
+                    );
+                } else if new_buffer.is_some_and(|buffer| buffer.has_disk_stage()) {
+                    info!(
+                        component_id = %key,
+                        ?buffer_dirs,
+                        buffered_events = usage.event_count,
+                        buffered_bytes = usage.byte_size,
+                        message = "Reopening the existing disk buffer during configuration reload. Buffered data remains associated with the same component ID and will be reused.",
+                    );
+                } else {
+                    warn!(
+                        component_id = %key,
+                        ?buffer_dirs,
+                        remaining_events = usage.event_count,
+                        remaining_bytes = usage.byte_size,
+                        message = "Replacing a sink without its disk buffer. The existing buffer will not be drained by the replacement and its directory will become orphaned; restore the disk-buffered component if the buffered data must be delivered.",
+                    );
+                }
+            }
+
             if reuse_buffers.contains(key) || changed_disk_buffer_sinks.contains(key) {
                 self.detach_triggers
                     .remove(key)
@@ -689,11 +753,25 @@ impl RunningTopology {
         // on, we don't bother waiting for it to shutdown.
         for key in &removed_sinks {
             let previous = self.tasks.remove(key).unwrap();
+            let drain = removed_disk_buffer_drains.remove(*key);
             if wait_for_sinks.contains(key) {
                 debug!(message = "Waiting for sink to shutdown.", component_id = %key);
-                previous.await.unwrap().unwrap();
+                if let Some(usage_handles) = drain {
+                    await_sink_buffer_drain(previous, (*key).clone(), usage_handles).await;
+                } else {
+                    previous.await.unwrap().unwrap();
+                }
             } else {
-                drop(previous); // detach and forget
+                if let Some(usage_handles) = drain {
+                    let component_id = (*key).clone();
+                    let task_name = format!("disk buffer drain ({component_id})");
+                    drop(spawn_named(
+                        await_sink_buffer_drain(previous, component_id, usage_handles),
+                        &task_name,
+                    ));
+                } else {
+                    drop(previous); // detach and forget
+                }
             }
         }
 
@@ -1499,6 +1577,100 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<O
         .iter()
         .filter(|id| producer_destroyed(&id.component) && producer_recreated(&id.component))
         .cloned()
+        .collect()
+}
+
+async fn await_sink_buffer_drain(
+    mut task: TaskHandle,
+    component_id: ComponentKey,
+    usage_handles: Vec<DiskBufferUsageHandle>,
+) {
+    let initial = disk_buffer_usage(&usage_handles);
+    info!(
+        component_id = %component_id,
+        initial_events = initial.event_count,
+        initial_bytes = initial.byte_size,
+        message = "Disk buffer drain started. Progress will be logged every 30 seconds until the sink finishes.",
+    );
+
+    let mut progress_interval = interval(Duration::from_secs(30));
+    progress_interval.tick().await;
+    loop {
+        tokio::select! {
+            result = &mut task => {
+                let remaining = disk_buffer_usage(&usage_handles);
+                let task_error = match result {
+                    Ok(Ok(_)) => None,
+                    Ok(Err(error)) => Some(error.to_string()),
+                    Err(error) => Some(error.to_string()),
+                };
+                if task_error.is_none() && remaining.byte_size == 0 {
+                    info!(
+                        component_id = %component_id,
+                        remaining_events_approximate = remaining.event_count,
+                        message = "Disk buffer drain completed. The buffer contains no unread bytes and its orphaned directory can be removed safely.",
+                    );
+                } else if remaining.byte_size == 0 {
+                    warn!(
+                        component_id = %component_id,
+                        remaining_events_approximate = remaining.event_count,
+                        ?task_error,
+                        message = "The sink task ended with an error, but the disk buffer reports no unread bytes. The orphaned directory can be removed after reviewing the sink error.",
+                    );
+                } else {
+                    warn!(
+                        component_id = %component_id,
+                        remaining_events = remaining.event_count,
+                        remaining_bytes = remaining.byte_size,
+                        ?task_error,
+                        message = "Disk buffer drain stopped before all events were delivered. The orphaned buffer still contains unread data.",
+                    );
+                }
+                return;
+            }
+            _ = progress_interval.tick() => {
+                let remaining = disk_buffer_usage(&usage_handles);
+                info!(
+                    component_id = %component_id,
+                    remaining_events = remaining.event_count,
+                    remaining_bytes = remaining.byte_size,
+                    message = "Disk buffer drain in progress.",
+                );
+            }
+        }
+    }
+}
+
+fn disk_buffer_usage(usage_handles: &[DiskBufferUsageHandle]) -> DiskBufferUsageSnapshot {
+    usage_handles
+        .iter()
+        .map(DiskBufferUsageHandle::snapshot)
+        .fold(
+            DiskBufferUsageSnapshot {
+                event_count: 0,
+                byte_size: 0,
+            },
+            |total, snapshot| DiskBufferUsageSnapshot {
+                event_count: total.event_count.saturating_add(snapshot.event_count),
+                byte_size: total.byte_size.saturating_add(snapshot.byte_size),
+            },
+        )
+}
+
+fn sink_buffer(config: &Config, sink_key: &ComponentKey) -> Option<BufferConfig> {
+    config
+        .sink(sink_key)
+        .map(|sink| sink.buffer.clone())
+        .or_else(|| enrichment_table_sink_buffer(config, sink_key))
+}
+
+fn disk_buffer_directories(config: &Config, sink_key: &ComponentKey) -> Vec<String> {
+    let global_data_dir = config.global.data_dir.clone();
+    sink_buffer(config, sink_key)
+        .into_iter()
+        .flat_map(|buffer| buffer.stages().to_vec())
+        .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), sink_key))
+        .map(|usage| usage.data_dir().to_string_lossy().into_owned())
         .collect()
 }
 
