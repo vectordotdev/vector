@@ -2441,18 +2441,7 @@ version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23cdc57ce23ac53c931e88a43d06d070a6fd142f2617be5855eb75efc9beb1c2"
 dependencies = [
- "bytecheck_derive 0.6.12",
- "ptr_meta",
- "simdutf8",
-]
-
-[[package]]
-name = "bytecheck"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41502630fe304ce54cbb2f8389e017784dee2b0328147779fcbe43b9db06d35d"
-dependencies = [
- "bytecheck_derive 0.7.0",
+ "bytecheck_derive",
  "ptr_meta",
  "simdutf8",
 ]
@@ -2462,17 +2451,6 @@ name = "bytecheck_derive"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3db406d29fbcd95542e92559bed4d8ad92636d1ca8b3b72ede10b4bcc010e659"
-dependencies = [
- "proc-macro2 1.0.106",
- "quote 1.0.45",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "bytecheck_derive"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eda88c587085bc07dc201ab9df871bd9baa5e07f7754b745e4d7194b43ac1eda"
 dependencies = [
  "proc-macro2 1.0.106",
  "quote 1.0.45",
@@ -9820,7 +9798,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2571463863a6bd50c32f94402933f03457a3fbaf697a707c5be741e459f08fd"
 dependencies = [
- "bytecheck 0.6.12",
+ "bytecheck",
 ]
 
 [[package]]
@@ -10036,7 +10014,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2297bf9c81a3f0dc96bc9521370b88f054168c29826a75e89c55ff196e7ed6a1"
 dependencies = [
  "bitvec",
- "bytecheck 0.6.12",
+ "bytecheck",
  "bytes",
  "hashbrown 0.12.3",
  "ptr_meta",
@@ -13430,7 +13408,7 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
- "bytecheck 0.7.0",
+ "bytecheck",
  "bytes",
  "clap",
  "crc32fast",
