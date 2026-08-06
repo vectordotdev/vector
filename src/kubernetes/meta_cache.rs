@@ -31,14 +31,24 @@ impl MetaCache {
 pub struct MetaDescribe {
     name: String,
     namespace: String,
+    uid: String,
 }
 
 impl MetaDescribe {
     pub fn from_meta(meta: &ObjectMeta) -> Self {
         let name = meta.name.clone().unwrap_or_default();
         let namespace = meta.namespace.clone().unwrap_or_default();
+        // Include the UID so that a resource recreated with the same name and
+        // namespace (for example a StatefulSet pod or a same-node restart) is
+        // tracked as a distinct entry rather than colliding with its
+        // predecessor. See https://github.com/vectordotdev/vector/issues/13467.
+        let uid = meta.uid.clone().unwrap_or_default();
 
-        Self { name, namespace }
+        Self {
+            name,
+            namespace,
+            uid,
+        }
     }
 }
 
