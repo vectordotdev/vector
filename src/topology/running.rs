@@ -614,6 +614,7 @@ impl RunningTopology {
             .sinks
             .to_change
             .iter()
+            .chain(diff.enrichment_tables.sinks.to_change.iter())
             .filter(|key| {
                 !reuse_buffers.contains(*key)
                     && (self
@@ -650,12 +651,18 @@ impl RunningTopology {
                     .disk_usage_handles();
                 let usage = disk_buffer_usage(&usage_handles);
                 let buffer_dirs = disk_buffer_directories(&self.config, key);
+                let drain_in_background = !wait_for_sinks.contains(*key);
                 warn!(
                     component_id = %key,
                     ?buffer_dirs,
                     remaining_events = usage.event_count,
                     remaining_bytes = usage.byte_size,
-                    message = "Removing a sink with a disk buffer. Vector will stop accepting new events and drain the buffer in the background; its directory becomes orphaned if Vector stops before draining completes. A disk-buffered component with the same ID cannot be started until this drain finishes.",
+                    drain_in_background,
+                    message = if drain_in_background {
+                        "Removing a sink with a disk buffer. Vector will stop accepting new events and drain the buffer in the background; its directory becomes orphaned if Vector stops before draining completes. A disk-buffered component with the same ID cannot be started until this drain finishes."
+                    } else {
+                        "Removing a sink with a disk buffer. Vector will wait for the buffer to drain before continuing the configuration reload; its directory becomes orphaned after the drain completes."
+                    },
                 );
                 removed_disk_buffer_drains.insert((*key).clone(), usage_handles);
             }
