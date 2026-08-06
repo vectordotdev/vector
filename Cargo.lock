@@ -2831,7 +2831,7 @@ dependencies = [
  "pin-project",
  "prost 0.12.6",
  "prost-reflect 0.14.7",
- "rand 0.9.4",
+ "rand 0.10.1",
  "regex",
  "rstest",
  "rust_decimal",
@@ -4370,7 +4370,7 @@ name = "fakedata"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "rand 0.9.4",
+ "rand 0.10.1",
 ]
 
 [[package]]
@@ -6395,7 +6395,7 @@ dependencies = [
  "indoc",
  "k8s-openapi",
  "k8s-test-framework",
- "rand 0.9.4",
+ "rand 0.10.1",
  "regex",
  "reqwest 0.11.26",
  "serde_json",
@@ -9443,12 +9443,12 @@ checksum = "0c8d0fd677905edcbeedbf2edb6494d676f0e98d54d5cf9bda0b061cb8fb8aba"
 
 [[package]]
 name = "rand_distr"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8615d50dcf34fa31f7ab52692afec947c4dd0ab803cc87cb3b0b4570ff7463"
+checksum = "4d431c2703ccf129de4d45253c03f49ebb22b97d6ad79ee3ecfc7e3f4862c1d8"
 dependencies = [
  "num-traits",
- "rand 0.9.4",
+ "rand 0.10.1",
 ]
 
 [[package]]
@@ -13305,7 +13305,7 @@ dependencies = [
  "quick-junit",
  "quick-xml 0.31.0",
  "quickcheck",
- "rand 0.9.4",
+ "rand 0.10.1",
  "rand_distr",
  "rdkafka",
  "redis",
@@ -13429,7 +13429,7 @@ dependencies = [
  "pastey",
  "proptest",
  "quickcheck",
- "rand 0.9.4",
+ "rand 0.10.1",
  "rkyv",
  "serde",
  "serde_json",
@@ -13584,7 +13584,7 @@ dependencies = [
  "quanta",
  "quickcheck",
  "quickcheck_macros",
- "rand 0.9.4",
+ "rand 0.10.1",
  "rand_distr",
  "regex",
  "schannel",
@@ -13662,7 +13662,7 @@ dependencies = [
  "futures-util",
  "pin-project",
  "proptest",
- "rand 0.9.4",
+ "rand 0.10.1",
  "rand_distr",
  "tokio",
  "tokio-util",

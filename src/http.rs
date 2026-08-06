@@ -20,7 +20,7 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use rand::Rng;
+use rand::RngExt;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;

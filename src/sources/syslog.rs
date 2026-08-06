@@ -468,7 +468,7 @@ mod test {
 
     use chrono::prelude::*;
     use indoc::indoc;
-    use rand::{Rng, rng};
+    use rand::{RngExt, rng};
     use serde::Deserialize;
     use tokio::time::{Duration, Instant, sleep};
     use tokio_util::codec::BytesCodec;

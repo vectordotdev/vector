@@ -859,7 +859,7 @@ mod test {
     use bytes::BufMut;
     use flate2::{Compression, write::ZlibEncoder};
     use futures::{Stream, StreamExt, stream};
-    use rand::{Rng, rng};
+    use rand::{RngExt, rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use vector_lib::codecs::ReadyFrames;
     use vector_lib::lookup::OwnedTargetPath;
