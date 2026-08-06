@@ -13207,7 +13207,6 @@ dependencies = [
  "azure_core",
  "azure_identity",
  "azure_storage_blob",
- "base64 0.22.1",
  "base64 0.23.0",
  "bloomy",
  "bollard",
