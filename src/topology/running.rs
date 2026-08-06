@@ -1675,6 +1675,43 @@ fn disk_buffer_directories(config: &Config, sink_key: &ComponentKey) -> Vec<Stri
         .collect()
 }
 
+#[cfg(test)]
+mod disk_buffer_drain_tests {
+    use super::*;
+    use crate::topology::task::TaskError;
+
+    #[tokio::test]
+    async fn preserves_successful_sink_task_result() {
+        let task = tokio::spawn(async { Ok(TaskOutput::Source) });
+
+        let result = await_sink_buffer_drain(task, ComponentKey::from("sink"), Vec::new())
+            .await
+            .unwrap();
+
+        assert!(matches!(result, Ok(TaskOutput::Source)));
+    }
+
+    #[tokio::test]
+    async fn preserves_failed_sink_task_result() {
+        let task = tokio::spawn(async { Err(TaskError::Opaque) });
+
+        let result = await_sink_buffer_drain(task, ComponentKey::from("sink"), Vec::new())
+            .await
+            .unwrap();
+
+        assert!(matches!(result, Err(TaskError::Opaque)));
+    }
+
+    #[tokio::test]
+    async fn preserves_panicked_sink_task_result() {
+        let task: TaskHandle = tokio::spawn(async { panic!("sink task failed") });
+
+        let result = await_sink_buffer_drain(task, ComponentKey::from("sink"), Vec::new()).await;
+
+        assert!(matches!(result, Err(error) if error.is_panic()));
+    }
+}
+
 fn enrichment_table_sink_resources(config: &Config, sink_key: &ComponentKey) -> Vec<Resource> {
     config
         .enrichment_tables()
