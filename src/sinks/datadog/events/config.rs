@@ -130,7 +130,7 @@ impl ValidatedSink for DatadogEventsConfig {
             .dd_common
             .site
             .clone()
-            .unwrap_or_else(|| datadog::default_site());
+            .unwrap_or_else(datadog::default_site);
         let endpoint = datadog::get_api_base_endpoint(self.dd_common.endpoint.as_deref(), &site);
         let endpoint = format!("{endpoint}/api/v1/events").parse::<Uri>()?;
         let request_settings = self.request.into_settings();
