@@ -246,6 +246,10 @@ impl SinkConfig for AzureBlobSinkConfig {
 pub struct ValidatedAzureBlob {
     /// Resolved connection string (pure validation without network).
     connection_string: String,
+    /// Parsed connection string, validated during `validate`.
+    parsed_connection_string: ParsedConnectionString,
+    /// Parsed container URL, validated during `validate`.
+    container_url: Url,
     /// Batch settings computed during validation.
     batcher_settings: BatcherSettings,
     /// Blob key timestamp format (defaulted).
@@ -262,6 +266,7 @@ impl fmt::Debug for ValidatedAzureBlob {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ValidatedAzureBlob")
             .field("connection_string", &self.connection_string)
+            .field("container_url", &self.container_url)
             .field("batcher_settings", &self.batcher_settings)
             .field("blob_time_format", &self.blob_time_format)
             .field("blob_append_uuid", &self.blob_append_uuid)
@@ -321,6 +326,19 @@ impl ValidatedSink for AzureBlobSinkConfig {
             }
         };
 
+        // Parse the resolved connection string and container URL up front so
+        // `vector validate --no-environment` catches malformed connection
+        // strings / container URLs instead of only failing at build time.
+        // Credential construction (shared key policy, token credential)
+        // remains in `build`.
+        let parsed_connection_string = ParsedConnectionString::parse(&connection_string)
+            .map_err(|e| format!("Invalid connection string: {e}"))?;
+        let container_url = parsed_connection_string
+            .container_url(&self.container_name)
+            .map_err(|e| format!("Failed to build container URL: {e}"))?;
+        let container_url =
+            Url::parse(&container_url).map_err(|e| format!("Invalid container URL: {e}"))?;
+
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         let blob_time_format = self
@@ -339,6 +357,8 @@ impl ValidatedSink for AzureBlobSinkConfig {
 
         Ok(ValidatedAzureBlob {
             connection_string,
+            parsed_connection_string,
+            container_url,
             batcher_settings,
             blob_time_format,
             blob_append_uuid,
@@ -354,8 +374,8 @@ impl ValidatedSink for AzureBlobSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = build_client(
             self.auth.clone(),
-            validated.connection_string.clone(),
-            self.container_name.clone(),
+            validated.parsed_connection_string.clone(),
+            validated.container_url.clone(),
             cx.proxy(),
             self.tls.clone(),
         )
@@ -490,6 +510,33 @@ mod tests {
         assert!(validated.blob_append_uuid);
         assert_eq!(validated.confined_blob_prefix.to_string(), "blob");
     }
+
+    #[test]
+    fn validate_rejects_malformed_connection_string() {
+        let config = AzureBlobSinkConfig {
+            auth: None,
+            connection_string: Some("not-a-valid-connection-string".to_string().into()),
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "my-logs".to_string(),
+            blob_prefix: "blob".try_into().unwrap(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+            compression: Compression::gzip_default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+            tls: None,
+            confinement: ConfinementConfig::default(),
+        };
+
+        assert!(config.validate().is_err());
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -597,20 +644,13 @@ pub fn build_healthcheck(
 
 pub async fn build_client(
     auth: Option<AzureAuthentication>,
-    connection_string: String,
-    container_name: String,
+    parsed: ParsedConnectionString,
+    url: Url,
     proxy: &crate::config::ProxyConfig,
     tls: Option<AzureBlobTlsConfig>,
 ) -> crate::Result<Arc<BlobContainerClient>> {
-    // Parse connection string without legacy SDK
-    let parsed = ParsedConnectionString::parse(&connection_string)
-        .map_err(|e| format!("Invalid connection string: {e}"))?;
-    // Compose container URL (SAS appended if present)
-    let container_url = parsed
-        .container_url(&container_name)
-        .map_err(|e| format!("Failed to build container URL: {e}"))?;
-    let url = Url::parse(&container_url).map_err(|e| format!("Invalid container URL: {e}"))?;
-
+    // The connection string and container URL were parsed and validated during
+    // `validate`; only credential construction remains here.
     let mut credential: Option<Arc<dyn TokenCredential>> = None;
 
     // Prepare options; attach Shared Key policy if needed
