@@ -452,10 +452,6 @@ fn find_orphaned_disk_buffers(
 
     let mut orphaned_buffers = Vec::new();
     while let Some(path) = pending.pop() {
-        if configured_buffer_paths.contains(&path) {
-            continue;
-        }
-
         let entries = match fs::read_dir(&path) {
             Ok(entries) => entries,
             Err(error) => {
@@ -498,7 +494,10 @@ fn find_orphaned_disk_buffers(
                 has_disk_buffer_file = true;
             }
         }
-        if has_disk_buffer_file {
+        let overlaps_configured_buffer = configured_buffer_paths
+            .iter()
+            .any(|configured_path| configured_path.starts_with(&path));
+        if has_disk_buffer_file && !overlaps_configured_buffer {
             orphaned_buffers.push(path);
         } else {
             pending.extend(child_directories);
@@ -607,23 +606,32 @@ mod tests {
         let buffer_root = data_dir.path().join("buffer").join("v2");
         let namespace = buffer_root.join("namespace");
         let configured = namespace.join("configured");
+        let nested_orphaned = configured.join("nested-orphaned");
         let orphaned = namespace.join("orphaned");
         let damaged = namespace.join("damaged");
+        let overlapping_orphan = namespace.join("overlapping-orphan");
+        let configured_descendant = overlapping_orphan.join("configured-descendant");
         let unrelated = buffer_root.join("unrelated");
         fs::create_dir_all(&configured).unwrap();
+        fs::create_dir(&nested_orphaned).unwrap();
         fs::create_dir(&orphaned).unwrap();
         fs::create_dir(&damaged).unwrap();
+        fs::create_dir_all(&configured_descendant).unwrap();
         fs::create_dir(&unrelated).unwrap();
+        fs::write(configured.join("buffer.db"), b"configured").unwrap();
+        fs::write(nested_orphaned.join("buffer.db"), b"nested orphan").unwrap();
         fs::write(orphaned.join("buffer.db"), b"ledger").unwrap();
         fs::write(damaged.join("buffer-data-42.dat"), b"data").unwrap();
+        fs::write(overlapping_orphan.join("buffer.db"), b"overlapping orphan").unwrap();
+        fs::write(configured_descendant.join("buffer.db"), b"configured").unwrap();
         fs::write(unrelated.join("other.db"), b"unrelated").unwrap();
         fs::write(unrelated.join("buffer-data-65535.dat"), b"reserved").unwrap();
         fs::write(buffer_root.join("not-a-buffer"), b"ignored").unwrap();
 
-        let configured_paths = HashSet::from([configured]);
+        let configured_paths = HashSet::from([configured, configured_descendant]);
         let actual = find_orphaned_disk_buffers(data_dir.path(), &configured_paths).unwrap();
 
-        assert_eq!(actual, vec![damaged, orphaned]);
+        assert_eq!(actual, vec![nested_orphaned, damaged, orphaned]);
     }
 
     #[test]
