@@ -24,6 +24,11 @@
       "what": "`encoding` field on HTTP server sources",
       "deprecated_since": "0.50.0",
       "description": "The `encoding` field will be removed. Use `decoding` and `framing` instead."
+    },
+    {
+      "what": "Environment-variable and secret placeholders in non-string positions",
+      "deprecated_since": "0.57.0",
+      "description": "Placeholders (`${VAR}` and `SECRET[backend.key]`) in structural positions of\na Vector configuration file are deprecated and will be removed in a future\nrelease. Current behavior is unchanged.\n\nAffected patterns:\n\n- Unquoted placeholders in non-string fields (`count = ${MY_COUNT}`).\n- Placeholders in map keys (`${KEY} = value`).\n- Placeholders in TOML table headers (`[${SECTION}]`).\n- Placeholders as inline array elements that expand to multiple values\n  (`inputs = [${VECTOR_INPUTS}]` where `VECTOR_INPUTS=a,b`).\n\nMigration guidance will accompany the removal PR. `envsubst` can be used today\nto pre-expand env-var placeholders into a fully static config as a workaround.\n\nSee [RFC: parse-first config interpolation](https://github.com/vectordotdev/vector/blob/master/rfcs/2026-06-09-parse-first-config-interpolation.md)\nfor the full rationale."
     }
   ],
   "deprecations_enacted": [

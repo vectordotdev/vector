@@ -594,6 +594,26 @@ generated: components: sources: socket: configuration: {
 			items: type: string: examples: ["['224.0.0.2', '224.0.0.4']"]
 		}
 	}
+	multicast_interface: {
+		description: """
+			The IPv4 interface address used when joining multicast groups.
+
+			Specifies which local network interface to use for receiving multicast traffic.
+			When not set, defaults to the socket's binding address.
+
+			Set this explicitly when the host has multiple interfaces and you need to control
+			which one receives multicast traffic. For example, `127.0.0.1` restricts multicast
+			reception to the loopback interface.
+
+			On macOS, specifying `0.0.0.0` only joins on the default network interface (typically
+			the primary Ethernet or Wi-Fi interface), unlike Linux, which joins on all interfaces.
+			If multicast traffic is expected on a specific interface (including loopback), set this
+			field explicitly.
+			"""
+		relevant_when: "mode = \"udp\""
+		required:      false
+		type: string: {}
+	}
 	path: {
 		description: """
 			The Unix socket path.

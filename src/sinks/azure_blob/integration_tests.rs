@@ -2,12 +2,14 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
-use azure_core::http::StatusCode;
+use vrl::event_path;
+
+use azure_core::http::{RequestContent, StatusCode};
 use azure_storage_blob::BlobContainerClient;
 
 use bytes::{Buf, BytesMut};
-use flate2::read::GzDecoder;
 use futures::{Stream, StreamExt, stream};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     ByteSizeOf,
     codecs::{
@@ -29,6 +31,34 @@ use crate::{
     },
     tls,
 };
+
+#[tokio::test]
+async fn azure_blob_uploads_one_shot_with_shared_key() {
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let client = config.build_test_client().await;
+    let blob_name = format!("one-shot/{}.blob", random_string(10));
+    let payload = vec![b'x'; 3 * 1024 * 1024];
+
+    client
+        .blob_client(&blob_name)
+        .upload(RequestContent::from(payload), None)
+        .await
+        .expect("one-shot upload should succeed");
+}
+
+#[tokio::test]
+async fn azure_blob_uploads_multipart_with_shared_key() {
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let client = config.build_test_client().await;
+    let blob_name = format!("multipart/{}.blob", random_string(10));
+    let payload = vec![b'x'; 5 * 1024 * 1024];
+
+    client
+        .blob_client(&blob_name)
+        .upload(RequestContent::from(payload), None)
+        .await
+        .expect("multipart upload should commit the block list");
+}
 
 #[tokio::test]
 async fn azure_blob_healthcheck_passed() {
@@ -310,6 +340,7 @@ impl AzureBlobSinkConfig {
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
             tls: None,
+            confinement: Default::default(),
         };
 
         config.ensure_container().await;
@@ -338,6 +369,7 @@ impl AzureBlobSinkConfig {
             tls: Some(azure_common::config::AzureBlobTlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             }),
+            confinement: Default::default(),
         };
 
         config.ensure_container().await;
@@ -484,7 +516,7 @@ impl AzureBlobSinkConfig {
         if self.compression == Compression::None {
             BufReader::new(body).lines().map(|l| l.unwrap()).collect()
         } else {
-            BufReader::new(GzDecoder::new(body))
+            BufReader::new(CappedDecoder::gzip(body).into_reader())
                 .lines()
                 .map(|l| l.unwrap())
                 .collect()
@@ -521,7 +553,7 @@ fn random_lines_with_stream_with_group_key(
         .map(move |(i, line)| {
             let mut log = LogEvent::from(line);
             let i = ((i / key) + 1) as i32;
-            log.insert("key", i);
+            log.insert(event_path!("key"), i);
             Event::from(log)
         })
         .fold((0, Vec::new()), |(mut size, mut events), event| {

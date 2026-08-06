@@ -384,6 +384,7 @@ mod tests {
     use chrono::Utc;
     use std::io::Cursor;
     use vector_core::event::{LogEvent, Value};
+    use vrl::event_path;
 
     /// Helper to encode events and return the decoded RecordBatch
     fn encode_and_decode(
@@ -403,7 +404,7 @@ mod tests {
     {
         let mut log = LogEvent::default();
         for (key, value) in fields {
-            log.insert(key, value.into());
+            log.insert(&vrl::path::parse_target_path(key).unwrap(), value.into());
         }
         Event::Log(log)
     }
@@ -445,25 +446,28 @@ mod tests {
 
             let mut log = LogEvent::default();
             // Primitive types
-            log.insert("string_field", "test");
-            log.insert("int8_field", 127);
-            log.insert("int16_field", 32000);
-            log.insert("int32_field", 1000000);
-            log.insert("int64_field", 42);
-            log.insert("uint8_field", 255);
-            log.insert("uint16_field", 65535);
-            log.insert("uint32_field", 4000000);
-            log.insert("uint64_field", 9000000000_i64);
-            log.insert("float32_field", 3.15);
-            log.insert("float64_field", 3.15);
-            log.insert("bool_field", true);
-            log.insert("timestamp_field", now);
-            log.insert("decimal_field", 99.99);
+            log.insert(event_path!("string_field"), "test");
+            log.insert(event_path!("int8_field"), 127);
+            log.insert(event_path!("int16_field"), 32000);
+            log.insert(event_path!("int32_field"), 1000000);
+            log.insert(event_path!("int64_field"), 42);
+            log.insert(event_path!("uint8_field"), 255);
+            log.insert(event_path!("uint16_field"), 65535);
+            log.insert(event_path!("uint32_field"), 4000000);
+            log.insert(event_path!("uint64_field"), 9000000000_i64);
+            log.insert(event_path!("float32_field"), 3.15);
+            log.insert(event_path!("float64_field"), 3.15);
+            log.insert(event_path!("bool_field"), true);
+            log.insert(event_path!("timestamp_field"), now);
+            log.insert(event_path!("decimal_field"), 99.99);
             // Complex types
-            log.insert("list_field", list_value);
-            log.insert("struct_field", Value::Object(tuple_value));
-            log.insert("named_struct_field", Value::Object(named_tuple_value));
-            log.insert("map_field", Value::Object(map_value));
+            log.insert(event_path!("list_field"), list_value);
+            log.insert(event_path!("struct_field"), Value::Object(tuple_value));
+            log.insert(
+                event_path!("named_struct_field"),
+                Value::Object(named_tuple_value),
+            );
+            log.insert(event_path!("map_field"), Value::Object(map_value));
 
             let events = vec![Event::Log(log)];
 
@@ -639,10 +643,10 @@ mod tests {
         fn test_encode_timestamp_precisions() {
             let now = Utc::now();
             let mut log = LogEvent::default();
-            log.insert("ts_second", now);
-            log.insert("ts_milli", now);
-            log.insert("ts_micro", now);
-            log.insert("ts_nano", now);
+            log.insert(event_path!("ts_second"), now);
+            log.insert(event_path!("ts_milli"), now);
+            log.insert(event_path!("ts_micro"), now);
+            log.insert(event_path!("ts_nano"), now);
 
             let events = vec![Event::Log(log)];
 
@@ -697,13 +701,13 @@ mod tests {
             let now = Utc::now();
 
             let mut log1 = LogEvent::default();
-            log1.insert("ts", "2025-10-22T10:18:44.256Z"); // RFC3339 String
+            log1.insert(event_path!("ts"), "2025-10-22T10:18:44.256Z"); // RFC3339 String
 
             let mut log2 = LogEvent::default();
-            log2.insert("ts", now); // Native Timestamp
+            log2.insert(event_path!("ts"), now); // Native Timestamp
 
             let mut log3 = LogEvent::default();
-            log3.insert("ts", 1729594724256000000_i64); // Integer (nanoseconds)
+            log3.insert(event_path!("ts"), 1729594724256000000_i64); // Integer (nanoseconds)
 
             let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
@@ -747,7 +751,7 @@ mod tests {
         #[test]
         fn test_config_allow_nullable_fields_overrides_schema() {
             let mut log1 = LogEvent::default();
-            log1.insert("strict_field", 42);
+            log1.insert(event_path!("strict_field"), 42);
             let log2 = LogEvent::default();
             let events = vec![Event::Log(log1), Event::Log(log2)];
 

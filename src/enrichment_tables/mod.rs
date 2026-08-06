@@ -35,6 +35,7 @@ pub mod mmdb;
 /// condition. We don't recommend using a condition that uses only date range searches.
 ///
 ///
+#[allow(clippy::large_enum_variant)]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -83,8 +84,8 @@ impl vector_lib::configurable::NamedComponent for EnrichmentTables {
 }
 
 impl GenerateConfig for EnrichmentTables {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::File(file::FileConfig {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::File(file::FileConfig {
             file: file::FileSettings {
                 path: "path/to/file".into(),
                 encoding: file::Encoding::default(),

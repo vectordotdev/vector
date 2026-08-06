@@ -88,8 +88,8 @@ fn default_locale() -> String {
 }
 
 impl GenerateConfig for GeoipConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             path: "/path/to/GeoLite2-City.mmdb".into(),
             locale: default_locale(),
         })
@@ -101,6 +101,7 @@ impl EnrichmentTableConfig for GeoipConfig {
     async fn build(
         &self,
         _: &crate::config::GlobalOptions,
+        _: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(Geoip::new(self.clone())?))
     }

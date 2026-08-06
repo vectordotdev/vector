@@ -98,7 +98,7 @@ impl From<udp::UdpConfig> for SocketConfig {
 }
 
 impl GenerateConfig for SocketConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"mode = "tcp"
             address = "0.0.0.0:9000""#,
@@ -139,6 +139,7 @@ impl SourceConfig for SocketConfig {
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     config.max_connection_duration_secs(),
@@ -397,10 +398,16 @@ mod test {
             .expect("Failed to bind UDP socket to OS-assigned port")
     }
 
-    pub fn bind_unused_udp_any() -> UdpSocket {
-        // Bind to port 0 to let the OS assign an available port
-        UdpSocket::bind((IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))
-            .expect("Failed to bind UDP socket to OS-assigned port")
+    /// Bind a UDP socket suitable for sending multicast packets through the loopback interface.
+    /// Sets `IP_MULTICAST_IF` to loopback so packets route through `lo` regardless of the
+    /// system's default multicast route, necessary for reliable local testing on macOS.
+    pub fn bind_unused_udp_multicast() -> UdpSocket {
+        let socket = UdpSocket::bind((IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))
+            .expect("Failed to bind UDP socket to OS-assigned port");
+        socket2::SockRef::from(&socket)
+            .set_multicast_if_v4(&Ipv4Addr::LOCALHOST)
+            .expect("Failed to set multicast interface to loopback");
+        socket
     }
 
     fn get_gelf_payload(message: &str) -> String {
@@ -1371,13 +1378,16 @@ mod test {
                 SocketAddr::new(IpAddr::V4(multicast_ip_address), socket_address.port());
             let mut config = UdpConfig::from_address(socket_address.into());
             config.multicast_groups = vec![multicast_ip_address];
+            // Use loopback as the multicast interface so local test packets are delivered
+            // on all platforms. Without this, macOS joins on the default network interface
+            // (e.g. en0) instead of loopback, and the sender's packets never arrive.
+            config.multicast_interface = Some(Ipv4Addr::LOCALHOST);
             init_udp_with_config(tx, config).await;
 
-            // We must send packets to the same interface the `socket_address` is bound to
-            // in order to receive the multicast packets the `from` socket sends.
-            // To do so, we use the `IPADDR_ANY` address
+            // Bind sender with loopback as the outgoing multicast interface so packets
+            // route through lo, matching the interface the receiver joined on.
             send_lines_udp_from(
-                bind_unused_udp_any(),
+                bind_unused_udp_multicast(),
                 multicast_socket_address,
                 ["test".to_string()],
             );
@@ -1405,9 +1415,10 @@ mod test {
                 .collect::<Vec<SocketAddr>>();
             let mut config = UdpConfig::from_address(socket_address.into());
             config.multicast_groups = multicast_ip_addresses;
+            config.multicast_interface = Some(Ipv4Addr::LOCALHOST);
             init_udp_with_config(tx, config).await;
 
-            let mut from = bind_unused_udp_any();
+            let mut from = bind_unused_udp_multicast();
             for multicast_ip_socket_address in multicast_ip_socket_addresses {
                 from = send_lines_udp_from(
                     from,
@@ -1435,11 +1446,13 @@ mod test {
                 SocketAddr::new(IpAddr::V4(multicast_ip_address), socket_address.port());
             let mut config = UdpConfig::from_address(socket_address.into());
             config.multicast_groups = vec![multicast_ip_address];
+            config.multicast_interface = Some(Ipv4Addr::LOCALHOST);
             init_udp_with_config(tx, config).await;
 
-            // Send packet to multicast address
+            // Send packet to multicast address using loopback as the outgoing interface
+            // so it routes through lo, matching the interface the receiver joined on.
             let _ = send_lines_udp_from(
-                bind_unused_udp_any(),
+                bind_unused_udp_multicast(),
                 multicast_socket_address,
                 ["test".to_string()],
             );

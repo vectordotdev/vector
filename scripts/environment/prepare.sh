@@ -36,12 +36,13 @@ CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
 CARGO_LLVM_COV_VERSION="0.8.4"
-WASM_PACK_VERSION="0.13.1"
+WASM_PACK_VERSION="0.15.0"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
 
 ALL_MODULES=(
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -82,6 +83,7 @@ Usage: $0 [--modules=mod1,mod2,...]
 
 Modules:
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -144,27 +146,14 @@ maybe_install_cargo_tool() {
   # --manifest-path, so vdev/Cargo.toml is the single source of truth.
   # `--disable-strategies compile` skips binstall's own crates.io compile
   # fallback (which would fail anyway on an unpublished version, and
-  # silently slow-paths a cache flake into a multi-minute build). If
-  # binstall fails for any reason — missing prebuilt for a freshly bumped
-  # version, or a transient cache/network issue — we fall back to building
-  # from the working tree. That gives PRs that bump vdev's version a
-  # working binary built from their own changes, and keeps master CI green
-  # in the gap between merging a vdev version bump and pushing the tag.
+  # silently slow-paths a cache flake into a multi-minute build). We always
+  # force the install because the version alone cannot identify the source
+  # code of an unmerged checkout. If no prebuilt binary exists, build the
+  # current checkout instead.
   if [[ "$tool" == "vdev" ]]; then
-    # Skip the install entirely when the cached binary already matches the
-    # version in vdev/Cargo.toml (the setup workflow restores ~/.cargo/bin/vdev
-    # from cache, but not binstall's resolution metadata, so without this check
-    # every job with `vdev: true` would re-hit GitHub releases).
-    local cargo_toml_version
-    cargo_toml_version=$(grep -E '^version = ' vdev/Cargo.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-    if vdev --version 2>/dev/null | grep -q "^vdev ${cargo_toml_version}$"; then
-      echo "vdev ${cargo_toml_version} already installed"
-      return 0
-    fi
-
     local installer=("${install[@]}")
     if [[ "${installer[0]}" == "binstall" ]]; then
-      installer+=(--disable-strategies compile)
+      installer+=(--force --disable-strategies compile)
       if ! cargo "${installer[@]}" --manifest-path vdev/Cargo.toml vdev; then
         echo "binstall failed; building vdev from the working tree..."
         cargo install -f --path vdev --locked
@@ -182,14 +171,14 @@ maybe_install_cargo_tool() {
     local should_install=true
     # Outside CI, preserve a newer-than-pin version the user already has.
     # `cargo install --force` would otherwise silently downgrade them.
-    if [[ -z "${CI:-}" ]]; then
+    if [[ "${CI:-}" != "true" ]]; then
       local current
       current=$($version_cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
       if [[ -n "$current" ]] && [[ "$current" != "$version" ]]; then
         local newest
         newest=$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)
         if [[ "$newest" == "$current" ]]; then
-          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=1 to force the pin."
+          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=true to force the pin."
           should_install=false
         fi
       fi
@@ -251,7 +240,7 @@ maybe_install_npm_tools() {
   # Outside CI, skip the global symlink to avoid a sudo write to /usr/local/bin
   # (or equivalent). The Makefile prepends this directory to PATH, so `make`
   # recipes find the tools automatically.
-  if [[ -z "${CI:-}" ]]; then
+  if [[ "${CI:-}" != "true" ]]; then
     echo "npm tools installed under ${npm_tools_dir}/node_modules/.bin"
     echo "Make recipes discover them automatically. To invoke directly from a"
     echo "shell, add the directory to your PATH:"
@@ -273,7 +262,7 @@ maybe_install_npm_tools() {
 # Set git safe.directory in CI where the repo may be checked out by a different
 # uid than the user running git. Skipped on workstations: the contributor owns
 # the checkout and a global config write is unnecessary.
-if [[ -n "${CI:-}" ]]; then
+if [[ "${CI:-}" == "true" ]]; then
   git config --global --add safe.directory "$(pwd)"
 fi
 
@@ -311,6 +300,21 @@ if contains_module rustup; then
   fi
 fi
 set -e -o verbose
+
+if contains_module protoc; then
+  if [[ "${CI:-}" == "true" ]]; then
+    protoc_dir="${RUNNER_TEMP:?RUNNER_TEMP must be set when CI is enabled}/protoc-bin"
+  else
+    protoc_dir="${HOME}/.local/bin"
+  fi
+
+  bash "${SCRIPT_DIR}/install-protoc.sh" "${protoc_dir}"
+  export PATH="${protoc_dir}:${PATH}"
+
+  if [[ -n "${GITHUB_PATH:-}" ]]; then
+    echo "${protoc_dir}" >> "${GITHUB_PATH}"
+  fi
+fi
 
 maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
 maybe_install_cargo_tool cross "${CROSS_VERSION}"

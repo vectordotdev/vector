@@ -13,7 +13,7 @@ use anyhow::{Context as _, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 
-use crate::utils::{self, platform};
+use crate::utils;
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -83,7 +83,6 @@ pub trait CommandExt {
     fn run(&mut self) -> Result<ExitStatus>;
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()>;
     fn pre_exec(&self);
-    fn features(&mut self, features: &[String]) -> &mut Self;
 }
 
 impl CommandExt for Command {
@@ -176,17 +175,6 @@ impl CommandExt for Command {
             }
         }
     }
-
-    fn features(&mut self, features: &[String]) -> &mut Self {
-        self.arg("--no-default-features");
-        self.arg("--features");
-        if features.is_empty() {
-            self.arg(platform::default_features());
-        } else {
-            self.arg(features.join(","));
-        }
-        self
-    }
 }
 
 /// Helper function to build an error message from command output
@@ -222,12 +210,16 @@ fn format_command_error(
 
 /// Short-cut wrapper to create a new command, feed in the args, set the working directory, and then
 /// run it, checking the resulting exit code.
-pub fn exec<T: AsRef<OsStr>>(
-    program: &str,
+pub fn exec<P: AsRef<OsStr>, T: AsRef<OsStr>>(
+    program: P,
     args: impl IntoIterator<Item = T>,
     in_repo: bool,
 ) -> Result<()> {
-    let mut command = match program.strip_prefix("scripts/") {
+    let program = program.as_ref();
+    let mut command = match program
+        .to_str()
+        .and_then(|program| program.strip_prefix("scripts/"))
+    {
         Some(script) => Command::script(script),
         None => Command::new(program),
     };
