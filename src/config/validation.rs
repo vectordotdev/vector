@@ -26,12 +26,6 @@ const EWMA_ALPHA_MAX: f64 = 1.0;
 /// The half-life value must be strictly greater than this value.
 const EWMA_HALF_LIFE_SECONDS_MIN: f64 = 0.0;
 
-#[derive(Clone, Copy)]
-struct MountpointDiskUsage {
-    total: u64,
-    available: u64,
-}
-
 /// Validates an optional EWMA alpha value and returns an error message if invalid.
 /// Returns `None` if the value is `None` or valid, otherwise returns an error message.
 fn validate_ewma_alpha(alpha: Option<f64>, field_name: &str) -> Option<String> {
@@ -315,18 +309,10 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
         match find_orphaned_disk_buffers(global_data_dir, &configured_buffer_paths) {
             Ok(orphaned_buffers) => {
                 for orphaned_buffer in orphaned_buffers {
-                    match directory_allocated_size(&orphaned_buffer) {
-                        Ok(allocated_bytes) => warn!(
-                            buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
-                            allocated_bytes,
-                            message = "Found a disk buffer not referenced by the new configuration. It may still be draining from the previous configuration during reload, but Vector will not reopen it on the next startup unless its component is restored.",
-                        ),
-                        Err(error) => warn!(
-                            buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
-                            %error,
-                            message = "Found a disk buffer not referenced by the new configuration, but failed to determine its size. It may still be draining during reload, but Vector will not reopen it on the next startup unless its component is restored.",
-                        ),
-                    }
+                    warn!(
+                        buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
+                        message = "Found a disk buffer not referenced by the new configuration. It may still be draining from the previous configuration during reload, but Vector will not reopen it on the next startup unless its component is restored.",
+                    );
                 }
             }
             Err(error) => warn!(
@@ -394,74 +380,30 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
         },
     );
 
-    // Finally, check both the total capacity and the capacity that the configured buffers can
-    // actually grow into. Existing files belonging to configured buffers are recyclable, while
-    // unrelated files and orphaned buffers are not.
+    // Finally, we have a mapping of disk buffers, based on their underlying mountpoint. Go through
+    // and check to make sure the sum total of `max_size` for all buffers associated with each
+    // mountpoint does not exceed that mountpoint's total capacity.
+    //
+    // We specifically do not do any sort of warning on free space because that has to be the
+    // responsibility of the operator to ensure there's enough total space for all buffers present.
     let mut errors = Vec::new();
 
     for (mountpoint, buffers) in mountpoint_buffer_mapping {
-        let buffer_max_size_total = buffers
-            .iter()
-            .fold(0u64, |total, usage| total.saturating_add(usage.max_size()));
-        let mountpoint_usage = mountpoints
+        let buffer_max_size_total: u64 = buffers.iter().map(|usage| usage.max_size()).sum();
+        let mountpoint_total_capacity = mountpoints
             .get(&mountpoint)
             .copied()
             .expect("mountpoint must exist");
 
-        let component_ids = buffers
-            .iter()
-            .map(|usage| usage.id().id())
-            .collect::<Vec<_>>();
-
-        if buffer_max_size_total > mountpoint_usage.total {
+        if buffer_max_size_total > mountpoint_total_capacity {
+            let component_ids = buffers
+                .iter()
+                .map(|usage| usage.id().id())
+                .collect::<Vec<_>>();
             errors.push(format!(
                 "Mountpoint '{}' has total capacity of {} bytes, but configured buffers using mountpoint have total maximum size of {} bytes. \
 Reduce the `max_size` of the buffers to fit within the total capacity of the mountpoint. (components associated with mountpoint: {})",
-                mountpoint.to_string_lossy(), mountpoint_usage.total, buffer_max_size_total, component_ids.join(", "),
-            ));
-            continue;
-        }
-
-        let configured_buffer_allocated_bytes = buffers.iter().fold(0u64, |total, usage| {
-            match directory_allocated_size(usage.data_dir()) {
-                Ok(size) => total.saturating_add(size),
-                Err(error) if error.kind() == io::ErrorKind::NotFound => total,
-                Err(error) => {
-                    warn!(
-                        buffer_id = usage.id().id(),
-                        buffer_dir = usage.data_dir().to_string_lossy().as_ref(),
-                        %error,
-                        message = "Failed to determine current disk buffer size. Treating it as zero for available-space validation.",
-                    );
-                    total
-                }
-            }
-        });
-        let available_bytes = match heim::disk::usage(&mountpoint).await {
-            Ok(usage) => mountpoint_usage.available.min(usage.free().get::<byte>()),
-            Err(error) => {
-                warn!(
-                    mountpoint = mountpoint.to_string_lossy().as_ref(),
-                    %error,
-                    message = "Failed to refresh available disk space after measuring configured buffers. Using the initial measurement.",
-                );
-                mountpoint_usage.available
-            }
-        };
-
-        if !has_sufficient_buffer_capacity(
-            buffer_max_size_total,
-            available_bytes,
-            configured_buffer_allocated_bytes,
-        ) {
-            errors.push(format!(
-                "Mountpoint '{}' has {} bytes available and {} bytes currently allocated to configured buffers, but those buffers have a total maximum size of {} bytes. \
-Free disk space, remove orphaned buffers after confirming their data is no longer needed, or reduce the configured `max_size`. (components associated with mountpoint: {})",
-                mountpoint.to_string_lossy(),
-                available_bytes,
-                configured_buffer_allocated_bytes,
-                buffer_max_size_total,
-                component_ids.join(", "),
+                mountpoint.to_string_lossy(), mountpoint_total_capacity, buffer_max_size_total, component_ids.join(", "),
             ));
         }
     }
@@ -473,32 +415,13 @@ Free disk space, remove orphaned buffers after confirming their data is no longe
     }
 }
 
-const fn has_sufficient_buffer_capacity(
-    maximum_buffer_bytes: u64,
-    available_bytes: u64,
-    configured_buffer_allocated_bytes: u64,
-) -> bool {
-    maximum_buffer_bytes <= available_bytes.saturating_add(configured_buffer_allocated_bytes)
-}
-
-async fn process_partitions(
-    partitions: Vec<Partition>,
-) -> heim::Result<IndexMap<PathBuf, MountpointDiskUsage>> {
+async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap<PathBuf, u64>> {
     stream::iter(partitions)
         .map(Ok)
         .and_then(|partition| {
             let mountpoint_path = partition.mount_point().to_path_buf();
-            heim::disk::usage(mountpoint_path.clone()).map(|usage| {
-                usage.map(|usage| {
-                    (
-                        mountpoint_path,
-                        MountpointDiskUsage {
-                            total: usage.total().get::<byte>(),
-                            available: usage.free().get::<byte>(),
-                        },
-                    )
-                })
-            })
+            heim::disk::usage(mountpoint_path.clone())
+                .map(|usage| usage.map(|usage| (mountpoint_path, usage.total().get::<byte>())))
         })
         .try_collect::<IndexMap<_, _>>()
         .await
@@ -529,65 +452,20 @@ fn find_orphaned_disk_buffers(
             continue;
         }
 
-        if configured_buffer_paths
-            .iter()
-            .any(|configured_path| configured_path.starts_with(&path))
-        {
-            for entry in fs::read_dir(path)? {
-                let entry = entry?;
-                if entry.file_type()?.is_dir() {
-                    pending.push(entry.path());
-                }
-            }
-        } else {
+        if path.join("buffer.db").is_file() {
             orphaned_buffers.push(path);
+            continue;
+        }
+
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                pending.push(entry.path());
+            }
         }
     }
     orphaned_buffers.sort();
     Ok(orphaned_buffers)
-}
-
-fn directory_allocated_size(path: &Path) -> io::Result<u64> {
-    let mut total = 0u64;
-    let mut pending = vec![path.to_path_buf()];
-
-    while let Some(path) = pending.pop() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let file_type = match entry.file_type() {
-                Ok(file_type) => file_type,
-                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(error),
-            };
-            if file_type.is_symlink() {
-                continue;
-            }
-            let metadata = match entry.metadata() {
-                Ok(metadata) => metadata,
-                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(error),
-            };
-            if file_type.is_dir() {
-                pending.push(entry.path());
-            } else if file_type.is_file() {
-                total = total.saturating_add(file_allocated_size(&metadata));
-            }
-        }
-    }
-
-    Ok(total)
-}
-
-#[cfg(unix)]
-fn file_allocated_size(metadata: &fs::Metadata) -> u64 {
-    use std::os::unix::fs::MetadataExt;
-
-    metadata.blocks().saturating_mul(512)
-}
-
-#[cfg(not(unix))]
-fn file_allocated_size(metadata: &fs::Metadata) -> u64 {
-    metadata.len()
 }
 
 pub fn warnings(config: &Config) -> Vec<String> {
@@ -669,44 +547,7 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use super::{
-        directory_allocated_size, find_orphaned_disk_buffers, has_sufficient_buffer_capacity,
-    };
-
-    const GIBIBYTE: u64 = 1024 * 1024 * 1024;
-
-    #[test]
-    fn rejects_maximum_that_cannot_be_reached_with_current_free_space() {
-        let maximum_buffer_bytes = 400 * GIBIBYTE;
-
-        assert!(!has_sufficient_buffer_capacity(
-            maximum_buffer_bytes,
-            250 * GIBIBYTE,
-            0,
-        ));
-        assert!(!has_sufficient_buffer_capacity(
-            maximum_buffer_bytes,
-            100 * GIBIBYTE,
-            150 * GIBIBYTE,
-        ));
-        assert!(has_sufficient_buffer_capacity(
-            maximum_buffer_bytes,
-            250 * GIBIBYTE,
-            150 * GIBIBYTE,
-        ));
-
-        let full_existing_buffer = 300 * GIBIBYTE;
-        assert!(has_sufficient_buffer_capacity(
-            full_existing_buffer,
-            200 * GIBIBYTE,
-            full_existing_buffer,
-        ));
-        assert!(!has_sufficient_buffer_capacity(
-            full_existing_buffer,
-            200 * GIBIBYTE,
-            0,
-        ));
-    }
+    use super::find_orphaned_disk_buffers;
 
     #[test]
     fn finds_only_unconfigured_disk_buffer_directories() {
@@ -715,8 +556,12 @@ mod tests {
         let namespace = buffer_root.join("namespace");
         let configured = namespace.join("configured");
         let orphaned = namespace.join("orphaned");
+        let unrelated = buffer_root.join("unrelated");
         fs::create_dir_all(&configured).unwrap();
         fs::create_dir(&orphaned).unwrap();
+        fs::create_dir(&unrelated).unwrap();
+        fs::write(orphaned.join("buffer.db"), b"ledger").unwrap();
+        fs::write(unrelated.join("other.db"), b"unrelated").unwrap();
         fs::write(buffer_root.join("not-a-buffer"), b"ignored").unwrap();
 
         let configured_paths = HashSet::from([configured]);
@@ -732,16 +577,5 @@ mod tests {
         let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
 
         assert!(actual.is_empty());
-    }
-
-    #[test]
-    fn measures_files_in_nested_buffer_directories() {
-        let data_dir = tempdir().unwrap();
-        let nested = data_dir.path().join("nested");
-        fs::create_dir(&nested).unwrap();
-        fs::write(data_dir.path().join("ledger"), vec![0u8; 4096]).unwrap();
-        fs::write(nested.join("buffer-data"), vec![0u8; 4096]).unwrap();
-
-        assert!(directory_allocated_size(data_dir.path()).unwrap() >= 8192);
     }
 }

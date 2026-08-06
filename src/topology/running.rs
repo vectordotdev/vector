@@ -25,7 +25,7 @@ use vector_lib::{
 };
 
 use super::{
-    BuiltBuffer, TaskHandle,
+    BuiltBuffer, TaskHandle, TaskResult,
     builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
@@ -757,7 +757,10 @@ impl RunningTopology {
             if wait_for_sinks.contains(key) {
                 debug!(message = "Waiting for sink to shutdown.", component_id = %key);
                 if let Some(usage_handles) = drain {
-                    await_sink_buffer_drain(previous, (*key).clone(), usage_handles).await;
+                    await_sink_buffer_drain(previous, (*key).clone(), usage_handles)
+                        .await
+                        .unwrap()
+                        .unwrap();
                 } else {
                     previous.await.unwrap().unwrap();
                 }
@@ -1584,7 +1587,7 @@ async fn await_sink_buffer_drain(
     mut task: TaskHandle,
     component_id: ComponentKey,
     usage_handles: Vec<DiskBufferUsageHandle>,
-) {
+) -> Result<TaskResult, tokio::task::JoinError> {
     let initial = disk_buffer_usage(&usage_handles);
     info!(
         component_id = %component_id,
@@ -1599,7 +1602,7 @@ async fn await_sink_buffer_drain(
         tokio::select! {
             result = &mut task => {
                 let remaining = disk_buffer_usage(&usage_handles);
-                let task_error = match result {
+                let task_error = match &result {
                     Ok(Ok(_)) => None,
                     Ok(Err(error)) => Some(error.to_string()),
                     Err(error) => Some(error.to_string()),
@@ -1626,7 +1629,7 @@ async fn await_sink_buffer_drain(
                         message = "Disk buffer drain stopped before all events were delivered. The orphaned buffer still contains unread data.",
                     );
                 }
-                return;
+                return result;
             }
             _ = progress_interval.tick() => {
                 let remaining = disk_buffer_usage(&usage_handles);

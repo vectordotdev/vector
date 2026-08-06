@@ -559,6 +559,12 @@ where
         self.disk_usage_handle.decrement(0, total_record_size);
     }
 
+    /// Removes an unread data file tail that could not be interpreted as a record.
+    pub fn track_abandoned_tail_bytes(&self, total_size: u64) {
+        self.decrement_total_buffer_size(total_size);
+        self.disk_usage_handle.decrement(0, total_size);
+    }
+
     /// Marks the writer as finished.
     ///
     /// If the writer was not yet marked done, `false` is returned.  Otherwise, `true` is returned,
