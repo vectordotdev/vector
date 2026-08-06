@@ -13,6 +13,16 @@ mod sketches;
 
 use super::*;
 
+// Metrics may take a moment to flow through to fakeintake, so pipeline
+// fetches are retried until data shows up (or we give up).
+//
+// The dogstatsd emitter deliberately waits 10s after startup before sending
+// any metrics (tests/e2e/datadog-metrics/dogstatsd_client/client.py), and the
+// Agent's default aggregator flush interval (~15s) adds further delay on top
+// of that before metrics reach fakeintake. 45s covers that ~25s worst case
+// with margin for network/processing overhead.
+const MAX_RETRIES: usize = 45;
+
 async fn decompress_payload(payload: &[u8]) -> std::io::Result<Vec<u8>> {
     if is_zstd(payload) {
         let mut decompressor = ZstdDecoder::new(payload);
@@ -115,10 +125,6 @@ where
 #[tokio::test]
 async fn validate() {
     trace_init();
-
-    // Even with configuring docker service dependencies, we need a small buffer of time
-    // to ensure events flow through to fakeintake before asking for them
-    std::thread::sleep(std::time::Duration::from_secs(2));
 
     series::validate().await;
 

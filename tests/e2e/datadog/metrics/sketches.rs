@@ -74,6 +74,23 @@ fn generate_sketch_intake(mut payloads: Vec<SketchPayload>) -> SketchIntake {
     intake
 }
 
+fn has_distribution(sketches: &SketchIntake) -> bool {
+    sketches
+        .keys()
+        .any(|ctx| ctx.metric_name.starts_with("foo_metric.distribution"))
+}
+
+// whether the sketch intake looks complete, i.e. the expected distribution
+// metric has arrived. Used to decide whether it's worth continuing to poll fakeintake.
+//
+// This is tied to the dogstatsd emitter (tests/e2e/datadog-metrics/dogstatsd_client/client.py),
+// which always emits a distribution metric once per run. fakeintake has no "wait until this
+// test's data is complete" API of its own, so we have to infer readiness from what the emitter
+// is known to send.
+fn sketch_intake_is_complete(sketches: &SketchIntake) -> bool {
+    !sketches.is_empty() && has_distribution(sketches)
+}
+
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
 fn common_sketch_assertions(sketches: &SketchIntake) {
@@ -81,28 +98,37 @@ fn common_sketch_assertions(sketches: &SketchIntake) {
     assert!(!sketches.is_empty());
     info!("metric sketch received: {}", sketches.len());
 
-    let mut found = false;
-    sketches.keys().for_each(|ctx| {
-        if ctx.metric_name.starts_with("foo_metric.distribution") {
-            found = true;
-        }
-    });
-
-    assert!(found, "Didn't receive metric type distribution");
+    assert!(
+        has_distribution(sketches),
+        "Didn't receive metric type distribution"
+    );
 }
 
 async fn get_sketches_from_pipeline(address: String) -> SketchIntake {
     info!("getting sketch payloads");
-    let payloads =
-        get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SKETCHES_ENDPOINT).await;
 
-    info!("unpacking payloads");
-    let payloads = unpack_proto_payloads(&payloads)
-        .await
-        .expect("Failed to unpack sketch payloads");
+    // Retry until we have sketch data or hit max retries. This is to ensure
+    // events flow through to fakeintake before asking for them, and that the
+    // data has stabilized (see `poll_until_stable`).
+    let sketches = poll_until_stable(
+        MAX_RETRIES,
+        WAIT_INTERVAL,
+        STABLE_WAIT_INTERVAL,
+        || async {
+            let payloads =
+                get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SKETCHES_ENDPOINT).await;
 
-    info!("generating sketch intake");
-    let sketches = generate_sketch_intake(payloads);
+            info!("unpacking payloads");
+            let payloads: Vec<SketchPayload> = unpack_proto_payloads(&payloads)
+                .await
+                .expect("Failed to unpack sketch payloads");
+
+            info!("generating sketch intake");
+            generate_sketch_intake(payloads)
+        },
+        |sketches: &SketchIntake| sketch_intake_is_complete(sketches),
+    )
+    .await;
 
     common_sketch_assertions(&sketches);
 

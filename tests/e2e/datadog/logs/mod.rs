@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use serde_json::Value;
 use tracing::info;
 use vector::test_util::trace_init;
@@ -8,7 +6,6 @@ use super::*;
 
 const LOGS_ENDPOINT: &str = "/api/v2/logs";
 const MAX_RETRIES: usize = 10;
-const WAIT_INTERVAL: Duration = Duration::from_secs(1);
 
 fn expected_log_events() -> usize {
     std::env::var("EXPECTED_LOG_EVENTS")
@@ -76,22 +73,18 @@ async fn validate() {
     // Retry until we have log payloads or hit max retries.
     // This is to ensure events flow through to fakeintake before asking for them.
     info!("getting log payloads from agent-only pipeline");
-    let mut agent_payloads = Vec::new();
-    for _ in 0..MAX_RETRIES {
-        agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
-            &fake_intake_agent_address(),
-            LOGS_ENDPOINT,
-        )
-        .await
-        .payloads;
-
-        if !agent_payloads.is_empty() {
-            break;
-        }
-
-        info!("No valid payloads yet, retrying...");
-        tokio::time::sleep(WAIT_INTERVAL).await;
-    }
+    let agent_address = fake_intake_agent_address();
+    let mut agent_payloads = poll_until(
+        MAX_RETRIES,
+        WAIT_INTERVAL,
+        || async {
+            get_fakeintake_payloads::<FakeIntakeResponseJson>(&agent_address, LOGS_ENDPOINT)
+                .await
+                .payloads
+        },
+        |payloads: &Vec<_>| !payloads.is_empty(),
+    )
+    .await;
 
     // If we still don't have valid payloads after retries, fail the test
     assert!(
