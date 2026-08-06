@@ -494,14 +494,10 @@ fn find_orphaned_disk_buffers(
                 has_disk_buffer_file = true;
             }
         }
-        let overlaps_configured_buffer = configured_buffer_paths
-            .iter()
-            .any(|configured_path| configured_path.starts_with(&path));
-        if has_disk_buffer_file && !overlaps_configured_buffer {
+        if has_disk_buffer_file && !configured_buffer_paths.contains(&path) {
             orphaned_buffers.push(path);
-        } else {
-            pending.extend(child_directories);
         }
+        pending.extend(child_directories);
     }
     orphaned_buffers.sort();
     Ok(orphaned_buffers)
@@ -631,7 +627,10 @@ mod tests {
         let configured_paths = HashSet::from([configured, configured_descendant]);
         let actual = find_orphaned_disk_buffers(data_dir.path(), &configured_paths).unwrap();
 
-        assert_eq!(actual, vec![nested_orphaned, damaged, orphaned]);
+        assert_eq!(
+            actual,
+            vec![nested_orphaned, damaged, orphaned, overlapping_orphan]
+        );
     }
 
     #[test]
