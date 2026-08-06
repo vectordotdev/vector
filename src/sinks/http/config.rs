@@ -396,7 +396,7 @@ impl HttpSinkConfig {
     /// templated headers happens here (not in `validate`) because the
     /// `component_name` threaded from the `opentelemetry`/`axiom` delegations
     /// must appear in per-template security warnings.
-    async fn build_from_validated(
+    pub(crate) async fn build_from_validated(
         &self,
         validated: &ValidatedHttp,
         cx: SinkContext,
