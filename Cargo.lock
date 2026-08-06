@@ -2848,7 +2848,7 @@ dependencies = [
  "memchr",
  "metrics",
  "opentelemetry-proto",
- "ordered-float 5.3.0",
+ "ordered-float 4.6.0",
  "parquet",
  "pin-project",
  "prost 0.12.6",
@@ -7155,7 +7155,7 @@ dependencies = [
  "itoa",
  "lockfree-object-pool",
  "metrics",
- "metrics-util 0.18.0",
+ "metrics-util",
  "once_cell",
  "tracing 0.1.44",
  "tracing-core 0.1.36",
@@ -7177,24 +7177,6 @@ dependencies = [
  "ordered-float 4.6.0",
  "quanta",
  "radix_trie",
- "sketches-ddsketch",
-]
-
-[[package]]
-name = "metrics-util"
-version = "0.20.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96f8722f8562635f92f8ed992f26df0532266eb03d5202607c20c0d7e9745e13"
-dependencies = [
- "crossbeam-epoch",
- "crossbeam-utils",
- "hashbrown 0.16.0",
- "indexmap 2.12.0",
- "metrics",
- "ordered-float 5.3.0",
- "rand 0.9.4",
- "rand_xoshiro",
- "rapidhash",
  "sketches-ddsketch",
 ]
 
@@ -8087,7 +8069,7 @@ dependencies = [
  "chrono",
  "glob",
  "hex",
- "ordered-float 5.3.0",
+ "ordered-float 4.6.0",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "tonic 0.11.0",
@@ -8118,15 +8100,6 @@ name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "ordered-float"
-version = "5.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7d950ca161dc355eaf28f82b11345ed76c6e1f6eb1f4f4479e0323b9e2fbd0e"
 dependencies = [
  "num-traits",
 ]
@@ -9514,15 +9487,6 @@ name = "rand_xorshift"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
-dependencies = [
- "rand_core 0.9.0",
-]
-
-[[package]]
-name = "rand_xoshiro"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
 dependencies = [
  "rand_core 0.9.0",
 ]
@@ -13346,7 +13310,7 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "openssl-src",
- "ordered-float 5.3.0",
+ "ordered-float 4.6.0",
  "parquet",
  "pastey",
  "percent-encoding",
@@ -13481,9 +13445,9 @@ dependencies = [
  "memmap2",
  "metrics",
  "metrics-tracing-context",
- "metrics-util 0.20.4",
+ "metrics-util",
  "num-traits",
- "ordered-float 5.3.0",
+ "ordered-float 4.6.0",
  "pastey",
  "proptest",
  "quickcheck",
@@ -13625,14 +13589,14 @@ dependencies = [
  "ipnet",
  "metrics",
  "metrics-tracing-context",
- "metrics-util 0.20.4",
+ "metrics-util",
  "mlua",
  "ndarray",
  "ndarray-stats",
  "no-proxy",
  "noisy_float",
  "openssl",
- "ordered-float 5.3.0",
+ "ordered-float 4.6.0",
  "parking_lot",
  "pin-project",
  "proptest",
