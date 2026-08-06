@@ -16,7 +16,7 @@ use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::Future
 use http::uri::{InvalidUri, Scheme, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     Code, Request, Status,
@@ -29,9 +29,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     finalizer::UnorderedFinalizer,
-    internal_event::{
-        ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
-    },
+    internal_event::{EventsReceived, Registered},
     lookup::owned_value_path,
 };
 use vrl::{
@@ -46,8 +44,8 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     internal_events::{
-        GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
-        StreamClosedError,
+        EndpointBytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError,
+        GcpPubsubStreamingPullError, StreamClosedError,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -67,6 +65,32 @@ const MAX_ACK_DEADLINE_SECS: u64 = 600;
 const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
+
+struct AckRequest {
+    ids: Vec<String>,
+    // Set during shutdown to wait until the request stream has pulled the final ack request.
+    consumed: Option<oneshot::Sender<()>>,
+}
+
+impl AckRequest {
+    const fn new(ids: Vec<String>) -> Self {
+        Self {
+            ids,
+            consumed: None,
+        }
+    }
+
+    fn new_with_consumed_signal(ids: Vec<String>) -> (Self, oneshot::Receiver<()>) {
+        let (sender, receiver) = oneshot::channel();
+        (
+            Self {
+                ids,
+                consumed: Some(sender),
+            },
+            receiver,
+        )
+    }
+}
 
 // prost emits some generated code that includes clones on `Arc`
 // objects, which causes a clippy ding on this block. We don't
@@ -305,8 +329,8 @@ impl SourceConfig for PubsubConfig {
 
         let protocol = uri
             .scheme()
-            .map(|scheme| Protocol(scheme.to_string().into()))
-            .unwrap_or(Protocol::HTTP);
+            .map(|scheme| scheme.to_string())
+            .unwrap_or_else(|| "http".to_string());
 
         let source = PubsubSource {
             endpoint,
@@ -331,7 +355,7 @@ impl SourceConfig for PubsubConfig {
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
-            bytes_received: register!(BytesReceived::from(protocol)),
+            protocol,
             events_received: register!(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
@@ -399,7 +423,7 @@ struct PubsubSource {
     concurrency: Arc<AtomicUsize>,
     full_response_size: usize,
     log_namespace: LogNamespace,
-    bytes_received: Registered<BytesReceived>,
+    protocol: String,
     events_received: Registered<EventsReceived>,
 }
 
@@ -518,23 +542,60 @@ impl PubsubSource {
         };
         let mut stream = stream.into_inner();
 
-        let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
+        let (finalizer, mut ack_stream) = Finalizer::maybe_new(self.acknowledgements, None);
         let mut pending_acks = 0;
+        let mut shutting_down = false;
 
         loop {
             tokio::select! {
                 biased;
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
-                    pending_acks -= 1;
-                    if status == BatchStatus::Delivered {
-                        ack_ids_sender
-                            .send(receipts)
-                            .await
-                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                _ = &mut self.shutdown, if !shutting_down => {
+                    if pending_acks == 0 {
+                        return State::Shutdown;
+                    }
+                    shutting_down = true;
+                    debug!(
+                        pending_acks,
+                        "Draining pending acknowledgements before shutting down."
+                    );
+                },
+                receipts = ack_stream.next(), if pending_acks > 0 => match receipts {
+                    Some((status, receipts)) => {
+                        pending_acks -= 1;
+                        let shutdown_drained = shutting_down && pending_acks == 0;
+                        if status == BatchStatus::Delivered {
+                            if shutdown_drained {
+                                let (request, consumed) =
+                                    AckRequest::new_with_consumed_signal(receipts);
+                                ack_ids_sender
+                                    .send(request)
+                                    .await
+                                    .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                                if consumed.await.is_err() {
+                                    debug!(
+                                        "Ack request stream closed before final acknowledgement was consumed."
+                                    );
+                                }
+                            } else {
+                                ack_ids_sender
+                                    .send(AckRequest::new(receipts))
+                                    .await
+                                    .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                            }
+                        }
+                        if shutdown_drained {
+                            return State::Shutdown;
+                        }
+                    }
+                    None => {
+                        warn!("Acknowledgement finalizer stream ended before all acknowledgements were processed.");
+                        if shutting_down {
+                            return State::Shutdown;
+                        }
+                        break State::RetryNow;
                     }
                 },
-                response = stream.next() => match response {
+                response = stream.next(), if !shutting_down => match response {
                     Some(Ok(response)) => {
                         self.handle_response(
                             response,
@@ -547,12 +608,11 @@ impl PubsubSource {
                     Some(Err(error)) => break translate_error(error),
                     None => break State::RetryNow,
                 },
-                _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
-                _ = self.token_generator.changed() => {
+                _ = self.token_generator.changed(), if !shutting_down => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                _ = tokio::time::sleep(self.keepalive) => {
+                _ = tokio::time::sleep(self.keepalive), if !shutting_down => {
                     if pending_acks == 0 {
                         // No pending acks, and no new data, so drop
                         // this stream if we aren't the only active
@@ -572,7 +632,7 @@ impl PubsubSource {
                     // in a new request with empty fields, effectively
                     // a keepalive.
                     ack_ids_sender
-                        .send(Vec::new())
+                        .send(AckRequest::new(Vec::new()))
                         .await
                         .unwrap_or_else(|_| unreachable!("request stream never closes"));
                 }
@@ -582,7 +642,7 @@ impl PubsubSource {
 
     fn request_stream(
         &self,
-        ack_ids: mpsc::Receiver<Vec<String>>,
+        ack_ids: mpsc::Receiver<AckRequest>,
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static + use<> {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
@@ -600,13 +660,23 @@ impl PubsubSource {
             }
         })
         .chain(ack_ids.map(|chunks| {
+            let mut ack_ids = Vec::new();
+            for request in chunks {
+                ack_ids.extend(request.ids);
+                if let Some(consumed) = request.consumed
+                    && consumed.send(()).is_err()
+                {
+                    debug!("Ack request was consumed after shutdown completed.");
+                }
+            }
+
             // These "requests" serve only to send updates about
             // acknowledgements to the server. None of the above
             // fields need to be repeated and, in fact, will cause
             // an stream error and cancellation if they are
             // present.
             proto::StreamingPullRequest {
-                ack_ids: chunks.into_iter().flatten().collect(),
+                ack_ids,
                 ..Default::default()
             }
         }))
@@ -616,14 +686,18 @@ impl PubsubSource {
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
-        ack_ids: &mpsc::Sender<Vec<String>>,
+        ack_ids: &mpsc::Sender<AckRequest>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
     ) {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
-        self.bytes_received.emit(ByteSize(response.size_of()));
+        emit!(EndpointBytesReceived {
+            byte_size: response.size_of(),
+            protocol: &self.protocol,
+            endpoint: &self.subscription,
+        });
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let (events, ids) = self.parse_messages(response.received_messages, batch).await;
@@ -633,7 +707,7 @@ impl PubsubSource {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
-                    .send(ids)
+                    .send(AckRequest::new(ids))
                     .await
                     .unwrap_or_else(|_| unreachable!("request stream never closes")),
                 Some(notifier) => {
@@ -877,7 +951,6 @@ mod integration_tests {
         LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn oneshot() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -889,7 +962,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_before_data_received() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
@@ -902,7 +974,6 @@ mod integration_tests {
         assert_eq!(tester.pull_count(1).await, 1);
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_after_data_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -926,7 +997,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn streams_data() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -940,7 +1010,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn sends_attributes() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -957,7 +1026,6 @@ mod integration_tests {
         .await;
     }
 
-    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn acks_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -1056,7 +1124,7 @@ mod integration_tests {
 
             let body = json!({
                 "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
-                "ackDeadlineSeconds": *ACK_DEADLINE,
+                "ackDeadlineSeconds": ACK_DEADLINE.as_secs(),
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
 
@@ -1153,7 +1221,7 @@ mod integration_tests {
         }
 
         async fn shutdown(&self, mut shutdown: shutdown::SourceShutdownCoordinator) {
-            let deadline = Instant::now() + Duration::from_secs(1);
+            let deadline = Instant::now() + Duration::from_secs(10);
             let shutdown = shutdown.shutdown_source(&self.component, deadline);
             assert!(shutdown.await);
         }
@@ -1167,7 +1235,7 @@ mod integration_tests {
         } = test_data;
 
         let events: Vec<Event> = tokio::time::timeout(
-            Duration::from_secs(1),
+            Duration::from_secs(30),
             test_util::collect_n_stream(rx, lines.len()),
         )
         .await
