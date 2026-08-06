@@ -1,5 +1,3 @@
-use std::fmt;
-
 use snafu::ResultExt;
 use vector_lib::{
     codecs::{JsonSerializerConfig, encoding::Serializer},
@@ -65,24 +63,14 @@ impl SinkConfig for WebSocketSinkConfig {
 
 /// Purely validated `websocket` sink configuration.
 ///
-/// Holds the built connector (which resolves TLS settings and parses the URI)
-/// and the built encoding components so `build` does not redo the (pure)
-/// structural validation.
-#[derive(Clone)]
+/// Holds the built encoding components so `build` does not redo the (pure)
+/// structural validation. The connector is NOT retained here: it resolves TLS
+/// settings (which may read certificate files from disk), so it is built in
+/// `build` instead.
+#[derive(Clone, Debug)]
 pub struct ValidatedWebSocketSink {
-    connector: WebSocketConnector,
     transformer: Transformer,
     serializer: Serializer,
-}
-
-impl fmt::Debug for ValidatedWebSocketSink {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ValidatedWebSocketSink")
-            .field("connector", &"<WebSocketConnector>")
-            .field("transformer", &self.transformer)
-            .field("serializer", &self.serializer)
-            .finish()
-    }
 }
 
 #[async_trait::async_trait]
@@ -90,11 +78,9 @@ impl ValidatedSink for WebSocketSinkConfig {
     type Validated = ValidatedWebSocketSink;
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
-        let connector = self.build_connector()?;
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
         Ok(ValidatedWebSocketSink {
-            connector,
             transformer,
             serializer,
         })
@@ -105,8 +91,10 @@ impl ValidatedSink for WebSocketSinkConfig {
         validated: &ValidatedWebSocketSink,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
+        // TLS settings may read certificate files from disk, so the connector is
+        // resolved at build time rather than during pure validation.
+        let connector = self.build_connector()?;
         let ValidatedWebSocketSink {
-            connector,
             transformer,
             serializer,
         } = validated;
@@ -117,7 +105,6 @@ impl ValidatedSink for WebSocketSinkConfig {
             serializer.clone(),
         )?;
 
-        let connector = connector.clone();
         Ok((
             VectorSink::from_event_streamsink(ws_sink),
             Box::pin(async move { connector.healthcheck().await }),
