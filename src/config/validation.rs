@@ -516,7 +516,8 @@ fn is_disk_buffer_file(file_name: &std::ffi::OsStr) -> bool {
         .to_str()
         .and_then(|name| name.strip_prefix("buffer-data-"))
         .and_then(|name| name.strip_suffix(".dat"))
-        .is_some_and(|file_id| file_id.parse::<u16>().is_ok())
+        .and_then(|file_id| file_id.parse::<u16>().ok())
+        .is_some_and(|file_id| file_id < u16::MAX)
 }
 
 pub fn warnings(config: &Config) -> Vec<String> {
@@ -616,6 +617,7 @@ mod tests {
         fs::write(orphaned.join("buffer.db"), b"ledger").unwrap();
         fs::write(damaged.join("buffer-data-42.dat"), b"data").unwrap();
         fs::write(unrelated.join("other.db"), b"unrelated").unwrap();
+        fs::write(unrelated.join("buffer-data-65535.dat"), b"reserved").unwrap();
         fs::write(buffer_root.join("not-a-buffer"), b"ignored").unwrap();
 
         let configured_paths = HashSet::from([configured]);
