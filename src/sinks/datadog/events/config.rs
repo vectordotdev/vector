@@ -184,11 +184,7 @@ mod tests {
     #[test]
     fn validate_rejects_malformed_endpoint() {
         let config = DatadogEventsConfig {
-            dd_common: LocalDatadogCommonConfig::new(
-                Some("not a uri".to_string()),
-                None,
-                None,
-            ),
+            dd_common: LocalDatadogCommonConfig::new(Some("not a uri".to_string()), None, None),
             ..Default::default()
         };
         assert!(config.validate().is_err());

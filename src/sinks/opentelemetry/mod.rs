@@ -117,9 +117,7 @@ impl ValidatedSink for OpenTelemetryConfig {
                 // Confinement of the URI and templated headers happens here (not in
                 // `validate`) so per-template security warnings carry the outer
                 // `opentelemetry` component type rather than `http`.
-                config
-                    .build_from_validated(validated, cx, Self::NAME)
-                    .await
+                config.build_from_validated(validated, cx, Self::NAME).await
             }
         }
     }
