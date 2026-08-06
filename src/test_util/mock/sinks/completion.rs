@@ -51,25 +51,25 @@ impl SinkConfig for CompletionSinkConfig {
 
 #[async_trait]
 impl ValidatedSink for CompletionSinkConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
         &self,
-        validated: &Self::Validated,
+        _validated: &Self::Validated,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let completion_tx = validated
+        let completion_tx = self
             .completion_tx
             .lock()
             .expect("completion sink mutex poisoned")
             .take();
 
         let sink = CompletionSink {
-            remaining: validated.expected,
+            remaining: self.expected,
             completion_tx,
         };
         let healthcheck = future::ready(Ok(())).boxed();

@@ -100,15 +100,15 @@ impl SinkConfig for BasicSinkConfig {
 
 #[async_trait]
 impl ValidatedSink for BasicSinkConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
         &self,
-        validated: &Self::Validated,
+        _validated: &Self::Validated,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
@@ -116,7 +116,7 @@ impl ValidatedSink for BasicSinkConfig {
         // started running, so that tests can request the topology be healthy before proceeding.
         let (tx, rx) = oneshot::channel();
 
-        let health_tx = if validated.healthy {
+        let health_tx = if self.healthy {
             Some(tx)
         } else {
             _ = tx.send(Err(HealthcheckError::Unhealthy.into()));
@@ -124,7 +124,7 @@ impl ValidatedSink for BasicSinkConfig {
         };
 
         let sink = MockSink {
-            sink: validated.sink.clone(),
+            sink: self.sink.clone(),
             health_tx,
         };
 

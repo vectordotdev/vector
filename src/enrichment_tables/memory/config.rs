@@ -330,25 +330,25 @@ impl SinkConfig for MemoryConfig {
 
 #[async_trait]
 impl ValidatedSink for MemoryConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
         &self,
-        validated: &Self::Validated,
+        _validated: &Self::Validated,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = match &validated.filter {
+        let sink = match &self.filter {
             Some(TableFilter::Cuckoo(_)) => {
-                VectorSink::from_event_streamsink(validated.get_or_build_cuckoo(None).await?)
+                VectorSink::from_event_streamsink(self.get_or_build_cuckoo(None).await?)
             }
             Some(TableFilter::Bloom(_)) => {
-                VectorSink::from_event_streamsink(validated.get_or_build_bloom(None).await?)
+                VectorSink::from_event_streamsink(self.get_or_build_bloom(None).await?)
             }
-            None => VectorSink::from_event_streamsink(validated.get_or_build_memory(None).await),
+            None => VectorSink::from_event_streamsink(self.get_or_build_memory(None).await),
         };
 
         Ok((sink, future::ok(()).boxed()))

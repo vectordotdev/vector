@@ -177,23 +177,23 @@ impl SinkConfig for UnitTestSinkConfig {
 
 #[async_trait::async_trait]
 impl ValidatedSink for UnitTestSinkConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
         &self,
-        validated: &Self::Validated,
+        _validated: &Self::Validated,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tx = validated.result_tx.lock().await.take();
+        let tx = self.result_tx.lock().await.take();
         let sink = UnitTestSink {
-            test_name: validated.test_name.clone(),
-            transform_ids: validated.transform_ids.clone(),
+            test_name: self.test_name.clone(),
+            transform_ids: self.transform_ids.clone(),
             result_tx: tx,
-            check: validated.check.clone(),
+            check: self.check.clone(),
         };
         let healthcheck = future::ok(()).boxed();
 
@@ -342,18 +342,18 @@ impl SinkConfig for UnitTestStreamSinkConfig {
 
 #[async_trait::async_trait]
 impl ValidatedSink for UnitTestStreamSinkConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
         &self,
-        validated: &Self::Validated,
+        _validated: &Self::Validated,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = validated.sink.lock().await.take().unwrap();
+        let sink = self.sink.lock().await.take().unwrap();
         let healthcheck = future::ok(()).boxed();
 
         #[allow(deprecated)]

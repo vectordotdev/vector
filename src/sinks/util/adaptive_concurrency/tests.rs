@@ -187,15 +187,15 @@ impl SinkConfig for TestConfig {
 
 #[async_trait::async_trait]
 impl ValidatedSink for TestConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
         &self,
-        validated: &Self::Validated,
+        _validated: &Self::Validated,
         _cx: SinkContext,
     ) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
@@ -203,11 +203,11 @@ impl ValidatedSink for TestConfig {
         batch_settings.size.events = 1;
         batch_settings.timeout = Duration::from_secs(9999);
 
-        let request = validated.request.into_settings();
+        let request = self.request.into_settings();
         let sink = request
             .batch_sink(
                 TestRetryLogic,
-                TestSink::new(validated),
+                TestSink::new(self),
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
             )
@@ -224,7 +224,7 @@ impl ValidatedSink for TestConfig {
                 .controller
                 .stats,
         );
-        *validated.controller_stats.lock().unwrap() = stats;
+        *self.controller_stats.lock().unwrap() = stats;
 
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))

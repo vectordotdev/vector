@@ -46,19 +46,19 @@ impl SinkConfig for BackpressureSinkConfig {
 
 #[async_trait]
 impl ValidatedSink for BackpressureSinkConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
         &self,
-        validated: &Self::Validated,
+        _validated: &Self::Validated,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = BackpressureSink {
-            num_to_consume: validated.num_to_consume,
+            num_to_consume: self.num_to_consume,
         };
         let healthcheck = futures::future::ok(()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))

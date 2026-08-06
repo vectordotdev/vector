@@ -41,10 +41,10 @@ impl SinkConfig for PanicSinkConfig {
 
 #[async_trait]
 impl ValidatedSink for PanicSinkConfig {
-    type Validated = Self;
+    type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        Ok(self.clone())
+        Ok(())
     }
 
     async fn build(
