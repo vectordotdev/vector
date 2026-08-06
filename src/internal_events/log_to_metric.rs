@@ -1,0 +1,150 @@
+use std::num::ParseFloatError;
+
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
+};
+
+#[derive(NamedInternalEvent)]
+pub struct LogToMetricFieldNullError<'a> {
+    pub field: &'a str,
+}
+
+impl InternalEvent for LogToMetricFieldNullError<'_> {
+    fn emit(self) {
+        let reason = "Unable to convert null field.";
+        error!(
+            message = reason,
+            error_code = "field_null",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+            null_field = %self.field
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "field_null",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "null_field" => self.field.to_string(),
+        )
+        .increment(1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+    }
+}
+
+#[derive(NamedInternalEvent)]
+pub struct LogToMetricParseFloatError<'a> {
+    pub field: &'a str,
+    pub error: ParseFloatError,
+}
+
+impl InternalEvent for LogToMetricParseFloatError<'_> {
+    fn emit(self) {
+        let reason = "Failed to parse field as float.";
+        error!(
+            message = reason,
+            error = ?self.error,
+            field = %self.field,
+            error_code = "failed_parsing_float",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "failed_parsing_float",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "field" => self.field.to_string(),
+        )
+        .increment(1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+    }
+}
+
+//  Metric Metadata Events and Errors
+#[derive(NamedInternalEvent)]
+pub struct MetricMetadataInvalidFieldValueError<'a> {
+    pub field: &'a str,
+    pub field_value: &'a str,
+}
+
+impl InternalEvent for MetricMetadataInvalidFieldValueError<'_> {
+    fn emit(self) {
+        let reason = "Field contained unsupported value.";
+        error!(
+            message = reason,
+            field = %self.field,
+            field_value = %self.field_value,
+            error_code = "failed_parsing_float",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "invalid_field_value",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "field" => self.field.to_string(),
+        )
+        .increment(1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+    }
+}
+
+#[derive(NamedInternalEvent)]
+pub struct MetricMetadataParseError<'a> {
+    pub field: &'a str,
+    pub kind: &'a str,
+}
+
+impl InternalEvent for MetricMetadataParseError<'_> {
+    fn emit(self) {
+        let reason = "Failed to parse field as float.";
+        error!(
+            message = reason,
+            field = %self.field,
+            error_code = format!("failed_parsing_{}", self.kind),
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => format!("failed_parsing_{}", self.kind),
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "field" => self.field.to_string(),
+        )
+        .increment(1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+    }
+}
+
+#[derive(NamedInternalEvent)]
+pub struct MetricMetadataMetricDetailsNotFoundError {}
+
+impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
+    fn emit(self) {
+        let reason = "Missing required metric details. Required one of gauge, distribution, aggregated_histogram, aggregated_summary, counter";
+        error!(
+            message = reason,
+            error_code = "missing_metric_details",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "missing_metric_details",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+    }
+}

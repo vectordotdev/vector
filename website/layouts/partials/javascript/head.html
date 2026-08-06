@@ -1,0 +1,19 @@
+{{ $appJsPath := "js/app.js" }}
+{{ $ddLogsRumPath := "js/dd-browser-logs-rum.js" }}
+{{ $trackingMarketingPath := "js/tracking-marketing.js" }}
+{{ $appJsOptions := dict "targetPath" $appJsPath "minify" true "sourceMap" "inline" }}
+{{ $ddLogsRumJsOptions := dict "targetPath" $ddLogsRumPath "minify" true "sourceMap" "inline" }}
+{{ $trackingMarketingJsOptions := dict "targetPath" $trackingMarketingPath "minify" true "sourceMap" "inline" }}
+
+{{ $app := resources.Get $appJsPath | resources.ExecuteAsTemplate $appJsPath . | js.Build $appJsOptions | fingerprint "sha256" }}
+{{ $ddLogsRum := resources.Get $ddLogsRumPath | resources.ExecuteAsTemplate $ddLogsRumPath . | js.Build $ddLogsRumJsOptions | fingerprint "sha256" }}
+{{ $trackingMarketing := resources.Get $trackingMarketingPath | resources.ExecuteAsTemplate $trackingMarketingPath . | js.Build $trackingMarketingJsOptions | fingerprint "sha256" }}
+
+<script defer type="text/javascript" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"></script>
+<script defer type="text/javascript" src="{{ $ddLogsRum.RelPermalink }}" integrity="{{ $ddLogsRum.Data.Integrity }}"></script>
+<script defer type="text/javascript" src="{{ $trackingMarketing.RelPermalink }}" integrity="{{ $trackingMarketing.Data.Integrity }}"></script>
+
+{{/* We have a few Ionicons icons scattered throughout */}}
+{{ $version := site.Params.ionicons_version }}
+<script type="module" src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule="" src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons/ionicons.js"></script>

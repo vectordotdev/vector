@@ -1,0 +1,1035 @@
+use std::{
+    cmp,
+    fmt::{self, Debug},
+    num::NonZeroUsize,
+    pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Instant,
+};
+
+#[cfg(test)]
+use std::sync::Mutex;
+
+use async_stream::stream;
+use crossbeam_queue::{ArrayQueue, SegQueue};
+use futures::Stream;
+use metrics::{Gauge, Histogram};
+use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
+use vector_common::internal_event::{GaugeName, HistogramName};
+use vector_common::stats::TimeEwmaGauge;
+use vector_common::{gauge, histogram};
+
+use crate::{InMemoryBufferable, config::MemoryBufferSize};
+
+pub const DEFAULT_EWMA_HALF_LIFE_SECONDS: f64 = 5.0;
+
+/// Identifies which buffer channel is being instrumented, determining the metric name prefix.
+#[derive(Clone, Copy, Debug)]
+pub enum BufferChannelKind {
+    Source,
+    Transform,
+}
+
+/// Error returned by `LimitedSender::send` when the receiver has disconnected.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SendError<T>(pub T);
+
+impl<T> fmt::Display for SendError<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "receiver disconnected")
+    }
+}
+
+impl<T: fmt::Debug> std::error::Error for SendError<T> {}
+
+/// Error returned by `LimitedSender::try_send`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum TrySendError<T> {
+    InsufficientCapacity(T),
+    Disconnected(T),
+}
+
+impl<T> TrySendError<T> {
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::InsufficientCapacity(item) | Self::Disconnected(item) => item,
+        }
+    }
+}
+
+impl<T> fmt::Display for TrySendError<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InsufficientCapacity(_) => {
+                write!(fmt, "channel lacks sufficient capacity for send")
+            }
+            Self::Disconnected(_) => write!(fmt, "receiver disconnected"),
+        }
+    }
+}
+
+impl<T: fmt::Debug> std::error::Error for TrySendError<T> {}
+
+// Trait over common queue operations so implementation can be chosen at initialization phase
+trait QueueImpl<T>: Send + Sync + fmt::Debug {
+    fn push(&self, item: T);
+    fn pop(&self) -> Option<T>;
+}
+
+impl<T> QueueImpl<T> for ArrayQueue<T>
+where
+    T: Send + Sync + fmt::Debug,
+{
+    fn push(&self, item: T) {
+        self.push(item)
+            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full."));
+    }
+
+    fn pop(&self) -> Option<T> {
+        self.pop()
+    }
+}
+
+impl<T> QueueImpl<T> for SegQueue<T>
+where
+    T: Send + Sync + fmt::Debug,
+{
+    fn push(&self, item: T) {
+        self.push(item);
+    }
+
+    fn pop(&self) -> Option<T> {
+        self.pop()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ChannelMetricMetadata {
+    kind: BufferChannelKind,
+    output: Option<String>,
+}
+
+impl ChannelMetricMetadata {
+    pub fn new(kind: BufferChannelKind, output: Option<String>) -> Self {
+        Self { kind, output }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Metrics {
+    histogram: Histogram,
+    gauge: Gauge,
+    mean_gauge: TimeEwmaGauge,
+    // We hold a handle to the max gauge to avoid it being dropped by the metrics collector, but
+    // since the value is static, we never need to update it. The compiler detects this as an unused
+    // field, so we need to suppress the warning here.
+    #[expect(dead_code)]
+    max_gauge: Gauge,
+    #[expect(dead_code)]
+    legacy_max_gauge: Gauge,
+    #[cfg(test)]
+    recorded_values: Arc<Mutex<Vec<usize>>>,
+}
+
+impl Metrics {
+    #[expect(clippy::cast_precision_loss)] // We have to convert buffer sizes for a gauge, it's okay to lose precision here.
+    fn new(
+        limit: MemoryBufferSize,
+        metadata: ChannelMetricMetadata,
+        ewma_half_life_seconds: Option<f64>,
+    ) -> Self {
+        let ewma_half_life_seconds =
+            ewma_half_life_seconds.unwrap_or(DEFAULT_EWMA_HALF_LIFE_SECONDS);
+        let ChannelMetricMetadata { kind, output } = metadata;
+
+        let (histogram_name, level_name, mean_name) = match kind {
+            BufferChannelKind::Source => (
+                HistogramName::SourceBufferUtilization,
+                GaugeName::SourceBufferUtilizationLevel,
+                GaugeName::SourceBufferUtilizationMean,
+            ),
+            BufferChannelKind::Transform => (
+                HistogramName::TransformBufferUtilization,
+                GaugeName::TransformBufferUtilizationLevel,
+                GaugeName::TransformBufferUtilizationMean,
+            ),
+        };
+
+        let (max_name, legacy_name, max_value) = match (kind, limit) {
+            (BufferChannelKind::Source, MemoryBufferSize::MaxEvents(n)) => (
+                GaugeName::SourceBufferMaxSizeEvents,
+                GaugeName::SourceBufferMaxEventSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Source, MemoryBufferSize::MaxSize(n)) => (
+                GaugeName::SourceBufferMaxSizeBytes,
+                GaugeName::SourceBufferMaxByteSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxEvents(n)) => (
+                GaugeName::TransformBufferMaxSizeEvents,
+                GaugeName::TransformBufferMaxEventSize,
+                n.get() as f64,
+            ),
+            (BufferChannelKind::Transform, MemoryBufferSize::MaxSize(n)) => (
+                GaugeName::TransformBufferMaxSizeBytes,
+                GaugeName::TransformBufferMaxByteSize,
+                n.get() as f64,
+            ),
+        };
+        #[cfg(test)]
+        let recorded_values = Arc::new(Mutex::new(Vec::new()));
+        if let Some(label_value) = output {
+            let max_gauge = gauge!(max_name, "output" => label_value.clone());
+            max_gauge.set(max_value);
+            let mean_gauge_handle = gauge!(mean_name, "output" => label_value.clone());
+            // DEPRECATED: buffer-bytes-events-metrics
+            let legacy_max_gauge = gauge!(legacy_name, "output" => label_value.clone());
+            legacy_max_gauge.set(max_value);
+            Self {
+                histogram: histogram!(histogram_name, "output" => label_value.clone()),
+                gauge: gauge!(level_name, "output" => label_value.clone()),
+                mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
+                max_gauge,
+                legacy_max_gauge,
+                #[cfg(test)]
+                recorded_values,
+            }
+        } else {
+            let max_gauge = gauge!(max_name);
+            max_gauge.set(max_value);
+            let mean_gauge_handle = gauge!(mean_name);
+            // DEPRECATED: buffer-bytes-events-metrics
+            let legacy_max_gauge = gauge!(legacy_name);
+            legacy_max_gauge.set(max_value);
+            Self {
+                histogram: histogram!(histogram_name),
+                gauge: gauge!(level_name),
+                mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
+                max_gauge,
+                legacy_max_gauge,
+                #[cfg(test)]
+                recorded_values,
+            }
+        }
+    }
+
+    #[expect(clippy::cast_precision_loss)]
+    fn record(&self, value: usize, reference: Instant) {
+        self.histogram.record(value as f64);
+        self.gauge.set(value as f64);
+        self.mean_gauge.record(value as f64, reference);
+        #[cfg(test)]
+        if let Ok(mut recorded) = self.recorded_values.lock() {
+            recorded.push(value);
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Inner<T> {
+    data: Arc<dyn QueueImpl<(OwnedSemaphorePermit, T)>>,
+    limit: MemoryBufferSize,
+    limiter: Arc<Semaphore>,
+    read_waker: Arc<Notify>,
+    metrics: Option<Metrics>,
+    capacity: NonZeroUsize,
+}
+
+impl<T> Clone for Inner<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            limit: self.limit,
+            limiter: self.limiter.clone(),
+            read_waker: self.read_waker.clone(),
+            metrics: self.metrics.clone(),
+            capacity: self.capacity,
+        }
+    }
+}
+
+impl<T: Send + Sync + Debug + 'static> Inner<T> {
+    fn new(
+        limit: MemoryBufferSize,
+        metric_metadata: Option<ChannelMetricMetadata>,
+        ewma_half_life_seconds: Option<f64>,
+    ) -> Self {
+        let read_waker = Arc::new(Notify::new());
+        let metrics =
+            metric_metadata.map(|metadata| Metrics::new(limit, metadata, ewma_half_life_seconds));
+        match limit {
+            MemoryBufferSize::MaxEvents(max_events) => Inner {
+                data: Arc::new(ArrayQueue::new(max_events.get())),
+                limit,
+                limiter: Arc::new(Semaphore::new(max_events.get())),
+                read_waker,
+                metrics,
+                capacity: max_events,
+            },
+            MemoryBufferSize::MaxSize(max_bytes) => Inner {
+                data: Arc::new(SegQueue::new()),
+                limit,
+                limiter: Arc::new(Semaphore::new(max_bytes.get())),
+                read_waker,
+                metrics,
+                capacity: max_bytes,
+            },
+        }
+    }
+
+    /// Records a send after acquiring all required permits.
+    ///
+    /// The `size` value is the true utilization contribution of `item`, which may exceed the number
+    /// of permits acquired for oversized payloads.
+    fn send_with_permits(&mut self, size: usize, permits: OwnedSemaphorePermit, item: T) {
+        if let Some(metrics) = &self.metrics {
+            // For normal items, capacity - available_permits() exactly represents the total queued
+            // utilization (including this item's just-acquired permits). For oversized items that
+            // acquired fewer permits than their true size, `size` is the correct utilization since
+            // the queue must have been empty for the oversized acquire to succeed.
+            let utilization = size.max(self.used_capacity());
+            metrics.record(utilization, Instant::now());
+        }
+        self.data.push((permits, item));
+        self.read_waker.notify_one();
+    }
+}
+
+impl<T> Inner<T> {
+    fn used_capacity(&self) -> usize {
+        self.capacity.get() - self.limiter.available_permits()
+    }
+
+    fn pop_and_record(&self) -> Option<T> {
+        self.data.pop().map(|(permit, item)| {
+            if let Some(metrics) = &self.metrics {
+                // Compute remaining utilization from the semaphore state. Since our permits haven't
+                // been released yet, used_capacity is stable against racing senders acquiring those
+                // permits.
+                let utilization = self.used_capacity().saturating_sub(permit.num_permits());
+                metrics.record(utilization, Instant::now());
+            }
+            // Release permits after recording so a waiting sender cannot enqueue a new item
+            // before this pop's utilization measurement is taken.
+            drop(permit);
+            item
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct LimitedSender<T> {
+    inner: Inner<T>,
+    sender_count: Arc<AtomicUsize>,
+}
+
+impl<T: InMemoryBufferable> LimitedSender<T> {
+    #[allow(clippy::cast_possible_truncation)]
+    fn calc_required_permits(&self, item: &T) -> (usize, u32) {
+        // We have to limit the number of permits we ask for to the overall limit since we're always
+        // willing to store more items than the limit if the queue is entirely empty, because
+        // otherwise we might deadlock ourselves by not being able to send a single item.
+        let value = match self.inner.limit {
+            MemoryBufferSize::MaxSize(_) => item.allocated_bytes(),
+            MemoryBufferSize::MaxEvents(_) => item.event_count(),
+        };
+        let limit = self.inner.capacity.get();
+        (value, cmp::min(limit, value) as u32)
+    }
+
+    /// Gets the number of items that this channel could accept.
+    pub fn available_capacity(&self) -> usize {
+        self.inner.limiter.available_permits()
+    }
+
+    /// Sends an item into the channel.
+    ///
+    /// # Errors
+    ///
+    /// If the receiver has disconnected (does not exist anymore), then `Err(SendError)` be returned
+    /// with the given `item`.
+    pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
+        // Calculate how many permits we need, and wait until we can acquire all of them.
+        let (size, permits_required) = self.calc_required_permits(&item);
+        match self
+            .inner
+            .limiter
+            .clone()
+            .acquire_many_owned(permits_required)
+            .await
+        {
+            Ok(permits) => {
+                self.inner.send_with_permits(size, permits, item);
+                trace!("Sent item.");
+                Ok(())
+            }
+            Err(_) => Err(SendError(item)),
+        }
+    }
+
+    /// Attempts to send an item into the channel.
+    ///
+    /// # Errors
+    ///
+    /// If the receiver has disconnected (does not exist anymore), then
+    /// `Err(TrySendError::Disconnected)` be returned with the given `item`. If the channel has
+    /// insufficient capacity for the item, then `Err(TrySendError::InsufficientCapacity)` will be
+    /// returned with the given `item`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if adding ack amount overflows.
+    pub fn try_send(&mut self, item: T) -> Result<(), TrySendError<T>> {
+        // Calculate how many permits we need, and try to acquire them all without waiting.
+        let (size, permits_required) = self.calc_required_permits(&item);
+        match self
+            .inner
+            .limiter
+            .clone()
+            .try_acquire_many_owned(permits_required)
+        {
+            Ok(permits) => {
+                self.inner.send_with_permits(size, permits, item);
+                trace!("Attempt to send item succeeded.");
+                Ok(())
+            }
+            Err(TryAcquireError::NoPermits) => Err(TrySendError::InsufficientCapacity(item)),
+            Err(TryAcquireError::Closed) => Err(TrySendError::Disconnected(item)),
+        }
+    }
+}
+
+impl<T> Clone for LimitedSender<T> {
+    fn clone(&self) -> Self {
+        self.sender_count.fetch_add(1, Ordering::SeqCst);
+
+        Self {
+            inner: self.inner.clone(),
+            sender_count: Arc::clone(&self.sender_count),
+        }
+    }
+}
+
+impl<T> Drop for LimitedSender<T> {
+    fn drop(&mut self) {
+        // If we're the last sender to drop, close the semaphore on our way out the door.
+        if self.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.inner.limiter.close();
+            self.inner.read_waker.notify_one();
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LimitedReceiver<T> {
+    inner: Inner<T>,
+}
+
+impl<T: Send + 'static> LimitedReceiver<T> {
+    /// Gets the number of items that this channel could accept.
+    pub fn available_capacity(&self) -> usize {
+        self.inner.limiter.available_permits()
+    }
+
+    pub async fn next(&mut self) -> Option<T> {
+        loop {
+            if let Some(item) = self.inner.pop_and_record() {
+                return Some(item);
+            }
+
+            // There wasn't an item for us to pop, so see if the channel is actually closed.  If so,
+            // then it's time for us to close up shop as well.
+            if self.inner.limiter.is_closed() {
+                if self.available_capacity() < self.inner.capacity.get() {
+                    // We only terminate when closed and fully drained. A close can race with queue
+                    // visibility while items/in-flight permits still exist.
+                    tokio::task::yield_now().await;
+                    continue;
+                }
+                return None;
+            }
+
+            // We're not closed, so we need to wait for a writer to tell us they made some
+            // progress.  This might end up being a spurious wakeup since `Notify` will
+            // store a wake-up if there are no waiters, but oh well.
+            self.inner.read_waker.notified().await;
+        }
+    }
+
+    pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = T> + Send>> {
+        let mut receiver = self;
+        Box::pin(stream! {
+            while let Some(item) = receiver.next().await {
+                yield item;
+            }
+        })
+    }
+}
+
+impl<T> Drop for LimitedReceiver<T> {
+    fn drop(&mut self) {
+        // Notify senders that the channel is now closed by closing the semaphore.  Any pending
+        // acquisitions will be awoken and notified that the semaphore is closed, and further new
+        // sends will immediately see the semaphore is closed.
+        self.inner.limiter.close();
+    }
+}
+
+pub fn limited<T: InMemoryBufferable + fmt::Debug>(
+    limit: MemoryBufferSize,
+    metric_metadata: Option<ChannelMetricMetadata>,
+    ewma_half_life_seconds: Option<f64>,
+) -> (LimitedSender<T>, LimitedReceiver<T>) {
+    let inner = Inner::new(limit, metric_metadata, ewma_half_life_seconds);
+
+    let sender = LimitedSender {
+        inner: inner.clone(),
+        sender_count: Arc::new(AtomicUsize::new(1)),
+    };
+    let receiver = LimitedReceiver { inner };
+
+    (sender, receiver)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+
+    use rand::{Rng as _, SeedableRng as _, rngs::SmallRng};
+    use tokio_test::{assert_pending, assert_ready, task::spawn};
+    use vector_common::byte_size_of::ByteSizeOf;
+
+    use super::{
+        BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender, limited,
+    };
+    use crate::{
+        MemoryBufferSize,
+        test::MultiEventRecord,
+        topology::{channel::limited_queue::SendError, test_util::Sample},
+    };
+
+    #[tokio::test]
+    async fn send_receive() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        assert_eq!(2, tx.available_capacity());
+
+        let msg = Sample::new(42);
+
+        // Create our send and receive futures.
+        let mut send = spawn(async { tx.send(msg).await });
+
+        let mut recv = spawn(async { rx.next().await });
+
+        // Nobody should be woken up.
+        assert!(!send.is_woken());
+        assert!(!recv.is_woken());
+
+        // Try polling our receive, which should be pending because we haven't anything yet.
+        assert_pending!(recv.poll());
+
+        // We should immediately be able to complete a send as there is available capacity.
+        assert_eq!(Ok(()), assert_ready!(send.poll()));
+
+        // Now our receive should have been woken up, and should immediately be ready.
+        assert!(recv.is_woken());
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
+    }
+
+    #[tokio::test]
+    async fn records_utilization() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(
+            limit,
+            Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
+            None,
+        );
+
+        let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+        tx.send(Sample::new(1)).await.expect("send should succeed");
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.last().copied(), Some(1));
+
+        assert_eq!(Sample::new(1), rx.next().await.unwrap());
+        let records = metrics.lock().unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records.last().copied(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn records_utilization_transform_channel() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(
+            limit,
+            Some(ChannelMetricMetadata::new(
+                BufferChannelKind::Transform,
+                None,
+            )),
+            None,
+        );
+
+        let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+        tx.send(Sample::new(1)).await.expect("send should succeed");
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.last().copied(), Some(1));
+
+        assert_eq!(Sample::new(1), rx.next().await.unwrap());
+        let records = metrics.lock().unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records.last().copied(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn oversized_send_records_true_utilization_via_normal_send_path() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(
+            limit,
+            Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
+            None,
+        );
+        let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+        // Normal send path: permits are capped to the limit (2), but utilization should reflect
+        // the true item contribution (3).
+        let oversized = MultiEventRecord::new(3);
+        tx.send(oversized.clone())
+            .await
+            .expect("send should succeed");
+
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.last().copied(), Some(3));
+
+        assert_eq!(Some(oversized), rx.next().await);
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records.last().copied(), Some(0));
+    }
+
+    #[test]
+    fn test_limiting_by_byte_size() {
+        let max_elements = 10;
+        let msg = Sample::new_with_heap_allocated_values(50);
+        let msg_size = msg.allocated_bytes();
+        let max_allowed_bytes = msg_size * max_elements;
+
+        // With this configuration a maximum of exactly 10 messages can fit in the channel
+        let limit = MemoryBufferSize::MaxSize(NonZeroUsize::new(max_allowed_bytes).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        assert_eq!(max_allowed_bytes, tx.available_capacity());
+
+        // Send 10 messages into the channel, filling it
+        for _ in 0..10 {
+            let msg_clone = msg.clone();
+            let mut f = spawn(async { tx.send(msg_clone).await });
+            assert_eq!(Ok(()), assert_ready!(f.poll()));
+        }
+        // With the 10th message in the channel no space should be left
+        assert_eq!(0, tx.available_capacity());
+
+        // Attempting to produce one more then the max capacity should block
+        let mut send_final = spawn({
+            let msg_clone = msg.clone();
+            async { tx.send(msg_clone).await }
+        });
+        assert_pending!(send_final.poll());
+
+        // Read all data from the channel, assert final states are as expected
+        for _ in 0..10 {
+            let mut f = spawn(async { rx.next().await });
+            let value = assert_ready!(f.poll());
+            assert_eq!(value.allocated_bytes(), msg_size);
+        }
+        // Channel should have no more data
+        let mut recv = spawn(async { rx.next().await });
+        assert_pending!(recv.poll());
+    }
+
+    #[test]
+    fn sender_waits_for_more_capacity_when_none_available() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        assert_eq!(1, tx.available_capacity());
+
+        let msg1 = Sample::new(42);
+        let msg2 = Sample::new(43);
+
+        // Create our send and receive futures.
+        let mut send1 = spawn(async { tx.send(msg1).await });
+
+        let mut recv1 = spawn(async { rx.next().await });
+
+        // Nobody should be woken up.
+        assert!(!send1.is_woken());
+        assert!(!recv1.is_woken());
+
+        // Try polling our receive, which should be pending because we haven't anything yet.
+        assert_pending!(recv1.poll());
+
+        // We should immediately be able to complete a send as there is available capacity.
+        assert_eq!(Ok(()), assert_ready!(send1.poll()));
+        drop(send1);
+
+        assert_eq!(0, tx.available_capacity());
+
+        // Now our receive should have been woken up, and should immediately be ready... but we
+        // aren't going to read the value just yet.
+        assert!(recv1.is_woken());
+
+        // Now trigger a second send, which should block as there's no available capacity.
+        let mut send2 = spawn(async { tx.send(msg2).await });
+
+        assert!(!send2.is_woken());
+        assert_pending!(send2.poll());
+
+        // Now if we receive the item, our second send should be woken up and be able to send in.
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv1.poll()));
+        drop(recv1);
+
+        // Since the second send was already waiting for permits, the semaphore returns them
+        // directly to our waiting send, which should now be woken up and able to complete:
+        assert_eq!(0, rx.available_capacity());
+        assert!(send2.is_woken());
+
+        let mut recv2 = spawn(async { rx.next().await });
+        assert_pending!(recv2.poll());
+
+        assert_eq!(Ok(()), assert_ready!(send2.poll()));
+        drop(send2);
+
+        assert_eq!(0, tx.available_capacity());
+
+        // And the final receive to get our second send:
+        assert!(recv2.is_woken());
+        assert_eq!(Some(Sample::new(43)), assert_ready!(recv2.poll()));
+
+        assert_eq!(1, tx.available_capacity());
+    }
+
+    #[test]
+    fn sender_waits_for_more_capacity_when_partial_available() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(7).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        assert_eq!(7, tx.available_capacity());
+
+        let msgs1 = vec![
+            MultiEventRecord::new(1),
+            MultiEventRecord::new(2),
+            MultiEventRecord::new(3),
+        ];
+        let msg2 = MultiEventRecord::new(4);
+
+        // Create our send and receive futures.
+        let mut small_sends = spawn(async {
+            for msg in msgs1.clone() {
+                tx.send(msg).await?;
+            }
+
+            Ok::<_, SendError<MultiEventRecord>>(())
+        });
+
+        let mut recv1 = spawn(async { rx.next().await });
+
+        // Nobody should be woken up.
+        assert!(!small_sends.is_woken());
+        assert!(!recv1.is_woken());
+
+        // Try polling our receive, which should be pending because we haven't anything yet.
+        assert_pending!(recv1.poll());
+
+        // We should immediately be able to complete our three event sends, which we have
+        // available capacity for, but will consume all but one of the available slots.
+        assert_eq!(Ok(()), assert_ready!(small_sends.poll()));
+        drop(small_sends);
+
+        assert_eq!(1, tx.available_capacity());
+
+        // Now our receive should have been woken up, and should immediately be ready, but we won't
+        // receive just yet.
+        assert!(recv1.is_woken());
+
+        // Now trigger a second send that has four events, and needs to wait for two receives to happen.
+        let mut send2 = spawn(tx.send(msg2.clone()));
+
+        assert!(!send2.is_woken());
+        assert_pending!(send2.poll());
+
+        // Now if we receive the first item, our second send should be woken up but still not able
+        // to send.
+        assert_eq!(Some(&msgs1[0]), assert_ready!(recv1.poll()).as_ref());
+        drop(recv1);
+
+        // Callers waiting to acquire permits have the permits immediately transfer to them when one
+        // (or more) are released, so we expect this to be zero until we send and then read the
+        // third item.
+        assert_eq!(0, rx.available_capacity());
+
+        // We don't get woken up until all permits have been acquired.
+        assert!(!send2.is_woken());
+
+        // Our second read should unlock enough available capacity for the second send once complete.
+        let mut recv2 = spawn(async { rx.next().await });
+        assert!(!recv2.is_woken());
+        assert_eq!(Some(&msgs1[1]), assert_ready!(recv2.poll()).as_ref());
+        drop(recv2);
+
+        assert_eq!(0, rx.available_capacity());
+
+        assert!(send2.is_woken());
+        assert_eq!(Ok(()), assert_ready!(send2.poll()));
+
+        // And just make sure we see those last two sends.
+        let mut recv3 = spawn(async { rx.next().await });
+        assert!(!recv3.is_woken());
+        assert_eq!(Some(&msgs1[2]), assert_ready!(recv3.poll()).as_ref());
+        drop(recv3);
+
+        assert_eq!(3, rx.available_capacity());
+
+        let mut recv4 = spawn(async { rx.next().await });
+        assert!(!recv4.is_woken());
+        assert_eq!(Some(msg2), assert_ready!(recv4.poll()));
+        drop(recv4);
+
+        assert_eq!(7, rx.available_capacity());
+    }
+
+    #[test]
+    fn empty_receiver_returns_none_when_last_sender_drops() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        assert_eq!(1, tx.available_capacity());
+
+        let tx2 = tx.clone();
+        let msg = Sample::new(42);
+
+        // Create our send and receive futures.
+        let mut send = spawn(async { tx.send(msg).await });
+
+        let mut recv = spawn(async { rx.next().await });
+
+        // Nobody should be woken up.
+        assert!(!send.is_woken());
+        assert!(!recv.is_woken());
+
+        // Try polling our receive, which should be pending because we haven't anything yet.
+        assert_pending!(recv.poll());
+
+        // Now drop our second sender, which shouldn't do anything yet.
+        drop(tx2);
+        assert!(!recv.is_woken());
+        assert_pending!(recv.poll());
+
+        // Now drop our second sender, but not before doing a send, which should trigger closing the
+        // semaphore which should let the receiver complete with no further waiting: one item and
+        // then `None`.
+        assert_eq!(Ok(()), assert_ready!(send.poll()));
+        drop(send);
+        drop(tx);
+
+        assert!(recv.is_woken());
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
+        drop(recv);
+
+        let mut recv2 = spawn(async { rx.next().await });
+        assert!(!recv2.is_woken());
+        assert_eq!(None, assert_ready!(recv2.poll()));
+    }
+
+    #[test]
+    fn receiver_returns_none_once_empty_when_last_sender_drops() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (tx, mut rx) = limited::<Sample>(limit, None, None);
+
+        assert_eq!(1, tx.available_capacity());
+
+        let tx2 = tx.clone();
+
+        // Create our receive future.
+        let mut recv = spawn(async { rx.next().await });
+
+        // Nobody should be woken up.
+        assert!(!recv.is_woken());
+
+        // Try polling our receive, which should be pending because we haven't anything yet.
+        assert_pending!(recv.poll());
+
+        // Now drop our first sender, which shouldn't do anything yet.
+        drop(tx);
+        assert!(!recv.is_woken());
+        assert_pending!(recv.poll());
+
+        // Now drop our second sender, which should trigger closing the semaphore which should let
+        // the receive complete as there are no items to read.
+        drop(tx2);
+        assert!(recv.is_woken());
+        assert_eq!(None, assert_ready!(recv.poll()));
+    }
+
+    #[test]
+    fn oversized_send_allowed_when_empty() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        assert_eq!(1, tx.available_capacity());
+
+        let msg = MultiEventRecord::new(2);
+
+        // Create our send and receive futures.
+        let mut send = spawn(async { tx.send(msg.clone()).await });
+
+        let mut recv = spawn(async { rx.next().await });
+
+        // Nobody should be woken up.
+        assert!(!send.is_woken());
+        assert!(!recv.is_woken());
+
+        // We should immediately be able to complete our send, which we don't have full
+        // available capacity for, but will consume all of the available slots.
+        assert_eq!(Ok(()), assert_ready!(send.poll()));
+        drop(send);
+
+        assert_eq!(0, tx.available_capacity());
+
+        // Now we should be able to get back the oversized item, but our capacity should not be
+        // greater than what we started with.
+        assert_eq!(Some(msg), assert_ready!(recv.poll()));
+        drop(recv);
+
+        assert_eq!(1, rx.available_capacity());
+    }
+
+    #[test]
+    fn oversized_send_allowed_when_partial_capacity() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(limit, None, None);
+
+        assert_eq!(2, tx.available_capacity());
+
+        let msg1 = MultiEventRecord::new(1);
+        let msg2 = MultiEventRecord::new(3);
+
+        // Create our send future.
+        let mut send = spawn(async { tx.send(msg1.clone()).await });
+
+        // Nobody should be woken up.
+        assert!(!send.is_woken());
+
+        // We should immediately be able to complete our send, which will only use up a single slot.
+        assert_eq!(Ok(()), assert_ready!(send.poll()));
+        drop(send);
+
+        assert_eq!(1, tx.available_capacity());
+
+        // Now we'll trigger another send which has an oversized item.  It shouldn't be able to send
+        // until all permits are available.
+        let mut send2 = spawn(async { tx.send(msg2.clone()).await });
+
+        assert!(!send2.is_woken());
+        assert_pending!(send2.poll());
+
+        assert_eq!(0, rx.available_capacity());
+
+        // Now do a receive which should return the one consumed slot, essentially allowing all
+        // permits to be acquired by the blocked send.
+        let mut recv = spawn(async { rx.next().await });
+        assert!(!recv.is_woken());
+        assert!(!send2.is_woken());
+
+        assert_eq!(Some(msg1), assert_ready!(recv.poll()));
+        drop(recv);
+
+        assert_eq!(0, rx.available_capacity());
+
+        // Now our blocked send should be able to proceed, and we should be able to read back the
+        // item.
+        assert_eq!(Ok(()), assert_ready!(send2.poll()));
+        drop(send2);
+
+        assert_eq!(0, tx.available_capacity());
+
+        let mut recv2 = spawn(async { rx.next().await });
+        assert_eq!(Some(msg2), assert_ready!(recv2.poll()));
+
+        assert_eq!(2, tx.available_capacity());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_send_receive_metrics_remain_valid() {
+        const ITEM_COUNT: usize = 4_000;
+
+        // Try different sizes of the buffer, from 10 to 1000 events.
+        for size in 1..=100 {
+            let limit = NonZeroUsize::new(size * 10).unwrap();
+            let (tx, rx) = limited(
+                MemoryBufferSize::MaxEvents(limit),
+                Some(ChannelMetricMetadata::new(BufferChannelKind::Source, None)),
+                None,
+            );
+            let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+            let sender = tokio::spawn(send_samples(tx, ITEM_COUNT));
+            let receiver = tokio::spawn(receive_samples(rx, ITEM_COUNT));
+
+            sender.await.expect("sender task should not panic");
+            receiver.await.expect("receiver task should not panic");
+
+            let recorded = metrics.lock().unwrap().clone();
+            assert_eq!(
+                recorded.len(),
+                ITEM_COUNT * 2,
+                "expected one metric update per send and per receive"
+            );
+
+            // For MaxEvents with single-event messages, the occupancy counter tracks exact
+            // utilization, so values must stay within [0, limit].
+            let max_allowed = limit.get();
+            let observed_max = recorded.iter().copied().max().unwrap_or_default();
+            assert!(
+                recorded.iter().all(|value| *value <= max_allowed),
+                "observed utilization value above valid bound: max={observed_max}, allowed={max_allowed}"
+            );
+        }
+    }
+
+    async fn send_samples(mut tx: LimitedSender<Sample>, item_count: usize) {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+        for i in 0..item_count {
+            tx.send(Sample::new(i as u64))
+                .await
+                .expect("send should succeed");
+            if rng.random::<u8>() % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
+        }
+    }
+
+    async fn receive_samples(mut rx: LimitedReceiver<Sample>, item_count: usize) {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+        for i in 0..item_count {
+            let next = rx
+                .next()
+                .await
+                .expect("receiver should yield all sent items");
+            assert_eq!(Sample::new(i as u64), next);
+            if rng.random::<u8>() % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
+        }
+    }
+}

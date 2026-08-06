@@ -1,0 +1,57 @@
+mod serialization;
+mod size_of;
+
+use std::collections::HashSet;
+
+use super::*;
+use vrl::event_path;
+
+#[test]
+fn event_iteration() {
+    let mut log = LogEvent::default();
+
+    log.insert(event_path!("Ke$ha"), "It's going down, I'm yelling timber");
+    log.insert(
+        event_path!("Pitbull"),
+        "The bigger they are, the harder they fall",
+    );
+
+    let all = log
+        .all_event_fields()
+        .unwrap()
+        .map(|(k, v)| (k, v.to_string_lossy()))
+        .collect::<HashSet<_>>();
+    assert_eq!(
+        all,
+        vec![
+            (
+                "Pitbull".into(),
+                "The bigger they are, the harder they fall".into()
+            ),
+            (
+                "\"Ke$ha\"".into(),
+                "It's going down, I'm yelling timber".into()
+            ),
+        ]
+        .into_iter()
+        .collect::<HashSet<_>>()
+    );
+}
+
+#[test]
+fn event_iteration_order() {
+    let mut log = LogEvent::default();
+    log.insert(event_path!("lZDfzKIL"), Value::from("tOVrjveM"));
+    log.insert(event_path!("o9amkaRY"), Value::from("pGsfG7Nr"));
+    log.insert(event_path!("YRjhxXcg"), Value::from("nw8iM5Jr"));
+
+    let collected: Vec<_> = log.all_event_fields().unwrap().collect();
+    assert_eq!(
+        collected,
+        vec![
+            ("YRjhxXcg".into(), &Value::from("nw8iM5Jr")),
+            ("lZDfzKIL".into(), &Value::from("tOVrjveM")),
+            ("o9amkaRY".into(), &Value::from("pGsfG7Nr")),
+        ]
+    );
+}

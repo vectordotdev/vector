@@ -1,0 +1,1 @@
+{"metric":{"name":"o","tags":{"m":"x","u":"l"},"kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[-2229,-2221,2139,2152,2185],"n":[1,1,1,1,1]},"count":5,"min":-996544.0,"max":505280.0,"sum":615616.0,"avg":386688.0}}}}}

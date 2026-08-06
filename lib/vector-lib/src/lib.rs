@@ -1,0 +1,55 @@
+pub use codecs;
+pub use enrichment;
+#[cfg(feature = "file-source")]
+pub use file_source;
+#[cfg(feature = "file-source")]
+pub use file_source_common;
+#[cfg(feature = "api-client")]
+pub use vector_api_client as api_client;
+pub use vector_buffers as buffers;
+#[cfg(feature = "test")]
+pub use vector_common::event_test_util;
+pub use vector_common::{
+    Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, atomic, btreemap,
+    byte_size_of, byte_size_of::ByteSizeOf, conversion, counter, encode_logfmt, finalization,
+    finalizer, gauge, histogram, id, impl_event_data_eq, internal_event, json_size,
+    registered_event, request_metadata, sensitive_string, shutdown, spawn_in_current_span, stats,
+    trigger,
+};
+pub use vector_config as configurable;
+pub use vector_config::impl_generate_config_from_default;
+#[cfg(feature = "vrl")]
+pub use vector_core::compile_vrl;
+pub use vector_core::{
+    EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, emit, event, fanout,
+    ipallowlist, latency, metric_tags, metrics, partition, quantiles, register,
+    register_extra_span_field, samples, schema, serde, sink, source, source_sender, tcp, tls,
+    transform,
+};
+pub use vector_lookup as lookup;
+pub use vector_stream as stream;
+pub use vector_tap as tap;
+#[cfg(feature = "vector-top")]
+pub use vector_top as top;
+#[cfg(feature = "vrl")]
+pub use vrl;
+
+pub mod config {
+    pub use vector_common::config::ComponentKey;
+    pub use vector_core::config::{
+        AcknowledgementsConfig, DataType, GlobalOptions, Input, LegacyKey, LogNamespace, LogSchema,
+        MEMORY_BUFFER_DEFAULT_MAX_EVENTS, OutputId, SourceAcknowledgementsConfig, SourceOutput,
+        Tags, Telemetry, TransformOutput, WildcardMatching, clone_input_definitions,
+        init_log_schema, init_telemetry, log_schema, proxy, telemetry,
+    };
+}
+
+#[cfg(feature = "opentelemetry")]
+pub mod opentelemetry {
+    pub use opentelemetry_proto::{common, logs, metrics, proto, spans};
+}
+
+#[cfg(feature = "prometheus")]
+pub mod prometheus {
+    pub use prometheus_parser as parser;
+}

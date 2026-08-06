@@ -1,0 +1,67 @@
+use std::{hash::Hash, sync::Arc};
+
+use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore};
+use tokio;
+
+use super::transform::Throttle;
+use crate::cpu_time::spawn_timed;
+
+/// Re-usable wrapper around the structs/type from the governor crate.
+/// Spawns a background task that periodically flushes keys that haven't been accessed recently.
+pub struct RateLimiterRunner<K, C>
+where
+    K: Hash + Eq + Clone,
+    C: clock::Clock,
+{
+    pub rate_limiter: Arc<RateLimiter<K, DashMapStateStore<K>, C, NoOpMiddleware<C::Instant>>>,
+    flush_handle: tokio::task::JoinHandle<()>,
+}
+
+impl<K, C> RateLimiterRunner<K, C>
+where
+    K: Hash + Eq + Clone + Send + Sync + 'static,
+    C: clock::Clock + Clone + Send + Sync + 'static,
+{
+    pub fn start(throttle: &Throttle<C, C::Instant>) -> Self {
+        let rate_limiter = Arc::new(RateLimiter::dashmap_with_clock(
+            throttle.quota,
+            throttle.clock.clone(),
+        ));
+
+        let flush_keys_interval = throttle.flush_keys_interval;
+        let cpu_ns = throttle.cpu_ns.clone();
+
+        let rate_limiter_clone = Arc::clone(&rate_limiter);
+        // Hook the periodic key-flush task onto the component's CPU counter so
+        // its housekeeping work is attributed to this throttle transform.
+        let flush_handle = spawn_timed(
+            async move {
+                let mut interval = tokio::time::interval(flush_keys_interval);
+                loop {
+                    interval.tick().await;
+                    rate_limiter_clone.retain_recent();
+                }
+            },
+            cpu_ns,
+        );
+
+        Self {
+            rate_limiter,
+            flush_handle,
+        }
+    }
+
+    pub fn check_key(&self, key: &K) -> bool {
+        self.rate_limiter.check_key(key).is_ok()
+    }
+}
+
+impl<K, C> Drop for RateLimiterRunner<K, C>
+where
+    K: Hash + Eq + Clone,
+    C: clock::Clock,
+{
+    fn drop(&mut self) {
+        self.flush_handle.abort();
+    }
+}

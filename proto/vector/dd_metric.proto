@@ -1,0 +1,94 @@
+// Extracted from https://github.com/DataDog/agent-payload/blob/master/proto/metrics/agent_payload.proto
+
+syntax = "proto3";
+
+package datadog.agentpayload;
+
+message CommonMetadata {
+	string agent_version = 1;
+	string timezone = 2;
+	double current_epoch = 3;
+	string internal_ip = 4;
+	string public_ip = 5;
+	string api_key = 6;
+}
+
+message Origin {
+    reserved 1,2,3;
+    uint32 origin_product = 4;
+    uint32 origin_category = 5;
+    uint32 origin_service = 6;
+}
+
+message Metadata {
+    Origin origin = 1;
+}
+
+message MetricPayload {
+    enum MetricType {
+        UNSPECIFIED = 0;
+        COUNT = 1;
+        RATE = 2;
+        GAUGE = 3;
+    }
+
+    message MetricPoint {
+        double value = 1;
+        int64 timestamp = 2;
+    }
+
+    message Resource {
+        string type = 1;
+        string name = 2;
+    }
+
+    message MetricSeries {
+        repeated Resource resources = 1;
+        string metric = 2;
+        repeated string tags = 3;
+        repeated MetricPoint points = 4;
+        MetricType type = 5;
+        string unit = 6;
+        string source_type_name = 7;
+        int64 interval = 8;
+        Metadata metadata = 9;
+    }
+    repeated MetricSeries series = 1;
+}
+
+message SketchPayload {
+	message Sketch {
+		message Distribution {
+			int64 ts = 1;
+			int64 cnt = 2;
+			double min = 3;
+			double max = 4;
+			double avg = 5;
+			double sum = 6;
+			repeated double v = 7;
+			repeated uint32 g = 8;
+			repeated uint32 delta = 9;
+			repeated double buf = 10;
+		}
+		message Dogsketch {
+			int64 ts = 1;
+			int64 cnt = 2;
+			double min = 3;
+			double max = 4;
+			double avg = 5;
+			double sum = 6;
+			repeated sint32 k = 7;
+			repeated uint32 n = 8;
+		}
+		string metric = 1;
+		string host = 2;
+		repeated Distribution distributions = 3;
+		repeated string tags = 4;
+                reserved 5, 6;
+				reserved "distributionsK", "distributionsC";
+		repeated Dogsketch dogsketches = 7;
+		Metadata metadata = 8;
+	}
+	repeated Sketch sketches = 1;
+	CommonMetadata metadata = 2;
+}

@@ -1,0 +1,67 @@
+services:
+  # Emits metrics to the Agent. Shared with the V1/V2 suite.
+  dogstatsd-client:
+    build:
+      context: ../../datadog-metrics/dogstatsd_client
+    environment:
+      - STATSD_HOST=datadog-agent
+    depends_on:
+      - datadog-agent
+
+  # Receives DogStatsD metrics and forwards them to two destinations, using `use_v3_api` (see
+  # data/agent.yaml) to force a different series wire format to each — the Agent otherwise
+  # picks one format per metric type and sends it identically to every destination:
+  #   1. fakeintake-agent directly (dd_url), forced to V3 — the real Agent-native baseline.
+  #   2. vector (additional_endpoints), forced to V2 — the only series format Vector's
+  #      datadog_agent source can ingest. Vector re-encodes to V3 on its way to
+  #      fakeintake-vector, so both fakeintake instances end up with V3 series data computed
+  #      from the same underlying dogstatsd traffic and flush window, and can be diffed.
+  datadog-agent:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    depends_on:
+      - fakeintake-agent
+      - vector
+    environment:
+      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+      - DD_HOSTNAME=datadog-agent
+    volumes:
+      - ../data/agent.yaml:/etc/datadog-agent/datadog.yaml
+
+  # Receives metric data from the `datadog-agent` via additional_endpoints and sends
+  # it to `fakeintake-vector` via the V3 series and sketches endpoints.
+  vector:
+    depends_on:
+      - fakeintake-vector
+    # re-using the integration test runner image since it already has
+    # compiled vector on it.
+    image: ${CONFIG_VECTOR_IMAGE}
+    environment:
+      - FEATURES=e2e-tests-datadog
+    working_dir: /home/vector
+    command:
+      - "/usr/bin/vector"
+      - "-vvv"
+      - "-c"
+      - "/home/vector/tests/e2e/datadog-metrics-v3/data/vector.toml"
+    volumes:
+      - ../../../..:/home/vector
+
+  # Receives the real Agent-native V3 series baseline directly (dd_url). Queried by the test
+  # runner the same way as fakeintake-vector below.
+  fakeintake-agent:
+    image: docker.io/datadog/fakeintake:v8bc80001
+
+  # Receives V3 metric data from the `vector` service. Is queried by the test runner, which
+  # asks fakeintake to decode the payloads itself (`?format=json`) rather than parsing the
+  # wire format locally. Needs `latest`: V3 series decoding. There's still no V3
+  # sketches decoder upstream at all, so the sketches endpoint is decoded locally below.
+  fakeintake-vector:
+    image: docker.io/datadog/fakeintake:v8bc80001
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
+
+volumes:
+  target: {}

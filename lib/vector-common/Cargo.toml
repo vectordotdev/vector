@@ -1,0 +1,67 @@
+[package]
+name = "vector-common"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lints]
+workspace = true
+
+[features]
+default = [
+  "btreemap",
+  "conversion",
+  "tokenize",
+  "encoding",
+  "sensitive_string"
+]
+
+btreemap = []
+
+byte_size_of = ["dep:bytes"]
+
+conversion = [
+  "dep:bytes",
+]
+
+encoding = [
+  "btreemap"
+]
+
+sensitive_string = []
+
+test = []
+
+tokenize = []
+
+[dependencies]
+async-compression.workspace = true
+flate2.workspace = true
+zstd.workspace = true
+async-stream = "0.3.6"
+bytes = { version = "1.11.1", default-features = false, optional = true }
+chrono.workspace = true
+crossbeam-utils.workspace = true
+derivative.workspace = true
+futures.workspace = true
+indexmap.workspace = true
+itertools.workspace = true
+metrics.workspace = true
+pastey.workspace = true
+pin-project.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+smallvec = { version = "1", default-features = false }
+strum.workspace = true
+stream-cancel = { version = "0.8.2", default-features = false }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
+tracing.workspace = true
+vrl.workspace = true
+vector-config.workspace = true
+vector-common-macros.workspace = true
+
+[dev-dependencies]
+futures = { version = "0.3.31", default-features = false, features = ["async-await"] }
+tokio = { workspace = true, features = ["rt", "time"] }

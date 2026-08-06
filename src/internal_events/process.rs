@@ -1,0 +1,148 @@
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
+
+use crate::{built_info, config};
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorStarted;
+
+impl InternalEvent for VectorStarted {
+    fn emit(self) {
+        info!(
+            target: "vector",
+            message = "Vector has started.",
+            debug = built_info::DEBUG,
+            version = built_info::PKG_VERSION,
+            arch = built_info::TARGET_ARCH,
+            revision = built_info::VECTOR_BUILD_DESC.unwrap_or(""),
+        );
+        counter!(CounterName::StartedTotal).increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorReloaded<'a> {
+    pub config_paths: &'a [config::ConfigPath],
+}
+
+impl InternalEvent for VectorReloaded<'_> {
+    fn emit(self) {
+        info!(
+            target: "vector",
+            message = "Vector has reloaded.",
+            path = ?self.config_paths,
+            internal_log_rate_limit = false,
+        );
+        counter!(CounterName::ReloadedTotal).increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorStopping;
+
+impl InternalEvent for VectorStopping {
+    fn emit(self) {
+        info!(
+            target: "vector",
+            message = "Vector is stopping.",
+        );
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorStopped;
+
+impl InternalEvent for VectorStopped {
+    fn emit(self) {
+        info!(
+            target: "vector",
+            message = "Vector has stopped.",
+        );
+        counter!(CounterName::StoppedTotal).increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorQuit;
+
+impl InternalEvent for VectorQuit {
+    fn emit(self) {
+        info!(
+            target: "vector",
+            message = "Vector has quit.",
+        );
+        counter!(CounterName::QuitTotal).increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorReloadError {
+    pub reason: &'static str,
+}
+
+impl InternalEvent for VectorReloadError {
+    fn emit(self) {
+        error!(
+            message = "Reload was not successful.",
+            reason = self.reason,
+            error_code = "reload",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "reload",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "reason" => self.reason,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorConfigLoadError;
+
+impl InternalEvent for VectorConfigLoadError {
+    fn emit(self) {
+        error!(
+            message = "Failed to load config files, reload aborted.",
+            error_code = "config_load",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "config_load",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct VectorRecoveryError;
+
+impl InternalEvent for VectorRecoveryError {
+    fn emit(self) {
+        error!(
+            message = "Vector has failed to recover from a failed reload.",
+            error_code = "recovery",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = false,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "recovery",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}

@@ -1,0 +1,18 @@
+[package]
+name = "docs-renderer"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+snafu.workspace = true
+tracing.workspace = true
+vector-config = { path = "../vector-config" }
+vector-config-common = { path = "../vector-config-common" }

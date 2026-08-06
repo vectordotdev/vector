@@ -1,0 +1,286 @@
+# Security Policy
+
+---
+
+<p align="center">
+  <strong>Reporting a vulnerability? See the <a href="#vulnerability-reporting">Vulnerability Reporting section</a></strong>
+</p>
+
+---
+
+We understand that many users place a high level of trust in Vector to collect
+and ship mission-critical data. The security of Vector is a top priority.
+That's why we apply widely accepted best practices when it comes to security.
+This document will describe these practices and aims to be as transparent as
+possible on our security efforts.
+
+- [Project Structure](#project-structure)
+  - [Transparency](#transparency)
+    - [Open Source](#open-source)
+    - [Workflow](#workflow)
+  - [Version Control](#version-control)
+    - [Pull Requests](#pull-requests)
+    - [Reviews & Approvals](#reviews--approvals)
+    - [Signed Commits](#signed-commits)
+    - [Protected Branches](#protected-branches)
+    - [Merge Policies](#merge-policies)
+- [Personnel](#personnel)
+  - [Education](#education)
+  - [Policies](#policies)
+  - [Two-factor Authentication](#two-factor-authentication)
+  - [Privilege Model](#privilege-model)
+  - [Third-Parties](#third-parties)
+- [Development & Code](#development--code)
+  - [Design & Architecture](#design--architecture)
+    - [Rust](#rust)
+    - [Unsafe Code](#unsafe-code)
+    - [User Privileges](#user-privileges)
+  - [Dependencies](#dependencies)
+  - [Automated Checks](#automated-checks)
+    - [Vulnerability Scans & Security Advisories](#vulnerability-scans--security-advisories)
+    - [Vulnerability Remediation](#vulnerability-remediation)
+- [Infrastructure](#infrastructure)
+  - [CI/CD](#cicd)
+  - [Network Security](#network-security)
+    - [Protocols](#protocols)
+  - [Release Artifacts & Channels](#release-artifacts--channels)
+    - [Asset Audit Logging](#asset-audit-logging)
+    - [Asset Signatures & Checksums](#asset-signatures--checksums)
+- [Vulnerability Reporting](#vulnerability-reporting)
+- [Meta](#meta)
+  - [Review Schedule](#review-schedule)
+  - [Vulnerability Reporting](#vulnerability-reporting)
+    - [Vector CI](#vector-ci)
+    - [Other reports](#other-reports)
+
+## Project Structure
+
+Project structure plays an important role in security. It creates guardrails
+that prevent common security issues. This section will outline our deliberate
+structural decisions that impact security.
+
+### Transparency
+
+We believe transparency is a strong deterrent of nefarious behavior that could
+otherwise undermine security.
+
+#### Open Source
+
+Vector and its dependencies are open-source. All code and changes are publicly
+available at [our GitHub repo][urls.vector_repo]. While the transparent nature
+open source helps to improve security, so does the large collaborative
+community behind Vector.
+
+#### Workflow
+
+All of Vector's workflow is transparent.
+[Pull requests][urls.vector_pull_requests], [issues][urls.vector_issues],
+[chats][urls.vector_chat], and [our roadmap][urls.vector_roadmap]
+are all publicly available.
+
+### Version Control
+
+Version control ensures that all code changes are audited and authentic.
+
+Vector uses [Git][urls.git] to ensure that changes are auditable and traceable.
+
+#### Pull Requests
+
+All changes to Vector must go through a pull request review process.
+
+#### Reviews & Approvals
+
+All pull requests must be reviewed by at least one Vector team member. The
+review process takes into account many factors, all of which are detailed in
+our [Reviewing guide](REVIEWING.md). In exceptional circumstances, this
+approval can be retroactive.
+
+
+#### Signed Commits
+
+Because of Vector's [merge style](CONTRIBUTING.md#merge-style), commits to
+release branches are signed by GitHub itself during the squash and merge
+process. Commits to development branches are encouraged to be signed but not
+required since changes must go through a [review process](#reviews--approvals).
+
+#### Protected Branches
+
+Vector cuts releases from the `master` and `v*` branches _only_. These branches
+are [protected][urls.github_protected_branches]. The exact requirements are:
+
+- Cannot be deleted.
+- Force pushes are not allowed.
+- A linear history is required.
+- Signed commits are required.
+- Administrators are included in these checks.
+
+#### Merge Policies
+
+Vector requires pull requests to pass all [automated checks](#automated-checks).
+Once passed, the pull request must be squashed and merged. This creates a clean
+linear history with a Vector team member's co-sign.
+
+## Personnel
+
+### Education
+
+Vector team members are required to review this security document as well as
+the [contributing](CONTRIBUTING.md) and [reviewing](REVIEWING.md) documents.
+
+### Policies
+
+Vector maintains this security policy. Changes are communicated to all Vector
+team members.
+
+### Two-factor Authentication
+
+All Vector team members are required to enable two-factor authentication
+for their GitHub accounts.
+
+### Privilege Model
+
+Vector follows the [principle of least privilege][urls.least_privilege] for
+its personnel access model. Vector maintains tiers user groups with tiered
+privileges to ensure users only have access to the minimal resources necessary.
+
+### Third-Parties
+
+When used, third-parties must also adhere to this security policy. Access is
+based on the [principle of least privilege][urls.least_privilege] and removed
+when the contract ends.
+
+## Development & Code
+
+### Design & Architecture
+
+The base of Vector's security lies in our choice of underlying technology and
+decisions around design and architecture.
+
+#### Rust
+
+The [Rust programming language][urls.rust] is memory and thread-safe; it will
+catch many common sources of vulnerabilities at compile time.
+
+#### Unsafe Code
+
+Vector uses unsafe code sparingly. Unsafe is sometimes required, such as dealing
+with CFFI. We may occasionally also use unsafe code for performance reasons but
+those changes are kept to a minimum.
+
+#### User Privileges
+
+Vector is always designed to run under non-`root` privileges, and our
+documentation always defaults to non-`root` use.
+
+### Dependencies
+
+Vector aims to reduce the number of dependencies it relies on. If a dependency
+is added it goes through a comprehensive review process that is detailed in
+the [Reviewing guide](REVIEWING.md#dependencies).
+
+### Automated Checks
+
+When possible, we'll create automated checks to enforce security policies.
+
+#### Vulnerability Scans & Security Advisories
+
+- Vector implements an automated [`cargo deny` check][urls.cargo_deny]. This
+  is part of the [Rust Security advisory database][urls.rust_sec]. The configuration, and a
+  list of currently accepted advisories, are maintained in the
+  [Cargo Deny configuration][urls.cargo_deny_configuration]. The check is run
+  on every PR to the Vector project.
+- Vector implements [Dependabot][urls.dependabot] which performs automated
+  upgrades on dependencies and [alerts][urls.dependabot_alerts] about any
+  dependency-related security vulnerabilities.
+
+#### Vulnerability Remediation
+
+If the advisory check fails due to changes made in the PR, it will not be
+merged. We review each advisory to determine what action to take. Whenever
+possible, we update the dependency to a version where the vulnerability has been
+addressed. If this isn't possible we either record the acceptance of the
+vulnerability or replace the dependency. If we accept the vulnerability we open
+a ticket to track its remediation, generally awaiting a fix upstream. If the
+risk is deemed unacceptable we revisit the code and dependency to find a more
+secure alternative.
+
+## Infrastructure
+
+Because Vector is an open-source project designed to be self-hosted it uses
+minimal infrastructure. Below we cover the various responsibilities for
+Vector's infrastructure and how we secure them.
+
+### CI/CD
+
+All builds run in GitHub Actions runners which are ephemeral and don't maintain
+state after the job is completed. We ensure we are following [OpenSSF best
+practices](https://bestpractices.dev/) to minimize CI risk and exposure.
+
+### Network Security
+
+#### Protocols
+
+All network traffic is secured via TLS and SSH. This includes checking out
+Vector's code from the relevant [protected branch](#protected-branches),
+Docker image retrieval, and publishing of Vector's release artifacts.
+
+### Release Artifacts & Channels
+
+#### Asset Audit Logging
+
+Changes to Vector's assets are logged through S3's audit logging feature.
+
+#### Asset Signatures & Checksums
+
+All assets are signed with checksums allowing users to verify asset authenticity
+upon download. This verifies that assets have not been modified at rest.
+
+## Meta
+
+### Review Schedule
+
+Vector reviews this policy and all user access levels on a quarterly basis.
+
+### Vulnerability Reporting
+
+We deeply appreciate any effort to discover and disclose security vulnerabilities responsibly.
+
+#### Vector CI
+
+If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products,
+please e-mail security@datadoghq.com.
+
+We take all disclosures very seriously and will do our best to rapidly respond
+and verify the vulnerability before taking the necessary steps to fix it. After
+our initial reply to your disclosure, which should be directly after receiving
+it, we will periodically update you with the status of the fix.
+
+#### Other reports
+
+Due to the nature of an open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could
+potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure
+via opening an [open an issue][urls.new_security_report] so that risks can be properly assessed and mitigated.
+
+For us to best investigate your request, please include any of the
+following when reporting:
+
+- Proof of concept
+- Any tools, including versions used
+- Any relevant output
+
+
+[urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
+[urls.cargo_deny_configuration]: https://github.com/vectordotdev/vector/blob/master/deny.toml
+[urls.dependabot]: https://github.com/marketplace/dependabot-preview
+[urls.dependabot_alerts]: https://github.com/vectordotdev/vector/network/alerts
+[urls.git]: https://git-scm.com/
+[urls.github_protected_branches]: https://help.github.com/en/github/administering-a-repository/about-protected-branches
+[urls.least_privilege]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
+[urls.new_security_report]: https://github.com/vectordotdev/vector/issues/new?labels=domain%3A+security
+[urls.rust]: https://www.rust-lang.org/
+[urls.rust_sec]: https://rustsec.org/
+[urls.vector_chat]: https://chat.vector.dev
+[urls.vector_issues]: https://github.com/vectordotdev/vector/issues
+[urls.vector_pull_requests]: https://github.com/vectordotdev/vector/pulls
+[urls.vector_repo]: https://github.com/vectordotdev/vector
+[urls.vector_roadmap]: https://github.com/vectordotdev/vector/milestones?direction=asc&sort=due_date&state=open

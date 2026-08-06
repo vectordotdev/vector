@@ -1,0 +1,9 @@
+{{ $componentKind:= .Get 0 }}
+{{ $componentsOfKind := where site.RegularPages ".Params.component_kind" $componentKind}}
+<div class="mt-3">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5 md:gap-2">
+    {{ range $componentsOfKind }}
+    {{ .Render "component-card" }}
+    {{ end }}
+  </div>
+</div>

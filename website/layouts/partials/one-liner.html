@@ -1,0 +1,19 @@
+{{ $commands := site.Data.docs.administration.install_commands }}
+{{ $defaultCommand := (index $commands 0).title }}
+<div x-data="{ command: '{{ $defaultCommand }}' }" class="mt-3">
+  <ul class="flex space-x-5" role="tablist" aria-orientation="horizontal">
+    {{ range $commands }}
+    <li @click="command = '{{ .title }}'" :class="{ 'text-secondary dark:text-primary font-bold': command === '{{ .title }}' }" role="tab" tabindex="0" class="cursor-pointer font-light tracking-tight text-sm md:text-base lg:text-lg text-gray-500 dark:text-gray-400">
+      {{ .title }}
+    </li>
+    {{ end }}
+  </ul>
+
+  {{ range $commands }}
+  <div x-show="command === '{{ .title }}'">
+    <div class="mt-3 p-4 bg-black rounded-md overflow-x-scroll text-sm md:text-base">
+      {{ highlight .command "bash" "" }}
+    </div>
+  </div>
+  {{ end }}
+</div>

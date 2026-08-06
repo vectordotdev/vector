@@ -1,0 +1,194 @@
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+};
+
+use vector_vrl_category::Category;
+use vrl::{
+    diagnostic::Label,
+    path::{OwnedTargetPath, PathPrefix},
+    prelude::*,
+};
+
+use indoc::indoc;
+
+#[derive(Debug, Default, Clone)]
+pub struct MeaningList(pub BTreeMap<String, OwnedTargetPath>);
+
+impl Deref for MeaningList {
+    type Target = BTreeMap<String, OwnedTargetPath>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for MeaningList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SetSemanticMeaning;
+
+impl Function for SetSemanticMeaning {
+    fn identifier(&self) -> &'static str {
+        "set_semantic_meaning"
+    }
+
+    fn usage(&self) -> &'static str {
+        indoc! {"Sets a semantic meaning for an event."}
+    }
+
+    fn notices(&self) -> &'static [&'static str] {
+        &[indoc! {"
+            This function assigns meaning at startup, and has _no_ runtime behavior. It is suggested
+            to put all calls to this function at the beginning of a VRL function. The function
+            cannot be conditionally called. For example, using an if statement cannot stop the
+            meaning from being assigned.
+        "}]
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        const PARAMETERS: &[Parameter] = &[
+            Parameter::required(
+                "target",
+                kind::ANY,
+                "The path of the value that is assigned a meaning.",
+            ),
+            Parameter::required("meaning", kind::BYTES, "The name of the meaning to assign."),
+        ];
+        PARAMETERS
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[example!(
+            title: "Sets custom field semantic meaning",
+            source: r#"set_semantic_meaning(.foo, "bar")"#,
+            result: Ok("null"),
+        )]
+    }
+
+    fn compile(
+        &self,
+        state: &TypeState,
+        ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
+    ) -> Compiled {
+        let span = ctx.span();
+        let query = arguments.required_query("target")?;
+
+        let meaning = arguments
+            .required_literal("meaning", state)?
+            .try_bytes_utf8_lossy()
+            .expect("meaning not bytes")
+            .into_owned();
+
+        let path = if let Some(path) = query.external_path() {
+            path
+        } else {
+            // Semantic meaning can only be assigned to external fields.
+            let mut labels = vec![Label::primary(
+                "this path must point to an event or metadata",
+                span,
+            )];
+
+            if let Some(variable) = query.as_variable() {
+                labels.push(Label::context(
+                    format!(
+                        "maybe you meant \".{}\" or \"%{}\"?",
+                        variable.ident(),
+                        variable.ident()
+                    ),
+                    span,
+                ));
+            }
+
+            let error = ExpressionError::Error {
+                message: "semantic meaning is not valid for local variables".to_owned(),
+                labels,
+                notes: vec![],
+            };
+
+            return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
+        };
+
+        let exists = match path.prefix {
+            PathPrefix::Event => state.external.target_kind(),
+            PathPrefix::Metadata => state.external.metadata_kind(),
+        }
+        .at_path(&path.path)
+        .contains_any_defined();
+
+        // Reject assigning meaning to non-existing field.
+        if !exists {
+            let error = ExpressionError::Error {
+                message: "semantic meaning defined for non-existing field".to_owned(),
+                labels: vec![
+                    Label::primary("cannot assign semantic meaning to non-existing field", span),
+                    Label::context(
+                        format!("field \".{}\" is not known to exist for all events", &path),
+                        span,
+                    ),
+                ],
+                notes: vec![],
+            };
+
+            return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
+        }
+
+        if let Some(list) = ctx.get_external_context_mut::<MeaningList>() {
+            let duplicate = list.get(&meaning).filter(|&p| p != &path);
+
+            // Disallow a single VRL program from assigning the same semantic meaning to two
+            // different fields.
+            if let Some(duplicate) = duplicate {
+                let error = ExpressionError::Error {
+                    message: "semantic meaning referencing two different fields".to_owned(),
+                    labels: vec![
+                        Label::primary(
+                            format!(
+                                "semantic meaning \"{}\" must reference a single field",
+                                &meaning
+                            ),
+                            span,
+                        ),
+                        Label::context(
+                            format!("already referencing field \".{}\"", &duplicate),
+                            span,
+                        ),
+                    ],
+                    notes: vec![],
+                };
+
+                return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
+            }
+
+            list.insert(meaning, path);
+        };
+
+        Ok(SetSemanticMeaningFn.as_expr())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SetSemanticMeaningFn;
+
+impl FunctionExpression for SetSemanticMeaningFn {
+    fn resolve(&self, _ctx: &mut Context) -> Resolved {
+        Ok(Value::Null)
+    }
+
+    fn type_def(&self, _: &TypeState) -> TypeDef {
+        TypeDef::null().infallible().impure()
+    }
+}

@@ -1,0 +1,66 @@
+[package]
+name = "vector-buffers"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-recursion = "1.1.1"
+async-stream = "0.3.6"
+async-trait.workspace = true
+bytecheck = { version = "0.6.9", default-features = false, features = ["std"] }
+bytes.workspace = true
+crc32fast = { version = "1.5.0", default-features = false }
+crossbeam-queue = { version = "0.3.12", default-features = false, features = ["std"] }
+crossbeam-utils.workspace = true
+derivative.workspace = true
+fslock = { version = "0.2.1", default-features = false, features = ["std"] }
+futures.workspace = true
+memmap2 = { version = "0.9.10", default-features = false }
+metrics.workspace = true
+num-traits = { version = "0.2.19", default-features = false }
+pastey.workspace = true
+rkyv = { version = "0.7.46", default-features = false, features = ["size_32", "std", "strict", "validation"] }
+serde.workspace = true
+snafu.workspace = true
+tokio-util = { version = "0.7.0", default-features = false }
+tokio = { workspace = true, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tracing = { workspace = true, features = ["attributes"] }
+vector-config = { path = "../vector-config", default-features = false }
+vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
+dashmap.workspace = true
+ordered-float.workspace = true
+antithesis_sdk = { workspace = true, optional = true, features = ["full"] }
+serde_json = { workspace = true, optional = true }
+
+[features]
+antithesis-disk-asserts = ["dep:antithesis_sdk", "dep:serde_json"]
+test = []
+
+[dev-dependencies]
+clap.workspace = true
+criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
+crossbeam-queue = "0.3.12"
+hdrhistogram = "7.5.4"
+metrics-tracing-context.workspace = true
+metrics-util = { workspace = true, features = ["debugging"] }
+proptest.workspace = true
+quickcheck.workspace = true
+rand.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+temp-dir = "0.1.16"
+tokio-test.workspace = true
+tracing-fluent-assertions = { version = "0.3" }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
+
+[[bench]]
+name = "sized_records"
+harness = false
+
+[[example]]
+name = "buffer_perf"

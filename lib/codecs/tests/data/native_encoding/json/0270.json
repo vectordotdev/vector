@@ -1,0 +1,1 @@
+{"metric":{"name":"h","tags":{"j":"z","n":"h"},"timestamp":"1970-01-01T01:04:03.000014574Z","kind":"incremental","distribution":{"samples":[{"value":-707008.0,"rate":377224893}],"statistic":"summary"}}}

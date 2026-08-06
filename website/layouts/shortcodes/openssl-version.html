@@ -1,0 +1,3 @@
+{{- $package := partialCached "cargo-package" "openssl-src" -}}
+{{- $openssl_version := index (strings.Split $package.version "+") 1 -}}
+{{- with .Get "majMin" -}}{{- with strings.Split $openssl_version "." -}}{{- index . 0 -}}.{{- index . 1 -}}{{- end -}}{{- else -}}{{- $openssl_version -}}{{- end -}}

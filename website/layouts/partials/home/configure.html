@@ -1,0 +1,59 @@
+{{ $configure := .Params.configure }}
+{{ $configs := site.Data.docs.config_examples }}
+{{ $defaultConfig := (index $configs 0).title }}
+<div class="relative py-12 md:py-16 lg:py-20 mx-auto max-w-7xl px-8 md:px-4 lg:px-0">
+  <div class="text-center">
+    {{ partial "home/heading.html" (dict "title" $configure.title) }}
+
+    <p class="mt-4 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
+      {{ $configure.description }}
+    </p>
+  </div>
+
+  <div x-data="{ config: '{{ $defaultConfig }}' }" class="mt-8 max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 items-start">
+    <div class="md:pt-2 flex flex-col items-start md:items-end space-y-1 md:space-y-2">
+      {{ range $configs }}
+      <button @click="config = '{{ .title }}'" :class="{ 'font-semibold dark:text-primary': config === '{{ .title }}', 'text-gray-400 font-light hover:text-secondary dark:hover:text-primary': config != '{{ .title }}' }" class="flex items-center space-x-2 md:text-lg">
+        <span>
+          {{ .title }}
+        </span>
+      </button>
+      {{ end }}
+    </div>
+
+    <div class="bg-black shadow-lg rounded-xl">
+      <div class="flex py-2.5 px-4 justify-between items-center border-b border-gray-700">
+        <div class="flex space-x-2">
+          {{ template "dot" "red-500" }}
+          {{ template "dot" "yellow-500" }}
+          {{ template "dot" "green-500" }}
+        </div>
+
+        <div>
+          <span class="font-bold text-sm font-mono text-gray-100">
+            {{ $configure.filename }}
+          </span>
+        </div>
+      </div>
+
+      <div class="p-4 overflow-x-scroll">
+        {{ range $configs }}
+        {{ $code := highlight .example "toml" "" }}
+        <div x-show="config === '{{ .title }}'" class="text-sm">
+          {{ $code }}
+        </div>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-8 text-center">
+    <span class="prose prose-sm dark:prose-dark tracking-tight text-gray-500 dark:text-gray-400">
+      {{ $configure.below | markdownify }}
+    </span>
+  </div>
+</div>
+
+{{ define "dot" }}
+<span class="h-3 w-3 bg-{{ . }} rounded-full"></span>
+{{ end }}

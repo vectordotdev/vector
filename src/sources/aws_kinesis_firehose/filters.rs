@@ -1,0 +1,309 @@
+use std::{collections::HashMap, convert::Infallible};
+
+use bytes::{Buf, Bytes};
+use chrono::Utc;
+use http::header::HeaderValue;
+use snafu::ResultExt;
+use vector_lib::{
+    config::LogNamespace,
+    internal_event::{BytesReceived, Protocol},
+};
+use warp::{Filter, http::StatusCode};
+
+use super::{
+    Compression,
+    errors::{DecodeSnafu, ParseSnafu, RequestError},
+    handlers,
+    models::{FirehoseCommonAttributesHeader, FirehoseRequest, FirehoseResponse},
+};
+use crate::{
+    SourceSender, codecs,
+    common::http::ErrorMessage,
+    internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
+    sources::http_server::HttpConfigParamKind,
+    sources::util::{decompression::CappedDecoder, http::capped_body},
+};
+
+/// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
+#[allow(clippy::too_many_arguments)]
+pub fn firehose(
+    access_keys: Vec<String>,
+    store_access_key: bool,
+    record_compression: Compression,
+    decoder: codecs::Decoder,
+    acknowledgements: bool,
+    out: SourceSender,
+    log_namespace: LogNamespace,
+    common_attributes: Vec<HttpConfigParamKind>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = Infallible> + Clone {
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let context = handlers::Context {
+        compression: record_compression,
+        store_access_key,
+        decoder,
+        acknowledgements,
+        bytes_received,
+        out,
+        log_namespace,
+        common_attributes,
+    };
+    warp::post()
+        .and(emit_received())
+        .and(authenticate(access_keys))
+        .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header("X-Amz-Firehose-Source-Arn"))
+        .and(
+            warp::header("X-Amz-Firehose-Protocol-Version")
+                .and_then(|version: String| async move {
+                    match version.as_str() {
+                        "1.0" => Ok(()),
+                        _ => Err(warp::reject::custom(
+                            RequestError::UnsupportedProtocolVersion { version },
+                        )),
+                    }
+                })
+                .untuple_one(),
+        )
+        .and(parse_common_attributes_header(
+            !context.common_attributes.is_empty(),
+        ))
+        .and(parse_body())
+        .and(warp::any().map(move || context.clone()))
+        .and_then(handlers::firehose)
+        .recover(handle_firehose_rejection)
+}
+
+/// Decode (if needed) and parse request body
+///
+/// Firehose can be configured to gzip compress messages so we handle this here
+fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::reject::Rejection> + Clone
+{
+    warp::any()
+        .and(warp::header::optional::<String>("Content-Encoding"))
+        .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
+        .and(capped_body())
+        .and_then(
+            |encoding: Option<String>,
+             request_id: String,
+             access_key: Option<String>,
+             body: Bytes| async move {
+                // Decompress (if needed) into a buffer capped by the global decompressed-size
+                // limit so a gzip bomb cannot drive unbounded allocation.
+                let decoded: Bytes = match encoding {
+                    Some(s) if s == "gzip" => CappedDecoder::gzip(body.reader())
+                        .decompress()
+                        .map(Bytes::from)
+                        .with_context(|_| DecodeSnafu {
+                            request_id: request_id.clone(),
+                        })
+                        .map_err(warp::reject::custom)?,
+                    Some(s) => {
+                        return Err(warp::reject::Rejection::from(
+                            RequestError::UnsupportedEncoding {
+                                encoding: s,
+                                request_id,
+                            },
+                        ));
+                    }
+                    None => body,
+                };
+
+                serde_json::from_slice(&decoded)
+                    .context(ParseSnafu {
+                        request_id: request_id.clone(),
+                    })
+                    .map(|request: FirehoseRequest| FirehoseRequest {
+                        access_key,
+                        ..request
+                    })
+                    .map_err(warp::reject::custom)
+            },
+        )
+}
+
+/// Parse AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
+fn parse_common_attributes_header(
+    is_common_attributes_configured: bool,
+) -> impl Filter<Extract = (HashMap<String, String>,), Error = warp::reject::Rejection> + Clone {
+    warp::any()
+        .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional::<HeaderValue>(
+            "X-Amz-Firehose-Common-Attributes",
+        ))
+        .and_then(
+            move |request_id: String, common_attributes_raw: Option<HeaderValue>| async move {
+                if !is_common_attributes_configured {
+                    return Ok(HashMap::new());
+                }
+
+                let common_attributes = common_attributes_raw.as_ref().map(HeaderValue::as_bytes);
+
+                match common_attributes {
+                    Some(common_attributes) => serde_json::from_slice(common_attributes)
+                        .context(ParseSnafu {
+                            request_id: request_id.clone(),
+                        })
+                        .map(|common_attributes_header: FirehoseCommonAttributesHeader| {
+                            common_attributes_header.common_attributes
+                        })
+                        .map_err(warp::reject::custom),
+                    None => Ok(HashMap::new()),
+                }
+            },
+        )
+}
+
+fn emit_received() -> impl Filter<Extract = (), Error = warp::reject::Rejection> + Clone {
+    warp::any()
+        .and(warp::header::optional("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional("X-Amz-Firehose-Source-Arn"))
+        .map(|request_id: Option<String>, source_arn: Option<String>| {
+            emit!(AwsKinesisFirehoseRequestReceived {
+                request_id: request_id.as_deref(),
+                source_arn: source_arn.as_deref(),
+            });
+        })
+        .untuple_one()
+}
+
+/// If there is a configured access key, validate that the request key matches it
+fn authenticate(
+    configured_access_keys: Vec<String>,
+) -> impl Filter<Extract = (), Error = warp::Rejection> + Clone {
+    warp::any()
+        .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
+        .and_then(move |request_id: String, access_key: Option<String>| {
+            let configured_access_keys = configured_access_keys.clone();
+
+            async move {
+                match (access_key, configured_access_keys.is_empty()) {
+                    // No configured access keys
+                    (_, true) => Ok(()),
+                    // Passed access key is present in configured access keys
+                    (Some(access_key), false) if configured_access_keys.contains(&access_key) => {
+                        Ok(())
+                    }
+                    // No configured access keys, but passed with the request
+                    (Some(_), false) => Err(warp::reject::custom(RequestError::AccessKeyInvalid {
+                        request_id,
+                    })),
+                    // Access keys are configured, but missing from the request
+                    (None, false) => Err(warp::reject::custom(RequestError::AccessKeyMissing {
+                        request_id,
+                    })),
+                }
+            }
+        })
+        .untuple_one()
+}
+
+/// Maps RequestError and warp errors to AWS Kinesis Firehose response structure
+async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Reply, Infallible> {
+    let request_id: Option<&str>;
+    let message: String;
+    let code: StatusCode;
+
+    if let Some(e) = err.find::<RequestError>() {
+        message = e.to_string();
+        code = e.status();
+        request_id = e.request_id();
+    } else if let Some(e) = err.find::<ErrorMessage>() {
+        code = e.status_code();
+        message = e.message().to_string();
+        request_id = None;
+    } else if let Some(e) = err.find::<warp::reject::MissingHeader>() {
+        code = StatusCode::BAD_REQUEST;
+        message = format!("Required header missing: {}", e.name());
+        request_id = None;
+    } else {
+        code = StatusCode::INTERNAL_SERVER_ERROR;
+        message = format!("{err:?}");
+        request_id = None;
+    }
+
+    emit!(AwsKinesisFirehoseRequestError::new(
+        code,
+        message.as_str(),
+        request_id
+    ));
+
+    let json = warp::reply::json(&FirehoseResponse {
+        request_id: request_id.unwrap_or_default().to_string(),
+        timestamp: Utc::now(),
+        error_message: Some(message),
+    });
+
+    Ok(warp::reply::with_status(json, code))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn request_construction() {
+        let parsed = warp::test::request()
+            .header(
+                "x-amzn-trace-id",
+                "Root=1-5f5fbf1c-877c68cace58bea222ddbeec",
+            )
+            .header("x-amz-firehose-protocol-version", "1.0")
+            .header(
+                "X-Amz-Firehose-Request-Id",
+                "e17265d6-97af-4938-982e-90d5614c4242",
+            )
+            .header(
+                "x-amz-firehose-source-arn",
+                "arn:aws:firehose:us-east-1:111111111111:deliverystream/test",
+            )
+            .header("x-amz-firehose-access-key", "secret123")
+            .header("user-agent", "Amazon Kinesis Data Firehose Agent/1.0")
+            .header("content-type", "application/json")
+            .header("Content-Encoding", "gzip")
+            .body({
+                let mut gz = flate2::read::GzEncoder::new(
+                    io::Cursor::new(
+                        serde_json::to_vec(&FirehoseRequest {
+                            access_key: None,
+                            request_id: "e17265d6-97af-4938-982e-90d5614c4242".to_owned(),
+                            records: Vec::new(),
+                            timestamp: Utc::now(),
+                        })
+                        .unwrap(),
+                    ),
+                    flate2::Compression::fast(),
+                );
+                let mut buffer = Vec::new();
+                io::Read::read_to_end(&mut gz, &mut buffer).unwrap();
+                buffer
+            })
+            .filter(&parse_body())
+            .await
+            .unwrap();
+
+        assert_eq!(parsed.access_key, Some("secret123".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn capped_body_rejection_maps_to_client_error() {
+        use warp::Reply;
+
+        // `capped_body()` rejects oversized payloads with an `ErrorMessage` (e.g. 413). The
+        // recovery must surface that status instead of falling through to a 500.
+        let rejection = warp::reject::custom(ErrorMessage::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Request body exceeds limit of 1024 bytes.".to_owned(),
+        ));
+
+        let response = handle_firehose_rejection(rejection)
+            .await
+            .unwrap()
+            .into_response();
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+}

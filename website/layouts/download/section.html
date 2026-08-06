@@ -1,0 +1,120 @@
+{{ define "title" }}
+Download | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $releases := site.Data.docs.releases }}
+{{ $versions := site.Data.docs.versions }}
+{{ $latest := index $versions 0 }}
+<div x-data x-init="$store.global.setToLatest()" class="relative max-w-3xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
+  <div class="my-16">
+    {{ partial "hero.html" . }}
+  </div>
+
+  <div class="mt-10 mb-8">
+    <div class="flex items-center space-x-4">
+      {{ partial "download/version-selector.html" . }}
+
+      {{ template "latest-toggler" }}
+    </div>
+  </div>
+
+  <div>
+    {{ range $k, $v := $releases }}
+    {{ template "release-header" (dict "version" $k "info" $v) }}
+    {{ end }}
+
+    {{ template "release-header" (dict "version" "nightly") }}
+  </div>
+
+  <div>
+    {{ range $k, $v := $releases }}
+    {{ template "release-body" (dict "version" $k "info" $v) }}
+    {{ end }}
+
+    {{ template "release-body" (dict "version" "nightly") }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "release-header" }}
+{{ $v := .version }}
+{{ $isNightly := eq $v "nightly" }}
+<div x-show="$store.global.isVersion('{{ $v }}')"{{ if $isNightly}} x-data="{ date: new Date().toISOString().slice(0, 10) }"{{ end }}>
+  <div class="flex items-center space-x-10">
+    <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
+      Date {{ if $isNightly }}
+      <span class="ml-1.5 font-bold" x-text="date"></span>
+      {{ else }}
+      <span class="ml-1.5 font-bold">{{ .info.date }}</span>
+      {{ end }}
+    </span>
+
+    <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
+      License <a href="https://github.com/vectordotdev/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary dark:hover:text-primary dark:text-gray-300 font-bold" rel="noopener" target="_blank">MPL 2.0</a>
+    </span>
+
+    {{ if not $isNightly }}
+    <a href="/releases/{{ $v }}" class="hover:text-secondary dark:hover:text-primary dark:text-gray-300 font-bold">
+      {{ $v }} release notes
+    </a>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "release-body" }}
+{{ $v := .version }}
+<div x-show="$store.global.isVersion('{{ $v }}')">
+  <div class="mt-8">
+    <div class="lg:grid lg:grid-cols-3 gap-8">
+      <div class="col-span-2">
+        <div class="prose">
+          {{ partial "heading.html" (dict "text" "Downloads" "level" 2) }}
+        </div>
+
+        <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+          {{ partial "download/download-matrix.html" (dict "version" $v) }}
+        </div>
+
+        {{ template "nightly-warning" }}
+      </div>
+
+      {{ template "methods" }}
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "latest-toggler" }}
+<button type="button" x-show="$store.global.notLatest()" @click="$store.global.setToLatest()" class="border-2 dark:text-gray-200 dark:border-gray-700 rounded-full py-1.5 px-4 hover:border-lime-600 hover:bg-lime-100 dark:hover:text-gray-200 dark:hover:bg-dark dark:hover:border-lime-600">
+  Set to latest version
+</button>
+{{ end }}
+
+{{ define "methods" }}
+<div class="col-span-1 mt-6 lg:mt-0">
+  <div class="prose">
+    {{ partial "heading.html" (dict "text" "Other methods" "level" 2) }}
+  </div>
+
+  <div class="mt-2 flex flex-col divide-y divide-gray-200 border rounded-md dark:border-gray-700">
+    {{ partial "download/links.html" . }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "nightly-warning" }}
+<div  x-show="$store.global.isNightly()" class="mt-8 rounded-md border-yellow-400 border-2 px-4 py-3 flex items-start bg-yellow-100 dark:bg-dark">
+  {{/* Heroicon: outline/exclamation */}}
+  <span>
+    <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+  </span>
+
+  <span class="font-semibold text-gray-600 dark:text-gray-300 ml-3">
+    Nightly versions contain bleeding-edge changes that may contain bugs. Proceed with caution.
+  </span>
+</div>
+{{ end }}

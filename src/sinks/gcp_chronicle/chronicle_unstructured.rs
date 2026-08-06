@@ -1,0 +1,728 @@
+//! This sink sends data to Google Chronicles unstructured log entries endpoint.
+//! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
+//! for more information.
+use std::{collections::HashMap, io};
+
+use bytes::{Bytes, BytesMut};
+use futures_util::{future::BoxFuture, task::Poll};
+use goauth::scopes::Scope;
+use http::{
+    Request, StatusCode, Uri,
+    header::{self, HeaderName, HeaderValue},
+};
+use hyper::Body;
+use indoc::indoc;
+use serde::Serialize;
+use serde_json::json;
+use snafu::Snafu;
+use tokio_util::codec::Encoder as _;
+use tower::{Service, ServiceBuilder};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::{AcknowledgementsConfig, Input, telemetry},
+    configurable::configurable_component,
+    event::{Event, EventFinalizers, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    sink::VectorSink,
+};
+use vrl::value::Kind;
+
+use crate::{
+    codecs::{self, EncodingConfig},
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
+    http::HttpClient,
+    schema,
+    sinks::{
+        Healthcheck,
+        gcp_chronicle::{
+            compression::ChronicleCompression,
+            partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
+            sink::ChronicleSink,
+        },
+        gcs_common::{
+            config::{GcsRetryLogic, healthcheck_response},
+            service::GcsResponse,
+        },
+        util::{
+            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            encoding::{Encoder, as_tracked_write},
+            metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
+            service::TowerRequestConfigDefaults,
+        },
+    },
+    template::{Template, TemplateParseError},
+    tls::{TlsConfig, TlsSettings},
+};
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+pub enum GcsHealthcheckError {
+    #[snafu(display("log_type template parse error: {}", source))]
+    LogTypeTemplate { source: TemplateParseError },
+
+    #[snafu(display("Endpoint not found"))]
+    NotFound,
+}
+
+/// Google Chronicle regions.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Region {
+    /// European Multi region
+    Eu,
+
+    /// US Multi region
+    Us,
+
+    /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)
+    Asia,
+
+    /// SãoPaulo Region
+    SãoPaulo,
+
+    /// Canada Region
+    Canada,
+
+    /// Dammam Region
+    Dammam,
+
+    /// Doha Region
+    Doha,
+
+    /// Frankfurt Region
+    Frankfurt,
+
+    /// London Region
+    London,
+
+    /// Mumbai Region
+    Mumbai,
+
+    /// Paris Region
+    Paris,
+
+    /// Singapore Region
+    Singapore,
+
+    /// Sydney Region
+    Sydney,
+
+    /// TelAviv Region
+    TelAviv,
+
+    /// Tokyo Region
+    Tokyo,
+
+    /// Turin Region
+    Turin,
+
+    /// Zurich Region
+    Zurich,
+}
+
+impl Region {
+    /// Each region has a its own endpoint.
+    const fn endpoint(self) -> &'static str {
+        match self {
+            Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
+            Region::Us => "https://malachiteingestion-pa.googleapis.com",
+            Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::SãoPaulo => "https://southamerica-east1-malachiteingestion-pa.googleapis.com",
+            Region::Canada => {
+                "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
+            }
+            Region::Dammam => "https://me-central2-malachiteingestion-pa.googleapis.com",
+            Region::Doha => "https://me-central1-malachiteingestion-pa.googleapis.com",
+            Region::Frankfurt => "https://europe-west3-malachiteingestion-pa.googleapis.com",
+            Region::London => "https://europe-west2-malachiteingestion-pa.googleapis.com",
+            Region::Mumbai => "https://asia-south1-malachiteingestion-pa.googleapis.com",
+            Region::Paris => "https://europe-west9-malachiteingestion-pa.googleapis.com",
+            Region::Singapore => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Sydney => "https://australia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::TelAviv => "https://me-west1-malachiteingestion-pa.googleapis.com",
+            Region::Tokyo => "https://asia-northeast1-malachiteingestion-pa.googleapis.com",
+            Region::Turin => "https://europe-west12-malachiteingestion-pa.googleapis.com",
+            Region::Zurich => "https://europe-west6-malachiteingestion-pa.googleapis.com",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ChronicleUnstructuredDefaultBatchSettings;
+
+// Chronicle Ingestion API has a 1MB limit[1] for unstructured log entries. We're also using a
+// conservatively low batch timeout to ensure events make it to Chronicle in a timely fashion, but
+// high enough that it allows for reasonable batching.
+//
+// [1]: https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
+impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: f64 = 15.0;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ChronicleUnstructuredTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 1_000;
+}
+
+/// Configuration for the `gcp_chronicle_unstructured` sink.
+#[configurable_component(sink(
+    "gcp_chronicle_unstructured",
+    "Store unstructured log events in Google Chronicle."
+))]
+#[derive(Clone, Debug)]
+pub struct ChronicleUnstructuredConfig {
+    /// The endpoint to send data to.
+    #[configurable(metadata(
+        docs::examples = "127.0.0.1:8080",
+        docs::examples = "example.com:12345"
+    ))]
+    pub endpoint: Option<String>,
+
+    /// The GCP region to use.
+    #[configurable(derived)]
+    pub region: Option<Region>,
+
+    /// The Unique identifier (UUID) corresponding to the Chronicle instance.
+    #[configurable(validation(format = "uuid"))]
+    #[configurable(metadata(docs::examples = "c8c65bfa-5f2c-42d4-9189-64bb7b939f2c"))]
+    pub customer_id: String,
+
+    /// User-configured environment namespace to identify the data domain the logs originated from.
+    #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(
+        docs::examples = "production",
+        docs::examples = "production-{{ namespace }}",
+    ))]
+    #[configurable(metadata(docs::advanced))]
+    pub namespace: Option<Template>,
+
+    /// A set of labels that are attached to each batch of events.
+    #[configurable(metadata(docs::examples = "chronicle_labels_examples()"))]
+    #[configurable(metadata(docs::additional_props_description = "A Chronicle label."))]
+    pub labels: Option<HashMap<String, String>>,
+
+    #[serde(flatten)]
+    pub auth: GcpAuthConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch: BatchConfig<ChronicleUnstructuredDefaultBatchSettings>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    #[serde(default)]
+    #[configurable(derived)]
+    pub compression: ChronicleCompression,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub request: TowerRequestConfig<ChronicleUnstructuredTowerRequestConfigDefaults>,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    /// The type of log entries in a request.
+    ///
+    /// This must be one of the [supported log types][unstructured_log_types_doc], otherwise
+    /// Chronicle rejects the entry with an error.
+    ///
+    /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
+    #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
+    pub log_type: Template,
+
+    /// The default `log_type` to attach to events if the template in `log_type` cannot be resolved.
+    #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
+    pub fallback_log_type: Option<String>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
+}
+
+fn chronicle_labels_examples() -> HashMap<String, String> {
+    let mut examples = HashMap::new();
+    examples.insert("source".to_string(), "vector".to_string());
+    examples.insert("tenant".to_string(), "marketing".to_string());
+    examples
+}
+
+impl GenerateConfig for ChronicleUnstructuredConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(indoc! {r#"
+            credentials_path = "/path/to/credentials.json"
+            customer_id = "customer_id"
+            namespace = "namespace"
+            compression = "gzip"
+            log_type = "log_type"
+            fallback_log_type = "VECTOR_DEV"
+            encoding.codec = "text"
+        "#})
+        .unwrap()
+    }
+}
+
+pub fn build_healthcheck(
+    client: HttpClient,
+    base_url: &str,
+    auth: GcpAuthenticator,
+) -> crate::Result<Healthcheck> {
+    let uri = base_url.parse::<Uri>()?;
+
+    let healthcheck = async move {
+        let mut request = http::Request::get(&uri).body(Body::empty())?;
+        auth.apply(&mut request);
+
+        let response = client.send(request).await?;
+        healthcheck_response(response, GcsHealthcheckError::NotFound.into())
+    };
+
+    Ok(Box::pin(healthcheck))
+}
+
+#[derive(Debug, Snafu)]
+pub enum ChronicleError {
+    #[snafu(display("Region or endpoint not defined"))]
+    RegionOrEndpoint,
+    #[snafu(display("You can only specify one of region or endpoint"))]
+    BothRegionAndEndpoint,
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "gcp_chronicle_unstructured")]
+impl SinkConfig for ChronicleUnstructuredConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
+
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls, cx.proxy())?;
+
+        let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
+
+        // For the healthcheck we see if we can fetch the list of available log types.
+        let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
+
+        let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
+        creds.spawn_regenerate_token();
+        let sink = self.build_sink(client, endpoint, creds)?;
+
+        Ok((sink, healthcheck))
+    }
+
+    fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+impl ChronicleUnstructuredConfig {
+    fn build_sink(
+        &self,
+        client: HttpClient,
+        base_url: String,
+        creds: GcpAuthenticator,
+    ) -> crate::Result<VectorSink> {
+        use crate::sinks::util::service::ServiceBuilderExt;
+
+        let request = self.request.into_settings();
+
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        let partitioner = self.partitioner()?;
+
+        let svc = ServiceBuilder::new()
+            .settings(request, GcsRetryLogic::default())
+            .service(ChronicleService::new(client, base_url, creds));
+
+        let request_settings = ChronicleRequestBuilder::new(self)?;
+
+        let sink = ChronicleSink::new(svc, request_settings, partitioner, batch_settings, "http");
+
+        Ok(VectorSink::from_event_streamsink(sink))
+    }
+
+    fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
+        Ok(ChroniclePartitioner::new(
+            self.log_type.clone(),
+            self.fallback_log_type.clone(),
+            self.namespace.clone(),
+        ))
+    }
+
+    fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
+        Ok(format!(
+            "{}/{}",
+            match (&self.endpoint, self.region) {
+                (Some(endpoint), None) => endpoint.trim_end_matches('/'),
+                (None, Some(region)) => region.endpoint(),
+                (Some(_), Some(_)) => return Err(ChronicleError::BothRegionAndEndpoint),
+                (None, None) => return Err(ChronicleError::RegionOrEndpoint),
+            },
+            path
+        ))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ChronicleRequest {
+    pub body: Bytes,
+    pub finalizers: EventFinalizers,
+    pub headers: HashMap<HeaderName, HeaderValue>,
+    metadata: RequestMetadata,
+}
+
+impl Finalizable for ChronicleRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for ChronicleRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ChronicleRequestBody {
+    customer_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    namespace: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    labels: Option<Vec<Label>>,
+    log_type: String,
+    entries: Vec<serde_json::Value>,
+}
+
+#[derive(Clone, Debug)]
+struct ChronicleEncoder {
+    customer_id: String,
+    labels: Option<Vec<Label>>,
+    encoder: codecs::Encoder<()>,
+    transformer: codecs::Transformer,
+}
+
+impl Encoder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleEncoder {
+    fn encode_input(
+        &self,
+        input: (ChroniclePartitionKey, Vec<Event>),
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        let (key, events) = input;
+        let mut encoder = self.encoder.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        let events = events
+            .into_iter()
+            .filter_map(|mut event| {
+                let timestamp = event
+                    .as_log()
+                    .get_timestamp()
+                    .and_then(|ts| ts.as_timestamp())
+                    .cloned();
+                let mut bytes = BytesMut::new();
+                self.transformer.transform(&mut event);
+
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
+                encoder.encode(event, &mut bytes).ok()?;
+
+                let mut value = json!({
+                    "log_text": String::from_utf8_lossy(&bytes),
+                });
+
+                if let Some(ts) = timestamp {
+                    value.as_object_mut().unwrap().insert(
+                        "ts_rfc3339".to_string(),
+                        ts.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
+                            .into(),
+                    );
+                }
+
+                Some(value)
+            })
+            .collect::<Vec<_>>();
+
+        let json = json!(ChronicleRequestBody {
+            customer_id: self.customer_id.clone(),
+            namespace: key.namespace,
+            labels: self.labels.clone(),
+            log_type: key.log_type,
+            entries: events,
+        });
+
+        let size = as_tracked_write::<_, _, io::Error>(writer, &json, |writer, json| {
+            serde_json::to_writer(writer, json)?;
+            Ok(())
+        })?;
+
+        Ok((size, byte_size))
+    }
+}
+
+// Settings required to produce a request that do not change per
+// request. All possible values are pre-computed for direct use in
+// producing a request.
+#[derive(Clone, Debug)]
+struct ChronicleRequestBuilder {
+    encoder: ChronicleEncoder,
+    compression: Compression,
+}
+
+struct ChronicleRequestPayload {
+    bytes: Bytes,
+}
+
+impl From<Bytes> for ChronicleRequestPayload {
+    fn from(bytes: Bytes) -> Self {
+        Self { bytes }
+    }
+}
+
+impl AsRef<[u8]> for ChronicleRequestPayload {
+    fn as_ref(&self) -> &[u8] {
+        self.bytes.as_ref()
+    }
+}
+
+impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBuilder {
+    type Metadata = EventFinalizers;
+    type Events = (ChroniclePartitionKey, Vec<Event>);
+    type Encoder = ChronicleEncoder;
+    type Payload = ChronicleRequestPayload;
+    type Request = ChronicleRequest;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(
+        &self,
+        input: (ChroniclePartitionKey, Vec<Event>),
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let (partition_key, mut events) = input;
+        let finalizers = events.take_finalizers();
+
+        let builder = RequestMetadataBuilder::from_events(&events);
+        (finalizers, builder, (partition_key, events))
+    }
+
+    fn build_request(
+        &self,
+        finalizers: Self::Metadata,
+        metadata: RequestMetadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let mut headers = HashMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+
+        match payload.compressed_byte_size {
+            Some(compressed_byte_size) => {
+                headers.insert(
+                    header::CONTENT_LENGTH,
+                    HeaderValue::from_str(&compressed_byte_size.to_string()).unwrap(),
+                );
+                headers.insert(
+                    header::CONTENT_ENCODING,
+                    HeaderValue::from_str(self.compression.content_encoding().unwrap()).unwrap(),
+                );
+            }
+            None => {
+                headers.insert(
+                    header::CONTENT_LENGTH,
+                    HeaderValue::from_str(&payload.uncompressed_byte_size.to_string()).unwrap(),
+                );
+            }
+        }
+
+        ChronicleRequest {
+            headers,
+            body: payload.into_payload().bytes,
+            finalizers,
+            metadata,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct Label {
+    key: String,
+    value: String,
+}
+
+impl ChronicleRequestBuilder {
+    fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.config().build()?;
+        let compression = Compression::from(config.compression);
+        let encoder = vector_lib::codecs::Encoder::<()>::new(serializer);
+        let encoder = ChronicleEncoder {
+            customer_id: config.customer_id.clone(),
+            labels: config.labels.as_ref().map(|labs| {
+                labs.iter()
+                    .map(|(k, v)| Label {
+                        key: k.to_string(),
+                        value: v.to_string(),
+                    })
+                    .collect::<Vec<_>>()
+            }),
+            encoder,
+            transformer,
+        };
+        Ok(Self {
+            encoder,
+            compression,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ChronicleService {
+    client: HttpClient,
+    base_url: String,
+    creds: GcpAuthenticator,
+}
+
+impl ChronicleService {
+    pub const fn new(client: HttpClient, base_url: String, creds: GcpAuthenticator) -> Self {
+        Self {
+            client,
+            base_url,
+            creds,
+        }
+    }
+}
+
+#[derive(Debug, Snafu)]
+pub enum ChronicleResponseError {
+    #[snafu(display("Server responded with an error: {}", code))]
+    ServerError { code: StatusCode },
+    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
+    HttpError { error: crate::http::HttpError },
+}
+
+impl Service<ChronicleRequest> for ChronicleService {
+    type Response = GcsResponse;
+    type Error = ChronicleResponseError;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, request: ChronicleRequest) -> Self::Future {
+        let mut builder = Request::post(&self.base_url);
+        let metadata = request.get_metadata().clone();
+
+        let headers = builder.headers_mut().unwrap();
+        for (name, value) in request.headers {
+            headers.insert(name, value);
+        }
+
+        let mut http_request = builder.body(Body::from(request.body)).unwrap();
+        self.creds.apply(&mut http_request);
+
+        let mut client = self.client.clone();
+        Box::pin(async move {
+            match client.call(http_request).await {
+                Ok(response) => {
+                    let status = response.status();
+                    if status.is_success() {
+                        Ok(GcsResponse {
+                            inner: response,
+                            metadata,
+                        })
+                    } else {
+                        Err(ChronicleResponseError::ServerError { code: status })
+                    }
+                }
+                Err(error) => Err(ChronicleResponseError::HttpError { error }),
+            }
+        })
+    }
+}
+
+#[cfg(test)]
+mod unit_tests {
+    use std::io::Write;
+
+    use tempfile::NamedTempFile;
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+
+    use super::*;
+    use crate::test_util::{random_string, trace_init};
+
+    #[tokio::test]
+    async fn invalid_credentials_rejected_by_oauth_server() {
+        trace_init();
+
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&mock_server)
+            .await;
+
+        let base_url = mock_server.uri();
+        let creds = serde_json::json!({
+            "type": "service_account",
+            "project_id": "test",
+            "private_key_id": "1",
+            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIICXgIBAAKBgQDouHdVDVz0/M6PGe60Kf/g0nyOxCvbZgiUAZNzFimXDU+RpZ54\n6/oETl6VpRkbp8a4Xb8avll2lsamdHvGcsgnjJXdpp7LfWYLqHEpn0/XFM+womXg\nvglWCDwAsXmrmwpZKEC82mmyFigheyPA/sfuN6z+wa7P5B65xzIdDQX7nQIDAQAB\nAoGBANID/rUDrTrtll8v8Oon6OH0MjIIuOdzKhSfY3h9rKTDf2YaB2xq0KLoMpVr\ne8AoZb5l45t34naR1M3M2xKY7SSDAVJFfg/3Vxeot86DQ23IGLXj7LnNxXnvklXa\nEXaD8LNz/MXxS7/Lu0R+lEtjEkf23+BRb11fL6Q/EDToNHnhAkEA/FnwHhKMc/Bm\nXsS8bENuZP3SV2v7TU6MFTtXJFmsoZBxHnsM8UUi0gq9gBnApmdhy7v2N/Mv9gFI\nviSdr7vm1QJBAOwV3cHAciRHVK71TweOWIJKZBM9ZVut0VDs5GrBYZxGMBiOr3BI\ns7+0ugTKxVimuei6c0KNXw1kg3Vtc5+utakCQQDklAbXBpAomJHxt5zBKBc/7VXx\nEANyk/p5ZOXbLEsdkXuVU3p2tNwEi+v4s9r4H97Kr3goV+SSnbkpWntm6fn9AkBn\nFnE7rlXpA4C12QYGTaDWW7dxM0j0DGUvChH/j6uYuok73+o5hHWAy2DCwOwFduAN\nAIVd1S9hQLeqaf2oB3jpAkEAnRT+bAlMjtUOBO6XPNO4IbYwWJvGMcIEO7zu6AdB\nPJy3/U+bLimxFuYdrs6SnIHIUVdl35AlckHqzT54a5YKqQ==\n-----END RSA PRIVATE KEY-----",
+            "client_email": "test@test.com",
+            "client_id": "1",
+            "auth_uri": format!("{base_url}/o/oauth2/auth"),
+            "token_uri": format!("{base_url}/token"),
+            "auth_provider_x509_cert_url": format!("{base_url}/oauth2/v1/certs"),
+            "client_x509_cert_url": "https://example.com"
+        });
+
+        let mut tmp = NamedTempFile::new().unwrap();
+        write!(tmp, "{creds}").unwrap();
+
+        let log_type = random_string(10);
+        let cx = SinkContext::default();
+        // Normalize to forward slashes so YAML doesn't interpret Windows path separators as escapes.
+        let creds_path = tmp.path().to_str().unwrap().replace('\\', "/");
+        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(&format!(
+            indoc! { r#"
+                endpoint: "http://127.0.0.1:1"
+                customer_id: test-customer
+                credentials_path: "{}"
+                log_type: "{}"
+                encoding:
+                  codec: text
+            "# },
+            creds_path, log_type
+        ))
+        .unwrap();
+        assert!(config.build(cx).await.is_err());
+    }
+}

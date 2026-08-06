@@ -1,0 +1,326 @@
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
+
+use async_trait::async_trait;
+use dyn_clone::DynClone;
+use metrics::Counter;
+use serde::Serialize;
+use vector_lib::{
+    config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    configurable::{
+        Configurable, GenerateError, Metadata, NamedComponent,
+        attributes::CustomAttribute,
+        configurable_component,
+        schema::{SchemaGenerator, SchemaObject},
+    },
+    id::Inputs,
+    schema,
+    transform::Transform,
+};
+use vector_vrl_metrics::MetricsStorage;
+
+use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
+use crate::extra_context::ExtraContext;
+
+pub type BoxedTransform = Box<dyn TransformConfig>;
+
+impl Configurable for BoxedTransform {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("vector::transforms::Transforms")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configurable transforms in Vector.");
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
+        metadata
+    }
+
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        vector_lib::configurable::component::TransformDescription::generate_schemas(generator)
+    }
+}
+
+impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
+    fn from(that: T) -> Self {
+        Box::new(that)
+    }
+}
+
+/// Fully resolved transform component.
+#[configurable_component]
+#[configurable(metadata(docs::component_base_type = "transform"))]
+#[derive(Clone, Debug)]
+pub struct TransformOuter<T>
+where
+    T: Configurable + Serialize + 'static,
+{
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
+    #[configurable(derived)]
+    pub inputs: Inputs<T>,
+
+    /// Enable CPU usage metrics for this transform.
+    ///
+    /// When set to `true`, each poll of the transform task is timed using the OS thread CPU clock
+    /// and the accumulated nanoseconds are reported as the `component_cpu_usage_ns_total` counter,
+    /// tagged with `component_id`, `component_kind`, and `component_type`.
+    ///
+    /// Defaults to `false`. Enable only for transforms where CPU attribution is needed, as it
+    /// adds a `clock_gettime` call on every future poll.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub measure_cpu_usage: bool,
+
+    #[configurable(metadata(docs::hidden))]
+    #[serde(flatten)]
+    pub inner: BoxedTransform,
+}
+
+impl<T> TransformOuter<T>
+where
+    T: Configurable + Serialize,
+{
+    pub(crate) fn new<I, IT>(inputs: I, inner: IT) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        IT: Into<BoxedTransform>,
+    {
+        let inputs = Inputs::from_iter(inputs);
+        let inner = inner.into();
+        TransformOuter {
+            inputs,
+            inner,
+            graph: Default::default(),
+            measure_cpu_usage: false,
+        }
+    }
+
+    pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
+    where
+        U: Configurable + Serialize,
+    {
+        let inputs = self.inputs.iter().map(f).collect::<Vec<_>>();
+        self.with_inputs(inputs)
+    }
+
+    pub(crate) fn with_inputs<I, U>(self, inputs: I) -> TransformOuter<U>
+    where
+        I: IntoIterator<Item = U>,
+        U: Configurable + Serialize,
+    {
+        TransformOuter {
+            inputs: Inputs::from_iter(inputs),
+            inner: self.inner,
+            graph: self.graph,
+            measure_cpu_usage: self.measure_cpu_usage,
+        }
+    }
+}
+
+pub struct TransformContext {
+    // This is optional because currently there are a lot of places we use `TransformContext` that
+    // may not have the relevant data available (e.g. tests). In the future it'd be nice to make it
+    // required somehow.
+    pub key: Option<ComponentKey>,
+
+    pub globals: GlobalOptions,
+
+    pub enrichment_tables: vector_lib::enrichment::TableRegistry,
+
+    pub metrics_storage: MetricsStorage,
+
+    /// Tracks the schema IDs assigned to schemas exposed by the transform.
+    ///
+    /// Given a transform can expose multiple [`TransformOutput`] channels, the ID is tied to the identifier of
+    /// that `TransformOutput`.
+    pub schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
+
+    /// The schema definition created by merging all inputs of the transform.
+    ///
+    /// This information can be used by transforms that behave differently based on schema
+    /// information, such as the `remap` transform, which passes this information along to the VRL
+    /// compiler such that type coercion becomes less of a need for operators writing VRL programs.
+    pub merged_schema_definition: schema::Definition,
+
+    pub schema: SchemaOptions,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
+    pub extra_context: ExtraContext,
+
+    /// Counter handle for `component_cpu_usage_ns_total`, pre-tagged with this transform's
+    /// component identity. `Some` only when `measure_cpu_usage` is enabled on the
+    /// `TransformOuter`. Transforms that spawn helper tokio tasks at construction time
+    /// (e.g. `aws_ec2_metadata`, `throttle`) clone this and pass it to [`crate::cpu_time::spawn_timed`] so
+    /// their CPU is attributed to the component alongside the main transform task.
+    pub cpu_ns: Option<Counter>,
+}
+
+impl Default for TransformContext {
+    fn default() -> Self {
+        Self {
+            key: Default::default(),
+            globals: Default::default(),
+            enrichment_tables: Default::default(),
+            metrics_storage: Default::default(),
+            schema_definitions: HashMap::from([(None, HashMap::new())]),
+            merged_schema_definition: schema::Definition::any(),
+            schema: SchemaOptions::default(),
+            extra_context: Default::default(),
+            cpu_ns: None,
+        }
+    }
+}
+
+impl TransformContext {
+    // clippy allow avoids an issue where vrl is flagged off and `globals` is
+    // the sole field in the struct
+    #[allow(clippy::needless_update)]
+    pub fn new_with_globals(globals: GlobalOptions) -> Self {
+        Self {
+            globals,
+            ..Default::default()
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_test(
+        schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
+    ) -> Self {
+        Self {
+            schema_definitions,
+            ..Default::default()
+        }
+    }
+
+    /// Gets the log namespacing to use. The passed in value is from the transform itself
+    /// and will override any global default if it's set.
+    ///
+    /// This should only be used for transforms that don't originate from a log (eg: `metric_to_log`)
+    /// Most transforms will keep the log_namespace value that already exists on the event.
+    pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
+        namespace
+            .or(self.schema.log_namespace)
+            .unwrap_or(false)
+            .into()
+    }
+}
+
+/// Generalized interface for describing and building transform components.
+#[async_trait]
+#[typetag::serde(tag = "type")]
+pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
+    /// Builds the transform with the given context.
+    ///
+    /// If the transform is built successfully, `Ok(...)` is returned containing the transform.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while building the transform, an error variant explaining the issue is
+    /// returned.
+    async fn build(&self, globals: &TransformContext) -> crate::Result<Transform>;
+
+    /// Gets the input configuration for this transform.
+    fn input(&self) -> Input;
+
+    /// Gets the list of outputs exposed by this transform.
+    ///
+    /// The provided `merged_definition` can be used by transforms to understand the expected shape
+    /// of events flowing through the transform.
+    fn outputs(
+        &self,
+        globals: &TransformContext,
+        input_definitions: &[(OutputId, schema::Definition)],
+    ) -> Vec<TransformOutput>;
+
+    /// Validates that the configuration of the transform is valid.
+    /// Validates structural constraints on the transform configuration that do not require
+    /// environment resources: reserved output names, duplicate route names, invalid sample
+    /// rates, and similar config-level checks. Called during config compilation so errors
+    /// are reported on both `vector validate` and normal startup/reload.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
+    /// Validates the transform configuration against environment resources: compiles VRL
+    /// programs, builds conditions, and resolves enrichment table references. Only called
+    /// from `vector validate` (via `validate_transforms`), not during normal startup because
+    /// `build()` performs equivalent checks with real resources.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate_env(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
+    /// Whether or not concurrency should be enabled for this transform.
+    ///
+    /// When enabled, this transform may be run in parallel in order to attempt to maximize
+    /// throughput for this node in the topology. Transforms should generally not run concurrently
+    /// unless they are compute-heavy, as there is a cost/overhead associated with fanning out
+    /// events to the parallel transform tasks.
+    fn enable_concurrency(&self) -> bool {
+        false
+    }
+
+    /// Whether or not this transform can be nested, given the types of transforms it would be
+    /// nested within.
+    ///
+    /// For some transforms, they can expand themselves into a subtopology of nested transforms.
+    /// However, in order to prevent an infinite recursion of nested transforms, we may want to only
+    /// allow one layer of "expansion". Additionally, there may be known issues with a transform
+    /// that is nested under another specific transform interacting poorly, or incorrectly.
+    ///
+    /// This method allows a transform to report if it can or cannot function correctly if it is
+    /// nested under transforms of a specific type, or if such nesting is fundamentally disallowed.
+    fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
+        true
+    }
+
+    /// Gets the files to watch to trigger reload
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        Vec::new()
+    }
+}
+
+dyn_clone::clone_trait_object!(TransformConfig);
+
+/// Often we want to call outputs just to retrieve the OutputId's without needing
+/// the schema definitions.
+pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
+    transform: &T,
+    key: ComponentKey,
+    global_log_namespace: LogNamespace,
+) -> impl Iterator<Item = OutputId> + '_ {
+    transform
+        .outputs(
+            &TransformContext {
+                schema: SchemaOptions {
+                    log_namespace: Some(global_log_namespace.into()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            &[(key.clone().into(), schema::Definition::any())],
+        )
+        .into_iter()
+        .map(move |output| OutputId {
+            component: key.clone(),
+            port: output.port,
+        })
+}

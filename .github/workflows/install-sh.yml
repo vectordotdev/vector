@@ -1,0 +1,32 @@
+name: Update install.sh Suite
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - run: timeout 30m sudo apt-get install --yes bc
+      - run: bash distribution/install.sh -- -y
+      - run: ~/.vector/bin/vector --version

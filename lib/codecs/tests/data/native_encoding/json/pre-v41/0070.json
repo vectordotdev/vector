@@ -1,0 +1,1 @@
+{"metric":{"name":"s","timestamp":"1969-12-31T23:39:03.000031419Z","interval_ms":3415546801,"kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":741632.0,"value":588608.0}],"count":16907439622266928866,"sum":205440.0}}}

@@ -1,0 +1,44 @@
+{{ $buttons := .Params.buttons }}
+{{ $desc := .Description }}
+
+<section class="hero is-black is-medium is-bold">
+  <div class="hero-body">
+    <div class="container">
+      <p class="title is-size-1 is-size-2-mobile has-text-weight-medium{{ if $desc }} is-spaced{{ end }}">
+        {{ .Title }}
+      </p>
+
+      {{ with $desc }}
+      <p class="subtitle is-size-4 is-size-5-mobile has-text-grey-light">
+        {{ . | markdownify }}
+      </p>
+      {{ end }}
+
+      <div class="columns is-variable is-8 mt-6">
+        {{ range $buttons }}
+        <div class="column">
+          <a href="{{ .url }}" rel="noopener" target="_blank">
+            <div class="card is-hoverable">
+              <div class="card-content has-text-centered">
+                <p class="title is-spaced">
+                  <span class="icon is-large has-text-{{ .icon_color }}">
+                    <i class="{{ .icon }} fa-lg"></i>
+                  </span>
+                </p>
+
+                <p class="title is-size-4 is-size-5-mobile has-text-dark has-text-weight-bold is-spaced">
+                  {{ .title }}
+                </p>
+
+                <p class="subtitle is-size-5 is-size-6-mobile has-text-grey">
+                  {{ .description }}
+                </p>
+              </div>
+            </div>
+          </a>
+        </div>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,52 @@
+[package]
+name = "vector-tap"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lints]
+workspace = true
+
+[features]
+api = [
+    "dep:bytes",
+    "dep:clap",
+    "dep:codecs",
+    "dep:colored",
+    "dep:prost",
+    "dep:serde_json",
+    "dep:serde_yaml",
+    "dep:tokio-stream",
+    "dep:tokio-util",
+    "dep:url",
+    "dep:vector-api-client",
+]
+
+[dependencies]
+# Server-side (always compiled)
+futures.workspace = true
+glob.workspace = true
+tokio = { workspace = true, features = ["time"] }
+tracing.workspace = true
+uuid.workspace = true
+vector-buffers = { path = "../vector-buffers" }
+vector-common = { path = "../vector-common" }
+vector-core = { path = "../vector-core" }
+
+# Client-side (gated behind the `api` feature)
+bytes = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+codecs = { path = "../codecs", optional = true }
+colored = { workspace = true, optional = true }
+prost = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
+tokio-stream = { workspace = true, features = ["sync"], optional = true }
+tokio-util = { version = "0.7", default-features = false, features = ["codec"], optional = true }
+url = { version = "2.5.4", default-features = false, optional = true }
+vector-api-client = { path = "../vector-api-client", optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

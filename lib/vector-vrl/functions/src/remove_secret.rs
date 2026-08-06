@@ -1,0 +1,72 @@
+use vector_vrl_category::Category;
+use vrl::prelude::*;
+
+fn remove_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
+    let key_str = key.as_str().expect("argument must be a string");
+    ctx.target_mut().remove_secret(key_str.as_ref());
+    Ok(Value::Null)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct RemoveSecret;
+
+impl Function for RemoveSecret {
+    fn identifier(&self) -> &'static str {
+        "remove_secret"
+    }
+
+    fn usage(&self) -> &'static str {
+        "Removes a secret from an event."
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        const PARAMETERS: &[Parameter] = &[Parameter::required(
+            "key",
+            kind::BYTES,
+            "The name of the secret to remove.",
+        )];
+        PARAMETERS
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[example!(
+            title: "Remove the datadog api key",
+            source: r#"remove_secret("datadog_api_key")"#,
+            result: Ok("null"),
+        )]
+    }
+
+    fn compile(
+        &self,
+        _state: &TypeState,
+        _ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
+    ) -> Compiled {
+        let key = arguments.required("key");
+        Ok(RemoveSecretFn { key }.as_expr())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RemoveSecretFn {
+    key: Box<dyn Expression>,
+}
+
+impl FunctionExpression for RemoveSecretFn {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let key = self.key.resolve(ctx)?;
+        remove_secret(ctx, key)
+    }
+
+    fn type_def(&self, _: &TypeState) -> TypeDef {
+        TypeDef::null().infallible().impure()
+    }
+}

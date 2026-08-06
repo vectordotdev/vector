@@ -1,0 +1,30 @@
+{
+  "transforms": {
+    "add_fields_nested_json": {
+      "inputs": [],
+      "type": "remap",
+      "source": ".a.b = 123\n.x.y = 456\n.x.z = 789\n"
+    }
+  },
+  "tests": [
+    {
+      "name": "add_fields_nested_json",
+      "input": {
+        "insert_at": "add_fields_nested_json",
+        "type": "raw",
+        "value": ""
+      },
+      "outputs": [
+        {
+          "extract_from": "add_fields_nested_json",
+          "conditions": [
+            {
+              "type": "vrl",
+              "source": ".a.b == 123 && .x.y == 456 && .x.z == 789"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

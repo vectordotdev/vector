@@ -1,0 +1,67 @@
+{{ $algoliaThemeCssUrl := printf "https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-%s" site.Params.search.algolia_autocomplete_theme }}
+@import url({{ $algoliaThemeCssUrl }})
+@import toc
+@import syntax
+@import marketo
+
+// SVG-specific variables
+$svg-gray: #001b3d
+$svg-white: white
+$svg-primary: #28d9f2
+$dark-mode-gray: rgb(224, 235, 247)
+$dark-mode-black: #191927
+
+// SVG theme compatibility
+svg
+  [fill="#000000"],
+  [fill="black"]
+    fill: $svg-gray
+
+  [stroke="#000000"],
+  [stroke="black"]
+    stroke: $svg-gray
+
+  [stop-color="#000000"],
+  [stop-color="black"]
+    stop-color: $svg-gray
+
+  [fill="#FFFFFF"],
+  [fill="white"]
+    fill: $svg-white
+
+  [stroke="#FFFFFF"],
+  [stroke="white"]
+    stroke: $svg-white
+
+  [fill="#10E7FF"],
+  [fill="white"]
+    fill: $svg-primary
+
+  [stroke="#10E7FF"],
+  [stroke="white"]
+    stroke: $svg-primary
+
+// SVG dark mode compatibility
+html
+  &.dark
+    svg
+      [fill="#000000"],
+      [fill="black"]
+        fill: $dark-mode-gray
+      [stroke="#000000"],
+      [stroke="black"]
+        stroke: $dark-mode-gray
+      [stop-color="#000000"],
+      [stop-color="black"]
+        stop-color: $dark-mode-gray
+      [fill="#FFFFFF"],
+      [fill="#FFF"]
+        fill: $dark-mode-black
+      [stroke="$FFFFFF"]
+        stroke: $dark-mode-black
+
+// Install icons on the main page
+.install-icon
+  &:hover
+    [fill="#000000"]
+      fill: $svg-primary

@@ -1,0 +1,106 @@
+{{ $tag := .File.BaseFileName }}
+{{ $type := .CurrentSection.Params.component_type }}
+{{ $config := index (index site.Data.docs.components $type) $tag }}
+{{ $classes := $config.classes }}
+{{ $features := $config.features }}
+{{ $alias := $config.alias }}
+
+{{ $input := $config.input }}
+{{ $output := $config.output }}
+
+{{ $singularType := strings.TrimSuffix "s" $type }}
+{{ $issuesUrl := printf "https://github.com/vectordotdev/vector/issues?q=sort%%3Aupdated-desc+is%%3Aissue+is%%3Aopen+label%%3A%%22%s%%3A+%s%%22" $singularType $tag }}
+
+<div class="block space-y-1">
+  {{ if eq $classes.development "beta" }}
+  {{ partial "badge.html" (dict "prefix" "status" "word" "beta" "color" "red" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $classes.development "stable" }}
+  {{ partial "badge.html" (dict "prefix" "status" "word" "stable" "color" "green" "inline" true) }}
+  {{ end }}
+
+  {{ range $classes.deployment_roles }}
+  {{ partial "badge.html" (dict "prefix" "role" "word" . "color" "gray" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $classes.delivery "best_effort" }}
+  {{ partial "badge.html" (dict "prefix" "delivery" "word" "best effort" "color" "blue" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $classes.delivery "at_least_once" }}
+  {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
+  {{ end }}
+  
+  {{ if eq $classes.delivery "exactly_once" }}
+  {{ partial "badge.html" (dict "prefix" "delivery" "word" "exactly-once" "color" "blue" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $features.acknowledgements true }}
+  {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "yes" "color" "green" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $features.acknowledgements false }}
+  {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "no" "color" "yellow" "inline" true) }}
+  {{ end }}
+
+  {{ with $classes.egress_method }}
+  {{ partial "badge.html" (dict "prefix" "egress" "word" . "color" "indigo" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $classes.stateful false }}
+  {{ partial "badge.html" (dict "prefix" "state" "word" "stateless" "color" "indigo" "inline" true) }}
+  {{ else }}
+  {{ partial "badge.html" (dict "prefix" "state" "word" "stateful" "color" "indigo" "inline" true) }}
+  {{ end }}
+
+  {{ with $alias }}
+  {{ partial "badge.html" (dict "prefix" "previously known as" "word" . "color" "yellow" "inline" true) }}
+  {{ end }}
+</div>
+
+{{ if or $input.logs $input.metrics $input.traces }}
+<div class="w-full mt-4">
+  {{ if $input.logs }}
+  {{ partial "badge.html" (dict "prefix" "input" "word" "logs" "color" "blue" "inline" true) }}
+  {{ end }}
+  {{ if $input.metrics }}
+  {{ partial "badge.html" (dict "prefix" "input" "word" "metrics" "color" "blue" "inline" true) }}
+  {{ end }}
+  {{ if $input.traces }}
+  {{ partial "badge.html" (dict "prefix" "input" "word" "traces" "color" "blue" "inline" true) }}
+  {{ end }}
+</div>
+{{ end }}
+
+{{ if $output }}
+<div class="w-full mt-4">
+  {{ range $k, $v := $output }}
+  {{ if eq $k "logs" }}
+  {{ partial "badge.html" (dict "prefix" "output" "word" "logs" "color" "yellow" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $k "metrics" }}
+  {{ partial "badge.html" (dict "prefix" "output" "word" "metrics" "color" "yellow" "inline" true) }}
+  {{ end }}
+
+  {{ if eq $k "traces" }}
+  {{ partial "badge.html" (dict "prefix" "output" "word" "traces" "color" "yellow" "inline" true) }}
+  {{ end }}
+  {{ end }}
+</div>
+{{ end }}
+
+
+{{ if .Params.deprecated }}
+<div class="mt-4">
+  {{ partial "badge.html" (dict "prefix" "status" "word" "deprecated" "color" "red" "inline" true) }}
+</div>
+{{ end }}
+
+<div class="mt-4 text-sm">
+  <a href="{{ $issuesUrl }}" rel="noopener" target="_blank" class="inline-flex items-center space-x-2 text-primary-dark dark:text-primary hover:underline">
+    <ion-icon name="logo-github" aria-hidden="true"></ion-icon>
+    <span>View open issues for this component on GitHub</span>
+  </a>
+</div>

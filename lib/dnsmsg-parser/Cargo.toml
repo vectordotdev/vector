@@ -1,0 +1,25 @@
+[package]
+name = "dnsmsg-parser"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MIT"
+
+[lints]
+workspace = true
+
+[dependencies]
+data-encoding = "2.10"
+hickory-proto.workspace = true
+snafu.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[lib]
+bench = false
+
+[[bench]]
+name = "benches"
+harness = false

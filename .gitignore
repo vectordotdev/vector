@@ -1,0 +1,85 @@
+# Rust
+cargo-timing*.html
+**/*.rs.bk
+target
+tests/data/wasm/*/target
+bench_output.txt
+rust-analyzer.toml
+
+# Python
+*.pyc
+
+# Ruby
+miniodat
+
+# Node.js / JavaScript / TypeScript
+node_modules
+scripts/package-lock.json
+
+# Yarn
+yarn.lock
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Emacs
+.dir-locals.el
+
+# Temporary files
+tmp/
+*.tmp
+*~
+sample.log
+
+# Profiling tools
+heaptrack.*
+massif.*
+
+# Checkpoints
+checkpoints/*
+
+# Tilt
+tilt_modules/
+
+# Docker
+**/Dockerfile~
+**/Dockerfile.*~
+.dockerignore
+
+# Docker Compose
+docker-compose.override.yml
+docker-compose.override.*.yml
+**/compose-temp-*.yaml
+
+# Compose project volume mounts
+volumes/
+*.volume/
+
+# Environment variable files (can contain secrets)
+*.env
+.env.*
+!tests/antithesis/scenarios/*/launch.env
+
+# LLM tools
+copilot-instructions.md
+
+# local files not checked in
+local/
+
+# vscode
+.vscode/
+
+# Claude skill-generated reports (published to Confluence, not tracked)
+.claude/skill-reports/
+# Local Claude Code settings (machine-specific permissions)
+.claude/settings.local.json
+
+# antithesis scratchbook (private knowledge store)
+/tests/antithesis/scratchbook/
+
+# stray rlib build artifacts
+*.rlib

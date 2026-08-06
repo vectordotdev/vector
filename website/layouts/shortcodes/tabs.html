@@ -1,0 +1,19 @@
+{{ if not .Params.default }}
+{{ errorf "no default tab specified in tabs shortcode %s" .File }}
+{{ end }}
+
+{{ $default := .Params.default | urlize }}
+<div x-data="{ selected: '{{ $default }}' }" class="tabs no-prose border rounded-md py-3 px-4 shadow dark:border-gray-700">
+  <div class="flex flex-wrap gap-2.5">
+    {{ .Inner }}
+  </div>
+
+  {{ range $k, $v := $.Page.Scratch.Get "tabs" }}
+  <div x-show="selected === '{{ $k }}'" class="mt-3.5 prose dark:prose-dark max-w-none">
+    {{ $v | $.Page.RenderString }}
+  </div>
+  {{ end }}
+</div>
+
+{{/* Reset Scratch for the "tabs" key, allowing for more than one tabs shortcode on a page */}}
+{{ $.Page.Scratch.Set "tabs" dict }}

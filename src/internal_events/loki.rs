@@ -1,0 +1,99 @@
+use vector_lib::internal_event::{
+    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, error_stage, error_type,
+};
+use vector_lib::{NamedInternalEvent, counter};
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct LokiEventUnlabeledError;
+
+impl InternalEvent for LokiEventUnlabeledError {
+    fn emit(self) {
+        error!(
+            message = "Event had no labels. Adding default `agent` label.",
+            error_code = "unlabeled_event",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "unlabeled_event",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct LokiOutOfOrderEventDroppedError {
+    pub count: usize,
+}
+
+impl InternalEvent for LokiOutOfOrderEventDroppedError {
+    fn emit(self) {
+        let reason = "Dropping out-of-order event(s).";
+
+        error!(
+            message = reason,
+            error_code = "out_of_order",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: self.count,
+            reason,
+        });
+
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "out_of_order",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct LokiOutOfOrderEventRewritten {
+    pub count: usize,
+}
+
+impl InternalEvent for LokiOutOfOrderEventRewritten {
+    fn emit(self) {
+        debug!(
+            message = "Timestamps rewritten.",
+            count = self.count,
+            reason = "out_of_order",
+        );
+        counter!(CounterName::RewrittenTimestampEventsTotal).increment(self.count as u64);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct LokiTimestampNonParsableEventsDropped;
+
+impl InternalEvent for LokiTimestampNonParsableEventsDropped {
+    fn emit(self) {
+        let reason = "Dropping timestamp non-parsable event(s).";
+
+        error!(
+            message = "Event timestamp non-parsable.",
+            error_code = "non-parsable_timestamp",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
+
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "non-parsable_timestamp",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}

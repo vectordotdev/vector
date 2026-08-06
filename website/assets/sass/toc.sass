@@ -1,0 +1,78 @@
+// Table of Contents provided by Tocbot (https://github.com/tscanlin/tocbot)
+// Our implementation uses the Tocbot JavaScript to build the HTML for the TOC but doesn't use Tocbot's CSS
+// Instead, we use the Sass/CSS here in this file
+@import variables
+
+.dark, .light
+  #toc
+    padding-top: $y-padding
+    padding-bottom: $y-padding
+    line-height: 110%
+
+    .toc-list // h2
+      padding-left: $toc-indent-lg
+      font-size: $h2-font-size
+
+      .toc-list // h3
+        font-size: $h3-font-size
+        padding-top: $h3-toc-spacing
+        padding-bottom: $h3-toc-spacing
+        padding-left: $toc-indent-sm
+
+        .toc-list // h4
+          font-size: $h4-font-size
+          padding-top: $h4-toc-spacing
+          padding-bottom: $h4-toc-spacing
+          padding-left: $toc-indent-sm
+
+    & > .toc-list
+      overflow: hidden
+      position: relative
+
+      & > li:not(:first-child)
+        margin-top: $h2-top-margin
+
+      li
+        list-style: none
+
+// Dark mode
+.dark
+  .is-active-link
+    color: $vector-blue
+
+  #toc
+    border-left: 2px solid $gray-700
+
+    .toc-list
+      color: $gray-200
+
+      .toc-list
+        color: $gray-300
+
+
+// Light mode
+.light
+  .is-active-link
+    color: $vector-purple
+
+  #toc
+    border-left: 2px solid $gray-200
+
+    .toc-list
+      color: $gray-800
+
+      .toc-list
+        color: $gray-500
+
+a.toc-link
+  color: currentColor
+  height: 100%
+
+
+.is-active-link
+  font-weight: 700
+
+// Get rid of the annoying border on Chrome when a link is selected
+.prose
+  *:focus
+    outline: none

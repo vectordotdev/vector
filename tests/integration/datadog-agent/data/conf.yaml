@@ -1,0 +1,5 @@
+logs:
+  - type: tcp
+    port: 8181
+    service: "vector-testing"
+    source: "random"

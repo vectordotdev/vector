@@ -1,0 +1,32 @@
+[package]
+name = "vector-api-client"
+version = "0.2.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+# gRPC
+tonic.workspace = true
+tonic-health.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+
+# Async
+futures.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+tokio-stream = { workspace = true, features = ["sync"] }
+
+# Error handling
+snafu.workspace = true
+
+# Utils
+http = { version = "0.2", default-features = false }
+
+[build-dependencies]
+tonic-build.workspace = true
+prost-build.workspace = true

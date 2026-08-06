@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file into source control so that
+# everyone who runs the test benefits from these saved cases.
+cc b463511e1fcc53b651ebb65bc4a1daf47c63990834d3660b743d2c10041bf335 # shrinks to stream = [0], item_limit = 1, allocation_limit = 8, partitioner = TestPartitioner { key_space: 1 }, timer = TestTimer { responses: [] }
+cc c96fa781162747ea75278abe6880a787d44f609ede07e320de0fa79407ab515f # shrinks to stream = [0], item_limit = 1, allocation_limit = 8, partitioner = TestPartitioner { key_space: 1 }, timer = TestTimer { responses: [] }
+cc 513f69d33fc3a47bbf960cd6822c9c3fad156e871832fdc2a3ead2d240bb9fa6 # shrinks to stream = [0], item_limit = 1, allocation_limit = 8, partitioner = TestPartitioner { key_space: 1 }, timer = TestTimer { responses: [] }

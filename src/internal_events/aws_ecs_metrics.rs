@@ -1,0 +1,68 @@
+use std::borrow::Cow;
+
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    json_size::JsonSize,
+};
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct AwsEcsMetricsEventsReceived<'a> {
+    pub byte_size: JsonSize,
+    pub count: usize,
+    pub endpoint: &'a str,
+}
+
+impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
+    fn emit(self) {
+        trace!(
+            message = "Events received.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+            protocol = "http",
+            endpoint = %self.endpoint,
+        );
+        counter!(
+            CounterName::ComponentReceivedEventsTotal,
+            "endpoint" => self.endpoint.to_string(),
+        )
+        .increment(self.count as u64);
+        counter!(
+            CounterName::ComponentReceivedEventBytesTotal,
+            "endpoint" => self.endpoint.to_string(),
+        )
+        .increment(self.byte_size.get() as u64);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct AwsEcsMetricsParseError<'a> {
+    pub error: serde_json::Error,
+    pub endpoint: &'a str,
+    pub body: Cow<'a, str>,
+}
+
+impl InternalEvent for AwsEcsMetricsParseError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Parsing error.",
+            endpoint = %self.endpoint,
+            error = ?self.error,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+        );
+        debug!(
+            response = %self.body.escape_debug(),
+            endpoint = %self.endpoint,
+            "Failed to parse response.",
+        );
+        counter!(CounterName::ParseErrorsTotal).increment(1);
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
+            "endpoint" => self.endpoint.to_string(),
+        )
+        .increment(1);
+    }
+}

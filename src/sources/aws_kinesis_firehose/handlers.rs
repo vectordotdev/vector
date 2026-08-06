@@ -1,0 +1,337 @@
+use std::collections::HashMap;
+
+use base64::prelude::{BASE64_STANDARD, Engine as _};
+use bytes::Bytes;
+use chrono::Utc;
+use futures::StreamExt;
+use snafu::{ResultExt, Snafu};
+use vector_common::constants::GZIP_MAGIC;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{DecoderFramedRead, StreamDecodingError},
+    config::{LegacyKey, LogNamespace},
+    event::BatchNotifier,
+    finalization::AddBatchNotifier,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+    },
+    lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
+};
+use vrl::{
+    compiler::SecretTarget,
+    value::{KeyString, ObjectMap, Value},
+};
+use warp::reject;
+
+use super::{
+    Compression,
+    errors::{ParseRecordsSnafu, RequestError},
+    models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
+};
+use crate::{
+    SourceSender,
+    codecs::Decoder,
+    config::log_schema,
+    event::{BatchStatus, Event},
+    internal_events::{
+        AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
+    },
+    sources::{
+        aws_kinesis_firehose::AwsKinesisFirehoseConfig,
+        http_server::HttpConfigParamKind,
+        util::decompression::{CappedDecoder, is_decompressed_size_limit_error},
+    },
+};
+
+#[derive(Clone)]
+pub(super) struct Context {
+    pub(super) compression: Compression,
+    pub(super) store_access_key: bool,
+    pub(super) decoder: Decoder,
+    pub(super) acknowledgements: bool,
+    pub(super) bytes_received: Registered<BytesReceived>,
+    pub(super) out: SourceSender,
+    pub(super) log_namespace: LogNamespace,
+    pub(super) common_attributes: Vec<HttpConfigParamKind>,
+}
+
+/// Publishes decoded events from the FirehoseRequest to the pipeline
+pub(super) async fn firehose(
+    request_id: String,
+    source_arn: String,
+    common_attributes: HashMap<String, String>,
+    request: FirehoseRequest,
+    mut context: Context,
+) -> Result<impl warp::Reply, reject::Rejection> {
+    let log_namespace = context.log_namespace;
+    let events_received = register!(EventsReceived);
+    let common_attributes_map =
+        build_common_attributes_map(&context.common_attributes, &common_attributes);
+
+    for record in request.records {
+        let bytes = decode_record(&record, context.compression)
+            .with_context(|_| ParseRecordsSnafu {
+                request_id: request_id.clone(),
+            })
+            .map_err(reject::custom)?;
+        context.bytes_received.emit(ByteSize(bytes.len()));
+
+        let mut stream = DecoderFramedRead::new(bytes.as_ref(), context.decoder.clone());
+        loop {
+            match stream.next().await {
+                Some(Ok((mut events, _byte_size))) => {
+                    events_received.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
+
+                    let (batch, receiver) = if context.acknowledgements {
+                        {
+                            let (batch, receiver) = BatchNotifier::new_with_receiver();
+                            (Some(batch), Some(receiver))
+                        }
+                    } else {
+                        (None, None)
+                    };
+
+                    let now = Utc::now();
+                    for event in &mut events {
+                        if let Some(batch) = &batch {
+                            event.add_batch_notifier(batch.clone());
+                        }
+                        if let Event::Log(log) = event {
+                            log_namespace.insert_vector_metadata(
+                                log,
+                                log_schema().source_type_key(),
+                                path!("source_type"),
+                                Bytes::from_static(AwsKinesisFirehoseConfig::NAME.as_bytes()),
+                            );
+                            // This handles the transition from the original timestamp logic. Originally the
+                            // `timestamp_key` was always populated by the `request.timestamp` time.
+                            match log_namespace {
+                                LogNamespace::Vector => {
+                                    log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                                    log.insert(
+                                        metadata_path!(AwsKinesisFirehoseConfig::NAME, "timestamp"),
+                                        request.timestamp,
+                                    );
+                                }
+                                LogNamespace::Legacy => {
+                                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                                        log.try_insert(
+                                            (PathPrefix::Event, timestamp_key),
+                                            request.timestamp,
+                                        );
+                                    }
+                                }
+                            };
+
+                            log_namespace.insert_source_metadata(
+                                AwsKinesisFirehoseConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("request_id"))),
+                                path!("request_id"),
+                                request_id.to_owned(),
+                            );
+                            log_namespace.insert_source_metadata(
+                                AwsKinesisFirehoseConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("source_arn"))),
+                                path!("source_arn"),
+                                source_arn.to_owned(),
+                            );
+
+                            if !common_attributes_map.is_empty() {
+                                log_namespace.insert_source_metadata(
+                                    AwsKinesisFirehoseConfig::NAME,
+                                    log,
+                                    Some(LegacyKey::InsertIfEmpty(path!("common_attributes"))),
+                                    path!("common_attributes"),
+                                    common_attributes_map.clone(),
+                                );
+                            }
+
+                            if context.store_access_key
+                                && let Some(access_key) = &request.access_key
+                            {
+                                log.metadata_mut()
+                                    .secrets_mut()
+                                    .insert_secret("aws_kinesis_firehose_access_key", access_key);
+                            }
+                        }
+                    }
+
+                    let count = events.len();
+                    match context.out.send_batch(events).await {
+                        Ok(()) => (),
+                        Err(SendError::Closed) => {
+                            emit!(StreamClosedError { count });
+                            let error = RequestError::ShuttingDown {
+                                request_id: request_id.clone(),
+                            };
+                            warp::reject::custom(error);
+                        }
+                        Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
+                    }
+
+                    drop(batch);
+                    if let Some(receiver) = receiver {
+                        match receiver.await {
+                            BatchStatus::Delivered => Ok(()),
+                            BatchStatus::Rejected => {
+                                Err(warp::reject::custom(RequestError::DeliveryFailed {
+                                    request_id: request_id.clone(),
+                                }))
+                            }
+                            BatchStatus::Errored => {
+                                Err(warp::reject::custom(RequestError::DeliveryErrored {
+                                    request_id: request_id.clone(),
+                                }))
+                            }
+                        }?;
+                    }
+                }
+                Some(Err(error)) => {
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
+                    // handling is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
+                }
+                None => break,
+            }
+        }
+    }
+
+    Ok(warp::reply::json(&FirehoseResponse {
+        request_id: request_id.clone(),
+        timestamp: Utc::now(),
+        error_message: None,
+    }))
+}
+
+#[derive(Debug, Snafu)]
+pub enum RecordDecodeError {
+    #[snafu(display("Could not base64 decode request data: {}", source))]
+    Base64 { source: base64::DecodeError },
+    #[snafu(display("Could not decompress request data as {}: {}", compression, source))]
+    Decompression {
+        source: std::io::Error,
+        compression: Compression,
+    },
+}
+
+/// Decodes a Firehose record.
+fn decode_record(
+    record: &EncodedFirehoseRecord,
+    compression: Compression,
+) -> Result<Bytes, RecordDecodeError> {
+    let buf = BASE64_STANDARD
+        .decode(record.data.as_bytes())
+        .context(Base64Snafu {})?;
+
+    if buf.is_empty() {
+        return Ok(Bytes::default());
+    }
+
+    match compression {
+        Compression::None => Ok(Bytes::from(buf)),
+        Compression::Gzip => decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu {
+            compression: compression.to_owned(),
+        }),
+        Compression::Auto => {
+            if is_gzip(&buf) {
+                decode_gzip(&buf[..]).or_else(|error| {
+                    // An exceeded size cap means the magic bytes really were gzip and the payload
+                    // is oversized, so reject it. Only fall back to forwarding the raw bytes when
+                    // auto-detection guessed wrong (valid-looking magic, but not actually gzip).
+                    if is_decompressed_size_limit_error(&error) {
+                        return Err(error).with_context(|_| DecompressionSnafu {
+                            compression: Compression::Gzip,
+                        });
+                    }
+                    emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        compression: Compression::Gzip,
+                        error
+                    });
+                    Ok(Bytes::from(buf))
+                })
+            } else {
+                // only support gzip for now
+                Ok(Bytes::from(buf))
+            }
+        }
+    }
+}
+
+fn is_gzip(data: &[u8]) -> bool {
+    // The header length of a GZIP file is 10 bytes. The first two bytes of the constant comes from
+    // the GZIP file format specification, which is the fixed member header identification bytes.
+    // The third byte is the compression method, of which only one is defined which is 8 for the
+    // deflate algorithm.
+    //
+    // Reference: https://datatracker.ietf.org/doc/html/rfc1952 Section 2.3
+    data.starts_with(GZIP_MAGIC)
+}
+
+fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
+    // Cap the decompressed output so a gzip-bomb record cannot drive unbounded allocation.
+    CappedDecoder::gzip(data).decompress().map(Bytes::from)
+}
+
+fn build_common_attributes_map(
+    common_attributes_config: &[HttpConfigParamKind],
+    common_attributes: &HashMap<String, String>,
+) -> ObjectMap {
+    let mut common_attributes_map = ObjectMap::new();
+
+    for common_attribute_config in common_attributes_config {
+        match common_attribute_config {
+            HttpConfigParamKind::Exact(common_attribute_name) => {
+                let value = common_attributes
+                    .get(common_attribute_name)
+                    .map(String::as_bytes);
+                common_attributes_map.insert(
+                    KeyString::from(common_attribute_name.to_owned()),
+                    Value::from(value.map(Bytes::copy_from_slice)),
+                );
+            }
+            HttpConfigParamKind::Glob(common_attribute_pattern) => {
+                for common_attribute_name in common_attributes.keys() {
+                    if common_attribute_pattern.matches(common_attribute_name) {
+                        let value = common_attributes
+                            .get(common_attribute_name)
+                            .map(String::as_bytes);
+                        common_attributes_map.insert(
+                            KeyString::from(common_attribute_name.to_owned()),
+                            Value::from(value.map(Bytes::copy_from_slice)),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    common_attributes_map
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write as _;
+
+    use flate2::{Compression, write::GzEncoder};
+
+    use super::*;
+
+    const CONTENT: &[u8] = b"Example";
+
+    #[test]
+    fn correctly_detects_gzipped_content() {
+        assert!(!is_gzip(CONTENT));
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+        encoder.write_all(CONTENT).unwrap();
+        let compressed = encoder.finish().unwrap();
+        assert!(is_gzip(&compressed));
+    }
+}

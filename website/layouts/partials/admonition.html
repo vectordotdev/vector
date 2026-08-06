@@ -1,0 +1,57 @@
+{{ $info := "blue-400" }}
+{{ $success := "green-400" }}
+{{ $danger := "red-400" }}
+{{ $warning := "yellow-400" }}
+{{ $requirement := "violet-400" }}
+{{ $quote := "gray-400" }}
+{{ $types := dict "info" $info "success" $success "danger" $danger "warning" $warning "requirement" $requirement "quote" $quote }}
+{{ $color := index $types .type }}
+{{ $dimension := 6 }}
+{{ $viewBox := cond (eq .type "requirement") 24 20 }}
+<div class="admonition no-prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-{{ $color }}">
+  <div class="flex items-center">
+    <div class="flex-shrink-0">
+      <svg class="h-{{ $dimension }} w-{{ $dimension }} text-{{ $color }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {{ $viewBox }} {{ $viewBox }}" fill="currentColor" aria-hidden="true"{{ if eq .type "requirement" }} stroke="currentColor"{{ end }}>
+        {{ if eq .type "info" }}
+        {{/* Heroicon: solid/information-circle */}}
+        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+        {{ end }}
+
+        {{ if eq .type "success" }}
+        {{/* Heroicon: solid/check-circle */}}
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+        {{ end }}
+
+        {{ if eq .type "danger" }}
+        {{/* Heroicon: solid/x-circle */}}
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+        {{ end }}
+
+        {{ if eq .type "warning" }}
+        {{/* Heroicon: solid/exclamation */}}
+        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+        {{ end }}
+
+        {{ if eq .type "requirement" }}
+        {{/* Heroicon: solid/code */}}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        {{ end }}
+
+        {{ if eq .type "quote" }}
+        {{/* Heroicon: solid/speakerphone */}}
+        <path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd" />        {{ end }}
+      </svg>
+    </div>
+    <div class="ml-6 flex flex-col m-0 space-y-1.5">
+      {{ with .title }}
+      <span class="lg:text-lg text-base font-bold leading-tight tracking-tight">
+        {{ . | markdownify }}
+      </span>
+      {{ end }}
+
+      <div class="tracking-tight leading-snug dark:prose-dark prose max-w-none">
+        {{ .content | markdownify }}
+      </div>
+    </div>
+  </div>
+</div>

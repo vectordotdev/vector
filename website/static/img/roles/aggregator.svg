@@ -1,0 +1,113 @@
+<svg width="850" height="375" viewBox="0 0 850 375" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="a">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="b">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="c">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="d">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="e">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="f">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="g">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+    <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="h">
+      <stop stop-color="#00DEFF" offset="0%"/>
+      <stop stop-color="#000000" offset="100%"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <path stroke-opacity=".153" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" d="M356.584 208.448l94.286 38.997 94.284-38.997-94.284-39z"/>
+    <path stroke-opacity=".153" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" d="M450.674 110.517l94.94 39.427-.46 58.504-94.284-39z"/>
+    <path stroke-opacity=".153" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" d="M356.922 149.438v59.007l93.948-39.052-.196-58.875z"/>
+    <path fill-opacity=".074" fill="#000000" d="M356.584 208.448l-.196-58.93 94.482-39.021 94.88 39.414-.31 58.4-94.57 39.134z"/>
+    <path stroke-opacity=".153" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" d="M356.584 208.448l-.196-58.93 94.482-39.021 94.88 39.414-.31 58.4-94.57 39.134z"/>
+    <path fill-opacity=".6" fill="#10E7FF" d="M378.32 203.546l72.344 29.28 72.342-29.28-72.342-29.283z"/>
+    <path fill-opacity=".6" fill="#10E7FF" d="M378 159.239v44.305l73.483 29.287v-43.927z"/>
+    <path fill-opacity=".6" fill="#10E7FF" d="M451.483 188.904l71.878-29.284-.354 43.927-71.524 29.284z"/>
+    <path fill-opacity=".6" fill="#10E7FF" d="M450.514 130.016l72.846 29.603-.353 43.927-72.343-29.283z"/>
+    <path fill-opacity=".6" fill="#10E7FF" d="M378 159.239v44.305l72.664-29.322-.15-44.206z"/>
+    <path fill-opacity=".6" fill="#10E7FF" d="M378.32 203.546l-.15-44.247L450.664 130l72.8 29.594-.238 43.85-72.562 29.383z"/>
+    <path fill-opacity=".6" fill="#00C1D8" d="M378.32 159.416l72.344 29.28 72.342-29.28-72.342-29.283z"/>
+    <g fill="#FFFFFF">
+      <path d="M485.827 194h4.91l-11.692 19.653-2.426-4.067zM469.63 213.55L481.26 194h-5.8l-5.71 9.557-5.714-9.557H458z"/>
+    </g>
+    <path d="M431.275 200.934h2.978v-2.695h-2.978v2.695zm-3.547 0h2.98v-2.695h-2.98v2.695zm-3.475 0h2.979v-2.695h-2.979v2.695zm-3.475 0h2.908v-2.695h-2.908v2.695zm-3.546 0h2.979v-2.695h-2.979v2.695zm3.546-3.262h2.908v-2.695h-2.908v2.695zm3.475 0h2.979v-2.695h-2.979v2.695zm3.475 0h2.98v-2.695h-2.98v2.695zm0-3.263h2.98v-2.695h-2.98v2.695zm16.029 5.32s-1.277-1.206-3.9-.78c-.285-2.057-2.483-3.263-2.483-3.263s-2.057 2.482-.568 5.248c-.425.213-1.134.497-2.198.497h-19.504c-.354 1.347-.354 10.283 9.433 10.283 7.021 0 12.27-3.262 14.752-9.22 3.688.284 4.468-2.766 4.468-2.766z" fill="#FFFFFF" fill-rule="nonzero"/>
+    <path stroke-opacity=".153" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" d="M356.922 149.438v59.007l94.097 39.005v-58.504zM451.02 188.947l94.596-39.002-.461 58.503-94.136 39.002z"/>
+    <g fill-rule="nonzero">
+      <path d="M519.638 135.98C385.925 111.157 294.67 86.502 245.842 61.977 194.74 36.311 167.47 16.27 164.06 1.757l-.163-.694 2.843-.16.163.695c3.315 14.113 30.301 33.946 80.99 59.404 48.471 24.345 139.399 48.912 272.747 73.668l3.004-3.927 15.253 8.015-22.269 1.156 3.01-3.934z" fill="url(#a)" transform="translate(-167 42)"/>
+      <path d="M519.088 136.827c-142.82-17.902-244.352-40.642-304.61-68.252-62.661-28.71-108.13-46.838-136.324-54.365l-1.257-.335 1.378-1.224 1.257.335c28.47 7.6 74.08 25.785 136.91 54.573 59.84 27.418 160.959 50.066 303.343 67.914l2.087-4.058 17.025 7.114-21.901 2.364 2.092-4.066z" fill="url(#b)" transform="translate(-167 42)"/>
+      <path d="M518.871 138.724C371.945 126.31 262.305 107.457 189.94 82.145 114.596 55.792 69.633 40.317 55.1 35.735l-1.202-.378 1.56-1.17 1.202.38c14.591 4.599 59.559 20.076 134.954 46.447 71.957 25.17 181.205 43.955 327.732 56.336l1.419-4.119 18.133 6.421-21.447 3.199 1.421-4.127z" fill="url(#c)" transform="translate(-167 42)"/>
+      <path d="M518.845 139.647c-150.723-6.239-264.13-20.698-340.239-43.401C99.023 72.506 58.114 52.135 55.984 34.97l-.087-.698 2.852-.084.087.697c2.053 16.546 42.437 36.656 121.258 60.168 75.666 22.57 188.663 36.978 338.974 43.2l.67-4.174 19.16 5.64-20.725 4.11.672-4.182z" fill="url(#d)" transform="translate(-167 42)"/>
+      <path d="M518.904 139.644c-186.774 1.33-316.576-10.78-389.46-36.384C55.119 77.148 13.816 83.35 3.915 121.973l-.178.691-2.839-.173.177-.691c10.196-39.766 54.084-46.357 130.043-19.671 72.264 25.387 201.525 37.446 387.73 36.12l-.172-4.178 20.222 4.685-19.822 5.074-.171-4.186z" fill="url(#e)" transform="translate(-167 42)"/>
+      <path d="M519.542 274.967c-133.657-23.53-224.878-47.533-273.7-72.044-51.102-25.657-78.373-45.69-81.782-60.197l-.163-.695 2.843-.159.163.695c3.315 14.107 30.301 33.932 80.99 59.38 48.45 24.325 139.33 48.238 272.604 71.702l2.864-3.95 15.536 7.881-22.224 1.345 2.869-3.958z" fill="url(#f)" transform="matrix(1 0 0 -1 -167 462.797)"/>
+      <path d="M519.088 264.09c-142.82-17.902-244.352-40.642-304.61-68.251-62.661-28.71-108.13-46.84-136.324-54.365l-1.257-.336 1.378-1.224 1.257.336c28.47 7.6 74.08 25.784 136.91 54.572 59.84 27.418 160.959 50.066 303.343 67.914l2.087-4.058 17.025 7.114-21.901 2.364 2.092-4.066z" fill="url(#b)" transform="matrix(1 0 0 -1 -167 450.07)"/>
+      <path d="M518.85 241.494c-146.912-11.592-256.546-30.067-328.91-55.449-75.344-26.425-120.307-41.943-134.84-46.537l-1.203-.38 1.56-1.172 1.202.38c14.591 4.612 59.559 20.131 134.954 46.575 71.945 25.234 181.175 43.642 327.678 55.203l1.318-4.138 18.288 6.334-21.368 3.33 1.321-4.146z" fill="url(#g)" transform="matrix(1 0 0 -1 -167 425.597)"/>
+      <path d="M518.845 240.475c-150.719-4.951-264.126-18.763-340.239-41.46-79.583-23.731-120.492-44.097-122.622-61.256l-.087-.697 2.852-.085.087.697c2.053 16.541 42.437 36.644 121.258 60.149 75.653 22.56 188.634 36.32 338.925 41.257l.52-4.178 19.358 5.474-20.573 4.285.521-4.186z" fill="url(#h)" transform="matrix(1 0 0 -1 -167 423.639)"/>
+      <path d="M518.904 190.55c-186.774 1.33-316.576-10.78-389.46-36.385-74.326-26.112-115.629-19.909-125.53 18.713l-.178.692-2.839-.173.177-.692c10.196-39.765 54.084-46.357 130.043-19.671 72.264 25.387 201.525 37.446 387.73 36.121l-.172-4.178 20.222 4.684-19.822 5.074-.171-4.186z" fill="url(#e)" transform="matrix(1 0 0 -1 -167 373.712)"/>
+      <path fill="#10E7FF" d="M818.097 166.326l32.2 19.09-32.2 19.09v-15.664h-289.8v-6.853h289.8z"/>
+    </g>
+    <g transform="translate(162 27)" fill="#000000">
+      <foreignObject x="10" y="0" width="350" height="200">
+        <div xmlns="http://www.w3.org/1999/xhtml" align="left" font-size=".9em">
+          <div>
+            <strong>
+              1. Vector receives the data
+            </strong>
+          </div>
+          <div>
+            Vector receives data from another upstream Vector instance
+          </div>
+        </div>
+      </foreignObject>
+      <path fill-rule="nonzero" d="M1.83 90.015v-85H.11v85z"/>
+    </g>
+    <g transform="translate(197 259)" fill="#000000">
+      <foreignObject x="-110" y="40" width="350" height="200">
+        <div xmlns="http://www.w3.org/1999/xhtml" align="right" font-size=".9em">
+          <div>
+            <strong>
+              2. Vector processes data
+            </strong>
+          </div>
+          <div>
+            Vector parses, transforms, and enriches data
+          </div>
+        </div>
+      </foreignObject>
+      <path fill-rule="nonzero" d="M255 85V0h-2v85z"/>
+    </g>
+    <g transform="translate(554 204)" fill="#000000">
+      <foreignObject x="-20" y="17" width="250" height="200">
+        <div xmlns="http://www.w3.org/1999/xhtml" align="right" font-size=".9em">
+          <div>
+            <strong>
+              3. Vector fans out data
+            </strong>
+          </div>
+          <div>
+            Vector forwards the data to one or more downstream services
+          </div>
+        </div>
+      </foreignObject>
+      <path fill-rule="nonzero" d="M242 85V0h-2v85z"/>
+    </g>
+  </g>
+</svg>

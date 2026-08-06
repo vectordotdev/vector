@@ -1,0 +1,36 @@
+features:
+  - e2e-tests-datadog
+
+test: "e2e"
+
+# NOTE: `v3` lives as a sibling of `v1v2` (not nested inside it) under datadog/metrics/, so this
+# filter and the V1/V2 suite's (`datadog::metrics::v1v2::`) stay mutually exclusive substrings —
+# test_filter is a bare substring match with no negation, and this suite's compose stack has no
+# V3 sink wired up in v1v2's environment, so a collision would try (and fail) to run this test
+# there.
+test_filter: "datadog::metrics::v3::"
+
+runner:
+  env:
+    VECTOR_RECEIVE_PORT: "8081"
+    FAKE_INTAKE_AGENT_ENDPOINT: "http://fakeintake-agent:80"
+    FAKE_INTAKE_VECTOR_ENDPOINT: "http://fakeintake-vector:80"
+
+matrix:
+  # Unlike the V1/V2 suite, this needs an Agent new enough to actually speak V3 (7.81+, for the
+  # `use_v3_api` config key data/agent.yaml relies on to force V3 to fakeintake-agent while
+  # keeping Vector on V2, the only series format its datadog_agent source ingests) — so it's
+  # deliberately *not* pinned below that version, unlike ../../datadog-metrics/config/test.yaml.
+  # A single representative version keeps this suite cheap.
+  agent_version: ["7"]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/common/datadog.rs"
+  - "src/sources/datadog_agent/**"
+  - "src/internal_events/datadog_*"
+  - "src/sinks/datadog/metrics/**"
+  - "src/sinks/util/**"
+  - "tests/e2e/datadog/metrics/v3.rs"
+  - "tests/e2e/datadog-metrics-v3/**"

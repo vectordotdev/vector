@@ -1,0 +1,266 @@
+# K8s E2E Suite
+#
+# This workflow runs under any of the following conditions:
+#    - manual dispatch in GH UI
+#    - on a PR commit if the kubernetes_logs source was changed
+#    - in the merge queue
+#    - on a weekly schedule (Monday 01:00 UTC)
+#    - on demand by either of the following comments in a PR:
+#        - '/ci-run-k8s'
+#        - '/ci-run-all'
+#
+# If the workflow trigger is the nightly schedule, all the k8s versions
+# are run in the matrix, otherwise, only the latest is run.
+
+name: K8S E2E Suite
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  schedule:
+    - cron: "0 1 * * 1" # 01:00 UTC every Monday
+
+concurrency:
+  # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
+  # additional PR commits are pushed. The comment.html_url should always be unique.
+  #
+  # Note that technically this workflow can run on PRs which have code changes that affect K8s. Choosing not to add the PR commit to
+  # the concurrency group settings- since that would result in new PR commits canceling out manual runs on any PR that doesn't flag
+  # change detection. This is a "conservative" approach that means we may have some runs that could be canceled, but it's safer than
+  # having user's runs canceled when they shouldn't be. In practice this shouldn't happen very often given this component does not change
+  # often so any increased cost from the conservative approach should be negligible.
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.ref || github.event.schedule }}
+  cancel-in-progress: true
+
+env:
+  CONTAINER_TOOL: "docker"
+  RUST_BACKTRACE: full
+  VECTOR_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+
+jobs:
+  changes:
+    # Only evaluate files changed on pull request trigger
+    if: ${{ github.event_name == 'merge_group' }}
+    uses: ./.github/workflows/changes.yml
+    secrets: inherit
+
+  build-x86_64-unknown-linux-gnu:
+    name: Build - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    needs: changes
+    # Run this job even if `changes` job is skipped
+    if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
+    env:
+      DISABLE_MOLD: true
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+      - run: sudo -E bash scripts/ci-free-disk-space.sh
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cross: true
+          mold: false
+          cargo-deb: true
+
+      - name: Install packaging dependencies
+        run: timeout 30m sudo apt-get install -y cmark-gfm
+
+      - run: VECTOR_VERSION="$(vdev version)" make package-deb-x86_64-unknown-linux-gnu
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts/*
+
+  # GitHub Actions don't support `matrix` at the job-level `if:` condition.
+  # We apply this workaround - compute `matrix` in a preceding job, and assign
+  # it's value dynamically at the actual test job.
+  # This approach can be advanced further by, for instance, dynamically
+  # detecting versions of various components, or reading them from `.meta`.
+  # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
+  compute-k8s-test-plan:
+    name: Compute K8s test plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: changes
+    # Run this job even if `changes` job is skipped
+    if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        id: set-matrix
+        with:
+          script: |
+            // Parameters.
+            const minikube_version = [
+              "v1.38.1",  // Latest stable version - Feb 19, 2026
+            ]
+
+            // Aim to test against oldest supported k8s cloud-provider versions
+            // https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
+            // https://cloud.google.com/kubernetes-engine/docs/release-notes
+            // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
+            const kubernetes_version = [
+              { version: "v1.35.1",  is_essential: true  }, // Latest stable (Feb 10, 2026)
+              { version: "v1.34.4",  is_essential: true  }, // Current patch (Feb 10, 2026)
+              { version: "v1.33.0",  is_essential: false }, // Widely supported
+              { version: "v1.32.0",  is_essential: false }, // EOL Feb 28 2026
+              { version: "v1.31.0",  is_essential: false }, // Extended support on cloud providers
+            ]
+            const container_runtime = [
+              "docker",
+              "containerd",
+              // https://github.com/kubernetes/minikube/issues/12928
+              // "crio",
+            ]
+
+            // Run all versions if triggered by nightly schedule. Otherwise only run latest.
+            const run_all = context.eventName == "schedule";
+            const filter_targets = array => array.filter(val => run_all || val.is_essential)
+
+            const matrix = {
+              minikube_version,
+              kubernetes_version: filter_targets(kubernetes_version).map(e => ({
+                version: e.version,
+                role: e.is_essential ? "essential" : "extra",
+              })),
+              container_runtime,
+            }
+            core.setOutput('matrix', matrix)
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+
+  test-e2e-kubernetes:
+    name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs:
+      - build-x86_64-unknown-linux-gnu
+      - compute-k8s-test-plan
+    # because `changes` job might be skipped
+    if: always() && needs.build-x86_64-unknown-linux-gnu.result == 'success' && needs.compute-k8s-test-plan.result == 'success'
+    strategy:
+      matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+          cargo-cache: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts
+
+      - name: Setup Minikube
+        run: scripts/ci-setup-minikube.sh
+        env:
+          KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
+          MINIKUBE_VERSION: ${{ matrix.minikube_version }}
+          CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
+
+      - name: Checkout helm-charts
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vectordotdev/helm-charts
+          ref: develop
+          path: helm-charts
+
+      # TODO: This job has been quite flakey. Need to investigate further and then remove the retries.
+      - name: Run tests
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        env:
+          USE_MINIKUBE_CACHE: "true"
+          SKIP_PACKAGE_DEB: "true"
+          HELM_CHART_REPO: ${{ github.workspace }}/helm-charts/charts/vector
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: make test-e2e-kubernetes
+
+      - name: Collect K8s diagnostics on failure
+        if: ${{ !success() }}
+        run: |
+          set +e +o pipefail
+          # Best-effort diagnostics -- never fail the job
+          run_diag() { local label="$1"; shift; echo "--- $label ---"; "$@" 2>&1 || true; echo; }
+          # For commands with pipes that can't be passed as args
+          run_diag_sh() { echo "--- $1 ---"; bash -c "$2" 2>&1 || true; echo; }
+
+          run_diag "Cluster-wide pods" kubectl get pods -A -o wide
+          run_diag "Cluster-wide events" kubectl get events -A --sort-by=.metadata.creationTimestamp
+          run_diag "Nodes" kubectl get nodes -o wide
+
+          for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -E '^vector-' || true); do
+            echo "=========================================="
+            echo "=== Namespace: $ns ==="
+            echo "=========================================="
+            run_diag "Pods"             kubectl get pods -n "$ns" -o wide
+            run_diag "Pod descriptions" kubectl describe pods -n "$ns"
+            run_diag "Events"           kubectl get events -n "$ns" --sort-by=.metadata.creationTimestamp
+            run_diag "ConfigMaps"       kubectl get configmaps -n "$ns" -o yaml
+
+            for pod in $(kubectl get pods -n "$ns" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+              run_diag "Logs: $pod"          kubectl logs -n "$ns" "$pod" --all-containers=true --tail=100
+              run_diag "Previous logs: $pod" kubectl logs -n "$ns" "$pod" --all-containers=true --previous --tail=50
+            done
+          done
+
+          run_diag_sh "Node resources" "kubectl describe nodes | grep -A20 'Allocated resources'"
+          run_diag "Minikube logs" minikube logs --length=100
+
+  final-result:
+    name: K8s E2E Suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs:
+      - changes
+      - build-x86_64-unknown-linux-gnu
+      - compute-k8s-test-plan
+      - test-e2e-kubernetes
+    if: always()
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+    steps:
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ env.FAILED }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
+            exit 1
+          else
+            echo "All jobs completed successfully"
+          fi

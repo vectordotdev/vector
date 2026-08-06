@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+# Add Vector to adm group to read /var/logs
+usermod --append --groups adm vector || true
+
+if getent group 'systemd-journal'
+then
+  # Add Vector to systemd-journal to read journald logs
+  usermod --append --groups systemd-journal vector || true
+  systemctl daemon-reload || true
+fi
+
+if getent group 'systemd-journal-remote'
+then
+  # Add Vector to systemd-journal-remote to read remote journald logs
+  usermod --append --groups systemd-journal-remote vector || true
+  systemctl daemon-reload || true
+fi
+
+#DEBHELPER#

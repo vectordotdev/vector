@@ -1,0 +1,25 @@
+[package]
+name = "opentelemetry-proto"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+tonic-build.workspace = true
+glob.workspace = true
+
+[dependencies]
+bytes.workspace = true
+chrono.workspace = true
+hex = { version = "0.4.3", default-features = false, features = ["std"] }
+lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
+ordered-float.workspace = true
+prost.workspace = true
+tonic.workspace = true
+vrl.workspace = true
+vector-core = { path = "../vector-core", default-features = false }

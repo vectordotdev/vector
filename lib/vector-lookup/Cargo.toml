@@ -1,0 +1,24 @@
+[package]
+name = "vector-lookup"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+serde.workspace = true
+vector-config = { path = "../vector-config" }
+vector-config-macros = { path = "../vector-config-macros" }
+vrl.workspace = true
+
+[dev-dependencies]
+
+[features]
+test = []
+proptest = ["dep:proptest", "dep:proptest-derive"]

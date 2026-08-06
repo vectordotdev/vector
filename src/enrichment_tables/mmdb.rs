@@ -1,0 +1,312 @@
+//! Handles enrichment tables for `type = mmdb`.
+//! Enrichment data is loaded from any database in [MaxMind][maxmind] format.
+//!
+//! [maxmind]: https://maxmind.com
+use std::{fs, net::IpAddr, path::PathBuf, sync::Arc, time::SystemTime};
+
+use maxminddb::Reader;
+use vector_lib::{
+    configurable::configurable_component,
+    enrichment::{Case, Condition, Error, IndexHandle, Table},
+};
+use vrl::value::{ObjectMap, Value};
+
+use crate::config::{EnrichmentTableConfig, GenerateConfig};
+
+/// Configuration for the `mmdb` enrichment table.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[configurable_component(enrichment_table("mmdb"))]
+pub struct MmdbConfig {
+    /// Path to the [MaxMind][maxmind] database
+    ///
+    /// [maxmind]: https://maxmind.com
+    pub path: PathBuf,
+}
+
+impl GenerateConfig for MmdbConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            path: "/path/to/GeoLite2-City.mmdb".into(),
+        })
+        .unwrap()
+    }
+}
+
+impl EnrichmentTableConfig for MmdbConfig {
+    async fn build(
+        &self,
+        _: &crate::config::GlobalOptions,
+        _: Option<Box<dyn std::any::Any + Send + Sync>>,
+    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        Ok(Box::new(Mmdb::new(self.clone())?))
+    }
+}
+
+#[derive(Clone)]
+/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a MaxMind database.
+pub struct Mmdb {
+    config: MmdbConfig,
+    dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
+    last_modified: SystemTime,
+}
+
+impl Mmdb {
+    /// Creates a new Mmdb struct from the provided config.
+    pub fn new(config: MmdbConfig) -> crate::Result<Self> {
+        let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
+
+        // Check if we can read database with dummy Ip.
+        let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
+        let result = dbreader.lookup(ip)?.decode::<ObjectMap>().map(|_| ());
+
+        match result {
+            Ok(_) => Ok(Mmdb {
+                last_modified: fs::metadata(&config.path)?.modified()?,
+                dbreader,
+                config,
+            }),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
+        let data = self.dbreader.lookup(ip).ok()?.decode().ok()??;
+
+        if let Some(fields) = select {
+            let mut filtered = Value::from(ObjectMap::new());
+            let mut data_value = Value::from(data);
+            for field in fields {
+                // Unparseable field names in the caller's `select` list are
+                // skipped: this matches the pre-migration behavior where the
+                // JIT `&str` path parser failed to iterate and the field was
+                // omitted from the output entirely.
+                let Ok(field_path) = vrl::path::parse_value_path(field) else {
+                    continue;
+                };
+                filtered.insert(
+                    &field_path,
+                    data_value.remove(&field_path, false).unwrap_or(Value::Null),
+                );
+            }
+            filtered.into_object()
+        } else {
+            Some(data)
+        }
+    }
+}
+
+impl Table for Mmdb {
+    /// Search the enrichment table data with the given condition.
+    /// All conditions must match (AND).
+    ///
+    /// # Errors
+    /// Errors if no rows, or more than 1 row is found.
+    fn find_table_row<'a>(
+        &self,
+        case: Case,
+        condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
+        wildcard: Option<&Value>,
+        index: Option<IndexHandle>,
+    ) -> Result<ObjectMap, Error> {
+        let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
+
+        match rows.pop() {
+            Some(row) if rows.is_empty() => Ok(row),
+            Some(_) => Err(Error::MoreThanOneRowFound),
+            None => Err(Error::NoRowsFound),
+        }
+    }
+
+    /// Search the enrichment table data with the given condition.
+    /// All conditions must match (AND).
+    /// Can return multiple matched records
+    fn find_table_rows<'a>(
+        &self,
+        _: Case,
+        condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
+        _wildcard: Option<&Value>,
+        _: Option<IndexHandle>,
+    ) -> Result<Vec<ObjectMap>, Error> {
+        match condition.first() {
+            Some(_) if condition.len() > 1 => Err(Error::OnlyOneConditionAllowed),
+            Some(Condition::Equals { value, .. }) => {
+                let ip = value
+                    .to_string_lossy()
+                    .parse::<IpAddr>()
+                    .map_err(|source| Error::InvalidAddress { source })?;
+                Ok(self
+                    .lookup(ip, select)
+                    .map(|values| vec![values])
+                    .unwrap_or_default())
+            }
+            Some(_) => Err(Error::OnlyEqualityConditionAllowed),
+            None => Err(Error::MissingCondition { kind: "IP" }),
+        }
+    }
+
+    /// Hints to the enrichment table what data is going to be searched to allow it to index the
+    /// data in advance.
+    ///
+    /// # Errors
+    /// Errors if the fields are not in the table.
+    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
+        match fields.len() {
+            0 => Err(Error::MissingRequiredField { field: "IP" }),
+            1 => Ok(IndexHandle(0)),
+            _ => Err(Error::OnlyOneFieldAllowed),
+        }
+    }
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        Vec::new()
+    }
+
+    /// Returns true if the underlying data has changed and the table needs reloading.
+    fn needs_reload(&self) -> bool {
+        matches!(fs::metadata(&self.config.path)
+            .and_then(|metadata| metadata.modified()),
+            Ok(modified) if modified > self.last_modified)
+    }
+}
+
+impl std::fmt::Debug for Mmdb {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Maxmind database {})", self.config.path.display())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use vrl::value::Value;
+
+    use super::*;
+
+    #[test]
+    fn city_partial_lookup() {
+        let values = find_select(
+            "2.125.160.216",
+            "tests/data/GeoIP2-City-Test.mmdb",
+            Some(&[
+                "location.latitude".to_string(),
+                "location.longitude".to_string(),
+            ]),
+        )
+        .unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert(
+            "location".into(),
+            ObjectMap::from([
+                ("latitude".into(), Value::from(51.75)),
+                ("longitude".into(), Value::from(-1.25)),
+            ])
+            .into(),
+        );
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn city_partial_lookup_skips_unparseable_selects() {
+        // An unparseable path in the select list is silently dropped from the
+        // output rather than surfacing as a null-valued literal field.
+        let values = find_select(
+            "2.125.160.216",
+            "tests/data/GeoIP2-City-Test.mmdb",
+            Some(&[
+                "location.latitude".to_string(),
+                "not a valid path".to_string(),
+            ]),
+        )
+        .unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert(
+            "location".into(),
+            ObjectMap::from([("latitude".into(), Value::from(51.75))]).into(),
+        );
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn isp_lookup() {
+        let values = find("208.192.1.2", "tests/data/GeoIP2-ISP-Test.mmdb").unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert("autonomous_system_number".into(), 701i64.into());
+        expected.insert(
+            "autonomous_system_organization".into(),
+            "MCI Communications Services, Inc. d/b/a Verizon Business".into(),
+        );
+        expected.insert("isp".into(), "Verizon Business".into());
+        expected.insert("organization".into(), "Verizon Business".into());
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn connection_type_lookup_success() {
+        let values = find(
+            "201.243.200.1",
+            "tests/data/GeoIP2-Connection-Type-Test.mmdb",
+        )
+        .unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert("connection_type".into(), "Corporate".into());
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn lookup_missing() {
+        let values = find("10.1.12.1", "tests/data/custom-type.mmdb");
+
+        assert!(values.is_none());
+    }
+
+    #[test]
+    fn custom_mmdb_type() {
+        let values = find("208.192.1.2", "tests/data/custom-type.mmdb").unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert("hostname".into(), "custom".into());
+        expected.insert(
+            "nested".into(),
+            ObjectMap::from([
+                ("hostname".into(), "custom".into()),
+                ("original_cidr".into(), "208.192.1.2/24".into()),
+            ])
+            .into(),
+        );
+
+        assert_eq!(values, expected);
+    }
+
+    fn find(ip: &str, database: &str) -> Option<ObjectMap> {
+        find_select(ip, database, None)
+    }
+
+    fn find_select(ip: &str, database: &str, select: Option<&[String]>) -> Option<ObjectMap> {
+        Mmdb::new(MmdbConfig {
+            path: database.into(),
+        })
+        .unwrap()
+        .find_table_rows(
+            Case::Insensitive,
+            &[Condition::Equals {
+                field: "ip",
+                value: ip.into(),
+            }],
+            select,
+            None,
+            None,
+        )
+        .unwrap()
+        .pop()
+    }
+}

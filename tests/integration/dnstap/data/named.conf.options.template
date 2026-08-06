@@ -1,0 +1,12 @@
+options {
+        directory "/etc/bind";
+        dnstap { all; };
+        dnstap-output unix "/etc/bind/socket/dnstap.sock#";
+        listen-on-v6 { none; };
+        dnssec-validation no;
+};
+
+controls {
+        inet 127.0.0.1 port #
+        allow { localhost; };
+};

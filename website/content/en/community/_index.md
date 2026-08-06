@@ -1,0 +1,97 @@
+---
+title: Vector Community
+description: >
+  Join the Vector community. Connect with other Vector users and help make Vector better.
+---
+
+## Support
+
+### Vector
+
+* For questions and help: [Create a Vector GitHub Discussions][vector_discussions]
+
+* For bug reports: [Create a Vector GitHub issue][vector_bug_report]
+* For feedback on pull requests, ping the Vector team directly on GitHub with `@vectordotdev/vector`
+
+### VRL
+
+* For VRL bugs: [Create a VRL GitHub issue][vrl_bug_report]
+* For VRL discussions: [Create a VRL GitHub discussion][vrl_discussion]
+
+## Discord
+
+Join our [Discord server][discord].
+
+The Discord server is meant for connecting with other Vector users and fostering community conversations.
+
+The Vector team does not actively monitor the Discord channels. The best way to reach out to the Vector team directly is through GitHub.
+
+## X
+
+Find us on [X][vector_x].
+
+## FAQ
+
+### How do I contribute to Vector?
+
+Vector is [open source][oss] and welcomes contributions. A few guidelines to help you get started:
+
+1. Read our [contribution guide][contribution].
+
+2. Start with [good first issues][first_issues].
+
+3. Use [GitHub Discussions][vector_discussions] if you have any questions. We are happy to help!
+
+### What is Vector's governance model?
+
+Vector's high-level governance model is designed around the requirements and best practices of the CNCF/Linux Foundation Core Infrastructure Initiative best practice targeting a silver badge status.
+
+1. [CNCF CII best practices][cncf]
+
+2. [Linux Foundation][lf]
+
+### What is the Vector project model?
+
+Vector's project/product management model is designed around the Linux kernel development practices and processes.
+
+1. [Linux Kernel CII best practices][kernel]
+
+2. [Linux Foundation][linux]
+
+### What is the Vector community model?
+
+Vector has adopted the Rust community model and practices for engaging with people and ensuring that all contributors and stakeholders respect the code of conduct.
+
+1. [Rust Language Organization][rust_lang]
+
+2. [Rust community standards][rust_community]
+
+[vector_x]: https://x.com/vectordotdev
+
+[discord]: https://chat.vector.dev
+
+[cncf]: https://bestpractices.coreinfrastructure.org/en
+
+[contribution]: https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md
+
+[first_issues]: https://github.com/vectordotdev/vector/contribute
+
+[kernel]: https://bestpractices.coreinfrastructure.org/en/projects/34
+
+[lf]: https://www.linuxfoundation.org
+
+[linux]: https://www.kernel.org
+
+[oss]: https://github.com/vectordotdev/vector
+
+[rust_community]: https://www.rust-lang.org/community
+
+[rust_lang]: https://www.rust-lang.org
+
+[vector_discussions]: https://github.com/vectordotdev/vector/discussions/new?category=q-a
+
+[vector_bug_report]: https://github.com/vectordotdev/vector/issues/new?assignees=&labels=type%3A+bug&projects=&template=bug.yml
+
+[vrl_bug_report]: https://github.com/vectordotdev/vrl/issues/new?template=bug.yml
+
+[vrl_discussion]: https://github.com/vectordotdev/vrl/discussions/new?category=q-a

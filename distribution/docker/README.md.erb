@@ -1,0 +1,26 @@
+<p align="center">
+  <strong>
+    <a href="<%= metadata.links.fetch("urls.vector_website") %>">Website<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_docs") %>">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_community") %>">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_repo") %>">GitHub<a/>
+  </strong>
+</p>
+
+---
+
+<p align="center">
+  <img src="https://res.cloudinary.com/timber/image/upload/v1561214425/vector_diagram_w26yw3.svg" alt="Vector">
+</p>
+
+Vector is an [open-source][urls.vector_repo] utility for building observability
+pipelines. [Collect][docs.sources], [transform][docs.transforms], and
+[route][docs.sinks] log, metrics and events with one simple tool.
+
+Built in [Rust][urls.rust], Vector places high-value on
+[performance][pages.index#performance], [correctness][pages.index#correctness],
+and [operator friendliness][docs.administration]. It compiles to a single static
+binary and is designed to be [deployed][docs.deployment] across your entire
+infrastructure, serving as a light-weight [daemon][docs.strategies#daemon],
+[sidecar][docs.strategies#sidecar], or highly efficient
+[service][docs.strategies#service]. Take back ownership and control of your
+observability data with Vector.
+
+<%= docker_docs %>

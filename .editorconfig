@@ -1,0 +1,29 @@
+# https://editorconfig.org
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+max_line_length = 100
+
+[website/layouts/**/*.html]
+insert_final_newline = false
+
+[*.rs]
+indent_style = space
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+[*.cue]
+indent_style = tab
+indent_size = 4
+
+[*.svg]
+insert_final_newline = false

@@ -1,0 +1,620 @@
+use std::io;
+
+use bytes::BytesMut;
+use itertools::{Itertools, Position};
+use tokio_util::codec::Encoder as _;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{Transformer, encoding::Framer, internal_events::EncoderWriteError},
+    config::telemetry,
+    request_metadata::GroupedCountByteSize,
+};
+
+use crate::event::Event;
+
+pub trait Encoder<T> {
+    /// Encodes the input into the provided writer.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
+    fn encode_input(
+        &self,
+        input: T,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)>;
+}
+
+impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        let mut encoder = self.1.clone();
+        let mut bytes_written = 0;
+        let mut n_events_pending = events.len();
+        let is_empty = events.is_empty();
+        let batch_prefix = encoder.batch_prefix();
+        write_all(writer, n_events_pending, batch_prefix)?;
+        bytes_written += batch_prefix.len();
+
+        let mut byte_size = telemetry().create_request_count_byte_size();
+
+        for (position, mut event) in events.into_iter().with_position() {
+            self.0.transform(&mut event);
+
+            // Ensure the json size is calculated after any fields have been removed
+            // by the transformer.
+            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
+            let mut bytes = BytesMut::new();
+            match (position, encoder.framer()) {
+                (
+                    Position::Last | Position::Only,
+                    Framer::CharacterDelimited(_) | Framer::NewlineDelimited(_),
+                ) => {
+                    encoder
+                        .serialize(event, &mut bytes)
+                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                }
+                _ => {
+                    encoder
+                        .encode(event, &mut bytes)
+                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                }
+            }
+            write_all(writer, n_events_pending, &bytes)?;
+            bytes_written += bytes.len();
+            n_events_pending -= 1;
+        }
+
+        let batch_suffix = encoder.batch_suffix(is_empty);
+        assert!(n_events_pending == 0);
+        write_all(writer, 0, batch_suffix)?;
+        bytes_written += batch_suffix.len();
+
+        Ok((bytes_written, byte_size))
+    }
+}
+
+impl Encoder<Event> for (Transformer, vector_lib::codecs::Encoder<()>) {
+    fn encode_input(
+        &self,
+        mut event: Event,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        let mut encoder = self.1.clone();
+        self.0.transform(&mut event);
+
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+
+        let mut bytes = BytesMut::new();
+        encoder
+            .serialize(event, &mut bytes)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+        write_all(writer, 1, &bytes)?;
+        Ok((bytes.len(), byte_size))
+    }
+}
+
+#[cfg(feature = "codecs-arrow")]
+impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        use tokio_util::codec::Encoder as _;
+        use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
+
+        let mut encoder = self.1.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        let n_events = events.len();
+        let mut transformed_events = Vec::with_capacity(n_events);
+
+        for mut event in events {
+            self.0.transform(&mut event);
+            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+            transformed_events.push(event);
+        }
+
+        let mut bytes = BytesMut::new();
+        encoder
+            .encode(transformed_events, &mut bytes)
+            .map_err(|error| {
+                // Codec error paths emit their own internal event
+                // (e.g. SchemaGenerationError, EncoderNullConstraintError,
+                // EncoderRecordBatchError) which logs the error and increments
+                // component_errors_total. We only emit the drop count here to
+                // avoid double-counting.
+                // n_events is the pre-filter count; Parquet filters non-log
+                // events before encoding, but that only happens if a sink is
+                // misconfigured to send non-log events into a log-only encoder,
+                // so the overcount is not a practical concern.
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: n_events,
+                    reason: "Failed to batch encode events.",
+                });
+                io::Error::new(io::ErrorKind::InvalidData, error)
+            })?;
+
+        write_all(writer, n_events, &bytes)?;
+        Ok((bytes.len(), byte_size))
+    }
+}
+
+impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        // Delegate to the specific encoder implementation
+        match &self.1 {
+            vector_lib::codecs::EncoderKind::Framed(encoder) => {
+                (self.0.clone(), *encoder.clone()).encode_input(events, writer)
+            }
+            #[cfg(feature = "codecs-arrow")]
+            vector_lib::codecs::EncoderKind::Batch(encoder) => {
+                (self.0.clone(), encoder.clone()).encode_input(events, writer)
+            }
+        }
+    }
+}
+
+/// Write the buffer to the writer. If the operation fails, emit an internal event which complies with the
+/// instrumentation spec- as this necessitates both an Error and EventsDropped event.
+///
+/// # Arguments
+///
+/// * `writer`           - The object implementing io::Write to write data to.
+/// * `n_events_pending` - The number of events that are dropped if this write fails.
+/// * `buf`              - The buffer to write.
+pub fn write_all(
+    writer: &mut dyn io::Write,
+    n_events_pending: usize,
+    buf: &[u8],
+) -> io::Result<()> {
+    writer.write_all(buf).inspect_err(|error| {
+        emit!(EncoderWriteError {
+            error,
+            count: n_events_pending,
+        });
+    })
+}
+
+pub fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>
+where
+    F: FnOnce(&mut dyn io::Write, I) -> Result<(), E>,
+    E: Into<io::Error> + 'static,
+{
+    struct Tracked<'inner> {
+        count: usize,
+        inner: &'inner mut dyn io::Write,
+    }
+
+    impl io::Write for Tracked<'_> {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            #[allow(clippy::disallowed_methods)] // We pass on the result of `write` to the caller.
+            let n = self.inner.write(buf)?;
+            self.count += n;
+            Ok(n)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.inner.flush()
+        }
+    }
+
+    let mut tracked = Tracked { count: 0, inner };
+    f(&mut tracked, input).map_err(|e| e.into())?;
+    Ok(tracked.count)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, env, path::PathBuf};
+
+    use bytes::{BufMut, Bytes};
+    use cfg_if::cfg_if;
+    use vector_lib::{
+        codecs::{
+            CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
+            NewlineDelimitedEncoder, TextSerializerConfig,
+            encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions},
+        },
+        event::LogEvent,
+        internal_event::CountByteSize,
+        json_size::JsonSize,
+    };
+    use vrl::value::{KeyString, Value};
+
+    cfg_if! {
+        if #[cfg(feature = "codecs-arrow")] {
+            use arrow::datatypes::{DataType, Field, Schema as ArrowSchema};
+            use vector_lib::codecs::{
+                BatchEncoder,
+                encoding::{ArrowStreamSerializer, ArrowStreamSerializerConfig, BatchSerializer},
+            };
+            use vector_lib::event_test_util::{clear_recorded_events, contains_name_once};
+        }
+    }
+
+    use super::*;
+
+    #[test]
+    fn test_encode_batch_json_empty() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializerConfig::default().build().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let (written, json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
+        assert_eq!(written, 2);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), "[]");
+        assert_eq!(
+            CountByteSize(0, JsonSize::zero()),
+            json_size.size().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_encode_batch_json_single() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializerConfig::default().build().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+            KeyString::from("key"),
+            Value::from("value"),
+        )])))];
+
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
+        assert_eq!(written, 17);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"[{"key":"value"}]"#);
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
+    }
+
+    #[test]
+    fn test_encode_batch_json_multiple() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializerConfig::default().build().into(),
+            ),
+        );
+
+        let input = vec![
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                KeyString::from("key"),
+                Value::from("value1"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                KeyString::from("key"),
+                Value::from("value2"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                KeyString::from("key"),
+                Value::from("value3"),
+            )]))),
+        ];
+
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let mut writer = Vec::new();
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
+        assert_eq!(written, 52);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            r#"[{"key":"value1"},{"key":"value2"},{"key":"value3"}]"#
+        );
+
+        assert_eq!(CountByteSize(3, input_json_size), json_size.size().unwrap());
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_empty() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::default().into(),
+                JsonSerializerConfig::default().build().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let (written, json_size) = encoding.encode_input(vec![], &mut writer).unwrap();
+        assert_eq!(written, 0);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), "");
+        assert_eq!(
+            CountByteSize(0, JsonSize::zero()),
+            json_size.size().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_single() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::default().into(),
+                JsonSerializerConfig::default().build().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+            KeyString::from("key"),
+            Value::from("value"),
+        )])))];
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
+        assert_eq!(written, 16);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), "{\"key\":\"value\"}\n");
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_multiple() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::default().into(),
+                JsonSerializerConfig::default().build().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let input = vec![
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                KeyString::from("key"),
+                Value::from("value1"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                KeyString::from("key"),
+                Value::from("value2"),
+            )]))),
+            Event::Log(LogEvent::from(BTreeMap::from([(
+                KeyString::from("key"),
+                Value::from("value3"),
+            )]))),
+        ];
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
+        assert_eq!(written, 51);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}\n"
+        );
+        assert_eq!(CountByteSize(3, input_json_size), json_size.size().unwrap());
+    }
+
+    #[test]
+    fn test_encode_event_json() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+        );
+
+        let mut writer = Vec::new();
+        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+            KeyString::from("key"),
+            Value::from("value"),
+        )])));
+        let input_json_size = input.estimated_json_encoded_size_of();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
+        assert_eq!(written, 15);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
+    }
+
+    #[test]
+    fn test_encode_event_text() {
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+        );
+
+        let mut writer = Vec::new();
+        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+            KeyString::from("message"),
+            Value::from("value"),
+        )])));
+        let input_json_size = input.estimated_json_encoded_size_of();
+
+        let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
+        assert_eq!(written, 5);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r"value");
+        assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
+    }
+
+    fn test_data_dir() -> PathBuf {
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/protobuf")
+    }
+
+    #[test]
+    fn test_encode_batch_protobuf_single() {
+        let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
+        let input_proto_size = message_raw.len();
+
+        // default LengthDelimitedCoderOptions.length_field_length is 4
+        let mut buf = BytesMut::with_capacity(64);
+        buf.reserve(4 + input_proto_size);
+        buf.put_uint(input_proto_size as u64, 4);
+        buf.extend_from_slice(&message_raw[..]);
+        let expected_bytes = buf.freeze();
+
+        let config = ProtobufSerializerConfig {
+            protobuf: ProtobufSerializerOptions {
+                desc_file: test_data_dir().join("test_proto.desc"),
+                message_type: "test_proto.User".to_string(),
+                use_json_names: false,
+            },
+        };
+
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                LengthDelimitedEncoder::default().into(),
+                config.build().unwrap().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([
+            (KeyString::from("id"), Value::from("123")),
+            (KeyString::from("name"), Value::from("Alice")),
+            (KeyString::from("age"), Value::from(30)),
+            (
+                KeyString::from("emails"),
+                Value::from(vec!["alice@example.com", "alice@work.com"]),
+            ),
+        ])))];
+
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, size) = encoding.encode_input(input, &mut writer).unwrap();
+
+        assert_eq!(input_proto_size, 49);
+        assert_eq!(written, input_proto_size + 4);
+        assert_eq!(CountByteSize(1, input_json_size), size.size().unwrap());
+        assert_eq!(Bytes::copy_from_slice(&writer), expected_bytes);
+    }
+
+    #[test]
+    fn test_encode_batch_protobuf_multiple() {
+        let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
+        let messages = vec![message_raw.clone(), message_raw.clone()];
+        let total_input_proto_size: usize = messages.iter().map(|m| m.len()).sum();
+
+        let mut buf = BytesMut::with_capacity(128);
+        for message in messages {
+            // default LengthDelimitedCoderOptions.length_field_length is 4
+            buf.reserve(4 + message.len());
+            buf.put_uint(message.len() as u64, 4);
+            buf.extend_from_slice(&message[..]);
+        }
+        let expected_bytes = buf.freeze();
+
+        let config = ProtobufSerializerConfig {
+            protobuf: ProtobufSerializerOptions {
+                desc_file: test_data_dir().join("test_proto.desc"),
+                message_type: "test_proto.User".to_string(),
+                use_json_names: false,
+            },
+        };
+
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                LengthDelimitedEncoder::default().into(),
+                config.build().unwrap().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let input = vec![
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (KeyString::from("id"), Value::from("123")),
+                (KeyString::from("name"), Value::from("Alice")),
+                (KeyString::from("age"), Value::from(30)),
+                (
+                    KeyString::from("emails"),
+                    Value::from(vec!["alice@example.com", "alice@work.com"]),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (KeyString::from("id"), Value::from("123")),
+                (KeyString::from("name"), Value::from("Alice")),
+                (KeyString::from("age"), Value::from(30)),
+                (
+                    KeyString::from("emails"),
+                    Value::from(vec!["alice@example.com", "alice@work.com"]),
+                ),
+            ]))),
+        ];
+
+        let input_json_size: JsonSize = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum();
+
+        let (written, size) = encoding.encode_input(input, &mut writer).unwrap();
+
+        assert_eq!(total_input_proto_size, 49 * 2);
+        assert_eq!(written, total_input_proto_size + 8);
+        assert_eq!(CountByteSize(2, input_json_size), size.size().unwrap());
+        assert_eq!(Bytes::copy_from_slice(&writer), expected_bytes);
+    }
+
+    #[cfg(feature = "codecs-arrow")]
+    #[test]
+    fn test_encode_batch_arrow_emits_record_batch_error_on_type_mismatch() {
+        clear_recorded_events();
+
+        // Schema declares `message` as Int64, but the event below carries a string,
+        // so `build_record_batch` returns `ArrowEncodingError::ArrowJsonDecode`.
+        let schema = ArrowSchema::new(vec![Field::new("message", DataType::Int64, false)]);
+        let serializer = ArrowStreamSerializer::new(ArrowStreamSerializerConfig::new(schema))
+            .expect("failed to build ArrowStreamSerializer");
+        let encoder = BatchEncoder::new(BatchSerializer::Arrow(serializer));
+        let encoding = (Transformer::default(), encoder);
+
+        let event = Event::Log(LogEvent::from(BTreeMap::from([(
+            KeyString::from("message"),
+            Value::from("not_an_integer"),
+        )])));
+
+        let mut writer = Vec::new();
+        let result = encoding.encode_input(vec![event], &mut writer);
+        assert!(
+            result.is_err(),
+            "type mismatch should fail batch encoding, got {result:?}"
+        );
+
+        contains_name_once("EncoderRecordBatchError")
+            .expect("EncoderRecordBatchError should be emitted on ArrowJsonDecode failure");
+        contains_name_once("ComponentEventsDropped")
+            .expect("ComponentEventsDropped should be emitted by the wrapper");
+    }
+}

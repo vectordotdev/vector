@@ -1,0 +1,4 @@
+name: "someone"
+phones {
+  number: "123456"
+}

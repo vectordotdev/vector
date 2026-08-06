@@ -1,0 +1,6 @@
+The Protocol Buffer definitions under this folder are downloaded from their official repositories:
+
+- [gogo.proto](https://github.com/gogo/protobuf/blob/master/gogoproto/gogo.proto)
+- [logproto.proto](https://github.com/grafana/loki/blob/main/pkg/logproto/logproto.proto)
+- [push.proto](https://github.com/grafana/loki/blob/main/pkg/push/push.proto)
+- [stats.proto](https://github.com/grafana/loki/blob/main/pkg/logqlmodel/stats/stats.proto)

@@ -1,0 +1,41 @@
+@startuml
+!include <kubernetes/k8s-sprites-labeled-25pct>
+
+sprite $vector ./vector.svg
+
+skinparam ComponentFontColor MediumBlue
+
+cloud "Kubernetes\nCluster" as cluster {
+  node "Worker\nNode" as node1 {
+    component "<$vector>" as node1_vector
+
+    component "<$pod>" as node1_pod1
+    component "<$pod>" as node1_pod2
+    component "<$pod>" as node1_pod3
+
+    node1_vector <-up- node1_pod1
+    node1_vector <-up- node1_pod2
+    node1_vector <-up- node1_pod3
+  }
+
+  node "Worker\nNode" as node2 {
+    component "<$vector>" as node2_vector
+
+    component "<$pod>" as node2_pod1
+    component "<$pod>" as node2_pod2
+    component "<$pod>" as node2_pod3
+
+    node2_vector <-up- node2_pod1
+    node2_vector <-up- node2_pod2
+    node2_vector <-up- node2_pod3
+  }
+}
+
+cloud {
+  component "Sink" as sink
+
+  node1_vector -down-> sink
+  node2_vector -down-> sink
+}
+
+@enduml

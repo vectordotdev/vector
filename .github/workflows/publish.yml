@@ -1,0 +1,590 @@
+name: Publish
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to build (branch, tag, or SHA)"
+        type: string
+        required: false
+      channel:
+        description: "Release channel (release/nightly/custom)"
+        type: string
+        default: custom
+      skip_publish:
+        description: "Build and verify only. Skip publishing to Docker, S3, and GitHub"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      git_ref:
+        type: string
+        required: true
+        # channel is the dir/namespace packages are organized into.
+        # Options are release/nightly/custom.
+      channel:
+        type: string
+        required: true
+      skip_publish:
+        description: "Build and verify only. Skip publishing to Docker, S3, and GitHub"
+        type: boolean
+        default: false
+
+env:
+  VERBOSE: true
+  CI: true
+  DISABLE_MOLD: true
+  DEBIAN_FRONTEND: noninteractive
+  CONTAINER_TOOL: docker
+  CHANNEL: ${{ inputs.channel }}
+
+jobs:
+  generate-publish-metadata:
+    name: Generate Publish-related Metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      vector_version: ${{ steps.generate-publish-metadata.outputs.vector_version }}
+      vector_build_desc: ${{ steps.generate-publish-metadata.outputs.vector_build_desc }}
+      vector_release_channel: ${{ steps.generate-publish-metadata.outputs.vector_release_channel }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+      - name: Generate publish metadata
+        id: generate-publish-metadata
+        run: make ci-generate-publish-metadata
+
+  build-linux-gnu-native:
+    name: Build Vector for ${{ matrix.target }} (native)
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c
+      # Align HOME with the container's root user so rustup/sudo don't warn
+      # about $HOME (/github/home) differing from the euid-obtained home (/root).
+      env:
+        HOME: /root
+    timeout-minutes: 90
+    needs: generate-publish-metadata
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04-8core
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-8core-arm
+    steps:
+      - name: Install system dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            gcc gcc-c++ make cmake perl perl-IPC-Cmd \
+            openssl-devel cyrus-sasl-devel zlib-devel \
+            pkgconfig clang \
+            rpm-build sudo \
+            git tar gzip xz which findutils \
+            curl unzip
+      # TODO: generate the .deb description once in generate-publish-metadata and consume as an artifact, so all builders share the same output and this source build can go away.
+      - name: Build cmark-gfm from source
+        env:
+          CMARK_GFM_TAG: "0.29.0.gfm.13"
+          CMARK_GFM_SHA: "587a12bb54d95ac37241377e6ddc93ea0e45439b"
+        run: |
+          git clone --depth 1 --branch "$CMARK_GFM_TAG" https://github.com/github/cmark-gfm.git /tmp/cmark-gfm
+          actual_sha="$(git -C /tmp/cmark-gfm rev-parse HEAD)"
+          if [ "$actual_sha" != "$CMARK_GFM_SHA" ]; then
+            echo "::error::cmark-gfm tag $CMARK_GFM_TAG resolved to $actual_sha, expected $CMARK_GFM_SHA"
+            exit 1
+          fi
+          cmake -S /tmp/cmark-gfm -B /tmp/cmark-gfm/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_INSTALL_LIBDIR=lib64
+          cmake --build /tmp/cmark-gfm/build -j "$(nproc)"
+          cmake --install /tmp/cmark-gfm/build
+          ldconfig
+          rm -rf /tmp/cmark-gfm
+          cmark-gfm --version
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-deb: true
+          protoc: true
+      - name: Build Vector
+        run: make NATIVE=true package-${{ matrix.target }}-all
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
+          path: target/artifacts/vector*
+
+  build-linux-cross:
+    name: Build Vector for ${{ matrix.target }}
+    runs-on: release-builder-linux
+    timeout-minutes: 60
+    needs: generate-publish-metadata
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl # .tar.gz
+          - target: aarch64-unknown-linux-musl # .tar.gz
+          - target: armv7-unknown-linux-gnueabihf # .tar.gz, .deb, .rpm
+          - target: armv7-unknown-linux-musleabihf # .tar.gz
+          - target: arm-unknown-linux-gnueabi # .tar.gz, .deb
+          - target: arm-unknown-linux-musleabi # .tar.gz
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cross: true
+          cargo-deb: true
+          protoc: true
+          libsasl2: true
+      - name: Install cross-compilation tools
+        run: timeout 30m sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
+      - name: Install rpm
+        if: endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: timeout 30m sudo apt-get install -y rpm
+      - name: Build Vector
+        run: make package-${{ matrix.target }}-all
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
+          path: target/artifacts/vector*
+
+  build-apple-darwin-packages:
+    name: Build Vector for ${{ matrix.architecture }}-apple-darwin (.tar.gz)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    needs: generate-publish-metadata
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    strategy:
+      matrix:
+        include:
+          # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
+          # and to https://github.com/actions/runner-images
+          - architecture: arm64
+            runner: macos-14-xlarge
+    steps:
+      - name: Verify Runner Architecture
+        run: |
+          ARCH=$(uname -m)
+          echo "Detected architecture: $ARCH"
+          if [ "$ARCH" != "${{ matrix.architecture }}" ]; then
+            echo "Error: Expected ${{ matrix.architecture }} architecture, but got $ARCH!"
+            exit 1
+          fi
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+      - name: Build Vector
+        env:
+          TARGET: "${{ matrix.architecture }}-apple-darwin"
+          NATIVE_BUILD: true
+          FEATURES: "target-aarch64-apple-darwin"
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          make package
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}-apple-darwin
+          path: target/artifacts/vector*
+
+  build-x86_64-pc-windows-msvc-packages:
+    name: Build Vector for x86_64-pc-windows-msvc (.zip)
+    runs-on: windows-2025-8core
+    timeout-minutes: 90
+    needs: generate-publish-metadata
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+      RELEASE_BUILDER: "true"
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - name: Bootstrap runner environment (Windows-specific)
+        run: .\scripts\environment\bootstrap-windows-2025.ps1
+      - name: Install Wix
+        shell: bash
+        run: |
+          mkdir -p /c/wix
+          cd /c/wix
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip > wix-binaries.zip
+          unzip -o wix-binaries.zip
+          rm wix-binaries.zip
+      - name: Build Vector
+        shell: bash
+        run: |
+          export FEATURES="default"
+          export ARCHIVE_TYPE="zip"
+          export KEEP_SYMBOLS="true"
+          export RUST_LTO=""
+          export TARGET="x86_64-pc-windows-msvc"
+          export NATIVE_BUILD="true"
+          make package
+      - name: Build MSI package
+        shell: bash
+        run: |
+          export PATH="/c/wix:$PATH"
+          ./scripts/package-msi.sh
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
+          path: target/artifacts/vector*
+
+  deb-verify:
+    name: Verify DEB Packages
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    needs:
+      - generate-publish-metadata
+      - build-linux-gnu-native
+      - build-linux-cross
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      DD_PKG_VERSION: "latest"
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+        container:
+          - ubuntu:20.04
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - debian:11
+          - debian:12
+          - debian:13
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - run: |
+          timeout 30m apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+          timeout 30m apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          make
+      - name: Install dd-pkg for linting
+        run: |
+          ARCH=$(uname -m)
+          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
+      - name: Fix Git safe directories issue when in containers (actions/checkout#760)
+        run: git config --global --add safe.directory /__w/vector/vector
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - name: Set artifact name
+        run: echo "ARTIFACT=$(uname -m)-unknown-linux-gnu" >> "$GITHUB_ENV"
+      - name: Download staged package artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ env.ARTIFACT }}
+          path: target/artifacts
+      - name: Verify install of DEB package.
+        run: |
+          ./scripts/verify-install.sh "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_$(dpkg --print-architecture).deb"
+
+  rpm-verify:
+    name: Verify RPM Packages
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    needs:
+      - generate-publish-metadata
+      - build-linux-gnu-native
+      - build-linux-cross
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      DD_PKG_VERSION: "latest"
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+        container:
+          # Lowest supported glibc tier (EL8 family, glibc 2.28). Catches glibc-floor regressions.
+          - "almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c"
+          - "quay.io/centos/centos:stream9"
+          - "amazonlinux:2023"
+          - "fedora:39"
+          - "fedora:40"
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - run: |
+          yum update -y
+          yum install -y \
+          ca-certificates \
+          git \
+          systemd \
+          tar \
+          make
+          # conflicts with curl-minimal on some distros and --allowerased is not
+          # supported on some distros
+          if ! command -v curl &> /dev/null ; then
+            yum install -y curl
+          fi
+      - name: Install dd-pkg for linting
+        run: |
+          ARCH=$(uname -m)
+          case "$ARCH" in aarch64) ARCH_DL=arm64 ;; *) ARCH_DL="$ARCH" ;; esac
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_${ARCH_DL}.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
+      - name: Fix Git safe directories issue when in containers (actions/checkout#760)
+        run: git config --global --add safe.directory /__w/vector/vector
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - name: Set artifact name
+        run: echo "ARTIFACT=$(uname -m)-unknown-linux-gnu" >> "$GITHUB_ENV"
+      - name: Download staged package artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ env.ARTIFACT }}
+          path: target/artifacts
+      - name: Verify install of RPM package.
+        run: |
+          ./scripts/verify-install.sh "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.$(uname -m).rpm"
+
+  macos-verify:
+    name: Verify macOS Package
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    needs:
+      - generate-publish-metadata
+      - build-apple-darwin-packages
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    strategy:
+      matrix:
+        include:
+          # Refer to https://github.com/actions/runner-images
+          - target: arm64-apple-darwin
+            runner: macos-14
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - name: Download staged package artifacts (${{ matrix.target }})
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
+          path: target/artifacts
+      - name: Verify macOS package
+        run: |
+          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}.tar.gz \
+            && vector-${{ matrix.target }}/bin/vector --version
+
+  publish-docker:
+    name: Publish to Docker
+    if: ${{ !inputs.skip_publish }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Elevated permission required to push Docker images to GitHub Container Registry
+    permissions:
+      packages: write
+    needs:
+      - generate-publish-metadata
+      - build-linux-gnu-native
+      - build-linux-cross
+      - deb-verify
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - name: Login to DockerHub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.CI_DOCKER_USERNAME }}
+          password: ${{ secrets.CI_DOCKER_PASSWORD }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        with:
+          platforms: all
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          version: latest
+      - name: Download all Linux package artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: vector-${{ env.VECTOR_VERSION }}-*-linux-*
+          path: target/artifacts
+          merge-multiple: true
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+      - name: Build and publish Docker images
+        env:
+          PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+          REPOS: "timberio/vector,ghcr.io/vectordotdev/vector"
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: make release-docker
+
+  publish-s3:
+    name: Publish to S3
+    if: ${{ !inputs.skip_publish }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs:
+      - generate-publish-metadata
+      - build-linux-gnu-native
+      - build-linux-cross
+      - build-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
+      - deb-verify
+      - rpm-verify
+      - macos-verify
+      - generate-sha256sum
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+      - name: Download all package artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: vector-${{ env.VECTOR_VERSION }}-*
+          path: target/artifacts
+          merge-multiple: true
+      - name: Publish artifacts to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
+        run: make release-s3
+
+  publish-github:
+    name: Publish release to GitHub
+    # We only publish to GitHub for versioned releases, not nightlies.
+    if: ${{ !inputs.skip_publish && inputs.channel == 'release' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Elevated permission required to create GitHub releases and upload release assets
+    permissions:
+      contents: write
+    needs:
+      - generate-publish-metadata
+      - build-linux-gnu-native
+      - build-linux-cross
+      - build-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
+      - deb-verify
+      - rpm-verify
+      - macos-verify
+      - generate-sha256sum
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+      - name: Download all package artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: vector-${{ env.VECTOR_VERSION }}-*
+          path: target/artifacts
+          merge-multiple: true
+      - name: Publish release to GitHub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make release-github
+
+  generate-sha256sum:
+    name: Generate SHA256 checksums
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs:
+      - generate-publish-metadata
+      - build-linux-gnu-native
+      - build-linux-cross
+      - build-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.git_ref }}
+      - name: Download all package artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: vector-${{ env.VECTOR_VERSION }}-*
+          path: target/artifacts
+          merge-multiple: true
+      - name: Generate SHA256 checksums for artifacts
+        run: make sha256sum
+      - name: Stage checksum for publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
+          path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-SHA256SUMS

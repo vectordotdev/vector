@@ -1,0 +1,21 @@
+[package]
+name = "loki-logproto"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints]
+workspace = true
+
+[dependencies]
+prost.workspace = true
+prost-types.workspace = true
+
+[dev-dependencies]
+chrono.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true

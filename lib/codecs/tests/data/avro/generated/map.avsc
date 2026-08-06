@@ -1,0 +1,1 @@
+{"name":"test","type":"record","fields":[{"name":"map_field","type":{"type":"map","values":"long"}}]}

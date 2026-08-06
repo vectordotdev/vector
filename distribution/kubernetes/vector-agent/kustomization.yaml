@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: vector
+
+resources:
+  - configmap.yaml
+  - daemonset.yaml
+  - rbac.yaml
+  - serviceaccount.yaml
+  - service-headless.yaml

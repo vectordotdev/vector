@@ -1,0 +1,88 @@
+{{/* modal takes in one arg, "form", that is a SLICE of DICT: [ { form_id, form_title, and form_thankyou }, ... ] */}}
+
+{{ $form_id_array := slice }}
+
+<script src="https://lp.datadoghq.com/js/forms2/js/forms2.min.js"></script>
+
+{{ range $index, $form := .form }}
+{{ $form_id_array = $form_id_array | append $form.form_id }}
+<div id={{ $form.form_id }} class="hidden bg-black dark:bg-white bg-opacity-50 dark:bg-opacity-50 z-50 fixed top-0 left-0 w-full h-full overflow-auto">
+    <div class="max-w-full md:max-w-2xl w-auto mx-auto my-6 px-2.5 py-2">
+        <div id="modal-container--{{ $form.form_id }}" class="bg-white dark:bg-gray-900 rounded flex flex-col">
+            <div class="relative text-center p-4 flex items-start justify-between">
+                <p class="w-4/5 m-auto text-dark dark:text-gray-100 text-lg font-semibold">
+                    {{ $form.form_title }}
+                </p>
+                <button id="modal-close--{{ $form.form_id }}" type="button" data-dismiss="modal"
+                    class="close absolute right-4 p-4 pt-3 -m-4 ml-auto font-semibold opacity-50 dark:text-gray-100">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="relative flex flex-auto px-2 pb-4 justify-center">
+                <form id="mktoForm_{{ $form.form_id }}"></form>
+                <p id="modal-thankyou--{{ $form.form_id }}" class="hidden pt-10 pb-14">
+                    {{ $form.form_thankyou }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+<script>
+    /*  MktoForms2 is a global variable used for all marketo forms -- source is script above  */
+    const { MktoForms2 } = window;
+
+    const loadMarketoForm = () => {
+        const formIDsArray = {{ $form_id_array }};
+
+        formIDsArray.forEach(id => {
+            MktoForms2.loadForm('//lp.datadoghq.com', '875-UVY-685', id, (form) => {
+                const formOnPage = document.getElementById(`mktoForm_${id}`);
+
+                formOnPage.removeAttribute("style");
+                formOnPage.setAttribute("class", "mktoForm flex flex-col");
+
+                function displayThankYouMessage() {
+                    const thankyouMessage = document.getElementById(`modal-thankyou--${id}`);
+                    const signUpHeader = document.querySelector(`#modal-container--${id} > div > p`);
+
+                    /*  Hide form and modal title, unhide thankyou message  */
+                    formOnPage.classList.add('hidden');
+                    signUpHeader.classList.add('hidden');
+                    thankyouMessage.classList.remove('hidden');
+                }
+
+                form.onSuccess((values, followUpUrl) => {
+                    displayThankYouMessage();
+
+                    /*  No redirect  */
+                    return false;
+                })
+            });
+        });
+    };
+
+    /* If User clicks CTA button, show modal */
+    const toggleModal = (id) => {
+        event.preventDefault();
+
+        const modal = document.getElementById(id);
+        const modalVisible = document.getElementById(`modal-container--${id}`);
+        const buttonExit = document.getElementById(`modal-close--${id}`);
+
+        /* If User clicks outside modal or on "X", hide modal & removeEventListener */
+        const handleModalClick = () => {
+            if (!modalVisible.contains(event.target) || buttonExit.contains(event.target)) {
+                modal.classList.toggle("hidden");
+                modal.removeEventListener("click", handleModalClick);
+            }
+        }
+
+        modal.classList.toggle("hidden");
+
+        modal.addEventListener("click", handleModalClick);
+    };
+
+    window.addEventListener("load", loadMarketoForm);
+</script>

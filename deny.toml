@@ -1,0 +1,54 @@
+[licenses]
+allow = [
+  "0BSD",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MIT-0",
+  "BlueOak-1.0.0",
+  "OpenSSL",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "Zlib"
+]
+
+private = { ignore = true }
+
+exceptions = [
+    # MPL-2.0 are added case-by-case to make sure we are in compliance. To be in
+    # compliance we cannot be modifying the source files.
+    { allow = ["MPL-2.0"], name = "colored", version = "*" },
+    { allow = ["MPL-2.0"], name = "webpki-roots", version = "*" },
+    { allow = ["MPL-2.0"], name = "vector-common-macros", version = "*" },
+    { allow = ["MPL-2.0"], name = "vector-config-common", version = "*" },
+    { allow = ["MPL-2.0"], name = "vector-config-macros", version = "*" },
+    { allow = ["MPL-2.0"], name = "vrl", version = "*" },
+]
+
+[[licenses.clarify]]
+name = "ring"
+version = "*"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
+[advisories]
+ignore = [
+  { id = "RUSTSEC-2023-0071", reason = "rsa marvin attack - unpatched upstream (https://github.com/vectordotdev/vector/issues/19262)" },
+  { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained (https://github.com/vectordotdev/vector/issues/24940)" },
+  { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile is unmaintained - unpatched crate (https://github.com/bytebeamio/rumqtt/issues/1010) & tonic/reqwest upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0049", reason = "rustls-webpki 0.102 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0098", reason = "rustls-webpki 0.102/0.101 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.102/0.101 is vulnerable - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2024-0436", reason = "paste crate is unmaintained - transitive dependency via parquet v56.2.0, no safe upgrade available" },
+  { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.102/0.101 CRL parsing panic - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179); 0.103 already patched to 0.103.13" },
+  { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is unmaintained - transitive dep via mlua_derive v0.11.0; unblocked when mlua upgrades its derive macro" },
+  { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39.2 quadratic-time duplicate attribute check - transitive dep via azure_core/typespec, no newer typespec release available" },
+  { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39.2 unbounded namespace-declaration allocation in NsReader - transitive dep via azure_core/typespec, no newer typespec release available" },
+]

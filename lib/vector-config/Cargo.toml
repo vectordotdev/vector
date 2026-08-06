@@ -1,0 +1,38 @@
+[package]
+name = "vector-config"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lints]
+workspace = true
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
+[dependencies]
+chrono.workspace = true
+chrono-tz.workspace = true
+encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
+indexmap.workspace = true
+inventory = { version = "0.3" }
+no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
+num-traits = { version = "0.2.19", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+serde_with.workspace = true
+snafu.workspace = true
+toml.workspace = true
+tracing.workspace = true
+url = { version = "2.5.4", default-features = false, features = ["serde"] }
+http = { version = "0.2.9", default-features = false }
+vrl.workspace = true
+vector-config-common = { path = "../vector-config-common" }
+vector-config-macros = { path = "../vector-config-macros" }
+
+[dev-dependencies]
+assert-json-diff = { version = "2", default-features = false }
+serde_with.workspace = true

@@ -1,0 +1,32 @@
+[package]
+name = "file-source"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>"]
+edition = "2024"
+publish = false
+license = "MIT"
+
+[lints]
+workspace = true
+
+[target.'cfg(windows)'.dependencies]
+libc.workspace = true
+winapi = { version = "0.3", features = ["winioctl"] }
+
+[dependencies]
+glob.workspace = true
+chrono.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tracing.workspace = true
+indexmap = { version = "2.11.0", default-features = false, features = ["serde"] }
+bytes.workspace = true
+futures = { version = "0.3.31", default-features = false, features = ["executor"] }
+futures-util.workspace = true
+vector-common = { path = "../vector-common", default-features = false }
+file-source-common = { path = "../file-source-common" }
+async-compression.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+quickcheck.workspace = true
+tempfile.workspace = true

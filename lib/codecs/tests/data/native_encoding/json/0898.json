@@ -1,0 +1,1 @@
+{"metric":{"name":"b","namespace":"t","tags":{"_":"x","b":"k","x":"c"},"kind":"incremental","gauge":{"value":-503552.0}}}

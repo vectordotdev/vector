@@ -1,0 +1,8 @@
+{{ $title := .Params.title }}
+{{ $slug := .Params.title | urlize }}
+{{ $.Page.Scratch.SetInMap "tabs" $slug .Inner }}
+<button :class="{ 'font-extrabold text-secondary dark:text-primary': selected === '{{ $slug }}' }" class="text-sm cursor-pointer tracking-snug text-gray-400">
+  <span @click="selected = '{{ $slug }}'">
+{{ $title }}
+  </span>
+</button>
