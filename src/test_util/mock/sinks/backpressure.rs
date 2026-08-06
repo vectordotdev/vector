@@ -3,9 +3,7 @@ use futures::{FutureExt, StreamExt, stream::BoxStream};
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     event::Event,
     sinks::{Healthcheck, VectorSink, util::StreamSink},
 };
@@ -37,10 +35,6 @@ impl_generate_config_from_default!(BackpressureSinkConfig);
 #[async_trait]
 #[typetag::serde(name = "test_backpressure")]
 impl SinkConfig for BackpressureSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

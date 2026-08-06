@@ -13,8 +13,7 @@ use vrl::{
 use crate::{
     codecs::Transformer,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::Event,
     http::{Auth, HttpClient},
@@ -47,10 +46,6 @@ impl GenerateConfig for LogdnaConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         self.0.input()
     }
@@ -175,10 +170,6 @@ impl GenerateConfig for MezmoConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "mezmo")]
 impl SinkConfig for MezmoConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .optional_meaning("timestamp", Kind::timestamp())

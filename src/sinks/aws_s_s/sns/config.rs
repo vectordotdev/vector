@@ -10,8 +10,8 @@ use super::{
 use crate::{
     aws::{ClientBuilder, RegionOrEndpoint, create_client},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
 };
 
@@ -64,10 +64,6 @@ impl SnsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_sns")]
 impl SinkConfig for SnsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::new(self.base_config.encoding.config().input_type() & DataType::Log)
     }

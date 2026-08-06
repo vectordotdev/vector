@@ -11,8 +11,7 @@ use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     http::HttpClient,
     sinks::{
@@ -153,10 +152,6 @@ impl GenerateConfig for HecMetricsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

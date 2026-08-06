@@ -17,8 +17,8 @@ use vrl::{path::OwnedTargetPath, value::Kind};
 use super::{Memory, internal_events::InternalMetricsConfig, source::EXPIRED_ROUTE};
 use crate::{
     config::{
-        DynValidatedSink, EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig,
-        SourceContext, SourceOutput, ValidatedSink,
+        EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+        ValidatedSink,
     },
     enrichment_tables::memory::{
         bloom_table::{BloomMemoryConfig, BloomMemoryTable},
@@ -319,10 +319,6 @@ impl EnrichmentTableConfig for MemoryConfig {
 #[async_trait]
 #[typetag::serde(name = "memory_enrichment_table")]
 impl SinkConfig for MemoryConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::log()
     }

@@ -9,9 +9,7 @@ use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
     codecs::{EncodingConfig, Transformer},
     common::http::server_auth::HttpServerAuthConfig,
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -149,10 +147,6 @@ impl Default for WebSocketListenerSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket_server")]
 impl SinkConfig for WebSocketListenerSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type())
     }

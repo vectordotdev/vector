@@ -17,7 +17,7 @@ use super::{
     sink::StackdriverLogsSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
@@ -248,10 +248,6 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

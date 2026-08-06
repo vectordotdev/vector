@@ -4,7 +4,7 @@ use super::sink::DorisSink;
 
 use crate::{
     codecs::EncodingConfigWithFraming,
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient},
     sinks::{
         doris::{
@@ -153,10 +153,6 @@ impl_generate_config_from_default!(DorisConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "doris")]
 impl SinkConfig for DorisConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

@@ -13,7 +13,7 @@ use super::{
     sink::PostgresSink,
 };
 use crate::{
-    config::{DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink},
+    config::{Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         util::{
@@ -89,10 +89,6 @@ impl GenerateConfig for PostgresConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "postgres")]
 impl SinkConfig for PostgresConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

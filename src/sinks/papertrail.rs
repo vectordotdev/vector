@@ -6,8 +6,8 @@ use vrl::value::Kind;
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -70,10 +70,6 @@ impl GenerateConfig for PapertrailConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty().optional_meaning("host", Kind::bytes());
 

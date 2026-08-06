@@ -11,7 +11,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{DynValidatedSink, SinkConfig, SinkContext, ValidatedSink},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -36,10 +36,6 @@ impl OneshotSinkConfig {
 #[async_trait]
 #[typetag::serde(name = "test_oneshot")]
 impl SinkConfig for OneshotSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

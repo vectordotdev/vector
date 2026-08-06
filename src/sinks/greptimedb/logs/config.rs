@@ -7,7 +7,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
@@ -137,10 +137,6 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

@@ -11,9 +11,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
@@ -120,10 +118,6 @@ impl_generate_config_from_default!(InfluxDbConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }

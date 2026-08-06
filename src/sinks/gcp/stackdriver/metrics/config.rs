@@ -8,7 +8,7 @@ use super::{
     sink::StackdriverMetricsSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
@@ -98,10 +98,6 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }

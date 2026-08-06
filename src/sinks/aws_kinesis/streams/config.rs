@@ -13,10 +13,7 @@ use super::{
 };
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, ProxyConfig, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck, VectorSink,
         prelude::*,
@@ -120,10 +117,6 @@ impl KinesisStreamsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisStreamsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         self.base.input()
     }

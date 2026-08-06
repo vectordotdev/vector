@@ -8,8 +8,7 @@ use super::Region;
 use crate::{
     codecs::Transformer,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::EventArray,
     sinks::{
@@ -81,10 +80,6 @@ const EU_ENDPOINT: &str = "https://logsene-receiver.eu.sematext.com";
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::log()
     }

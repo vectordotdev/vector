@@ -10,8 +10,7 @@ use super::{
 use crate::{
     common::datadog,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     http::HttpClient,
     sinks::{
@@ -92,10 +91,6 @@ impl DatadogEventsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .required_meaning("message", Kind::bytes())

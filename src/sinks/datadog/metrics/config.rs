@@ -12,9 +12,7 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
         Healthcheck, UriParseSnafu, VectorSink,
@@ -198,10 +196,6 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }

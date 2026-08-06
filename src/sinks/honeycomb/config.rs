@@ -11,7 +11,7 @@ use super::{
     service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         prelude::*,
@@ -104,10 +104,6 @@ impl GenerateConfig for HoneycombConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 

@@ -35,8 +35,8 @@ use vector_lib::{
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, Resource, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     event::{
         Event, EventStatus, Finalizable,
@@ -194,10 +194,6 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }

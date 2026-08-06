@@ -6,7 +6,7 @@ use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 
 use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -185,10 +185,6 @@ impl GenerateConfig for NatsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "nats")]
 impl SinkConfig for NatsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

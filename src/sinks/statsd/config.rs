@@ -13,7 +13,7 @@ use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink:
 #[cfg(unix)]
 use crate::sinks::util::service::net::UnixConnectorConfig;
 use crate::{
-    config::{DynValidatedSink, SinkConfig, SinkContext, ValidatedSink},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     internal_events::SocketMode,
     sinks::{
         Healthcheck,
@@ -122,10 +122,6 @@ impl GenerateConfig for StatsdSinkConfig {
 #[async_trait]
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }

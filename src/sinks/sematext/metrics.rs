@@ -15,8 +15,7 @@ use super::Region;
 use crate::{
     Result,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{
         Event, KeyString,
@@ -128,10 +127,6 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }

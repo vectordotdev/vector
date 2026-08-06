@@ -6,8 +6,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::{Healthcheck, VectorSink, blackhole::sink::BlackholeSink},
 };
@@ -54,10 +53,6 @@ pub struct BlackholeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

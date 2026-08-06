@@ -10,8 +10,8 @@ use vector_lib::{
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     http::Auth as HttpAuthConfig,
     sinks::{
@@ -153,10 +153,6 @@ impl GenerateConfig for AxiomConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "axiom")]
 impl SinkConfig for AxiomConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

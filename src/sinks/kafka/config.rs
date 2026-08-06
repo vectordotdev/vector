@@ -10,7 +10,7 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
@@ -286,10 +286,6 @@ impl GenerateConfig for KafkaSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

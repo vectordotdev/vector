@@ -25,7 +25,7 @@ use crate::aws::AwsAuthentication;
 use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -241,10 +241,6 @@ pub(super) fn validate_payload_wrapper(
 #[async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

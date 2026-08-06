@@ -9,7 +9,7 @@ use super::{
     healthcheck, service::NewRelicApiRequest,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{prelude::*, util::service::TowerRequestSettings},
 };
@@ -130,10 +130,6 @@ impl NewRelicConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Metric)
     }

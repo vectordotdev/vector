@@ -30,7 +30,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{DynValidatedSink, GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     schema,
@@ -303,10 +303,6 @@ pub enum ChronicleError {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirement =
             schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());

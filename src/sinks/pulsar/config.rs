@@ -18,7 +18,7 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     schema,
     sinks::{
         prelude::*,
@@ -394,10 +394,6 @@ impl GenerateConfig for PulsarSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

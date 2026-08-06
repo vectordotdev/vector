@@ -10,9 +10,7 @@ use vector_lib::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
@@ -79,10 +77,6 @@ impl GenerateConfig for OpenTelemetryConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "opentelemetry")]
 impl SinkConfig for OpenTelemetryConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         match &self.protocol {
             Protocol::Http(config) => Some(&config.confinement),

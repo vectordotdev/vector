@@ -11,7 +11,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{DynValidatedSink, SinkConfig, SinkContext, ValidatedSink},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -40,10 +40,6 @@ impl CompletionSinkConfig {
 #[async_trait]
 #[typetag::serde(name = "test_completion")]
 impl SinkConfig for CompletionSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

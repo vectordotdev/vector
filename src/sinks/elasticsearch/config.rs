@@ -13,10 +13,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, Input, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{EventRef, LogEvent, Value},
     http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
@@ -731,10 +728,6 @@ fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

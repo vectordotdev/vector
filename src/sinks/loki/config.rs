@@ -7,7 +7,7 @@ use super::{
     sink::{LokiSink, confine_template_map},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{
@@ -224,10 +224,6 @@ impl LokiConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

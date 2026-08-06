@@ -11,9 +11,7 @@ use crate::{
         ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
         TlsSnafu,
     },
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
     template::{ConfinementConfig, Template},
     tls::MaybeTlsSettings,
@@ -117,10 +115,6 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

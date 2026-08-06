@@ -11,7 +11,7 @@ use super::{
     sink::KeepSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         prelude::*,
@@ -92,10 +92,6 @@ impl GenerateConfig for KeepConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "keep")]
 impl SinkConfig for KeepConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 

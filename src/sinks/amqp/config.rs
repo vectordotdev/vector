@@ -7,10 +7,7 @@ use vector_lib::{
 
 use super::{channel::AmqpSinkChannels, sink::AmqpSink};
 use crate::{
-    amqp::AmqpConfig,
-    config::{DynValidatedSink, ValidatedSink},
-    sinks::prelude::*,
-    template::ConfinementConfig,
+    amqp::AmqpConfig, config::ValidatedSink, sinks::prelude::*, template::ConfinementConfig,
 };
 
 /// AMQP properties configuration.
@@ -139,10 +136,6 @@ impl GenerateConfig for AmqpSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

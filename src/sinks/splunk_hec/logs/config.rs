@@ -8,7 +8,7 @@ use vector_lib::{
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         prelude::*,
@@ -254,10 +254,6 @@ impl HecLogsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

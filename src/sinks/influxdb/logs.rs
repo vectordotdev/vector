@@ -20,8 +20,7 @@ use super::{
 use crate::{
     codecs::Transformer,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
     http::HttpClient,
@@ -161,10 +160,6 @@ impl GenerateConfig for InfluxDbLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirements = schema::Requirement::empty()
             .optional_meaning("message", Kind::bytes())

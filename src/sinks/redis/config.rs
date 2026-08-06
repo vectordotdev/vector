@@ -9,7 +9,7 @@ use super::{
     sink::{RedisConnection, RedisSink},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -201,10 +201,6 @@ impl GenerateConfig for RedisSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "redis")]
 impl SinkConfig for RedisSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

@@ -11,8 +11,7 @@ use vector_lib::{
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::{Healthcheck, VectorSink, console::sink::WriterSink},
 };
@@ -78,10 +77,6 @@ impl GenerateConfig for ConsoleSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type())
     }

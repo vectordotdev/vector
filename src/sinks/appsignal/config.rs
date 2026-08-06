@@ -16,7 +16,7 @@ use super::{
 };
 use crate::{
     codecs::Transformer,
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         BuildError, Healthcheck, HealthcheckError, VectorSink,
@@ -136,10 +136,6 @@ impl_generate_config_from_default!(AppsignalConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "appsignal")]
 impl SinkConfig for AppsignalConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
     }

@@ -31,10 +31,7 @@ use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
 use super::{AdaptiveConcurrencySettings, controller::ControllerStatistics};
 use crate::{
-    config::{
-        self, AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{Event, metric::MetricValue},
     metrics,
     sinks::{
@@ -179,10 +176,6 @@ impl_generate_config_from_default!(TestConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "test_arc")]
 impl SinkConfig for TestConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

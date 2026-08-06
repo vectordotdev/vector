@@ -11,8 +11,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
@@ -137,10 +136,6 @@ impl SocketSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let encoder_input_type = match &self.mode {
             Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),

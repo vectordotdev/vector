@@ -10,7 +10,7 @@ use super::{
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         UriParseSnafu,
@@ -191,10 +191,6 @@ fn validate_headers(
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }

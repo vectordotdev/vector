@@ -31,8 +31,7 @@ use vector_lib::{
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
@@ -246,10 +245,6 @@ impl OutFile {
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

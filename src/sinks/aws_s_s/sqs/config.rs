@@ -11,8 +11,8 @@ use crate::{
     aws::{RegionOrEndpoint, create_client},
     common::sqs::SqsClientBuilder,
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
 };
 
@@ -67,10 +67,6 @@ impl SqsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::new(self.base_config.encoding.config().input_type() & DataType::Log)
     }

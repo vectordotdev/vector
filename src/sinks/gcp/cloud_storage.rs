@@ -22,8 +22,8 @@ use vector_lib::{
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
@@ -272,10 +272,6 @@ impl GenerateConfig for GcsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

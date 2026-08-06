@@ -7,7 +7,7 @@ use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
@@ -199,10 +199,6 @@ pub struct ValidatedAzureLogsIngestion {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());

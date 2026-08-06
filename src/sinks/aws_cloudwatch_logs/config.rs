@@ -14,8 +14,8 @@ use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     codecs::{Encoder, EncodingConfig},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -209,10 +209,6 @@ impl CloudwatchLogsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

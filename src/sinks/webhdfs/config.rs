@@ -10,7 +10,7 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{DynValidatedSink, GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         opendal_common::*,
@@ -105,10 +105,6 @@ impl GenerateConfig for WebHdfsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "webhdfs")]
 impl SinkConfig for WebHdfsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

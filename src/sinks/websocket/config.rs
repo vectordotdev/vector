@@ -10,8 +10,7 @@ use crate::{
     codecs::{EncodingConfig, Transformer},
     common::websocket::{ConnectSnafu, WebSocketCommonConfig, WebSocketConnector, WebSocketError},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::{Healthcheck, VectorSink, websocket::sink::WebSocketSink},
     tls::MaybeTlsSettings,
@@ -55,10 +54,6 @@ impl GenerateConfig for WebSocketSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket")]
 impl SinkConfig for WebSocketSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type())
     }

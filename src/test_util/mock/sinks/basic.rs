@@ -12,7 +12,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    config::{DynValidatedSink, SinkConfig, SinkContext, ValidatedSink},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -85,10 +85,6 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

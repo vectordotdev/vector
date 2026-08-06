@@ -14,7 +14,7 @@ use super::{
     sink::AzureMonitorLogsSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         prelude::*,
@@ -225,10 +225,6 @@ pub struct ValidatedAzureMonitorLogs {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());

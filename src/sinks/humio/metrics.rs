@@ -17,8 +17,8 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        TransformContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformContext,
+        ValidatedSink,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -161,10 +161,6 @@ impl GenerateConfig for HumioMetricsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

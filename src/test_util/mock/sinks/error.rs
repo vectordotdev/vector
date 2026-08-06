@@ -13,7 +13,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{DynValidatedSink, SinkConfig, SinkContext, ValidatedSink},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -30,10 +30,6 @@ impl_generate_config_from_default!(ErrorSinkConfig);
 #[async_trait]
 #[typetag::serde(name = "test_error")]
 impl SinkConfig for ErrorSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::log()
     }

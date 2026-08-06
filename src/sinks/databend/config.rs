@@ -21,9 +21,7 @@ use super::{
 };
 use crate::{
     codecs::{Encoder, EncodingConfig},
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::{Auth, MaybeAuth},
     sinks::{
         Healthcheck, VectorSink,
@@ -108,10 +106,6 @@ impl GenerateConfig for DatabendConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "databend")]
 impl SinkConfig for DatabendConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::log()
     }

@@ -17,8 +17,8 @@ use vector_lib::{
 use crate::{
     conditions::Condition,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, SinkConfig, SinkContext, SourceConfig,
-        SourceContext, SourceOutput, ValidatedSink,
+        AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+        ValidatedSink,
     },
     sinks::Healthcheck,
     sources,
@@ -166,10 +166,6 @@ impl_generate_config_from_default!(UnitTestSinkConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }
@@ -335,10 +331,6 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }

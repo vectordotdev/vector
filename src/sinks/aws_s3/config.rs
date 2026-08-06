@@ -20,8 +20,8 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     sinks::{
         Healthcheck,
@@ -232,10 +232,6 @@ impl GenerateConfig for S3SinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

@@ -10,7 +10,7 @@ use vrl::value::Kind;
 use hyper::{Body, client::connect::Connect};
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
-use crate::config::{DynValidatedSink, ValidatedSink};
+use crate::config::ValidatedSink;
 use crate::{
     common::datadog,
     http::HttpClient,
@@ -185,10 +185,6 @@ impl DatadogLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .optional_meaning(meaning::MESSAGE, Kind::bytes())

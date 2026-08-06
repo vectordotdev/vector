@@ -15,8 +15,8 @@ use super::{
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -122,10 +122,6 @@ impl KinesisFirehoseSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         self.base.input()
     }

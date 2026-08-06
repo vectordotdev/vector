@@ -9,8 +9,8 @@ use super::config_host_key_target_path;
 use crate::{
     codecs::EncodingConfig,
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -182,10 +182,6 @@ impl GenerateConfig for HumioLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

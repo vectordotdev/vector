@@ -1,7 +1,7 @@
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     sinks::{
         greptimedb::{
             GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
@@ -33,10 +33,6 @@ impl GenerateConfig for GreptimeDBConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "greptimedb")]
 impl SinkConfig for GreptimeDBConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         self.0.input()
     }
@@ -153,10 +149,6 @@ impl_generate_config_from_default!(GreptimeDBMetricsConfig);
 #[typetag::serde(name = "greptimedb_metrics")]
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBMetricsConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
