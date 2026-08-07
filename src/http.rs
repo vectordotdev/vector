@@ -59,6 +59,7 @@ pub mod http_1 {
     use snafu::{ResultExt, Snafu};
     use tracing::Instrument;
 
+    use super::{TlsProxyAuthorities, tls_proxy_authority};
     use crate::{
         config::http_1::ProxyConfig,
         internal_events::http_client::http_1 as http_client,
@@ -205,11 +206,37 @@ pub mod http_1 {
         tls_settings: MaybeTlsSettings,
         proxy_config: &ProxyConfig,
     ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+        // The inner connector dials the proxy for proxied requests and the destination directly for
+        // `no_proxy` requests. Apply `tls.server_name` only to destination connections.
+        let proxy_authorities = if proxy_config.enabled {
+            TlsProxyAuthorities {
+                http: tls_proxy_authority(proxy_config.http.as_deref()),
+                https: tls_proxy_authority(proxy_config.https.as_deref()),
+            }
+        } else {
+            TlsProxyAuthorities::default()
+        };
+
+        // The override still cannot be applied to the tunneled destination TLS connection because
+        // `hyper-proxy2` verifies it against the destination URL host.
+        if proxy_config.enabled
+            && (proxy_config.http.is_some() || proxy_config.https.is_some())
+            && let Some(tls) = tls_settings.tls()
+            && tls.server_name().is_some()
+            && tls.verify_hostname()
+        {
+            tracing::warn!(
+                message = "`tls.server_name` is set with hostname verification enabled, but a proxy is configured. \
+                           `server_name` is not applied to proxied (tunneled) TLS connections, so certificate \
+                           verification may fail with a hostname mismatch."
+            );
+        }
+
         // Create dedicated TLS connector for the proxied connection with user TLS settings.
         let tls = tls_connector_builder(&tls_settings)
             .context(BuildTlsConnectorSnafu)?
             .build();
-        let https = build_tls_connector(tls_settings)?;
+        let https = build_https_connector(tls_settings, proxy_authorities)?;
         let mut proxy = ProxyConnector::new(https).unwrap();
         // Make proxy connector aware of user TLS settings by setting the TLS connector:
         // https://github.com/vectordotdev/vector/issues/13683
@@ -223,6 +250,13 @@ pub mod http_1 {
     pub fn build_tls_connector(
         tls_settings: MaybeTlsSettings,
     ) -> Result<HttpsConnector<HttpConnector>, HttpError> {
+        build_https_connector(tls_settings, TlsProxyAuthorities::default())
+    }
+
+    fn build_https_connector(
+        tls_settings: MaybeTlsSettings,
+        proxy_authorities: TlsProxyAuthorities,
+    ) -> Result<HttpsConnector<HttpConnector>, HttpError> {
         let mut http = HttpConnector::new();
         http.enforce_http(false);
 
@@ -231,9 +265,11 @@ pub mod http_1 {
             HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
 
         let settings = tls_settings.tls().cloned();
-        https.set_callback(move |c, _uri| {
+        https.set_callback(move |c, uri| {
             if let Some(settings) = &settings {
-                settings.apply_connect_configuration(c)
+                let skip_server_name =
+                    proxy_authorities.matches_authority(uri.host(), uri.port_u16());
+                settings.apply_connect_configuration(c, skip_server_name)
             } else {
                 Ok(())
             }
@@ -588,17 +624,21 @@ struct TlsProxyAuthorities {
 }
 
 impl TlsProxyAuthorities {
-    fn matches(&self, uri: &http::Uri) -> bool {
+    fn matches_authority(&self, host: Option<&str>, port: Option<u16>) -> bool {
         if self.http.is_none() && self.https.is_none() {
             return false;
         }
-        let target = (uri.host(), uri.port_u16());
+        let target = (host, port);
         let matches_one = |authority: &Option<(String, Option<u16>)>| {
             authority
                 .as_ref()
                 .is_some_and(|(host, port)| target.0 == Some(host.as_str()) && target.1 == *port)
         };
         matches_one(&self.http) || matches_one(&self.https)
+    }
+
+    fn matches(&self, uri: &http::Uri) -> bool {
+        self.matches_authority(uri.host(), uri.port_u16())
     }
 }
 

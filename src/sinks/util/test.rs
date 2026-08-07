@@ -91,32 +91,34 @@ pub fn build_test_http_1_server_status(
             let tx = tx.clone();
             let status = status;
             tokio::spawn(async move {
-                let _ = hyper_1::server::conn::http1::Builder::new()
-                    .serve_connection(
-                        io,
-                        hyper_1::service::service_fn(
-                            move |req: http_1::Request<hyper_1::body::Incoming>| {
-                                let mut tx = tx.clone();
-                                async move {
-                                    let (parts, body) = req.into_parts();
-                                    if status.is_success() {
-                                        let bytes = http_body_util::BodyExt::collect(body)
-                                            .await
-                                            .unwrap()
-                                            .to_bytes();
-                                        tx.send((parts, bytes)).await.unwrap();
+                drop(
+                    hyper_1::server::conn::http1::Builder::new()
+                        .serve_connection(
+                            io,
+                            hyper_1::service::service_fn(
+                                move |req: http_1::Request<hyper_1::body::Incoming>| {
+                                    let mut tx = tx.clone();
+                                    async move {
+                                        let (parts, body) = req.into_parts();
+                                        if status.is_success() {
+                                            let bytes = http_body_util::BodyExt::collect(body)
+                                                .await
+                                                .unwrap()
+                                                .to_bytes();
+                                            tx.send((parts, bytes)).await.unwrap();
+                                        }
+                                        Ok::<_, std::convert::Infallible>(
+                                            http_1::Response::builder()
+                                                .status(status)
+                                                .body(Empty::<Bytes>::new())
+                                                .unwrap(),
+                                        )
                                     }
-                                    Ok::<_, std::convert::Infallible>(
-                                        http_1::Response::builder()
-                                            .status(status)
-                                            .body(Empty::<Bytes>::new())
-                                            .unwrap(),
-                                    )
-                                }
-                            },
-                        ),
-                    )
-                    .await;
+                                },
+                            ),
+                        )
+                        .await,
+                );
             });
         }
         Ok(())

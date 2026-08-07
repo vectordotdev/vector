@@ -128,8 +128,10 @@ pub mod http_1 {
     };
     use hyper_1::body::Body;
     use hyper_util::client::legacy::Error;
-    use metrics::{counter, histogram};
-    use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+    use vector_lib::{
+        counter, histogram,
+        internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
+    };
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct AboutToSendHttpRequest<'a, T> {
@@ -161,8 +163,8 @@ pub mod http_1 {
                 headers = ?remove_sensitive(self.request.headers()),
                 body = %FormatBody(self.request.body()),
             );
-            counter!("http_client_requests_sent_total", "method" => self.request.method().to_string())
-            .increment(1);
+            counter!(CounterName::HttpClientRequestsSentTotal, "method" => self.request.method().to_string())
+                .increment(1);
         }
     }
 
@@ -181,15 +183,13 @@ pub mod http_1 {
                 headers = ?remove_sensitive(self.response.headers()),
                 body = %FormatBody(self.response.body()),
             );
-            counter!(
-                "http_client_responses_total",
-                "status" => self.response.status().as_u16().to_string(),
-            )
-            .increment(1);
-            histogram!("http_client_rtt_seconds").record(self.roundtrip);
+            let status = self.response.status().as_u16().to_string();
+            counter!(CounterName::HttpClientResponsesTotal, "status" => status.clone())
+                .increment(1);
+            histogram!(HistogramName::HttpClientRttSeconds).record(self.roundtrip);
             histogram!(
-                "http_client_response_rtt_seconds",
-                "status" => self.response.status().as_u16().to_string(),
+                HistogramName::HttpClientResponseRttSeconds,
+                "status" => status,
             )
             .record(self.roundtrip);
         }
@@ -209,10 +209,10 @@ pub mod http_1 {
                 error_type = error_type::REQUEST_FAILED,
                 stage = error_stage::PROCESSING,
             );
-            counter!("http_client_errors_total", "error_kind" => self.error.to_string())
+            counter!(CounterName::HttpClientErrorsTotal, "error_kind" => self.error.to_string())
                 .increment(1);
-            histogram!("http_client_rtt_seconds").record(self.roundtrip);
-            histogram!("http_client_error_rtt_seconds", "error_kind" => self.error.to_string())
+            histogram!(HistogramName::HttpClientRttSeconds).record(self.roundtrip);
+            histogram!(HistogramName::HttpClientErrorRttSeconds, "error_kind" => self.error.to_string())
                 .record(self.roundtrip);
         }
     }
