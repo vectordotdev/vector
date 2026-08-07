@@ -14,13 +14,11 @@ generated: configuration: {
 						Vector in a Docker container, bind to `0.0.0.0`. Otherwise
 						the API will not be exposed outside the container.
 						"""
-					common:   true
 					required: false
 				}
 				enabled: {
 					type: bool: default: false
 					description: "Whether the API is enabled for this Vector instance."
-					common:      true
 					required:    false
 				}
 			}
@@ -1004,7 +1002,6 @@ generated: configuration: {
 					}
 				}
 				description: "A secret backend."
-				common:      false
 				required:    true
 			}
 			description: "All configured secrets backends."
@@ -1519,7 +1516,6 @@ generated: configuration: {
 
 				[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 				"""
-			common:   true
 			required: false
 			group:    "global_options"
 		}
@@ -1554,8 +1550,7 @@ generated: configuration: {
 
 				Vector must have write permissions to this directory.
 				"""
-			common: false
-			group:  "global_options"
+			group: "global_options"
 		}
 		expire_metrics_per_metric_set: {
 			type: array: items: type: object: options: {
@@ -1658,7 +1653,6 @@ generated: configuration: {
 				Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
 				so metrics live long enough to be emitted and captured.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1728,7 +1722,6 @@ generated: configuration: {
 				This is used if a component does not have its own specific log schema. All events use a log
 				schema, whether or not the default is used, to assign event fields on incoming events.
 				"""
-			common:   false
 			required: false
 			warnings: ["These settings are ignored when `schema.log_namespace` is set to `true`."]
 			group: "schema"
@@ -1801,7 +1794,6 @@ generated: configuration: {
 				to use based on the type of traffic being proxied. You can also set specific hosts that
 				should not be proxied.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1836,7 +1828,6 @@ generated: configuration: {
 				Determines whether `source` and `service` tags should be emitted with the
 				`component_sent_*` and `component_received_*` events.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1852,8 +1843,7 @@ generated: configuration: {
 
 				[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 				"""
-			common: false
-			group:  "global_options"
+			group: "global_options"
 		}
 		wildcard_matching: {
 			type: string: enum: {
@@ -1866,7 +1856,6 @@ generated: configuration: {
 				Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
 				to be accepted without causing an error.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}

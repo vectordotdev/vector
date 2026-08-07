@@ -18,7 +18,6 @@ components: sinks: loki: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    1_000_000
 				max_events:   100_000
 				timeout_secs: 1.0

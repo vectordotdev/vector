@@ -93,7 +93,6 @@ pub struct GreptimeDBLogsConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to GreptimeDB.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "extra_params_examples()"))]
     pub extra_params: Option<HashMap<String, String>>,
@@ -101,7 +100,6 @@ pub struct GreptimeDBLogsConfig {
     /// Custom headers to add to the HTTP request sent to GreptimeDB.
     /// Note that these headers will override the existing headers.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "Extra header key-value pairs."
     ))]

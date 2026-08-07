@@ -60,11 +60,9 @@ pub struct PrometheusRemoteWriteConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
 
     /// Defines the behavior for handling conflicting metric metadata.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
@@ -80,7 +78,6 @@ pub struct PrometheusRemoteWriteConfig {
     ///
     /// When enabled, any metric sample with a NaN value will be filtered out
     /// during parsing, preventing downstream processing of invalid metrics.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     skip_nan_values: bool,
 }
