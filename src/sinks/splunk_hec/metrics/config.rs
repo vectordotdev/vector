@@ -72,7 +72,6 @@ pub struct HecMetricsSinkConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "config_host_key")]
     pub host_key: OptionalValuePath,
 
@@ -85,7 +84,6 @@ pub struct HecMetricsSinkConfig {
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk defaults to `httpevent`.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
@@ -94,7 +92,6 @@ pub struct HecMetricsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector sets it.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::examples = "{{ file }}",
         docs::examples = "/var/log/syslog",
