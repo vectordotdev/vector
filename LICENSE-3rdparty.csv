@@ -362,6 +362,7 @@ hyper-http-proxy,https://github.com/metalbear-co/hyper-http-proxy,MIT,MetalBear 
 hyper-named-pipe,https://github.com/fussybeaver/hyper-named-pipe,Apache-2.0,The hyper-named-pipe Authors
 hyper-openssl,https://github.com/sfackler/hyper-openssl,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 hyper-proxy,https://github.com/tafia/hyper-proxy,MIT,Johann Tuffe <tafia973@gmail.com>
+hyper-proxy2,https://github.com/siketyan/hyper-proxy2,MIT,Natsuki Ikeguchi <me@s6n.jp>
 hyper-rustls,https://github.com/rustls/hyper-rustls,Apache-2.0 OR ISC OR MIT,The hyper-rustls Authors
 hyper-timeout,https://github.com/hjr3/hyper-timeout,MIT OR Apache-2.0,Herman J. Radtke III <herman@hermanradtke.com>
 hyper-tls,https://github.com/hyperium/hyper-tls,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
@@ -909,6 +910,7 @@ windows-interface,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The 
 windows-link,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-link,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-link Authors
 windows-numerics,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,The windows-numerics Authors
+windows-registry,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-result,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft
 windows-service,https://github.com/mullvad/windows-service-rs,MIT OR Apache-2.0,Mullvad VPN
 windows-strings,https://github.com/microsoft/windows-rs,MIT OR Apache-2.0,Microsoft

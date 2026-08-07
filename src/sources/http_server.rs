@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use http::StatusCode;
+use http::{HeaderMap, StatusCode};
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vector_lib::{
@@ -17,7 +17,6 @@ use vector_lib::{
     schema::Definition,
 };
 use vrl::value::{Kind, kind::Collection};
-use warp::http::HeaderMap;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -27,7 +26,7 @@ use crate::{
         SourceOutput,
     },
     event::Event,
-    http::KeepaliveConfig,
+    http::{KeepaliveConfig, http_1::IntoHttp1},
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         Encoding, HttpSource,
@@ -495,7 +494,7 @@ impl HttpSource for SimpleHttpSource {
         add_headers(
             events,
             &self.headers,
-            headers,
+            &headers.into_http_1(),
             self.log_namespace,
             SimpleHttpConfig::NAME,
         );
@@ -555,8 +554,9 @@ mod tests {
         write::{GzEncoder, ZlibEncoder},
     };
     use futures::Stream;
-    use headers::{Authorization, authorization::Credentials};
-    use http::{HeaderMap, Method, StatusCode, Uri, header::AUTHORIZATION};
+    use headers_04::{Authorization, authorization::Credentials};
+    use http::{StatusCode, Uri};
+    use http_1::{HeaderMap, Method, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::{
