@@ -102,8 +102,10 @@ cargo nextest run --workspace --no-default-features --features "${FEATURES}"
 
 ```bash
 # See available integration tests:
-# cargo vdev int show
-./scripts/run-integration-test.sh <integration-name>
+cargo vdev int show
+
+# Run a specific integration test
+cargo vdev integration run <integration-name>
 ```
 
 See [Integration Tests](#integration-tests) section below for more details.
@@ -116,7 +118,7 @@ make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
 make check-generated-docs     # Check generated documentation
-./scripts/check_changelog_fragments.sh  # Verify changelog
+make check-changelog-fragments  # Verify changelog
 ```
 
 ### Website/Docs Development (Separate Process)
@@ -184,8 +186,7 @@ make check-fmt
 make check-clippy
 make check-markdown
 make check-generated-docs
-
-./scripts/check_changelog_fragments.sh
+make check-changelog-fragments
 ```
 
 Then: `chmod +x .git/hooks/pre-push`
@@ -268,6 +269,18 @@ make build-licenses
 
 - **Commit messages:** Do NOT include co-authoring information from coding agents (i.e. avoid "Co-Authored-By: Claude" attribution)
 - **Pull requests:** Do NOT add "Generated with Claude Code" or similar footers — keep PR descriptions focused on the technical changes
+
+### Preserve Open Pull Request History
+
+Before rewriting a branch that has been pushed, use `gh` when available to check whether the branch has an open pull request:
+
+```bash
+gh pr list --head "$(git branch --show-current)" --state open --json number,url
+```
+
+If `gh` is unavailable or the check fails, assume an open pull request exists.
+
+When an open pull request exists, never rewrite published commits or force-push the branch. Push additional commits normally to preserve incremental review.
 
 ## Creating Pull Requests
 

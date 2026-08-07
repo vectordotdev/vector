@@ -241,16 +241,32 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         input_definitions: &[(OutputId, schema::Definition)],
     ) -> Vec<TransformOutput>;
 
-    /// Validates that the configuration of the transform is valid.
+    /// Validates structural constraints on the transform configuration that do not require
+    /// environment resources: reserved output names, duplicate route names, invalid sample
+    /// rates, and similar config-level checks.
     ///
-    /// This would generally be where logical conditions were checked, such as ensuring a transform
-    /// isn't using a named output that matches a reserved output name, and so on.
+    /// Called during config compilation so errors are reported on both `vector validate`
+    /// and normal startup/reload. This is the first validation phase, run before any
+    /// context-dependent checks.
     ///
     /// # Errors
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
+    /// Validates the transform configuration against the schema and enrichment context.
+    /// Compiles VRL programs, builds conditions, and resolves enrichment table references.
+    /// Only called from `vector validate` (via `validate_transforms`), not during normal startup
+    /// because `build()` performs equivalent checks with real resources.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate_with_context(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
         Ok(())
     }
 

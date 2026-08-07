@@ -406,6 +406,7 @@ mod test {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{enrichment::TableRegistry, lookup::owned_value_path};
+    use vrl::event_path;
     use vrl::value::Kind;
 
     use super::*;
@@ -418,15 +419,13 @@ mod test {
 
     #[tokio::test]
     async fn reduce_from_condition() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -464,33 +463,33 @@ group_by = [ "request_id" ]
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test message 1");
-            e_1.insert("counter", 1);
-            e_1.insert("request_id", "1");
+            e_1.insert(event_path!("counter"), 1);
+            e_1.insert(event_path!("request_id"), "1");
             let mut metadata_1 = e_1.metadata().clone();
             metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
 
             let mut e_2 = LogEvent::from("test message 2");
-            e_2.insert("counter", 2);
-            e_2.insert("request_id", "2");
+            e_2.insert(event_path!("counter"), 2);
+            e_2.insert(event_path!("request_id"), "2");
             let mut metadata_2 = e_2.metadata().clone();
             metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_2.set_schema_definition(&Arc::new(new_schema_definition.clone()));
 
             let mut e_3 = LogEvent::from("test message 3");
-            e_3.insert("counter", 3);
-            e_3.insert("request_id", "1");
+            e_3.insert(event_path!("counter"), 3);
+            e_3.insert(event_path!("request_id"), "1");
 
             let mut e_4 = LogEvent::from("test message 4");
-            e_4.insert("counter", 4);
-            e_4.insert("request_id", "1");
-            e_4.insert("test_end", "yep");
+            e_4.insert(event_path!("counter"), 4);
+            e_4.insert(event_path!("request_id"), "1");
+            e_4.insert(event_path!("test_end"), "yep");
 
             let mut e_5 = LogEvent::from("test message 5");
-            e_5.insert("counter", 5);
-            e_5.insert("request_id", "2");
-            e_5.insert("extra_field", "value1");
-            e_5.insert("test_end", "yep");
+            e_5.insert(event_path!("counter"), 5);
+            e_5.insert(event_path!("request_id"), "2");
+            e_5.insert(event_path!("extra_field"), "value1");
+            e_5.insert(event_path!("test_end"), "yep");
 
             for event in [e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()] {
                 tx.send(event).await.unwrap();
@@ -522,19 +521,17 @@ group_by = [ "request_id" ]
 
     #[tokio::test]
     async fn reduce_merge_strategies() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-merge_strategies.foo = "concat"
-merge_strategies.bar = "array"
-merge_strategies.baz = "max"
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            merge_strategies:
+              foo: concat
+              bar: array
+              baz: max
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -553,28 +550,28 @@ merge_strategies.baz = "max"
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test message 1");
-            e_1.insert("foo", "first foo");
-            e_1.insert("bar", "first bar");
-            e_1.insert("baz", 2);
-            e_1.insert("request_id", "1");
+            e_1.insert(event_path!("foo"), "first foo");
+            e_1.insert(event_path!("bar"), "first bar");
+            e_1.insert(event_path!("baz"), 2);
+            e_1.insert(event_path!("request_id"), "1");
             let mut metadata = e_1.metadata().clone();
             metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata.set_schema_definition(&Arc::new(new_schema_definition.clone()));
             tx.send(e_1.into()).await.unwrap();
 
             let mut e_2 = LogEvent::from("test message 2");
-            e_2.insert("foo", "second foo");
-            e_2.insert("bar", 2);
-            e_2.insert("baz", "not number");
-            e_2.insert("request_id", "1");
+            e_2.insert(event_path!("foo"), "second foo");
+            e_2.insert(event_path!("bar"), 2);
+            e_2.insert(event_path!("baz"), "not number");
+            e_2.insert(event_path!("request_id"), "1");
             tx.send(e_2.into()).await.unwrap();
 
             let mut e_3 = LogEvent::from("test message 3");
-            e_3.insert("foo", 10);
-            e_3.insert("bar", "third bar");
-            e_3.insert("baz", 3);
-            e_3.insert("request_id", "1");
-            e_3.insert("test_end", "yep");
+            e_3.insert(event_path!("foo"), 10);
+            e_3.insert(event_path!("bar"), "third bar");
+            e_3.insert(event_path!("baz"), 3);
+            e_3.insert(event_path!("request_id"), "1");
+            e_3.insert(event_path!("test_end"), "yep");
             tx.send(e_3.into()).await.unwrap();
 
             let output_1 = out.recv().await.unwrap().into_log();
@@ -596,15 +593,13 @@ merge_strategies.baz = "max"
 
     #[tokio::test]
     async fn missing_group_by() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -622,35 +617,35 @@ group_by = [ "request_id" ]
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test message 1");
-            e_1.insert("counter", 1);
-            e_1.insert("request_id", "1");
+            e_1.insert(event_path!("counter"), 1);
+            e_1.insert(event_path!("request_id"), "1");
             let mut metadata_1 = e_1.metadata().clone();
             metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
             tx.send(e_1.into()).await.unwrap();
 
             let mut e_2 = LogEvent::from("test message 2");
-            e_2.insert("counter", 2);
+            e_2.insert(event_path!("counter"), 2);
             let mut metadata_2 = e_2.metadata().clone();
             metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_2.set_schema_definition(&Arc::new(new_schema_definition));
             tx.send(e_2.into()).await.unwrap();
 
             let mut e_3 = LogEvent::from("test message 3");
-            e_3.insert("counter", 3);
-            e_3.insert("request_id", "1");
+            e_3.insert(event_path!("counter"), 3);
+            e_3.insert(event_path!("request_id"), "1");
             tx.send(e_3.into()).await.unwrap();
 
             let mut e_4 = LogEvent::from("test message 4");
-            e_4.insert("counter", 4);
-            e_4.insert("request_id", "1");
-            e_4.insert("test_end", "yep");
+            e_4.insert(event_path!("counter"), 4);
+            e_4.insert(event_path!("request_id"), "1");
+            e_4.insert(event_path!("test_end"), "yep");
             tx.send(e_4.into()).await.unwrap();
 
             let mut e_5 = LogEvent::from("test message 5");
-            e_5.insert("counter", 5);
-            e_5.insert("extra_field", "value1");
-            e_5.insert("test_end", "yep");
+            e_5.insert(event_path!("counter"), 5);
+            e_5.insert(event_path!("extra_field"), "value1");
+            e_5.insert(event_path!("test_end"), "yep");
             tx.send(e_5.into()).await.unwrap();
 
             let output_1 = out.recv().await.unwrap().into_log();
@@ -673,14 +668,14 @@ group_by = [ "request_id" ]
 
     #[tokio::test]
     async fn max_events_0() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "id" ]
-merge_strategies.id = "retain"
-merge_strategies.message = "array"
-max_events = 0
-            "#,
-        );
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: retain
+              message: array
+            max_events: 0
+        "});
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
@@ -693,27 +688,27 @@ max_events = 0
 
     #[tokio::test]
     async fn max_events_1() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "id" ]
-merge_strategies.id = "retain"
-merge_strategies.message = "array"
-max_events = 1
-            "#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: retain
+              message: array
+            max_events: 1
+        "})
         .unwrap();
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test 1");
-            e_1.insert("id", "1");
+            e_1.insert(event_path!("id"), "1");
 
             let mut e_2 = LogEvent::from("test 2");
-            e_2.insert("id", "1");
+            e_2.insert(event_path!("id"), "1");
 
             let mut e_3 = LogEvent::from("test 3");
-            e_3.insert("id", "1");
+            e_3.insert(event_path!("id"), "1");
 
             for event in [e_1.into(), e_2.into(), e_3.into()] {
                 tx.send(event).await.unwrap();
@@ -736,14 +731,14 @@ max_events = 1
 
     #[tokio::test]
     async fn max_events() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "id" ]
-merge_strategies.id = "retain"
-merge_strategies.message = "array"
-max_events = 3
-            "#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: retain
+              message: array
+            max_events: 3
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -751,22 +746,22 @@ max_events = 3
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test 1");
-            e_1.insert("id", "1");
+            e_1.insert(event_path!("id"), "1");
 
             let mut e_2 = LogEvent::from("test 2");
-            e_2.insert("id", "1");
+            e_2.insert(event_path!("id"), "1");
 
             let mut e_3 = LogEvent::from("test 3");
-            e_3.insert("id", "1");
+            e_3.insert(event_path!("id"), "1");
 
             let mut e_4 = LogEvent::from("test 4");
-            e_4.insert("id", "1");
+            e_4.insert(event_path!("id"), "1");
 
             let mut e_5 = LogEvent::from("test 5");
-            e_5.insert("id", "1");
+            e_5.insert(event_path!("id"), "1");
 
             let mut e_6 = LogEvent::from("test 6");
-            e_6.insert("id", "1");
+            e_6.insert(event_path!("id"), "1");
 
             for event in [
                 e_1.into(),
@@ -800,18 +795,16 @@ max_events = 3
 
     #[tokio::test]
     async fn arrays() {
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-group_by = [ "request_id" ]
-
-merge_strategies.foo = "array"
-merge_strategies.bar = "concat"
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            merge_strategies:
+              foo: array
+              bar: concat
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -830,9 +823,9 @@ merge_strategies.bar = "concat"
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("test message 1");
-            e_1.insert("foo", json!([1, 3]));
-            e_1.insert("bar", json!([1, 3]));
-            e_1.insert("request_id", "1");
+            e_1.insert(event_path!("foo"), json!([1, 3]));
+            e_1.insert(event_path!("bar"), json!([1, 3]));
+            e_1.insert(event_path!("request_id"), "1");
             let mut metadata_1 = e_1.metadata().clone();
             metadata_1.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
@@ -840,38 +833,38 @@ merge_strategies.bar = "concat"
             tx.send(e_1.into()).await.unwrap();
 
             let mut e_2 = LogEvent::from("test message 2");
-            e_2.insert("foo", json!([2, 4]));
-            e_2.insert("bar", json!([2, 4]));
-            e_2.insert("request_id", "2");
+            e_2.insert(event_path!("foo"), json!([2, 4]));
+            e_2.insert(event_path!("bar"), json!([2, 4]));
+            e_2.insert(event_path!("request_id"), "2");
             let mut metadata_2 = e_2.metadata().clone();
             metadata_2.set_upstream_id(Arc::new(OutputId::from("transform")));
             metadata_2.set_schema_definition(&Arc::new(new_schema_definition));
             tx.send(e_2.into()).await.unwrap();
 
             let mut e_3 = LogEvent::from("test message 3");
-            e_3.insert("foo", json!([5, 7]));
-            e_3.insert("bar", json!([5, 7]));
-            e_3.insert("request_id", "1");
+            e_3.insert(event_path!("foo"), json!([5, 7]));
+            e_3.insert(event_path!("bar"), json!([5, 7]));
+            e_3.insert(event_path!("request_id"), "1");
             tx.send(e_3.into()).await.unwrap();
 
             let mut e_4 = LogEvent::from("test message 4");
-            e_4.insert("foo", json!("done"));
-            e_4.insert("bar", json!("done"));
-            e_4.insert("request_id", "1");
-            e_4.insert("test_end", "yep");
+            e_4.insert(event_path!("foo"), json!("done"));
+            e_4.insert(event_path!("bar"), json!("done"));
+            e_4.insert(event_path!("request_id"), "1");
+            e_4.insert(event_path!("test_end"), "yep");
             tx.send(e_4.into()).await.unwrap();
 
             let mut e_5 = LogEvent::from("test message 5");
-            e_5.insert("foo", json!([6, 8]));
-            e_5.insert("bar", json!([6, 8]));
-            e_5.insert("request_id", "2");
+            e_5.insert(event_path!("foo"), json!([6, 8]));
+            e_5.insert(event_path!("bar"), json!([6, 8]));
+            e_5.insert(event_path!("request_id"), "2");
             tx.send(e_5.into()).await.unwrap();
 
             let mut e_6 = LogEvent::from("test message 6");
-            e_6.insert("foo", json!("done"));
-            e_6.insert("bar", json!("done"));
-            e_6.insert("request_id", "2");
-            e_6.insert("test_end", "yep");
+            e_6.insert(event_path!("foo"), json!("done"));
+            e_6.insert(event_path!("bar"), json!("done"));
+            e_6.insert(event_path!("request_id"), "2");
+            e_6.insert(event_path!("test_end"), "yep");
             tx.send(e_6.into()).await.unwrap();
 
             let output_1 = out.recv().await.unwrap().into_log();
@@ -893,18 +886,16 @@ merge_strategies.bar = "concat"
 
     #[tokio::test]
     async fn strategy_path_with_nested_fields() {
-        let reduce_config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            group_by = [ "id" ]
-
-            merge_strategies.id = "discard"
-            merge_strategies."message.a.b" = "array"
-
-            [ends_when]
-              type = "vrl"
-              source = "exists(.test_end)"
-            "#,
-        ))
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: discard
+              message.a.b: array
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -944,7 +935,7 @@ merge_strategies.bar = "concat"
 
             // Remove timestamp fields which were automatically added.
             output.remove_timestamp();
-            output.remove("timestamp_end");
+            output.remove(event_path!("timestamp_end"));
 
             assert_eq!(
                 *output.value(),
@@ -971,14 +962,13 @@ merge_strategies.bar = "concat"
 
     #[test]
     fn invalid_merge_strategies_containing_indexes() {
-        let config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            group_by = [ "id" ]
-
-            merge_strategies.id = "discard"
-            merge_strategies."nested.msg[0]" = "array"
-            "#,
-        ))
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: discard
+              'nested.msg[0]': array
+        "})
         .unwrap();
         let error = Reduce::new(
             &config,
@@ -994,18 +984,17 @@ merge_strategies.bar = "concat"
 
     #[tokio::test]
     async fn merge_objects_in_array() {
-        let config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            group_by = [ "id" ]
-            merge_strategies.events = "array"
-            merge_strategies."\"a-b\"" = "retain"
-            merge_strategies.another = "discard"
-
-            [ends_when]
-              type = "vrl"
-              source = "exists(.test_end)"
-            "#,
-        ))
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {r#"
+            group_by:
+              - id
+            merge_strategies:
+              events: array
+              '"a-b"': retain
+              another: discard
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "#})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -1022,8 +1011,8 @@ merge_strategies.bar = "concat"
             let mut e_1 = LogEvent::from(Value::from(
                 btreemap! {"id" => 777, "another" => btreemap!{ "a" => 1}},
             ));
-            e_1.insert("events", v_1.clone());
-            e_1.insert("\"a-b\"", 2);
+            e_1.insert(event_path!("events"), v_1.clone());
+            e_1.insert(&vrl::path::parse_target_path("\"a-b\"").unwrap(), 2);
             tx.send(e_1.into()).await.unwrap();
 
             let v_2 = Value::from(btreemap! {
@@ -1035,8 +1024,8 @@ merge_strategies.bar = "concat"
             let mut e_2 = LogEvent::from(Value::from(
                 btreemap! {"id" => 777, "test_end" => "done", "another" => btreemap!{ "b" => 2}},
             ));
-            e_2.insert("events", v_2.clone());
-            e_2.insert("\"a-b\"", 2);
+            e_2.insert(event_path!("events"), v_2.clone());
+            e_2.insert(&vrl::path::parse_target_path("\"a-b\"").unwrap(), 2);
             tx.send(e_2.into()).await.unwrap();
 
             let output = out.recv().await.unwrap().into_log();
@@ -1058,13 +1047,11 @@ merge_strategies.bar = "concat"
 
     #[tokio::test]
     async fn merged_quoted_path() {
-        let config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            [ends_when]
-              type = "vrl"
-              source = "exists(.test_end)"
-            "#,
-        ))
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {

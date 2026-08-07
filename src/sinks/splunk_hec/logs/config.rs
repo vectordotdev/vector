@@ -19,6 +19,7 @@ use crate::{
         },
         util::http::HttpRetryLogic,
     },
+    template::ConfinementConfig,
 };
 
 /// Configuration for the `splunk_hec_logs` sink.
@@ -151,6 +152,10 @@ pub struct HecLogsSinkConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_endpoint_target() -> EndpointTarget {
@@ -158,8 +163,8 @@ const fn default_endpoint_target() -> EndpointTarget {
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
             host_key: None,
@@ -177,18 +182,41 @@ impl GenerateConfig for HecLogsSinkConfig {
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec_logs")]
-impl SinkConfig for HecLogsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+impl HecLogsSinkConfig {
+    /// Confinement + sink construction. `component_name` is threaded into the
+    /// per-template security warnings emitted from `Template::confine`, so
+    /// wrapping sinks (Humio) see their own type in logs rather than the
+    /// delegated `splunk_hec_logs`.
+    pub(crate) fn build_with_component_type(
+        &self,
+        cx: SinkContext,
+        component_name: &'static str,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.auto_extract_timestamp.is_some() && self.endpoint_target == EndpointTarget::Raw {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
+
+        let index = self
+            .index
+            .clone()
+            .map(|t| t.confine(&self.confinement, component_name, "index"))
+            .transpose()?;
+        let source = self
+            .source
+            .clone()
+            .map(|t| t.confine(&self.confinement, component_name, "source"))
+            .transpose()?;
+        let sourcetype = self
+            .sourcetype
+            .clone()
+            .map(|t| t.confine(&self.confinement, component_name, "sourcetype"))
+            .transpose()?;
 
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
@@ -197,9 +225,21 @@ impl SinkConfig for HecLogsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = self.build_processor(client, cx)?;
+        let sink = self.build_processor(client, cx, sourcetype, source, index)?;
 
         Ok((sink, healthcheck))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec_logs")]
+impl SinkConfig for HecLogsSinkConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_with_component_type(cx, Self::NAME)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -212,7 +252,14 @@ impl SinkConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    pub fn build_processor(&self, client: HttpClient, _: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        client: HttpClient,
+        _: SinkContext,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
+    ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
@@ -261,9 +308,9 @@ impl HecLogsSinkConfig {
             service,
             request_builder,
             batch_settings,
-            sourcetype: self.sourcetype.clone(),
-            source: self.source.clone(),
-            index: self.index.clone(),
+            sourcetype,
+            source,
+            index,
             indexed_fields: self
                 .indexed_fields
                 .iter()
@@ -289,10 +336,37 @@ mod tests {
 
     use super::*;
     use crate::components::validation::prelude::*;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HecLogsSinkConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "splunk_hec_logs", "index");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "splunk_hec_logs", "index");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_index() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "splunk_hec_logs", "index");
+        assert!(result.is_ok());
     }
 
     impl ValidatableComponent for HecLogsSinkConfig {
@@ -334,6 +408,7 @@ mod tests {
                 timestamp_key: None,
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
+                confinement: ConfinementConfig::default(),
             };
 
             let endpoint = format!("{endpoint}/services/collector/raw");

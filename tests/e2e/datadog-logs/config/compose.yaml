@@ -96,7 +96,7 @@ services:
       - "/usr/bin/vector"
       - "-vvv"
       - "-c"
-      - "/home/vector/tests/e2e/datadog-logs/data/vector.toml"
+      - "/home/vector/tests/e2e/datadog-logs/data/vector.yaml"
     volumes:
       - type: bind
         source: ../../../..

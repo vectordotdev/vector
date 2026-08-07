@@ -36,13 +36,13 @@ CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
 CARGO_LLVM_COV_VERSION="0.8.4"
-WASM_PACK_VERSION="0.13.1"
+WASM_PACK_VERSION="0.15.0"
 # npm tool versions are defined in scripts/environment/npm-tools/package.json
 # and pinned (including transitive deps) in npm-tools/package-lock.json.
-VDEV_VERSION="0.3.3"
 
 ALL_MODULES=(
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -83,6 +83,7 @@ Usage: $0 [--modules=mod1,mod2,...]
 
 Modules:
   rustup
+  protoc
   cargo-deb
   cross
   cargo-nextest
@@ -122,11 +123,13 @@ contains_module() {
 }
 
 # Helper function to check version and install if needed
-# Usage: maybe_install_cargo_tool <tool-name> <version> [<version-check-pattern>]
+# Usage: maybe_install_cargo_tool <tool-name> [<version> [<version-check-pattern>]]
 # Note: cargo-* tools are invoked as "cargo <subcommand>", not as direct binaries
+# vdev omits the version argument: binstall reads it from vdev/Cargo.toml via
+# --manifest-path, which also provides the pkg-url so crates.io is not consulted.
 maybe_install_cargo_tool() {
   local tool="$1"
-  local version="$2"
+  local version="${2:-}"
   local version_pattern="${3:-${tool} ${version}}"  # Default to "tool version"
 
   if ! contains_module "$tool"; then
@@ -139,31 +142,49 @@ maybe_install_cargo_tool() {
     version_cmd="cargo ${tool#cargo-}"
   fi
 
-  # vdev fails fast on missing prebuilts so a cache/asset miss can't
-  # reintroduce the source-compile path that previously stalled a release.
-  local installer=("${install[@]}")
-  if [[ "$tool" == "vdev" && "${installer[0]}" == "binstall" ]]; then
-    installer+=(--disable-strategies compile)
+  # vdev: binstall reads the version and pkg-url from vdev/Cargo.toml via
+  # --manifest-path, so vdev/Cargo.toml is the single source of truth.
+  # `--disable-strategies compile` skips binstall's own crates.io compile
+  # fallback (which would fail anyway on an unpublished version, and
+  # silently slow-paths a cache flake into a multi-minute build). We always
+  # force the install because the version alone cannot identify the source
+  # code of an unmerged checkout. If no prebuilt binary exists, build the
+  # current checkout instead.
+  if [[ "$tool" == "vdev" ]]; then
+    local installer=("${install[@]}")
+    if [[ "${installer[0]}" == "binstall" ]]; then
+      installer+=(--force --disable-strategies compile)
+      if ! cargo "${installer[@]}" --manifest-path vdev/Cargo.toml vdev; then
+        echo "binstall failed; building vdev from the working tree..."
+        cargo install -f --path vdev --locked
+      fi
+    else
+      # binstall unavailable. `cargo install vdev` (no version) would resolve
+      # against crates.io and could pick an older version than the checkout
+      # declares; install from the working tree to match vdev/Cargo.toml.
+      cargo install -f --path vdev --locked
+    fi
+    return 0
   fi
 
   if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
     local should_install=true
     # Outside CI, preserve a newer-than-pin version the user already has.
     # `cargo install --force` would otherwise silently downgrade them.
-    if [[ -z "${CI:-}" ]]; then
+    if [[ "${CI:-}" != "true" ]]; then
       local current
       current=$($version_cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
       if [[ -n "$current" ]] && [[ "$current" != "$version" ]]; then
         local newest
         newest=$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)
         if [[ "$newest" == "$current" ]]; then
-          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=1 to force the pin."
+          echo "Keeping ${tool} ${current} (newer than pin ${version}). Set CI=true to force the pin."
           should_install=false
         fi
       fi
     fi
     if [[ "$should_install" == "true" ]]; then
-      cargo "${installer[@]}" "$tool" --version "$version" --force --locked
+      cargo "${install[@]}" "$tool" --version "$version" --force --locked
     fi
   fi
 
@@ -219,7 +240,7 @@ maybe_install_npm_tools() {
   # Outside CI, skip the global symlink to avoid a sudo write to /usr/local/bin
   # (or equivalent). The Makefile prepends this directory to PATH, so `make`
   # recipes find the tools automatically.
-  if [[ -z "${CI:-}" ]]; then
+  if [[ "${CI:-}" != "true" ]]; then
     echo "npm tools installed under ${npm_tools_dir}/node_modules/.bin"
     echo "Make recipes discover them automatically. To invoke directly from a"
     echo "shell, add the directory to your PATH:"
@@ -241,7 +262,7 @@ maybe_install_npm_tools() {
 # Set git safe.directory in CI where the repo may be checked out by a different
 # uid than the user running git. Skipped on workstations: the contributor owns
 # the checkout and a global config write is unnecessary.
-if [[ -n "${CI:-}" ]]; then
+if [[ "${CI:-}" == "true" ]]; then
   git config --global --add safe.directory "$(pwd)"
 fi
 
@@ -280,6 +301,21 @@ if contains_module rustup; then
 fi
 set -e -o verbose
 
+if contains_module protoc; then
+  if [[ "${CI:-}" == "true" ]]; then
+    protoc_dir="${RUNNER_TEMP:?RUNNER_TEMP must be set when CI is enabled}/protoc-bin"
+  else
+    protoc_dir="${HOME}/.local/bin"
+  fi
+
+  bash "${SCRIPT_DIR}/install-protoc.sh" "${protoc_dir}"
+  export PATH="${protoc_dir}:${PATH}"
+
+  if [[ -n "${GITHUB_PATH:-}" ]]; then
+    echo "${protoc_dir}" >> "${GITHUB_PATH}"
+  fi
+fi
+
 maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
 maybe_install_cargo_tool cross "${CROSS_VERSION}"
 maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
@@ -289,6 +325,6 @@ maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
 maybe_install_cargo_tool cargo-llvm-cov "${CARGO_LLVM_COV_VERSION}"
 maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
 maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
-maybe_install_cargo_tool vdev "${VDEV_VERSION}"
+maybe_install_cargo_tool vdev
 
 maybe_install_npm_tools

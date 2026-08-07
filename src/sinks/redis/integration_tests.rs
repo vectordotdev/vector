@@ -1,5 +1,5 @@
 use futures::stream;
-use rand::Rng;
+use rand::RngExt;
 use redis::AsyncCommands;
 use vector_lib::{
     codecs::JsonSerializerConfig,
@@ -14,6 +14,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent},
     serde::OneOrMany,
     sinks::prelude::*,
+    template::Template,
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
@@ -53,6 +54,7 @@ async fn redis_sink_sentinel_reaches_primary() {
         sentinel_service: Some("vector".to_owned()),
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     let mut redis_connection = cnf.build_connection().await.unwrap();
@@ -98,6 +100,7 @@ async fn redis_sink_sentinel_rpush() {
         sentinel_service: Some("vector".to_owned()),
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
@@ -172,6 +175,7 @@ async fn redis_sink_list_lpush() {
         sentinel_service: None,
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
@@ -246,6 +250,7 @@ async fn redis_sink_list_rpush() {
         sentinel_service: None,
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
@@ -321,13 +326,14 @@ async fn redis_sink_sorted_set_zadd() {
         sentinel_service: None,
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
     for i in 0..num_events {
         let s: String = i.to_string();
         let mut e = LogEvent::from(s);
-        e.insert("num", i);
+        e.insert(vrl::event_path!("num"), i);
         events.push(e.into());
     }
     let input = stream::iter(events.clone().into_iter().map(Into::into));
@@ -412,6 +418,7 @@ async fn redis_sink_channel() {
         sentinel_service: None,
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     // Publish events.
@@ -490,6 +497,7 @@ async fn redis_sink_channel_data_volume_tags() {
         sentinel_service: None,
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     // Publish events.
@@ -542,6 +550,7 @@ async fn redis_sink_metrics() {
         sentinel_service: None,
         sentinel_connect: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     };
 
     // Create a mix of counter and gauge metrics
@@ -643,6 +652,7 @@ async fn redis_sink_traces() {
             sentinel_service: None,
             sentinel_connect: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
 
         // Build the sink
@@ -651,8 +661,8 @@ async fn redis_sink_traces() {
 
         // Create a  trace event
         let mut trace = TraceEvent::default();
-        trace.insert("name", "test_trace");
-        trace.insert("service", "redis_test");
+        trace.insert(vrl::event_path!("name"), "test_trace");
+        trace.insert(vrl::event_path!("service"), "redis_test");
 
         // Set up batch notification for checking delivery status
         let (batch, receiver) = BatchNotifier::new_with_receiver();

@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures::{StreamExt as FuturesStreamExt, stream};
-use rand::{Rng, SeedableRng as _, rngs::SmallRng};
+use rand::{RngExt, SeedableRng as _, rngs::SmallRng};
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::time::{self, interval};
@@ -425,9 +425,9 @@ impl observability::Service for ObservabilityService {
         &self,
         _request: Request<GetAllocationTracingStatusRequest>,
     ) -> Result<Response<GetAllocationTracingStatusResponse>, Status> {
-        #[cfg(feature = "allocation-tracing")]
+        #[cfg(unix)]
         let enabled = crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
-        #[cfg(not(feature = "allocation-tracing"))]
+        #[cfg(not(unix))]
         let enabled = false;
         Ok(Response::new(GetAllocationTracingStatusResponse {
             enabled,
