@@ -451,12 +451,7 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ve
 .PHONY: check-generated-docs
 check-generated-docs: generate-docs ## Checks that machine-generated component docs and examples are up-to-date.
 	$(VDEV) check generated-docs
-	@if test -n "$$(git status --porcelain -- website/generated/example-configs)"; then \
-		echo "Generated component examples are out of date. Run 'make generate-example-configs' and commit the changes."; \
-		git status --short -- website/generated/example-configs; \
-		exit 1; \
-	fi
-	VECTOR_BIN=$(abspath $(CARGO_TARGET_DIR)/debug/vector) $(MAKE) -C website validate-config-examples
+	$(VDEV) check component-examples
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
