@@ -526,10 +526,13 @@ where
 
     /// Publishes flushed writer progress and then wakes the reader.
     pub fn publish_writer_progress(&self, event_count: u64, record_size: u64) -> u64 {
-        let next_record_id = self.state().increment_next_writer_record_id(event_count);
+        // The next writer record ID is the reader's publication gate. Publish every other piece of
+        // shared state first so an acquire load that observes the new ID also observes the matching
+        // occupancy and usage accounting.
         self.increment_total_buffer_size(record_size);
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
+        let next_record_id = self.state().increment_next_writer_record_id(event_count);
         self.notify_writer_waiters();
         next_record_id
     }

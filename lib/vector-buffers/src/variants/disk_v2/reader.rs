@@ -482,6 +482,10 @@ where
         self.data_file_start_record_id = None;
     }
 
+    fn is_record_published(&self, token: &ReadToken) -> bool {
+        token.record_id() < self.ledger.state().get_next_writer_record_id()
+    }
+
     fn track_read(&mut self, record_id: u64, record_bytes: u64, event_count: NonZeroU64) {
         // We explicitly reduce the event count by one here in order to correctly calculate the
         // "last" record ID, which you can visualize as follows...
@@ -1016,14 +1020,6 @@ where
                 .context(IoSnafu)?;
             force_check_pending_data_files = false;
 
-            // Startup can read one valid frame beyond the durable reader checkpoint while using
-            // its ID to bound a preceding corrupt frame. The underlying file cursor has already
-            // advanced, but the frame itself remains in `RecordReader::aligned_buf`, so retain its
-            // token and deliver it through the normal read path once initialization is complete.
-            if let Some(token) = self.pending_read_token.take() {
-                break token;
-            }
-
             // If the writer has marked themselves as done, and the buffer has been emptied, then
             // we're done and can return.  We have to look at something besides simply the writer
             // being marked as done to know if we're actually done or not, and "buffer size" is better
@@ -1039,6 +1035,21 @@ where
                 if total_buffer_size == 0 {
                     return Ok(None);
                 }
+            }
+
+            // Startup can read one valid frame beyond the durable reader checkpoint while using
+            // its ID to bound a preceding corrupt frame. Runtime reads can likewise observe a
+            // physically flushed record in the short interval before the writer publishes it to
+            // the ledger. The underlying file cursor has already advanced in either case, so keep
+            // the token until it is safe to deliver. An unrelated notification only causes this
+            // predicate to be checked again.
+            if let Some(token) = self.pending_read_token.take() {
+                if self.ready_to_read && !self.is_record_published(&token) {
+                    self.pending_read_token = Some(token);
+                    self.ledger.wait_for_writer().await;
+                    continue;
+                }
+                break token;
             }
 
             self.ensure_ready_for_read().await.context(IoSnafu)?;
@@ -1076,6 +1087,14 @@ where
                 {
                     self.pending_read_token = Some(token);
                     return Ok(None);
+                }
+                // The file write becomes visible before the writer can synchronously publish its
+                // record and byte counters. Do not let a reader already draining the file consume
+                // and acknowledge that record against the old counters.
+                Ok(Some(token)) if !self.is_record_published(&token) => {
+                    self.pending_read_token = Some(token);
+                    self.ledger.wait_for_writer().await;
+                    continue;
                 }
                 // We got a valid record within the startup replay window, or a normal runtime
                 // record, so keep the token.
