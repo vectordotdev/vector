@@ -87,7 +87,7 @@ targets.
 
 ### Rust Development (Most Common)
 
-If you're working on Vector's Rust codebase (sources, sinks, transforms, core functionality):
+If you're working on Vector's Rust codebase:
 
 
 #### Running unit tests
