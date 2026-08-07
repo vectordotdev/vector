@@ -17,7 +17,8 @@ use hyper::{
     body::{HttpBody, Sender},
 };
 use tokio::{pin, select};
-use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
+use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue, server::NamedService};
+use tonic_health::{pb::health_server::HealthServer, server::HealthService};
 use tower::{Layer, Service};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
@@ -28,6 +29,10 @@ use crate::sources::util::decompression::{
     CappedDecoder, DecompressedSizeLimitExceeded, is_decompressed_size_limit_error,
     max_decompressed_size_bytes, max_zlib_compressed_frame_size_bytes,
 };
+
+// The `grpc.health.v1.Health` service, which sources register alongside their data services on the
+// same listener. Taken from the generated service rather than written out so it cannot drift.
+const HEALTH_SERVICE_NAME: &str = <HealthServer<HealthService> as NamedService>::NAME;
 
 // Every gRPC message has a five byte header:
 // - a compressed flag (u8, 0/1 for compressed/decompressed)
@@ -470,11 +475,18 @@ async fn drive_body_decompression(
     Ok(bytes_received)
 }
 
+// Whether a request path belongs to the health service, i.e. `/grpc.health.v1.Health/Check`.
+fn is_health_check(path: &str) -> bool {
+    path.strip_prefix('/')
+        .and_then(|path| path.strip_prefix(HEALTH_SERVICE_NAME))
+        .is_some_and(|method| method.starts_with('/'))
+}
+
 async fn drive_request<F, E>(
     source: Body,
     destination: Sender,
     inner: F,
-    bytes_received: Registered<BytesReceived>,
+    bytes_received: Option<Registered<BytesReceived>>,
     scheme: Option<CompressionScheme>,
 ) -> Result<Response<BoxBody>, E>
 where
@@ -512,7 +524,9 @@ where
     // otherwise emit the error.
     match &result {
         Ok(res) if res.status().is_success() => {
-            bytes_received.emit(ByteSize(body_bytes_received));
+            if let Some(bytes_received) = &bytes_received {
+                bytes_received.emit(ByteSize(body_bytes_received));
+            }
         }
         Ok(res) => {
             emit!(GrpcError {
@@ -571,6 +585,12 @@ where
             // can support decompression based on the indicated compression scheme... so wrap the body to decompress, if
             // need be, and then track the bytes that flowed through.
             Ok(scheme) => {
+                // A health probe is not data the component received, so it is left out of the byte
+                // accounting even though it arrives on the same listener as the data services. It
+                // still goes through decompression below, because a client is free to compress it.
+                let bytes_received =
+                    (!is_health_check(req.uri().path())).then(|| self.bytes_received.clone());
+
                 let (destination, decompressed_body) = Body::channel();
                 let (mut req_parts, req_body) = req.into_parts();
                 // Since this layer owns compression negotiation and is about to hand the
@@ -585,14 +605,7 @@ where
 
                 let inner = self.inner.call(mapped_req);
 
-                drive_request(
-                    req_body,
-                    destination,
-                    inner,
-                    self.bytes_received.clone(),
-                    scheme,
-                )
-                .boxed()
+                drive_request(req_body, destination, inner, bytes_received, scheme).boxed()
             }
         }
     }
