@@ -12,6 +12,14 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      # These dependencies share archive validation APIs and must be updated
+      # together, including consideration of disk buffer format compatibility.
+      rkyv-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "bytecheck"
+          - "rkyv"
+
       patches:
         applies-to: version-updates
         patterns:
@@ -174,6 +182,7 @@ updates:
           - "*"
         exclude-patterns:
           - "axum"
+          - "bytecheck"
           - "headers"
           - "http"
           - "http-*"
@@ -182,6 +191,7 @@ updates:
           - "prost"
           - "prost-*"
           - "reqwest"
+          - "rkyv"
           - "tokio-tungstenite"
           - "tonic"
           - "tonic-*"
