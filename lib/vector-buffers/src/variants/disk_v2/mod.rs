@@ -482,13 +482,13 @@ where
             buffer_dir = buffer_path.to_string_lossy().as_ref(),
             unread_events = existing_usage.event_count,
             unread_bytes = existing_usage.byte_size,
-            message = "Opened disk buffer with existing unread data. The data is available for delivery by this component.",
+            message = "Disk buffer opened with unread data; the component will attempt delivery.",
         );
     } else {
         debug!(
             buffer_id = id,
             buffer_dir = buffer_path.to_string_lossy().as_ref(),
-            message = "Opened empty disk buffer.",
+            message = "Empty disk buffer opened.",
         );
     }
 

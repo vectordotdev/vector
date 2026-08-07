@@ -304,14 +304,14 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
                     warn!(
                         orphaned_buffer_id = orphaned_buffer_id.to_string_lossy().as_ref(),
                         buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
-                        message = "Found a disk buffer not referenced by the new configuration. Vector will not reopen it unless a component with the same buffer ID is restored.",
+                        message = "Unreferenced disk buffer found; the configuration being loaded will not open it.",
                     );
                 }
             }
             Err(error) => warn!(
                 data_dir = global_data_dir.to_string_lossy().as_ref(),
                 %error,
-                message = "Failed to inspect the disk buffer directory for orphaned buffers.",
+                message = "Could not scan for unreferenced disk buffers; continuing without this check.",
             ),
         }
     }
@@ -440,12 +440,12 @@ fn find_orphaned_disk_buffers(
                 Err(error) => warn!(
                     path = entry.path().to_string_lossy().as_ref(),
                     %error,
-                    message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+                    message = "Could not determine a disk buffer entry type; continuing the scan, which may miss unreferenced buffers.",
                 ),
             },
             Err(error) => warn!(
                 %error,
-                message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+                message = "Could not read a disk buffer directory entry; continuing the scan, which may miss unreferenced buffers.",
             ),
         }
     }
@@ -458,7 +458,7 @@ fn find_orphaned_disk_buffers(
                 warn!(
                     path = path.to_string_lossy().as_ref(),
                     %error,
-                    message = "Failed to inspect a directory while scanning for orphaned disk buffers.",
+                    message = "Could not read a disk buffer directory; continuing the scan, which may miss unreferenced buffers.",
                 );
                 continue;
             }
@@ -472,7 +472,7 @@ fn find_orphaned_disk_buffers(
                     warn!(
                         path = path.to_string_lossy().as_ref(),
                         %error,
-                        message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+                        message = "Could not read a disk buffer directory entry; continuing the scan, which may miss unreferenced buffers.",
                     );
                     continue;
                 }
@@ -483,7 +483,7 @@ fn find_orphaned_disk_buffers(
                     warn!(
                         path = entry.path().to_string_lossy().as_ref(),
                         %error,
-                        message = "Failed to inspect an entry while scanning for orphaned disk buffers.",
+                        message = "Could not determine a disk buffer entry type; continuing the scan, which may miss unreferenced buffers.",
                     );
                     continue;
                 }

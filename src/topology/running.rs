@@ -659,9 +659,9 @@ impl RunningTopology {
                     remaining_bytes = usage.byte_size,
                     drain_in_background,
                     message = if drain_in_background {
-                        "Removing disk-buffered sink; buffered events will drain in the background."
+                        "Removing disk-buffered sink; monitoring shutdown in the background."
                     } else {
-                        "Removing disk-buffered sink; waiting for buffered events to drain before continuing the configuration reload."
+                        "Removing disk-buffered sink; waiting for shutdown before continuing the configuration reload."
                     },
                 );
                 removed_disk_buffer_drains.insert((*key).clone(), usage_handles);
@@ -707,7 +707,7 @@ impl RunningTopology {
                         ?buffer_dirs,
                         buffered_events = usage.event_count,
                         buffered_bytes = usage.byte_size,
-                        message = "Reusing the existing disk buffer during configuration reload. Buffered data remains available to the replacement sink.",
+                        message = "Sink configuration modified; retaining its disk buffer across the configuration reload.",
                     );
                 } else if buffer_dirs
                     .iter()
@@ -724,9 +724,10 @@ impl RunningTopology {
                     warn!(
                         component_id = %key,
                         ?buffer_dirs,
+                        ?replacement_buffer_dirs,
                         remaining_events = usage.event_count,
                         remaining_bytes = usage.byte_size,
-                        message = "Changing disk-buffered sink; the replacement will not reopen the existing buffer.",
+                        message = "Sink configuration modified; the replacement configuration does not reference any existing disk buffer paths.",
                     );
                 }
             }
@@ -1603,7 +1604,7 @@ async fn await_sink_buffer_drain(
         component_id = %component_id,
         initial_events = initial.event_count,
         initial_bytes = initial.byte_size,
-        message = "Disk buffer drain started. Progress will be logged every 30 seconds until the sink finishes.",
+        message = "Monitoring disk-buffered sink shutdown; unread data will be logged every 30 seconds.",
     );
 
     let mut progress_interval = interval(Duration::from_secs(30));
@@ -1621,14 +1622,14 @@ async fn await_sink_buffer_drain(
                     info!(
                         component_id = %component_id,
                         remaining_events_approximate = remaining.event_count,
-                        message = "Disk buffer drained successfully.",
+                        message = "Disk-buffered sink stopped with no unread data.",
                     );
                 } else if remaining.byte_size == 0 {
                     warn!(
                         component_id = %component_id,
                         remaining_events_approximate = remaining.event_count,
                         ?task_error,
-                        message = "The sink task ended with an error after the disk buffer drained.",
+                        message = "Disk-buffered sink failed with no unread data remaining.",
                     );
                 } else {
                     warn!(
@@ -1636,7 +1637,7 @@ async fn await_sink_buffer_drain(
                         remaining_events = remaining.event_count,
                         remaining_bytes = remaining.byte_size,
                         ?task_error,
-                        message = "Disk buffer drain stopped before all events were delivered. The orphaned buffer still contains unread data.",
+                        message = "Disk-buffered sink stopped with unread data remaining.",
                     );
                 }
                 return result;
@@ -1647,7 +1648,7 @@ async fn await_sink_buffer_drain(
                     component_id = %component_id,
                     remaining_events = remaining.event_count,
                     remaining_bytes = remaining.byte_size,
-                    message = "Disk buffer drain in progress.",
+                    message = "Disk-buffered sink is still shutting down.",
                 );
             }
         }
