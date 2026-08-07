@@ -279,12 +279,14 @@ mod test {
 
                 [keepalive]
                 max_connection_age_secs = 300
+                max_connection_age_jitter_factor = 0.2
                 max_connection_age_grace_secs = 30
             "#,
         )
         .unwrap();
 
         assert_eq!(config.keepalive.max_connection_age_secs, Some(300));
+        assert_eq!(config.keepalive.max_connection_age_jitter_factor, 0.2);
         assert_eq!(config.keepalive.max_connection_age_grace_secs, Some(30));
     }
 
