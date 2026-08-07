@@ -74,14 +74,12 @@ mod complete;
 mod crate_versions;
 mod deprecation;
 mod e2e;
-mod features;
 mod fmt;
 mod info;
 mod integration;
 mod meta;
 mod package;
 mod release;
-mod run;
 mod status;
 mod test;
 mod test_vrl;
@@ -95,14 +93,12 @@ cli_commands! {
     crate_versions,
     deprecation,
     e2e,
-    features,
     fmt,
     info,
     integration,
     meta,
     package,
     release,
-    run,
     status,
     test,
     test_vrl,
