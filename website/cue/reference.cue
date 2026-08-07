@@ -348,6 +348,12 @@ _values: {
 	//              relevant_when: 'strategy = "fingerprint" or "inode"'
 	relevant_when?: string
 
+	// `required_one_of` documents that exactly one field from the listed group
+	// must be set. All members share the same list. The field itself is optional
+	// in isolation; the constraint is expressed at the schema level via oneOf.
+	required_one_of?: [...string]
+	required_one_of_group?: string
+
 	// `required` requires the option to be set.
 	required: bool
 
@@ -596,19 +602,11 @@ _values: {
 	//      }
 	enum?: #Enum
 
+	// `examples` demonstrates example values. Enum values are not repeated here;
+	// they are rendered from `enum` as their own table.
 	examples?: [...string]
 
-	if Args.required && enum != _|_ {
-		// `examples` demonstrates example values. This should be used when
-		// examples cannot be derived from the `default` or `enum` options.
-		examples: [string, ...string] | *[
-			for k, v in enum {
-				k
-			},
-		]
-	}
-
-	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_program" | "strftime"
+	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "vrl_program" | "lua" | "yaml" | "toml" | "strftime"
 }
 
 #TypeAsciiChar: {

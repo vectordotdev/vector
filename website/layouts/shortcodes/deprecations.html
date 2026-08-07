@@ -16,7 +16,7 @@
         Deprecated since {{ .deprecated_since }}
       </div>
       {{ with .description }}
-      <div class="mt-2.5 prose dark:prose-dark max-w-none">
+      <div class="mt-2.5 prose dark:prose-invert max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -36,7 +36,7 @@
         Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
       </div>
       {{ with .description }}
-      <div class="mt-2.5 prose dark:prose-dark max-w-none">
+      <div class="mt-2.5 prose dark:prose-invert max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}

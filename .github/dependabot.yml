@@ -19,6 +19,28 @@ updates:
         update-types:
           - "patch"
 
+      # These dependencies must cross the http 0.2 / hyper 0.14 to
+      # http 1 / hyper 1 boundary together. Tracked in #19179.
+      http-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "axum"
+          - "headers"
+          - "http"
+          - "http-*"
+          - "hyper"
+          - "hyper-*"
+          - "prost"
+          - "prost-*"
+          - "reqwest"
+          - "tokio-tungstenite"
+          - "tonic"
+          - "tonic-*"
+          - "tower-http"
+          - "warp"
+        update-types:
+          - "major"
+
       amq:
         patterns:
           - "amq-*"
@@ -150,6 +172,21 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          - "axum"
+          - "headers"
+          - "http"
+          - "http-*"
+          - "hyper"
+          - "hyper-*"
+          - "prost"
+          - "prost-*"
+          - "reqwest"
+          - "tokio-tungstenite"
+          - "tonic"
+          - "tonic-*"
+          - "tower-http"
+          - "warp"
         update-types:
           - "major"
       cargo-security:

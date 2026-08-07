@@ -1,4 +1,5 @@
 mod changelog_fragments;
+mod component_examples;
 mod component_features;
 mod deny;
 mod events;
@@ -15,6 +16,7 @@ crate::cli_subcommands! {
     changelog_fragments,
     generated_docs,
     component_features,
+    component_examples,
     deny,
     docs,
     events,

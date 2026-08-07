@@ -7,7 +7,6 @@ use chrono::{TimeZone, Utc};
 use futures::{future::ready, stream};
 use http::Uri;
 use indoc::indoc;
-use serde::Deserialize;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, value};
 
@@ -60,11 +59,9 @@ fn generate_config() {
 async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-    let config = StackdriverConfig::generate_config().to_string();
-    let mut config = StackdriverConfig::deserialize(
-        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-    )
-    .expect("config should be valid");
+    let mut config: StackdriverConfig =
+        serde_json::from_value(StackdriverConfig::generate_config())
+            .expect("config should be valid");
 
     // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
     // Metadata API, which we clearly don't have in unit tests. :)
