@@ -5,11 +5,12 @@ use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input},
     configurable::configurable_component,
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         opendal_common::*,
@@ -18,7 +19,7 @@ use crate::{
             partitioner::KeyPartitioner,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
 };
 
 /// Configuration for the `webhdfs` sink.
@@ -104,16 +105,6 @@ impl GenerateConfig for WebHdfsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "webhdfs")]
 impl SinkConfig for WebHdfsConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let op = self.build_operator()?;
-
-        let check_op = op.clone();
-        let healthcheck = Box::pin(async move { Ok(check_op.check().await?) });
-
-        let sink = self.build_processor(op)?;
-        Ok((sink, healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -124,6 +115,53 @@ impl SinkConfig for WebHdfsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated WebHDFS sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedWebHdfs {
+    /// Batch settings computed during validation.
+    batcher_settings: BatcherSettings,
+    /// Encoder built during validation.
+    encoder: Encoder<Framer>,
+    /// Confined prefix template.
+    confined_prefix: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for WebHdfsConfig {
+    type Validated = ValidatedWebHdfs;
+
+    fn validate(&self) -> crate::Result<ValidatedWebHdfs> {
+        let batcher_settings = self.batch.into_batcher_settings()?;
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let confined_prefix = self.confined_prefix()?;
+
+        Ok(ValidatedWebHdfs {
+            batcher_settings,
+            encoder,
+            confined_prefix,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedWebHdfs,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let op = self.build_operator()?;
+
+        let check_op = op.clone();
+        let healthcheck = Box::pin(async move { Ok(check_op.check().await?) });
+
+        let sink = self.build_processor(op, validated)?;
+        Ok((sink, healthcheck))
     }
 }
 
@@ -141,16 +179,19 @@ impl WebHdfsConfig {
         Ok(op)
     }
 
-    pub fn build_processor(&self, op: Operator) -> crate::Result<VectorSink> {
-        // Configure our partitioning/batching.
-        let batcher_settings = self.batch.into_batcher_settings()?;
-
-        let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+    pub fn build_processor(
+        &self,
+        op: Operator,
+        validated: &ValidatedWebHdfs,
+    ) -> crate::Result<VectorSink> {
+        let ValidatedWebHdfs {
+            batcher_settings,
+            encoder,
+            confined_prefix,
+        } = validated;
 
         let request_builder = OpenDalRequestBuilder {
-            encoder: (transformer, encoder),
+            encoder: (self.encoding.transformer(), encoder.clone()),
             compression: self.compression,
         };
 
@@ -160,16 +201,20 @@ impl WebHdfsConfig {
         let sink = OpenDalSink::new(
             svc,
             request_builder,
-            self.key_partitioner()?,
-            batcher_settings,
+            KeyPartitioner::new(confined_prefix.clone(), None),
+            *batcher_settings,
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
+    fn confined_prefix(&self) -> crate::Result<ConfinedTemplate> {
         let prefix: Template = self.prefix.clone().try_into()?;
-        let prefix = prefix.confine(&self.confinement, Self::NAME, "prefix")?;
+        prefix.confine(&self.confinement, Self::NAME, "prefix")
+    }
+
+    pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
+        let prefix = self.confined_prefix()?;
         Ok(KeyPartitioner::new(prefix, None))
     }
 }
@@ -244,5 +289,24 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("tenant"), "../../escape");
         assert!(partitioner.partition(&event).is_none());
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config = WebHdfsConfig {
+            prefix: "%F/".into(),
+            ..base_config()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        // Bulk size-based defaults: 10 MB batches, 300s timeout.
+        assert_eq!(
+            validated.batcher_settings.timeout,
+            std::time::Duration::from_secs(300)
+        );
+        assert_eq!(validated.batcher_settings.size_limit, 10_000_000);
+        // The confined prefix retains the validated value.
+        assert_eq!(validated.confined_prefix.to_string(), "%F/");
     }
 }

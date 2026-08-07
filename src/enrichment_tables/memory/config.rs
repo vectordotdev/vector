@@ -18,6 +18,7 @@ use super::{Memory, internal_events::InternalMetricsConfig, source::EXPIRED_ROUT
 use crate::{
     config::{
         EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+        ValidatedSink,
     },
     enrichment_tables::memory::{
         bloom_table::{BloomMemoryConfig, BloomMemoryTable},
@@ -318,26 +319,39 @@ impl EnrichmentTableConfig for MemoryConfig {
 #[async_trait]
 #[typetag::serde(name = "memory_enrichment_table")]
 impl SinkConfig for MemoryConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = match &self.filter {
-            Some(TableFilter::Cuckoo(_)) => {
-                VectorSink::from_event_streamsink(self.get_or_build_cuckoo(None).await?)
-            }
-            Some(TableFilter::Bloom(_)) => {
-                VectorSink::from_event_streamsink(self.get_or_build_bloom(None).await?)
-            }
-            None => VectorSink::from_event_streamsink(self.get_or_build_memory(None).await),
-        };
-
-        Ok((sink, future::ok(()).boxed()))
-    }
-
     fn input(&self) -> Input {
         Input::log()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for MemoryConfig {
+    type Validated = Self;
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(self.clone())
+    }
+
+    async fn build(
+        &self,
+        validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = match &validated.filter {
+            Some(TableFilter::Cuckoo(_)) => {
+                VectorSink::from_event_streamsink(validated.get_or_build_cuckoo(None).await?)
+            }
+            Some(TableFilter::Bloom(_)) => {
+                VectorSink::from_event_streamsink(validated.get_or_build_bloom(None).await?)
+            }
+            None => VectorSink::from_event_streamsink(validated.get_or_build_memory(None).await),
+        };
+
+        Ok((sink, future::ok(()).boxed()))
     }
 }
 

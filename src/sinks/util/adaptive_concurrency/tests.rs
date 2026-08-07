@@ -31,7 +31,7 @@ use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
 use super::{AdaptiveConcurrencySettings, controller::ControllerStatistics};
 use crate::{
-    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{Event, metric::MetricValue},
     metrics,
     sinks::{
@@ -176,17 +176,38 @@ impl_generate_config_from_default!(TestConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "test_arc")]
 impl SinkConfig for TestConfig {
-    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for TestConfig {
+    type Validated = Self;
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(self.clone())
+    }
+
+    async fn build(
+        &self,
+        validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 1;
         batch_settings.timeout = Duration::from_secs(9999);
 
-        let request = self.request.into_settings();
+        let request = validated.request.into_settings();
         let sink = request
             .batch_sink(
                 TestRetryLogic,
-                TestSink::new(self),
+                TestSink::new(validated),
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
             )
@@ -203,18 +224,10 @@ impl SinkConfig for TestConfig {
                 .controller
                 .stats,
         );
-        *self.controller_stats.lock().unwrap() = stats;
+        *validated.controller_stats.lock().unwrap() = stats;
 
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
     }
 }
 

@@ -12,7 +12,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -85,29 +85,6 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // If this sink is set to not be healthy, just send the healthcheck error immediately over
-        // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
-        // started running, so that tests can request the topology be healthy before proceeding.
-        let (tx, rx) = oneshot::channel();
-
-        let health_tx = if self.healthy {
-            Some(tx)
-        } else {
-            _ = tx.send(Err(HealthcheckError::Unhealthy.into()));
-            None
-        };
-
-        let sink = MockSink {
-            sink: self.sink.clone(),
-            health_tx,
-        };
-
-        let healthcheck = async move { rx.await.unwrap() };
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }
@@ -118,6 +95,42 @@ impl SinkConfig for BasicSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for BasicSinkConfig {
+    type Validated = Self;
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(self.clone())
+    }
+
+    async fn build(
+        &self,
+        validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        // If this sink is set to not be healthy, just send the healthcheck error immediately over
+        // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
+        // started running, so that tests can request the topology be healthy before proceeding.
+        let (tx, rx) = oneshot::channel();
+
+        let health_tx = if validated.healthy {
+            Some(tx)
+        } else {
+            _ = tx.send(Err(HealthcheckError::Unhealthy.into()));
+            None
+        };
+
+        let sink = MockSink {
+            sink: validated.sink.clone(),
+            health_tx,
+        };
+
+        let healthcheck = async move { rx.await.unwrap() };
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
 }
 

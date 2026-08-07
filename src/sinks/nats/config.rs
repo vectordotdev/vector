@@ -6,6 +6,7 @@ use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 
 use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
+    config::ValidatedSink,
     nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -184,16 +185,6 @@ impl GenerateConfig for NatsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "nats")]
 impl SinkConfig for NatsSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let subject = self
-            .subject
-            .clone()
-            .confine(&self.confinement, Self::NAME, "subject")?;
-        let sink = NatsSink::new(self.clone(), subject).await?;
-        let healthcheck = healthcheck(self.clone()).boxed();
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -204,6 +195,41 @@ impl SinkConfig for NatsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated NATS sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedNatsSink {
+    /// The confined subject template.
+    subject: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for NatsSinkConfig {
+    type Validated = ValidatedNatsSink;
+
+    fn validate(&self) -> crate::Result<ValidatedNatsSink> {
+        let subject = self
+            .subject
+            .clone()
+            .confine(&self.confinement, Self::NAME, "subject")?;
+        Ok(ValidatedNatsSink { subject })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedNatsSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedNatsSink { subject } = validated;
+        let sink = NatsSink::new(self.clone(), subject.clone()).await?;
+        let healthcheck = healthcheck(self.clone()).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -317,7 +343,24 @@ impl NatsPublisher {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn validate_returns_confined_subject() {
+        let config: NatsSinkConfig = serde_yaml::from_str(
+            r#"
+            subject: "test-subject"
+            url: "nats://127.0.0.1:4222"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.subject.to_string(), "test-subject");
+    }
 
     #[test]
     fn confinement_rejects_unconfined_subject() {

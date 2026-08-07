@@ -6,6 +6,7 @@ use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
     configurable::configurable_component,
     sensitive_string::SensitiveString,
+    stream::BatcherSettings,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -15,6 +16,7 @@ use super::{
 };
 use crate::{
     codecs::Transformer,
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         BuildError, Healthcheck, HealthcheckError, VectorSink,
@@ -87,16 +89,21 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 }
 
 impl AppsignalConfig {
-    pub(super) fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let client = HttpClient::new(tls, proxy)?;
+    pub(super) fn build_client(
+        &self,
+        proxy: &ProxyConfig,
+        tls: &MaybeTlsSettings,
+    ) -> crate::Result<HttpClient> {
+        let client = HttpClient::new(tls.clone(), proxy)?;
         Ok(client)
     }
 
-    pub(super) fn build_sink(&self, http_client: HttpClient) -> crate::Result<VectorSink> {
-        let batch_settings = self.batch.into_batcher_settings()?;
-
-        let endpoint = endpoint_uri(&self.endpoint, "vector/events")?;
+    pub(super) fn build_sink(
+        &self,
+        http_client: HttpClient,
+        batch_settings: BatcherSettings,
+        endpoint: Uri,
+    ) -> crate::Result<VectorSink> {
         let push_api_key = self.push_api_key.clone();
         let compression = self.compression;
         let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
@@ -129,25 +136,70 @@ impl_generate_config_from_default!(AppsignalConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "appsignal")]
 impl SinkConfig for AppsignalConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(cx.proxy())?;
-        let healthcheck = healthcheck(
-            endpoint_uri(&self.endpoint, "vector/healthcheck")?,
-            self.push_api_key.inner().to_string(),
-            client.clone(),
-        )
-        .boxed();
-        let sink = self.build_sink(client)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated AppSignal sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedAppsignal {
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// The events endpoint URI, validated.
+    endpoint: Uri,
+    /// The healthcheck endpoint URI, validated.
+    healthcheck_endpoint: Uri,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AppsignalConfig {
+    type Validated = ValidatedAppsignal;
+
+    fn validate(&self) -> crate::Result<ValidatedAppsignal> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let endpoint = endpoint_uri(&self.endpoint, "vector/events")?;
+        let healthcheck_endpoint = endpoint_uri(&self.endpoint, "vector/healthcheck")?;
+
+        Ok(ValidatedAppsignal {
+            batch_settings,
+            endpoint,
+            healthcheck_endpoint,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAppsignal,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedAppsignal {
+            batch_settings,
+            endpoint,
+            healthcheck_endpoint,
+        } = validated;
+
+        // TLS settings may read certificate files from disk, so they are
+        // resolved at build time rather than during pure validation.
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
+        let client = self.build_client(cx.proxy(), &tls)?;
+        let healthcheck = healthcheck(
+            healthcheck_endpoint.clone(),
+            self.push_api_key.inner().to_string(),
+            client.clone(),
+        )
+        .boxed();
+        let sink = self.build_sink(client, *batch_settings, endpoint.clone())?;
+
+        Ok((sink, healthcheck))
     }
 }
 
@@ -197,6 +249,25 @@ mod test {
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"
+        );
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config = AppsignalConfig {
+            endpoint: "https://appsignal-endpoint.net".to_string(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint.to_string(),
+            "https://appsignal-endpoint.net/vector/events"
+        );
+        assert_eq!(
+            validated.healthcheck_endpoint.to_string(),
+            "https://appsignal-endpoint.net/vector/healthcheck"
         );
     }
 }

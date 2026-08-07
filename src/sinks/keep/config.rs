@@ -11,11 +11,12 @@ use super::{
     sink::KeepSink,
 };
 use crate::{
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         prelude::*,
         util::{
-            BatchConfig, BoxedRawValue,
+            BatchConfig, BoxedRawValue, TowerRequestSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
@@ -91,8 +92,57 @@ impl GenerateConfig for KeepConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "keep")]
 impl SinkConfig for KeepConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated Keep sink configuration.
+///
+/// Captures the pure validation results (batch settings, endpoint URI and
+/// request limits) so `build` does not recompute them.
+#[derive(Clone, Debug)]
+pub struct ValidatedKeep {
+    /// Batch settings computed during preparation.
+    batch_settings: BatcherSettings,
+    /// The parsed endpoint URI.
+    uri: Uri,
+    /// Request settings computed during preparation.
+    request_limits: TowerRequestSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for KeepConfig {
+    type Validated = ValidatedKeep;
+
+    fn validate(&self) -> crate::Result<ValidatedKeep> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+        let uri: Uri = self.endpoint.clone().try_into()?;
+        let request_limits = self.request.into_settings();
+
+        Ok(ValidatedKeep {
+            batch_settings,
+            uri,
+            request_limits,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedKeep,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedKeep {
+            batch_settings,
+            uri,
+            request_limits,
+        } = validated;
 
         let request_builder = KeepRequestBuilder {
             encoder: KeepEncoder {
@@ -102,7 +152,6 @@ impl SinkConfig for KeepConfig {
             compression: Compression::None,
         };
 
-        let uri: Uri = self.endpoint.clone().try_into()?;
         let keep_service_request_builder = KeepSvcRequestBuilder {
             uri: uri.clone(),
             api_key: self.api_key.clone(),
@@ -112,30 +161,18 @@ impl SinkConfig for KeepConfig {
 
         let service = HttpService::new(client.clone(), keep_service_request_builder);
 
-        let request_limits = self.request.into_settings();
-
         let service = ServiceBuilder::new()
             .settings(
-                request_limits,
+                request_limits.clone(),
                 http_response_retry_logic(self.retry_strategy.clone()),
             )
             .service(service);
 
-        let sink = KeepSink::new(service, batch_settings, request_builder);
+        let sink = KeepSink::new(service, *batch_settings, request_builder);
 
-        let healthcheck = healthcheck(uri, self.api_key.clone(), client).boxed();
+        let healthcheck = healthcheck(uri.clone(), self.api_key.clone(), client).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
-
-        Input::log().with_schema_requirement(requirement)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -172,5 +209,27 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
             let body = String::from_utf8_lossy(&body[..]);
             Err(format!("Server returned unexpected error status: {status} body: {body}").into())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
+
+    #[test]
+    fn validate_produces_usable_values() {
+        let config: KeepConfig = serde_yaml::from_str(
+            r#"
+            api_key: "test-key"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.uri.to_string(),
+            "http://localhost:8080/alerts/event/vectordev?provider_id=test"
+        );
+        assert_eq!(validated.batch_settings.size_limit, 100_000);
     }
 }

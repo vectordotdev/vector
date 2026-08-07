@@ -1,3 +1,4 @@
+use http::Uri;
 use openssl::{base64, pkey};
 use vector_lib::{
     config::log_schema,
@@ -13,6 +14,7 @@ use super::{
     sink::AzureMonitorLogsSink,
 };
 use crate::{
+    config::ValidatedSink,
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         prelude::*,
@@ -161,19 +163,10 @@ impl AzureMonitorLogsConfig {
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
-        endpoint: UriSerde,
+        validated: &ValidatedAzureMonitorLogs,
+        endpoint: Uri,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = endpoint.with_default_parts().uri;
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
-
-        let batch_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(MAX_BATCH_SIZE)?
-            .into_batcher_settings()?;
-
-        let shared_key = self.build_shared_key()?;
-        let time_generated_key = self.get_time_generated_key();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
@@ -184,8 +177,8 @@ impl AzureMonitorLogsConfig {
             self.customer_id.clone(),
             self.azure_resource_id.as_deref(),
             &self.log_type,
-            time_generated_key.clone(),
-            shared_key,
+            validated.time_generated_key.clone(),
+            validated.shared_key.clone(),
         )?;
         let healthcheck = service.healthcheck();
 
@@ -199,10 +192,10 @@ impl AzureMonitorLogsConfig {
             .service(service);
 
         let sink = AzureMonitorLogsSink::new(
-            batch_settings,
+            validated.batch_settings,
             self.encoding.clone(),
             service,
-            time_generated_key,
+            validated.time_generated_key.clone(),
             protocol,
         );
 
@@ -212,14 +205,26 @@ impl AzureMonitorLogsConfig {
 
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
+/// Purely validated Azure Monitor Logs sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedAzureMonitorLogs {
+    /// The parsed endpoint URI.
+    endpoint: Uri,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// The decoded shared key.
+    shared_key: pkey::PKey<pkey::Private>,
+    /// The resolved time generated key.
+    time_generated_key: Option<OwnedValuePath>,
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = format!("https://{}.{}", self.customer_id, self.host).parse()?;
-        self.build_inner(cx, endpoint).await
-    }
-
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
@@ -229,5 +234,40 @@ impl SinkConfig for AzureMonitorLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AzureMonitorLogsConfig {
+    type Validated = ValidatedAzureMonitorLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedAzureMonitorLogs> {
+        let endpoint: UriSerde = format!("https://{}.{}", self.customer_id, self.host).parse()?;
+        let endpoint = endpoint.with_default_parts().uri;
+
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_SIZE)?
+            .into_batcher_settings()?;
+
+        let shared_key = self.build_shared_key()?;
+        let time_generated_key = self.get_time_generated_key();
+
+        Ok(ValidatedAzureMonitorLogs {
+            endpoint,
+            batch_settings,
+            shared_key,
+            time_generated_key,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAzureMonitorLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_inner(cx, validated, validated.endpoint.clone())
+            .await
     }
 }

@@ -11,7 +11,9 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     http::HttpClient,
@@ -19,7 +21,8 @@ use crate::{
         Healthcheck, UriParseSnafu, VectorSink,
         gcs_common::config::healthcheck_response,
         util::{
-            BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings,
+            TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },
@@ -116,13 +119,69 @@ impl GenerateConfig for PubsubConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = PubsubSink::from_config(self).await?;
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().input_type())
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PubsubConfig {
+    type Validated = ValidatedPubsub;
+
+    fn validate(&self) -> crate::Result<ValidatedPubsub> {
+        // Parse the assembled publish URI up front so `vector validate
+        // --no-environment` rejects a malformed endpoint/project/topic
+        // combination instead of failing (or panicking) at build time.
+        let uri_base = format!(
+            "{}/v1/projects/{}/topics/{}",
+            self.endpoint, self.project, self.topic,
+        )
+        .parse::<Uri>()?;
+
         let batch_settings = self
             .batch
             .validate()?
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
+
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
+        Ok(ValidatedPubsub {
+            uri_base,
+            batch_settings,
+            transformer,
+            encoder,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedPubsub,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedPubsub {
+            uri_base,
+            batch_settings,
+            transformer,
+            encoder,
+        } = validated;
+
+        // We only need to load the credentials if we are not targeting an emulator.
+        let auth = self.auth.build(Scope::PubSub).await?;
+
+        let sink = PubsubSink {
+            auth,
+            uri_base: uri_base.clone(),
+            transformer: transformer.clone(),
+            encoder: encoder.clone(),
+        };
+
         let request_settings = self.request.into_settings();
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
@@ -142,45 +201,33 @@ impl SinkConfig for PubsubConfig {
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
+}
 
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
+/// Purely validated Pub/Sub sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedPubsub {
+    /// The resolved Pub/Sub topic URI base.
+    uri_base: Uri,
+    /// Batch settings computed during validation.
+    batch_settings: BatchSettings<JsonArrayBuffer>,
+    /// The configured transformer.
+    transformer: Transformer,
+    /// The configured encoder.
+    encoder: Encoder<()>,
 }
 
 struct PubsubSink {
     auth: GcpAuthenticator,
-    uri_base: String,
+    uri_base: Uri,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
 
 impl PubsubSink {
-    async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
-        // We only need to load the credentials if we are not targeting an emulator.
-        let auth = config.auth.build(Scope::PubSub).await?;
-
-        let uri_base = format!(
-            "{}/v1/projects/{}/topics/{}",
-            config.endpoint, config.project, config.topic,
-        );
-
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
-
-        Ok(Self {
-            auth,
-            uri_base,
-            transformer,
-            encoder,
-        })
-    }
-
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
         let uri = format!("{}{}", self.uri_base, suffix);
         let mut uri = uri.parse::<Uri>().context(UriParseSnafu)?;
@@ -251,6 +298,25 @@ mod tests {
         crate::test_util::test_generate_config::<PubsubConfig>();
     }
 
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
+                project: project
+                topic: topic
+                encoding:
+                  codec: json
+            "#})
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.uri_base.to_string(),
+            "https://pubsub.googleapis.com/v1/projects/project/topics/topic"
+        );
+    }
+
     #[tokio::test]
     async fn fails_missing_creds() {
         let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
@@ -260,7 +326,10 @@ mod tests {
                   codec: json
             "#})
         .unwrap();
-        if config.build(SinkContext::default()).await.is_ok() {
+        if SinkConfig::build(&config, SinkContext::default())
+            .await
+            .is_ok()
+        {
             panic!("config.build failed to error");
         }
     }
@@ -309,7 +378,9 @@ mod integration_tests {
 
     async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
         let cx = SinkContext::default();
-        config(topic).build(cx).await.expect("Building sink failed")
+        SinkConfig::build(&config(topic), cx)
+            .await
+            .expect("Building sink failed")
     }
 
     #[tokio::test]

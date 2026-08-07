@@ -6,13 +6,14 @@ use vector_lib::{
     configurable::{component::GenerateConfig, configurable_component},
     internal_event::Protocol,
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink::StatsdSink};
 #[cfg(unix)]
 use crate::sinks::util::service::net::UnixConnectorConfig;
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     internal_events::SocketMode,
     sinks::{
         Healthcheck,
@@ -121,27 +122,6 @@ impl GenerateConfig for StatsdSinkConfig {
 #[async_trait]
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batcher_settings = self.batch.into_batcher_settings()?;
-
-        let socket_mode = self.mode.as_socket_mode();
-        let request_builder =
-            StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode);
-        let protocol = Protocol::from(socket_mode.as_str());
-
-        let connector = self.mode.as_connector();
-        let service = connector.service();
-        let healthcheck = connector.healthcheck();
-
-        let sink = StatsdSink::new(
-            StatsdService::from_transport(service),
-            batcher_settings,
-            request_builder,
-            protocol,
-        );
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -151,12 +131,84 @@ impl SinkConfig for StatsdSinkConfig {
     }
 }
 
+/// Purely validated StatsD sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration. The actual sink building consumes these values without
+/// recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedStatsd {
+    /// Batch settings computed during validation.
+    batcher_settings: BatcherSettings,
+    /// The resolved socket mode.
+    socket_mode: SocketMode,
+}
+
+#[async_trait]
+impl ValidatedSink for StatsdSinkConfig {
+    type Validated = ValidatedStatsd;
+
+    fn validate(&self) -> crate::Result<ValidatedStatsd> {
+        let batcher_settings = self.batch.into_batcher_settings()?;
+        let socket_mode = self.mode.as_socket_mode();
+
+        Ok(ValidatedStatsd {
+            batcher_settings,
+            socket_mode,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedStatsd,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedStatsd {
+            batcher_settings,
+            socket_mode,
+        } = validated;
+
+        let request_builder =
+            StatsdRequestBuilder::new(self.default_namespace.clone(), *socket_mode);
+        let protocol = Protocol::from(socket_mode.as_str());
+
+        let connector = self.mode.as_connector();
+        let service = connector.service();
+        let healthcheck = connector.healthcheck();
+
+        let sink = StatsdSink::new(
+            StatsdService::from_transport(service),
+            *batcher_settings,
+            request_builder,
+            protocol,
+        );
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::StatsdSinkConfig;
+    use super::{Mode, SocketMode, StatsdSinkConfig, UdpConnectorConfig};
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StatsdSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = StatsdSinkConfig {
+            default_namespace: Some("service".to_string()),
+            mode: Mode::Udp(UdpConnectorConfig::from_address(
+                "127.0.0.1".to_string(),
+                8125,
+            )),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert!(matches!(validated.socket_mode, SocketMode::Udp));
     }
 }

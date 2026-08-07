@@ -3,10 +3,12 @@
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
-use crate::config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext};
+use crate::config::{
+    AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+};
 use crate::sinks::{
     prelude::*,
-    util::{BatchConfig, RealtimeSizeBasedDefaultBatchSettings},
+    util::{BatchConfig, RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings},
 };
 
 use super::{error::ZerobusSinkError, service::ZerobusService, sink::ZerobusSink};
@@ -214,15 +216,47 @@ impl GenerateConfig for ZerobusSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "databricks_zerobus")]
 impl SinkConfig for ZerobusSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.validate()?;
+    fn input(&self) -> Input {
+        Input::log()
+    }
 
-        let service = ZerobusService::new(self.clone(), cx.proxy()).await?;
-        let healthcheck_service = service.clone();
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated Zerobus sink configuration.
+///
+/// Captures the pure validation results (structural checks and request
+/// limits) so `build` does not recompute them.
+#[derive(Clone, Debug)]
+pub struct ValidatedZerobus {
+    /// Request settings computed during preparation.
+    request_limits: TowerRequestSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for ZerobusSinkConfig {
+    type Validated = ValidatedZerobus;
+
+    fn validate(&self) -> crate::Result<ValidatedZerobus> {
+        // Pure structural validation (no network/filesystem/async).
+        self.validate()?;
 
         let request_limits = self.request.into_settings();
 
-        let sink = ZerobusSink::new(service, request_limits, self.batch)?;
+        Ok(ValidatedZerobus { request_limits })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedZerobus,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let service = ZerobusService::new(self.clone(), cx.proxy()).await?;
+        let healthcheck_service = service.clone();
+
+        let sink = ZerobusSink::new(service, validated.request_limits.clone(), self.batch)?;
 
         let healthcheck = async move {
             healthcheck_service
@@ -235,14 +269,6 @@ impl SinkConfig for ZerobusSinkConfig {
             VectorSink::from_event_streamsink(sink),
             Box::pin(healthcheck),
         ))
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -352,6 +378,19 @@ mod tests {
             request: Default::default(),
             acknowledgements: Default::default(),
         }
+    }
+
+    #[test]
+    fn validate_produces_request_limits() {
+        use crate::config::ValidatedSink;
+        let config = create_test_config();
+        // The inherent `validate` (structural checks) shadows the trait method in
+        // method-call syntax, so call the trait method via UFCS.
+        let validated = <ZerobusSinkConfig as ValidatedSink>::validate(&config)
+            .expect("validation should succeed");
+        // Default request settings resolve to an unbounded concurrency.
+        assert_eq!(validated.request_limits.concurrency, None);
+        assert!(validated.request_limits.timeout.as_secs() > 0);
     }
 
     #[test]

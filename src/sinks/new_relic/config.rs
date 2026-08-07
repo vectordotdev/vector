@@ -8,7 +8,11 @@ use super::{
     NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink, NewRelicSinkError,
     healthcheck, service::NewRelicApiRequest,
 };
-use crate::{http::HttpClient, sinks::prelude::*};
+use crate::{
+    config::ValidatedSink,
+    http::HttpClient,
+    sinks::{prelude::*, util::service::TowerRequestSettings},
+};
 
 /// New Relic region.
 #[configurable_component]
@@ -126,47 +130,82 @@ impl NewRelicConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let batcher_settings = self
-            .batch
-            .validate()?
-            .limit_max_events(self.batch.max_events.unwrap_or(100))?
-            .into_batcher_settings()?;
-
-        let request_limits = self.request.into_settings();
-        let tls_settings = TlsSettings::from_options(None)?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
-        let credentials = Arc::from(NewRelicCredentials::from(self));
-
-        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(&credentials))?;
-
-        let service = ServiceBuilder::new()
-            .settings(request_limits, NewRelicApiRetry)
-            .service(NewRelicApiService { client });
-
-        let sink = NewRelicSink {
-            service,
-            encoder: NewRelicEncoder {
-                transformer: self.encoding.clone(),
-                credentials: Arc::clone(&credentials),
-            },
-            credentials,
-            compression: self.compression,
-            batcher_settings,
-        };
-
-        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Metric)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated `new_relic` sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedNewRelic {
+    /// Batch settings computed during validation.
+    batcher_settings: BatcherSettings,
+    /// Tower request settings.
+    request_limits: TowerRequestSettings,
+    /// Credentials (license key, account id, resolved region/API and URI).
+    credentials: Arc<NewRelicCredentials>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for NewRelicConfig {
+    type Validated = ValidatedNewRelic;
+
+    fn validate(&self) -> crate::Result<ValidatedNewRelic> {
+        let batcher_settings = self
+            .batch
+            .validate()?
+            .limit_max_events(self.batch.max_events.unwrap_or(100))?
+            .into_batcher_settings()?;
+        let request_limits = self.request.into_settings();
+        let credentials = Arc::from(NewRelicCredentials::from(self));
+
+        Ok(ValidatedNewRelic {
+            batcher_settings,
+            request_limits,
+            credentials,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedNewRelic,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let ValidatedNewRelic {
+            batcher_settings,
+            request_limits,
+            credentials,
+        } = validated;
+
+        let tls_settings = TlsSettings::from_options(None)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
+        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(credentials))?;
+
+        let service = ServiceBuilder::new()
+            .settings(request_limits.clone(), NewRelicApiRetry)
+            .service(NewRelicApiService { client });
+
+        let sink = NewRelicSink {
+            service,
+            encoder: NewRelicEncoder {
+                transformer: self.encoding.clone(),
+                credentials: Arc::clone(credentials),
+            },
+            credentials: Arc::clone(credentials),
+            compression: self.compression,
+            batcher_settings: *batcher_settings,
+        };
+
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -223,5 +262,27 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
             region: config.region.unwrap_or(NewRelicRegion::Us),
             override_uri: config.override_uri.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.credentials.api, NewRelicApi::Events);
+        assert_eq!(validated.credentials.region, NewRelicRegion::Us);
+        assert!(
+            validated
+                .credentials
+                .get_uri()
+                .to_string()
+                .starts_with("https://insights-collector.newrelic.com/v1/accounts/")
+        );
     }
 }

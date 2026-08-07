@@ -11,7 +11,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -40,28 +40,41 @@ impl CompletionSinkConfig {
 #[async_trait]
 #[typetag::serde(name = "test_completion")]
 impl SinkConfig for CompletionSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let completion_tx = self
-            .completion_tx
-            .lock()
-            .expect("completion sink mutex poisoned")
-            .take();
-
-        let sink = CompletionSink {
-            remaining: self.expected,
-            completion_tx,
-        };
-        let healthcheck = future::ready(Ok(())).boxed();
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for CompletionSinkConfig {
+    type Validated = Self;
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(self.clone())
+    }
+
+    async fn build(
+        &self,
+        validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let completion_tx = validated
+            .completion_tx
+            .lock()
+            .expect("completion sink mutex poisoned")
+            .take();
+
+        let sink = CompletionSink {
+            remaining: validated.expected,
+            completion_tx,
+        };
+        let healthcheck = future::ready(Ok(())).boxed();
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 

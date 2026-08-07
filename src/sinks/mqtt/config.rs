@@ -11,7 +11,7 @@ use crate::{
         ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
         TlsSnafu,
     },
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
     template::{ConfinementConfig, Template},
     tls::MaybeTlsSettings,
@@ -115,19 +115,6 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let topic = self
-            .topic
-            .clone()
-            .confine(&self.confinement, Self::NAME, "topic")?;
-        let connector = self.build_connector()?;
-        let sink = MqttSink::new(self, topic, connector.clone())?;
-        Ok((
-            VectorSink::from_event_streamsink(sink),
-            Box::pin(async move { connector.healthcheck().await }),
-        ))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -138,6 +125,44 @@ impl SinkConfig for MqttSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated MQTT sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedMqttSink {
+    /// The confined topic template.
+    topic: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for MqttSinkConfig {
+    type Validated = ValidatedMqttSink;
+
+    fn validate(&self) -> crate::Result<ValidatedMqttSink> {
+        let topic = self
+            .topic
+            .clone()
+            .confine(&self.confinement, Self::NAME, "topic")?;
+        Ok(ValidatedMqttSink { topic })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedMqttSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedMqttSink { topic } = validated;
+        let connector = self.build_connector()?;
+        let sink = MqttSink::new(self, topic.clone(), connector.clone())?;
+        Ok((
+            VectorSink::from_event_streamsink(sink),
+            Box::pin(async move { connector.healthcheck().await }),
+        ))
     }
 }
 
@@ -198,11 +223,22 @@ impl MqttSinkConfig {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MqttSinkConfig>();
+    }
+
+    #[test]
+    fn validate_returns_confined_topic() {
+        let config = MqttSinkConfig {
+            topic: Template::try_from("test-topic").unwrap(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.topic.to_string(), "test-topic");
     }
 
     #[test]

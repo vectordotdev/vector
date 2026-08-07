@@ -24,12 +24,13 @@ use vector_lib::{
     event::{Event, EventFinalizers, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 use vrl::value::Kind;
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     schema,
@@ -302,24 +303,6 @@ pub enum ChronicleError {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
-
-        let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
-
-        let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
-
-        // For the healthcheck we see if we can fetch the list of available log types.
-        let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
-
-        let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
-        creds.spawn_regenerate_token();
-        let sink = self.build_sink(client, endpoint, creds)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement =
             schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
@@ -332,18 +315,79 @@ impl SinkConfig for ChronicleUnstructuredConfig {
     }
 }
 
+#[async_trait::async_trait]
+impl ValidatedSink for ChronicleUnstructuredConfig {
+    type Validated = ValidatedChronicleUnstructured;
+
+    fn validate(&self) -> crate::Result<ValidatedChronicleUnstructured> {
+        let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
+
+        // For the healthcheck we see if we can fetch the list of available log types.
+        let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
+
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let request_builder = ChronicleRequestBuilder::new(self)?;
+
+        Ok(ValidatedChronicleUnstructured {
+            endpoint,
+            healthcheck_endpoint,
+            batch_settings,
+            request_builder,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedChronicleUnstructured,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedChronicleUnstructured {
+            endpoint,
+            healthcheck_endpoint,
+            ..
+        } = validated;
+
+        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
+
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls, cx.proxy())?;
+
+        let healthcheck = build_healthcheck(client.clone(), healthcheck_endpoint, creds.clone())?;
+        creds.spawn_regenerate_token();
+        let sink = self.build_sink(client, endpoint.clone(), creds, validated)?;
+
+        Ok((sink, healthcheck))
+    }
+}
+
+/// Purely validated Chronicle unstructured sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedChronicleUnstructured {
+    /// The resolved endpoint for the unstructured log entries API.
+    endpoint: String,
+    /// The resolved endpoint for the log types API (used by the healthcheck).
+    healthcheck_endpoint: String,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+    /// The request builder with the resolved encoder.
+    request_builder: ChronicleRequestBuilder,
+}
+
 impl ChronicleUnstructuredConfig {
     fn build_sink(
         &self,
         client: HttpClient,
         base_url: String,
         creds: GcpAuthenticator,
+        validated: &ValidatedChronicleUnstructured,
     ) -> crate::Result<VectorSink> {
         use crate::sinks::util::service::ServiceBuilderExt;
 
         let request = self.request.into_settings();
-
-        let batch_settings = self.batch.into_batcher_settings()?;
 
         let partitioner = self.partitioner()?;
 
@@ -351,9 +395,13 @@ impl ChronicleUnstructuredConfig {
             .settings(request, GcsRetryLogic::default())
             .service(ChronicleService::new(client, base_url, creds));
 
-        let request_settings = ChronicleRequestBuilder::new(self)?;
-
-        let sink = ChronicleSink::new(svc, request_settings, partitioner, batch_settings, "http");
+        let sink = ChronicleSink::new(
+            svc,
+            validated.request_builder.clone(),
+            partitioner,
+            validated.batch_settings,
+            "http",
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -723,6 +771,30 @@ mod unit_tests {
             creds_path, log_type
         ))
         .unwrap();
-        assert!(config.build(cx).await.is_err());
+        assert!(SinkConfig::build(&config, cx).await.is_err());
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(indoc! {r#"
+            endpoint: "http://127.0.0.1:8080"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#})
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint,
+            "http://127.0.0.1:8080/v2/unstructuredlogentries:batchCreate"
+        );
+        assert_eq!(
+            validated.healthcheck_endpoint,
+            "http://127.0.0.1:8080/v2/logtypes"
+        );
     }
 }

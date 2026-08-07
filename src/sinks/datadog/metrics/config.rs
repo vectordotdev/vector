@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
         Healthcheck, UriParseSnafu, VectorSink,
@@ -196,22 +196,55 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
-        let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(&dd_common, client)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
+    }
+}
+
+/// Purely validated Datadog metrics sink configuration.
+#[derive(Clone, Debug)]
+pub struct ValidatedMetrics {
+    /// Series batcher settings computed during validation.
+    batcher_settings: BatcherSettings,
+    /// Sketches batcher settings computed during validation.
+    sketches_batcher_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatadogMetricsConfig {
+    type Validated = ValidatedMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedMetrics> {
+        let (batcher_settings, sketches_batcher_settings) =
+            resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
+
+        Ok(ValidatedMetrics {
+            batcher_settings,
+            sketches_batcher_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.build_client(&cx.proxy)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.local_dd_common.with_globals(global)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(
+            &dd_common,
+            client,
+            validated.batcher_settings,
+            validated.sketches_batcher_settings,
+        )?;
+
+        Ok((sink, healthcheck))
     }
 }
 
@@ -272,10 +305,9 @@ impl DatadogMetricsConfig {
         &self,
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
+        batcher_settings: BatcherSettings,
+        sketches_batcher_settings: BatcherSettings,
     ) -> crate::Result<VectorSink> {
-        let (batcher_settings, sketches_batcher_settings) =
-            resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
-
         // TODO: revisit our concurrency and batching defaults
         let request_limits = self.request.into_settings();
 
@@ -348,10 +380,19 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogMetricsConfig>();
+    }
+
+    #[test]
+    fn validate_produces_endpoint_specific_batch_settings() {
+        let config = DatadogMetricsConfig::default();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batcher_settings.size_limit, 5_242_880); // 5 MiB — Series v2 limit
+        assert_eq!(validated.sketches_batcher_settings.size_limit, 62_914_560); // 60 MiB — Sketches limit
     }
 
     // When max_bytes is unset, each endpoint gets its own API payload limit.

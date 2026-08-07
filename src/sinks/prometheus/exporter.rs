@@ -34,7 +34,10 @@ use vector_lib::{
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     event::{
         Event, EventStatus, Finalizable,
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
@@ -191,21 +194,6 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
-            return Err(Box::new(BuildError::FlushPeriodTooShort {
-                min: MIN_FLUSH_PERIOD_SECS,
-            }));
-        }
-
-        validate_quantiles(&self.quantiles)?;
-
-        let sink = PrometheusExporter::new(self.clone());
-        let healthcheck = future::ok(()).boxed();
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -216,6 +204,34 @@ impl SinkConfig for PrometheusExporterConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PrometheusExporterConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<()> {
+        if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
+            return Err(Box::new(BuildError::FlushPeriodTooShort {
+                min: MIN_FLUSH_PERIOD_SECS,
+            }));
+        }
+
+        validate_quantiles(&self.quantiles)?;
+
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &(),
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = PrometheusExporter::new(self.clone());
+        let healthcheck = future::ok(()).boxed();
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -633,6 +649,26 @@ mod tests {
         crate::test_util::test_generate_config::<PrometheusExporterConfig>();
     }
 
+    #[test]
+    fn validate_checks_flush_period() {
+        // A flush period below the minimum is rejected during validation.
+        let config = PrometheusExporterConfig {
+            flush_period_secs: std::time::Duration::from_secs(0),
+            ..Default::default()
+        };
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("Flush period for sets must be greater or equal to 1 secs"),
+            "unexpected error: {err}"
+        );
+
+        // The default config validates cleanly.
+        PrometheusExporterConfig::default()
+            .validate()
+            .expect("default config should validate");
+    }
+
     #[tokio::test]
     async fn prometheus_notls() {
         export_and_fetch_simple(None).await;
@@ -913,7 +949,9 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -1002,7 +1040,9 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -1542,7 +1582,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
@@ -1580,7 +1622,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
@@ -1637,7 +1681,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 

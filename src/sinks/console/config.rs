@@ -3,14 +3,16 @@ use tokio::io;
 use vector_lib::{
     codecs::{
         JsonSerializerConfig,
-        encoding::{Framer, FramingConfig},
+        encoding::{Framer, FramingConfig, Serializer},
     },
     configurable::configurable_component,
 };
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     sinks::{Healthcheck, VectorSink, console::sink::WriterSink},
 };
 
@@ -75,27 +77,6 @@ impl GenerateConfig for ConsoleSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
-
-        let sink: VectorSink = match self.target {
-            Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
-                output: io::stdout(),
-                transformer,
-                encoder,
-            }),
-            Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
-                output: io::stderr(),
-                transformer,
-                encoder,
-            }),
-        };
-
-        Ok((sink, future::ok(()).boxed()))
-    }
-
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type())
     }
@@ -105,12 +86,78 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
+/// Purely validated `console` sink configuration.
+///
+/// Holds the built encoding components so `build` does not redo the (pure)
+/// encoding construction.
+#[derive(Clone, Debug)]
+pub struct ValidatedConsoleSink {
+    transformer: Transformer,
+    framer: Framer,
+    serializer: Serializer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for ConsoleSinkConfig {
+    type Validated = ValidatedConsoleSink;
+
+    fn validate(&self) -> crate::Result<ValidatedConsoleSink> {
+        let transformer = self.encoding.transformer();
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+        Ok(ValidatedConsoleSink {
+            transformer,
+            framer,
+            serializer,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedConsoleSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedConsoleSink {
+            transformer,
+            framer,
+            serializer,
+        } = validated;
+        let encoder = Encoder::<Framer>::new(framer.clone(), serializer.clone());
+
+        let sink: VectorSink = match self.target {
+            Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
+                output: io::stdout(),
+                transformer: transformer.clone(),
+                encoder,
+            }),
+            Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
+                output: io::stderr(),
+                transformer: transformer.clone(),
+                encoder,
+            }),
+        };
+
+        Ok((sink, future::ok(()).boxed()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ConsoleSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = ConsoleSinkConfig {
+            target: Target::Stdout,
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            acknowledgements: Default::default(),
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert!(matches!(validated.serializer, Serializer::Json(_)));
     }
 }

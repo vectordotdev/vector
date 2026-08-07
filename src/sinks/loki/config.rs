@@ -2,11 +2,18 @@ use std::collections::HashMap;
 
 use vrl::value::Kind;
 
-use super::{healthcheck::healthcheck, sink::LokiSink};
+use super::{
+    healthcheck::healthcheck,
+    sink::{LokiSink, confine_template_map},
+};
 use crate::{
+    config::ValidatedSink,
     http::{Auth, HttpClient, MaybeAuth},
     schema,
-    sinks::{prelude::*, util::UriSerde},
+    sinks::{
+        prelude::*,
+        util::{UriSerde, service::TowerRequestSettings},
+    },
     template::{ConfinementConfig, Template},
 };
 
@@ -217,33 +224,6 @@ impl LokiConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
-        if self.labels.is_empty() {
-            return Err("`labels` must include at least one label.".into());
-        }
-
-        for label in self.labels.keys() {
-            if !valid_label_name(label) {
-                return Err(format!("Invalid label name {:?}", label.get_ref()).into());
-            }
-        }
-
-        let client = self.build_client(cx)?;
-
-        let config = LokiConfig {
-            auth: self.auth.choose_one(&self.endpoint.auth)?,
-            ..self.clone()
-        };
-
-        let sink = LokiSink::new(config.clone(), client.clone())?;
-
-        let healthcheck = healthcheck(config, client).boxed();
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -258,6 +238,115 @@ impl SinkConfig for LokiConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated `loki` sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedLokiSink {
+    /// Resolved auth (pure validation without network).
+    pub(super) auth: Option<Auth>,
+    /// Tower request settings, adjusted for the out-of-order action.
+    pub(super) request_limits: TowerRequestSettings,
+    /// Event transformer from the encoding configuration.
+    pub(super) transformer: Transformer,
+    /// Message encoder built from the encoding configuration.
+    pub(super) encoder: Encoder<()>,
+    /// Confined tenant ID template.
+    pub(super) tenant_id: Option<ConfinedTemplate>,
+    /// Confined label templates.
+    pub(super) labels: HashMap<ConfinedTemplate, ConfinedTemplate>,
+    /// Confined structured metadata templates.
+    pub(super) structured_metadata: HashMap<ConfinedTemplate, ConfinedTemplate>,
+    /// Batch settings computed during validation.
+    pub(super) batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for LokiConfig {
+    type Validated = ValidatedLokiSink;
+
+    fn validate(&self) -> crate::Result<ValidatedLokiSink> {
+        if self.labels.is_empty() {
+            return Err("`labels` must include at least one label.".into());
+        }
+
+        for label in self.labels.keys() {
+            if !valid_label_name(label) {
+                return Err(format!("Invalid label name {:?}", label.get_ref()).into());
+            }
+        }
+
+        let auth = self.auth.choose_one(&self.endpoint.auth)?;
+
+        let request_limits = match self.out_of_order_action {
+            OutOfOrderAction::Accept => self.request.into_settings(),
+            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
+                let mut settings = self.request.into_settings();
+                settings.concurrency = Some(1);
+                settings
+            }
+        };
+
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
+        let tenant_id = self
+            .tenant_id
+            .clone()
+            .map(|template| template.confine(&self.confinement, LokiConfig::NAME, "tenant_id"))
+            .transpose()?;
+
+        let labels = confine_template_map(
+            self.labels.clone(),
+            &self.confinement,
+            LokiConfig::NAME,
+            "labels[key]",
+            "labels[value]",
+        )?;
+        let structured_metadata = confine_template_map(
+            self.structured_metadata.clone(),
+            &self.confinement,
+            LokiConfig::NAME,
+            "structured_metadata[key]",
+            "structured_metadata[value]",
+        )?;
+
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedLokiSink {
+            auth,
+            request_limits,
+            transformer,
+            encoder,
+            tenant_id,
+            labels,
+            structured_metadata,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedLokiSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
+        let client = self.build_client(cx)?;
+
+        let config = LokiConfig {
+            auth: validated.auth.clone(),
+            ..self.clone()
+        };
+
+        let sink = LokiSink::from_validated(config.clone(), validated.clone(), client.clone())?;
+
+        let healthcheck = healthcheck(config, client).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -291,7 +380,11 @@ mod tests {
     use std::convert::TryInto;
 
     use super::valid_label_name;
-    use crate::template::{ConfinementConfig, Template};
+    use crate::{
+        config::ValidatedSink,
+        sinks::loki::LokiConfig,
+        template::{ConfinementConfig, Template},
+    };
 
     #[test]
     fn valid_label_names() {
@@ -347,5 +440,24 @@ mod tests {
             rendered.starts_with("team-"),
             "operator-controlled prefix must be preserved in rendered tenant_id"
         );
+    }
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config: LokiConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "http://localhost:3100"
+            labels:
+              test_name: "placeholder"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        assert!(validated.auth.is_none()); // Default has no auth
+        assert_eq!(validated.labels.len(), 1);
+        assert!(validated.batch_settings.timeout > std::time::Duration::ZERO);
     }
 }

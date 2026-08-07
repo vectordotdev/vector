@@ -12,13 +12,16 @@ use vrl::{
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::Event,
     http::{Auth, HttpClient},
     schema,
     sinks::util::{
-        BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
-        RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
+        PartitionInnerBuffer, RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
+        TowerRequestSettings, UriSerde,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
     },
     template::{TemplateRenderingError, UnconfinedTemplate},
@@ -43,20 +46,30 @@ impl GenerateConfig for LogdnaConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        warn!("DEPRECATED: The `logdna` sink has been renamed. Please use `mezmo` instead.");
-        self.0.build(cx).await
-    }
-
     fn input(&self) -> Input {
         self.0.input()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.0.acknowledgements()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for LogdnaConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<()> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &(),
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        warn!("DEPRECATED: The `logdna` sink has been renamed. Please use `mezmo` instead.");
+        SinkConfig::build(&self.0, cx).await
     }
 }
 
@@ -157,29 +170,6 @@ impl GenerateConfig for MezmoConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "mezmo")]
 impl SinkConfig for MezmoConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let request_settings = self.request.into_settings();
-        let batch_settings = self.batch.into_batch_settings()?;
-        let client = HttpClient::new(None, cx.proxy())?;
-
-        let sink = PartitionHttpSink::new(
-            self.clone(),
-            PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
-            request_settings,
-            batch_settings.timeout,
-            client.clone(),
-        )
-        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error, internal_log_rate_limit = false));
-
-        let healthcheck = healthcheck(self.clone(), client).boxed();
-
-        #[allow(deprecated)]
-        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .optional_meaning("timestamp", Kind::timestamp())
@@ -190,6 +180,60 @@ impl SinkConfig for MezmoConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+/// Purely validated Mezmo sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedMezmo {
+    /// Request settings computed during validation.
+    request_settings: TowerRequestSettings,
+    /// Batch settings computed during validation.
+    batch_settings: BatchSettings<JsonArrayBuffer>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for MezmoConfig {
+    type Validated = ValidatedMezmo;
+
+    fn validate(&self) -> crate::Result<ValidatedMezmo> {
+        let request_settings = self.request.into_settings();
+        let batch_settings = self.batch.into_batch_settings()?;
+        Ok(ValidatedMezmo {
+            request_settings,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedMezmo,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let ValidatedMezmo {
+            request_settings,
+            batch_settings,
+        } = validated;
+
+        let client = HttpClient::new(None, cx.proxy())?;
+
+        let sink = PartitionHttpSink::new(
+            self.clone(),
+            PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
+            request_settings.clone(),
+            batch_settings.timeout,
+            client.clone(),
+        )
+        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error, internal_log_rate_limit = false));
+
+        let healthcheck = healthcheck(self.clone(), client).boxed();
+
+        #[allow(deprecated)]
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 }
 
@@ -458,6 +502,26 @@ mod tests {
         assert_eq!(event4_out.get("env").unwrap(), &json!("staging"));
     }
 
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let (config, _cx) = load_sink::<MezmoConfig>(
+            r#"
+            api_key = "mylogtoken"
+            hostname = "vector"
+        "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        // Realtime size-based defaults: 10 MB batches, 1s timeout.
+        assert_eq!(validated.batch_settings.size.bytes, 10_000_000);
+        assert_eq!(
+            validated.batch_settings.timeout,
+            std::time::Duration::from_secs(1)
+        );
+    }
+
     async fn smoke_start(
         status_code: StatusCode,
         batch_status: BatchStatus,
@@ -478,7 +542,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        _ = config.build(cx.clone()).await.unwrap();
+        _ = SinkConfig::build(&config, cx.clone()).await.unwrap();
 
         let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
@@ -489,7 +553,7 @@ mod tests {
         };
         config.endpoint = endpoint;
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server_status(addr, status_code);
         tokio::spawn(server);

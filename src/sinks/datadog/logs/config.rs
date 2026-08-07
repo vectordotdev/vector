@@ -10,6 +10,7 @@ use vrl::value::Kind;
 use hyper::{Body, client::connect::Connect};
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
+use crate::config::ValidatedSink;
 use crate::{
     common::datadog,
     http::HttpClient,
@@ -114,21 +115,13 @@ impl DatadogLogsConfig {
         dd_common: &DatadogCommonConfig,
         client: HttpClient<Body, C>,
         dd_evp_origin: String,
+        batch: BatcherSettings,
     ) -> crate::Result<VectorSink>
     where
         C: Connect + Clone + Send + Sync + 'static,
     {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.into_settings();
-
-        // We forcefully cap the provided batch configuration to the size/log line limits imposed by
-        // the Datadog Logs API, but we still allow them to be lowered if need be.
-        let batch = self
-            .batch
-            .validate()?
-            .limit_max_bytes(BATCH_GOAL_BYTES)?
-            .limit_max_events(BATCH_MAX_EVENTS)?
-            .into_batcher_settings()?;
 
         let headers = {
             let mut request_headers = self.request.headers.clone();
@@ -192,18 +185,6 @@ impl DatadogLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
-
-        let healthcheck = dd_common.build_healthcheck(client.clone())?;
-
-        let sink = self.build_processor(&dd_common, client, cx.app_name_slug)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .optional_meaning(meaning::MESSAGE, Kind::bytes())
@@ -222,6 +203,45 @@ impl SinkConfig for DatadogLogsConfig {
     }
 }
 
+/// Purely validated Datadog logs sink configuration.
+#[derive(Clone, Debug)]
+pub struct ValidatedLogs {
+    /// Batch settings computed during validation.
+    batch: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatadogLogsConfig {
+    type Validated = ValidatedLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedLogs> {
+        let batch = self
+            .batch
+            .validate()?
+            .limit_max_bytes(BATCH_GOAL_BYTES)?
+            .limit_max_events(BATCH_MAX_EVENTS)?
+            .into_batcher_settings()?;
+
+        Ok(ValidatedLogs { batch })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.create_client(&cx.proxy)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.local_dd_common.with_globals(global)?;
+
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+
+        let sink = self.build_processor(&dd_common, client, cx.app_name_slug, validated.batch)?;
+
+        Ok((sink, healthcheck))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use vector_lib::{
@@ -230,11 +250,22 @@ mod test {
     };
 
     use super::*;
-    use crate::{codecs::EncodingConfigWithFraming, components::validation::prelude::*};
+    use crate::{
+        codecs::EncodingConfigWithFraming, components::validation::prelude::*,
+        config::ValidatedSink,
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_batch_settings() {
+        let config = DatadogLogsConfig::default();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batch.size_limit, BATCH_GOAL_BYTES);
+        assert_eq!(validated.batch.item_limit, BATCH_MAX_EVENTS);
     }
 
     #[test]

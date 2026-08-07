@@ -13,6 +13,7 @@ use crate::sinks::azure_common::config::{AzureAuthentication, SpecificAzureCrede
 use super::config::AzureLogsIngestionConfig;
 
 use crate::{
+    config::ValidatedSink,
     event::LogEvent,
     sinks::prelude::*,
     test_util::{
@@ -24,6 +25,23 @@ use crate::{
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<AzureLogsIngestionConfig>();
+}
+
+#[test]
+fn validate_accepts_valid_config() {
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+    .unwrap();
+
+    config.validate().expect("validation should succeed");
 }
 
 #[tokio::test]
@@ -173,10 +191,12 @@ async fn correct_request() {
 
     let context = SinkContext::default();
 
+    let validated = config.validate().unwrap();
     let (sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            &validated,
+            mock_endpoint,
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -285,10 +305,12 @@ async fn mock_healthcheck_with_400_response() {
     let context = SinkContext::default();
     let credential = std::sync::Arc::new(create_mock_credential());
 
+    let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            &validated,
+            mock_endpoint,
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -352,10 +374,12 @@ async fn mock_healthcheck_with_403_response() {
     let context = SinkContext::default();
     let credential = std::sync::Arc::new(create_mock_credential());
 
+    let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            &validated,
+            mock_endpoint,
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,

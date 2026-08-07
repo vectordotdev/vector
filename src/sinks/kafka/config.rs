@@ -10,6 +10,7 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
+    config::ValidatedSink,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
@@ -285,16 +286,6 @@ impl GenerateConfig for KafkaSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let topic = self
-            .topic
-            .clone()
-            .confine(&self.confinement, Self::NAME, "topic")?;
-        let sink = KafkaSink::new(self.clone(), topic.clone())?;
-        let hc = healthcheck(self.clone(), topic, cx.healthcheck.clone()).boxed();
-        Ok((VectorSink::from_event_streamsink(sink), hc))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -310,14 +301,65 @@ impl SinkConfig for KafkaSinkConfig {
     }
 }
 
+/// Purely validated Kafka sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedKafkaSink {
+    /// The confined topic template.
+    topic: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for KafkaSinkConfig {
+    type Validated = ValidatedKafkaSink;
+
+    fn validate(&self) -> crate::Result<ValidatedKafkaSink> {
+        let topic = self
+            .topic
+            .clone()
+            .confine(&self.confinement, Self::NAME, "topic")?;
+        Ok(ValidatedKafkaSink { topic })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedKafkaSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedKafkaSink { topic } = validated;
+        let sink = KafkaSink::new(self.clone(), topic.clone())?;
+        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck.clone()).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
         KafkaSinkConfig::generate_config();
+    }
+
+    #[test]
+    fn validate_returns_confined_topic() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.topic.to_string(), "test-topic");
     }
 
     #[test]

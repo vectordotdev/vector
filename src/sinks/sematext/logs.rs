@@ -7,7 +7,9 @@ use vrl::event_path;
 use super::Region;
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::EventArray,
     sinks::{
         Healthcheck, VectorSink,
@@ -78,22 +80,58 @@ const EU_ENDPOINT: &str = "https://logsene-receiver.eu.sematext.com";
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+/// Purely validated `sematext_logs` sink configuration.
+///
+/// This type captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+/// The actual sink building consumes these values without recomputing them.
+#[derive(Clone, Debug)]
+pub struct ValidatedSematextLogs {
+    endpoint: String,
+    index: Template,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for SematextLogsConfig {
+    type Validated = ValidatedSematextLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedSematextLogs> {
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), _) => endpoint.clone(),
             (None, Region::Us) => US_ENDPOINT.to_owned(),
             (None, Region::Eu) => EU_ENDPOINT.to_owned(),
         };
 
-        let (sink, healthcheck) = ElasticsearchConfig {
-            endpoints: vec![endpoint],
+        let index =
+            Template::try_from(self.token.inner()).expect("unable to parse token as Template");
+
+        Ok(ValidatedSematextLogs { endpoint, index })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedSematextLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedSematextLogs { endpoint, index } = validated;
+
+        let es_config = ElasticsearchConfig {
+            endpoints: vec![endpoint.clone()],
             compression: Compression::None,
             doc_type: "\
                 logs"
                 .to_string(),
             bulk: BulkConfig {
-                index: Template::try_from(self.token.inner())
-                    .expect("unable to parse token as Template"),
+                index: index.clone(),
                 ..Default::default()
             },
             batch: self.batch,
@@ -104,22 +142,13 @@ impl SinkConfig for SematextLogsConfig {
             encoding: self.encoding.clone(),
             api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
-        }
-        .build(cx)
-        .await?;
+        };
+        let (sink, healthcheck) = SinkConfig::build(&es_config, cx).await?;
 
         let stream = sink.into_stream();
         let mapped_stream = MapTimestampStream { inner: stream };
 
         Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -162,7 +191,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::SinkConfig,
+        config::{SinkConfig, ValidatedSink},
         sinks::util::test::{build_test_server, load_sink},
         test_util::{
             addr::next_addr,
@@ -176,6 +205,23 @@ mod tests {
         crate::test_util::test_generate_config::<SematextLogsConfig>();
     }
 
+    #[test]
+    fn prepares_valid_config() {
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: "mylogtoken".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.endpoint, US_ENDPOINT);
+        assert_eq!(validated.index.get_ref(), "mylogtoken");
+    }
+
     #[tokio::test]
     async fn smoke() {
         let (mut config, cx) = load_sink::<SematextLogsConfig>(indoc! {r#"
@@ -184,14 +230,14 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        _ = config.build(cx.clone()).await.unwrap();
+        _ = SinkConfig::build(&config, cx.clone()).await.unwrap();
 
         let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         config.endpoint = Some(format!("http://{addr}"));
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);

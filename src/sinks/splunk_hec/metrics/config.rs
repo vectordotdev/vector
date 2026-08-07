@@ -4,13 +4,15 @@ use futures_util::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::{
     configurable::configurable_component, lookup::lookup_v2::OptionalValuePath,
-    sensitive_string::SensitiveString, sink::VectorSink,
+    sensitive_string::SensitiveString, sink::VectorSink, stream::BatcherSettings,
 };
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     http::HttpClient,
     sinks::{
         Healthcheck,
@@ -150,7 +152,42 @@ impl GenerateConfig for HecMetricsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::metric()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements.inner
+    }
+}
+
+/// Purely validated Splunk HEC metrics sink configuration.
+///
+/// Captures all validation results that can be computed purely from
+/// configuration without network/filesystem/credentials/async operations.
+#[derive(Clone, Debug)]
+pub struct ValidatedHecMetricsSink {
+    /// Confined index template.
+    index: Option<ConfinedTemplate>,
+    /// Confined source template.
+    source: Option<ConfinedTemplate>,
+    /// Confined sourcetype template.
+    sourcetype: Option<ConfinedTemplate>,
+    /// Templated field keys derived from the templates.
+    templated_field_keys: Box<[String]>,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HecMetricsSinkConfig {
+    type Validated = ValidatedHecMetricsSink;
+
+    fn validate(&self) -> crate::Result<ValidatedHecMetricsSink> {
         let templated_field_keys =
             compute_templated_field_keys(&self.index, &self.source, &self.sourcetype);
 
@@ -170,6 +207,22 @@ impl SinkConfig for HecMetricsSinkConfig {
             .map(|t| t.confine(&self.confinement, Self::NAME, "index"))
             .transpose()?;
 
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedHecMetricsSink {
+            index: confined_index,
+            source: confined_source,
+            sourcetype: confined_sourcetype,
+            templated_field_keys,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHecMetricsSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
@@ -177,27 +230,8 @@ impl SinkConfig for HecMetricsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = self.build_processor(
-            client,
-            cx,
-            confined_sourcetype,
-            confined_source,
-            confined_index,
-            templated_field_keys, // passed to encoder, not per-event metadata
-        )?;
+        let sink = self.build_processor(client, cx, validated)?;
         Ok((sink, healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::metric()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements.inner
     }
 }
 
@@ -220,10 +254,7 @@ impl HecMetricsSinkConfig {
         &self,
         client: HttpClient,
         _: SinkContext,
-        sourcetype: Option<ConfinedTemplate>,
-        source: Option<ConfinedTemplate>,
-        index: Option<ConfinedTemplate>,
-        templated_field_keys: Box<[String]>,
+        validated: &ValidatedHecMetricsSink,
     ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
@@ -231,7 +262,8 @@ impl HecMetricsSinkConfig {
             None
         };
 
-        let request_builder = HecMetricsRequestBuilder::new(self.compression, templated_field_keys);
+        let request_builder =
+            HecMetricsRequestBuilder::new(self.compression, validated.templated_field_keys.clone());
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
@@ -256,15 +288,13 @@ impl HecMetricsSinkConfig {
             self.acknowledgements.clone(),
         );
 
-        let batch_settings = self.batch.into_batcher_settings()?;
-
         let sink = HecMetricsSink {
             service,
-            batch_settings,
+            batch_settings: validated.batch_settings,
             request_builder,
-            sourcetype,
-            source,
-            index,
+            sourcetype: validated.sourcetype.clone(),
+            source: validated.source.clone(),
+            index: validated.index.clone(),
             host_key: self.host_key.path.clone(),
             default_namespace: self.default_namespace.clone(),
         };
