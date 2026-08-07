@@ -1,13 +1,20 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use serde_json::Value;
+use vector_config::schema::generate_root_schema;
 
 use super::{
-    Format, component_name, open_file, read_dir,
+    Format, component_name, interpolate_config_map_with_env_vars, open_file, read_dir,
     representation::{
-        ConfigMap, deserialize_config, deserialize_config_value, merge_into_map, merge_values,
+        ConfigMap, deserialize_config_value, merge_into_map, merge_values, parse_config_value,
     },
+    schema_coercion::coerce,
 };
+use crate::config::ConfigBuilder;
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
@@ -47,26 +54,33 @@ impl ComponentHint {
 // because there are numerous internal functions for dealing with (non)recursive loading that
 // rely on `&self` but don't need overriding and would be confusingly named in a public API.
 pub(super) mod process {
-    use std::io::Read;
-
     use super::*;
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why
     /// this is nested in a private mod.
     pub trait Process {
-        /// Prepares input for serialization. This can be a useful step to interpolate
-        /// environment variables or perform some other pre-processing on the input.
-        fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>>;
+        /// Runs implementation-specific processing after parsing and interpolation.
+        fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>>;
 
-        /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
-        fn load<R: std::io::Read, T>(&mut self, input: R, format: Format) -> Result<T, Vec<String>>
-        where
-            T: serde::de::DeserializeOwned,
-        {
-            let content = self.prepare(input)?;
+        /// Returns whether environment variable interpolation should be applied.
+        fn should_interpolate_env(&self) -> bool {
+            true
+        }
 
-            deserialize_config(&content, format)
+        /// Parses input, interpolates string leaves, and runs implementation-specific processing.
+        fn load<R: Read>(&mut self, input: R, format: Format) -> Result<ConfigMap, Vec<String>> {
+            let source = string_from_input(input)?;
+            let value = parse_config_value(&source, format)
+                .map_err(|errors| annotate_unquoted_placeholders(errors, &source, format))?;
+            let map = deserialize_config_value(value)?;
+            let map = if self.should_interpolate_env() {
+                resolve_environment_variables(map)?
+            } else {
+                map
+            };
+
+            self.postprocess(map)
         }
 
         /// Helper method used by other methods to recursively handle file/dir loading, merging
@@ -222,10 +236,8 @@ where
         input: R,
         format: Format,
     ) -> Result<(), Vec<String>> {
-        if let Some(map) = self.load(input, format)? {
-            self.merge(map, None)?;
-        }
-        Ok(())
+        let map = self.load(input, format)?;
+        self.merge(map, None)
     }
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
@@ -298,9 +310,208 @@ fn merge_with_value(res: &mut ConfigMap, name: String, value: Value) -> Result<(
     Ok(())
 }
 
-/// Deserialize a configuration map into a `T`.
+/// Deserialize a configuration map into a `T`, coercing string scalars according
+/// to the root `ConfigBuilder` JSON Schema.
 pub(super) fn deserialize_config_map<T: serde::de::DeserializeOwned>(
     map: ConfigMap,
 ) -> Result<T, Vec<String>> {
-    deserialize_config_value(Value::Object(map))
+    deserialize_config_map_inner(map, None)
+}
+
+/// Deserialize a namespaced component map against its corresponding root field.
+pub(super) fn deserialize_config_map_wrapped<T: serde::de::DeserializeOwned>(
+    map: ConfigMap,
+    wrapper_key: &str,
+) -> Result<T, Vec<String>> {
+    deserialize_config_map_inner(map, Some(wrapper_key))
+}
+
+fn deserialize_config_map_inner<T: serde::de::DeserializeOwned>(
+    map: ConfigMap,
+    wrapper_key: Option<&str>,
+) -> Result<T, Vec<String>> {
+    let inner = Value::Object(map);
+    let mut config = match wrapper_key {
+        Some(key) => serde_json::json!({ key: inner }),
+        None => inner,
+    };
+
+    let schema =
+        generate_root_schema::<ConfigBuilder>().map_err(|error| vec![format!("{error:?}")])?;
+    let schema = serde_json::to_value(schema).map_err(|error| vec![error.to_string()])?;
+    coerce(
+        &mut config,
+        &schema,
+        schema.get("definitions"),
+        &mut Vec::new(),
+    )
+    .map_err(|error| vec![error.to_string()])?;
+
+    let value = match wrapper_key {
+        Some(key) => config
+            .as_object_mut()
+            .and_then(|map| map.remove(key))
+            .ok_or_else(|| vec![format!("internal: missing wrapper key '{key}'")])?,
+        None => config,
+    };
+
+    deserialize_config_value(value)
+}
+
+fn string_from_input<R: Read>(mut input: R) -> Result<String, Vec<String>> {
+    let mut source = String::new();
+    input
+        .read_to_string(&mut source)
+        .map_err(|error| vec![error.to_string()])?;
+    Ok(source)
+}
+
+pub fn load<R: Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let source = string_from_input(input)?;
+    let value = parse_config_value(&source, format)?;
+    let map = deserialize_config_value(value)?;
+    deserialize_config_map(map)
+}
+
+pub fn resolve_environment_variables(map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+    let mut vars = std::env::vars_os()
+        .filter_map(|(key, value)| Some((key.into_string().ok()?, value.into_string().ok()?)))
+        .collect::<HashMap<_, _>>();
+
+    if !vars.contains_key("HOSTNAME")
+        && let Ok(hostname) = crate::get_hostname()
+    {
+        vars.insert("HOSTNAME".into(), hostname);
+    }
+
+    interpolate_config_map_with_env_vars(&map, &vars)
+}
+
+/// Adds a migration hint when TOML or JSON contains an unquoted placeholder.
+fn annotate_unquoted_placeholders(
+    errors: Vec<String>,
+    source: &str,
+    format: Format,
+) -> Vec<String> {
+    if !matches!(format, Format::Toml | Format::Json) {
+        return errors;
+    }
+
+    let Some((line_no, line, placeholder)) = find_unquoted_placeholder(source) else {
+        return errors;
+    };
+
+    let hint = format!(
+        "Config contains an unquoted placeholder `{placeholder}` at line {line_no}:\n  \
+         {line}\n\
+         Wrap the placeholder in quotes so it parses as a string. Vector will coerce \
+         the value to the declared field type at load time.\n  \
+         Example: `field = \"{placeholder}\"`"
+    );
+
+    let mut annotated = Vec::with_capacity(errors.len() + 1);
+    annotated.push(hint);
+    annotated.extend(errors);
+    annotated
+}
+
+fn find_unquoted_placeholder(source: &str) -> Option<(usize, &str, String)> {
+    for (index, line) in source.lines().enumerate() {
+        if let Some(placeholder) = scan_line_for_unquoted_placeholder(line) {
+            return Some((index + 1, line, placeholder));
+        }
+    }
+    None
+}
+
+fn scan_line_for_unquoted_placeholder(line: &str) -> Option<String> {
+    let bytes = line.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'$'
+            && index + 1 < bytes.len()
+            && bytes[index + 1] == b'{'
+            && let Some(relative_end) = bytes[index + 2..].iter().position(|&byte| byte == b'}')
+        {
+            let end = index + 2 + relative_end + 1;
+            let placeholder =
+                std::str::from_utf8(&bytes[index..end]).expect("bounds are at ASCII chars");
+            if !is_wrapped_in_quotes(line, index, end) {
+                return Some(placeholder.to_string());
+            }
+            index = end;
+            continue;
+        }
+
+        if bytes[index..].starts_with(b"SECRET[")
+            && let Some(relative_end) = bytes[index + 7..].iter().position(|&byte| byte == b']')
+        {
+            let end = index + 7 + relative_end + 1;
+            let placeholder =
+                std::str::from_utf8(&bytes[index..end]).expect("bounds are at ASCII chars");
+            if !is_wrapped_in_quotes(line, index, end) {
+                return Some(placeholder.to_string());
+            }
+            index = end;
+            continue;
+        }
+
+        index += 1;
+    }
+    None
+}
+
+fn is_wrapped_in_quotes(line: &str, start: usize, end: usize) -> bool {
+    let bytes = line.as_bytes();
+    let previous = start.checked_sub(1).map(|position| bytes[position]);
+    let next = bytes.get(end).copied();
+    matches!(previous, Some(b'"') | Some(b'\'')) && matches!(next, Some(b'"') | Some(b'\''))
+}
+
+#[cfg(test)]
+mod placeholder_hint_tests {
+    use super::{Format, annotate_unquoted_placeholders, find_unquoted_placeholder};
+
+    #[test]
+    fn finds_unquoted_env_var_in_toml() {
+        let source = "[sources.in]\ntype = \"demo_logs\"\ncount = ${MY_COUNT}\n";
+        let (line, _, placeholder) = find_unquoted_placeholder(source).expect("should detect");
+        assert_eq!(line, 3);
+        assert_eq!(placeholder, "${MY_COUNT}");
+    }
+
+    #[test]
+    fn ignores_quoted_env_var() {
+        let source = "[sources.in]\ntype = \"demo_logs\"\ncount = \"${MY_COUNT}\"\n";
+        assert!(find_unquoted_placeholder(source).is_none());
+    }
+
+    #[test]
+    fn finds_unquoted_secret_in_json() {
+        let source = "{\"port\": SECRET[vault.port]}\n";
+        let (_, _, placeholder) = find_unquoted_placeholder(source).expect("should detect");
+        assert_eq!(placeholder, "SECRET[vault.port]");
+    }
+
+    #[test]
+    fn ignores_secret_inside_string_value() {
+        let source = "{\"key\": \"SECRET[vault.api_key]\"}\n";
+        assert!(find_unquoted_placeholder(source).is_none());
+    }
+
+    #[test]
+    fn annotation_only_applied_to_toml_or_json() {
+        let errors = vec!["some parse error".to_string()];
+        let yaml =
+            annotate_unquoted_placeholders(errors.clone(), "count: ${MY_COUNT}\n", Format::Yaml);
+        assert_eq!(yaml, errors);
+
+        let toml =
+            annotate_unquoted_placeholders(errors.clone(), "count = ${MY_COUNT}\n", Format::Toml);
+        assert_eq!(toml.len(), errors.len() + 1);
+        assert!(toml[0].contains("Wrap the placeholder in quotes"));
+    }
 }
