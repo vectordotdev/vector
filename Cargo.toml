@@ -533,7 +533,8 @@ vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
-zstd.workspace = true
+# `zdict_builder` exposes dictionary training, used only to build test fixtures.
+zstd = { workspace = true, features = ["zdict_builder"] }
 
 [patch.crates-io]
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
