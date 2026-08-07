@@ -52,14 +52,14 @@ Changes to CI, website, playground and similar are generally not considered user
 
   <type>(<scope>)!: <description>
 
-  * `type` = chore, enhancement, feat, fix, docs, revert, perf
+  * `type` = feat, fix, docs, chore, revert, enhancement, perf, security (only these types are accepted)
   * `!` = OPTIONAL: signals a breaking change
   * `scope` = Optional but appreciated; letters, digits, spaces, hyphens, underscores (e.g. `kafka source`, `amazon-linux`)
   * `description` = short description of the change
 
 Examples:
 
-  * enhancement(file source): Add `sort` option to sort discovered files
+  * enhancement(http_client source): Add `zstd` decoding support
   * feat(new source): Initial `statsd` source
   * fix(file source): Fix a bug discovering new files
   * chore(external docs): Clarify `batch_size` option
