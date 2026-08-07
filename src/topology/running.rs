@@ -684,7 +684,6 @@ impl RunningTopology {
             .iter()
             .chain(diff.enrichment_tables.sinks.to_change.iter())
             .collect::<Vec<_>>();
-        let mut changed_disk_buffer_drains = HashMap::new();
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
@@ -700,6 +699,7 @@ impl RunningTopology {
                     .disk_usage_handles();
                 let usage = disk_buffer_usage(&usage_handles);
                 let buffer_dirs = disk_buffer_directories(&self.config, key);
+                let replacement_buffer_dirs = disk_buffer_directories(new_config, key);
 
                 if reuse_buffers.contains(key) {
                     info!(
@@ -709,15 +709,25 @@ impl RunningTopology {
                         buffered_bytes = usage.byte_size,
                         message = "Reusing the existing disk buffer during configuration reload. Buffered data remains available to the replacement sink.",
                     );
-                } else {
+                } else if buffer_dirs
+                    .iter()
+                    .any(|path| replacement_buffer_dirs.contains(path))
+                {
                     info!(
+                        component_id = %key,
+                        ?buffer_dirs,
+                        buffered_events = usage.event_count,
+                        buffered_bytes = usage.byte_size,
+                        message = "Changing disk-buffered sink; the replacement will reopen the existing buffer after the old sink stops.",
+                    );
+                } else {
+                    warn!(
                         component_id = %key,
                         ?buffer_dirs,
                         remaining_events = usage.event_count,
                         remaining_bytes = usage.byte_size,
-                        message = "Changing a sink with a disk buffer. Vector will wait for the existing buffer to drain before starting the replacement sink.",
+                        message = "Changing disk-buffered sink; the replacement will not reopen the existing buffer.",
                     );
-                    changed_disk_buffer_drains.insert((*key).clone(), usage_handles);
                 }
             }
 
@@ -783,14 +793,7 @@ impl RunningTopology {
             if wait_for_sinks.contains(key) {
                 let previous = self.tasks.remove(key).unwrap();
                 debug!(message = "Waiting for sink to shutdown.", component_id = %key);
-                let buffer = if let Some(usage_handles) = changed_disk_buffer_drains.remove(*key) {
-                    await_sink_buffer_drain(previous, (*key).clone(), usage_handles)
-                        .await
-                        .unwrap()
-                        .unwrap()
-                } else {
-                    previous.await.unwrap().unwrap()
-                };
+                let buffer = previous.await.unwrap().unwrap();
 
                 if reuse_buffers.contains(key) {
                     // We clone instead of removing here because otherwise the input will be
