@@ -241,6 +241,11 @@ where
     state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
     // The total size, in bytes, of all unread records in the buffer.
     total_buffer_size: AtomicU64,
+    // Byte offset published as readable within the current writer file.
+    //
+    // This is runtime-only coordination state. The durable writer checkpoint remains the source of
+    // truth across restarts, and writer initialization reconstructs this boundary after recovery.
+    published_writer_data_file_size: AtomicU64,
     // Notifier for reader-related progress.
     reader_notify: Notify,
     // Notifier for writer-related progress.
@@ -372,6 +377,24 @@ where
     /// Gets the current writer file ID.
     pub fn get_current_writer_file_id(&self) -> u16 {
         self.state().get_current_writer_file_id()
+    }
+
+    /// Gets the readable byte boundary in the current writer data file.
+    pub(super) fn get_published_writer_data_file_size(&self) -> u64 {
+        self.published_writer_data_file_size.load(Ordering::Acquire)
+    }
+
+    /// Initializes the readable byte boundary for the current writer data file.
+    pub(super) fn set_published_file_size(&self, published_bytes: u64) {
+        self.published_writer_data_file_size
+            .store(published_bytes, Ordering::Release);
+    }
+
+    /// Advances the writer file and resets its readable byte boundary.
+    pub(super) fn increment_writer_file_id(&self) {
+        self.published_writer_data_file_size
+            .store(0, Ordering::Release);
+        self.state().increment_writer_file_id();
     }
 
     /// Gets the next writer file ID.
@@ -530,6 +553,8 @@ where
         self.increment_total_buffer_size(record_size);
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
+        self.published_writer_data_file_size
+            .fetch_add(record_size, Ordering::AcqRel);
         self.notify_writer_waiters();
         next_record_id
     }
@@ -802,6 +827,7 @@ where
             lock,
             state: ledger_state,
             total_buffer_size: AtomicU64::new(0),
+            published_writer_data_file_size: AtomicU64::new(0),
             reader_notify: Notify::new(),
             writer_notify: Notify::new(),
             writer_done: AtomicBool::new(false),
