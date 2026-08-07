@@ -63,4 +63,5 @@ Examples:
   * feat(new source): Initial `statsd` source
   * fix(file source): Fix a bug discovering new files
   * chore(external docs): Clarify `batch_size` option
+  * docs: fix whitespace issues in .md files
 -->
