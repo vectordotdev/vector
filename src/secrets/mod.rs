@@ -55,7 +55,7 @@ mod test;
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[configurable(metadata(docs::enum_tag_description = "secret type", docs::required = false,))]
+#[configurable(metadata(docs::enum_tag_description = "secret type", docs::required = false))]
 pub enum SecretBackends {
     /// File.
     File(file::FileBackend),
