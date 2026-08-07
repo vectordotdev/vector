@@ -34,7 +34,7 @@ struct PartialEventMergeState {
 impl PartialEventMergeState {
     fn add_event(
         &mut self,
-        event: LogEvent,
+        mut event: LogEvent,
         file: &str,
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
@@ -45,6 +45,17 @@ impl PartialEventMergeState {
             if bucket.exceeds_max_merged_line_limit {
                 return;
             }
+
+            // Transfer finalizers from the new fragment to the bucket event before
+            // the fragment is dropped. This ensures acknowledgement status propagates
+            // correctly when partial lines are merged: the merged event carries all
+            // fragments' finalizers, so the source checkpoint only advances after the
+            // merged event is delivered (not when individual fragments are dropped).
+            let fragment_finalizers = event.metadata_mut().take_finalizers();
+            bucket
+                .event
+                .metadata_mut()
+                .merge_finalizers(fragment_finalizers);
 
             // merging with existing event
 
