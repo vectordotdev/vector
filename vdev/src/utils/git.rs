@@ -96,6 +96,21 @@ pub fn get_modified_files() -> Result<Vec<String>> {
         .collect())
 }
 
+/// Get a list of files that differ from HEAD, including staged and untracked files.
+pub fn get_files_changed_from_head() -> Result<Vec<String>> {
+    let mut files = HashSet::new();
+
+    let output = run_and_check_output(&["diff", "--name-only", "HEAD"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let output = run_and_check_output(&["ls-files", "--others", "--exclude-standard"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let mut files = Vec::from_iter(files);
+    files.sort();
+    Ok(files)
+}
+
 pub fn set_config_value(key: &str, value: &str) -> Result<String> {
     Command::new("git")
         .args(["config", key, value])

@@ -396,7 +396,6 @@ inotify,https://github.com/hannobraun/inotify,ISC,"Hanno Braun <mail@hannobraun.
 inotify-sys,https://github.com/hannobraun/inotify-sys,ISC,Hanno Braun <hb@hannobraun.de>
 inout,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 instability,https://github.com/ratatui-org/instability,MIT,"Stephen M. Coakley <me@stephencoakley.com>, Joshka"
-integer-encoding,https://github.com/dermesser/integer-encoding-rs,MIT,Lewin Bormann <lbo@spheniscida.de>
 inventory,https://github.com/dtolnay/inventory,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 ipconfig,https://github.com/liranringel/ipconfig,MIT OR Apache-2.0,Liran Ringel <liranringel@gmail.com>
 ipcrypt-rs,https://github.com/jedisct1/rust-ipcrypt2,ISC,Frank Denis <github@pureftpd.org>
@@ -794,7 +793,6 @@ terminal_size,https://github.com/eminence/terminal-size,MIT OR Apache-2.0,Andrew
 thiserror,https://github.com/dtolnay/thiserror,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 thiserror-impl,https://github.com/dtolnay/thiserror,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 thread_local,https://github.com/Amanieu/thread_local-rs,MIT OR Apache-2.0,Amanieu d'Antras <amanieu@gmail.com>
-thrift,https://github.com/apache/thrift/tree/master/lib/rs,Apache-2.0,Apache Thrift Developers <dev@thrift.apache.org>
 tikv-jemalloc-sys,https://github.com/tikv/jemallocator,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>, The TiKV Project Developers"
 tikv-jemallocator,https://github.com/tikv/jemallocator,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>, Simon Sapin <simon.sapin@exyr.org>, Steven Fackler <sfackler@gmail.com>, The TiKV Project Developers"
 time,https://github.com/time-rs/time,MIT OR Apache-2.0,"Jacob Pratt <open-source@jhpratt.dev>, Time contributors"
@@ -827,6 +825,7 @@ tonic,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.co
 tonic-health,https://github.com/hyperium/tonic,MIT,James Nugent <james@jen20.com>
 tonic-prost,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.com>
 tonic-reflection,https://github.com/hyperium/tonic,MIT,"James Nugent <james@jen20.com>, Samani G. Gikandi <samani@gojulas.com>"
+tonic-types,https://github.com/hyperium/tonic,MIT,"Lucio Franco <luciofranco14@gmail.com>, Rafael Lemos <flemos.rafael.dev@gmail.com>"
 tower,https://github.com/tower-rs/tower,MIT,Tower Maintainers <team@tower-rs.com>
 tower-http,https://github.com/tower-rs/tower-http,MIT,Tower Maintainers <team@tower-rs.com>
 tower-layer,https://github.com/tower-rs/tower,MIT,Tower Maintainers <team@tower-rs.com>
