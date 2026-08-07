@@ -722,6 +722,9 @@ fn translate_error(error: tonic::Status) -> State {
     if is_reset(&error) {
         debug!("Stream reset by server.");
         State::RetryNow
+    } else if is_expected_closure(&error) {
+        debug!("Stream closed for an expected reason by the server.");
+        State::RetryNow
     } else {
         emit!(GcpPubsubReceiveError { error });
         State::RetryDelay
@@ -735,6 +738,13 @@ fn is_reset(error: &Status) -> bool {
         .and_then(|error| error.source())
         .and_then(|source| source.downcast_ref::<h2::Error>())
         .is_some_and(|error| error.is_remote() && error.is_reset())
+}
+
+fn is_expected_closure(error: &Status) -> bool {
+    error.code() == Code::Unavailable
+        && error
+            .message()
+            .starts_with("The StreamingPull stream closed for an expected reason")
 }
 
 #[pin_project::pin_project]
@@ -838,6 +848,36 @@ mod tests {
         .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
 
         assert_eq!(definitions, Some(expected_definition));
+    }
+
+    #[test]
+    fn expected_closure_matches_unavailable_with_known_message() {
+        let error = Status::unavailable(
+            "The StreamingPull stream closed for an expected reason. Reconnecting.",
+        );
+        assert!(is_expected_closure(&error));
+    }
+
+    #[test]
+    fn expected_closure_does_not_match_different_message() {
+        let error = Status::unavailable("Server shutting down");
+        assert!(!is_expected_closure(&error));
+    }
+
+    #[test]
+    fn expected_closure_does_not_match_different_code() {
+        let error = Status::internal(
+            "The StreamingPull stream closed for an expected reason. Reconnecting.",
+        );
+        assert!(!is_expected_closure(&error));
+    }
+
+    #[test]
+    fn translate_error_retries_now_on_expected_closure() {
+        let error = Status::unavailable(
+            "The StreamingPull stream closed for an expected reason. Reconnecting.",
+        );
+        assert!(matches!(translate_error(error), State::RetryNow));
     }
 }
 
