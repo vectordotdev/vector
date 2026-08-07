@@ -12,6 +12,14 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      # These dependencies share archive validation APIs and must be updated
+      # together, including consideration of disk buffer format compatibility.
+      rkyv-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "bytecheck"
+          - "rkyv"
+
       patches:
         applies-to: version-updates
         patterns:
@@ -38,16 +46,6 @@ updates:
           - "tonic-*"
           - "tower-http"
           - "warp"
-        update-types:
-          - "major"
-
-      # These dependencies share archive validation APIs and must be migrated
-      # together, including consideration of disk buffer format compatibility.
-      rkyv-upgrade:
-        applies-to: version-updates
-        patterns:
-          - "bytecheck"
-          - "rkyv"
         update-types:
           - "major"
 
