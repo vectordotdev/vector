@@ -5,8 +5,10 @@ use super::{
     BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SnsMessagePublisher,
     message_deduplication_id, message_group_id,
 };
+use aws_config::Region;
+
 use crate::{
-    aws::{ClientBuilder, RegionOrEndpoint, create_client},
+    aws::{ClientBuilder, RegionOrEndpoint, create_client_without_transport_metrics},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext,
@@ -45,8 +47,11 @@ impl GenerateConfig for SnsSinkConfig {
 }
 
 impl SnsSinkConfig {
-    pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SnsClient> {
-        create_client::<SnsClientBuilder>(
+    pub(super) async fn create_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<(SnsClient, Region)> {
+        create_client_without_transport_metrics::<SnsClientBuilder>(
             &SnsClientBuilder {},
             &self.base_config.auth,
             self.region.region(),
@@ -66,7 +71,7 @@ impl SinkConfig for SnsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
+        let (client, resolved_region) = self.create_client(&cx.proxy).await?;
 
         let publisher = SnsMessagePublisher::new(client.clone(), self.topic_arn.clone());
 
@@ -79,6 +84,7 @@ impl SinkConfig for SnsSinkConfig {
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone());
 
+        let region = resolved_region.to_string();
         let sink = SSSink::new(
             SSRequestBuilder::new(
                 message_group_id?,
@@ -87,6 +93,7 @@ impl SinkConfig for SnsSinkConfig {
             )?,
             self.base_config.request,
             publisher,
+            region,
         )?;
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),

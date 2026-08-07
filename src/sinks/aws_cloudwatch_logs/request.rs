@@ -22,7 +22,10 @@ use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
+use crate::sinks::{
+    aws_cloudwatch_logs::{config::Retention, service::CloudwatchError},
+    util::EncodedLength,
+};
 
 pub struct CloudwatchFuture {
     client: Client,
@@ -32,6 +35,8 @@ pub struct CloudwatchFuture {
     retention_enabled: bool,
     events: Vec<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
+    current_batch_bytes: usize,
+    accumulated_bytes_sent: usize,
 }
 
 struct Client {
@@ -55,6 +60,10 @@ enum State {
 }
 
 impl CloudwatchFuture {
+    fn batch_message_bytes(batch: &[InputLogEvent]) -> usize {
+        batch.iter().map(|e| e.encoded_length()).sum()
+    }
+
     /// Panics if events.is_empty()
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
@@ -82,10 +91,12 @@ impl CloudwatchFuture {
             tags,
         };
 
-        let state = if let Some(token) = token {
-            State::Put(client.put_logs(Some(token), events.pop().expect("No Events to send")))
+        let (state, current_batch_bytes) = if let Some(token) = token {
+            let batch = events.pop().expect("No Events to send");
+            let bytes = Self::batch_message_bytes(&batch);
+            (State::Put(client.put_logs(Some(token), batch)), bytes)
         } else {
-            State::DescribeStream(client.describe_stream())
+            (State::DescribeStream(client.describe_stream()), 0)
         };
 
         let retention_enabled = retention.enabled;
@@ -98,6 +109,8 @@ impl CloudwatchFuture {
             create_missing_group,
             create_missing_stream,
             retention_enabled,
+            current_batch_bytes,
+            accumulated_bytes_sent: 0,
         }
     }
 }
@@ -145,6 +158,7 @@ impl Future for CloudwatchFuture {
 
                         let token = stream.upload_sequence_token;
 
+                        self.current_batch_bytes = Self::batch_message_bytes(&events);
                         info!(message = "Putting logs.", token = ?token);
                         self.state = State::Put(self.client.put_logs(token, events));
                     } else if self.create_missing_stream {
@@ -210,10 +224,21 @@ impl Future for CloudwatchFuture {
                 State::Put(fut) => {
                     let next_token = match ready!(fut.poll_unpin(cx)) {
                         Ok(resp) => resp.next_sequence_token,
-                        Err(err) => return Poll::Ready(Err(CloudwatchError::Put(err))),
+                        Err(err) => {
+                            if self.accumulated_bytes_sent > 0 {
+                                return Poll::Ready(Err(CloudwatchError::PutPartial {
+                                    error: err,
+                                    bytes_sent: self.accumulated_bytes_sent,
+                                }));
+                            }
+                            return Poll::Ready(Err(CloudwatchError::Put(err)));
+                        }
                     };
 
+                    self.accumulated_bytes_sent += self.current_batch_bytes;
+
                     if let Some(events) = self.events.pop() {
+                        self.current_batch_bytes = Self::batch_message_bytes(&events);
                         debug!(message = "Putting logs.", next_token = ?next_token);
                         self.state = State::Put(self.client.put_logs(next_token, events));
                     } else {

@@ -78,6 +78,7 @@ impl SendRecord for KinesisStreamClient {
                 failed_records: extract_failed_records(&output),
                 failure_count: output.failed_record_count().unwrap_or(0) as usize,
                 events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
+                byte_size: 0,
             })
     }
 }

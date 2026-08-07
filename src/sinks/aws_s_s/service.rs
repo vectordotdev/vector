@@ -7,7 +7,7 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::future::BoxFuture;
 use tower::Service;
 use vector_lib::{
-    ByteSizeOf, event::EventStatus, request_metadata::GroupedCountByteSize, stream::DriverResponse,
+    event::EventStatus, request_metadata::GroupedCountByteSize, stream::DriverResponse,
 };
 
 use super::{client::Client, request_builder::SendMessageEntry};
@@ -63,7 +63,7 @@ where
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, entry: SendMessageEntry) -> Self::Future {
-        let byte_size = entry.size_of();
+        let byte_size = entry.metadata.request_encoded_size();
         let client = self.client.clone();
 
         Box::pin(async move { client.send_message(entry, byte_size).await })

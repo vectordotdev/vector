@@ -109,8 +109,8 @@ impl CloudwatchRequestBuilder {
             return None;
         }
 
-        let bytes_len =
-            NonZeroUsize::new(message_bytes.len()).expect("payload should never be zero length");
+        let bytes_len = NonZeroUsize::new(message_bytes.len() + BATCH_SIZE_OVERHEAD)
+            .expect("payload should never be zero length");
         let metadata = builder.with_request_size(bytes_len);
 
         Some(CloudwatchRequest {

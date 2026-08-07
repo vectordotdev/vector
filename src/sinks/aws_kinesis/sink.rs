@@ -29,6 +29,8 @@ pub struct KinesisSink<S, R> {
     pub service: S,
     pub request_builder: KinesisRequestBuilder<R>,
     pub partition_key_field: Option<ConfigValuePath>,
+    /// The AWS region string for metric labels.
+    pub region: String,
     pub _phantom: PhantomData<R>,
 }
 
@@ -72,6 +74,8 @@ where
                 BatchKinesisRequest { events, metadata }
             })
             .into_driver(self.service)
+            .protocol("https")
+            .label("region", self.region)
             .run()
             .await
     }

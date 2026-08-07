@@ -44,6 +44,7 @@ pub struct Driver<St, Svc> {
     input: St,
     service: Svc,
     protocol: Option<SharedString>,
+    extra_labels: Vec<(SharedString, SharedString)>,
 }
 
 impl<St, Svc> Driver<St, Svc> {
@@ -52,6 +53,7 @@ impl<St, Svc> Driver<St, Svc> {
             input,
             service,
             protocol: None,
+            extra_labels: vec![],
         }
     }
 
@@ -62,6 +64,13 @@ impl<St, Svc> Driver<St, Svc> {
     #[must_use]
     pub fn protocol(mut self, protocol: impl Into<SharedString>) -> Self {
         self.protocol = Some(protocol.into());
+        self
+    }
+
+    /// Add an extra label to the `BytesSent` metric emitted by this driver.
+    #[must_use]
+    pub fn label(mut self, key: impl Into<SharedString>, value: impl Into<SharedString>) -> Self {
+        self.extra_labels.push((key.into(), value.into()));
         self
     }
 }
@@ -92,12 +101,18 @@ where
             input,
             mut service,
             protocol,
+            extra_labels,
         } = self;
 
         let batched_input = input.ready_chunks(1024);
         pin!(batched_input);
 
-        let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
+        let bytes_sent = protocol.map(|protocol| {
+            register(BytesSent {
+                protocol,
+                extra_labels,
+            })
+        });
         let events_sent = RegisteredEventCache::new(());
 
         loop {
