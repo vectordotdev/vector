@@ -1,6 +1,7 @@
-The `reduce` transform now accepts a `data_type` option (`log` or
-`trace`, default `log`) that selects whether the instance collapses log
-events or trace events. The existing merge strategies and conditions
-apply unchanged to trace events.
+The `reduce` transform now accepts and emits `trace` events in addition to
+`log` events. The event type is detected automatically, and events of
+different types are never merged together, so a `reduce` instance fed both
+logs and traces reduces each type independently. The existing merge
+strategies and conditions apply unchanged to trace events.
 
 authors: p120ph37

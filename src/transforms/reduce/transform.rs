@@ -14,13 +14,13 @@ use vrl::{
 };
 
 use crate::{
-    conditions::{AnyCondition, Condition, ConditionConfig},
+    conditions::Condition,
     event::{Event, EventMetadata, LogEvent, TraceEvent, discriminant::Discriminant},
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
         TaskTransform,
         reduce::{
-            config::{ReduceConfig, ReduceDataType},
+            config::ReduceConfig,
             merge_strategy::{MergeStrategy, ReduceValueMerger, get_value_merger},
         },
     },
@@ -139,6 +139,15 @@ impl ReduceState {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum EventType {
+    Log,
+    Trace,
+}
+
+// Qualified by event type so that logs and traces are never reduced together.
+type TypedDiscriminant = (EventType, Discriminant);
+
 #[derive(Clone, Debug)]
 pub struct Reduce {
     expire_after: Duration,
@@ -146,11 +155,10 @@ pub struct Reduce {
     end_every_period: Option<Duration>,
     group_by: Vec<String>,
     merge_strategies: IndexMap<OwnedTargetPath, MergeStrategy>,
-    reduce_merge_states: HashMap<Discriminant, ReduceState>,
+    reduce_merge_states: HashMap<TypedDiscriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
-    data_type: ReduceDataType,
 }
 
 fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
@@ -180,22 +188,6 @@ impl Reduce {
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
-        }
-
-        if config.data_type == ReduceDataType::Trace {
-            for (field, condition) in [
-                ("ends_when", &config.ends_when),
-                ("starts_when", &config.starts_when),
-            ] {
-                if let Some(AnyCondition::Map(ConditionConfig::DatadogSearch(_))) = condition {
-                    return Err(format!(
-                        "`{field}` does not support `datadog_search` conditions when \
-                         `data_type = \"trace\"`: the `datadog_search` matcher only \
-                         evaluates log events and would silently never match trace inputs."
-                    )
-                    .into());
-                }
-            }
         }
 
         let ends_when = config
@@ -236,7 +228,6 @@ impl Reduce {
             ends_when,
             starts_when,
             max_events,
-            data_type: config.data_type,
         })
     }
 
@@ -257,19 +248,18 @@ impl Reduce {
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
                 emit!(ReduceStaleEventFlushed);
-                emitter.emit(wrap_flushed(t.flush(), self.data_type));
+                emitter.emit(wrap_flushed(t.flush(), k.0));
             }
         }
     }
 
     fn flush_all_into(&mut self, emitter: &mut Emitter<Event>) {
-        let data_type = self.data_type;
         self.reduce_merge_states
             .drain()
-            .for_each(|(_, s)| emitter.emit(wrap_flushed(s.flush(), data_type)));
+            .for_each(|((event_type, _), s)| emitter.emit(wrap_flushed(s.flush(), event_type)));
     }
 
-    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
+    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: TypedDiscriminant) {
         match self.reduce_merge_states.entry(discriminant) {
             Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
@@ -293,19 +283,16 @@ impl Reduce {
             None => (false, event),
         };
 
-        // `input()` restricts the variants we can see here to `Log` or
-        // `Trace` based on `data_type`. `TraceEvent` is a newtype around
-        // `LogEvent` (`From<TraceEvent> for LogEvent` is lossless), so we
-        // operate on its inner `LogEvent` for the duration of the reduce
-        // and re-wrap on flush via `wrap_flushed`.
-        let event = match event {
-            Event::Log(log) => log,
-            Event::Trace(trace) => LogEvent::from(trace),
-            Event::Metric(_) => {
-                unreachable!("reduce input() rejects metric events")
-            }
+        // `TraceEvent` is a newtype around `LogEvent`, so reduce over the inner one.
+        let (event_type, event) = match event {
+            Event::Log(log) => (EventType::Log, log),
+            Event::Trace(trace) => (EventType::Trace, LogEvent::from(trace)),
+            Event::Metric(_) => panic!("component can never receive metric events"),
         };
-        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
+        let discriminant = (
+            event_type,
+            Discriminant::from_log_event(&event, &self.group_by),
+        );
 
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
@@ -320,7 +307,7 @@ impl Reduce {
 
         if starts_here {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
-                emitter.emit(wrap_flushed(state.flush(), self.data_type));
+                emitter.emit(wrap_flushed(state.flush(), event_type));
             }
 
             self.push_or_new_reduce_state(event, discriminant)
@@ -337,7 +324,7 @@ impl Reduce {
                         state.flush()
                     }
                 },
-                self.data_type,
+                event_type,
             ));
         } else {
             self.push_or_new_reduce_state(event, discriminant)
@@ -345,14 +332,10 @@ impl Reduce {
     }
 }
 
-/// Wrap a reduced `LogEvent` back into the `Event` variant declared by the
-/// transform's `data_type`. Pairs with the input-variant extraction in
-/// `transform_one`: a `Log` input round-trips as `Event::Log`, a `Trace`
-/// input round-trips as `Event::Trace(TraceEvent::from(log))`.
-fn wrap_flushed(log: LogEvent, data_type: ReduceDataType) -> Event {
-    match data_type {
-        ReduceDataType::Log => Event::Log(log),
-        ReduceDataType::Trace => Event::Trace(TraceEvent::from(log)),
+fn wrap_flushed(log: LogEvent, event_type: EventType) -> Event {
+    match event_type {
+        EventType::Log => Event::Log(log),
+        EventType::Trace => Event::Trace(TraceEvent::from(log)),
     }
 }
 
@@ -1081,21 +1064,14 @@ mod test {
 
     #[tokio::test]
     async fn reduce_trace_events() {
-        // Mirror of `reduce_from_condition`, but configured with
-        // `data_type = "trace"` so the reduce instance accepts and emits
-        // `Event::Trace` rather than `Event::Log`. Verifies that the
-        // existing field-merge machinery works unchanged across event
-        // variants and that the output round-trips through `TraceEvent`.
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-data_type = "trace"
-group_by = [ "request_id" ]
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        // Mirror of `reduce_from_condition`, but fed `Event::Trace` inputs.
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -1120,7 +1096,6 @@ group_by = [ "request_id" ]
             }
 
             let output = out.recv().await.unwrap();
-            // Output variant must match the configured data_type.
             let trace = match output {
                 Event::Trace(t) => t,
                 other => panic!("expected Event::Trace, got {other:?}"),
@@ -1140,22 +1115,17 @@ group_by = [ "request_id" ]
 
     #[tokio::test]
     async fn reduce_trace_merge_strategies() {
-        // Exercise per-field merge strategies on trace events to confirm
-        // the strategy machinery is fully event-type-agnostic.
-        let reduce_config = toml::from_str::<ReduceConfig>(
-            r#"
-data_type = "trace"
-group_by = [ "request_id" ]
-
-merge_strategies.foo = "concat"
-merge_strategies.bar = "array"
-merge_strategies.baz = "max"
-
-[ends_when]
-  type = "vrl"
-  source = "exists(.test_end)"
-"#,
-        )
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            merge_strategies:
+              foo: concat
+              bar: array
+              baz: max
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
 
         assert_transform_compliance(async move {
@@ -1213,33 +1183,61 @@ merge_strategies.baz = "max"
         .await;
     }
 
-    #[test]
-    fn rejects_datadog_search_with_trace_data_type() {
-        // `DatadogSearchRunner::matches` is log-only, so combining it with
-        // `data_type = "trace"` would silently never fire the boundary
-        // condition. Reject the combination at config build time.
-        let config = toml::from_str::<ReduceConfig>(indoc!(
-            r#"
-            data_type = "trace"
-            group_by = [ "request_id" ]
-
-            [ends_when]
-              type = "datadog_search"
-              source = "@test_end:yep"
-            "#,
-        ))
+    #[tokio::test]
+    async fn does_not_merge_logs_with_traces() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
         .unwrap();
-        let error = Reduce::new(
-            &config,
-            &TableRegistry::default(),
-            &MetricsStorage::default(),
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("`datadog_search` conditions when `data_type = \"trace\"`"),
-            "unexpected error: {error}"
-        );
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let make = |msg: &str, counter: i64, end: bool| {
+                let mut e = LogEvent::from(msg);
+                e.insert(event_path!("counter"), counter);
+                e.insert(event_path!("request_id"), "1");
+                if end {
+                    e.insert(event_path!("test_end"), "yep");
+                }
+                e
+            };
+
+            tx.send(Event::Log(make("log 1", 1, false))).await.unwrap();
+            tx.send(Event::Trace(TraceEvent::from(make("trace 1", 10, false))))
+                .await
+                .unwrap();
+            tx.send(Event::Log(make("log 2", 2, true))).await.unwrap();
+
+            match out.recv().await.unwrap() {
+                Event::Log(log) => {
+                    assert_eq!(log.get(event_path!("message")), Some(&"log 1".into()));
+                    assert_eq!(log.get(event_path!("counter")), Some(&Value::from(3)));
+                }
+                other => panic!("expected Event::Log, got {other:?}"),
+            }
+
+            tx.send(Event::Trace(TraceEvent::from(make("trace 2", 20, true))))
+                .await
+                .unwrap();
+
+            match out.recv().await.unwrap() {
+                Event::Trace(trace) => {
+                    assert_eq!(trace.get(event_path!("message")), Some(&"trace 1".into()));
+                    assert_eq!(trace.get(event_path!("counter")), Some(&Value::from(30)));
+                }
+                other => panic!("expected Event::Trace, got {other:?}"),
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }
