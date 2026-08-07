@@ -1,7 +1,7 @@
 use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
-use tokio_util::codec::Decoder;
-use tracing::{trace, warn};
+use tokio_util::codec::{Decoder, LinesCodecError};
+use tracing::trace;
 use vector_config::configurable_component;
 
 use super::BoxedFramingError;
@@ -119,13 +119,14 @@ impl Decoder for CharacterDelimitedDecoder {
                 Some(next_delimiter_idx) => {
                     if next_delimiter_idx > self.max_length {
                         // The discovered sub-buffer is too big, so we discard
-                        // it, taking care to also discard the delimiter.
-                        warn!(
-                            message = "Discarding frame larger than max_length.",
-                            buf_len = buf.len(),
-                            max_length = self.max_length
-                        );
+                        // it, taking care to also discard the delimiter. Report
+                        // this via `Err` rather than only a trace-level log so
+                        // it surfaces through the standard
+                        // `DecoderFramingError`/`component_errors_total` path
+                        // instead of being silently dropped and hidden behind
+                        // log suppression.
                         buf.advance(next_delimiter_idx + 1);
+                        return Err(LinesCodecError::MaxLineLengthExceeded.into());
                     } else {
                         let frame = buf.split_to(next_delimiter_idx).freeze();
                         trace!(
@@ -147,12 +148,8 @@ impl Decoder for CharacterDelimitedDecoder {
                 if buf.is_empty() {
                     Ok(None)
                 } else if buf.len() > self.max_length {
-                    warn!(
-                        message = "Discarding frame larger than max_length.",
-                        buf_len = buf.len(),
-                        max_length = self.max_length
-                    );
-                    Ok(None)
+                    buf.advance(buf.len());
+                    Err(LinesCodecError::MaxLineLengthExceeded.into())
                 } else {
                     let bytes: Bytes = buf.split_to(buf.len()).freeze();
                     Ok(Some(bytes))
@@ -186,10 +183,15 @@ mod tests {
         let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
-        // limit is 6 so it will skip longer lines
+        // limit is 6 so it will skip longer lines, surfacing an `Err` for
+        // each skipped line so the discard is observable via
+        // `DecoderFramingError`/`component_errors_total` rather than only a
+        // suppressible trace-level log.
         buf.put_slice(b"1234567\n123456\n123412314\n123");
 
+        assert!(codec.decode(buf).is_err());
         assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("123456")));
+        assert!(codec.decode(buf).is_err());
         assert_eq!(codec.decode(buf).unwrap(), None);
 
         let buf = &mut BytesMut::new();
@@ -197,7 +199,9 @@ mod tests {
         // limit is 6 so it will skip longer lines
         buf.put_slice(b"1234567\n123456\n123412314\n123");
 
+        assert!(codec.decode_eof(buf).is_err());
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123456")));
+        assert!(codec.decode_eof(buf).is_err());
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123")));
         assert_eq!(codec.decode_eof(buf).unwrap(), None);
     }

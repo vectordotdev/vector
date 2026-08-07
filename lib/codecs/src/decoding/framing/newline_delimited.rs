@@ -134,6 +134,7 @@ mod tests {
         let mut decoder = NewlineDelimitedDecoder::new_with_max_length(3);
 
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
+        assert!(decoder.decode(&mut input).is_err());
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "baz");
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
@@ -165,6 +166,7 @@ mod tests {
         let mut decoder = NewlineDelimitedDecoder::new_with_max_length(3);
 
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "foo");
+        assert!(decoder.decode_eof(&mut input).is_err());
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "baz");
         assert_eq!(decoder.decode_eof(&mut input).unwrap(), None);
     }
