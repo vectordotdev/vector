@@ -1,0 +1,1 @@
+Adds ability to add arbitrary request headers to the `prometheus scrape` source.
