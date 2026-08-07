@@ -418,10 +418,10 @@ impl AzureBlobSinkConfig {
         let mut names = Vec::new();
         while let Some(result) = pager.next().await {
             let item = result.expect("Failed to fetch blobs");
-            if let Some(name) = item.name {
-                if name.starts_with(&prefix) {
-                    names.push(name);
-                }
+            if let Some(name) = item.name
+                && name.starts_with(&prefix)
+            {
+                names.push(name);
             }
         }
 
