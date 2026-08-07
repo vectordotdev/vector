@@ -41,6 +41,16 @@ updates:
         update-types:
           - "major"
 
+      # These dependencies share archive validation APIs and must be migrated
+      # together, including consideration of disk buffer format compatibility.
+      rkyv-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "bytecheck"
+          - "rkyv"
+        update-types:
+          - "major"
+
       amq:
         patterns:
           - "amq-*"
@@ -174,6 +184,7 @@ updates:
           - "*"
         exclude-patterns:
           - "axum"
+          - "bytecheck"
           - "headers"
           - "http"
           - "http-*"
@@ -182,6 +193,7 @@ updates:
           - "prost"
           - "prost-*"
           - "reqwest"
+          - "rkyv"
           - "tokio-tungstenite"
           - "tonic"
           - "tonic-*"
