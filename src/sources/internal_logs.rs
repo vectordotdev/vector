@@ -1,10 +1,11 @@
 use chrono::Utc;
 use futures::{StreamExt, stream};
+use tracing_subscriber::filter::LevelFilter;
 use vector_lib::{
     codecs::BytesDeserializerConfig,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
-    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
+    lookup::{OwnedValuePath, event_path, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
 use vrl::value::Kind;
@@ -12,7 +13,7 @@ use vrl::value::Kind;
 use crate::{
     SourceSender,
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
-    event::{EstimatedJsonEncodedSizeOf, Event},
+    event::{EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
@@ -43,10 +44,85 @@ pub struct InternalLogsConfig {
     #[serde(default = "default_pid_key")]
     pid_key: OptionalValuePath,
 
+    /// The maximum verbosity of log events to expose.
+    ///
+    /// Log events at this severity level and above are delivered to this source,
+    /// independently of the console log level Vector was started with (`VECTOR_LOG`,
+    /// `--verbose`, and `--quiet`).
+    ///
+    /// This setting takes effect once the configuration has been loaded. The few events emitted
+    /// before that, during early startup, are captured at the console log level (with a floor of
+    /// `info`), so exposing `debug` or `trace` events from early startup additionally requires
+    /// starting Vector with a verbose console log level (for example, `VECTOR_LOG=debug`).
+    #[serde(default = "default_level")]
+    level: LogLevel,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+}
+
+/// A log verbosity level.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    /// Expose all log events.
+    Trace,
+
+    /// Expose log events at the `DEBUG` level and above.
+    Debug,
+
+    /// Expose log events at the `INFO` level and above.
+    Info,
+
+    /// Expose log events at the `WARN` level and above.
+    Warn,
+
+    /// Expose only log events at the `ERROR` level.
+    Error,
+}
+
+impl LogLevel {
+    /// Ranks levels by verbosity, such that more verbose levels are greater.
+    const fn verbosity(self) -> u8 {
+        match self {
+            Self::Error => 0,
+            Self::Warn => 1,
+            Self::Info => 2,
+            Self::Debug => 3,
+            Self::Trace => 4,
+        }
+    }
+
+    /// Parses the level recorded on internal log events at `metadata.level`.
+    fn from_event_level(level: &[u8]) -> Option<Self> {
+        match level {
+            b"TRACE" => Some(Self::Trace),
+            b"DEBUG" => Some(Self::Debug),
+            b"INFO" => Some(Self::Info),
+            b"WARN" => Some(Self::Warn),
+            b"ERROR" => Some(Self::Error),
+            _ => None,
+        }
+    }
+}
+
+impl From<LogLevel> for LevelFilter {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => LevelFilter::TRACE,
+            LogLevel::Debug => LevelFilter::DEBUG,
+            LogLevel::Info => LevelFilter::INFO,
+            LogLevel::Warn => LevelFilter::WARN,
+            LogLevel::Error => LevelFilter::ERROR,
+        }
+    }
+}
+
+const fn default_level() -> LogLevel {
+    LogLevel::Info
 }
 
 fn default_pid_key() -> OptionalValuePath {
@@ -60,6 +136,7 @@ impl Default for InternalLogsConfig {
         InternalLogsConfig {
             host_key: None,
             pid_key: default_pid_key(),
+            level: default_level(),
             log_namespace: None,
         }
     }
@@ -109,18 +186,30 @@ impl SourceConfig for InternalLogsConfig {
             .path;
         let pid_key = self.pid_key.clone().path;
 
+        // The broadcast channel feeding all `internal_logs` sources is filtered at the most
+        // verbose level registered by any running source; events below this source's own level
+        // are dropped from its stream in `run`. The registration lives as long as the source, so
+        // that removing or reconfiguring the source through a reload lowers the level again.
+        let broadcast_registration = crate::trace::register_broadcast_level(self.level.into());
+
         let subscription = TraceSubscription::subscribe();
 
+        let level = self.level;
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(run(
-            host_key,
-            pid_key,
-            subscription,
-            cx.out,
-            cx.shutdown,
-            log_namespace,
-        )))
+        Ok(Box::pin(async move {
+            let _broadcast_registration = broadcast_registration;
+            run(
+                host_key,
+                pid_key,
+                level,
+                subscription,
+                cx.out,
+                cx.shutdown,
+                log_namespace,
+            )
+            .await
+        }))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -138,9 +227,19 @@ impl SourceConfig for InternalLogsConfig {
     }
 }
 
+/// Checks whether a log event is at `max_level` or above in severity. Events whose level is
+/// missing or unrecognised are passed through.
+fn within_max_level(log: &LogEvent, max_level: LogLevel) -> bool {
+    log.get(event_path!("metadata", "level"))
+        .and_then(|value| value.as_bytes())
+        .and_then(|bytes| LogLevel::from_event_level(bytes))
+        .is_none_or(|level| level.verbosity() <= max_level.verbosity())
+}
+
 async fn run(
     host_key: Option<OwnedValuePath>,
     pid_key: Option<OwnedValuePath>,
+    max_level: LogLevel,
     mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
@@ -160,6 +259,12 @@ async fn run(
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
     while let Some(mut log) = rx.next().await {
+        // The broadcast channel is shared by all `internal_logs` sources and carries events for
+        // the most verbose of them, so events below this source's level must be dropped here.
+        if !within_max_level(&log, max_level) {
+            continue;
+        }
+
         // TODO: Should this actually be in memory size?
         let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();
@@ -343,9 +448,15 @@ mod tests {
     }
 
     async fn start_source() -> impl Stream<Item = Event> + Unpin {
+        start_source_with_config(InternalLogsConfig::default()).await
+    }
+
+    async fn start_source_with_config(
+        config: InternalLogsConfig,
+    ) -> impl Stream<Item = Event> + Unpin {
         let (tx, rx) = SourceSender::new_test();
 
-        let source = InternalLogsConfig::default()
+        let source = config
             .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
@@ -353,6 +464,62 @@ mod tests {
         sleep(Duration::from_millis(1)).await;
         trace::stop_early_buffering();
         rx
+    }
+
+    // The console log level is set to `debug` here, so during the startup window debug events
+    // are captured into the early buffer, and the source's default `level` of `info` must drop
+    // the buffered debug event from its output. Once the source is running, the broadcast level
+    // falls to the source's `info`, keeping later debug events out as well.
+    #[tokio::test]
+    #[serial]
+    async fn drops_events_below_configured_level() {
+        trace::init(false, false, "debug", 10, None);
+        trace::reset_early_buffer();
+
+        let test_id: u8 = rand::random();
+        debug!(message = "Buffered debug message.", %test_id);
+
+        let rx = start_source().await;
+
+        debug!(message = "Debug message.", %test_id);
+        info!(message = "Info message.", %test_id);
+
+        sleep(Duration::from_millis(50)).await;
+        let mut events = collect_ready(rx).await;
+        let test_id = Value::from(test_id.to_string());
+        events.retain(|event| event.as_log().get("test_id") == Some(&test_id));
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].as_log()["message"], "Info message.".into());
+    }
+
+    // The console log level is set to `info` here, so trace events would normally not even be
+    // generated, but a source configured with `level: trace` must raise the broadcast level and
+    // receive them.
+    #[tokio::test]
+    #[serial]
+    async fn receives_events_below_console_level_when_configured() {
+        trace::init(false, false, "info", 10, None);
+        trace::reset_early_buffer();
+
+        let config = InternalLogsConfig {
+            level: LogLevel::Trace,
+            ..Default::default()
+        };
+        let rx = start_source_with_config(config).await;
+
+        let test_id: u8 = rand::random();
+        trace!(message = "Trace message.", %test_id);
+        info!(message = "Info message.", %test_id);
+
+        sleep(Duration::from_millis(50)).await;
+        let mut events = collect_ready(rx).await;
+        let test_id = Value::from(test_id.to_string());
+        events.retain(|event| event.as_log().get("test_id") == Some(&test_id));
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].as_log()["message"], "Trace message.".into());
+        assert_eq!(events[1].as_log()["message"], "Info message.".into());
     }
 
     // Register a span field through the same macro downstream crates would use, then verify
