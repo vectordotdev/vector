@@ -485,13 +485,10 @@ impl AzureBlobSinkConfig {
             .iter()
             .filter_map(|(name, value)| {
                 let key = name.as_str();
-                if key.len() > META_PREFIX.len()
-                    && key[..META_PREFIX.len()].eq_ignore_ascii_case(META_PREFIX)
-                {
-                    Some((
-                        key[META_PREFIX.len()..].to_string(),
-                        value.as_str().to_string(),
-                    ))
+                let suffix = key.get(META_PREFIX.len()..)?;
+                let prefix = key.get(..META_PREFIX.len())?;
+                if prefix.eq_ignore_ascii_case(META_PREFIX) {
+                    Some((suffix.to_string(), value.as_str().to_string()))
                 } else {
                     None
                 }
