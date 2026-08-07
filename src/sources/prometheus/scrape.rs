@@ -113,8 +113,8 @@ fn query_example() -> serde_json::Value {
 }
 
 impl GenerateConfig for PrometheusScrapeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             interval: default_interval(),
             timeout: default_timeout(),
@@ -627,7 +627,7 @@ mod test {
         }
     }
 
-    // Intentially not using assert_source_compliance here because this is a round-trip test which
+    // Intentionally not using assert_source_compliance here because this is a round-trip test which
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn test_prometheus_routing() {

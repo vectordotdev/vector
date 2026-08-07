@@ -150,8 +150,10 @@ make check-deny
 make check-docs
 make check-examples
 make check-scripts
+make check-changelog-fragments
 
-./scripts/check_changelog_fragments.sh
+# Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
+typos
 
 # The following check is very slow.
 # make check-component-features
@@ -310,7 +312,7 @@ git push
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md).
 
 ### Dependencies
 
@@ -326,7 +328,7 @@ documents:
 
 1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
 2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
+3. **[DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md)** - Deprecating functionality in Vector
 
 ## Legal
 

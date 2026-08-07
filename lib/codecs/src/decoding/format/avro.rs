@@ -290,7 +290,7 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         assert_eq!(
-            events[0].as_log().get("message").unwrap(),
+            events[0].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from("hello from avro")
         );
     }
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         assert_eq!(
-            events[0].as_log().get("message").unwrap(),
+            events[0].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from("hello from avro")
         );
     }
@@ -343,7 +343,7 @@ mod tests {
             .unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(
-            events[0].as_log().get("message").unwrap(),
+            events[0].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from(uuid)
         );
     }

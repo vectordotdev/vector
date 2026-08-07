@@ -1,0 +1,17 @@
+sinks:
+  my_sink_id:
+    type: influxdb_metrics
+    inputs:
+      - my-source-or-transform-id
+    bucket: vector-bucket
+    consistency: any
+    database: vector-database
+    default_namespace: service
+    endpoint: http://localhost:8086/
+    org: my-org
+    password: ${INFLUXDB_PASSWORD}
+    retention_policy_name: autogen
+    tags:
+      region: us-west-1
+    token: ${INFLUXDB_TOKEN}
+    username: todd

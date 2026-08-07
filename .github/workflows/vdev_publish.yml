@@ -54,7 +54,7 @@ jobs:
           echo "ASSET=${OUTDIR}.tgz" >> "$GITHUB_ENV"
 
       - name: Upload asset to release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: ${{ env.ASSET }}
         env:

@@ -3,8 +3,8 @@ use std::{convert::TryInto, fmt::Debug, sync::Arc};
 pub use array::{EventArray, EventContainer, LogArray, MetricArray, TraceArray, into_event_stream};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
-    BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
-    Finalizable,
+    BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizerGroups,
+    EventFinalizers, EventStatus, Finalizable, GroupedFinalizable, MergeFinalizable,
 };
 pub use log_event::LogEvent;
 pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
@@ -18,7 +18,7 @@ use vector_common::{
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
 pub use vrl::value::{KeyString, ObjectMap, Value};
-#[cfg(feature = "vrl")]
+pub use vrl_target::MetricTagMode;
 pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
@@ -42,7 +42,6 @@ mod ser;
 mod test;
 mod trace;
 pub mod util;
-#[cfg(feature = "vrl")]
 mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
@@ -88,6 +87,16 @@ impl Finalizable for Event {
             Event::Log(log_event) => log_event.take_finalizers(),
             Event::Metric(metric) => metric.take_finalizers(),
             Event::Trace(trace_event) => trace_event.take_finalizers(),
+        }
+    }
+}
+
+impl MergeFinalizable for Event {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        match self {
+            Event::Log(log_event) => log_event.merge_finalizers(finalizers),
+            Event::Metric(metric) => metric.merge_finalizers(finalizers),
+            Event::Trace(trace_event) => trace_event.merge_finalizers(finalizers),
         }
     }
 }

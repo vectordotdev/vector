@@ -36,13 +36,17 @@ services:
     image: ${CONFIG_VECTOR_IMAGE}
     environment:
       - FEATURES=e2e-tests-datadog
+      # Read by envsubst (below) to render the config template; Vector's own
+      # env-var interpolation stays disabled.
       - CONFIG_SERIES_API_VERSION
     working_dir: /home/vector
     command:
-      - "/usr/bin/vector"
-      - "-vvv"
+      - "sh"
       - "-c"
-      - "/home/vector/tests/e2e/datadog-metrics/data/vector.toml"
+      # Render the config template with envsubst ($${...} escapes docker-compose
+      # interpolation so the literal ${...} reaches the container), then run
+      # Vector against the rendered file.
+      - "envsubst '$${CONFIG_SERIES_API_VERSION}' < /home/vector/tests/e2e/datadog-metrics/data/vector.yaml > /tmp/vector.yaml && exec /usr/bin/vector -vvv -c /tmp/vector.yaml"
     volumes:
       - ../../../..:/home/vector
 

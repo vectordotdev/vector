@@ -40,7 +40,8 @@ mod integration_tests {
     use futures::{FutureExt, stream::TryStreamExt};
     use itertools::Itertools as _;
     use similar_asserts::assert_eq;
-    use vrl::value;
+    use vrl::path::parse_target_path;
+    use vrl::{event_path, value};
 
     use crate::{
         SourceSender,
@@ -321,7 +322,10 @@ mod integration_tests {
             schema_definitions
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
-            assert_eq!(events[0].as_log().get(".").unwrap(), &value!(message));
+            assert_eq!(
+                events[0].as_log().get(event_path!()).unwrap(),
+                &value!(message)
+            );
         })
         .await;
     }
@@ -388,7 +392,7 @@ mod integration_tests {
 
             let log = events[0].as_log();
             let meta = log.metadata().value();
-            assert_eq!(log.get(".").unwrap(), &value!(message));
+            assert_eq!(log.get(event_path!()).unwrap(), &value!(message));
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, CONTAINER)).unwrap(),
                 &value!(id)
@@ -451,9 +455,12 @@ mod integration_tests {
             let log = events[0].as_log();
             assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
-            assert!(log.get(CREATED_AT).is_some());
+            assert!(log.get(vrl::event_path!(CREATED_AT)).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{label}").as_str()).is_some());
+            assert!(
+                log.get(&parse_target_path(&format!("label.{label}")).unwrap())
+                    .is_some()
+            );
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -648,9 +655,12 @@ mod integration_tests {
             let log = events[0].as_log();
             assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
-            assert!(log.get(CREATED_AT).is_some());
+            assert!(log.get(vrl::event_path!(CREATED_AT)).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{label}").as_str()).is_some());
+            assert!(
+                log.get(&parse_target_path(&format!("label.{label}")).unwrap())
+                    .is_some()
+            );
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -783,10 +793,10 @@ mod integration_tests {
             let log = events[0].as_log();
             assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
-            assert!(log.get(CREATED_AT).is_some());
+            assert!(log.get(vrl::event_path!(CREATED_AT)).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
             assert!(
-                log.get("label")
+                log.get(event_path!("label"))
                     .unwrap()
                     .as_object()
                     .unwrap()
@@ -896,7 +906,7 @@ mod integration_tests {
 
                     event
                         .into_log()
-                        .remove(".")
+                        .remove(vrl::event_path!())
                         .unwrap()
                         .to_string_lossy()
                         .into_owned()

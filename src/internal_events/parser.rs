@@ -16,6 +16,10 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {
         while !s.is_char_boundary(len) {
             len -= 1;
         }
+        #[expect(
+            clippy::string_slice,
+            reason = "len is adjusted to a char boundary in the loop above"
+        )]
         format!("{}{}", &s[..len], ellipsis).into()
     } else {
         s.into()
@@ -34,7 +38,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error_code = "no_match_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..]
+            field = truncate_string_at(&String::from_utf8_lossy(self.value), 60).as_ref()
         );
         counter!(
             CounterName::ComponentErrorsTotal,

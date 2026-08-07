@@ -408,6 +408,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _buffer_tags
 		}
+		component_cpu_usage_ns_total: {
+			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms only. Emitted only on Linux, macOS, and Windows."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_discarded_events_total: {
 			description:       "The number of events dropped by this component."
 			type:              "counter"
@@ -555,6 +561,12 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags: _component_tags & {output: _output}
+		}
+		datadog_logs_reserved_attribute_conflicts_total: {
+			description:       "The total number of conflicts encountered when relocating fields with semantic meaning to a Datadog reserved attribute."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {meaning: _meaning}
 		}
 		internal_metrics_cardinality: {
 			description:       "The total number of metrics emitted from the internal metrics registry."
@@ -1085,7 +1097,7 @@ components: sources: internal_metrics: {
 					required:    true
 				}
 				revision: {
-					description: "Revision identifer, related to versioned releases."
+					description: "Revision identifier, related to versioned releases."
 					required:    true
 				}
 			}
@@ -1251,6 +1263,20 @@ components: sources: internal_metrics: {
 			description: "The hostname of the originating system."
 			required:    true
 			examples: [_values.local_host]
+		}
+		_meaning: {
+			description: "The semantic meaning."
+			required:    true
+			enum: {
+				service:   "The service typically represents the application that generated the event."
+				message:   "The main text message of the event."
+				timestamp: "The main timestamp of the event."
+				host:      "The hostname of the machine where the event was generated."
+				tags:      "The tags of an event, generally a key-value paired list."
+				source:    "The source of the event."
+				severity:  "The severity of the event."
+				trace_id:  "The Id of the trace associated to the event."
+			}
 		}
 		_mode: {
 			description: "The connection mode used by the component."

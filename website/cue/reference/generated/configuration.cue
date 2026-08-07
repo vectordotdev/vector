@@ -216,6 +216,207 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"file\""
 					}
+					filter: {
+						type: object: options: {
+							bucket_size: {
+								type: uint: default: 4
+								description:   "Number of slots in each bucket"
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							concurrent_scanning: {
+								type: bool: default: false
+								description: """
+																		If set to true scanning will not block insertions.
+																		This may affect behavior since blocking scans would free up space before insertions.
+
+																		By default, scanning is blocking.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_bits: {
+								type: uint: default: 8
+								description:   "Number of bits to use to track counter. This will limit the max value."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to track a count alongside hashes."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_field: {
+								type: string: default: ""
+								description:   "Field in the incoming value used as the counter increment override."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_insertion_increment: {
+								type: int: default: 1
+								description:   "The amount to increment the counter by on every insertion. Negative values are allowed."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_lookup_increment: {
+								type: int: default: 1
+								description:   "The amount to increment the counter by on every lookup. Negative values are allowed."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							export_interval: {
+								type: uint: {}
+								description: """
+																		The interval used for exporting data.
+
+																		By default, export is only done on exit.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							fingerprint_bits: {
+								type: uint: default: 8
+								description:   "Number of bits used for fingerprint."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_aging_strategy: {
+								type: object: options: {
+									value: {
+										type: uint: {}
+										description:   "Value to decrement by"
+										required:      true
+										relevant_when: "strategy = \"decrement\""
+									}
+									strategy: {
+										required: false
+										type: string: {
+											enum: {
+												halving:   "Aging LRU counters by halving their value on each scan."
+												decrement: "Aging LRU counters by decrementing by a fixed value on each scan."
+											}
+											default: "halving"
+										}
+										description: "The LRU aging strategy to use."
+									}
+								}
+								description:   "Strategy to use when aging LRU counters at each scan."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track LRU counter.
+																		Low bit count will reduce the maximum LRU counter value, making the items expire sooner if
+																		unused.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_deletion_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to delete unused items on scan when LRU is used."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to use LRU strategy for kicking."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_increment: {
+								type: uint: default: 1
+								description:   "Value to increase LRU counter by on each item access."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_starting_value: {
+								type: uint: default: 1
+								description: """
+																		Starting value for LRU counter on item insertion.
+																		Higher value will give newer items a higher probability to stay in the filter.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							max_entries: {
+								type: uint: {}
+								description: """
+																		Maximum number of entries that can be stored in the filter (actual capacity will usually be
+																		larger)
+																		"""
+								required: true
+							}
+							max_kicks: {
+								type: uint: default: 500
+								description:   "Max number of kicks when experiencing hash collisions."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							persistence_path: {
+								type: string: {}
+								description: """
+																		Path to the file to export data to periodically and on exit.
+																		Data will be imported from this file on startup and reload.
+
+																		If table `reload_behavior` is set to `clear-state` and this is set, the persisted state will
+																		still be read after reload.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							scanning_threads: {
+								type: uint: {}
+								description: """
+																		Number of threads to use for scanning and updating LRU/TTL.
+
+																		By default, scanning is single threaded.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							ttl_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track TTL. Low bit count will reduce maximum TTL and also require a
+																		worse resolution to keep working.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							ttl_enabled: {
+								type: bool: default: true
+								description:   "Can be set to true to also track TTL for entries."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							type: {
+								required: true
+								type: string: enum: {
+									cuckoo: """
+																					Cuckoo filter
+
+																					Supports removal by accepting null values for keys, as well as TTL and LRU.
+																					"""
+									bloom: """
+																					Bloom filter
+
+																					Only supports insertion and presence check, no TTL
+																					"""
+								}
+								description: "The probabilistic filter to use."
+							}
+						}
+						description: """
+														Set to make the table act as a probabilistic filter instead of storing original values. This
+														will prevent reading values from the table - found keys will have empty value.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
 					flush_interval: {
 						type: uint: {}
 						description: """
@@ -224,6 +425,9 @@ generated: configuration: {
 														but there is a longer delay before the data is visible in the table.
 														Since every TTL scan makes its changes visible, only use this value
 														if it is shorter than the `scan_interval`.
+
+														NOTE: For cuckoo filter, all writes are visible immediately. Flush interval still defines
+														when metrics for cuckoo filter are made visible.
 
 														By default, all writes are made visible immediately.
 														"""
@@ -253,6 +457,18 @@ generated: configuration: {
 
 														By default, there is no size limit.
 														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
+					reload_behavior: {
+						type: string: {
+							enum: {
+								"clear-state":    "Always clear state on configuration reload."
+								"preserve-state": "Try to preserve state when possible."
+							}
+							default: "clear-state"
+						}
+						description:   "Behavior for memory table state on configuration reload."
 						required:      false
 						relevant_when: "type = \"memory\""
 					}
@@ -1256,6 +1472,20 @@ generated: configuration: {
 														[configuration]: https://vector.dev/docs/reference/configuration/
 														"""
 						required: true
+					}
+					measure_cpu_usage: {
+						type: bool: default: false
+						description: """
+														Enable CPU usage metrics for this transform.
+
+														When set to `true`, each poll of the transform task is timed using the OS thread CPU clock
+														and the accumulated nanoseconds are reported as the `component_cpu_usage_ns_total` counter,
+														tagged with `component_id`, `component_kind`, and `component_type`.
+
+														Defaults to `false`. Enable only for transforms where CPU attribution is needed, as it
+														adds a `clock_gettime` call on every future poll.
+														"""
+						required: false
 					}
 				}
 				description: "A transform."
