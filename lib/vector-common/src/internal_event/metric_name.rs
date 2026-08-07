@@ -212,6 +212,7 @@ pub enum GaugeName {
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
     SecurityConfinementDisabled,
+    PrometheusKubernetesSdTargetsDiscovered,
 }
 
 impl GaugeName {
@@ -256,6 +257,9 @@ impl GaugeName {
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
             Self::SecurityConfinementDisabled => "security_confinement_disabled",
+            Self::PrometheusKubernetesSdTargetsDiscovered => {
+                "prometheus_kubernetes_sd_targets_discovered"
+            }
         }
     }
 }
