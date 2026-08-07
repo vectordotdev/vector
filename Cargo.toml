@@ -163,11 +163,11 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.6.5"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
-convert_case = { version = "0.10", default-features = false }
+convert_case = { version = "0.11", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 cuckoo-clock = { version = "0.2.7" , default-features = false }
-darling = { version = "0.23.0", default-features = false, features = ["suggestions"] }
+darling = { version = "0.24.0", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
@@ -184,7 +184,7 @@ itertools = { version = "0.15.0", default-features = false, features = ["use_all
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
-metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
+metrics-util = { version = "0.20.4", default-features = false, features = ["registry"] }
 mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "5.3.0", default-features = false }
