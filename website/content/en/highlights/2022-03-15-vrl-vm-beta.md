@@ -26,7 +26,7 @@ transforms:
     type: "remap"
     inputs: ["..."]
     runtime: "vm"
-    source: |
+    source: |-
       ...
 ```
 

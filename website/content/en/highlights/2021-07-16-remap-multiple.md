@@ -25,7 +25,7 @@ transforms:
   remap:
     type: "remap"
     inputs: []
-    source: |
+    source: |-
       . = [{"message": "hello"}, {"message": "world"}]
 ```
 
@@ -50,9 +50,8 @@ transforms:
   remap:
     type: "remap"
     inputs: []
-    source: |
+    source: |-
       . = {"host": "localhost", "events": [{"message": "hello"}, {"message": "world"}]} # to represent the incoming event
-
       . = unnest(.events)
 ```
 
@@ -76,13 +75,11 @@ transforms:
     inputs: []
     source: |
       . = {"host": "localhost", "events": [{"message": "hello"}, {"message": "world"}]} # to represent the incoming event
-
       . = unnest(.events)
-
   map:
     type: "remap"
     inputs: ["explode"]
-    source: |
+    source: |-
       # example of pulling up the nested field to merge it into the top-level
       . |= .events
       del(.events)

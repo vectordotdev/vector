@@ -30,7 +30,6 @@ For example, given the configuration:
 ```yaml
 api:
   enabled: true
-
 sources:
   in:
     type: "generator"
@@ -38,7 +37,6 @@ sources:
     interval: 1.0
     lines: ["Hello World"]
     sequence: true
-
 sinks:
   out:
     type: "blackhole"

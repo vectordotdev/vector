@@ -35,12 +35,10 @@ cheap and durable qualities:
 sources:
   prometheus:
     type: "prometheus_remote_write"
-
 transforms:
   convert:
     type: "metric_to_log"
     inputs: ["prometheus"]
-
 sinks:
   backup:
     type: "aws_s3"
@@ -75,7 +73,6 @@ your metrics to [Datadog][datadog], [New Relic][new_relic], [Influx][influx],
 sources:
   prometheus:
     type: "prometheus_remote_write"
-
 sinks:
   datadog:
     type: "datadog_metrics"

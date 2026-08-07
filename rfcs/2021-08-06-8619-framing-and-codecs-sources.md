@@ -112,7 +112,7 @@ sequences of bytes they produce to create events.
 The `framing` and `decoding` behavior can be configured for a source in the
 vector config, e.g.:
 
-```yaml
+```toml
 [framing]
 method = "character_delimited"
 character_delimited.delimiter = "\t"

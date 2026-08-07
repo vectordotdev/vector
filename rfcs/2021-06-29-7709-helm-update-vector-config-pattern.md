@@ -37,7 +37,7 @@ our default configurations for Vector and it's related Kubernetes resources.
 The following example for the vector-agent chart ignores backward compatibility with existing keys for simplicity.
 The ConfigMap template would be replaced with the following:
 
-```yaml
+```gotemplate
 {{- if (empty .Values.existingConfigMap) -}}
 apiVersion: v1
 kind: ConfigMap
