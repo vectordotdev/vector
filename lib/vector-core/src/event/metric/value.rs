@@ -637,6 +637,8 @@ where
             Ok(value)
         }
 
+        // f64 represents integers exactly up to 2^53 (~9 quadrillion), which covers any realistic
+        // histogram bucket boundary. The precision loss only affects values beyond that threshold.
         #[allow(clippy::cast_precision_loss)]
         fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
             Ok(value as f64)
@@ -766,6 +768,12 @@ mod tests {
         let bucket: Bucket = serde_json::from_str(r#"{"upper_limit": 1, "count": 5}"#).unwrap();
         assert_eq!(bucket.upper_limit, 1.0_f64);
         assert_eq!(bucket.count, 5);
+    }
+
+    #[test]
+    fn bucket_upper_limit_deserializes_negative_integer() {
+        let bucket: Bucket = serde_json::from_str(r#"{"upper_limit": -1, "count": 0}"#).unwrap();
+        assert_eq!(bucket.upper_limit, -1.0_f64);
     }
 
     #[test]
