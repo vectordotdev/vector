@@ -718,7 +718,7 @@ impl RunningTopology {
                         ?buffer_dirs,
                         buffered_events = usage.event_count,
                         buffered_bytes = usage.byte_size,
-                        message = "Changing disk-buffered sink; the replacement is configured to use the existing buffer directory.",
+                        message = "Sink configuration modified; the new sink instance will continue using the existing disk buffer.",
                     );
                 } else {
                     warn!(
