@@ -1103,17 +1103,17 @@ group_by = [ "request_id" ]
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("trace message 1");
-            e_1.insert("counter", 1);
-            e_1.insert("request_id", "1");
+            e_1.insert(event_path!("counter"), 1);
+            e_1.insert(event_path!("request_id"), "1");
 
             let mut e_2 = LogEvent::from("trace message 2");
-            e_2.insert("counter", 2);
-            e_2.insert("request_id", "1");
+            e_2.insert(event_path!("counter"), 2);
+            e_2.insert(event_path!("request_id"), "1");
 
             let mut e_3 = LogEvent::from("trace message 3");
-            e_3.insert("counter", 3);
-            e_3.insert("request_id", "1");
-            e_3.insert("test_end", "yep");
+            e_3.insert(event_path!("counter"), 3);
+            e_3.insert(event_path!("request_id"), "1");
+            e_3.insert(event_path!("test_end"), "yep");
 
             for log in [e_1, e_2, e_3] {
                 tx.send(Event::Trace(TraceEvent::from(log))).await.unwrap();
@@ -1125,8 +1125,11 @@ group_by = [ "request_id" ]
                 Event::Trace(t) => t,
                 other => panic!("expected Event::Trace, got {other:?}"),
             };
-            assert_eq!(trace.get("message"), Some(&"trace message 1".into()));
-            assert_eq!(trace.get("counter"), Some(&Value::from(6)));
+            assert_eq!(
+                trace.get(event_path!("message")),
+                Some(&"trace message 1".into())
+            );
+            assert_eq!(trace.get(event_path!("counter")), Some(&Value::from(6)));
 
             drop(tx);
             topology.stop().await;
@@ -1160,42 +1163,48 @@ merge_strategies.baz = "max"
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
             let mut e_1 = LogEvent::from("trace message 1");
-            e_1.insert("foo", "first foo");
-            e_1.insert("bar", "first bar");
-            e_1.insert("baz", 2);
-            e_1.insert("request_id", "1");
+            e_1.insert(event_path!("foo"), "first foo");
+            e_1.insert(event_path!("bar"), "first bar");
+            e_1.insert(event_path!("baz"), 2);
+            e_1.insert(event_path!("request_id"), "1");
             tx.send(Event::Trace(TraceEvent::from(e_1))).await.unwrap();
 
             let mut e_2 = LogEvent::from("trace message 2");
-            e_2.insert("foo", "second foo");
-            e_2.insert("bar", 2);
-            e_2.insert("baz", "not number");
-            e_2.insert("request_id", "1");
+            e_2.insert(event_path!("foo"), "second foo");
+            e_2.insert(event_path!("bar"), 2);
+            e_2.insert(event_path!("baz"), "not number");
+            e_2.insert(event_path!("request_id"), "1");
             tx.send(Event::Trace(TraceEvent::from(e_2))).await.unwrap();
 
             let mut e_3 = LogEvent::from("trace message 3");
-            e_3.insert("foo", 10);
-            e_3.insert("bar", "third bar");
-            e_3.insert("baz", 3);
-            e_3.insert("request_id", "1");
-            e_3.insert("test_end", "yep");
+            e_3.insert(event_path!("foo"), 10);
+            e_3.insert(event_path!("bar"), "third bar");
+            e_3.insert(event_path!("baz"), 3);
+            e_3.insert(event_path!("request_id"), "1");
+            e_3.insert(event_path!("test_end"), "yep");
             tx.send(Event::Trace(TraceEvent::from(e_3))).await.unwrap();
 
             let trace = match out.recv().await.unwrap() {
                 Event::Trace(t) => t,
                 other => panic!("expected Event::Trace, got {other:?}"),
             };
-            assert_eq!(trace.get("message"), Some(&"trace message 1".into()));
-            assert_eq!(trace.get("foo"), Some(&"first foo second foo".into()));
             assert_eq!(
-                trace.get("bar"),
+                trace.get(event_path!("message")),
+                Some(&"trace message 1".into())
+            );
+            assert_eq!(
+                trace.get(event_path!("foo")),
+                Some(&"first foo second foo".into())
+            );
+            assert_eq!(
+                trace.get(event_path!("bar")),
                 Some(&Value::Array(vec![
                     "first bar".into(),
                     2.into(),
                     "third bar".into(),
                 ])),
             );
-            assert_eq!(trace.get("baz"), Some(&3.into()));
+            assert_eq!(trace.get(event_path!("baz")), Some(&3.into()));
 
             drop(tx);
             topology.stop().await;
