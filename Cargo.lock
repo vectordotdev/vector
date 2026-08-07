@@ -7133,7 +7133,7 @@ dependencies = [
  "itoa",
  "lockfree-object-pool",
  "metrics",
- "metrics-util",
+ "metrics-util 0.18.0",
  "once_cell",
  "tracing 0.1.44",
  "tracing-core 0.1.36",
@@ -7155,6 +7155,24 @@ dependencies = [
  "ordered-float 4.6.0",
  "quanta",
  "radix_trie",
+ "sketches-ddsketch",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.20.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96f8722f8562635f92f8ed992f26df0532266eb03d5202607c20c0d7e9745e13"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "hashbrown 0.16.0",
+ "indexmap 2.12.0",
+ "metrics",
+ "ordered-float 5.3.0",
+ "rand 0.9.4",
+ "rand_xoshiro",
+ "rapidhash",
  "sketches-ddsketch",
 ]
 
@@ -8078,6 +8096,15 @@ name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "ordered-float"
+version = "5.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7d950ca161dc355eaf28f82b11345ed76c6e1f6eb1f4f4479e0323b9e2fbd0e"
 dependencies = [
  "num-traits",
 ]
@@ -9470,6 +9497,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_xoshiro"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
+dependencies = [
+ "rand_core 0.9.0",
+]
+
+[[package]]
 name = "rapidhash"
 version = "4.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10646,13 +10682,13 @@ dependencies = [
 
 [[package]]
 name = "serde_derive_internals"
-version = "0.29.1"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
+checksum = "f852137cce035d6a4df67ccce505ff6b3e9fd3a10e3e52b24dc71e650bb1a9bd"
 dependencies = [
  "proc-macro2 1.0.106",
  "quote 1.0.45",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -13423,7 +13459,7 @@ dependencies = [
  "memmap2",
  "metrics",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.20.4",
  "num-traits",
  "ordered-float 4.6.0",
  "pastey",
@@ -13567,7 +13603,7 @@ dependencies = [
  "ipnet",
  "metrics",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.20.4",
  "mlua",
  "ndarray",
  "ndarray-stats",
