@@ -53,6 +53,7 @@ jobs:
           protoc: true
           libsasl2: true
           cargo-cache: true
+          unixodbc: true
       - run: make check-clippy
 
   test:
@@ -147,9 +148,9 @@ jobs:
           rust: true
           protoc: true
           cue: true
-          prettier: true
           libsasl2: true
           cargo-cache: true
+      - run: cd website && yarn install --frozen-lockfile
       - run: make check-generated-docs
 
   check-rust-docs:

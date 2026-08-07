@@ -33,6 +33,10 @@ inputs:
     required: false
     default: false
     description: "Install libsasl2." # Required to fully build Vector
+  unixodbc:
+    required: false
+    default: false
+    description: "Install unixODBC headers/libs (apt unixodbc-dev, dnf unixODBC-devel, or brew unixodbc). Required when sources-odbc is enabled."
 
   # prepare.sh - rust
   rust: # rustup module
@@ -201,10 +205,45 @@ runs:
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
 
-    - name: Install libsasl2
-      if: ${{ inputs.libsasl2 == 'true' }}
+    - name: Install system libraries (Linux)
+      if: ${{ runner.os == 'Linux' && (inputs.libsasl2 == 'true' || inputs.unixodbc == 'true') }}
       shell: bash
-      run: timeout 30m sudo apt-get update && timeout 30m sudo apt-get install -y libsasl2-dev
+      run: |
+        if command -v apt-get >/dev/null 2>&1; then
+          pkgs=()
+          [[ "${{ inputs.libsasl2 }}" == "true" ]] && pkgs+=(libsasl2-dev)
+          [[ "${{ inputs.unixodbc }}" == "true" ]] && pkgs+=(unixodbc-dev)
+          timeout 30m sudo apt-get update
+          timeout 30m sudo apt-get install -y "${pkgs[@]}"
+        elif command -v dnf >/dev/null 2>&1; then
+          pkgs=()
+          [[ "${{ inputs.libsasl2 }}" == "true" ]] && pkgs+=(cyrus-sasl-devel)
+          [[ "${{ inputs.unixodbc }}" == "true" ]] && pkgs+=(unixODBC-devel)
+          timeout 30m sudo dnf install -y --setopt=install_weak_deps=False "${pkgs[@]}"
+        else
+          echo "No supported package manager (apt-get/dnf) found for system libraries" >&2
+          exit 1
+        fi
+
+    - name: Install unixODBC (macOS)
+      if: ${{ runner.os == 'macOS' && inputs.unixodbc == 'true' }}
+      shell: bash
+      run: |
+        echo "Installing unixODBC"
+        brew install unixodbc
+        # Use the formula prefix so Intel (/usr/local) and Apple Silicon (/opt/homebrew)
+        # both work. odbc-sys also probes `brew --prefix`, but these keep the linker,
+        # headers, and pkg-config consistent for the rest of the build.
+        prefix="$(brew --prefix unixodbc)"
+        lib_dir="${prefix}/lib"
+        include_dir="${prefix}/include"
+        pkgconfig_dir="${prefix}/lib/pkgconfig"
+        {
+          echo "LIBRARY_PATH=${lib_dir}${LIBRARY_PATH:+:$LIBRARY_PATH}"
+          echo "CPATH=${include_dir}${CPATH:+:$CPATH}"
+          echo "PKG_CONFIG_PATH=${pkgconfig_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+          echo "DYLD_FALLBACK_LIBRARY_PATH=${lib_dir}${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
+        } >> "$GITHUB_ENV"
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries
