@@ -1,111 +1,96 @@
-use std::{collections::HashMap, ops::Range};
-
-use serde_json::Value;
+use vector_lib::event::EventStatus;
 
 use super::tests::*;
 use crate::{
-    config::{SinkConfig, SinkContext},
-    event::{Event, metric::MetricValue},
-    sinks::{
-        influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-        prometheus::remote_write::config::RemoteWriteConfig,
-    },
-    test_util::components::{HTTP_SINK_TAGS, assert_sink_compliance},
-    tls::{self, TlsConfig},
+    SourceSender,
+    config::{SinkConfig, SinkContext, SourceConfig, SourceContext},
+    event::Event,
+    sinks::prometheus::remote_write::config::RemoteWriteConfig,
+    sources::prometheus::PrometheusRemoteWriteConfig,
+    test_util::{self, addr::next_addr, wait_for_tcp},
+    tls::{self, MaybeTlsSettings, TlsEnableableConfig},
 };
-
-const HTTP_URL: &str = "http://influxdb-v1:8086";
-const HTTPS_URL: &str = "https://influxdb-v1-tls:8087";
 
 #[tokio::test]
 async fn insert_metrics_over_http() {
-    insert_metrics(HTTP_URL).await;
+    insert_metrics(None).await;
 }
 
 #[tokio::test]
 async fn insert_metrics_over_https() {
-    insert_metrics(HTTPS_URL).await;
+    insert_metrics(Some(TlsEnableableConfig::test_config())).await;
 }
 
-async fn insert_metrics(url: &str) {
-    assert_sink_compliance(&HTTP_SINK_TAGS, async {
-        let database = onboarding_v1(url).await;
+async fn insert_metrics(tls: Option<TlsEnableableConfig>) {
+    let (_guard, address) = next_addr();
+    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-        let cx = SinkContext::default();
+    let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
+        .unwrap()
+        .http_protocol_name();
 
-        let config = RemoteWriteConfig {
-            endpoint: format!("{url}/api/v1/prom/write?db={database}"),
-            tls: Some(TlsConfig {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let events = create_events(0..5, |n| n * 11.0);
+    // Start a `prometheus_remote_write` source to act as the remote write receiver.
+    let tls_yaml = tls.as_ref().map(|_| {
+        format!(
+            "tls:\n  enabled: true\n  ca_file: \"{}\"\n  crt_file: \"{}\"\n  key_file: \"{}\"",
+            tls::TEST_PEM_CA_PATH,
+            tls::TEST_PEM_CRT_PATH,
+            tls::TEST_PEM_KEY_PATH
+        )
+    });
+    let source: PrometheusRemoteWriteConfig = serde_yaml::from_str(&format!(
+        "address: \"{address}\"\n{}",
+        tls_yaml.unwrap_or_default()
+    ))
+    .unwrap();
+    let source = source
+        .build(SourceContext::new_test(tx, None))
+        .await
+        .expect("source should not fail to build");
+    tokio::spawn(source);
+    wait_for_tcp(address).await;
 
-        let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run_events(events.clone()).await.unwrap();
+    let config = RemoteWriteConfig {
+        endpoint: format!("{proto}://localhost:{}/", address.port()),
+        tls: tls.map(|tls| tls.options),
+        ..Default::default()
+    };
+    let events = create_events(0..5, |n| n * 11.0);
+    let events_copy = events.clone();
 
-        let result = query(url, &format!("show series on {database}")).await;
+    let cx = SinkContext::default();
+    let (sink, _) = config.build(cx).await.expect("error building config");
 
-        let values = &result["results"][0]["series"][0]["values"];
-        assert_eq!(values.as_array().unwrap().len(), 5);
+    let mut output = test_util::spawn_collect_ready(
+        async move {
+            sink.run_events(events_copy).await.unwrap();
+        },
+        rx,
+        1,
+    )
+    .await;
 
-        for event in events {
-            let metric = event.into_metric();
-            let result = query(
-                url,
-                &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
-            )
-            .await;
+    // The MetricBuffer used by the sink may reorder the metrics, so
+    // put them back into order before comparing.
+    output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-            let metrics = decode_metrics(&result["results"][0]["series"][0]);
-            assert_eq!(metrics.len(), 1);
-            let output = &metrics[0];
+    assert_eq!(output.len(), events.len());
 
-            match metric.value() {
-                MetricValue::Gauge { value } => {
-                    assert_eq!(output["value"], Value::Number((*value as u32).into()))
-                }
-                _ => panic!("Unhandled metric value, fix the test"),
-            }
-            for (tag, value) in metric.tags().unwrap().iter_single() {
-                assert_eq!(output[tag], Value::String(value.to_string()));
-            }
-            let timestamp =
-                format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
-            assert_eq!(output["time"], Value::String(timestamp));
-        }
-
-        cleanup_v1(url, &database).await;
-    })
-    .await
+    for (sent, received) in events.iter().zip(output.iter()) {
+        let sent = sent.as_metric();
+        let received = received.as_metric();
+        assert_eq!(sent.name(), received.name());
+        assert_eq!(sent.value(), received.value());
+        assert_eq!(sent.tags(), received.tags());
+        // Remote write stores timestamps with millisecond precision.
+        assert_eq!(
+            sent.timestamp().unwrap().timestamp_millis(),
+            received.timestamp().unwrap().timestamp_millis()
+        );
+    }
 }
 
-async fn query(url: &str, query: &str) -> Value {
-    let result = query_v1(url, query).await;
-    let text = result.text().await.unwrap();
-    serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON")
-}
-
-fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
-    let data = data.as_object().expect("Data is not an object");
-    let columns = data["columns"].as_array().expect("Columns is not an array");
-    data["values"]
-        .as_array()
-        .expect("Values is not an array")
-        .iter()
-        .map(|values| {
-            columns
-                .iter()
-                .zip(values.as_array().unwrap().iter())
-                .map(|(column, value)| (column.as_str().unwrap().to_owned(), value.clone()))
-                .collect()
-        })
-        .collect()
-}
-
-fn create_events(name_range: Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
+fn create_events(name_range: std::ops::Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
     name_range
         .map(move |num| create_event(format!("metric_{num}"), value(num as f64)))
         .collect()
