@@ -304,7 +304,7 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
                     warn!(
                         orphaned_buffer_id = orphaned_buffer_id.to_string_lossy().as_ref(),
                         buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
-                        message = "Found a disk buffer not referenced by the new configuration. It may still be draining from the previous configuration during reload, but Vector will not reopen it on the next startup unless its component is restored.",
+                        message = "Found a disk buffer not referenced by the new configuration. Vector will not reopen it unless a component with the same buffer ID is restored.",
                     );
                 }
             }

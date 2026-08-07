@@ -659,9 +659,9 @@ impl RunningTopology {
                     remaining_bytes = usage.byte_size,
                     drain_in_background,
                     message = if drain_in_background {
-                        "Removing a sink with a disk buffer. Vector will stop accepting new events and drain the buffer in the background; its directory becomes orphaned if Vector stops before draining completes. A disk-buffered component with the same ID cannot be started until this drain finishes."
+                        "Removing disk-buffered sink; buffered events will drain in the background."
                     } else {
-                        "Removing a sink with a disk buffer. Vector will wait for the buffer to drain before continuing the configuration reload; its directory becomes orphaned after the drain completes."
+                        "Removing disk-buffered sink; waiting for buffered events to drain before continuing the configuration reload."
                     },
                 );
                 removed_disk_buffer_drains.insert((*key).clone(), usage_handles);
@@ -684,6 +684,7 @@ impl RunningTopology {
             .iter()
             .chain(diff.enrichment_tables.sinks.to_change.iter())
             .collect::<Vec<_>>();
+        let mut changed_disk_buffer_drains = HashMap::new();
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
@@ -716,6 +717,7 @@ impl RunningTopology {
                         remaining_bytes = usage.byte_size,
                         message = "Changing a sink with a disk buffer. Vector will wait for the existing buffer to drain before starting the replacement sink.",
                     );
+                    changed_disk_buffer_drains.insert((*key).clone(), usage_handles);
                 }
             }
 
@@ -781,7 +783,14 @@ impl RunningTopology {
             if wait_for_sinks.contains(key) {
                 let previous = self.tasks.remove(key).unwrap();
                 debug!(message = "Waiting for sink to shutdown.", component_id = %key);
-                let buffer = previous.await.unwrap().unwrap();
+                let buffer = if let Some(usage_handles) = changed_disk_buffer_drains.remove(*key) {
+                    await_sink_buffer_drain(previous, (*key).clone(), usage_handles)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                } else {
+                    previous.await.unwrap().unwrap()
+                };
 
                 if reuse_buffers.contains(key) {
                     // We clone instead of removing here because otherwise the input will be
@@ -1609,14 +1618,14 @@ async fn await_sink_buffer_drain(
                     info!(
                         component_id = %component_id,
                         remaining_events_approximate = remaining.event_count,
-                        message = "Disk buffer drain completed. The buffer contains no unread bytes and its orphaned directory can be removed safely.",
+                        message = "Disk buffer drained successfully.",
                     );
                 } else if remaining.byte_size == 0 {
                     warn!(
                         component_id = %component_id,
                         remaining_events_approximate = remaining.event_count,
                         ?task_error,
-                        message = "The sink task ended with an error, but the disk buffer reports no unread bytes. The orphaned directory can be removed after reviewing the sink error.",
+                        message = "The sink task ended with an error after the disk buffer drained.",
                     );
                 } else {
                     warn!(
