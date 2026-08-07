@@ -13,3 +13,7 @@ sinks:
     dangerously_allow_unconfined_template_resolution: false
     encoding:
       codec: json
+    tags:
+      Classification: confidential
+      PHI: "True"
+      Project: Blue
