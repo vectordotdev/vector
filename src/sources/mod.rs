@@ -52,6 +52,8 @@ pub mod internal_metrics;
 pub mod journald;
 #[cfg(feature = "sources-kafka")]
 pub mod kafka;
+#[cfg(feature = "sources-kubernetes_events")]
+pub mod kubernetes_events;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub mod kubernetes_logs;
 #[cfg(feature = "sources-logstash")]
