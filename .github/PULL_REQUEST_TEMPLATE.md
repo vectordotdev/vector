@@ -52,7 +52,7 @@ Changes to CI, website, playground and similar are generally not considered user
 
   <type>(<scope>)!: <description>
 
-  * `type` = feat, fix, docs, chore, revert, enhancement, perf, security (only these types are accepted)
+  * `type` = feat, fix, docs, chore, revert, enhancement, perf, security (**must** be one of these)
   * `!` = OPTIONAL: signals a breaking change
   * `scope` = Optional but appreciated; letters, digits, spaces, hyphens, underscores (e.g. `kafka source`, `amazon-linux`)
   * `description` = short description of the change

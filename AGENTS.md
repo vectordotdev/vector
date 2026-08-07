@@ -286,3 +286,5 @@ When an open pull request exists, never rewrite published commits or force-push 
 
 Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
 The PR title must use one of the allowed conventional commit types from the template.
+
+The type list in the template is a **strict allowlist** — the template states "only these types are accepted". Do not assume a conventional commit type is valid just because it exists in the general conventional commits spec. When unsure, re-read the template's type list instead of guessing.
