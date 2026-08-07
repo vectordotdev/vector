@@ -288,13 +288,19 @@ Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQU
 
 ### PR Title Format
 
-PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
+[Title validation workflow](.github/workflows/semantic.yml)
 
-Examples:
+PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec.
+
+Must follow the following pattern: `<type>[optional scope]: <description>`
+
+Accepted types are *only* the following: feat,fix,docs,chore,revert,enhancement,perf,security
+
+Example PR titles:
 
 ```text
 feat(kafka source): add consumer group lag metric
 fix(loki sink): handle empty label sets correctly
 docs(internal docs): update contributing guide
-chore(deps): bump tokio to X
+chore(deps): bump tokio from X to Y
 ```
