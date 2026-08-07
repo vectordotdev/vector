@@ -37,9 +37,7 @@ use vrl::{
 
 use crate::{
     SourceSender,
-    common::datadog::{
-        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, datadog_agent_v2_resources,
-    },
+    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
@@ -2733,15 +2731,6 @@ async fn series_v2_resources_preserved_as_tags() {
             ]
         );
         assert_eq!(tags.get("env"), Some("prod"));
-
-        let v2_resources = datadog_agent_v2_resources(metric.metadata())
-            .expect("v2 resource provenance should be present");
-        assert_eq!(
-            v2_resources.get("database_instance"),
-            Some(&value!(["mongo-repro-01", "mongo-repro-02"]))
-        );
-        assert!(!v2_resources.contains_key("host"));
-        assert!(!v2_resources.contains_key("device"));
     })
     .await;
 }

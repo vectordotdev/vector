@@ -12,7 +12,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
     event::{
-        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, Value,
+        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue,
         metric::{MetricSketch, TagValue},
     },
     metrics::AgentDDSketch,
@@ -27,8 +27,8 @@ use vector_common::constants::{
 use super::config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::{
-        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
-        datadog_agent_v2_resources,
+        DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogPoint, DatadogSeriesMetric,
+        DatadogSeriesMetricMetadata,
     },
     proto::fds::protobuf_descriptors,
     sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
@@ -617,38 +617,34 @@ fn series_to_proto_message(
         });
     }
 
-    // In the `datadog_agent` source, the tag is added as `device` for the V1 endpoint
-    // and `resource.device` for the V2 endpoint.
-    if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
+    // The Agent source preserves `device` as a plain tag for v1/v2 compatibility.
+    if let Some(device) = tags.remove("device") {
         resources.push(ddmetric_proto::metric_payload::Resource {
             r#type: "device".to_string(),
             name: device,
         });
     }
 
-    let event_metadata = metric.metadata();
-    // Only promote values recorded by the v2 source.
-    if let Some(v2_resources) = datadog_agent_v2_resources(event_metadata) {
-        for (resource_type, resource_names) in v2_resources {
-            let Value::Array(resource_names) = resource_names else {
-                continue;
-            };
-            let tag = format!("resource.{resource_type}");
-            if let Some(values) = tags.remove_set(&tag) {
-                for value in values {
-                    match value {
-                        TagValue::Value(name)
-                            if resource_names.iter().any(|resource_name| {
-                                matches!(resource_name, Value::Bytes(resource_name) if resource_name.as_ref() == name.as_bytes())
-                            }) =>
-                        {
-                            resources.push(ddmetric_proto::metric_payload::Resource {
-                                r#type: resource_type.to_string(),
-                                name,
-                            });
-                        }
-                        value => tags.insert(tag.clone(), value),
+    let resource_tags: Vec<_> = tags
+        .keys()
+        .filter_map(|tag| {
+            tag.strip_prefix(DATADOG_METRIC_RESOURCE_TAG_PREFIX)
+                .filter(|resource_type| !resource_type.is_empty())
+                .map(|resource_type| (tag.to_string(), resource_type.to_string()))
+        })
+        .collect();
+
+    for (tag, resource_type) in resource_tags {
+        if let Some(values) = tags.remove_set(&tag) {
+            for value in values {
+                match value {
+                    TagValue::Value(name) if !name.is_empty() => {
+                        resources.push(ddmetric_proto::metric_payload::Resource {
+                            r#type: resource_type.clone(),
+                            name,
+                        });
                     }
+                    value => tags.insert(tag.clone(), value),
                 }
             }
         }
@@ -658,6 +654,7 @@ fn series_to_proto_message(
 
     let tags = encode_tags(&tags);
 
+    let event_metadata = metric.metadata();
     let metadata = generate_proto_metadata(
         event_metadata.datadog_origin_metadata(),
         event_metadata.source_type(),
@@ -1040,7 +1037,7 @@ mod tests {
         write_payload_footer, write_payload_header,
     };
     use crate::{
-        common::datadog::{DatadogMetricType, set_datadog_agent_v2_resources},
+        common::datadog::DatadogMetricType,
         sinks::{
             datadog::metrics::{
                 config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApiVersion},
@@ -1062,16 +1059,6 @@ mod tests {
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
         Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
-    }
-
-    fn mark_datadog_agent_v2_resources(metric: &mut Metric, resources: &[(&str, &str)]) {
-        metric.metadata_mut().set_source_type("datadog_agent");
-        set_datadog_agent_v2_resources(
-            metric.metadata_mut(),
-            resources.iter().map(|(resource_type, resource_name)| {
-                (resource_type.to_string(), resource_name.to_string())
-            }),
-        );
     }
 
     fn get_simple_counter_with_metadata(metadata: EventMetadata) -> Metric {
@@ -1271,25 +1258,14 @@ mod tests {
     }
 
     #[test]
-    fn encode_datadog_agent_resource_tags_as_v2_resources() {
-        let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
+    fn encode_resource_tags_as_v2_resources() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
             "resource.database_instance" => "mongo-repro-01",
+            "resource.database_instance" => "custom",
             "resource.aws_docdb_cluster" => "docdb-cluster",
             "resource.owner" => "payments",
             "abc.def.ghi" => "database_name:mongo_potatoes",
         }));
-        mark_datadog_agent_v2_resources(
-            &mut metric,
-            &[
-                ("database_instance", "mongo-repro-01"),
-                ("aws_docdb_cluster", "docdb-cluster"),
-            ],
-        );
-        // Simulate a transform-added value with the same key.
-        metric
-            .tags_mut()
-            .unwrap()
-            .insert("resource.database_instance".into(), "custom");
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1305,18 +1281,23 @@ mod tests {
         assert!(series_proto.resources.iter().any(|resource| {
             resource.r#type == "aws_docdb_cluster" && resource.name == "docdb-cluster"
         }));
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "custom"
+        }));
+        assert!(
+            series_proto
+                .resources
+                .iter()
+                .any(|resource| resource.r#type == "owner" && resource.name == "payments")
+        );
         assert_eq!(
             series_proto.tags,
-            vec![
-                "abc.def.ghi:database_name:mongo_potatoes",
-                "resource.database_instance:custom",
-                "resource.owner:payments",
-            ]
+            vec!["abc.def.ghi:database_name:mongo_potatoes"]
         );
     }
 
     #[test]
-    fn encode_datadog_agent_multi_value_resource_tags_and_preserve_bare_tags() {
+    fn encode_multi_value_resource_tags_and_preserve_bare_tags() {
         let mut tags = MetricTags::default();
         tags.insert(
             "resource.database_instance".into(),
@@ -1328,15 +1309,10 @@ mod tests {
         );
         tags.insert("resource.database_instance".into(), TagValue::Bare);
         tags.insert("resource.bare_only".into(), TagValue::Bare);
+        tags.insert("resource.".into(), "missing-type");
+        tags.insert("resource.empty".into(), "");
 
-        let mut metric = get_simple_counter().with_tags(Some(tags));
-        mark_datadog_agent_v2_resources(
-            &mut metric,
-            &[
-                ("database_instance", "mongo-repro-01"),
-                ("database_instance", "mongo-repro-02"),
-            ],
-        );
+        let metric = get_simple_counter().with_tags(Some(tags));
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1361,16 +1337,20 @@ mod tests {
         );
         assert_eq!(
             series_proto.tags,
-            vec!["resource.bare_only", "resource.database_instance"]
+            vec![
+                "resource.:missing-type",
+                "resource.bare_only",
+                "resource.database_instance",
+                "resource.empty:",
+            ]
         );
     }
 
     #[test]
-    fn encode_unmarked_datadog_agent_resource_tag_as_tag() {
-        let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
+    fn encode_resource_tag_from_any_source_as_v2_resource() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
             "resource.database_instance" => "mongo-repro-01",
         }));
-        metric.metadata_mut().set_source_type("datadog_agent");
 
         let series_proto = series_to_proto_message(
             &metric,
@@ -1380,21 +1360,17 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!series_proto.resources.iter().any(|resource| {
+        assert!(series_proto.resources.iter().any(|resource| {
             resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
         }));
-        assert_eq!(
-            series_proto.tags,
-            vec!["resource.database_instance:mongo-repro-01"]
-        );
+        assert!(series_proto.tags.is_empty());
     }
 
     #[test]
-    fn encode_datadog_agent_resource_as_v1_tag() {
-        let mut metric = get_simple_counter().with_tags(Some(metric_tags! {
+    fn encode_resource_tag_as_v1_tag() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
             "resource.database_instance" => "mongo-repro-01",
         }));
-        mark_datadog_agent_v2_resources(&mut metric, &[("database_instance", "mongo-repro-01")]);
 
         let series = generate_series_metrics(
             &metric,

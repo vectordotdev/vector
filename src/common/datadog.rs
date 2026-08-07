@@ -4,17 +4,12 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::LazyLock,
-};
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use vector_lib::{
-    event::{DatadogMetricOriginMetadata, EventMetadata, ObjectMap, Value},
-    schema::meaning,
-    sensitive_string::SensitiveString,
+    event::DatadogMetricOriginMetadata, schema::meaning, sensitive_string::SensitiveString,
 };
 
 pub(crate) const DD_US_SITE: &str = "datadoghq.com";
@@ -24,51 +19,7 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 pub const DDTAGS: &str = "ddtags";
 /// The datadog message event path.
 pub const MESSAGE: &str = "message";
-const DATADOG_AGENT_METADATA_NAMESPACE: &str = "datadog_agent";
-const V2_RESOURCES_METADATA_KEY: &str = "v2_resources";
-
-/// Records v2 resources so the sink can distinguish them from ordinary `resource.*` tags.
-pub(crate) fn set_datadog_agent_v2_resources(
-    metadata: &mut EventMetadata,
-    resources: impl IntoIterator<Item = (String, String)>,
-) {
-    let mut resources_by_type: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for (resource_type, resource_name) in resources {
-        if !resource_type.is_empty() {
-            resources_by_type
-                .entry(resource_type)
-                .or_default()
-                .insert(resource_name);
-        }
-    }
-
-    let resources: ObjectMap = resources_by_type
-        .into_iter()
-        .map(|(resource_type, resource_names)| {
-            (
-                resource_type.into(),
-                Value::Array(resource_names.into_iter().map(Value::from).collect()),
-            )
-        })
-        .collect();
-
-    if !resources.is_empty() {
-        metadata.value_mut().insert(
-            vrl::path!(DATADOG_AGENT_METADATA_NAMESPACE, V2_RESOURCES_METADATA_KEY),
-            Value::Object(resources),
-        );
-    }
-}
-
-pub(crate) fn datadog_agent_v2_resources(metadata: &EventMetadata) -> Option<&ObjectMap> {
-    match metadata.value().get(vrl::path!(
-        DATADOG_AGENT_METADATA_NAMESPACE,
-        V2_RESOURCES_METADATA_KEY
-    )) {
-        Some(Value::Object(resources)) => Some(resources),
-        _ => None,
-    }
-}
+pub(crate) const DATADOG_METRIC_RESOURCE_TAG_PREFIX: &str = "resource.";
 
 /// Mapping of the semantic meaning of well known Datadog reserved attributes
 /// to the field name that Datadog intake expects.

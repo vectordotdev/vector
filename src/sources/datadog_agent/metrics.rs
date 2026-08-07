@@ -17,7 +17,7 @@ use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_paylo
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
-        datadog::{DatadogMetricType, DatadogSeriesMetric, set_datadog_agent_v2_resources},
+        datadog::{DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogSeriesMetric},
         http::ErrorMessage,
     },
     config::log_schema,
@@ -253,7 +253,7 @@ pub(crate) fn decode_ddseries_v2(
             };
             let mut tags = into_metric_tags(serie.tags);
 
-            let mut event_metadata = get_event_metadata(serie.metadata.as_ref());
+            let event_metadata = get_event_metadata(serie.metadata.as_ref());
 
             // It is possible to receive non-rate metrics from the Agent with an interval set.
             // That interval can be applied with the `as_rate` function in the Datadog UI.
@@ -282,7 +282,6 @@ pub(crate) fn decode_ddseries_v2(
                 None
             };
 
-            let mut v2_resources = Vec::new();
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/965622d50073913d95176606ebcbd0f7553627b6/pkg/serializer/internal/metrics/iterable_series.go#L201-L264
                 // MetricSeries::resources can contain host, device, and other series resources.
@@ -296,12 +295,12 @@ pub(crate) fn decode_ddseries_v2(
                     tags.replace("device".into(), r.name);
                 } else {
                     // Preserve other resources in the generic metric tags.
-                    tags.insert(format!("resource.{}", r.r#type), r.name.clone());
-                    v2_resources.push((r.r#type, r.name));
+                    tags.insert(
+                        format!("{DATADOG_METRIC_RESOURCE_TAG_PREFIX}{}", r.r#type),
+                        r.name,
+                    );
                 }
             });
-            // Track which values actually came from v2 resources.
-            set_datadog_agent_v2_resources(&mut event_metadata, v2_resources);
             (!serie.source_type_name.is_empty())
                 .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
