@@ -1,9 +1,8 @@
 # Quick Reference for Vector Development
 
-This guide provides quick commands and coding conventions for Vector development. It's designed to help both AI assistants and human
-contributors get started quickly.
+This guide provides quick commands and coding conventions for Vector development.
 
-**For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).**
+For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Project Summary
 
@@ -22,7 +21,6 @@ reduction and improved data quality for observability infrastructure.
   - `config/` - Configuration system and validation
   - `topology/` - Component graph management
   - `api/` - gRPC API for management and monitoring
-  - `cli.rs` - Command-line interface
 
 - `/lib/` - Modular library crates
   - `vector-lib/` - Unified library re-exporting core Vector components
@@ -35,15 +33,10 @@ reduction and improved data quality for observability infrastructure.
   - `prometheus-parser/` - Prometheus metrics parsing
 
 - `/config/` - Configuration examples and templates
-- `/distribution/` - Packaging and deployment configs
-  - `docker/` - Docker images (Alpine, Debian, Distroless)
-  - `kubernetes/` - Kubernetes manifests
-  - `systemd/` - SystemD service files
-  - `debian/`, `rpm/` - Linux package configurations
-
-- `/scripts/` - Build, test, and deployment automation
 - `/docs/` - Developer documentation
 - `/tests/` - Integration and E2E tests
+- `/website/` - Website source code and user facing documentation
+- `/vdev/` - Custom development CLI tool. Most `make` commands use `vdev`
 
 ## Development Workflow
 
@@ -52,65 +45,93 @@ reduction and improved data quality for observability infrastructure.
 When working on Vector's Rust codebase, follow this iterative development cycle:
 
 1. Make code changes
-2. Run `make check-clippy` to check for linting issues
-3. Fix any issues found (use `make clippy-fix` for auto-fixes)
+2. Run `cargo clippy --no-default-features --features <FEATURES>` to check for linting issues
+3. Fix any issues found (use `cargo clippy --no-default-features --features "<FEATURES>" --fix` for auto-fixes)
 4. Continue to next task or mark current task complete
 
 Run this cycle after any code modification.
 
-When editing markdown files (*.md), run `make check-markdown` after changes.
+#### Choosing the correct <FEATURES>
 
-## Two Different Workflows
+Vector is a large project with a lot of dependencies. Compiling with all features enabled can take
+several minutes. To speed up the development lifecycle use only the necessary features. Every
+source, sink and transform has its own feature. Every component feature is named `type-component_name`.
+
+Examples:
+
+- `sources-file`
+- `sources-demo_logs`
+- `sources-http_client`
+- `transforms-remap`
+- `transforms-filter`
+- `sinks-socket`
+- `sinks-http`
+- `sinks-blackhole`
+- `sinks-aws_s3`
+
+If you are developing a feature for the file source you may compile with `--no-default-features --features sources-file`
+only. If testing a pipeline using a `file` source, a `remap` transform, and  `socket` sink you may compile with
+`--no-default-features --features sources-file,transforms-remap,sinks-socket`.
+
+
+### Final validation step
+
+After the task is complete run the following `make` commands to check for errors in tests and other
+targets.
+
+1. Run `make check-clippy` to check for linting issues
+2. Fix any issues found (use `make clippy-fix` for auto-fixes)
+3. Run `make fmt` to format your code.
+
+## Code change workflows and validation
 
 ### Rust Development (Most Common)
 
 If you're working on Vector's Rust codebase (sources, sinks, transforms, core functionality):
 
-**Format your code:**
 
-```bash
-make fmt
-```
-
-**Check formatting:**
-
-```bash
-make check-fmt
-```
-
-**Run Clippy (linter):**
-
-```bash
-make check-clippy
-```
-
-**Auto-fix Clippy issues:**
-
-```bash
-make clippy-fix
-```
-
-**Run unit tests:**
+#### Running unit tests
 
 ```bash
 make test
 # or
-cargo nextest run --workspace --no-default-features --features "${FEATURES}"
+cargo nextest run --workspace --no-default-features --features "<FEATURES>"
 ```
 
-**Run integration tests:**
+#### Running integration tests
 
 ```bash
 # See available integration tests:
 cargo vdev int show
 
 # Run a specific integration test
-cargo vdev integration run <integration-name>
+cargo vdev int run <integration-name>
 ```
 
 See [Integration Tests](#integration-tests) section below for more details.
 
-**Before committing (recommended checks):**
+#### If editing any markdown files
+
+```bash
+make check-markdown
+```
+
+#### If changing any user facing documentation, including examples, component configuration or VRL functions
+
+```bash
+make generate-docs
+```
+
+#### If modifying any external dependencies
+
+Requires `dd-rust-license-tool`
+
+```bash
+make build-licenses
+```
+
+
+#### Before committing (recommended checks)
 
 ```bash
 make fmt                      # Format code
@@ -135,8 +156,8 @@ If you're working on vector.dev website or documentation content:
 **Run the site locally:**
 
 ```bash
-cd website
-make serve
+make generate-docs
+cd website && make serve
 # Navigate to http://localhost:1313
 ```
 
@@ -148,10 +169,6 @@ make cue-build
 ```
 
 **Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
-
-## Configuration Format
-
-Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.
 
 ## Common Patterns
 
@@ -230,41 +247,6 @@ cargo vdev int test aws
 
 See [docs/DEVELOPING.md](docs/DEVELOPING.md#integration-tests) for adding new integration tests.
 
-### Key Files
-
-- `Makefile` - Common build/test/check targets
-- `vdev/` - Custom development CLI tool
-- `src/` - Rust source code
-- `website/` - Hugo-based documentation site
-- `tests/` - Integration and behavior tests
-
-## Common Issues
-
-### Formatting Fails
-
-Run `make fmt` before committing. Formatting must be exact.
-
-### Clippy Errors
-
-Run `make clippy-fix` to auto-fix many issues. Manual fixes may be required.
-
-### Generated Docs Out of Sync
-
-Documentation is generated from code. Run:
-
-```bash
-make check-generated-docs
-```
-
-### License Check Fails
-
-After adding/updating dependencies:
-
-```bash
-cargo install dd-rust-license-tool --locked
-make build-licenses
-```
-
 ## Git Conventions
 
 - **Commit messages:** Do NOT include co-authoring information from coding agents (i.e. avoid "Co-Authored-By: Claude" attribution)
@@ -288,13 +270,19 @@ Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQU
 
 ### PR Title Format
 
-PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
+[Title validation workflow](.github/workflows/semantic.yml)
 
-Examples:
+PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec.
+
+Must follow the following pattern: `<type>[optional scope]: <description>`
+
+Accepted types are *only* the following: feat,fix,docs,chore,revert,enhancement,perf,security
+
+Example PR titles:
 
 ```text
 feat(kafka source): add consumer group lag metric
 fix(loki sink): handle empty label sets correctly
 docs(internal docs): update contributing guide
-chore(deps): bump tokio to X
+chore(deps): bump tokio from X to Y
 ```
