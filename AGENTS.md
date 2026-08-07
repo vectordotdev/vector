@@ -285,3 +285,4 @@ When an open pull request exists, never rewrite published commits or force-push 
 ## Creating Pull Requests
 
 Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
+The PR title must use one of the allowed conventional commit types from the template.
