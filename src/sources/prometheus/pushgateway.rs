@@ -52,7 +52,6 @@ pub struct PrometheusPushgatewayConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
 
     #[configurable(derived)]

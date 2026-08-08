@@ -12,6 +12,14 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      # These dependencies share archive validation APIs and must be updated
+      # together, including consideration of disk buffer format compatibility.
+      rkyv-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "bytecheck"
+          - "rkyv"
+
       patches:
         applies-to: version-updates
         patterns:
@@ -84,14 +92,13 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      # These dependencies share metrics-util layer traits and must be updated
+      # together to avoid incompatible trait implementations across versions.
       metrics:
         patterns:
           - "metrics"
           - "metrics-tracing-context"
           - "metrics-util"
-        update-types:
-          - "patch"
-          - "minor"
       netlink:
         patterns:
           - "netlink-*"
@@ -174,14 +181,19 @@ updates:
           - "*"
         exclude-patterns:
           - "axum"
+          - "bytecheck"
           - "headers"
           - "http"
           - "http-*"
           - "hyper"
           - "hyper-*"
+          - "metrics"
+          - "metrics-tracing-context"
+          - "metrics-util"
           - "prost"
           - "prost-*"
           - "reqwest"
+          - "rkyv"
           - "tokio-tungstenite"
           - "tonic"
           - "tonic-*"

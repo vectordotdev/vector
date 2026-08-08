@@ -1,3 +1,5 @@
+use std::sync::Once;
+
 use opendal::{Operator, layers::LoggingLayer, services::Webhdfs};
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -129,6 +131,8 @@ impl SinkConfig for WebHdfsConfig {
 
 impl WebHdfsConfig {
     pub fn build_operator(&self) -> crate::Result<Operator> {
+        ensure_opendal_http_transport();
+
         // Build OpenDal Operator
         let mut builder = Webhdfs::default();
         // Prefix logic will be handled by key_partitioner.
@@ -170,6 +174,18 @@ impl WebHdfsConfig {
         let prefix = prefix.confine(&self.confinement, Self::NAME, "prefix")?;
         Ok(KeyPartitioner::new(prefix, None))
     }
+}
+
+/// Install OpenDAL's reqwest HTTP transport once for this process.
+///
+/// Required because we enable `http-transport-reqwest-native-tls` rather than
+/// the `http-transport-reqwest` alias (which would auto-install via
+/// `auto-register-services` but also enable rustls aws-lc-rs).
+fn ensure_opendal_http_transport() {
+    static INSTALL: Once = Once::new();
+    INSTALL.call_once(|| {
+        opendal_http_transport_reqwest::install_default();
+    });
 }
 
 #[cfg(test)]

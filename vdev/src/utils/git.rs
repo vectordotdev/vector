@@ -222,7 +222,7 @@ pub fn create_branch(branch_name: &str) -> Result<()> {
     let reference = branch.into_reference();
     let full_ref_name = reference
         .name()
-        .ok_or_else(|| git2::Error::from_str("branch reference has no name"))?;
+        .context("branch reference name is not valid UTF-8")?;
     repo.set_head(full_ref_name)?;
     repo.checkout_head(None)?;
 
