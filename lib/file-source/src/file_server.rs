@@ -9,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use file_source_common::{
-    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
+    FileFingerprint, FileSourceInternalEvents, Fingerprinter, PortableFileExt, ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
 };
 use futures::{
@@ -185,7 +185,36 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
+
+                // Reverse lookup: path → (fingerprint, file_position, devno, inode)
+                // to skip fingerprinting files we're already watching.
+                let watched_paths: HashMap<PathBuf, (FileFingerprint, u64, u64, u64)> = fp_map
+                    .iter()
+                    .map(|(fp, watcher)| {
+                        let (devno, inode) = watcher.get_inode();
+                        (watcher.path.clone(), (*fp, watcher.get_file_position(), devno, inode))
+                    })
+                    .collect();
+
                 for path in self.paths_provider.paths().into_iter() {
+                    // Fast path: skip fingerprinting if we're already watching this path,
+                    // the file hasn't been replaced (same inode), and hasn't been
+                    // truncated (size >= our read position).
+                    if let Some((file_id, file_position, devno, inode)) = watched_paths.get(&path)
+                        && let Ok(metadata) = fs::metadata(&path).await
+                        && metadata.portable_dev() == *devno
+                        && metadata.portable_ino() == *inode
+                        && metadata.len() >= *file_position
+                        && let Some(watcher) = fp_map.get_mut(file_id)
+                    {
+                        watcher.set_file_findable(true);
+                        trace!(
+                            message = "Continue watching file.",
+                            path = ?path,
+                        );
+                        continue;
+                    }
+
                     if let Some(file_id) = self
                         .fingerprinter
                         .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
