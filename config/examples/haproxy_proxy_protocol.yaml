@@ -1,0 +1,47 @@
+# Ingest logs from behind a PROXY-protocol-aware load balancer.
+#
+# HAProxy terminates the client connection and prepends a PROXY protocol v2
+# header carrying the original client address plus custom TLV fields. Here a
+# tenant identifier is sent in custom TLV type 0xE0, which Vector uses to route
+# events to a per-tenant Kafka topic.
+#
+# Matching HAProxy backend configuration:
+#
+#   backend bk_vector
+#     mode tcp
+#     server vector 10.0.0.9:9000 send-proxy-v2 \
+#       set-proxy-v2-tlv-fmt(0xE0) %[ssl_c_s_dn(CN)]
+#
+# Enable proxy_protocol only when a trusted proxy sits in front of this source;
+# the header is otherwise spoofable.
+
+sources:
+  tcp_in:
+    type: socket
+    mode: tcp
+    address: "0.0.0.0:9000"
+    proxy_protocol: true
+    decoding:
+      codec: bytes
+
+transforms:
+  extract_tenant:
+    type: remap
+    inputs:
+      - tcp_in
+    source: |-
+      # The wire identifies TLVs by numeric type, so custom fields are keyed by
+      # their lowercase hex byte. Fall back to "unknown" when the TLV is absent.
+      .tenant_name = string(.proxy_protocol.tlvs."0xe0") ?? "unknown"
+      # Kafka topic names allow only [a-zA-Z0-9._-]; sanitize untrusted values.
+      .tenant_name = replace(.tenant_name, r'[^a-zA-Z0-9._-]', "_")
+
+sinks:
+  kafka_out:
+    type: kafka
+    inputs:
+      - extract_tenant
+    bootstrap_servers: "kafka:9092"
+    topic: "logs-{{ tenant_name }}"
+    encoding:
+      codec: json

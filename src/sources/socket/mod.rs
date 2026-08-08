@@ -113,6 +113,18 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
+                // The PROXY protocol header is sent unencrypted before any TLS
+                // handshake (as HAProxy and AWS NLB do), but this source reads
+                // it from the post-handshake stream. Feeding the plaintext
+                // header into the TLS acceptor would fail the handshake, so
+                // reject the combination explicitly rather than break at
+                // runtime.
+                if config.proxy_protocol() && config.tls().is_some() {
+                    return Err(
+                        "The `proxy_protocol` option is not supported together with `tls` on the `socket` source; terminate TLS upstream and forward plaintext to this source.".into(),
+                    );
+                }
+
                 let log_namespace = cx.log_namespace(config.log_namespace);
 
                 let decoding = config.decoding().clone();
@@ -239,6 +251,16 @@ impl SourceConfig for SocketConfig {
                         Self::NAME,
                         tls_client_metadata_path,
                         &owned_value_path!("tls_client_metadata"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None,
+                    )
+                    .with_source_metadata(
+                        Self::NAME,
+                        config
+                            .proxy_protocol()
+                            .then(|| LegacyKey::Overwrite(owned_value_path!("proxy_protocol"))),
+                        &owned_value_path!("proxy_protocol"),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
                         None,
@@ -462,7 +484,72 @@ mod test {
         crate::test_util::test_generate_config::<SocketConfig>();
     }
 
+    #[test]
+    fn tcp_proxy_protocol_defaults_off() {
+        let config: SocketConfig = toml::from_str(
+            r#"
+                mode = "tcp"
+                address = "127.0.0.1:9000"
+            "#,
+        )
+        .unwrap();
+        match config.mode {
+            Mode::Tcp(tcp) => assert!(!tcp.proxy_protocol()),
+            _ => panic!("expected tcp mode"),
+        }
+    }
+
+    #[test]
+    fn tcp_proxy_protocol_can_be_enabled() {
+        let config: SocketConfig = toml::from_str(
+            r#"
+                mode = "tcp"
+                address = "127.0.0.1:9000"
+                proxy_protocol = true
+            "#,
+        )
+        .unwrap();
+        match config.mode {
+            Mode::Tcp(tcp) => assert!(tcp.proxy_protocol()),
+            _ => panic!("expected tcp mode"),
+        }
+    }
+
     //////// TCP TESTS ////////
+    #[tokio::test]
+    async fn tcp_proxy_protocol_with_tls_is_rejected() {
+        use vector_lib::tls::{TlsConfig, TlsEnableableConfig, TlsSourceConfig};
+
+        let (guard, addr) = next_addr();
+        drop(guard);
+
+        let mut tcp = TcpConfig::from_address(addr.into());
+        tcp.proxy_protocol = true;
+        tcp.set_tls(Some(TlsSourceConfig {
+            client_metadata_key: None,
+            tls_config: TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig::default(),
+            },
+        }));
+
+        let (tx, _rx) = SourceSender::new_test();
+        let result = SocketConfig::from(tcp)
+            .build(SourceContext::new_test(tx, None))
+            .await;
+
+        match result {
+            Ok(_) => panic!("tls + proxy_protocol must be rejected"),
+            Err(err) => {
+                let msg = err.to_string();
+                assert!(
+                    msg.contains("proxy_protocol") && msg.contains("tls"),
+                    "unexpected error: {msg}"
+                );
+            }
+        }
+    }
+
     #[tokio::test]
     async fn tcp_it_includes_host() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
