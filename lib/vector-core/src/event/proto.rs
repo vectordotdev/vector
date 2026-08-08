@@ -20,6 +20,17 @@ use super::EventFinalizers;
 use super::metadata::{Inner, default_schema_definition};
 use super::{EventMetadata, array, metric::MetricSketch};
 
+/// Convert protobuf timestamp nanos (`i32`) to chrono nanos (`u32`).
+/// Returns `None` when the value is negative (corrupt / non-spec input).
+fn proto_nanos_to_u32(nanos: i32) -> Option<u32> {
+    u32::try_from(nanos).ok()
+}
+
+/// Convert chrono `timestamp_subsec_nanos` (`u32`, always ≤ 1_999_999_999) to protobuf `i32`.
+fn chrono_nanos_to_i32(nanos: u32) -> i32 {
+    i32::try_from(nanos).expect("chrono subsec nanos always fits in i32")
+}
+
 impl event_array::Events {
     // We can't use the standard `From` traits here because the actual
     // type of `LogArray` and `TraceArray` are the same.
@@ -215,13 +226,15 @@ impl From<Metric> for super::Metric {
 
         let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
-        // Sign can never be lost as ts.nanos is always non negative (per proto spec)
-        #[allow(clippy::cast_sign_loss)]
-        let timestamp = metric.timestamp.map(|ts| {
-            chrono::Utc
-                .timestamp_opt(ts.seconds, ts.nanos as u32)
-                .single()
-                .expect("invalid timestamp")
+        // Reject negative nanos instead of wrapping via `as u32`.
+        let timestamp = metric.timestamp.and_then(|ts| {
+            let nanos = proto_nanos_to_u32(ts.nanos)?;
+            Some(
+                chrono::Utc
+                    .timestamp_opt(ts.seconds, nanos)
+                    .single()
+                    .expect("invalid timestamp"),
+            )
         });
 
         let mut tags = MetricTags(
@@ -424,12 +437,10 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
-        // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
-        // (as per chrono leap-second specs), which is below i32::MAX
-        #[allow(clippy::cast_possible_wrap)]
+        // timestamp_subsec_nanos is always ≤ 1_999_999_999 (chrono leap-second specs).
         let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
-            nanos: ts.timestamp_subsec_nanos() as i32,
+            nanos: chrono_nanos_to_i32(ts.timestamp_subsec_nanos()),
         });
 
         let interval_ms = data.time.interval_ms.map_or(0, std::num::NonZeroU32::get);
@@ -704,14 +715,15 @@ impl From<Metadata> for EventMetadata {
 fn decode_value(input: Value) -> Option<super::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(super::Value::Bytes(data)),
-        // Sign is never lost as ts.nanos is always non negative (per proto spec)
-        #[allow(clippy::cast_sign_loss)]
-        Some(value::Kind::Timestamp(ts)) => Some(super::Value::Timestamp(
-            chrono::Utc
-                .timestamp_opt(ts.seconds, ts.nanos as u32)
-                .single()
-                .expect("invalid timestamp"),
-        )),
+        Some(value::Kind::Timestamp(ts)) => {
+            let nanos = proto_nanos_to_u32(ts.nanos)?;
+            Some(super::Value::Timestamp(
+                chrono::Utc
+                    .timestamp_opt(ts.seconds, nanos)
+                    .single()
+                    .expect("invalid timestamp"),
+            ))
+        }
         Some(value::Kind::Integer(value)) => Some(super::Value::Integer(value)),
         Some(value::Kind::Float(value)) => Some(super::Value::Float(NotNan::new(value).unwrap())),
         Some(value::Kind::Boolean(value)) => Some(super::Value::Boolean(value)),
@@ -746,12 +758,9 @@ fn encode_value(value: super::Value) -> Value {
         kind: match value {
             super::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
             super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
-            // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
-            // (as per chrono leap-second specs), which is below i32::MAX
-            #[allow(clippy::cast_possible_wrap)]
             super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
-                nanos: ts.timestamp_subsec_nanos() as i32,
+                nanos: chrono_nanos_to_i32(ts.timestamp_subsec_nanos()),
             })),
             super::Value::Integer(value) => Some(value::Kind::Integer(value)),
             super::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
