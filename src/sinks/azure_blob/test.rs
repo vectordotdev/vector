@@ -1049,10 +1049,18 @@ fn azure_blob_append_blob_custom_time_format_hourly_rotation() {
         request_options.split_input((key, vec![log]));
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
 
-    let expected = format!("app/{}.log", Utc::now().format("%Y-%m-%d-%H"));
-    assert_eq!(request.metadata.partition_key, expected);
+    // Bracket build_request with two Utc::now() samples so an hour boundary between the
+    // formatter's clock read and the assertion doesn't flake the test.
+    let before = Utc::now().format("%Y-%m-%d-%H").to_string();
+    let request = request_options.build_request(metadata, request_metadata, payload);
+    let after = Utc::now().format("%Y-%m-%d-%H").to_string();
+
+    let key = &request.metadata.partition_key;
+    assert!(
+        *key == format!("app/{before}.log") || *key == format!("app/{after}.log"),
+        "partition_key {key:?} did not match the expected hourly key for {before} or {after}"
+    );
     assert_eq!(request.blob_type, AzureBlobType::Append);
 }
 
