@@ -7,6 +7,7 @@ sinks:
     blob_append_uuid: false
     blob_endpoint: https://mylogstorage.blob.core.windows.net/
     blob_prefix: blob/%F/
+    blob_type: block
     compression: gzip
     connection_string: DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net
     container_name: my-logs
