@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use chrono::TimeZone;
+use chrono::{DateTime, TimeZone, Utc};
 use ordered_float::NotNan;
 use uuid::Uuid;
 
@@ -20,13 +20,22 @@ use super::EventFinalizers;
 use super::metadata::{Inner, default_schema_definition};
 use super::{EventMetadata, array, metric::MetricSketch};
 
-/// Convert protobuf timestamp nanos (`i32`) to chrono nanos (`u32`).
-/// Returns `None` when the value is negative (corrupt / non-spec input).
-fn proto_nanos_to_u32(nanos: i32) -> Option<u32> {
-    u32::try_from(nanos).ok()
+/// Convert a protobuf timestamp to a chrono timestamp.
+///
+/// Panics on a timestamp that is not representable, which is what the previous
+/// `ts.nanos as u32` cast already did by way of `timestamp_opt`: a negative `nanos`
+/// wrapped to a value far outside the valid subsecond range, so `single()` returned
+/// `None` and the `expect` fired. Doing the conversion with `try_from` keeps that
+/// behaviour without an unchecked cast — deliberately, because mapping it to `None`
+/// instead would turn a malformed frame into silently absent data.
+fn proto_timestamp_to_chrono(ts: &prost_types::Timestamp) -> DateTime<Utc> {
+    u32::try_from(ts.nanos)
+        .ok()
+        .and_then(|nanos| chrono::Utc.timestamp_opt(ts.seconds, nanos).single())
+        .expect("invalid timestamp")
 }
 
-/// Convert chrono `timestamp_subsec_nanos` (`u32`, always ≤ 1_999_999_999) to protobuf `i32`.
+/// Convert chrono `timestamp_subsec_nanos` (`u32`, always ≤ `1_999_999_999`) to protobuf `i32`.
 fn chrono_nanos_to_i32(nanos: u32) -> i32 {
     i32::try_from(nanos).expect("chrono subsec nanos always fits in i32")
 }
@@ -226,16 +235,7 @@ impl From<Metric> for super::Metric {
 
         let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
-        // Reject negative nanos instead of wrapping via `as u32`.
-        let timestamp = metric.timestamp.and_then(|ts| {
-            let nanos = proto_nanos_to_u32(ts.nanos)?;
-            Some(
-                chrono::Utc
-                    .timestamp_opt(ts.seconds, nanos)
-                    .single()
-                    .expect("invalid timestamp"),
-            )
-        });
+        let timestamp = metric.timestamp.as_ref().map(proto_timestamp_to_chrono);
 
         let mut tags = MetricTags(
             metric
@@ -716,13 +716,7 @@ fn decode_value(input: Value) -> Option<super::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(super::Value::Bytes(data)),
         Some(value::Kind::Timestamp(ts)) => {
-            let nanos = proto_nanos_to_u32(ts.nanos)?;
-            Some(super::Value::Timestamp(
-                chrono::Utc
-                    .timestamp_opt(ts.seconds, nanos)
-                    .single()
-                    .expect("invalid timestamp"),
-            ))
+            Some(super::Value::Timestamp(proto_timestamp_to_chrono(&ts)))
         }
         Some(value::Kind::Integer(value)) => Some(super::Value::Integer(value)),
         Some(value::Kind::Float(value)) => Some(super::Value::Float(NotNan::new(value).unwrap())),
