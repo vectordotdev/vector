@@ -258,36 +258,26 @@ generated: components: sinks: azure_blob: configuration: {
 		description: """
 			The type of blob to use when writing to Azure Blob Storage.
 
-			- `block` (default): a new uniquely-named blob per batch.
+			- `block` (default): each batch creates a new uniquely-named blob.
 			  `blob_append_uuid` defaults to `true`; `blob_time_format` defaults to `%s`.
-			- `append`: each batch appends to the same blob.
-			  `blob_append_uuid` defaults to `false`; `blob_time_format` defaults to `%Y-%m-%d`.
-			  Multiple batches within the same time window write to the same blob.
+			- `append`: each batch appends to the same blob, keyed off `blob_prefix` and
+			  `blob_time_format`. `blob_append_uuid` defaults to `false`; `blob_time_format`
+			  defaults to `%Y-%m-%d`.
 
-			**Batch size limit for `append` mode**: Azure limits each `append_block` call to 4 MiB
-			(4,194,304 bytes). `batch.max_bytes` automatically defaults to `4194304` when
-			`blob_type` is `append` and the setting is not explicitly configured.
-			Setting `batch.max_bytes` above `4194304` with `blob_type: append` is an error and
-			Vector will fail to start.
-
-			`batch.max_bytes` is measured on the uncompressed, pre-encoding event size, while Azure
-			enforces the 4 MiB limit on the encoded (and, if enabled, compressed) request body. With
-			the default `gzip` compression the encoded body is smaller than the batched events, so the
-			4 MiB batch limit leaves headroom. If you disable compression, encoding overhead (for
-			example JSON escaping) can push a near-limit batch over 4 MiB and Azure rejects it; lower
+			Azure limits each `append_block` call to 4 MiB (4,194,304 bytes), so `batch.max_bytes`
+			defaults to that limit in `append` mode and any explicit value above it is rejected at
+			startup. `batch.max_bytes` measures the pre-encoding event size, while Azure enforces the
+			limit on the encoded (and, if enabled, compressed) request body — with the default `gzip`
+			compression the encoded body is smaller than the batched events, so 4 MiB leaves
+			headroom. If you disable compression, encoding overhead (for example JSON escaping) can
+			push a near-limit batch over the limit and Azure rejects the request; lower
 			`batch.max_bytes` to leave headroom in that case.
 
-			**Ordering and delivery for `append` mode**: appended blocks are persisted in the order
-			Azure receives the requests, so append mode pins request concurrency to 1 (unless you set a
-			fixed `request.concurrency`) to keep flushes to the same blob in order. As with all Vector
-			sinks, delivery is at-least-once: if a flush is retried after Azure already committed the
-			block (a rare server-side error after a successful write), the batch can be appended twice.
-			Set `request.retry_attempts` to `0` if you prefer at-most-once over possible duplication.
-
-			When `blob_type` is `append` and compression is enabled, each batch is compressed as an
-			independent frame and appended to the blob. The result is a series of concatenated
-			compressed frames. Use decompressors that support multi-stream decompression
-			(e.g., `gunzip`, `zstd -d`).
+			Appended blocks are persisted in the order Azure receives the requests, so `append` mode
+			defaults `request.concurrency` to `1` to keep flushes to the same blob in order. As with
+			all Vector sinks, delivery is at-least-once: if a flush is retried after Azure already
+			committed the block (a rare server-side error after a successful write), the batch is
+			appended twice. Set `request.retry_attempts` to `0` for at-most-once instead.
 			"""
 		required: false
 		type: string: {
