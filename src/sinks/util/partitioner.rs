@@ -2,7 +2,7 @@ use vector_lib::{event::Event, partition::Partitioner};
 
 use crate::{
     internal_events::{KeyOutsideBasePrefixError, TemplateRenderingError},
-    template::{Template, TemplateRenderingError as TplRenderError},
+    template::{ConfinedTemplate, TemplateRenderingError as TplRenderError},
 };
 
 /// Render `template` against `event` and apply standard key-prefix error handling.
@@ -14,7 +14,7 @@ use crate::{
 ///   - with `dead_letter` set: return `Some(dead_letter)` (warning, no drop)
 ///   - without `dead_letter`:  return `None` (error, drop)
 pub(crate) fn render_key_with_fallback(
-    template: &Template,
+    template: &ConfinedTemplate,
     event: &Event,
     dead_letter: Option<&str>,
 ) -> Option<String> {
@@ -58,13 +58,13 @@ pub(crate) fn render_key_with_fallback(
 /// [`Template::confine`][crate::template::Template::confine]),
 /// keys that escape the base prefix are dropped as intentional security discards.
 pub struct KeyPartitioner {
-    key_prefix_template: Template,
+    key_prefix_template: ConfinedTemplate,
     dead_letter_key_prefix: Option<String>,
 }
 
 impl KeyPartitioner {
     pub const fn new(
-        key_prefix_template: Template,
+        key_prefix_template: ConfinedTemplate,
         dead_letter_key_prefix: Option<String>,
     ) -> Self {
         Self {

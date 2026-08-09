@@ -29,7 +29,6 @@ use crate::{
 
 pub mod api;
 mod builder;
-mod cmd;
 mod compiler;
 mod diff;
 pub mod dot_graph;
@@ -41,6 +40,7 @@ pub mod provider;
 pub mod schema;
 mod secret;
 mod sink;
+mod sink_validated;
 mod source;
 mod transform;
 pub mod unit_test;
@@ -49,7 +49,6 @@ mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
-pub use cmd::{Opts, cmd};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
@@ -61,6 +60,7 @@ pub use loading::{
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use sink_validated::{DynValidatedSink, ValidatedSink};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,

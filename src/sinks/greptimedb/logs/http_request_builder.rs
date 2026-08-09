@@ -32,18 +32,18 @@ pub(super) struct PartitionKey {
 
 /// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
 pub(super) struct KeyPartitioner {
-    dbname: Template,
-    table: Template,
-    pipeline_name: Template,
-    pipeline_version: Option<Template>,
+    dbname: ConfinedTemplate,
+    table: ConfinedTemplate,
+    pipeline_name: ConfinedTemplate,
+    pipeline_version: Option<ConfinedTemplate>,
 }
 
 impl KeyPartitioner {
     pub const fn new(
-        db: Template,
-        table: Template,
-        pipeline_name: Template,
-        pipeline_version: Option<Template>,
+        db: ConfinedTemplate,
+        table: ConfinedTemplate,
+        pipeline_name: ConfinedTemplate,
+        pipeline_version: Option<ConfinedTemplate>,
     ) -> Self {
         Self {
             dbname: db,
@@ -53,7 +53,7 @@ impl KeyPartitioner {
         }
     }
 
-    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
         template
             .render_string(item)
             .map_err(|error| {

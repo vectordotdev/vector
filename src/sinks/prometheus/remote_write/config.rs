@@ -63,21 +63,18 @@ pub struct RemoteWriteConfig {
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[configurable(metadata(docs::examples = "service"))]
-    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_histogram_buckets")]
-    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_summary_quantiles")]
-    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     #[configurable(derived)]
@@ -95,7 +92,6 @@ pub struct RemoteWriteConfig {
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "my-domain"))]
-    #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
     /// The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
@@ -103,7 +99,7 @@ pub struct RemoteWriteConfig {
     ///
     /// If unset, sending unique incremental metrics to this sink will cause indefinite memory growth.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     #[configurable(derived)]
@@ -114,7 +110,6 @@ pub struct RemoteWriteConfig {
 
     #[cfg(feature = "aws-config")]
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[configurable(derived)]
@@ -126,7 +121,6 @@ pub struct RemoteWriteConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_compression")]
     #[derivative(Default(value = "default_compression()"))]
     pub compression: Compression,
@@ -289,9 +283,11 @@ impl SinkConfig for RemoteWriteConfig {
             expire_metrics_secs: self.expire_metrics_secs,
             service,
         };
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

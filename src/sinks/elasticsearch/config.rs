@@ -32,7 +32,7 @@ use crate::{
             service::HealthConfig,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
@@ -102,7 +102,6 @@ pub struct ElasticsearchConfig {
     ///
     /// [doc_type]: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/actions-index.html
     #[serde(default = "default_doc_type")]
-    #[configurable(metadata(docs::advanced))]
     pub doc_type: String,
 
     /// The API version of Elasticsearch.
@@ -127,7 +126,6 @@ pub struct ElasticsearchConfig {
     ///
     /// To avoid duplicates in Elasticsearch, please use option `id_key`.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub request_retry_partial: bool,
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
@@ -138,14 +136,12 @@ pub struct ElasticsearchConfig {
     /// [es_id]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
     /// [perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "id"))]
     #[configurable(metadata(docs::examples = "_id"))]
     pub id_key: Option<ConfigValuePath>,
 
     /// The name of the pipeline to apply.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "pipeline-name"))]
     pub pipeline: Option<String>,
 
@@ -159,7 +155,6 @@ pub struct ElasticsearchConfig {
 
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     pub encoding: Transformer,
 
     #[serde(default)]
@@ -175,7 +170,6 @@ pub struct ElasticsearchConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: Option<QueryParameters>,
@@ -268,17 +262,31 @@ impl Default for ElasticsearchConfig {
 }
 
 impl ElasticsearchConfig {
+    /// Build the render-capable [`ElasticsearchCommonMode`], confining the templated fields of the
+    /// active mode. `common_mode()` ignores the inactive branch, so a leftover unused template
+    /// (e.g. a `bulk.index` in a config that runs in `data_stream` mode) is never confined and
+    /// cannot reject an otherwise-valid config.
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
-                index: self.bulk.index.clone(),
+                // Only `index` is a routing field, so it is the only bulk template that is confined.
+                // `action` and `version` are not routing values and render unconfined, hence their
+                // `UnconfinedTemplate` type.
+                index: self.bulk.index.clone().confine(
+                    &self.confinement,
+                    Self::NAME,
+                    "bulk.index",
+                )?,
                 template_fallback_index: self.bulk.template_fallback_index.clone(),
                 action: self.bulk.action.clone(),
                 version: self.bulk.version.clone(),
                 version_type: self.bulk.version_type,
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
-                self.data_stream.clone().unwrap_or_default(),
+                self.data_stream
+                    .clone()
+                    .unwrap_or_default()
+                    .confine(&self.confinement, Self::NAME)?,
             )),
         }
     }
@@ -297,7 +305,7 @@ pub struct BulkConfig {
     #[serde(default = "default_bulk_action")]
     #[configurable(metadata(docs::examples = "create"))]
     #[configurable(metadata(docs::examples = "{{ action }}"))]
-    pub action: Template,
+    pub action: UnconfinedTemplate,
 
     /// The name of the index to write events to.
     #[serde(default = "default_index")]
@@ -312,7 +320,7 @@ pub struct BulkConfig {
     /// Version field value.
     #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "123"))]
-    pub version: Option<Template>,
+    pub version: Option<UnconfinedTemplate>,
 
     /// Version type.
     ///
@@ -325,8 +333,8 @@ pub struct BulkConfig {
     pub version_type: VersionType,
 }
 
-fn default_bulk_action() -> Template {
-    Template::try_from("index").expect("unable to parse template")
+fn default_bulk_action() -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from("index").expect("unable to parse template")
 }
 
 fn default_index() -> Template {
@@ -424,6 +432,47 @@ impl DataStreamConfig {
         true
     }
 
+    /// Confine the templated fields, producing a render-capable [`DataStreamMode`].
+    ///
+    /// This is the only way to obtain a `DataStreamMode`, so the `data_stream.*` templates can
+    /// never be rendered without first passing through confinement.
+    pub fn confine(
+        self,
+        confinement: &ConfinementConfig,
+        component_name: &'static str,
+    ) -> crate::Result<DataStreamMode> {
+        Ok(DataStreamMode {
+            dtype: self
+                .dtype
+                .confine(confinement, component_name, "data_stream.type")?,
+            dataset: self
+                .dataset
+                .confine(confinement, component_name, "data_stream.dataset")?,
+            namespace: self.namespace.confine(
+                confinement,
+                component_name,
+                "data_stream.namespace",
+            )?,
+            auto_routing: self.auto_routing,
+            sync_fields: self.sync_fields,
+        })
+    }
+}
+
+/// Runtime counterpart of [`DataStreamConfig`], holding confined templates.
+///
+/// Obtained via [`DataStreamConfig::confine`]. The render methods here operate on
+/// [`ConfinedTemplate`], so the confinement checker is enforced on every rendered value.
+#[derive(Clone, Debug)]
+pub struct DataStreamMode {
+    dtype: ConfinedTemplate,
+    dataset: ConfinedTemplate,
+    namespace: ConfinedTemplate,
+    auto_routing: bool,
+    sync_fields: bool,
+}
+
+impl DataStreamMode {
     /// If there is a `timestamp` field, rename it to the expected `@timestamp` for Elastic Common Schema.
     pub fn remap_timestamp(&self, log: &mut LogEvent) {
         if let Some(timestamp_key) = log.timestamp_path().cloned() {
@@ -557,7 +606,7 @@ impl DataStreamConfig {
 fn auto_routed_value<F>(
     data_stream: Option<&std::collections::BTreeMap<vector_lib::event::KeyString, Value>>,
     key: &str,
-    template: &Template,
+    template: &ConfinedTemplate,
     field: &'static str,
     fallback: F,
 ) -> Option<String>
@@ -674,58 +723,24 @@ fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut confined_config = self.clone();
-        // Confine only the routing fields belonging to the active mode.
-        // `common_mode()` ignores the inactive branch, so confining unused
-        // templates would reject otherwise-valid configs (e.g. a leftover
-        // `bulk.index = "{{ index }}"` in a config that runs in
-        // `data_stream` mode).
-        match self.mode {
-            ElasticsearchMode::Bulk => {
-                confined_config.bulk.index = confined_config.bulk.index.confine(
-                    &self.confinement,
-                    Self::NAME,
-                    "bulk.index",
-                )?;
-            }
-            ElasticsearchMode::DataStream => {
-                confined_config.data_stream = confined_config
-                    .data_stream
-                    .map(|mut ds| -> crate::Result<DataStreamConfig> {
-                        ds.dtype =
-                            ds.dtype
-                                .confine(&self.confinement, Self::NAME, "data_stream.type")?;
-                        ds.dataset = ds.dataset.confine(
-                            &self.confinement,
-                            Self::NAME,
-                            "data_stream.dataset",
-                        )?;
-                        ds.namespace = ds.namespace.confine(
-                            &self.confinement,
-                            Self::NAME,
-                            "data_stream.namespace",
-                        )?;
-                        Ok(ds)
-                    })
-                    .transpose()?;
-            }
-        }
-        let this = &confined_config;
-        let commons = ElasticsearchCommon::parse_many(this, cx.proxy()).await?;
+        // Confinement of the active mode's routing templates happens in
+        // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
+        // parsing. There is therefore nothing to confine up front here.
+        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
-        let request_limits = this.request.tower.into_settings();
+        let request_limits = self.request.tower.into_settings();
 
-        let health_config = this.endpoint_health.clone().unwrap_or_default();
+        let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         let services = commons
             .iter()
             .map(|common| {
                 let endpoint = common.base_url.clone();
 
-                let http_request_builder = HttpRequestBuilder::new(common, this);
+                let http_request_builder = HttpRequestBuilder::new(common, self);
                 let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
                 (endpoint, service)
@@ -734,7 +749,7 @@ impl SinkConfig for ElasticsearchConfig {
 
         let service = request_limits.distributed_service(
             ElasticsearchRetryLogic {
-                retry_partial: this.request_retry_partial,
+                retry_partial: self.request_retry_partial,
             },
             services,
             health_config,
@@ -742,7 +757,7 @@ impl SinkConfig for ElasticsearchConfig {
             1,
         );
 
-        let sink = ElasticsearchSink::new(&common, this, service)?;
+        let sink = ElasticsearchSink::new(&common, self, service)?;
 
         let stream = VectorSink::from_event_streamsink(sink);
 
@@ -753,8 +768,11 @@ impl SinkConfig for ElasticsearchConfig {
         )
         .map_ok(|((), _)| ())
         .boxed();
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((stream, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

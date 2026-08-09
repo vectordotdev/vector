@@ -60,7 +60,9 @@ components: sinks: mqtt: {
 		notices: []
 	}
 
-	configuration: generated.components.sinks.mqtt.configuration
+	configuration: generated.components.sinks.mqtt.configuration & {
+		topic: type: string: examples: ["my-topic"]
+	}
 
 	input: {
 		logs:    true

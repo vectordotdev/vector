@@ -220,7 +220,7 @@ jobs:
               - 'rust-toolchain.toml'
               - 'Makefile'
               - 'scripts/cross/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             deny:
               - '**/Cargo.toml'
@@ -229,15 +229,25 @@ jobs:
             deprecations:
               - 'deprecation.d/**'
               - 'website/data/deprecations.json'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/deprecation.yaml"
               - ".github/workflows/changes.yml"
             cue:
               - 'website/cue/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
+              - 'vdev/src/commands/build/docs_json.rs'
               - ".github/workflows/changes.yml"
             component_docs:
-              - "vdev/**"
+              - 'Makefile'
+              - "vdev/Cargo.toml"
+              - 'website/Makefile'
+              - 'website/package.json'
+              - 'website/yarn.lock'
+              - 'website/generated/example-configs/**'
+              - 'vdev/src/commands/build/component_docs/**'
+              - 'vdev/src/commands/build/component_examples.rs'
+              - 'vdev/src/commands/build/docs_json.rs'
+              - 'vdev/src/commands/check/component_examples.rs'
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'
               # If changes to the VRL sha is made the combined generated cue file will change which
@@ -246,18 +256,18 @@ jobs:
               - ".github/workflows/changes.yml"
             markdown:
               - '**/**.md'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             scripts:
               - '**/**.sh'
               - ".github/workflows/changes.yml"
             internal_events:
               - 'src/internal_events/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             docker:
               - 'distribution/docker/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             install:
               - ".github/workflows/install-sh.yml"
@@ -454,6 +464,7 @@ jobs:
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
+      opentelemetry-metrics-native: ${{ steps.filter.outputs.opentelemetry-metrics-native }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -486,7 +497,8 @@ jobs:
             "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
             "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
-            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }}
+            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }},
+            "opentelemetry-metrics-native": ${{ steps.filter.outputs.opentelemetry-metrics-native }}
           }
           EOF
           )

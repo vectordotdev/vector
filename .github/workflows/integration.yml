@@ -96,8 +96,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
-        # If you modify this list, please also update the `int_tests` job in changes.yml.
         service:
           [
             "amqp",
@@ -124,8 +122,8 @@ jobs:
             "kafka",
             "logstash",
             "loki",
-            "mqtt",
             "mongodb",
+            "mqtt",
             "nats",
             "nginx",
             "opentelemetry",
@@ -133,6 +131,7 @@ jobs:
             "prometheus",
             "pulsar",
             "redis",
+            "splunk",
             "webhdfs"
           ]
     timeout-minutes: 90
@@ -190,8 +189,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} int ${{ matrix.service }}
+          command: vdev integration run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()
@@ -214,7 +212,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
+        service:
+          [
+            "datadog-logs",
+            "datadog-metrics",
+            "opentelemetry-logs",
+            "opentelemetry-metrics",
+            "opentelemetry-metrics-native"
+          ]
     timeout-minutes: 90
 
     steps:
@@ -271,8 +276,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} e2e ${{ matrix.service }}
+          command: vdev e2e run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()
