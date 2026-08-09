@@ -6,6 +6,7 @@ use aws_smithy_types::DateTime;
 use futures::StreamExt;
 use tokio::time::{Duration, sleep};
 use vector_lib::{codecs::TextSerializerConfig, lookup::lookup_v2::ConfigValuePath};
+use vrl::event_path;
 
 use super::{config::KinesisClientBuilder, *};
 use crate::{
@@ -60,7 +61,7 @@ async fn kinesis_put_records_with_partition_key() {
 
     let events = events.map(move |mut events| {
         events.iter_logs_mut().for_each(move |log| {
-            log.insert("partition_key", partition_value);
+            log.insert(event_path!("partition_key"), partition_value);
         });
         events
     });
@@ -252,7 +253,7 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
         events.iter_logs_mut().enumerate().for_each(|(i, log)| {
             // Use a limited set of partition keys to force collisions
             let partition_key = format!("key-{}", i % 3); // Only 3 different keys
-            log.insert("partition_key", partition_key);
+            log.insert(event_path!("partition_key"), partition_key);
         });
         events
     });

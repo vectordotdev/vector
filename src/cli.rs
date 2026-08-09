@@ -1,6 +1,9 @@
 #![allow(missing_docs)]
 
-use std::{num::NonZeroU64, path::PathBuf};
+use std::{
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 
@@ -129,6 +132,11 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
 
+    /// Number of events batched per source send and used as the base for source output buffer sizing
+    /// (source output buffer capacity is this value multiplied by the number of worker threads)
+    #[arg(long, env = "VECTOR_CHUNK_SIZE_EVENTS")]
+    pub chunk_size_events: Option<NonZeroUsize>,
+
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
@@ -137,13 +145,14 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
@@ -193,7 +202,8 @@ pub struct RootOpts {
     /// This controls the time window for rate limiting Vector's own internal logs.
     /// Within each time window, the first occurrence of a log is emitted, the second
     /// shows a suppression warning, and subsequent occurrences are silent until the
-    /// window expires.
+    /// window expires. When the window expires and the log fires again, a summary of
+    /// the suppressed count is emitted followed by the log itself.
     ///
     /// Logs are grouped by their location in the code and the `component_id` field, so logs
     /// from different components are rate limited independently.
@@ -209,6 +219,16 @@ pub struct RootOpts {
         default_value = "10"
     )]
     pub internal_log_rate_limit: u64,
+
+    /// Apply a rate limit (in seconds) to the broadcast channel that feeds all `internal_logs`
+    /// sources. When set, the first occurrence of a repeated log is emitted, the second shows a
+    /// suppression warning, and subsequent occurrences are silent until the window expires. When
+    /// the window expires and the log fires again, a summary of the suppressed count is emitted
+    /// followed by the log itself. Unset by default so that `internal_logs` consumers receive
+    /// every log event. This limit is independent of `--internal-log-rate-limit`, which only
+    /// applies to stdout/stderr output.
+    #[arg(long, env = "VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT")]
+    pub internal_logs_source_rate_limit: Option<NonZeroU64>,
 
     /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
     /// received. After the duration has passed, Vector will force shutdown. To never force
@@ -233,12 +253,12 @@ pub struct RootOpts {
     pub no_graceful_shutdown_limit: bool,
 
     /// Set runtime allocation tracing
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
     pub allocation_tracing: bool,
 
     /// Set allocation tracing reporting rate in milliseconds.
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(
         long,
         env = "ALLOCATION_TRACING_REPORTING_INTERVAL_MS",
@@ -260,6 +280,21 @@ pub struct RootOpts {
     /// `--watch-config`.
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
+
+    /// Maximum number of bytes allowed after decompressing a payload.
+    ///
+    /// Sources that decompress incoming payloads (gzip, deflate, zstd, snappy) enforce this cap to
+    /// prevent a compressed "bomb" from exhausting memory. Payloads whose decompressed size exceeds
+    /// the limit are rejected.
+    ///
+    /// Defaults to 104857600 (100 MiB). Raise this only when sources routinely receive
+    /// legitimately large compressed payloads.
+    #[arg(
+        long,
+        env = "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES",
+        default_value = "104857600"
+    )]
+    pub max_decompressed_size_bytes: usize,
 
     /// Raise the file descriptor soft limit (RLIMIT_NOFILE) to the hard limit at startup.
     ///
@@ -414,10 +449,6 @@ pub enum SubCommand {
     #[command(hide = true)]
     Completion(completion::Opts),
 
-    /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
-    #[command(hide = true)]
-    Config(config::Opts),
-
     /// List available components, then exit.
     List(list::Opts),
 
@@ -445,6 +476,21 @@ pub enum SubCommand {
 }
 
 impl SubCommand {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "the #[cfg(windows)] arm calls a non-const method"
+    )]
+    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+        match self {
+            Self::Graph(g) => g.dangerously_allow_env_var_interpolation,
+            Self::Test(t) => t.dangerously_allow_env_var_interpolation,
+            Self::Validate(v) => v.dangerously_allow_env_var_interpolation,
+            #[cfg(windows)]
+            Self::Service(s) => s.dangerously_allow_env_var_interpolation(),
+            _ => false,
+        }
+    }
+
     pub async fn execute(
         &self,
         mut signals: signal::SignalPair,
@@ -452,7 +498,6 @@ impl SubCommand {
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
-            Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema(opts) => generate_schema::cmd(opts),
@@ -578,7 +623,7 @@ mod tests {
         if setrlimit(Resource::RLIMIT_NOFILE, hard, hard).is_err() {
             #[cfg(target_os = "macos")]
             if let Some(maxfiles) = super::macos_maxfilesperproc() {
-                let _ = setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard);
+                setrlimit(Resource::RLIMIT_NOFILE, maxfiles, hard).ok();
             }
         }
 

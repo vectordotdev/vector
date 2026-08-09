@@ -192,13 +192,11 @@ generated: components: sinks: azure_blob: configuration: {
 
 			The UUID is appended to the timestamp portion of the object key, such that if the blob key
 			generated is `date=2022-07-18/1658176486`, setting this field to `true` results
-			in a blob key that looks like
+			in an blob key that looks like
 			`date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
 
-			The default value depends on `blob_type`:
-			- `block`: `true` — guarantees unique blob names across concurrent writers.
-			- `append`: `false` — multiple batches must share the same blob name to append to it.
-			  Set to `true` only if you intentionally want each flush to target a distinct append blob.
+			This ensures there are no name collisions, and can be useful in high-volume workloads where
+			blob keys must be unique.
 			"""
 		required: false
 		type: bool: {}
@@ -232,86 +230,23 @@ generated: components: sinks: azure_blob: configuration: {
 		description: """
 			The timestamp format for the time component of the blob key.
 
-			Blob keys are appended with a timestamp that reflects when the blob is sent to
-			Azure Blob Storage. The resulting blob key is functionally equivalent to joining
+			By default, blob keys are appended with a timestamp that reflects when the blob are sent to
+			Azure Blob Storage, such that the resulting blob key is functionally equivalent to joining
 			the blob prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
 
 			This would represent a `blob_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
-			20:34:44 GMT+0000, with the `blob_time_format` set to `%s`, which renders timestamps in
-			seconds since the Unix epoch.
+			20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
+			timestamps in seconds since the Unix epoch.
 
 			Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
 			languages.
 
 			When set to an empty string, no timestamp is appended to the blob prefix.
 
-			The default value depends on `blob_type`:
-			- `block`: `%s` (Unix epoch seconds) — each batch gets a unique timestamp.
-			- `append`: `%Y-%m-%d` (ISO date) — batches within the same day share the same blob.
-
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
 		type: string: syntax: "strftime"
-	}
-	blob_type: {
-		description: """
-			The type of blob to use when writing to Azure Blob Storage.
-
-			- `block` (default): a new uniquely-named blob per batch.
-			  `blob_append_uuid` defaults to `true`; `blob_time_format` defaults to `%s`.
-			- `append`: each batch appends to the same blob.
-			  `blob_append_uuid` defaults to `false`; `blob_time_format` defaults to `%Y-%m-%d`.
-			  Multiple batches within the same time window write to the same blob.
-
-			**Batch size limit for `append` mode**: Azure limits each `append_block` call to 4 MiB
-			(4,194,304 bytes). `batch.max_bytes` automatically defaults to `4194304` when
-			`blob_type` is `append` and the setting is not explicitly configured.
-			Setting `batch.max_bytes` above `4194304` with `blob_type: append` is an error and
-			Vector will fail to start.
-
-			`batch.max_bytes` is measured on the uncompressed, pre-encoding event size, while Azure
-			enforces the 4 MiB limit on the encoded (and, if enabled, compressed) request body. With
-			the default `gzip` compression the encoded body is smaller than the batched events, so the
-			4 MiB batch limit leaves headroom. If you disable compression, encoding overhead (for
-			example JSON escaping) can push a near-limit batch over 4 MiB and Azure rejects it; lower
-			`batch.max_bytes` to leave headroom in that case.
-
-			**Ordering and delivery for `append` mode**: appended blocks are persisted in the order
-			Azure receives the requests, so append mode pins request concurrency to 1 (unless you set a
-			fixed `request.concurrency`) to keep flushes to the same blob in order. As with all Vector
-			sinks, delivery is at-least-once: if a flush is retried after Azure already committed the
-			block (a rare server-side error after a successful write), the batch can be appended twice.
-			Set `request.retry_attempts` to `0` if you prefer at-most-once over possible duplication.
-
-			When `blob_type` is `append` and compression is enabled, each batch is compressed as an
-			independent frame and appended to the blob. The result is a series of concatenated
-			compressed frames. Use decompressors that support multi-stream decompression
-			(e.g., `gunzip`, `zstd -d`).
-			"""
-		required: false
-		type: string: {
-			default: "block"
-			enum: {
-				append: """
-					Stores data as append blobs.
-
-					Batches are appended to an existing blob rather than creating a new one.
-					The blob name stays stable across flushes — suited for continuous log streaming
-					where you want a single growing file per time window.
-
-					When combined with compression, each batch is compressed as an independent frame
-					and appended to the blob. The result is a series of concatenated compressed frames.
-					Use decompressors that support multi-stream decompression (e.g., `gunzip`, `zstd -d`).
-					"""
-				block: """
-					Stores data as block blobs.
-
-					Each batch creates a new uniquely-named blob. Recommended for high-throughput
-					scenarios where blobs are written once and read many times.
-					"""
-			}
-		}
 	}
 	compression: {
 		description: """
@@ -367,9 +302,10 @@ generated: components: sinks: azure_blob: configuration: {
 			| Allowed resource types | Container & Object |
 			| Allowed permissions    | Read & Create      |
 
-			When `blob_type` is `append`, the SAS token additionally needs the `Add` (or `Write`)
-			permission. `Read & Create` is sufficient to pass the health check and create the blob,
-			but every `Append Block` call fails with `403 Forbidden` without `Add`/`Write`.
+			If you also configure the `tags` option, the SAS must include the
+			`Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
+			the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
+			uploads fail with an authorization error even when the health check still passes.
 			"""
 		required: false
 		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
@@ -379,6 +315,22 @@ generated: components: sinks: azure_blob: configuration: {
 		description: "The Azure Blob Storage Account container name."
 		required:    true
 		type: string: examples: ["my-logs"]
+	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	encoding: {
 		description: """
@@ -697,12 +649,18 @@ generated: components: sinks: azure_blob: configuration: {
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
 					metric. When set to `full`, all metric tags are exposed as separate assignments.
+					When set to `auto`, tag values are encoded using their underlying shape.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+															force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
@@ -881,6 +839,25 @@ generated: components: sinks: azure_blob: configuration: {
 						"""
 				}
 			}
+		}
+	}
+	metadata: {
+		description: """
+			The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
+
+			Each entry becomes an `x-ms-meta-{key}` header. Azure limits the total size of all
+			metadata and restricts key names to ASCII alphanumeric characters and underscores,
+			starting with a letter. Non-ASCII values must be Base64-encoded before being set.
+			The service rejects invalid configurations. See the [Azure documentation][blob_metadata]
+			for current limits.
+
+			[blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "A key/value pair."
+			required:    true
+			type: string: {}
 		}
 	}
 	request: {
@@ -1066,6 +1043,41 @@ generated: components: sinks: azure_blob: configuration: {
 					default: 60
 					unit:    "seconds"
 				}
+			}
+		}
+	}
+	tags: {
+		description: """
+			The set of [blob index tags][blob_index_tags] to apply to created blobs.
+
+			Each entry becomes a tag in the `x-ms-tags` header. Azure limits blobs to 10 tags,
+			with restricted character sets for keys and values; the service rejects invalid
+			configurations.
+
+			When authenticating with a shared access signature (SAS), the token must include the
+			`Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
+			authorization requirement to the `Put Blob` request that carries these tags, so without
+			it tagged uploads fail with an authorization error even when the health check still passes.
+
+			When authenticating with an Azure credential (managed identity, workload identity, and so
+			on), the identity needs the
+			`Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write` RBAC action.
+			The least-privileged built-in role that grants it is *Storage Blob Data Owner*; the
+			*Storage Blob Data Contributor* role commonly sufficient for uploads does not include it.
+
+			[blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				Classification: "confidential"
+				PHI:            "True"
+				Project:        "Blue"
+			}]
+			options: "*": {
+				description: "A single tag."
+				required:    true
+				type: string: {}
 			}
 		}
 	}

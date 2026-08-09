@@ -1337,7 +1337,7 @@ fn line_agg_adapter(
     let line_agg_in = inner.map(move |mut log| {
         let message_value = match log_namespace {
             LogNamespace::Vector => log
-                .remove(event_path!())
+                .remove(&vrl::path::OwnedTargetPath::event_root())
                 .expect("`.` must exist in the event"),
             LogNamespace::Legacy => log
                 .remove(
@@ -1363,7 +1363,7 @@ fn line_agg_adapter(
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(move |(_, message, mut log, _)| {
         match log_namespace {
-            LogNamespace::Vector => log.insert(event_path!(), message),
+            LogNamespace::Vector => log.insert(&vrl::path::OwnedTargetPath::event_root(), message),
             LogNamespace::Legacy => log.insert(
                 log_schema()
                     .message_key_target_path()

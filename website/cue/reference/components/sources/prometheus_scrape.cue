@@ -2,7 +2,6 @@ package metadata
 
 components: sources: prometheus_scrape: {
 	title: "Prometheus Scrape"
-	alias: "prometheus"
 
 	classes: {
 		delivery: "at_least_once"

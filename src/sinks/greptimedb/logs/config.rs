@@ -22,6 +22,7 @@ use crate::{
         prelude::*,
         util::http::HttpService,
     },
+    template::ConfinementConfig,
 };
 
 fn extra_params_examples() -> HashMap<String, String> {
@@ -92,7 +93,6 @@ pub struct GreptimeDBLogsConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to GreptimeDB.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "extra_params_examples()"))]
     pub extra_params: Option<HashMap<String, String>>,
@@ -100,7 +100,6 @@ pub struct GreptimeDBLogsConfig {
     /// Custom headers to add to the HTTP request sent to GreptimeDB.
     /// Note that these headers will override the existing headers.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "Extra header key-value pairs."
     ))]
@@ -124,6 +123,10 @@ pub struct GreptimeDBLogsConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl_generate_config_from_default!(GreptimeDBLogsConfig);
@@ -132,6 +135,23 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let confined_table = self
+            .table
+            .clone()
+            .confine(&self.confinement, Self::NAME, "table")?;
+        let confined_dbname =
+            self.dbname
+                .clone()
+                .confine(&self.confinement, Self::NAME, "dbname")?;
+        let confined_pipeline_name =
+            self.pipeline_name
+                .clone()
+                .confine(&self.confinement, Self::NAME, "pipeline_name")?;
+        let confined_pipeline_version = self
+            .pipeline_version
+            .clone()
+            .map(|t| t.confine(&self.confinement, Self::NAME, "pipeline_version"))
+            .transpose()?;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
@@ -167,10 +187,10 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {
-            dbname: self.dbname.clone(),
-            table: self.table.clone(),
-            pipeline_name: self.pipeline_name.clone(),
-            pipeline_version: self.pipeline_version.clone(),
+            dbname: confined_dbname,
+            table: confined_table,
+            pipeline_name: confined_pipeline_name,
+            pipeline_version: confined_pipeline_version,
         };
 
         let sink = GreptimeDBLogsHttpSink::new(
@@ -188,11 +208,46 @@ impl SinkConfig for GreptimeDBLogsConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         Input::log()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn confinement_rejects_unconfined_table() {
+        let template = Template::try_from("{{ table }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "greptimedb_logs", "table");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_table() {
+        let template = Template::try_from("{{ table }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "greptimedb_logs", "table");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_table() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "greptimedb_logs", "table");
+        assert!(result.is_ok());
     }
 }

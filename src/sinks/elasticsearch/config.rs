@@ -32,7 +32,7 @@ use crate::{
             service::HealthConfig,
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
@@ -102,7 +102,6 @@ pub struct ElasticsearchConfig {
     ///
     /// [doc_type]: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/actions-index.html
     #[serde(default = "default_doc_type")]
-    #[configurable(metadata(docs::advanced))]
     pub doc_type: String,
 
     /// The API version of Elasticsearch.
@@ -127,7 +126,6 @@ pub struct ElasticsearchConfig {
     ///
     /// To avoid duplicates in Elasticsearch, please use option `id_key`.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub request_retry_partial: bool,
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
@@ -138,14 +136,12 @@ pub struct ElasticsearchConfig {
     /// [es_id]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
     /// [perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "id"))]
     #[configurable(metadata(docs::examples = "_id"))]
     pub id_key: Option<ConfigValuePath>,
 
     /// The name of the pipeline to apply.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "pipeline-name"))]
     pub pipeline: Option<String>,
 
@@ -159,7 +155,6 @@ pub struct ElasticsearchConfig {
 
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     pub encoding: Transformer,
 
     #[serde(default)]
@@ -175,7 +170,6 @@ pub struct ElasticsearchConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: Option<QueryParameters>,
@@ -221,6 +215,10 @@ pub struct ElasticsearchConfig {
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 fn default_doc_type() -> String {
@@ -258,22 +256,37 @@ impl Default for ElasticsearchConfig {
             data_stream: None,
             metrics: None,
             acknowledgements: Default::default(),
+            confinement: ConfinementConfig::default(),
         }
     }
 }
 
 impl ElasticsearchConfig {
+    /// Build the render-capable [`ElasticsearchCommonMode`], confining the templated fields of the
+    /// active mode. `common_mode()` ignores the inactive branch, so a leftover unused template
+    /// (e.g. a `bulk.index` in a config that runs in `data_stream` mode) is never confined and
+    /// cannot reject an otherwise-valid config.
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
-                index: self.bulk.index.clone(),
+                // Only `index` is a routing field, so it is the only bulk template that is confined.
+                // `action` and `version` are not routing values and render unconfined, hence their
+                // `UnconfinedTemplate` type.
+                index: self.bulk.index.clone().confine(
+                    &self.confinement,
+                    Self::NAME,
+                    "bulk.index",
+                )?,
                 template_fallback_index: self.bulk.template_fallback_index.clone(),
                 action: self.bulk.action.clone(),
                 version: self.bulk.version.clone(),
                 version_type: self.bulk.version_type,
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
-                self.data_stream.clone().unwrap_or_default(),
+                self.data_stream
+                    .clone()
+                    .unwrap_or_default()
+                    .confine(&self.confinement, Self::NAME)?,
             )),
         }
     }
@@ -292,7 +305,7 @@ pub struct BulkConfig {
     #[serde(default = "default_bulk_action")]
     #[configurable(metadata(docs::examples = "create"))]
     #[configurable(metadata(docs::examples = "{{ action }}"))]
-    pub action: Template,
+    pub action: UnconfinedTemplate,
 
     /// The name of the index to write events to.
     #[serde(default = "default_index")]
@@ -307,7 +320,7 @@ pub struct BulkConfig {
     /// Version field value.
     #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "123"))]
-    pub version: Option<Template>,
+    pub version: Option<UnconfinedTemplate>,
 
     /// Version type.
     ///
@@ -320,8 +333,8 @@ pub struct BulkConfig {
     pub version_type: VersionType,
 }
 
-fn default_bulk_action() -> Template {
-    Template::try_from("index").expect("unable to parse template")
+fn default_bulk_action() -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from("index").expect("unable to parse template")
 }
 
 fn default_index() -> Template {
@@ -419,6 +432,47 @@ impl DataStreamConfig {
         true
     }
 
+    /// Confine the templated fields, producing a render-capable [`DataStreamMode`].
+    ///
+    /// This is the only way to obtain a `DataStreamMode`, so the `data_stream.*` templates can
+    /// never be rendered without first passing through confinement.
+    pub fn confine(
+        self,
+        confinement: &ConfinementConfig,
+        component_name: &'static str,
+    ) -> crate::Result<DataStreamMode> {
+        Ok(DataStreamMode {
+            dtype: self
+                .dtype
+                .confine(confinement, component_name, "data_stream.type")?,
+            dataset: self
+                .dataset
+                .confine(confinement, component_name, "data_stream.dataset")?,
+            namespace: self.namespace.confine(
+                confinement,
+                component_name,
+                "data_stream.namespace",
+            )?,
+            auto_routing: self.auto_routing,
+            sync_fields: self.sync_fields,
+        })
+    }
+}
+
+/// Runtime counterpart of [`DataStreamConfig`], holding confined templates.
+///
+/// Obtained via [`DataStreamConfig::confine`]. The render methods here operate on
+/// [`ConfinedTemplate`], so the confinement checker is enforced on every rendered value.
+#[derive(Clone, Debug)]
+pub struct DataStreamMode {
+    dtype: ConfinedTemplate,
+    dataset: ConfinedTemplate,
+    namespace: ConfinedTemplate,
+    auto_routing: bool,
+    sync_fields: bool,
+}
+
+impl DataStreamMode {
     /// If there is a `timestamp` field, rename it to the expected `@timestamp` for Elastic Common Schema.
     pub fn remap_timestamp(&self, log: &mut LogEvent) {
         if let Some(timestamp_key) = log.timestamp_path().cloned() {
@@ -512,18 +566,24 @@ impl DataStreamConfig {
             let data_stream = log
                 .get(event_path!("data_stream"))
                 .and_then(|ds| ds.as_object());
-            let dtype = data_stream
-                .and_then(|ds| ds.get("type"))
-                .map(|value| value.to_string_lossy().into_owned())
-                .or_else(|| self.dtype(log))?;
-            let dataset = data_stream
-                .and_then(|ds| ds.get("dataset"))
-                .map(|value| value.to_string_lossy().into_owned())
-                .or_else(|| self.dataset(log))?;
-            let namespace = data_stream
-                .and_then(|ds| ds.get("namespace"))
-                .map(|value| value.to_string_lossy().into_owned())
-                .or_else(|| self.namespace(log))?;
+            let dtype =
+                auto_routed_value(data_stream, "type", &self.dtype, "data_stream.type", || {
+                    self.dtype(log)
+                })?;
+            let dataset = auto_routed_value(
+                data_stream,
+                "dataset",
+                &self.dataset,
+                "data_stream.dataset",
+                || self.dataset(log),
+            )?;
+            let namespace = auto_routed_value(
+                data_stream,
+                "namespace",
+                &self.namespace,
+                "data_stream.namespace",
+                || self.namespace(log),
+            )?;
             (dtype, dataset, namespace)
         };
 
@@ -537,10 +597,135 @@ impl DataStreamConfig {
     }
 }
 
+/// Auto-routed helper: prefer the event's `data_stream.<key>` field, but run
+/// that raw value through the confinement check attached to the
+/// corresponding template so `auto_routing` can't be used to bypass the
+/// build-time confinement on `data_stream.{type,dataset,namespace}`. Falls
+/// back to `fallback` (normal template rendering) when the event field is
+/// missing.
+fn auto_routed_value<F>(
+    data_stream: Option<&std::collections::BTreeMap<vector_lib::event::KeyString, Value>>,
+    key: &str,
+    template: &ConfinedTemplate,
+    field: &'static str,
+    fallback: F,
+) -> Option<String>
+where
+    F: FnOnce() -> Option<String>,
+{
+    match data_stream.and_then(|ds| ds.get(key)) {
+        Some(value) => {
+            let s = value.to_string_lossy().into_owned();
+            // Two layers of validation:
+            //
+            // 1. If the operator-authored template has a confinement checker,
+            //    run it. That catches values that violate a `PrefixChecker`
+            //    base or contain `..` segments.
+            //
+            // 2. If the template is *static* (e.g. the default `type = "logs"`),
+            //    no checker is attached and `check_confinement` returns Ok
+            //    for anything. Data-stream names are simple identifiers per
+            //    Elasticsearch's naming rules, so anything containing a path
+            //    separator, `..`, NUL, or over 255 bytes is either an attack
+            //    or would be rejected by Elasticsearch on ingest anyway.
+            template
+                .check_confinement(&s)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some(field),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            if !is_valid_data_stream_component(&s, field) {
+                emit!(TemplateRenderingError {
+                    error: crate::template::TemplateRenderingError::Confined {
+                        rendered_preview: crate::template::confined_preview(&s),
+                        rendered_len: s.len(),
+                        message: format!(
+                            "auto-routed {field} value is not a valid data-stream identifier"
+                        ),
+                    },
+                    field: Some(field),
+                    drop_event: true,
+                });
+                return None;
+            }
+            Some(s)
+        }
+        None => fallback(),
+    }
+}
+
+/// Baseline sanity check for auto-routed `data_stream.*` values pulled off
+/// events. Rejects anything Elasticsearch itself would reject at ingest, so
+/// that attacker-controlled values can't slip past Vector's drop guard and
+/// blow up later in the request pipeline.
+///
+/// Rules (from the Elasticsearch data-stream / index naming spec):
+///
+/// - No control characters, NUL bytes, or the characters
+///   `\ / * ? " < > | , # : <space>` (forbidden in any index or
+///   data-stream name).
+/// - No exact `.` or `.._` path segments (traversal).
+/// - Cannot start with `- _ + .` (reserved leading characters).
+/// - Combined `type-dataset-namespace` is capped at 100 bytes by
+///   Elasticsearch, so each part must be well under that. We use 100
+///   here as a per-part cap — cheap and conservative.
+/// - `dataset` and `namespace` additionally forbid `-` because `-` is
+///   the separator between the three parts of a data-stream name.
+///
+/// Empty is legitimate — `DataStreamConfig::index` filters empty parts
+/// out of the joined name, so an event field explicitly overriding one
+/// part to `""` just skips it.
+fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
+    if s.is_empty() {
+        return true;
+    }
+    if s.len() > 100 {
+        return false;
+    }
+    // Forbidden anywhere in the string.
+    const FORBIDDEN: &[char] = &[
+        '\0', '/', '\\', '*', '?', '"', '<', '>', '|', ',', '#', ':', ' ',
+    ];
+    if s.contains(FORBIDDEN) {
+        return false;
+    }
+    // Reserved leading characters.
+    if let Some(first) = s.chars().next()
+        && matches!(first, '-' | '_' | '+' | '.')
+    {
+        return false;
+    }
+    // Path-traversal segments — belt-and-braces even though `/` and `\`
+    // are already forbidden.
+    if s == "." || s == ".." {
+        return false;
+    }
+    // Control characters have no place in a routing identifier.
+    if s.chars().any(|c| c.is_control()) {
+        return false;
+    }
+    // `-` is the separator inside the composed data-stream name
+    // (`{type}-{dataset}-{namespace}`), so `dataset` and `namespace`
+    // must not contain it. `type` values (`logs`, `metrics`, …) also
+    // conventionally don't contain `-`, but we accept it there for
+    // forward compatibility with custom types.
+    if (field == "data_stream.dataset" || field == "data_stream.namespace") && s.contains('-') {
+        return false;
+    }
+    true
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Confinement of the active mode's routing templates happens in
+        // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
+        // parsing. There is therefore nothing to confine up front here.
         let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
@@ -586,6 +771,10 @@ impl SinkConfig for ElasticsearchConfig {
         Ok((stream, healthcheck))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 
@@ -600,6 +789,7 @@ impl SinkConfig for ElasticsearchConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::template::{ConfinementConfig, Template};
 
     #[test]
     fn generate_config() {
@@ -607,34 +797,147 @@ mod tests {
     }
 
     #[test]
+    fn is_valid_data_stream_component_accepts_normal_identifiers() {
+        // `-` allowed for `type` (custom types), forbidden for
+        // dataset/namespace where it collides with the separator.
+        assert!(is_valid_data_stream_component("logs", "data_stream.type"));
+        assert!(is_valid_data_stream_component(
+            "metrics-prod",
+            "data_stream.type"
+        ));
+        assert!(is_valid_data_stream_component(
+            "app.errors",
+            "data_stream.dataset"
+        ));
+        assert!(is_valid_data_stream_component(
+            "tenant_42",
+            "data_stream.namespace"
+        ));
+        // Empty is accepted — filtered out of the joined name downstream.
+        assert!(is_valid_data_stream_component("", "data_stream.dataset"));
+    }
+
+    #[test]
+    fn is_valid_data_stream_component_rejects_traversal_and_injection() {
+        // Path traversal / separators.
+        assert!(!is_valid_data_stream_component("..", "data_stream.dataset"));
+        assert!(!is_valid_data_stream_component(".", "data_stream.dataset"));
+        assert!(!is_valid_data_stream_component(
+            "../evil",
+            "data_stream.dataset"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "logs/tenant",
+            "data_stream.type"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "logs\\tenant",
+            "data_stream.type"
+        ));
+        // Elasticsearch-forbidden characters.
+        for bad in [
+            "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b", "a,b", "a#b", "a:b", "a b",
+        ] {
+            assert!(
+                !is_valid_data_stream_component(bad, "data_stream.type"),
+                "should reject {bad:?}"
+            );
+        }
+        // Reserved leading characters.
+        for bad in ["-logs", "_logs", "+logs", ".logs"] {
+            assert!(
+                !is_valid_data_stream_component(bad, "data_stream.type"),
+                "should reject {bad:?}"
+            );
+        }
+        // Length cap (Elasticsearch caps the joined name at 100 bytes; we
+        // apply per-part to stay safely under).
+        assert!(!is_valid_data_stream_component(
+            &"x".repeat(101),
+            "data_stream.type"
+        ));
+        // NUL + control chars.
+        assert!(!is_valid_data_stream_component(
+            "logs\0",
+            "data_stream.type"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "logs\n",
+            "data_stream.type"
+        ));
+    }
+
+    #[test]
+    fn is_valid_data_stream_component_rejects_hyphen_in_dataset_and_namespace() {
+        // `-` separates the three parts of a data-stream name, so it
+        // must not appear inside dataset or namespace.
+        assert!(!is_valid_data_stream_component(
+            "app-errors",
+            "data_stream.dataset"
+        ));
+        assert!(!is_valid_data_stream_component(
+            "prod-us",
+            "data_stream.namespace"
+        ));
+        // Same string is accepted for `type` (custom types may contain `-`).
+        assert!(is_valid_data_stream_component(
+            "app-errors",
+            "data_stream.type"
+        ));
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "elasticsearch", "bulk.index");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_index() {
+        let template = Template::try_from("{{ index }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "elasticsearch", "bulk.index");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_index() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "elasticsearch", "bulk.index");
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn parse_aws_auth() {
-        toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            auth.strategy = "aws"
-            auth.assume_role = "role"
-        "#,
-        )
+        serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            auth:
+              strategy: aws
+              assume_role: role
+        "#})
         .unwrap();
 
-        toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            auth.strategy = "aws"
-        "#,
-        )
+        serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            auth:
+              strategy: aws
+        "#})
         .unwrap();
     }
 
     #[test]
     fn parse_mode() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            mode = "data_stream"
-            data_stream.type = "synthetics"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            mode: data_stream
+            data_stream:
+              type: synthetics
+        "#})
         .unwrap();
         assert!(matches!(config.mode, ElasticsearchMode::DataStream));
         assert!(config.data_stream.is_some());
@@ -642,46 +945,39 @@ mod tests {
 
     #[test]
     fn parse_distribution() {
-        toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = ["", ""]
-            distribution.retry_initial_backoff_secs = 10
-        "#,
-        )
+        serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: ["", ""]
+            distribution:
+              retry_initial_backoff_secs: 10
+        "#})
         .unwrap();
     }
 
     #[test]
     fn parse_version() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            api_version = "v7"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            api_version: v7
+        "#})
         .unwrap();
         assert_eq!(config.api_version, ElasticsearchApiVersion::V7);
     }
 
     #[test]
     fn parse_version_auto() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            api_version = "auto"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            api_version: auto
+        "#})
         .unwrap();
         assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
     }
 
     #[test]
     fn parse_default_bulk() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+        "#})
         .unwrap();
         assert_eq!(config.mode, ElasticsearchMode::Bulk);
         assert_eq!(config.bulk, BulkConfig::default());
@@ -689,12 +985,10 @@ mod tests {
 
     #[test]
     fn parse_opensearch_service_type_managed() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            opensearch_service_type = "managed"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            opensearch_service_type: managed
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
@@ -704,14 +998,13 @@ mod tests {
 
     #[test]
     fn parse_opensearch_service_type_serverless() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            opensearch_service_type = "serverless"
-            auth.strategy = "aws"
-            api_version = "auto"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            api_version: auto
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
@@ -721,11 +1014,9 @@ mod tests {
 
     #[test]
     fn parse_opensearch_service_type_default() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
@@ -736,14 +1027,13 @@ mod tests {
     #[cfg(feature = "aws-core")]
     #[test]
     fn parse_opensearch_serverless_with_aws_auth() {
-        let config = toml::from_str::<ElasticsearchConfig>(
-            r#"
-            endpoints = [""]
-            opensearch_service_type = "serverless"
-            auth.strategy = "aws"
-            api_version = "auto"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: [""]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            api_version: auto
+        "#})
         .unwrap();
         assert_eq!(
             config.opensearch_service_type,
