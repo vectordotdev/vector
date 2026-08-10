@@ -825,7 +825,14 @@ impl AgentDDSketch {
                 // bucket-derived `sum`/`avg`, which stay self-consistent with
                 // `sketch.count()` since both are derived from the same
                 // (possibly incomplete) buckets.
-                if true_count > 0 && true_count == u64::from(sketch.count()) {
+                //
+                // The exact `sum` also has to actually be a number. Vector's
+                // Prometheus parser accepts `NaN`/`+Inf`/`-Inf` as metric values
+                // (see `parse_value` in `lib/prometheus-parser/src/line.rs`), so a
+                // scraped `_sum` can be non-finite, and OTLP's `sum` is an
+                // unvalidated `double`.
+                if true_count > 0 && true_count == u64::from(sketch.count()) && true_sum.is_finite()
+                {
                     #[allow(
                         clippy::cast_precision_loss,
                         reason = "Real histogram counts are always far below 2^52, so this conversion never loses meaningful precision in practice"
@@ -1440,6 +1447,57 @@ mod tests {
             sketch.avg(),
             Some(true_sum / f64::from(u32::try_from(true_count).unwrap()))
         );
+    }
+
+    #[test]
+    fn test_transform_to_sketch_skips_override_for_non_finite_sum() {
+        // Regression test: a histogram's exact `sum` comes from outside Vector and
+        // isn't guaranteed to be a number. The Prometheus exposition format allows
+        // `NaN`/`+Inf`/`-Inf` and Vector's parser accepts them (`parse_value` in
+        // `lib/prometheus-parser/src/line.rs`), and OTLP's `sum` is an unvalidated
+        // `double`. Overriding with a non-finite value would send `NaN`/`inf` on to
+        // the encoded payload, and for `NaN` it would also break the
+        // `min <= avg <= max` invariant, because `f64::min`/`f64::max` ignore `NaN`
+        // and leave `min`/`max` sitting at their bucket edges. Fall back to the
+        // (always finite) bucket-derived `sum`/`avg` instead.
+        let true_count: u64 = 2;
+
+        for non_finite_sum in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let metric = Metric::new(
+                "source_send_latency_seconds",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![Bucket {
+                        upper_limit: 1.0,
+                        count: true_count,
+                    }],
+                    count: true_count,
+                    sum: non_finite_sum,
+                },
+            );
+
+            let transformed =
+                AgentDDSketch::transform_to_sketch(metric).expect("valid histogram converts");
+            let MetricValue::Sketch { sketch } = transformed.value() else {
+                panic!("expected a sketch value");
+            };
+            let crate::event::metric::MetricSketch::AgentDDSketch(sketch) = sketch;
+
+            let sum = sketch.sum().expect("non-empty sketch has a sum");
+            let avg = sketch.avg().expect("non-empty sketch has an avg");
+            let min = sketch.min().expect("non-empty sketch has a min");
+            let max = sketch.max().expect("non-empty sketch has a max");
+
+            assert!(
+                sum.is_finite() && avg.is_finite(),
+                "a non-finite exact sum ({non_finite_sum}) must not reach the sketch: \
+                 sum={sum} avg={avg}"
+            );
+            assert!(
+                min <= avg && avg <= max,
+                "summary stats must stay internally consistent: min={min} avg={avg} max={max}"
+            );
+        }
     }
 
     #[test]
