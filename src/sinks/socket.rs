@@ -154,13 +154,18 @@ impl SinkConfig for SocketSinkConfig {
 /// Purely validated socket sink configuration.
 ///
 /// Holds the encoding transformer per socket mode so `build` can construct
-/// the encoder. Serializer construction is deferred to `build` because some
-/// codecs (e.g. protobuf) read files at construction time, which must not
-/// happen during `--no-environment` validation.
+/// the encoder. For TCP, the parsed host/port are also retained so `build`
+/// consumes the validated address rather than re-parsing it. Serializer
+/// construction is deferred to `build` because some codecs (e.g. protobuf)
+/// read files at construction time, which must not happen during validation.
 #[derive(Clone, Debug)]
 pub enum ValidatedSocket {
-    /// TCP mode with its stream encoding transformer.
-    Tcp { transformer: Transformer },
+    /// TCP mode with its parsed host/port and stream encoding transformer.
+    Tcp {
+        host: String,
+        port: u16,
+        transformer: Transformer,
+    },
     /// UDP mode with its message encoding transformer.
     Udp { transformer: Transformer },
     /// Unix stream mode with its stream encoding transformer.
@@ -177,9 +182,14 @@ impl ValidatedSink for SocketSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedSocket> {
         match &self.mode {
-            Mode::Tcp(TcpMode { encoding, .. }) => {
+            Mode::Tcp(TcpMode { config, encoding }) => {
+                let (host, port) = config.parse_address()?;
                 let transformer = encoding.transformer();
-                Ok(ValidatedSocket::Tcp { transformer })
+                Ok(ValidatedSocket::Tcp {
+                    host,
+                    port,
+                    transformer,
+                })
             }
             Mode::Udp(UdpMode { encoding, .. }) => {
                 let transformer = encoding.transformer();
@@ -216,10 +226,17 @@ impl ValidatedSink for SocketSinkConfig {
         _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match (validated, &self.mode) {
-            (ValidatedSocket::Tcp { transformer }, Mode::Tcp(TcpMode { config, encoding })) => {
+            (
+                ValidatedSocket::Tcp {
+                    host,
+                    port,
+                    transformer,
+                },
+                Mode::Tcp(TcpMode { config, encoding }),
+            ) => {
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(transformer.clone(), encoder)
+                config.build_with_address(host.clone(), *port, transformer.clone(), encoder)
             }
             (ValidatedSocket::Udp { transformer }, Mode::Udp(UdpMode { config, encoding })) => {
                 let serializer = encoding.build()?;
@@ -327,6 +344,38 @@ mod test {
 
         let validated = config.validate().expect("validation should succeed");
         assert!(matches!(validated, ValidatedSocket::Tcp { .. }));
+    }
+
+    #[test]
+    fn validate_rejects_invalid_tcp_address() {
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address("not a valid address".to_string()),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a malformed TCP address should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_tcp_address_without_port() {
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address("127.0.0.1".to_string()),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a TCP address without a port should fail validation"
+        );
     }
 
     enum DatagramSocket {
