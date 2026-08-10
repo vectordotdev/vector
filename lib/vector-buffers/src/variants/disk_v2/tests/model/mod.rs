@@ -30,10 +30,10 @@ use self::action::{Action, arb_actions};
 mod common;
 use self::common::{Progress, arb_buffer_config};
 
-mod filesystem;
+pub(super) mod filesystem;
 use self::filesystem::TestFilesystem;
 
-mod record;
+pub(super) mod record;
 use self::record::Record;
 
 mod sequencer;
@@ -139,17 +139,9 @@ impl FileModel {
             flushed_bytes += bytes;
         }
 
-        if record_len >= self.write_buffer_size {
-            // The record is bigger the write buffer itself, so just write it immediately:
-            flushed_events += record.event_count();
-            flushed_bytes += record_len;
-
-            self.flushed_bytes.fetch_add(record_len, Ordering::SeqCst);
-            self.flushed_records.push((record, record_len));
-        } else {
-            self.unflushed_bytes.fetch_add(record_len, Ordering::SeqCst);
-            self.unflushed_records.push((record, record_len));
-        }
+        // Large records use the same buffered, resumable flush path as every other record.
+        self.unflushed_bytes.fetch_add(record_len, Ordering::SeqCst);
+        self.unflushed_records.push((record, record_len));
 
         (None, flushed_events, flushed_bytes)
     }

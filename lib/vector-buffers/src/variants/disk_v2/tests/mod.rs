@@ -29,6 +29,7 @@ mod invariants;
 mod known_errors;
 mod model;
 mod record;
+mod runtime_capacity;
 mod size_limits;
 
 impl AsyncFile for DuplexStream {

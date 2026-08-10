@@ -9,6 +9,47 @@ use tokio::{
     io::{AsyncRead, AsyncWrite},
 };
 
+/// Returns whether an I/O error indicates exhausted filesystem capacity or quota.
+pub(crate) fn is_filesystem_full(error: &io::Error) -> bool {
+    if error.kind() == io::ErrorKind::StorageFull {
+        return true;
+    }
+
+    #[cfg(unix)]
+    if matches!(error.raw_os_error(), Some(libc::ENOSPC | libc::EDQUOT)) {
+        return true;
+    }
+
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_filesystem_full;
+    use std::io;
+
+    #[test]
+    fn classifies_storage_full() {
+        assert!(is_filesystem_full(&io::Error::from(
+            io::ErrorKind::StorageFull
+        )));
+        assert!(!is_filesystem_full(&io::Error::from(
+            io::ErrorKind::PermissionDenied
+        )));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn classifies_unix_capacity_errors() {
+        assert!(is_filesystem_full(&io::Error::from_raw_os_error(
+            libc::ENOSPC
+        )));
+        assert!(is_filesystem_full(&io::Error::from_raw_os_error(
+            libc::EDQUOT
+        )));
+    }
+}
+
 #[cfg(unix)]
 const FILE_MODE_OWNER_RW_GROUP_RO: u32 = 0o640;
 

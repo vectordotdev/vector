@@ -33,6 +33,17 @@ struct FileInner {
     buf: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Default)]
+struct FaultState {
+    data_write_error: Option<io::ErrorKind>,
+    bytes_until_error: Option<usize>,
+    max_write_size: Option<usize>,
+    data_open_error: Option<io::ErrorKind>,
+    data_open_attempts: usize,
+    data_sync_error: Option<io::ErrorKind>,
+    data_syncs_until_error: usize,
+}
+
 impl FileInner {
     fn consume_buf(&mut self) -> Vec<u8> {
         self.buf.take().expect("tried to consume buf, but empty")
@@ -68,14 +79,18 @@ impl fmt::Debug for FileInner {
 #[derive(Clone)]
 pub struct TestFile {
     inner: Arc<Mutex<FileInner>>,
+    faults: Arc<Mutex<FaultState>>,
+    is_data_file: bool,
     is_writable: bool,
     read_pos: usize,
 }
 
 impl TestFile {
-    fn new() -> Self {
+    fn new(path: &Path, faults: Arc<Mutex<FaultState>>) -> Self {
         Self {
             inner: Arc::new(Mutex::new(FileInner::default())),
+            faults,
+            is_data_file: path.extension().is_some_and(|extension| extension == "dat"),
             is_writable: false,
             read_pos: 0,
         }
@@ -102,7 +117,7 @@ impl fmt::Debug for TestFile {
             .field("data", &inner)
             .field("writable", &self.is_writable)
             .field("read_pos", &self.read_pos)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -183,11 +198,33 @@ impl AsyncWrite for TestFile {
             return Err(io_err_permission_denied()).into();
         }
 
+        let write_len = if self.is_data_file {
+            let mut faults = self.faults.lock().expect("poisoned");
+            if faults.bytes_until_error == Some(0) {
+                return Err(io::Error::from(
+                    faults
+                        .data_write_error
+                        .unwrap_or(io::ErrorKind::StorageFull),
+                ))
+                .into();
+            }
+
+            let until_error = faults.bytes_until_error.unwrap_or(usize::MAX);
+            let max_write_size = faults.max_write_size.unwrap_or(usize::MAX);
+            let write_len = buf.len().min(until_error).min(max_write_size);
+            if let Some(bytes_until_error) = faults.bytes_until_error.as_mut() {
+                *bytes_until_error -= write_len;
+            }
+            write_len
+        } else {
+            buf.len()
+        };
+
         let mut inner = self.inner.lock().expect("poisoned");
         let dst = inner.buf.as_mut().expect("file buf consumed");
-        dst.extend_from_slice(buf);
+        dst.extend_from_slice(&buf[..write_len]);
 
-        Poll::Ready(Ok(buf.len()))
+        Poll::Ready(Ok(write_len))
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -239,6 +276,15 @@ impl AsyncFile for TestFile {
     }
 
     async fn sync_all(&self) -> io::Result<()> {
+        if self.is_data_file {
+            let mut faults = self.faults.lock().expect("poisoned");
+            if let Some(kind) = faults.data_sync_error {
+                if faults.data_syncs_until_error == 0 {
+                    return Err(io::Error::from(kind));
+                }
+                faults.data_syncs_until_error -= 1;
+            }
+        }
         Ok(())
     }
 }
@@ -247,6 +293,7 @@ impl AsyncFile for TestFile {
 #[derive(Debug, Default)]
 struct FilesystemInner {
     files: HashMap<PathBuf, TestFile>,
+    faults: Arc<Mutex<FaultState>>,
 }
 
 impl FilesystemInner {
@@ -255,7 +302,7 @@ impl FilesystemInner {
         let file = self
             .files
             .entry(path.to_owned())
-            .or_insert_with(TestFile::new);
+            .or_insert_with(|| TestFile::new(path, Arc::clone(&self.faults)));
         let mut new_file = file.clone();
         new_file.set_writable();
 
@@ -267,7 +314,7 @@ impl FilesystemInner {
         if self.files.contains_key(path) {
             None
         } else {
-            let mut new_file = TestFile::new();
+            let mut new_file = TestFile::new(path, Arc::clone(&self.faults));
             new_file.set_writable();
 
             self.files.insert(path.to_owned(), new_file.clone());
@@ -320,7 +367,9 @@ impl fmt::Debug for TestFilesystem {
 
 impl Clone for TestFilesystem {
     fn clone(&self) -> Self {
-        Self::default()
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
     }
 }
 
@@ -329,6 +378,67 @@ impl Default for TestFilesystem {
         Self {
             inner: Arc::new(Mutex::new(FilesystemInner::default())),
         }
+    }
+}
+
+impl TestFilesystem {
+    pub(crate) fn fail_data_writes_after(&self, bytes: usize, kind: io::ErrorKind) {
+        let inner = self.inner.lock().expect("poisoned");
+        let mut faults = inner.faults.lock().expect("poisoned");
+        faults.data_write_error = Some(kind);
+        faults.bytes_until_error = Some(bytes);
+    }
+
+    pub(crate) fn restore_data_writes(&self) {
+        let inner = self.inner.lock().expect("poisoned");
+        let mut faults = inner.faults.lock().expect("poisoned");
+        faults.data_write_error = None;
+        faults.bytes_until_error = None;
+    }
+
+    pub(crate) fn set_max_write_size(&self, size: Option<usize>) {
+        let inner = self.inner.lock().expect("poisoned");
+        inner.faults.lock().expect("poisoned").max_write_size = size;
+    }
+
+    pub(crate) fn fail_data_file_open(&self, kind: io::ErrorKind) {
+        let inner = self.inner.lock().expect("poisoned");
+        let mut faults = inner.faults.lock().expect("poisoned");
+        faults.data_open_error = Some(kind);
+        faults.data_open_attempts = 0;
+    }
+
+    pub(crate) fn restore_data_file_open(&self) {
+        let inner = self.inner.lock().expect("poisoned");
+        inner.faults.lock().expect("poisoned").data_open_error = None;
+    }
+
+    pub(crate) fn data_file_open_attempts(&self) -> usize {
+        let inner = self.inner.lock().expect("poisoned");
+        inner.faults.lock().expect("poisoned").data_open_attempts
+    }
+
+    pub(crate) fn fail_data_file_sync_after(&self, successful_syncs: usize, kind: io::ErrorKind) {
+        let inner = self.inner.lock().expect("poisoned");
+        let mut faults = inner.faults.lock().expect("poisoned");
+        faults.data_sync_error = Some(kind);
+        faults.data_syncs_until_error = successful_syncs;
+    }
+
+    pub(crate) fn restore_data_file_sync(&self) {
+        let inner = self.inner.lock().expect("poisoned");
+        inner.faults.lock().expect("poisoned").data_sync_error = None;
+    }
+
+    pub(crate) fn data(&self, path: &Path) -> Vec<u8> {
+        let inner = self.inner.lock().expect("poisoned");
+        let file = inner.files.get(path).expect("file should exist");
+        file.inner
+            .lock()
+            .expect("poisoned")
+            .buf
+            .clone()
+            .expect("file buffer should be available")
     }
 }
 
@@ -344,6 +454,13 @@ impl Filesystem for TestFilesystem {
 
     async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File> {
         let mut inner = self.inner.lock().expect("poisoned");
+        if path.extension().is_some_and(|extension| extension == "dat") {
+            let mut faults = inner.faults.lock().expect("poisoned");
+            faults.data_open_attempts += 1;
+            if let Some(kind) = faults.data_open_error {
+                return Err(io::Error::from(kind));
+            }
+        }
         match inner.open_file_writable_atomic(path) {
             Some(file) => Ok(file),
             None => Err(io_err_already_exists()),
