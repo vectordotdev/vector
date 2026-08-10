@@ -10,10 +10,16 @@
 
 set -u
 
-# If PACKAGE_ROOT is unset or empty, default it.
-PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
 # If VECTOR_VERSION is unset or empty, default it.
 VECTOR_VERSION="${VECTOR_VERSION:-"0.57.0"}"
+
+# PACKAGE_ROOT remains an override for package mirrors. Official releases are
+# downloaded from the matching immutable GitHub Release.
+if [ -n "${PACKAGE_ROOT:-}" ]; then
+    PACKAGE_URL="${PACKAGE_ROOT}/${VECTOR_VERSION}"
+else
+    PACKAGE_URL="https://github.com/vectordotdev/vector/releases/download/v${VECTOR_VERSION}"
+fi
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -91,7 +97,7 @@ main() {
     # Confirm with the user before proceeding to install Vector through a
     # package manager. Otherwise, we install from an archive.
     if [ "$prompt" = "yes" ]; then
-        echo "$_prompt We'll be installing Vector via a pre-built archive at https://packages.timber.io/vector/${VECTOR_VERSION}/"
+        echo "$_prompt We'll be installing Vector via a pre-built archive at ${PACKAGE_URL}/"
         echo "$_prompt Ready to proceed? (y/n)"
         echo ""
 
@@ -167,7 +173,7 @@ install_from_archive() {
             ;;
     esac
 
-    local _url="${PACKAGE_ROOT}/${VECTOR_VERSION}/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
+    local _url="${PACKAGE_URL}/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     local _dir
     _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"

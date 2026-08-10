@@ -36,8 +36,10 @@
           {{ $showOption = le $version $maxVersion }}
         {{ end }}
         {{ if $showOption }}
-        {{ $vector := cond (eq $version "nightly") "vector/nightly" "vector" }}
         {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
+        {{ if eq $version "nightly" }}
+          {{ $url = .nightly_download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
+        {{ end }}
 
         <a
           type="button"
@@ -63,8 +65,10 @@
   {{ end }}
 </div>
 
-{{ $version = cond (eq $version "nightly") "nightly/latest" $version }}
-{{ $link := printf "https://packages.timber.io/vector/%s" $version }}
+{{ $link := printf "https://github.com/vectordotdev/vector/releases/tag/v%s" $version }}
+{{ if eq $version "nightly" }}
+  {{ $link = "https://packages.timber.io/vector/nightly/latest" }}
+{{ end }}
 <div class="mt-8">
   <a href="{{ $link }}" class="text-sm dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary dark:text-primary text-secondary" rel="noopener" target="_blank">
     browse all files...

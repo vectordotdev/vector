@@ -610,7 +610,7 @@ urls: {
 	vector_new_relic_sink:                      "/docs/reference/configuration/sinks/new_relic/"
 	vector_nightly_builds:                      "https://packages.timber.io/vector/nightly/latest/"
 	vector_nix_package:                         "\(github)/NixOS/nixpkgs/blob/master/pkgs/tools/misc/vector/default.nix"
-	vector_packages_root:                       "https://packages.timber.io"
+	vector_github_release_assets:               "\(github)/vectordotdev/vector/releases/download"
 	vector_performance:                         "\(vector_repo)/#performance"
 	vector_privacy_policy:                      "\(vector_repo)/blob/master/PRIVACY.md"
 	vector_pull_requests:                       "\(vector_repo)/pulls"

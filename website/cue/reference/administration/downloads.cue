@@ -25,12 +25,16 @@ administration: {
 				filename: "\(tag)-\(extra).\(_file_type)"
 			}
 
-			// Calculate the download URL without needing site templating
+			// Calculate the stable-release download URL without needing site templating.
+			// Nightly downloads remain on packages.timber.io and are selected by the
+			// website template.
 			if _file_type != "deb" {
-				download_url: "\(urls.vector_packages_root)/vector/{v1}/vector-{v2}-\(_version_postfix)\(filename)"
+				download_url:         "\(urls.vector_github_release_assets)/v{v2}/vector-{v2}-\(_version_postfix)\(filename)"
+				nightly_download_url: "https://packages.timber.io/vector/{v1}/vector-{v2}-\(_version_postfix)\(filename)"
 			}
 			if _file_type == "deb" {
-				download_url: "\(urls.vector_packages_root)/vector/{v1}/vector_{v2}-1_\(_version_postfix)\(filename)"
+				download_url:         "\(urls.vector_github_release_assets)/v{v2}/vector_{v2}-1_\(_version_postfix)\(filename)"
+				nightly_download_url: "https://packages.timber.io/vector/{v1}/vector_{v2}-1_\(_version_postfix)\(filename)"
 			}
 
 			// Unused fields
@@ -113,6 +117,7 @@ administration: {
 					{
 						target: "armv7-rpm"
 						arch:   "ARMv7"
+						tag:    "armv7hl"
 					},
 					{
 						target: "x86_64-rpm"
