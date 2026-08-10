@@ -18,23 +18,6 @@ const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
 const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
 
-/// Semantic commit types accepted by the release CUE schema (`#SemanticType` in
-/// `website/cue/reference/releases.cue`). Commits whose parsed type is not in this
-/// list (or that have no parseable type) are rendered without a `type` field, since
-/// the schema makes the field optional.
-const SEMANTIC_TYPES: &[&str] = &[
-    "chore",
-    "docs",
-    "enhancement",
-    "feat",
-    "fix",
-    "perf",
-    "security",
-    "status",
-    "deprecation",
-    "revert",
-];
-
 /// Generate the release CUE file (and, if there are breaking fragments, the upgrade guide)
 /// for the given version. Handy for testing the changelog pipeline without running the
 /// full `release prepare` flow.
@@ -383,8 +366,8 @@ impl Commit {
             None => "null".to_string(),
         };
         let type_field = match self.r#type.as_deref() {
-            Some(t) if SEMANTIC_TYPES.contains(&t) => format!("type: {}, ", json!(t)),
-            _ => String::new(),
+            Some(t) => format!("type: {}, ", json!(t)),
+            None => String::new(),
         };
         format!(
             "{{sha: {sha}, date: {date}, description: {description}, pr_number: {pr_number}, {type_field}breaking_change: {breaking}, author: {author}, files_count: {files}, insertions_count: {ins}, deletions_count: {del}}}",
@@ -1057,7 +1040,7 @@ mod tests {
     }
 
     #[test]
-    fn render_cue_omits_type_for_unknown_or_null() {
+    fn render_cue_omits_type_only_when_null() {
         let commit = |r#type: Option<String>| Commit {
             sha: "x".into(),
             author: "a".into(),
@@ -1071,15 +1054,18 @@ mod tests {
             deletions_count: 0,
         };
 
-        // A known semantic type is rendered.
+        // Any parsed type is rendered; the schema accepts a free-form string.
         assert!(
             commit(Some("feat".into()))
                 .render_cue()
                 .contains("type: \"feat\"")
         );
-        // An unknown type (e.g. `ci`) is omitted so the release CUE stays valid.
-        assert!(!commit(Some("ci".into())).render_cue().contains("type:"));
-        // An unparsable subject (null type) is omitted too.
+        assert!(
+            commit(Some("ci".into()))
+                .render_cue()
+                .contains("type: \"ci\"")
+        );
+        // An unparsable subject (null type) omits the field.
         assert!(!commit(None).render_cue().contains("type:"));
     }
 
