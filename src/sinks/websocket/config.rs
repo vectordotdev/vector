@@ -60,12 +60,14 @@ impl SinkConfig for WebSocketSinkConfig {
 
 /// Purely validated `websocket` sink configuration.
 ///
-/// Holds the built encoding components so `build` does not redo the (pure)
-/// structural validation. The connector is NOT retained here: it resolves TLS
-/// settings (which may read certificate files from disk), so it is built in
-/// `build` instead.
+/// Holds the encoding transformer and the parsed URI host/port so `build`
+/// consumes the validated address rather than re-parsing it. The connector is
+/// NOT retained here: it resolves TLS settings (which may read certificate
+/// files from disk), so it is built in `build` instead.
 #[derive(Clone, Debug)]
 pub struct ValidatedWebSocketSink {
+    host: String,
+    port: u16,
     transformer: Transformer,
 }
 
@@ -74,8 +76,13 @@ impl ValidatedSink for WebSocketSinkConfig {
     type Validated = ValidatedWebSocketSink;
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
+        let (host, port) = WebSocketConnector::parse_uri(&self.common.uri)?;
         let transformer = self.encoding.transformer();
-        Ok(ValidatedWebSocketSink { transformer })
+        Ok(ValidatedWebSocketSink {
+            host,
+            port,
+            transformer,
+        })
     }
 
     async fn build(
@@ -84,9 +91,13 @@ impl ValidatedSink for WebSocketSinkConfig {
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         // TLS settings may read certificate files from disk, so the connector is
-        // resolved at build time rather than during pure validation.
-        let connector = self.build_connector()?;
-        let ValidatedWebSocketSink { transformer } = validated;
+        // resolved at build time rather than during validation.
+        let ValidatedWebSocketSink {
+            host,
+            port,
+            transformer,
+        } = validated;
+        let connector = self.build_connector(host.clone(), *port)?;
         let serializer = self.encoding.build()?;
         let ws_sink = WebSocketSink::new(self, connector.clone(), transformer.clone(), serializer)?;
 
@@ -98,10 +109,20 @@ impl ValidatedSink for WebSocketSinkConfig {
 }
 
 impl WebSocketSinkConfig {
-    fn build_connector(&self) -> Result<WebSocketConnector, WebSocketError> {
+    fn build_connector(
+        &self,
+        host: String,
+        port: u16,
+    ) -> Result<WebSocketConnector, WebSocketError> {
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
-        WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())
+        Ok(WebSocketConnector::from_validated(
+            self.common.uri.clone(),
+            host,
+            port,
+            tls,
+            self.common.auth.clone(),
+        ))
     }
 }
 
@@ -134,5 +155,39 @@ mod test {
             config.encoding.config(),
             SerializerConfig::Json(_)
         ));
+    }
+
+    #[test]
+    fn validate_rejects_malformed_uri() {
+        let config = WebSocketSinkConfig {
+            common: WebSocketCommonConfig {
+                uri: "not a valid uri".to_string(),
+                ..Default::default()
+            },
+            encoding: JsonSerializerConfig::default().into(),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a malformed URI should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_uri_without_host() {
+        let config = WebSocketSinkConfig {
+            common: WebSocketCommonConfig {
+                uri: "ws:///path".to_string(),
+                ..Default::default()
+            },
+            encoding: JsonSerializerConfig::default().into(),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a URI without a host should fail validation"
+        );
     }
 }

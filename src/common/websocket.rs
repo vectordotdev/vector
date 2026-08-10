@@ -54,21 +54,35 @@ pub(crate) struct WebSocketConnector {
 }
 
 impl WebSocketConnector {
-    pub(crate) fn new(
+    /// Parse the URI and extract the host and port, without any TLS setup.
+    ///
+    /// This is pure parsing that can run during validation; TLS resolution
+    /// happens later when the connector is built.
+    pub(crate) fn parse_uri(uri: &str) -> Result<(String, u16), WebSocketError> {
+        let request = uri.into_client_request().context(CreateFailedSnafu)?;
+        let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
+        Ok((host, port))
+    }
+
+    /// Construct a connector from an already-parsed host and port.
+    ///
+    /// Used by callers whose `validate` already parsed the URI, so the parsed
+    /// values are plumbed through the validated state rather than re-parsed
+    /// here. TLS resolution still happens in this method.
+    pub(crate) fn from_validated(
         uri: String,
+        host: String,
+        port: u16,
         tls: MaybeTlsSettings,
         auth: Option<Auth>,
-    ) -> Result<Self, WebSocketError> {
-        let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
-        let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             uri,
             host,
             port,
             tls,
             auth,
-        })
+        }
     }
 
     fn extract_host_and_port(request: &Request) -> Result<(String, u16), TungsteniteError> {
