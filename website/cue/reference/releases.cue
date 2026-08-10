@@ -13,7 +13,7 @@ releases: {
 		insertions_count: uint
 		pr_number:        uint | null
 		scopes: [string, ...string] | *[]
-		sha:  #CommitSha
+		sha:   #CommitSha
 		type?: string
 	}
 
