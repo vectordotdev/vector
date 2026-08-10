@@ -227,10 +227,12 @@ impl SinkConfig for ZerobusSinkConfig {
 
 /// Purely validated Zerobus sink configuration.
 ///
-/// Captures the pure validation results (structural checks and request
-/// limits) so `build` does not recompute them.
+/// Captures the pure validation results (structural checks, batch settings,
+/// and request limits) so `build` does not recompute them.
 #[derive(Clone, Debug)]
 pub struct ValidatedZerobus {
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
     /// Request settings computed during preparation.
     request_limits: TowerRequestSettings,
 }
@@ -243,9 +245,14 @@ impl ValidatedSink for ZerobusSinkConfig {
         // Pure structural validation (no network/filesystem/async).
         self.validate()?;
 
+        let batch_settings = self.batch.into_batcher_settings()?;
+
         let request_limits = self.request.into_settings();
 
-        Ok(ValidatedZerobus { request_limits })
+        Ok(ValidatedZerobus {
+            batch_settings,
+            request_limits,
+        })
     }
 
     async fn build(
@@ -256,7 +263,11 @@ impl ValidatedSink for ZerobusSinkConfig {
         let service = ZerobusService::new(self.clone(), cx.proxy()).await?;
         let healthcheck_service = service.clone();
 
-        let sink = ZerobusSink::new(service, validated.request_limits.clone(), self.batch)?;
+        let sink = ZerobusSink::new(
+            service,
+            validated.request_limits.clone(),
+            validated.batch_settings,
+        );
 
         let healthcheck = async move {
             healthcheck_service
@@ -381,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_produces_request_limits() {
+    fn validate_produces_request_limits_and_batch() {
         use crate::config::ValidatedSink;
         let config = create_test_config();
         // The inherent `validate` (structural checks) shadows the trait method in
@@ -391,6 +402,29 @@ mod tests {
         // Default request settings resolve to an unbounded concurrency.
         assert_eq!(validated.request_limits.concurrency, None);
         assert!(validated.request_limits.timeout.as_secs() > 0);
+        // Default batch settings resolve to the 10MB size limit.
+        assert_eq!(validated.batch_settings.size_limit, 10_000_000);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_batch_settings() {
+        use crate::config::ValidatedSink;
+        // `batch.max_events = 0` is a pure config error that `vector validate
+        // --no-environment` must catch rather than deferring to build.
+        let mut config = create_test_config();
+        config.batch.max_events = Some(0);
+        assert!(
+            <ZerobusSinkConfig as ValidatedSink>::validate(&config).is_err(),
+            "max_events = 0 should fail validation"
+        );
+
+        // Same for a non-positive timeout.
+        let mut config = create_test_config();
+        config.batch.timeout_secs = Some(0.0);
+        assert!(
+            <ZerobusSinkConfig as ValidatedSink>::validate(&config).is_err(),
+            "timeout_secs <= 0 should fail validation"
+        );
     }
 
     #[test]
