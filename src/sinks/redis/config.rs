@@ -223,6 +223,8 @@ impl SinkConfig for RedisSinkConfig {
 pub struct ValidatedRedisSink {
     /// The confined key template.
     key: ConfinedTemplate,
+    /// Batch settings computed during validation.
+    batch_settings: BatcherSettings,
 }
 
 #[async_trait::async_trait]
@@ -237,7 +239,14 @@ impl ValidatedSink for RedisSinkConfig {
             .key
             .clone()
             .confine(&self.confinement, Self::NAME, "key")?;
-        Ok(ValidatedRedisSink { key })
+        if self.endpoint.clone().to_vec().is_empty() {
+            return Err("`endpoint` cannot be empty.".into());
+        }
+        let batch_settings = self.batch.into_batcher_settings()?;
+        Ok(ValidatedRedisSink {
+            key,
+            batch_settings,
+        })
     }
 
     async fn build(
@@ -245,10 +254,13 @@ impl ValidatedSink for RedisSinkConfig {
         validated: &ValidatedRedisSink,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ValidatedRedisSink { key } = validated;
+        let ValidatedRedisSink {
+            key,
+            batch_settings,
+        } = validated;
         let conn = self.build_connection().await?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = RedisSink::new(self, conn, key.clone())?;
+        let sink = RedisSink::new(self, conn, key.clone(), *batch_settings)?;
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
@@ -414,6 +426,42 @@ mod tests {
         .unwrap();
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.key.to_string(), "test-key");
+    }
+
+    #[test]
+    fn validate_rejects_invalid_batch_settings() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "redis://127.0.0.1:6379/0"
+            key: "test-key"
+            encoding:
+                codec: "json"
+            batch:
+                max_events: 0
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "batch.max_events = 0 should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_empty_endpoint() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: []
+            key: "test-key"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "an empty endpoint list should fail validation"
+        );
     }
 
     #[test]

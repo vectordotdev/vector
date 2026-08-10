@@ -153,13 +153,6 @@ impl AzureMonitorLogsConfig {
         Ok(shared_key)
     }
 
-    fn get_time_generated_key(&self) -> Option<OwnedValuePath> {
-        self.time_generated_key
-            .clone()
-            .and_then(|k| k.path)
-            .or_else(|| log_schema().timestamp_key().cloned())
-    }
-
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
@@ -171,13 +164,20 @@ impl AzureMonitorLogsConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
 
+        // Resolve the `log_schema()` fallback here, after the global log schema
+        // has been initialized, so a custom global timestamp key is honored.
+        let time_generated_key = validated
+            .time_generated_key
+            .clone()
+            .or_else(|| log_schema().timestamp_key().cloned());
+
         let service = AzureMonitorLogsService::new(
             client,
             endpoint,
             self.customer_id.clone(),
             self.azure_resource_id.as_deref(),
             &self.log_type,
-            validated.time_generated_key.clone(),
+            time_generated_key.clone(),
             validated.shared_key.clone(),
         )?;
         let healthcheck = service.healthcheck();
@@ -195,7 +195,7 @@ impl AzureMonitorLogsConfig {
             validated.batch_settings,
             self.encoding.clone(),
             service,
-            validated.time_generated_key.clone(),
+            time_generated_key.clone(),
             protocol,
         );
 
@@ -218,7 +218,8 @@ pub struct ValidatedAzureMonitorLogs {
     batch_settings: BatcherSettings,
     /// The decoded shared key.
     shared_key: pkey::PKey<pkey::Private>,
-    /// The resolved time generated key.
+    /// The configured time generated key, if any. The `log_schema.timestamp_key`
+    /// fallback is resolved in `build` after global log schema initialization.
     time_generated_key: Option<OwnedValuePath>,
 }
 
@@ -252,7 +253,10 @@ impl ValidatedSink for AzureMonitorLogsConfig {
             .into_batcher_settings()?;
 
         let shared_key = self.build_shared_key()?;
-        let time_generated_key = self.get_time_generated_key();
+        // Only the configured key is retained here; the `log_schema()` fallback
+        // is resolved in `build`, after the global log schema has been
+        // initialized (validation runs before `init_log_schema` at startup).
+        let time_generated_key = self.time_generated_key.clone().and_then(|k| k.path);
 
         Ok(ValidatedAzureMonitorLogs {
             endpoint,
@@ -269,5 +273,28 @@ impl ValidatedSink for AzureMonitorLogsConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_inner(cx, validated, validated.endpoint.clone())
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_retains_configured_time_generated_key_only() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "Vector".to_string(),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        // With `time_generated_key` unset, validation must not resolve the
+        // global `log_schema.timestamp_key` fallback (which isn't initialized
+        // yet at validation time in the startup path); it is resolved in `build`.
+        assert_eq!(validated.time_generated_key, None);
     }
 }
