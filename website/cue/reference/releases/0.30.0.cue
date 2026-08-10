@@ -82,7 +82,7 @@ releases: "0.30.0": {
 			pr_numbers: [17052]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["socket source"]
 			description: """
 				The deprecated `max_length` option of the `socket` source was removed. Please see

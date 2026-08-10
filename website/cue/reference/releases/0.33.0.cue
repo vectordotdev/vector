@@ -314,7 +314,7 @@ releases: "0.33.0": {
 			pr_numbers: [18541]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["datadog_logs sink"]
 			description: """
 				The `datadog_logs` `endpoint` configuration is now treated as the "base URL" where

@@ -160,7 +160,7 @@ releases: "0.38.0": {
 				"""
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			description: """
 				The deprecated `--strict-env-vars` flag has been removed. The previous behavior of defaulting unset
 				environment variables can be accomplished by syntax like `${FOO-}` (which will default `FOO` to
@@ -171,7 +171,7 @@ releases: "0.38.0": {
 			breaking: true
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			description: """
 				The `enterprise` global configuration has been deprecated and will be removed in
 				a future version. This corresponds to a deprecation for "Vector Enterprise" by the

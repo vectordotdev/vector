@@ -65,7 +65,7 @@ releases: "0.26.0": {
 			contributors: ["fluetm"]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["transforms: route"]
 			breaking: true
 			description: """
@@ -78,7 +78,7 @@ releases: "0.26.0": {
 			pr_numbers: [14903]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["transforms: route"]
 			breaking: true
 			description: """

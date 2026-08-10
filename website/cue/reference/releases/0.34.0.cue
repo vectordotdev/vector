@@ -121,7 +121,7 @@ releases: "0.34.0": {
 			pr_numbers: [18761]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["releasing"]
 			description: """
 				The armv7 rpm package, `vector-<version>-1.armv7.rpm`, is no longer published. It
@@ -188,7 +188,7 @@ releases: "0.34.0": {
 			pr_numbers: [18676]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["datadog provider"]
 			description: """
 				The deprecated `region` configuration option was removed from the Datadog sinks.
@@ -211,7 +211,7 @@ releases: "0.34.0": {
 			pr_numbers: [18899]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["observability"]
 			description: """
 				The deprecated `component_name` tag has been removed from all internal metrics. Instead, the
@@ -287,7 +287,7 @@ releases: "0.34.0": {
 			pr_numbers: [18963]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["observability"]
 			description: """
 				The deprecated `peer_addr` metric tag was removed from the
@@ -298,7 +298,7 @@ releases: "0.34.0": {
 			pr_numbers: [18982]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["observability"]
 			description: """
 				Deprecated metrics that were redundant with `component_errors_total` were removed.
@@ -360,7 +360,7 @@ releases: "0.34.0": {
 			pr_numbers: [19021]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["security"]
 			description: """
 				In this release, we drop support for enabling the OpenSSL legacy provider when using

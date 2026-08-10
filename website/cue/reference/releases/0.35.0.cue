@@ -344,7 +344,7 @@ releases: "0.35.0": {
 			pr_numbers: [19342]
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			scopes: ["observability"]
 			breaking: true
 			description: """
