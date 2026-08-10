@@ -18,8 +18,8 @@ use crate::{
         util::{
             http::HttpMethod,
             http_client::{
-                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
-                default_interval, default_timeout, warn_if_interval_too_low,
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_headers,
+                build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
             },
         },
     },
@@ -153,6 +153,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let headers = build_headers(&self.headers)?;
 
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
@@ -166,7 +167,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             urls,
             interval: self.interval,
             timeout: self.timeout,
-            headers: self.headers.clone(),
+            headers,
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             tls,
