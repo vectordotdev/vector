@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
 use heim::{disk::Partition, units::information::byte};
@@ -284,6 +288,34 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
         })
         .collect::<Vec<_>>();
 
+    if let Some(global_data_dir) = global_data_dir.as_deref() {
+        let disk_buffer_root = global_data_dir.join("buffer").join("v2");
+        let configured_buffer_paths = configured_disk_buffers
+            .iter()
+            .map(|usage| usage.data_dir().to_path_buf())
+            .collect::<HashSet<_>>();
+
+        match find_orphaned_disk_buffers(global_data_dir, &configured_buffer_paths) {
+            Ok(orphaned_buffers) => {
+                for orphaned_buffer in orphaned_buffers {
+                    let orphaned_buffer_id = orphaned_buffer
+                        .strip_prefix(&disk_buffer_root)
+                        .expect("orphaned buffer must be under the disk buffer root");
+                    warn!(
+                        buffer_id = orphaned_buffer_id.to_string_lossy().as_ref(),
+                        buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
+                        message = "Found unreferenced disk buffer.",
+                    );
+                }
+            }
+            Err(error) => warn!(
+                data_dir = global_data_dir.to_string_lossy().as_ref(),
+                %error,
+                message = "Failed to scan for unreferenced disk buffers.",
+            ),
+        }
+    }
+
     if configured_disk_buffers.is_empty() {
         return Ok(());
     }
@@ -388,6 +420,101 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
         .await
 }
 
+fn find_orphaned_disk_buffers(
+    data_dir: &Path,
+    configured_buffer_paths: &HashSet<PathBuf>,
+) -> io::Result<Vec<PathBuf>> {
+    let disk_buffer_root = data_dir.join("buffer").join("v2");
+    let entries = match fs::read_dir(disk_buffer_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+
+    let mut pending = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => match entry.file_type() {
+                Ok(file_type) if file_type.is_dir() => pending.push(entry.path()),
+                Ok(_) => {}
+                Err(error) => warn!(
+                    path = entry.path().to_string_lossy().as_ref(),
+                    %error,
+                    message = "Failed to determine disk buffer entry type.",
+                ),
+            },
+            Err(error) => warn!(
+                %error,
+                message = "Failed to read disk buffer directory entry.",
+            ),
+        }
+    }
+
+    let mut orphaned_buffers = Vec::new();
+    while let Some(path) = pending.pop() {
+        let entries = match fs::read_dir(&path) {
+            Ok(entries) => entries,
+            Err(error) => {
+                warn!(
+                    path = path.to_string_lossy().as_ref(),
+                    %error,
+                    message = "Failed to read disk buffer directory.",
+                );
+                continue;
+            }
+        };
+        let mut child_directories = Vec::new();
+        let mut has_disk_buffer_file = false;
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    warn!(
+                        path = path.to_string_lossy().as_ref(),
+                        %error,
+                        message = "Failed to read disk buffer directory entry.",
+                    );
+                    continue;
+                }
+            };
+            let file_type = match entry.file_type() {
+                Ok(file_type) => file_type,
+                Err(error) => {
+                    warn!(
+                        path = entry.path().to_string_lossy().as_ref(),
+                        %error,
+                        message = "Failed to determine disk buffer entry type.",
+                    );
+                    continue;
+                }
+            };
+            if file_type.is_dir() {
+                child_directories.push(entry.path());
+            } else if file_type.is_file() && is_disk_buffer_file(&entry.file_name()) {
+                has_disk_buffer_file = true;
+            }
+        }
+        if has_disk_buffer_file && !configured_buffer_paths.contains(&path) {
+            orphaned_buffers.push(path);
+        }
+        pending.extend(child_directories);
+    }
+    orphaned_buffers.sort();
+    Ok(orphaned_buffers)
+}
+
+fn is_disk_buffer_file(file_name: &std::ffi::OsStr) -> bool {
+    if file_name == "buffer.db" {
+        return true;
+    }
+    file_name
+        .to_str()
+        .and_then(|name| name.strip_prefix("buffer-data-"))
+        .and_then(|name| name.strip_suffix(".dat"))
+        .and_then(|file_id| file_id.parse::<u16>().ok())
+        .is_some_and(|file_id| file_id < u16::MAX)
+}
+
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
@@ -459,4 +586,59 @@ fn capitalize(s: &str) -> String {
         r.make_ascii_uppercase();
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashSet, fs};
+
+    use tempfile::tempdir;
+
+    use super::find_orphaned_disk_buffers;
+
+    #[test]
+    fn finds_only_unconfigured_disk_buffer_directories() {
+        let data_dir = tempdir().unwrap();
+        let buffer_root = data_dir.path().join("buffer").join("v2");
+        let namespace = buffer_root.join("namespace");
+        let configured = namespace.join("configured");
+        let nested_orphaned = configured.join("nested-orphaned");
+        let orphaned = namespace.join("orphaned");
+        let damaged = namespace.join("damaged");
+        let overlapping_orphan = namespace.join("overlapping-orphan");
+        let configured_descendant = overlapping_orphan.join("configured-descendant");
+        let unrelated = buffer_root.join("unrelated");
+        fs::create_dir_all(&configured).unwrap();
+        fs::create_dir(&nested_orphaned).unwrap();
+        fs::create_dir(&orphaned).unwrap();
+        fs::create_dir(&damaged).unwrap();
+        fs::create_dir_all(&configured_descendant).unwrap();
+        fs::create_dir(&unrelated).unwrap();
+        fs::write(configured.join("buffer.db"), b"configured").unwrap();
+        fs::write(nested_orphaned.join("buffer.db"), b"nested orphan").unwrap();
+        fs::write(orphaned.join("buffer.db"), b"ledger").unwrap();
+        fs::write(damaged.join("buffer-data-42.dat"), b"data").unwrap();
+        fs::write(overlapping_orphan.join("buffer.db"), b"overlapping orphan").unwrap();
+        fs::write(configured_descendant.join("buffer.db"), b"configured").unwrap();
+        fs::write(unrelated.join("other.db"), b"unrelated").unwrap();
+        fs::write(unrelated.join("buffer-data-65535.dat"), b"reserved").unwrap();
+        fs::write(buffer_root.join("not-a-buffer"), b"ignored").unwrap();
+
+        let configured_paths = HashSet::from([configured, configured_descendant]);
+        let actual = find_orphaned_disk_buffers(data_dir.path(), &configured_paths).unwrap();
+
+        assert_eq!(
+            actual,
+            vec![nested_orphaned, damaged, orphaned, overlapping_orphan]
+        );
+    }
+
+    #[test]
+    fn missing_disk_buffer_root_has_no_orphans() {
+        let data_dir = tempdir().unwrap();
+
+        let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
+
+        assert!(actual.is_empty());
+    }
 }

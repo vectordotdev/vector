@@ -14,7 +14,7 @@ use crate::{
     BufferInstrumentation, Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
-    variants::disk_v2::{self, ProductionFilesystem, TryWriteOutcome},
+    variants::disk_v2::{self, DiskBufferUsageHandle, ProductionFilesystem, TryWriteOutcome},
 };
 
 /// Adapter for papering over various sender backends.
@@ -24,7 +24,10 @@ pub enum SenderAdapter<T: Bufferable> {
     InMemory(LimitedSender<T>),
 
     /// The disk v2 buffer.
-    DiskV2(Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>),
+    DiskV2 {
+        writer: Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>,
+        usage: DiskBufferUsageHandle,
+    },
 }
 
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
@@ -35,7 +38,11 @@ impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
 
 impl<T: Bufferable> From<disk_v2::BufferWriter<T, ProductionFilesystem>> for SenderAdapter<T> {
     fn from(v: disk_v2::BufferWriter<T, ProductionFilesystem>) -> Self {
-        Self::DiskV2(Arc::new(Mutex::new(v)))
+        let usage = v.usage_handle();
+        Self::DiskV2 {
+            writer: Arc::new(Mutex::new(v)),
+            usage,
+        }
     }
 }
 
@@ -50,7 +57,7 @@ where
                 .await
                 .map(|()| TryWriteOutcome::Written)
                 .map_err(Into::into),
-            Self::DiskV2(writer) => {
+            Self::DiskV2 { writer, .. } => {
                 let mut writer = writer.lock().await;
 
                 writer.write_record_outcome(item).await.map_err(|e| {
@@ -73,7 +80,7 @@ where
                 .try_send(item)
                 .map(|()| TryWriteOutcome::Written)
                 .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
-            Self::DiskV2(writer) => {
+            Self::DiskV2 { writer, .. } => {
                 let mut writer = writer.lock().await;
 
                 writer.try_write_record(item).await.map_err(|e| {
@@ -93,7 +100,7 @@ where
     pub(crate) async fn flush(&mut self) -> crate::Result<()> {
         match self {
             Self::InMemory(_) => Ok(()),
-            Self::DiskV2(writer) => {
+            Self::DiskV2 { writer, .. } => {
                 let mut writer = writer.lock().await;
                 writer.flush().await.map_err(|e| {
                     // Errors on the I/O path, which is all that flushing touches, are never recoverable.
@@ -108,7 +115,14 @@ where
     pub fn capacity(&self) -> Option<usize> {
         match self {
             Self::InMemory(tx) => Some(tx.available_capacity()),
-            Self::DiskV2(_) => None,
+            Self::DiskV2 { .. } => None,
+        }
+    }
+
+    fn disk_usage_handle(&self) -> Option<DiskBufferUsageHandle> {
+        match self {
+            Self::InMemory(_) => None,
+            Self::DiskV2 { usage, .. } => Some(usage.clone()),
         }
     }
 }
@@ -224,6 +238,19 @@ impl<T: Bufferable> BufferSender<T> {
     /// Configures this sender to invoke a custom instrumentation hook.
     pub fn with_custom_instrumentation(&mut self, instrumentation: impl BufferInstrumentation<T>) {
         self.custom_instrumentation = Some(Arc::new(instrumentation));
+    }
+
+    /// Returns read-only usage handles for all disk stages in this buffer topology.
+    pub fn disk_usage_handles(&self) -> Vec<DiskBufferUsageHandle> {
+        let mut handles = self
+            .base
+            .disk_usage_handle()
+            .into_iter()
+            .collect::<Vec<_>>();
+        if let Some(overflow) = self.overflow.as_ref() {
+            handles.extend(overflow.disk_usage_handles());
+        }
+        handles
     }
 }
 
