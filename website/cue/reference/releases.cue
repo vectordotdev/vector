@@ -14,7 +14,7 @@ releases: {
 		pr_number:        uint | null
 		scopes: [string, ...string] | *[]
 		sha:  #CommitSha
-		type: #SemanticType
+		type?: #SemanticType
 	}
 
 	#CommitSha: =~"^[a-z0-9]{40}$"

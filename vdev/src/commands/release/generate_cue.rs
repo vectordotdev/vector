@@ -18,6 +18,23 @@ const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
 const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
 
+/// Semantic commit types accepted by the release CUE schema (`#SemanticType` in
+/// `website/cue/reference/releases.cue`). Commits whose parsed type is not in this
+/// list (or that have no parseable type) are rendered without a `type` field, since
+/// the schema makes the field optional.
+const SEMANTIC_TYPES: &[&str] = &[
+    "chore",
+    "docs",
+    "enhancement",
+    "feat",
+    "fix",
+    "perf",
+    "security",
+    "status",
+    "deprecation",
+    "revert",
+];
+
 /// Generate the release CUE file (and, if there are breaking fragments, the upgrade guide)
 /// for the given version. Handy for testing the changelog pipeline without running the
 /// full `release prepare` flow.
@@ -365,16 +382,16 @@ impl Commit {
             Some(n) => n.to_string(),
             None => "null".to_string(),
         };
-        let type_json = match &self.r#type {
-            Some(t) => serde_json::to_string(t).unwrap(),
-            None => "null".to_string(),
+        let type_field = match self.r#type.as_deref() {
+            Some(t) if SEMANTIC_TYPES.contains(&t) => format!("type: {}, ", json!(t)),
+            _ => String::new(),
         };
         format!(
-            "{{sha: {sha}, date: {date}, description: {description}, pr_number: {pr_number}, type: {type_field}, breaking_change: {breaking}, author: {author}, files_count: {files}, insertions_count: {ins}, deletions_count: {del}}}",
+            "{{sha: {sha}, date: {date}, description: {description}, pr_number: {pr_number}, {type_field}breaking_change: {breaking}, author: {author}, files_count: {files}, insertions_count: {ins}, deletions_count: {del}}}",
             sha = json!(self.sha),
             date = json!(self.date),
             description = json!(self.description),
-            type_field = type_json,
+            type_field = type_field,
             breaking = self.breaking_change,
             author = json!(self.author),
             files = self.files_count,
@@ -1037,6 +1054,33 @@ mod tests {
         assert!(!out.contains("scopes:"));
         assert!(out.contains("pr_number: 42"));
         assert!(out.contains("files_count: 1"));
+    }
+
+    #[test]
+    fn render_cue_omits_type_for_unknown_or_null() {
+        let commit = |r#type: Option<String>| Commit {
+            sha: "x".into(),
+            author: "a".into(),
+            date: "d".into(),
+            description: "desc".into(),
+            r#type,
+            breaking_change: false,
+            pr_number: None,
+            files_count: 0,
+            insertions_count: 0,
+            deletions_count: 0,
+        };
+
+        // A known semantic type is rendered.
+        assert!(
+            commit(Some("feat".into()))
+                .render_cue()
+                .contains("type: \"feat\"")
+        );
+        // An unknown type (e.g. `ci`) is omitted so the release CUE stays valid.
+        assert!(!commit(Some("ci".into())).render_cue().contains("type:"));
+        // An unparsable subject (null type) is omitted too.
+        assert!(!commit(None).render_cue().contains("type:"));
     }
 
     #[test]
