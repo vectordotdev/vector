@@ -502,13 +502,34 @@ impl ConventionalParts {
                 pr_number,
             }
         } else {
+            // Non-conventional subject (e.g. "Update release docs (#123)"):
+            // still extract a trailing PR reference so backport suppression by
+            // PR number keeps working for these commits.
+            let (description, pr_number) = parse_trailing_pr_number(message);
             ConventionalParts {
                 r#type: None,
                 breaking_change: false,
-                description: message.to_string(),
-                pr_number: None,
+                description,
+                pr_number,
             }
         }
+    }
+}
+
+/// Extract a trailing ` (#123)` PR reference from a non-conventional subject,
+/// stripping it from the description (mirroring how the conventional branch
+/// drops the ` (#123)` suffix from `desc`).
+fn parse_trailing_pr_number(message: &str) -> (String, Option<u64>) {
+    let re = Regex::new(r"^(?P<desc>.*?) \(#(?P<pr>[0-9]+)\)$").unwrap();
+    if let Some(caps) = re.captures(message) {
+        let description = caps
+            .name("desc")
+            .map(|m| m.as_str().trim().to_string())
+            .unwrap_or_default();
+        let pr_number = caps.name("pr").and_then(|m| m.as_str().parse::<u64>().ok());
+        (description, pr_number)
+    } else {
+        (message.to_string(), None)
     }
 }
 
@@ -901,6 +922,17 @@ mod tests {
         let p = ConventionalParts::parse("Merge branch 'foo'");
         assert!(p.r#type.is_none());
         assert_eq!(p.description, "Merge branch 'foo'");
+        assert_eq!(p.pr_number, None);
+    }
+
+    #[test]
+    fn parse_non_conventional_with_pr_number() {
+        // Non-conventional subjects (now allowed) should still preserve a
+        // trailing PR reference so backport suppression by PR number works.
+        let p = ConventionalParts::parse("Update release docs (#123)");
+        assert!(p.r#type.is_none());
+        assert_eq!(p.description, "Update release docs");
+        assert_eq!(p.pr_number, Some(123));
     }
 
     #[test]
