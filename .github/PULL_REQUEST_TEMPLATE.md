@@ -47,12 +47,12 @@ Changes to CI, website, playground and similar are generally not considered user
 
 
 <!--
-  Your PR title must conform to the conventional commit spec:
+  We recommend your PR title follow the conventional commit spec:
   https://www.conventionalcommits.org/en/v1.0.0/
 
   <type>(<scope>)!: <description>
 
-  * `type` = feat, fix, docs, chore, revert, enhancement, perf, security (**must** be one of these)
+  * `type` = feat, fix, docs, chore, revert, enhancement, perf, security
   * `!` = OPTIONAL: signals a breaking change
   * `scope` = Optional but appreciated; letters, digits, spaces, hyphens, underscores (e.g. `kafka source`, `amazon-linux`)
   * `description` = short description of the change
