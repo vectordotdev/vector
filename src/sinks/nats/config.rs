@@ -207,6 +207,8 @@ impl SinkConfig for NatsSinkConfig {
 pub struct ValidatedNatsSink {
     /// The confined subject template.
     subject: ConfinedTemplate,
+    /// The parsed NATS server addresses.
+    server_addresses: Vec<async_nats::ServerAddr>,
 }
 
 #[async_trait::async_trait]
@@ -218,7 +220,11 @@ impl ValidatedSink for NatsSinkConfig {
             .subject
             .clone()
             .confine(&self.confinement, Self::NAME, "subject")?;
-        Ok(ValidatedNatsSink { subject })
+        let server_addresses = self.parse_server_addresses()?;
+        Ok(ValidatedNatsSink {
+            subject,
+            server_addresses,
+        })
     }
 
     async fn build(
@@ -226,9 +232,12 @@ impl ValidatedSink for NatsSinkConfig {
         validated: &ValidatedNatsSink,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ValidatedNatsSink { subject } = validated;
-        let sink = NatsSink::new(self.clone(), subject.clone()).await?;
-        let healthcheck = healthcheck(self.clone()).boxed();
+        let ValidatedNatsSink {
+            subject,
+            server_addresses,
+        } = validated.clone();
+        let sink = NatsSink::new(self.clone(), subject, server_addresses.clone()).await?;
+        let healthcheck = healthcheck(self.clone(), server_addresses).boxed();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
@@ -245,12 +254,15 @@ impl NatsSinkConfig {
     pub(super) async fn connect(
         &self,
         options: async_nats::ConnectOptions,
+        server_addresses: Vec<async_nats::ServerAddr>,
     ) -> Result<async_nats::Client, NatsError> {
-        let urls = self.parse_server_addresses()?;
-        options.connect(urls).await.context(ConnectSnafu)
+        options
+            .connect(server_addresses)
+            .await
+            .context(ConnectSnafu)
     }
 
-    fn parse_server_addresses(&self) -> Result<Vec<async_nats::ServerAddr>, NatsError> {
+    pub(super) fn parse_server_addresses(&self) -> Result<Vec<async_nats::ServerAddr>, NatsError> {
         self.url
             .split(',')
             .map(|url| {
@@ -275,9 +287,12 @@ impl NatsSinkConfig {
         Ok(options)
     }
 
-    pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
+    pub(super) async fn publisher(
+        &self,
+        server_addresses: Vec<async_nats::ServerAddr>,
+    ) -> Result<NatsPublisher, NatsError> {
         let options = self.create_connect_options()?;
-        let connection = self.connect(options).await?;
+        let connection = self.connect(options, server_addresses).await?;
 
         if self.jetstream.enabled {
             Ok(NatsPublisher::JetStream(async_nats::jetstream::new(
@@ -289,10 +304,13 @@ impl NatsSinkConfig {
     }
 }
 
-async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
+async fn healthcheck(
+    config: NatsSinkConfig,
+    server_addresses: Vec<async_nats::ServerAddr>,
+) -> crate::Result<()> {
     let options: async_nats::ConnectOptions = (&config).try_into().context(ConfigSnafu)?;
     config
-        .connect(options)
+        .connect(options, server_addresses)
         .map_ok(|_| ())
         .map_err(|e| e.into())
         .await
@@ -346,6 +364,40 @@ mod tests {
     use super::*;
     use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn validate_rejects_malformed_url() {
+        let config: NatsSinkConfig = serde_yaml::from_str(
+            r#"
+            subject: "test-subject"
+            url: "not a valid url"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "a malformed url should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_comma_separated_urls() {
+        let config: NatsSinkConfig = serde_yaml::from_str(
+            r#"
+            subject: "test-subject"
+            url: "nats://localhost:4222,nats://localhost:5222"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_ok(),
+            "a comma-separated list of valid urls should pass validation"
+        );
+    }
 
     #[test]
     fn validate_returns_confined_subject() {
