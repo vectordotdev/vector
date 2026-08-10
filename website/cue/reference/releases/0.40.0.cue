@@ -95,7 +95,7 @@ releases: "0.40.0": {
 			contributors: ["suikammd"]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			description: """
 				Now the GELF codec with stream-based sources uses null byte (`\\0`) by default as messages delimiter instead of newline (`\\n`) character. This better matches GELF server behavior.
 
@@ -137,7 +137,7 @@ releases: "0.40.0": {
 			contributors: ["jorgehermo9"]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			description: """
 				Reduce transforms can now properly aggregate nested fields.
 
@@ -267,7 +267,7 @@ releases: "0.40.0": {
 				"""
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			description: """
 				Vector no longer supports running on CentOS 7 since it is now end-of-life
 				"""

@@ -569,7 +569,7 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
     let fragment_type = parts[1];
     let breaking = fragment_type == "breaking";
     let cue_type = match fragment_type {
-        "breaking" => "chore",
+        "breaking" => "breaking",
         "security" => "security",
         "fix" => "fix",
         "feature" => "feat",
@@ -961,7 +961,7 @@ mod tests {
 
         // Sorted by filename
         let by_type: Vec<_> = entries.iter().map(|e| e.cue_type.as_str()).collect();
-        assert_eq!(by_type, vec!["feat", "chore", "security"]);
+        assert_eq!(by_type, vec!["feat", "breaking", "security"]);
 
         let feat = &entries[0];
         assert_eq!(

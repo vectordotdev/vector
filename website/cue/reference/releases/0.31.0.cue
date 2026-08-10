@@ -143,7 +143,7 @@ releases: "0.31.0": {
 			pr_numbers: [16199]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["observability"]
 			description: """
 				Several deprecated internal metrics were removed:
@@ -162,7 +162,7 @@ releases: "0.31.0": {
 			pr_numbers: [17516, 17542]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["observability"]
 			description: """
 				The `component_received_event_bytes_total` and `component_sent_event_bytes_total`

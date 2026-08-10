@@ -97,7 +97,7 @@ releases: "0.28.0": {
 			pr_numbers: [15696]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["buffers"]
 			description: """
 				The deprecated `disk_v1` buffer type was removed. See [the upgrade
@@ -192,7 +192,7 @@ releases: "0.28.0": {
 			pr_numbers: [16059]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["journald source"]
 			description: """
 				The deprecated `units` of the `journald` source was removed. `include_units` should
@@ -233,7 +233,7 @@ releases: "0.28.0": {
 			pr_numbers: [16063]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["aws provider"]
 			description: """
 				Vector's AWS components now use OpenSSL for the TLS implementation rather than
@@ -247,7 +247,7 @@ releases: "0.28.0": {
 			pr_numbers: [16335]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["vrl: stdlib"]
 			description: """
 				The deprecated VRL functions for accessing metadata were removed:
@@ -265,7 +265,7 @@ releases: "0.28.0": {
 			pr_numbers: [14821]
 		},
 		{
-			type: "docs"
+			type: "chore"
 			scopes: ["aws_s3 source"]
 			description: """
 				The `strategy` field on the `aws_s3` source has been hidden from the docs given it
@@ -304,7 +304,7 @@ releases: "0.28.0": {
 			pr_numbers: [16060]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["apex sink"]
 			description: """
 				The `apex` sink was dropped given that the service no longer exists. See [the upgrade

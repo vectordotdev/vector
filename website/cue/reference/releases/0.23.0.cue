@@ -292,7 +292,7 @@ releases: "0.23.0": {
 			pr_numbers: [12901, 12913, 12936]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["vrl stdlib"]
 			description: """
 				The `parse_grok` function now always omits fields from the pattern that did not match the input, dropping the `remove_empty` parameter.
@@ -495,7 +495,7 @@ releases: "0.23.0": {
 			pr_numbers: [12433]
 		},
 		{
-			type:     "chore"
+			type:     "breaking"
 			breaking: true
 			scopes: ["releasing"]
 			breaking: true

@@ -178,7 +178,7 @@ releases: "0.24.0": {
 			pr_numbers: [13375]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["codecs"]
 			breaking: true
 			description: """

@@ -146,7 +146,7 @@ releases: "0.21.0": {
 			pr_numbers: [11183]
 		},
 		{
-			type: "chore"
+			type: "breaking"
 			scopes: ["api"]
 			breaking: true
 			description: """
