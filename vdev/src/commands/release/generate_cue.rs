@@ -18,18 +18,6 @@ const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
 const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
 
-/// Allowed conventional-commit types.
-const ALLOWED_TYPES: &[&str] = &[
-    "chore",
-    "docs",
-    "feat",
-    "fix",
-    "enhancement",
-    "perf",
-    "revert",
-    "security",
-];
-
 /// Generate the release CUE file (and, if there are breaking fragments, the upgrade guide)
 /// for the given version. Handy for testing the changelog pipeline without running the
 /// full `release prepare` flow.
@@ -117,10 +105,6 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
 
     if commits.is_empty() {
         bail!("No commits found since v{last_version}; nothing to release.");
-    }
-
-    for c in &commits {
-        c.validate()?;
     }
 
     let changelog_dir = repo_root.join(CHANGELOG_DIR);
@@ -376,47 +360,21 @@ struct Commit {
 }
 
 impl Commit {
-    fn validate(&self) -> Result<()> {
-        // The release path *must* refuse to write a release CUE that contains
-        // commits whose subject didn't match the conventional-commit format —
-        // otherwise a malformed PR title slips silently into the published
-        // release notes. The Ruby release flow used a strict (`!`-suffixed)
-        // parser at this point for the same reason.
-        let Some(t) = self.r#type.as_deref() else {
-            bail!(
-                "Commit {} ({}) does not match the conventional-commit format \
-                 (`type(scope): description (#pr)`); fix the PR title or amend \
-                 the commit subject before tagging the release.",
-                self.sha,
-                self.description
-            );
-        };
-        if !ALLOWED_TYPES.contains(&t) {
-            bail!(
-                "Commit {} has invalid type '{}'. Allowed types: {:?}",
-                self.sha,
-                t,
-                ALLOWED_TYPES
-            );
-        }
-        Ok(())
-    }
-
     fn render_cue(&self) -> String {
         let pr_number = match self.pr_number {
             Some(n) => n.to_string(),
             None => "null".to_string(),
         };
-        let type_json = match &self.r#type {
-            Some(t) => serde_json::to_string(t).unwrap(),
-            None => "null".to_string(),
+        let type_field = match self.r#type.as_deref() {
+            Some(t) => format!("type: {}, ", json!(t)),
+            None => String::new(),
         };
         format!(
-            "{{sha: {sha}, date: {date}, description: {description}, pr_number: {pr_number}, type: {type_field}, breaking_change: {breaking}, author: {author}, files_count: {files}, insertions_count: {ins}, deletions_count: {del}}}",
+            "{{sha: {sha}, date: {date}, description: {description}, pr_number: {pr_number}, {type_field}breaking_change: {breaking}, author: {author}, files_count: {files}, insertions_count: {ins}, deletions_count: {del}}}",
             sha = json!(self.sha),
             date = json!(self.date),
             description = json!(self.description),
-            type_field = type_json,
+            type_field = type_field,
             breaking = self.breaking_change,
             author = json!(self.author),
             files = self.files_count,
@@ -544,13 +502,34 @@ impl ConventionalParts {
                 pr_number,
             }
         } else {
+            // Non-conventional subject (e.g. "Update release docs (#123)"):
+            // still extract a trailing PR reference so backport suppression by
+            // PR number keeps working for these commits.
+            let (description, pr_number) = parse_trailing_pr_number(message);
             ConventionalParts {
                 r#type: None,
                 breaking_change: false,
-                description: message.to_string(),
-                pr_number: None,
+                description,
+                pr_number,
             }
         }
+    }
+}
+
+/// Extract a trailing ` (#123)` PR reference from a non-conventional subject,
+/// stripping it from the description (mirroring how the conventional branch
+/// drops the ` (#123)` suffix from `desc`).
+fn parse_trailing_pr_number(message: &str) -> (String, Option<u64>) {
+    let re = Regex::new(r"^(?P<desc>.*?) \(#(?P<pr>[0-9]+)\)$").unwrap();
+    if let Some(caps) = re.captures(message) {
+        let description = caps
+            .name("desc")
+            .map(|m| m.as_str().trim().to_string())
+            .unwrap_or_default();
+        let pr_number = caps.name("pr").and_then(|m| m.as_str().parse::<u64>().ok());
+        (description, pr_number)
+    } else {
+        (message.to_string(), None)
     }
 }
 
@@ -924,9 +903,8 @@ mod tests {
     }
 
     #[test]
-    fn scoped_subject_parses_and_validates() {
-        // End-to-end: a scoped conventional subject must flow through both
-        // parsing and Commit::validate without error after the scope drop.
+    fn scoped_subject_parses() {
+        // Scoped conventional subjects must parse cleanly after the scope drop.
         let subjects = [
             "feat(kafka source): add new metric (#123)",
             "fix(loki sink): handle empty labels (#9)",
@@ -936,20 +914,6 @@ mod tests {
         for subject in subjects {
             let p = ConventionalParts::parse(subject);
             assert!(p.r#type.is_some(), "parse failed for: {subject}");
-            let c = Commit {
-                sha: "x".into(),
-                author: "a".into(),
-                date: "d".into(),
-                description: p.description,
-                r#type: p.r#type,
-                breaking_change: p.breaking_change,
-                pr_number: p.pr_number,
-                files_count: 0,
-                insertions_count: 0,
-                deletions_count: 0,
-            };
-            c.validate()
-                .unwrap_or_else(|e| panic!("validate failed for {subject}: {e}"));
         }
     }
 
@@ -958,6 +922,17 @@ mod tests {
         let p = ConventionalParts::parse("Merge branch 'foo'");
         assert!(p.r#type.is_none());
         assert_eq!(p.description, "Merge branch 'foo'");
+        assert_eq!(p.pr_number, None);
+    }
+
+    #[test]
+    fn parse_non_conventional_with_pr_number() {
+        // Non-conventional subjects (now allowed) should still preserve a
+        // trailing PR reference so backport suppression by PR number works.
+        let p = ConventionalParts::parse("Update release docs (#123)");
+        assert!(p.r#type.is_none());
+        assert_eq!(p.description, "Update release docs");
+        assert_eq!(p.pr_number, Some(123));
     }
 
     #[test]
@@ -1097,66 +1072,33 @@ mod tests {
     }
 
     #[test]
-    fn commit_validate_scope_is_optional_for_all_types() {
-        for t in ALLOWED_TYPES {
-            let c = Commit {
-                sha: "x".into(),
-                author: "a".into(),
-                date: "d".into(),
-                description: "no scope".into(),
-                r#type: Some((*t).into()),
-                breaking_change: false,
-                pr_number: None,
-                files_count: 0,
-                insertions_count: 0,
-                deletions_count: 0,
-            };
-            assert!(
-                c.validate().is_ok(),
-                "type '{t}' should be valid without a scope"
-            );
-        }
-    }
-
-    #[test]
-    fn commit_validate_rejects_unknown_type() {
-        let c = Commit {
+    fn render_cue_omits_type_only_when_null() {
+        let commit = |r#type: Option<String>| Commit {
             sha: "x".into(),
             author: "a".into(),
             date: "d".into(),
-            description: "x".into(),
-            r#type: Some("nope".into()),
+            description: "desc".into(),
+            r#type,
             breaking_change: false,
             pr_number: None,
             files_count: 0,
             insertions_count: 0,
             deletions_count: 0,
         };
-        assert!(c.validate().is_err());
-    }
 
-    #[test]
-    fn commit_validate_rejects_unparsable_subject() {
-        // A non-conventional subject must abort the release path rather than
-        // silently land in the published CUE with type=null.
-        let c = Commit {
-            sha: "x".into(),
-            author: "a".into(),
-            date: "d".into(),
-            description: "Merge branch 'foo'".into(),
-            r#type: None,
-            breaking_change: false,
-            pr_number: None,
-            files_count: 0,
-            insertions_count: 0,
-            deletions_count: 0,
-        };
-        let err = c.validate().expect_err("must reject unparsable subject");
-        let msg = format!("{err}");
+        // Any parsed type is rendered; the schema accepts a free-form string.
         assert!(
-            msg.contains("conventional-commit format"),
-            "error should mention the rule: {msg}"
+            commit(Some("feat".into()))
+                .render_cue()
+                .contains("type: \"feat\"")
         );
+        assert!(
+            commit(Some("ci".into()))
+                .render_cue()
+                .contains("type: \"ci\"")
+        );
+        // An unparsable subject (null type) omits the field.
+        assert!(!commit(None).render_cue().contains("type:"));
     }
 
     #[test]
