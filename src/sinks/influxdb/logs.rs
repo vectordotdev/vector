@@ -187,9 +187,15 @@ pub struct ValidatedInfluxDbLogs {
     uri: Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,
-    host_key: OwnedValuePath,
-    message_key: OwnedValuePath,
-    source_type_key: OwnedValuePath,
+    /// The configured `host_key`, if any. The `log_schema.host_key` fallback
+    /// is resolved in `build` after global log schema initialization.
+    host_key: Option<OwnedValuePath>,
+    /// The configured `message_key`, if any. The `log_schema.message_key`
+    /// fallback is resolved in `build` after global log schema initialization.
+    message_key: Option<OwnedValuePath>,
+    /// The configured `source_type_key`, if any. The `log_schema.source_type_key`
+    /// fallback is resolved in `build` after global log schema initialization.
+    source_type_key: Option<OwnedValuePath>,
 }
 
 #[async_trait::async_trait]
@@ -213,26 +219,13 @@ impl ValidatedSink for InfluxDbLogsConfig {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let host_key = self
-            .host_key
-            .as_ref()
-            .and_then(|k| k.path.clone())
-            .or_else(|| log_schema().host_key().cloned())
-            .expect("global log_schema.host_key to be valid path");
-
-        let message_key = self
-            .message_key
-            .as_ref()
-            .and_then(|k| k.path.clone())
-            .or_else(|| log_schema().message_key().cloned())
-            .expect("global log_schema.message_key to be valid path");
-
-        let source_type_key = self
-            .source_type_key
-            .as_ref()
-            .and_then(|k| k.path.clone())
-            .or_else(|| log_schema().source_type_key().cloned())
-            .expect("global log_schema.source_type_key to be valid path");
+        // Only the config-provided keys are retained here; the `log_schema()`
+        // fallbacks are resolved in `build`, after the global log schema has
+        // been initialized. Resolving them here would capture the built-in
+        // defaults, since validation runs before `init_log_schema` at startup.
+        let host_key = self.host_key.as_ref().and_then(|k| k.path.clone());
+        let message_key = self.message_key.as_ref().and_then(|k| k.path.clone());
+        let source_type_key = self.source_type_key.as_ref().and_then(|k| k.path.clone());
 
         Ok(ValidatedInfluxDbLogs {
             measurement,
@@ -270,6 +263,21 @@ impl ValidatedSink for InfluxDbLogsConfig {
 
         let request = self.request.into_settings();
 
+        // Resolve the `log_schema()` fallbacks here, after the global log schema
+        // has been initialized, so custom global log schema keys are honored.
+        let host_key = host_key
+            .clone()
+            .or_else(|| log_schema().host_key().cloned())
+            .expect("global log_schema.host_key to be valid path");
+        let message_key = message_key
+            .clone()
+            .or_else(|| log_schema().message_key().cloned())
+            .expect("global log_schema.message_key to be valid path");
+        let source_type_key = source_type_key
+            .clone()
+            .or_else(|| log_schema().source_type_key().cloned())
+            .expect("global log_schema.source_type_key to be valid path");
+
         let sink = InfluxDbLogsSink {
             uri: uri.clone(),
             token: token.inner().to_owned(),
@@ -277,9 +285,9 @@ impl ValidatedSink for InfluxDbLogsConfig {
             measurement: measurement.clone(),
             tags: tags.clone(),
             transformer: self.encoding.clone(),
-            host_key: host_key.clone(),
-            message_key: message_key.clone(),
-            source_type_key: source_type_key.clone(),
+            host_key,
+            message_key,
+            source_type_key,
         };
 
         let sink = BatchedHttpSink::new(
@@ -521,6 +529,30 @@ mod tests {
             validated.uri.to_string(),
             "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
         );
+    }
+
+    #[test]
+    fn validate_retains_config_keys_without_log_schema_fallback() {
+        let config = InfluxDbLogsConfig {
+            measurement: Some("vector".to_string()),
+            endpoint: "http://localhost:9999".to_string(),
+            influxdb2_settings: Some(InfluxDb2Settings {
+                org: "my-org".to_string(),
+                bucket: "my-bucket".to_string(),
+                token: "my-token".to_string().into(),
+            }),
+            host_key: Some(OptionalValuePath::new("custom_host")),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        // Config-provided keys are retained...
+        assert_eq!(validated.host_key, Some(owned_value_path!("custom_host")));
+        // ...but unset keys stay unset: `validate` must not resolve the global
+        // `log_schema()` defaults, which aren't initialized yet at validation
+        // time in the startup path. The fallbacks are resolved in `build`.
+        assert_eq!(validated.message_key, None);
+        assert_eq!(validated.source_type_key, None);
     }
 
     #[test]
