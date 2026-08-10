@@ -114,6 +114,13 @@ impl ValidatedSink for SematextLogsConfig {
         let index =
             Template::try_from(self.token.inner()).expect("unable to parse token as Template");
 
+        // Validate the derived Elasticsearch config (template confinement of
+        // `bulk.index`) so `vector validate --no-environment` catches unconfined
+        // routing templates such as a token of `{{ index }}` rather than
+        // failing at startup.
+        self.derived_elasticsearch_config(&endpoint, &index)
+            .common_mode()?;
+
         Ok(ValidatedSematextLogs { endpoint, index })
     }
 
@@ -124,12 +131,27 @@ impl ValidatedSink for SematextLogsConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedSematextLogs { endpoint, index } = validated;
 
-        let es_config = ElasticsearchConfig {
-            endpoints: vec![endpoint.clone()],
+        let es_config = self.derived_elasticsearch_config(endpoint, index);
+        let (sink, healthcheck) = SinkConfig::build(&es_config, cx).await?;
+
+        let stream = sink.into_stream();
+        let mapped_stream = MapTimestampStream { inner: stream };
+
+        Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
+    }
+}
+
+impl SematextLogsConfig {
+    /// Build the Elasticsearch config this sink delegates to.
+    fn derived_elasticsearch_config(
+        &self,
+        endpoint: &str,
+        index: &Template,
+    ) -> ElasticsearchConfig {
+        ElasticsearchConfig {
+            endpoints: vec![endpoint.to_owned()],
             compression: Compression::None,
-            doc_type: "\
-                logs"
-                .to_string(),
+            doc_type: "logs".to_string(),
             bulk: BulkConfig {
                 index: index.clone(),
                 ..Default::default()
@@ -142,13 +164,7 @@ impl ValidatedSink for SematextLogsConfig {
             encoding: self.encoding.clone(),
             api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
-        };
-        let (sink, healthcheck) = SinkConfig::build(&es_config, cx).await?;
-
-        let stream = sink.into_stream();
-        let mapped_stream = MapTimestampStream { inner: stream };
-
-        Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
+        }
     }
 }
 
@@ -220,6 +236,28 @@ mod tests {
         let validated = config.validate().expect("preparation should succeed");
         assert_eq!(validated.endpoint, US_ENDPOINT);
         assert_eq!(validated.index.get_ref(), "mylogtoken");
+    }
+
+    #[test]
+    fn validate_rejects_unconfined_token_template() {
+        // A token that is an unconfined routing template (no literal prefix)
+        // passes template parsing but is rejected by the derived Elasticsearch
+        // config's confinement check. `vector validate --no-environment` must
+        // catch it here rather than deferring the error to startup.
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: "{{ index }}".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "an unconfined token template should fail validation"
+        );
     }
 
     #[tokio::test]
