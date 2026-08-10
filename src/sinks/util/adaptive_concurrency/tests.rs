@@ -20,7 +20,7 @@ use futures::{
     future::{self, BoxFuture},
     stream,
 };
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Exp1;
 use rstest::*;
 use serde::Deserialize;

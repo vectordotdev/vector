@@ -60,13 +60,11 @@ pub struct HecLogsSinkConfig {
     // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
     //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
     //       empty string to a `None` path internally.
-    #[configurable(metadata(docs::advanced))]
     pub host_key: Option<OptionalTargetPath>,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
     /// [splunk_field_index_docs]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     #[configurable(metadata(docs::examples = "field1", docs::examples = "field2"))]
     pub indexed_fields: Vec<ConfigValuePath>,
@@ -80,7 +78,6 @@ pub struct HecLogsSinkConfig {
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk defaults to `httpevent`.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
@@ -89,7 +86,6 @@ pub struct HecLogsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector sets it.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::examples = "{{ file }}",
         docs::examples = "/var/log/syslog",
@@ -131,7 +127,6 @@ pub struct HecLogsSinkConfig {
     /// if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
     // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
     //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
@@ -150,7 +145,6 @@ pub struct HecLogsSinkConfig {
     pub auto_extract_timestamp: Option<bool>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
 

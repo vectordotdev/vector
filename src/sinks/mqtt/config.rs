@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::Rng;
+use rand::RngExt;
 use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;

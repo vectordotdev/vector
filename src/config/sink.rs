@@ -80,7 +80,7 @@ where
     #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
     pub healthcheck_uri: Option<UriSerde>,
 
-    #[configurable(derived, metadata(docs::advanced))]
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub healthcheck: SinkHealthcheckOptions,
 

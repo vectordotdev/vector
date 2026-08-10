@@ -34,14 +34,12 @@ components: sources: pulsar: {
 
 	configuration: {
 		auth: {
-			common:      false
 			description: "Options for the authentication strategy."
 			required:    false
 			type: object: {
 				examples: []
 				options: {
 					name: {
-						common:      false
 						description: "The basic authentication name."
 						required:    false
 						type: string: {
@@ -50,7 +48,6 @@ components: sources: pulsar: {
 						}
 					}
 					token: {
-						common:      false
 						description: "The basic authentication password."
 						required:    false
 						type: string: {
@@ -59,7 +56,6 @@ components: sources: pulsar: {
 						}
 					}
 					oauth2: {
-						common:      false
 						description: "Options for OAuth2 authentication."
 						required:    false
 						type: object: {
@@ -80,7 +76,6 @@ components: sources: pulsar: {
 									}
 								}
 								audience: {
-									common:      false
 									description: "OAuth2 audience."
 									required:    false
 									type: string: {
@@ -89,7 +84,6 @@ components: sources: pulsar: {
 									}
 								}
 								scope: {
-									common:      false
 									description: "OAuth2 scope."
 									required:    false
 									type: string: {

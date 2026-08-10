@@ -201,7 +201,6 @@ pub struct ChronicleUnstructuredConfig {
         docs::examples = "production",
         docs::examples = "production-{{ namespace }}",
     ))]
-    #[configurable(metadata(docs::advanced))]
     pub namespace: Option<UnconfinedTemplate>,
 
     /// A set of labels that are attached to each batch of events.
