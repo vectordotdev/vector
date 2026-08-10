@@ -230,6 +230,10 @@ fn default_shadow_every() -> NonZeroU64 {
     NonZeroU64::new(1000).unwrap()
 }
 
+const fn default_dual_write_enabled() -> bool {
+    true
+}
+
 /// Configuration for the V3 shadow dual-write mode.
 ///
 /// When enabled, every `shadow_every`-th legacy series flush, and every `shadow_every`-th
@@ -239,12 +243,28 @@ fn default_shadow_every() -> NonZeroU64 {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct DualWriteConfig {
+    /// Whether to enable V3 shadow dual-write.
+    ///
+    /// Enabled by default, sampling a fraction of legacy flushes to validate the V3 intake
+    /// path. Set to `false` to disable V3 shadow dual-write entirely.
+    #[serde(default = "default_dual_write_enabled")]
+    pub enabled: bool,
+
     /// Send a V3 shadow payload once per this many legacy series or sketches flushes.
     ///
     /// Set to `1` to shadow every flush (full dual-write). Must be greater than zero.
     /// Defaults to `1000`.
     #[serde(default = "default_shadow_every")]
     pub shadow_every: NonZeroU64,
+}
+
+impl Default for DualWriteConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_dual_write_enabled(),
+            shadow_every: default_shadow_every(),
+        }
+    }
 }
 
 impl DualWriteConfig {
@@ -299,13 +319,14 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    /// Optional V3 shadow dual-write configuration.
+    /// V3 shadow dual-write configuration.
     ///
-    /// When set, a sampled fraction of legacy series and sketches flushes are each mirrored
-    /// as V3 payloads to a separate intake endpoint, both stamped with a shared
-    /// `X-Metrics-Request-ID`.
+    /// Enabled by default: a sampled fraction of legacy series and sketches flushes are each
+    /// mirrored as V3 payloads to a separate intake endpoint, both stamped with a shared
+    /// `X-Metrics-Request-ID`. Set `dual_write.enabled` to `false` to disable it.
+    #[configurable(derived)]
     #[serde(default)]
-    pub dual_write: Option<DualWriteConfig>,
+    pub dual_write: DualWriteConfig,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -406,7 +427,8 @@ impl DatadogMetricsConfig {
 
         let shadow_config = self
             .dual_write
-            .as_ref()
+            .enabled
+            .then_some(&self.dual_write)
             .map(|dw| -> crate::Result<ShadowBuilderConfig> {
                 let base_uri = self.get_base_agent_endpoint(dd_common);
                 let series_shadow_uri = build_uri(&base_uri, dw.get_series_path())?;
