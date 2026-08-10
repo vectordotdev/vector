@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
-use vector_lib::{codecs::encoding::Serializer, configurable::configurable_component};
+use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
 use crate::{
@@ -84,14 +84,15 @@ impl SinkConfig for PapertrailConfig {
 
 /// Purely validated `papertrail` sink configuration.
 ///
-/// Holds the resolved endpoint address, TLS settings and built encoding
-/// components so `build` does not redo the (pure) structural validation.
+/// Holds the resolved endpoint address and TLS settings so `build` can
+/// construct the serializer. Serializer construction is deferred to `build`
+/// because some codecs (e.g. protobuf) read files at construction time, which
+/// must not happen during `--no-environment` validation.
 #[derive(Clone, Debug)]
 pub struct ValidatedPapertrail {
     address: String,
     tls: Option<TlsEnableableConfig>,
     transformer: Transformer,
-    serializer: Serializer,
 }
 
 #[async_trait::async_trait]
@@ -119,13 +120,11 @@ impl ValidatedSink for PapertrailConfig {
         );
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
 
         Ok(ValidatedPapertrail {
             address,
             tls,
             transformer,
-            serializer,
         })
     }
 
@@ -138,7 +137,6 @@ impl ValidatedSink for PapertrailConfig {
             address,
             tls,
             transformer,
-            serializer,
         } = validated;
 
         let pid = std::process::id();
@@ -151,7 +149,8 @@ impl ValidatedSink for PapertrailConfig {
             self.send_buffer_bytes,
         );
 
-        let encoder = Encoder::<()>::new(serializer.clone());
+        let serializer = self.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
 
         sink_config.build(
             Transformer::default(),

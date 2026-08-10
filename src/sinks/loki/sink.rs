@@ -531,6 +531,9 @@ impl LokiSink {
             _ => LokiBatchEncoder(LokiBatchEncoding::Json),
         };
 
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
         Ok(Self {
             request_builder: LokiRequestBuilder {
                 compression,
@@ -539,7 +542,7 @@ impl LokiSink {
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(validated.tenant_id),
                 transformer: validated.transformer,
-                encoder: validated.encoder,
+                encoder,
                 labels: validated.labels,
                 structured_metadata: validated.structured_metadata,
                 remove_label_fields: config.remove_label_fields,

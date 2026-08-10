@@ -9,8 +9,8 @@ use aws_types::region::Region;
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
 use vector_lib::codecs::{
-    CharacterDelimitedEncoder,
-    encoding::{Framer, Serializer},
+    CharacterDelimitedEncoderConfig, LengthDelimitedEncoderConfig,
+    encoding::{Framer, FramingConfig, SerializerConfig},
 };
 #[cfg(feature = "aws-core")]
 use vector_lib::config::proxy::ProxyConfig;
@@ -170,6 +170,7 @@ impl HttpSinkConfig {
         Ok(HttpClient::new(tls, cx.proxy())?)
     }
 
+    #[cfg(test)]
     pub(super) fn build_encoder(&self) -> crate::Result<Encoder<Framer>> {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         Ok(Encoder::<Framer>::new(framer, serializer))
@@ -218,22 +219,58 @@ pub(super) fn validate_headers(
     Ok(headers)
 }
 
+/// Returns the effective framing configuration for the `http` sink (which is
+/// message-based): the explicit framing if set, otherwise the default for the
+/// serializer. This mirrors the framer selection in
+/// `EncodingConfigWithFraming::build` without building the serializer (which
+/// may read files for codecs such as protobuf).
+fn effective_framer_config(encoding: &EncodingConfigWithFraming) -> FramingConfig {
+    match encoding.config().0 {
+        Some(framing) => framing.clone(),
+        None => match encoding.config().1 {
+            SerializerConfig::Json(_) => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(b','))
+            }
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
+                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
+            SerializerConfig::Gelf(_) => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
+            }
+            SerializerConfig::Protobuf(_) => {
+                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
+            SerializerConfig::Cef(_)
+            | SerializerConfig::Csv(_)
+            | SerializerConfig::Logfmt
+            | SerializerConfig::NativeJson
+            | SerializerConfig::RawMessage
+            | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
+            #[cfg(feature = "codecs-syslog")]
+            SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
+            #[cfg(feature = "codecs-opentelemetry")]
+            SerializerConfig::Otlp => FramingConfig::Bytes,
+        },
+    }
+}
+
 pub(super) fn validate_payload_wrapper(
     payload_prefix: &str,
     payload_suffix: &str,
-    encoder: &Encoder<Framer>,
+    serializer: &SerializerConfig,
+    framer: &FramingConfig,
 ) -> crate::Result<(String, String)> {
     let payload = [payload_prefix, "{}", payload_suffix].join("");
     match (
-        encoder.serializer(),
-        encoder.framer(),
+        serializer,
+        framer,
         serde_json::from_str::<serde_json::Value>(&payload),
     ) {
-        (
-            Serializer::Json(_),
-            Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
-            Err(_),
-        ) => Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into()),
+        (SerializerConfig::Json(_), FramingConfig::CharacterDelimited(cfg), Err(_))
+            if cfg.character_delimited.delimiter == b',' =>
+        {
+            Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into())
+        }
         _ => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
     }
 }
@@ -283,8 +320,6 @@ impl SinkConfig for HttpSinkConfig {
 pub struct ValidatedHttp {
     /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// Message encoder built from the framing/serializer configuration.
-    encoder: Encoder<Framer>,
     /// Event transformer from the encoding configuration.
     transformer: Transformer,
     /// Templated (dynamic) request headers, confined at build time.
@@ -310,7 +345,8 @@ impl ValidatedSink for HttpSinkConfig {
     fn validate(&self) -> crate::Result<ValidatedHttp> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
-        let encoder = self.build_encoder()?;
+        let serializer_config = self.encoding.config().1;
+        let framer_config = effective_framer_config(&self.encoding);
         let transformer = self.encoding.transformer();
 
         let request = self.request.clone();
@@ -337,20 +373,24 @@ impl ValidatedSink for HttpSinkConfig {
             }
         }
 
-        let (payload_prefix, payload_suffix) =
-            validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
+        let (payload_prefix, payload_suffix) = validate_payload_wrapper(
+            &self.payload_prefix,
+            &self.payload_suffix,
+            serializer_config,
+            &framer_config,
+        )?;
 
         let content_type = {
-            use Framer::*;
-            use Serializer::*;
-            match (encoder.serializer(), encoder.framer()) {
-                (RawMessage(_) | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
-                (Json(_), NewlineDelimited(_)) => Some(CONTENT_TYPE_NDJSON.to_owned()),
-                (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
+            use FramingConfig::*;
+            use SerializerConfig::*;
+            match (serializer_config, &framer_config) {
+                (RawMessage | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
+                (Json(_), NewlineDelimited) => Some(CONTENT_TYPE_NDJSON.to_owned()),
+                (Json(_), CharacterDelimited(cfg)) if cfg.character_delimited.delimiter == b',' => {
                     Some(CONTENT_TYPE_JSON.to_owned())
                 }
                 #[cfg(feature = "codecs-opentelemetry")]
-                (Otlp(_), _) => Some("application/x-protobuf".to_owned()),
+                (Otlp, _) => Some("application/x-protobuf".to_owned()),
                 _ => None,
             }
         };
@@ -376,7 +416,6 @@ impl ValidatedSink for HttpSinkConfig {
 
         Ok(ValidatedHttp {
             batch_settings,
-            encoder,
             transformer,
             template_headers,
             payload_prefix,
@@ -410,7 +449,6 @@ impl HttpSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedHttp {
             batch_settings,
-            encoder,
             transformer,
             template_headers,
             payload_prefix,
@@ -430,9 +468,12 @@ impl HttpSinkConfig {
             None => future::ok(()).boxed(),
         };
 
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         let request_builder = HttpRequestBuilder {
             encoder: HttpEncoder::new(
-                encoder.clone(),
+                encoder,
                 transformer.clone(),
                 payload_prefix.clone(),
                 payload_suffix.clone(),

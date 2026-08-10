@@ -127,8 +127,6 @@ impl SinkConfig for WebHdfsConfig {
 pub struct ValidatedWebHdfs {
     /// Batch settings computed during validation.
     batcher_settings: BatcherSettings,
-    /// Encoder built during validation.
-    encoder: Encoder<Framer>,
     /// Confined prefix template.
     confined_prefix: ConfinedTemplate,
 }
@@ -139,13 +137,10 @@ impl ValidatedSink for WebHdfsConfig {
 
     fn validate(&self) -> crate::Result<ValidatedWebHdfs> {
         let batcher_settings = self.batch.into_batcher_settings()?;
-        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
         let confined_prefix = self.confined_prefix()?;
 
         Ok(ValidatedWebHdfs {
             batcher_settings,
-            encoder,
             confined_prefix,
         })
     }
@@ -186,12 +181,14 @@ impl WebHdfsConfig {
     ) -> crate::Result<VectorSink> {
         let ValidatedWebHdfs {
             batcher_settings,
-            encoder,
             confined_prefix,
         } = validated;
 
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         let request_builder = OpenDalRequestBuilder {
-            encoder: (self.encoding.transformer(), encoder.clone()),
+            encoder: (self.encoding.transformer(), encoder),
             compression: self.compression,
         };
 

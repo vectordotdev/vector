@@ -1,8 +1,5 @@
 use snafu::ResultExt;
-use vector_lib::{
-    codecs::{JsonSerializerConfig, encoding::Serializer},
-    configurable::configurable_component,
-};
+use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component};
 
 use crate::{
     codecs::{EncodingConfig, Transformer},
@@ -70,7 +67,6 @@ impl SinkConfig for WebSocketSinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedWebSocketSink {
     transformer: Transformer,
-    serializer: Serializer,
 }
 
 #[async_trait::async_trait]
@@ -79,11 +75,7 @@ impl ValidatedSink for WebSocketSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
-        Ok(ValidatedWebSocketSink {
-            transformer,
-            serializer,
-        })
+        Ok(ValidatedWebSocketSink { transformer })
     }
 
     async fn build(
@@ -94,16 +86,9 @@ impl ValidatedSink for WebSocketSinkConfig {
         // TLS settings may read certificate files from disk, so the connector is
         // resolved at build time rather than during pure validation.
         let connector = self.build_connector()?;
-        let ValidatedWebSocketSink {
-            transformer,
-            serializer,
-        } = validated;
-        let ws_sink = WebSocketSink::new(
-            self,
-            connector.clone(),
-            transformer.clone(),
-            serializer.clone(),
-        )?;
+        let ValidatedWebSocketSink { transformer } = validated;
+        let serializer = self.encoding.build()?;
+        let ws_sink = WebSocketSink::new(self, connector.clone(), transformer.clone(), serializer)?;
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),
@@ -123,6 +108,8 @@ impl WebSocketSinkConfig {
 #[cfg(test)]
 mod test {
     use super::*;
+    use vector_lib::codecs::encoding::SerializerConfig;
+
     use crate::config::ValidatedSink;
 
     #[test]
@@ -140,7 +127,12 @@ mod test {
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
         };
-        let validated = config.validate().expect("validation should succeed");
-        assert!(matches!(validated.serializer, Serializer::Json(_)));
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the serializer.
+        assert!(matches!(
+            config.encoding.config(),
+            SerializerConfig::Json(_)
+        ));
     }
 }

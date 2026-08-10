@@ -1,9 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
 
-use vector_lib::{
-    codecs::{JsonSerializerConfig, encoding::Serializer},
-    configurable::configurable_component,
-};
+use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component};
 
 use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
@@ -158,14 +155,16 @@ impl SinkConfig for WebSocketListenerSinkConfig {
 
 /// Purely validated `websocket_server` sink configuration.
 ///
-/// Holds the resolved TLS settings and the built encoding components so `build`
-/// does not redo the (pure) structural validation. The server auth matcher is
-/// NOT retained here: it is built from `cx.enrichment_tables` /
-/// `cx.metrics_storage` in `build`, which is context-dependent.
+/// Holds the resolved TLS settings and the encoding transformer so `build`
+/// does not redo the (pure) structural validation. Serializer construction is
+/// deferred to `build` because some codecs (e.g. protobuf) read files at
+/// construction time, which must not happen during `--no-environment`
+/// validation. The server auth matcher is NOT retained here: it is built from
+/// `cx.enrichment_tables` / `cx.metrics_storage` in `build`, which is
+/// context-dependent.
 #[derive(Clone, Debug)]
 pub struct ValidatedWebSocketListenerSink {
     pub(super) transformer: Transformer,
-    pub(super) serializer: Serializer,
 }
 
 #[async_trait::async_trait]
@@ -174,11 +173,7 @@ impl ValidatedSink for WebSocketListenerSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketListenerSink> {
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
-        Ok(ValidatedWebSocketListenerSink {
-            transformer,
-            serializer,
-        })
+        Ok(ValidatedWebSocketListenerSink { transformer })
     }
 
     async fn build(
@@ -203,6 +198,8 @@ impl_generate_config_from_default!(WebSocketListenerSinkConfig);
 #[cfg(test)]
 mod test {
     use super::*;
+    use vector_lib::codecs::encoding::SerializerConfig;
+
     use crate::config::ValidatedSink;
 
     #[test]
@@ -216,7 +213,12 @@ mod test {
             address: "0.0.0.0:8080".parse().unwrap(),
             ..Default::default()
         };
-        let validated = config.validate().expect("validation should succeed");
-        assert!(matches!(validated.serializer, Serializer::Json(_)));
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the serializer.
+        assert!(matches!(
+            config.encoding.config(),
+            SerializerConfig::Json(_)
+        ));
     }
 }

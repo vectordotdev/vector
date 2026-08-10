@@ -3,7 +3,7 @@ use tokio::io;
 use vector_lib::{
     codecs::{
         JsonSerializerConfig,
-        encoding::{Framer, FramingConfig, Serializer},
+        encoding::{Framer, FramingConfig},
     },
     configurable::configurable_component,
 };
@@ -88,13 +88,12 @@ impl SinkConfig for ConsoleSinkConfig {
 
 /// Purely validated `console` sink configuration.
 ///
-/// Holds the built encoding components so `build` does not redo the (pure)
-/// encoding construction.
+/// Serializer construction is deferred to `build` because some codecs (e.g.
+/// protobuf) read files at construction time, which must not happen during
+/// `--no-environment` validation.
 #[derive(Clone, Debug)]
 pub struct ValidatedConsoleSink {
     transformer: Transformer,
-    framer: Framer,
-    serializer: Serializer,
 }
 
 #[async_trait::async_trait]
@@ -103,12 +102,7 @@ impl ValidatedSink for ConsoleSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedConsoleSink> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
-        Ok(ValidatedConsoleSink {
-            transformer,
-            framer,
-            serializer,
-        })
+        Ok(ValidatedConsoleSink { transformer })
     }
 
     async fn build(
@@ -116,12 +110,9 @@ impl ValidatedSink for ConsoleSinkConfig {
         validated: &ValidatedConsoleSink,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ValidatedConsoleSink {
-            transformer,
-            framer,
-            serializer,
-        } = validated;
-        let encoder = Encoder::<Framer>::new(framer.clone(), serializer.clone());
+        let ValidatedConsoleSink { transformer } = validated;
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink: VectorSink = match self.target {
             Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
@@ -143,6 +134,10 @@ impl ValidatedSink for ConsoleSinkConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vector_lib::codecs::encoding::{
+        ProtobufSerializerConfig, ProtobufSerializerOptions, SerializerConfig,
+    };
+
     use crate::config::ValidatedSink;
 
     #[test]
@@ -157,7 +152,40 @@ mod tests {
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             acknowledgements: Default::default(),
         };
-        let validated = config.validate().expect("validation should succeed");
-        assert!(matches!(validated.serializer, Serializer::Json(_)));
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the encoder.
+        assert!(matches!(
+            config.encoding.config().1,
+            SerializerConfig::Json(_)
+        ));
+    }
+
+    #[test]
+    fn validate_does_not_build_file_reading_serializers() {
+        // A protobuf codec pointing at a nonexistent descriptor file must still
+        // validate without error: serializer construction (which reads the file)
+        // is deferred to `build`, so `vector validate --no-environment` never
+        // touches the descriptor file.
+        let config = ConsoleSinkConfig {
+            target: Target::Stdout,
+            encoding: (
+                None::<FramingConfig>,
+                ProtobufSerializerConfig {
+                    protobuf: ProtobufSerializerOptions {
+                        desc_file: "/nonexistent/descriptor.desc".into(),
+                        message_type: "package.Message".into(),
+                        use_json_names: false,
+                    },
+                },
+            )
+                .into(),
+            acknowledgements: Default::default(),
+        };
+        let _validated = config.validate().expect("validation should succeed");
+        assert!(matches!(
+            config.encoding.config().1,
+            SerializerConfig::Protobuf(_)
+        ));
     }
 }

@@ -85,7 +85,8 @@ impl WebSocketListenerSink {
             .auth
             .map(|config| config.build(&cx.enrichment_tables, &cx.metrics_storage))
             .transpose()?;
-        let encoder = Encoder::<()>::new(validated.serializer.clone());
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             tls,

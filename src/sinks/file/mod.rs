@@ -22,7 +22,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{
         TextSerializerConfig,
-        encoding::{Framer, FramingConfig, Serializer},
+        encoding::{Framer, FramingConfig},
     },
     configurable::configurable_component,
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
@@ -270,8 +270,6 @@ impl SinkConfig for FileSinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedFileSink {
     transformer: Transformer,
-    framer: Framer,
-    serializer: Serializer,
 }
 
 #[async_trait::async_trait]
@@ -280,7 +278,6 @@ impl ValidatedSink for FileSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedFileSink> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
 
         // Pure path-confinement checks. `PathConfinement` itself is not
         // retained (it is not `Clone`), so `build` reconstructs it from the
@@ -304,11 +301,7 @@ impl ValidatedSink for FileSinkConfig {
                 .map_err(Box::new)?;
         }
 
-        Ok(ValidatedFileSink {
-            transformer,
-            framer,
-            serializer,
-        })
+        Ok(ValidatedFileSink { transformer })
     }
 
     async fn build(
@@ -379,8 +372,8 @@ impl FileSink {
                 .map_err(Box::new)?
         };
 
-        let encoder =
-            Encoder::<Framer>::new(validated.framer.clone(), validated.serializer.clone());
+        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
@@ -814,7 +807,7 @@ mod tests {
     use futures::{SinkExt, stream};
     use similar_asserts::assert_eq;
     use vector_lib::{
-        codecs::JsonSerializerConfig,
+        codecs::{JsonSerializerConfig, encoding::SerializerConfig},
         event::{LogEvent, TraceEvent},
         sink::VectorSink,
     };
@@ -839,8 +832,13 @@ mod tests {
     #[test]
     fn validate_produces_usable_state() {
         let config = base_config("/tmp/vector-test.log");
-        let validated = config.validate().expect("validation should succeed");
-        assert!(matches!(validated.serializer, Serializer::Text(_)));
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the encoder.
+        assert!(matches!(
+            config.encoding.config().1,
+            SerializerConfig::Text(_)
+        ));
     }
 
     #[tokio::test]

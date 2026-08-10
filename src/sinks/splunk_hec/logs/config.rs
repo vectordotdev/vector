@@ -219,14 +219,12 @@ impl HecLogsSinkConfig {
             .transpose()?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
-        let encoder = Encoder::<()>::new(self.encoding.build()?);
 
         Ok(ValidatedHecLogsSink {
             index,
             source,
             sourcetype,
             batch_settings,
-            encoder,
         })
     }
 
@@ -281,8 +279,6 @@ pub struct ValidatedHecLogsSink {
     sourcetype: Option<ConfinedTemplate>,
     /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// Encoder built during validation.
-    encoder: Encoder<()>,
 }
 
 #[async_trait::async_trait]
@@ -316,9 +312,10 @@ impl HecLogsSinkConfig {
         };
 
         let transformer = self.encoding.transformer();
+        let serializer = self.encoding.build()?;
         let encoder = HecLogsEncoder {
             transformer,
-            encoder: validated.encoder.clone(),
+            encoder: Encoder::<()>::new(serializer),
             auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
         let request_builder = HecLogsRequestBuilder {

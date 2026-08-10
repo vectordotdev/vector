@@ -256,8 +256,6 @@ pub struct ValidatedAzureBlob {
     blob_time_format: String,
     /// Whether to append a UUID to blob keys (defaulted).
     blob_append_uuid: bool,
-    /// Encoder built from the encoding configuration.
-    encoder: Encoder<Framer>,
     /// Confined blob prefix template.
     confined_blob_prefix: ConfinedTemplate,
 }
@@ -270,7 +268,6 @@ impl fmt::Debug for ValidatedAzureBlob {
             .field("batcher_settings", &self.batcher_settings)
             .field("blob_time_format", &self.blob_time_format)
             .field("blob_append_uuid", &self.blob_append_uuid)
-            .field("encoder", &self.encoder)
             .field(
                 "confined_blob_prefix",
                 &self.confined_blob_prefix.to_string(),
@@ -350,9 +347,6 @@ impl ValidatedSink for AzureBlobSinkConfig {
             .blob_append_uuid
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
-        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
-
         let confined_blob_prefix = self.confined_blob_prefix()?;
 
         Ok(ValidatedAzureBlob {
@@ -362,7 +356,6 @@ impl ValidatedSink for AzureBlobSinkConfig {
             batcher_settings,
             blob_time_format,
             blob_append_uuid,
-            encoder,
             confined_blob_prefix,
         })
     }
@@ -402,11 +395,14 @@ impl AzureBlobSinkConfig {
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
 
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         let request_options = AzureBlobRequestOptions {
             container_name: self.container_name.clone(),
             blob_time_format: validated.blob_time_format.clone(),
             blob_append_uuid: validated.blob_append_uuid,
-            encoder: (self.encoding.transformer(), validated.encoder.clone()),
+            encoder: (self.encoding.transformer(), encoder),
             compression: self.compression,
         };
 

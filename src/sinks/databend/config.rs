@@ -6,7 +6,7 @@ use tower::ServiceBuilder;
 use vector_lib::{
     codecs::{
         Transformer,
-        encoding::{Framer, FramingConfig, Serializer},
+        encoding::{Framer, FramingConfig},
     },
     configurable::{component::GenerateConfig, configurable_component},
     stream::BatcherSettings,
@@ -132,10 +132,6 @@ pub struct ValidatedDatabend {
     file_format_options: BTreeMap<&'static str, &'static str>,
     /// The resolved compression algorithm.
     compression: Compression,
-    /// The built serializer.
-    serializer: Serializer,
-    /// The newline-delimited framer.
-    framer: Framer,
     /// The encoding transformer.
     transformer: Transformer,
 }
@@ -200,21 +196,18 @@ impl ValidatedSink for DatabendConfig {
             }
         };
         let encoding: EncodingConfig = self.encoding.clone().into();
-        let serializer = match self.encoding.config() {
+        match self.encoding.config() {
             DatabendSerializerConfig::Json(_) => {
                 file_format_options.insert("type", "NDJSON");
                 file_format_options.insert("missing_field_as", self.missing_field_as.as_str());
-                encoding.build()?
             }
             DatabendSerializerConfig::Csv(_) => {
                 file_format_options.insert("type", "CSV");
                 file_format_options.insert("field_delimiter", ",");
                 file_format_options.insert("record_delimiter", "\n");
                 file_format_options.insert("skip_header", "0");
-                encoding.build()?
             }
-        };
-        let framer = FramingConfig::NewlineDelimited.build();
+        }
         let transformer = encoding.transformer();
 
         Ok(ValidatedDatabend {
@@ -223,8 +216,6 @@ impl ValidatedSink for DatabendConfig {
             batch_settings,
             file_format_options,
             compression,
-            serializer,
-            framer,
             transformer,
         })
     }
@@ -240,8 +231,6 @@ impl ValidatedSink for DatabendConfig {
             batch_settings,
             file_format_options,
             compression,
-            serializer,
-            framer,
             transformer,
         } = validated;
 
@@ -263,7 +252,10 @@ impl ValidatedSink for DatabendConfig {
             .settings(request_settings.clone(), DatabendRetryLogic)
             .service(service);
 
-        let encoder = Encoder::<Framer>::new(framer.clone(), serializer.clone());
+        let encoding: EncodingConfig = self.encoding.clone().into();
+        let serializer = encoding.build()?;
+        let framer = FramingConfig::NewlineDelimited.build();
+        let encoder = Encoder::<Framer>::new(framer, serializer);
         let request_builder =
             DatabendRequestBuilder::new(*compression, (transformer.clone(), encoder));
 

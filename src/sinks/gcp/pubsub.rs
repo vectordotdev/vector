@@ -149,14 +149,11 @@ impl ValidatedSink for PubsubConfig {
             .into_batch_settings()?;
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
 
         Ok(ValidatedPubsub {
             uri_base,
             batch_settings,
             transformer,
-            encoder,
         })
     }
 
@@ -169,17 +166,19 @@ impl ValidatedSink for PubsubConfig {
             uri_base,
             batch_settings,
             transformer,
-            encoder,
         } = validated;
 
         // We only need to load the credentials if we are not targeting an emulator.
         let auth = self.auth.build(Scope::PubSub).await?;
 
+        let serializer = self.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
         let sink = PubsubSink {
             auth,
             uri_base: uri_base.clone(),
             transformer: transformer.clone(),
-            encoder: encoder.clone(),
+            encoder,
         };
 
         let request_settings = self.request.into_settings();
@@ -216,8 +215,6 @@ pub struct ValidatedPubsub {
     batch_settings: BatchSettings<JsonArrayBuffer>,
     /// The configured transformer.
     transformer: Transformer,
-    /// The configured encoder.
-    encoder: Encoder<()>,
 }
 
 struct PubsubSink {

@@ -254,8 +254,6 @@ pub struct ValidatedLokiSink {
     pub(super) request_limits: TowerRequestSettings,
     /// Event transformer from the encoding configuration.
     pub(super) transformer: Transformer,
-    /// Message encoder built from the encoding configuration.
-    pub(super) encoder: Encoder<()>,
     /// Confined tenant ID template.
     pub(super) tenant_id: Option<ConfinedTemplate>,
     /// Confined label templates.
@@ -293,8 +291,6 @@ impl ValidatedSink for LokiConfig {
         };
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
 
         let tenant_id = self
             .tenant_id
@@ -323,7 +319,6 @@ impl ValidatedSink for LokiConfig {
             auth,
             request_limits,
             transformer,
-            encoder,
             tenant_id,
             labels,
             structured_metadata,
