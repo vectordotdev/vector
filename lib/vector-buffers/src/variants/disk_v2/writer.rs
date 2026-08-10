@@ -22,7 +22,10 @@ use rkyv::{
     },
 };
 use snafu::{ResultExt, Snafu};
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::{
+    io::{AsyncWrite, AsyncWriteExt},
+    sync::watch,
+};
 
 use super::{
     common::{DiskBufferConfig, create_crc32c_hasher},
@@ -48,6 +51,10 @@ pub enum WriterError<T>
 where
     T: Bufferable,
 {
+    /// The writer was asked to shut down while waiting for reader progress.
+    #[snafu(display("writer shutting down"))]
+    Shutdown,
+
     /// A general I/O error occurred.
     ///
     /// Different methods will capture specific I/O errors depending on the situation, as some
@@ -375,6 +382,7 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
         if buf.len() >= self.buf.capacity() {
             self.inner.write_all(buf).await?;
+            self.inner.flush().await?;
 
             let flush_result = flush_result.get_or_insert(FlushResult::default());
             flush_result.events_flushed += event_count as u64;
@@ -409,6 +417,10 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         let bytes_flushed = self.buf.len() as u64;
 
         let result = self.inner.write_all(&self.buf[..]).await;
+        let result = match result {
+            Ok(()) => self.inner.flush().await,
+            Err(error) => Err(error),
+        };
         self.unflushed_events = 0;
         self.buf.clear();
 
@@ -876,6 +888,8 @@ where
     FS::File: Unpin,
 {
     ledger: Arc<Ledger<FS>>,
+    reader_progress: watch::Receiver<u64>,
+    shutdown: Option<watch::Receiver<()>>,
     config: DiskBufferConfig<FS>,
     writer: Option<RecordWriter<FS::File, T>>,
     next_record_id: u64,
@@ -898,8 +912,11 @@ where
     pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         let config = ledger.config().clone();
         let next_record_id = ledger.state().get_next_writer_record_id();
+        let reader_progress = ledger.subscribe_reader_progress();
         BufferWriter {
             ledger,
+            reader_progress,
+            shutdown: None,
             config,
             writer: None,
             data_file_size: 0,
@@ -935,9 +952,48 @@ where
 
         self.unflushed_events -= flushed_events;
         self.unflushed_bytes -= flushed_bytes;
-        self.next_record_id = self
-            .ledger
-            .publish_writer_progress(flushed_events, flushed_bytes);
+        let published_byte_offset = self.data_file_size - self.unflushed_bytes;
+        self.next_record_id = self.ledger.publish_writer_progress(
+            flushed_events,
+            flushed_bytes,
+            self.ledger.get_current_writer_file_id(),
+            published_byte_offset,
+        );
+    }
+
+    pub(super) fn publish_current_position(&self) {
+        let position = self.writer.as_ref().map(|_| {
+            (
+                self.ledger.get_current_writer_file_id(),
+                self.data_file_size - self.unflushed_bytes,
+            )
+        });
+        self.ledger.publish_writer_position(position);
+    }
+
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    async fn wait_for_reader(&mut self) -> bool {
+        if let Some(shutdown) = self.shutdown.as_mut() {
+            tokio::select! {
+                biased;
+                _ = shutdown.changed() => true,
+                result = self.reader_progress.changed() => {
+                    match result {
+                        Ok(()) | Err(_) => {}
+                    }
+                    false
+                }
+            }
+        } else {
+            match self.reader_progress.changed().await {
+                Ok(()) | Err(_) => {}
+            }
+            false
+        }
+    }
+
+    pub(crate) fn set_shutdown(&mut self, shutdown: watch::Receiver<()>) {
+        self.shutdown = Some(shutdown);
     }
 
     fn can_write(&self) -> bool {
@@ -1050,7 +1106,7 @@ where
         let previous_writer_file_id = self.ledger.get_current_writer_file_id();
         self.reset();
         self.ledger.state().increment_writer_file_id();
-        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.ensure_ready_for_write().await?;
         self.reconcile_current_data_file_with_checkpoint().await?;
         self.ledger.flush().context(IoSnafu)?;
 
@@ -1279,7 +1335,7 @@ where
             current_writer_data_file = ?self.ledger.get_current_writer_data_file_path(),
             "Validating last written record in current data file."
         );
-        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.ensure_ready_for_write().await?;
 
         // If our current file is empty, there's no sense doing this check.
         if self.data_file_size == 0 {
@@ -1443,7 +1499,7 @@ where
 
         self.reset();
         self.mark_for_skip();
-        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.ensure_ready_for_write().await?;
         self.ledger.flush().context(IoSnafu)?;
 
         debug!(
@@ -1465,7 +1521,7 @@ where
     // The inline antithesis assertion block pushes this over the line limit. Its
     // source lines count even when the feature is off, so the allow is unconditional.
     #[allow(clippy::too_many_lines)]
-    async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
+    async fn ensure_ready_for_write(&mut self) -> Result<(), WriterError<T>> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
             // If we haven't yet exceeded the maximum buffer size, then we can proceed. Likewise, if
@@ -1498,7 +1554,9 @@ where
                 );
             }
 
-            self.ledger.wait_for_reader().await;
+            if self.wait_for_reader().await {
+                return Err(WriterError::Shutdown);
+            }
         }
 
         // If we already have an open writer, and we have no more space in the data file to write,
@@ -1520,7 +1578,7 @@ where
             //
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
-            self.flush_inner(true).await?;
+            self.flush_inner(true).await.context(IoSnafu)?;
 
             self.reset();
         }
@@ -1577,8 +1635,9 @@ where
                             .ledger
                             .filesystem()
                             .open_file_writable(&data_file_path)
-                            .await?;
-                        let metadata = data_file.metadata().await?;
+                            .await
+                            .context(IoSnafu)?;
+                        let metadata = data_file.metadata().await.context(IoSnafu)?;
                         let file_len = metadata.len();
                         if file_len == 0 || !should_open_next {
                             // The file is either empty, which means we created it and "own it" now,
@@ -1595,7 +1654,7 @@ where
                         }
                     }
                     // Legitimate I/O error with the operation, bubble this up.
-                    _ => return Err(e),
+                    _ => return Err(WriterError::Io { source: e }),
                 },
             };
 
@@ -1608,7 +1667,7 @@ where
                 );
 
                 // Make sure the file is flushed to disk, especially if we just created it.
-                data_file.sync_all().await?;
+                data_file.sync_all().await.context(IoSnafu)?;
 
                 self.writer = Some(RecordWriter::new(
                     data_file,
@@ -1623,7 +1682,7 @@ where
                 // file ID now to signal that the writer has moved on.
                 if should_open_next {
                     self.ledger.state().increment_writer_file_id();
-                    self.ledger.notify_writer_waiters();
+                    self.publish_current_position();
 
                     // The writer just rolled to a fresh data file, the boundary the
                     // crash, partial-write, and file-id-rollover faults act on.
@@ -1655,7 +1714,9 @@ where
 
             // Wait until the reader signals progress and try again.
             debug!("Target data file is still present and not yet processed. Waiting for reader.");
-            self.ledger.wait_for_reader().await;
+            if self.wait_for_reader().await {
+                return Err(WriterError::Shutdown);
+            }
         }
     }
 
@@ -1712,7 +1773,7 @@ where
             // Make sure we have an open data file to write to, which might also be us opening the
             // next data file because our first attempt at writing had to finalize a data file that
             // was already full.
-            self.ensure_ready_for_write().await.context(IoSnafu)?;
+            self.ensure_ready_for_write().await?;
 
             let writer = self
                 .writer
@@ -1800,7 +1861,8 @@ where
             // error like `DataFileFull`, as that gets checked during archiving. The guard fires
             // Errored automatically on `?` exit.
             let result = writer.flush_record(token).await?;
-            // Record is durable on disk; disarm so finalizers resolve as Delivered.
+            // The record has been accepted by the file writer; disarm so finalizers resolve as
+            // Delivered. The flush result below independently controls when progress is published.
             record_finalizers.disarm();
             result
         } else {
@@ -1876,7 +1938,9 @@ where
                 Ok(bytes_written) => return Ok(bytes_written),
                 Err(old_record) => {
                     record = old_record;
-                    self.ledger.wait_for_reader().await;
+                    if self.wait_for_reader().await {
+                        return Err(WriterError::Shutdown);
+                    }
                 }
             }
         }
@@ -1901,10 +1965,9 @@ where
 
     #[instrument(skip(self), level = "debug")]
     async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
-        // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
-        // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
-        // cache, as we don't do any O_DIRECT fanciness, and the new contents can be immediately
-        // read.
+        // We always flush the `BufWriter` and wait for the underlying asynchronous file write when
+        // this is called, but we don't always synchronize the file or flush the ledger. Completion
+        // is enough to make the new contents visible to readers through the page cache on Linux.
         //
         // TODO: Windows has a page cache as well, and macOS _should_, but we should verify this
         // behavior works on those platforms as well.
@@ -1967,8 +2030,11 @@ where
     pub fn close(&mut self) {
         if self.ledger.mark_writer_done() {
             debug!("Writer marked as closed.");
-            self.ledger.notify_writer_waiters();
         }
+    }
+
+    pub(crate) fn fail(&self) {
+        self.ledger.mark_writer_failed();
     }
 }
 
