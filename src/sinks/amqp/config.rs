@@ -5,7 +5,7 @@ use vector_lib::{
     internal_event::{error_stage, error_type},
 };
 
-use super::{channel::AmqpSinkChannels, sink::AmqpSink};
+use super::{channel::AmqpSinkChannels, service::AmqpError, sink::AmqpSink};
 use crate::{
     amqp::AmqpConfig, config::ValidatedSink, sinks::prelude::*, template::ConfinementConfig,
 };
@@ -167,6 +167,11 @@ impl ValidatedSink for AmqpSinkConfig {
     type Validated = ValidatedAmqpSink;
 
     fn validate(&self) -> crate::Result<ValidatedAmqpSink> {
+        if self.max_channels == 0 {
+            return Err(Box::new(AmqpError::PoolError {
+                error: "max_channels must be positive".into(),
+            }));
+        }
         let exchange = self
             .exchange
             .clone()
@@ -224,6 +229,16 @@ mod tests {
     #[test]
     pub fn generate_config() {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_zero_max_channels() {
+        let config = AmqpSinkConfig {
+            max_channels: 0,
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(result.is_err(), "validation should reject max_channels = 0");
     }
 
     #[test]
