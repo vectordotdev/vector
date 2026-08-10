@@ -45,7 +45,6 @@ pub struct LogstashConfig {
     address: SocketListenAddr,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     keepalive: Option<TcpKeepaliveConfig>,
 
     #[configurable(derived)]
@@ -57,12 +56,10 @@ pub struct LogstashConfig {
     /// The size of the receive buffer used for each connection.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 65536))]
-    #[configurable(metadata(docs::advanced))]
     receive_buffer_bytes: Option<usize>,
 
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
-    #[configurable(metadata(docs::advanced))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]
@@ -859,7 +856,7 @@ mod test {
     use bytes::BufMut;
     use flate2::{Compression, write::ZlibEncoder};
     use futures::{Stream, StreamExt, stream};
-    use rand::{Rng, rng};
+    use rand::{RngExt, rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use vector_lib::codecs::ReadyFrames;
     use vector_lib::lookup::OwnedTargetPath;

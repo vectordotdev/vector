@@ -9,8 +9,8 @@ sources:
         - value2
     honor_labels: false
     query:
-      "match[]":
+      match[]:
         - '{job="somejob"}'
         - '{__name__=~"job:.*"}'
     scrape_interval_secs: 15
-    scrape_timeout_secs: 5
+    scrape_timeout_secs: 5.0
