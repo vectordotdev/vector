@@ -14,12 +14,7 @@
                 {{ partial "heading.html" (dict "text" $name "level" 3 "anchor" true "icon" false) }}
               </span>
 
-              {{/* Config labels */}}
               <span class="flex justify-between space-x-1">
-                {{ if $v.common }}
-                  {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
-                {{ end }}
-
                 {{ if $v.required }}
                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
                 {{ else if $v.required_one_of }}
@@ -515,10 +510,6 @@
             </span>
 
             <span class="flex space-x-1">
-              {{ if $v.common }}
-                {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
-              {{ end }}
-
               {{ if $v.required }}
                 {{ partial "badge.html" (dict "word" "required" "color" "red") }}
               {{ else if $v.required_one_of }}
@@ -623,10 +614,6 @@
                 </span>
 
                 <span class="flex space-x-1">
-                  {{ if $v.common }}
-                    {{ partial "badge.html" (dict "word" "common" "color" "indigo") }}
-                  {{ end }}
-
                   {{ if $v.required }}
                     {{ partial "badge.html" (dict "word" "required" "color" "red") }}
                   {{ else if $v.required_one_of }}
@@ -2047,10 +2034,6 @@
           </span>
 
           <span class="flex space-x-1">
-            {{ if $v.common }}
-              {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
-            {{ end }}
-
             {{ if $v.required }}
               {{ partial "badge.html" (dict "word" "required" "color" "red") }}
             {{ else if $v.required_one_of }}
