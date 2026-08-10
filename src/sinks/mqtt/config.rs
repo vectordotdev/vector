@@ -144,6 +144,22 @@ impl ValidatedSink for MqttSinkConfig {
     type Validated = ValidatedMqttSink;
 
     fn validate(&self) -> crate::Result<ValidatedMqttSink> {
+        // Reject an empty client ID, matching `build_connector` which rejects it
+        // before the runtime connector is created.
+        if self.common.client_id.as_deref() == Some("") {
+            return Err(Box::new(MqttError::Configuration {
+                source: ConfigurationError::EmptyClientId,
+            }));
+        }
+        // Username and password must be either both provided or both missing.
+        match (&self.common.user, &self.common.password) {
+            (Some(_), Some(_)) | (None, None) => {}
+            _ => {
+                return Err(Box::new(MqttError::Configuration {
+                    source: ConfigurationError::InvalidCredentials,
+                }));
+            }
+        }
         let topic = self
             .topic
             .clone()
@@ -229,6 +245,36 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MqttSinkConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_empty_client_id() {
+        let config = MqttSinkConfig {
+            common: MqttCommonConfig {
+                client_id: Some(String::new()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_err(),
+            "an empty client_id should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_partial_credentials() {
+        let config = MqttSinkConfig {
+            common: MqttCommonConfig {
+                user: Some("user".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_err(),
+            "credentials with only a username should fail validation"
+        );
     }
 
     #[test]
