@@ -152,9 +152,7 @@ Contributors document user-facing changes by adding a fragment under
 changelog section is assembled from those fragments by `cargo vdev release
 prepare` during release prep. The CUE file's `commits:` array is populated
 from the git log. Titles can follow the [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/)
-schema (`<type>[optional scope]: <description>`); if they do, the type is
-extracted and recorded in the entry's `type` field, otherwise the entry is
-included without a `type` field.
+schema (`<type>[optional scope]: <description>`).
 
 ### Release highlights
 
