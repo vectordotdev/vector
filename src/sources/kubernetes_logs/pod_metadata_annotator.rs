@@ -214,7 +214,6 @@ impl PodMetadataAnnotator {
                 message = "Pod not found in API store, annotating from file path only.",
                 pod_namespace = file_info.pod_namespace,
                 pod_name = file_info.pod_name,
-                internal_log_rate_limit = true,
             );
             annotate_from_file_path(log, &self.fields_spec, &file_info, self.log_namespace);
             return Some(file_info);
