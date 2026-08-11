@@ -3,8 +3,11 @@ use chrono::Utc;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        NewlineDelimitedEncoder, TextSerializerConfig,
-        encoding::{Framer, FramingConfig},
+        JsonSerializerConfig, NativeSerializerConfig, NewlineDelimitedEncoder,
+        NewlineDelimitedEncoderConfig, TextSerializerConfig,
+        encoding::{
+            CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
+        },
     },
     partition::Partitioner,
     request_metadata::GroupedCountByteSize,
@@ -21,6 +24,7 @@ use crate::{
     sinks::prelude::*,
     sinks::util::{
         BatchConfig, Compression,
+        encoding::Encoder as _,
         request_builder::{EncodeResult, RequestBuilder},
     },
 };
@@ -763,6 +767,175 @@ fn azure_blob_build_request_append_blob_defaults() {
         "partition_key {key:?} did not match the expected hourly key for {before} or {after}"
     );
     assert_eq!(request.blob_type, AzureBlobType::Append);
+}
+
+/// An append blob accumulates batches, so JSON without explicit framing must be newline-delimited
+/// rather than one array per batch — concatenated arrays are not parseable JSON.
+#[test]
+fn azure_blob_append_blob_json_defaults_to_newline_framing() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+    };
+
+    let encoder = config
+        .build_encoder()
+        .expect("append mode with the JSON codec and no framing must build");
+
+    assert!(
+        encoder.batch_prefix().is_empty() && encoder.batch_suffix(false) == b"\n",
+        "append batches must be newline-delimited, not enclosed in a JSON array"
+    );
+    assert!(matches!(encoder.framer(), Framer::NewlineDelimited(_)));
+}
+
+/// A block blob holds exactly one batch, so the JSON array framing stays correct there.
+#[test]
+fn azure_blob_block_blob_json_keeps_array_framing() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Block,
+        ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+    };
+
+    let encoder = config.build_encoder().expect("block mode must build");
+
+    assert_eq!(
+        encoder.batch_prefix(),
+        b"[",
+        "block blobs must keep emitting one JSON array per blob"
+    );
+}
+
+/// Why the append default is newline-delimited: Azure appends payloads with nothing between them, so
+/// a blob only reads back as a record stream if the framing terminates the batch's last record.
+#[test]
+fn record_terminating_framing_survives_payload_concatenation() {
+    fn payload(framer: Framer) -> String {
+        let encoder = (
+            Transformer::default(),
+            Encoder::<Framer>::new(framer, TextSerializerConfig::default().build().into()),
+        );
+        let mut out = Vec::new();
+        encoder
+            .encode_input(
+                vec![
+                    Event::Log(LogEvent::from("a")),
+                    Event::Log(LogEvent::from("b")),
+                ],
+                &mut out,
+            )
+            .expect("encoding must succeed");
+
+        String::from_utf8(out).expect("payload must be utf8")
+    }
+
+    let newline = payload(NewlineDelimitedEncoder::default().into());
+    assert_eq!(
+        newline, "a\nb\n",
+        "newline framing terminates the last record"
+    );
+    assert_eq!(
+        format!("{newline}{newline}"),
+        "a\nb\na\nb\n",
+        "so concatenated payloads keep exactly one record per line"
+    );
+
+    let semicolon = payload(CharacterDelimitedEncoder::new(b';').into());
+    assert_eq!(
+        semicolon, "a;b",
+        "character framing separates records but leaves the last one unterminated"
+    );
+    assert_eq!(
+        format!("{semicolon}{semicolon}"),
+        "a;ba;b",
+        "so concatenating fuses `b` and `a` into a single record at the seam"
+    );
+}
+
+/// Only the defaults are `blob_type`-aware. An explicit `framing` is passed through untouched, even
+/// one whose seam behavior is the concatenation above — that is the user's call to make.
+#[test]
+fn azure_blob_append_blob_honors_explicit_framing() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        ..default_config(
+            (
+                Some(CharacterDelimitedEncoderConfig::new(b';')),
+                TextSerializerConfig::default(),
+            )
+                .into(),
+        )
+    };
+
+    let encoder = config
+        .build_encoder()
+        .expect("explicitly configured framing must be honored");
+
+    assert!(
+        matches!(
+            encoder.framer(),
+            Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b';' })
+        ),
+        "append mode must not override an explicit framing choice"
+    );
+}
+
+/// Block blobs hold exactly one batch, so nothing concatenates and every framing stays valid.
+#[test]
+fn azure_blob_block_blob_allows_non_terminating_framing() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Block,
+        ..default_config(
+            (
+                Some(CharacterDelimitedEncoderConfig::new(b';')),
+                TextSerializerConfig::default(),
+            )
+                .into(),
+        )
+    };
+
+    let encoder = config
+        .build_encoder()
+        .expect("block blobs must accept any framing");
+    assert!(matches!(encoder.framer(), Framer::CharacterDelimited(_)));
+}
+
+/// Only the JSON default is `blob_type`-aware: codecs that already default to a stream-safe framing
+/// resolve the same in both modes.
+#[test]
+fn azure_blob_append_blob_keeps_length_delimited_framing() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        ..default_config((None::<FramingConfig>, NativeSerializerConfig).into())
+    };
+
+    let encoder = config
+        .build_encoder()
+        .expect("binary codecs must build in append mode");
+    assert!(
+        matches!(encoder.framer(), Framer::LengthDelimited(_)),
+        "binary codecs must keep their length-delimited framing"
+    );
+}
+
+/// Explicit newline framing resolves the same as the append default.
+#[test]
+fn azure_blob_append_blob_accepts_explicit_newline_framing() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        ..default_config(
+            (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+        )
+    };
+
+    let encoder = config
+        .build_encoder()
+        .expect("explicit newline framing must be accepted in append mode");
+    assert!(encoder.batch_prefix().is_empty());
 }
 
 #[test]

@@ -76,6 +76,15 @@ pub enum AzureBlobType {
     /// streams. Read it with a multi-stream-aware decompressor such as `gunzip` or `zstd -d`.
     /// Only `gzip`, `zstd`, and `none` are supported: `snappy` and `zlib` cannot be concatenated
     /// and are rejected at startup.
+    ///
+    /// Because a batch is appended to whatever is already in the blob, `append` uses the same
+    /// stream-oriented framing defaults as the `file` sink: with `codec = "json"` and no explicit
+    /// `framing`, it writes newline-delimited JSON, whereas `block` emits one JSON array per blob.
+    ///
+    /// Explicitly configured `framing` is always used as given. Azure concatenates the appended
+    /// payloads with nothing in between, so framing that separates records without terminating them
+    /// — `character_delimited`, for example — leaves a batch's last record joined to the next
+    /// batch's first record.
     Append,
 }
 
@@ -490,8 +499,7 @@ impl AzureBlobSinkConfig {
         let (blob_append_uuid, blob_time_format) = self.resolved_blob_naming();
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let encoder = self.build_encoder()?;
 
         let request_options = AzureBlobRequestOptions {
             container_name: self.container_name.clone(),
@@ -512,6 +520,27 @@ impl AzureBlobSinkConfig {
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
+    }
+
+    /// Builds the event encoder for this `blob_type`.
+    ///
+    /// A block blob receives one self-contained payload per request, like the other object-store
+    /// sinks. An append blob instead accumulates payloads into one growing blob — the same shape the
+    /// `file` sink writes — so it takes the stream-oriented codec defaults that sink uses.
+    pub(super) fn build_encoder(&self) -> crate::Result<Encoder<Framer>> {
+        // Only the codec defaults differ: explicitly configured `framing` is honored either way.
+        let sink_type = match self.blob_type {
+            // A new blob per batch, so a batch is a self-contained payload — JSON defaults to one
+            // array per blob, as with the other object-store sinks.
+            AzureBlobType::Block => SinkType::MessageBased,
+            // One blob accumulates many batches, the same shape the `file` sink writes, so the
+            // defaults must be line-oriented: JSON becomes newline-delimited.
+            AzureBlobType::Append => SinkType::StreamBased,
+        };
+
+        let (framer, serializer) = self.encoding.build(sink_type)?;
+
+        Ok(Encoder::<Framer>::new(framer, serializer))
     }
 
     /// The `blob_append_uuid` and `blob_time_format` values actually in effect, after the

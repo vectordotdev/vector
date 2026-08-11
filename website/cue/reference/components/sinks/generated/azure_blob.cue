@@ -302,6 +302,15 @@ generated: components: sinks: azure_blob: configuration: {
 					streams. Read it with a multi-stream-aware decompressor such as `gunzip` or `zstd -d`.
 					Only `gzip`, `zstd`, and `none` are supported: `snappy` and `zlib` cannot be concatenated
 					and are rejected at startup.
+
+					Because a batch is appended to whatever is already in the blob, `append` uses the same
+					stream-oriented framing defaults as the `file` sink: with `codec = "json"` and no explicit
+					`framing`, it writes newline-delimited JSON, whereas `block` emits one JSON array per blob.
+
+					Explicitly configured `framing` is always used as given. Azure concatenates the appended
+					payloads with nothing in between, so framing that separates records without terminating them
+					— `character_delimited`, for example — leaves a batch's last record joined to the next
+					batch's first record.
 					"""
 				block: """
 					Stores data as block blobs.

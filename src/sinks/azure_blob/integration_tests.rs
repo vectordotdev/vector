@@ -400,6 +400,49 @@ async fn azure_blob_append_blob_json_encoding() {
     assert_append_blob_json_encoding(AzureBlobSinkConfig::new_emulator().await).await;
 }
 
+/// The minimal JSON append config — `codec = "json"` with no `framing` — must produce NDJSON.
+/// Block mode would frame each batch as a JSON array, and appending a second array would leave the
+/// blob unparseable, so append mode defaults to newline framing instead.
+async fn assert_append_blob_json_default_framing(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/json-default-framing/{}", random_string(10));
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        blob_type: AzureBlobType::Append,
+        blob_time_format: Some(String::new()),
+        blob_append_uuid: Some(false),
+        // Deliberately no framing: this is the config that array-framed each batch.
+        encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+        ..config
+    };
+
+    let (events1, input1) = random_events_with_stream(100, 5, None);
+    let (events2, input2) = random_events_with_stream(100, 5, None);
+
+    config.run_assert(input1).await;
+    config.run_assert(input2).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(blobs.len(), 1, "append blob must produce exactly one blob");
+    let (content_type, _content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(
+        content_type,
+        Some(String::from("application/x-ndjson")),
+        "append mode must default to NDJSON framing, not a JSON array per batch"
+    );
+
+    let expected: Vec<String> = events1
+        .iter()
+        .chain(events2.iter())
+        .map(|e| serde_json::to_string(&e.as_log().all_event_fields().unwrap()).unwrap())
+        .collect();
+    assert_eq!(blob_lines, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_json_default_framing() {
+    assert_append_blob_json_default_framing(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
 #[tokio::test]
 async fn azure_blob_append_blob_json_encoding_with_oauth() {
     assert_append_blob_json_encoding(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;

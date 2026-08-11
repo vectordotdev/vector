@@ -12,4 +12,9 @@ Compression is supported in append mode with `gzip`, `zstd`, or `none`. Because 
 compressed independently, `snappy` and `zlib` are rejected at startup: neither format can be
 decoded as a concatenated sequence of streams.
 
+Because a batch is appended to whatever the blob already holds, append mode takes the same
+stream-oriented encoding defaults as the `file` sink: with `codec: json` and no explicit `framing`
+it writes newline-delimited JSON, rather than the one-array-per-batch framing used for block blobs.
+Explicitly configured `framing` is always used as given.
+
 authors: danielku15
