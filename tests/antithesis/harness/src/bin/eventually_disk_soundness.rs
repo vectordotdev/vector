@@ -11,10 +11,7 @@
 #[cfg(target_os = "linux")]
 extern crate antithesis_instrumentation;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use antithesis_harness::{is_progress_probe_payload, payload_field};
 use antithesis_sdk::{antithesis_init, assert_always, assert_reachable};
@@ -39,12 +36,8 @@ struct Args {
         default_value = "http://vector:9598/metrics"
     )]
     metrics_url: String,
-    #[arg(
-        long,
-        env = "VECTOR_BUFFER_DIR",
-        default_value = "/sut-data/buffer/v2/out"
-    )]
-    buffer_dir: PathBuf,
+    #[arg(long, env = "VECTOR_DATA_DIR", default_value = "/var/lib/vector")]
+    vector_data_dir: String,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -150,7 +143,11 @@ async fn open_ingest_gate(
     false
 }
 
-async fn wait_for_empty_buffer(
+fn has_zero_byte_occupancy(metrics: BufferMetrics) -> bool {
+    metrics.occupancy_bytes == Some(0.0)
+}
+
+async fn wait_for_zero_byte_occupancy(
     client: &reqwest::Client,
     metrics_url: &str,
     timeout: time::Duration,
@@ -160,12 +157,14 @@ async fn wait_for_empty_buffer(
     let mut latest = None;
     while time::Instant::now() < deadline {
         if let Some(metrics) = fetch_metrics(client, metrics_url).await {
-            stable_empty_polls =
-                if metrics.occupancy_events == Some(0.0) && metrics.occupancy_bytes == Some(0.0) {
-                    stable_empty_polls + 1
-                } else {
-                    0
-                };
+            // A complete corrupt record has a trustworthy byte span but not a trustworthy event
+            // count. Its bytes leave occupancy immediately, while the event-count metric cannot
+            // reconcile until a later valid record exposes the record-ID gap.
+            stable_empty_polls = if has_zero_byte_occupancy(metrics) {
+                stable_empty_polls + 1
+            } else {
+                0
+            };
             latest = Some(metrics);
             if stable_empty_polls >= EMPTY_POLLS_REQUIRED {
                 return (true, latest);
@@ -407,7 +406,8 @@ async fn main() {
     // Loss is permitted, but after the FIFO barrier arrives, a healthy recovery
     // must explicitly report that it has stopped claiming occupied byte space.
     let (initially_drained, pre_probe_metrics) =
-        wait_for_empty_buffer(&client, &args.metrics_url, time::Duration::from_secs(180)).await;
+        wait_for_zero_byte_occupancy(&client, &args.metrics_url, time::Duration::from_secs(180))
+            .await;
     assert_always!(
         initially_drained,
         "the recovered disk buffer drains instead of remaining permanently stuck",
@@ -424,7 +424,8 @@ async fn main() {
     }
     // Three empty metric polls span the one-second stale-file cleanup interval,
     // so the physical snapshot is settled rather than racing normal deletion.
-    assert_physical_bounds(disk_snapshot(&args.buffer_dir), "after recovery drain");
+    let buffer_dir = Path::new(&args.vector_data_dir).join("buffer/v2/out");
+    assert_physical_bounds(disk_snapshot(&buffer_dir), "after recovery drain");
 
     // Each selected payload is just over the 256KiB write-buffer size and is
     // hex encoded in JSON. Twelve records therefore force multiple 2MiB data
@@ -467,7 +468,8 @@ async fn main() {
     );
 
     let (finally_drained, post_probe_metrics) =
-        wait_for_empty_buffer(&client, &args.metrics_url, time::Duration::from_secs(180)).await;
+        wait_for_zero_byte_occupancy(&client, &args.metrics_url, time::Duration::from_secs(180))
+            .await;
     assert_always!(
         finally_drained,
         "the disk buffer returns to zero occupancy after fresh progress",
@@ -480,13 +482,13 @@ async fn main() {
         })
     );
     if finally_drained {
-        assert_physical_bounds(disk_snapshot(&args.buffer_dir), "after fresh progress");
+        assert_physical_bounds(disk_snapshot(&buffer_dir), "after fresh progress");
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_buffer_metrics;
+    use super::{has_zero_byte_occupancy, parse_buffer_metrics};
 
     #[test]
     fn max_size_metric_does_not_imply_zero_occupancy() {
@@ -501,6 +503,7 @@ vector_buffer_max_size_bytes{buffer_id="out",buffer_type="disk"} 8388608
         assert_eq!(metrics.received_events, None);
         assert_eq!(metrics.sent_events, None);
         assert_eq!(metrics.discarded_events, None);
+        assert!(!has_zero_byte_occupancy(metrics));
     }
 
     #[test]
@@ -521,6 +524,19 @@ vector_buffer_discarded_events_total{buffer_id="out",buffer_type="disk"} 2
         assert_eq!(metrics.received_events, Some(12.0));
         assert_eq!(metrics.sent_events, Some(11.0));
         assert_eq!(metrics.discarded_events, Some(2.0));
+    }
+
+    #[test]
+    fn zero_byte_occupancy_ignores_a_stale_event_count() {
+        let body = r#"
+vector_buffer_max_size_bytes{buffer_id="out",buffer_type="disk"} 8388608
+vector_buffer_size_events{buffer_id="out",buffer_type="disk"} 1
+vector_buffer_size_bytes{buffer_id="out",buffer_type="disk"} 0
+"#;
+
+        let metrics = parse_buffer_metrics(body).expect("buffer should be ready");
+
+        assert!(has_zero_byte_occupancy(metrics));
     }
 
     #[test]

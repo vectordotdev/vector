@@ -15,6 +15,14 @@ HTTP sink receives retryable responses while ingress remains available, forcing
 the disk buffer through its full-buffer backpressure path. The terminal command
 reopens the gate before checking recovery, drain, and fresh progress.
 
+A separate periodic corruption command waits for that pressure state, finds the
+highest-numbered active data file, and flips two bytes of the final complete
+record's checksum in place before calling `fsync`. The file length and record
+boundary remain intact, allowing Vector to account for the complete corrupt
+frame. Each file id is mutated at most once so repeated command scheduling
+cannot restore or repeatedly corrupt the same segment. Fixed sink concurrency
+keeps the reader behind while the active segment is corrupted.
+
 ## Properties
 
 The scenario makes these universal assertions:

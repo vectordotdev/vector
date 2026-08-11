@@ -56,8 +56,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
       --config "target.x86_64-unknown-linux-gnu.rustflags = ${SANCOV_RUSTFLAGS}" \
     && D=target/x86_64-unknown-linux-gnu/release \
     && cp "$D/disk_soundness_oracle" "$D/parallel_driver_disk_soundness" \
-          "$D/eventually_disk_soundness" /usr/local/bin/ \
-    && nm /usr/local/bin/disk_soundness_oracle | grep -q __sanitizer_cov_trace_pc_guard
+          "$D/parallel_driver_disk_corruption" "$D/eventually_disk_soundness" \
+          /usr/local/bin/ \
+    && nm /usr/local/bin/disk_soundness_oracle | grep -q __sanitizer_cov_trace_pc_guard \
+    && nm /usr/local/bin/parallel_driver_disk_corruption | grep -q __sanitizer_cov_trace_pc_guard
 
 #######################
 # Runtime: Vector SUT #
@@ -93,9 +95,11 @@ FROM debian:stable-slim AS workload
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=workload-build /usr/local/bin/parallel_driver_disk_soundness /opt/antithesis/test/v1/disk/parallel_driver_disk_soundness
+COPY --from=workload-build /usr/local/bin/parallel_driver_disk_corruption /opt/antithesis/test/v1/disk/parallel_driver_disk_corruption
 COPY --from=workload-build /usr/local/bin/eventually_disk_soundness /opt/antithesis/test/v1/disk/eventually_disk_soundness
 RUN mkdir -p /symbols \
  && ln -s /opt/antithesis/test/v1/disk/parallel_driver_disk_soundness /symbols/parallel_driver_disk_soundness \
+ && ln -s /opt/antithesis/test/v1/disk/parallel_driver_disk_corruption /symbols/parallel_driver_disk_corruption \
  && ln -s /opt/antithesis/test/v1/disk/eventually_disk_soundness /symbols/eventually_disk_soundness
 ENV NO_COLOR=1
 ENTRYPOINT ["sleep", "infinity"]

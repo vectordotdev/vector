@@ -36,6 +36,9 @@ pub(crate) mod variants;
 /// size payloads against the real value instead of hardcoding it.
 #[cfg(feature = "test")]
 pub use variants::disk_v2::common::DEFAULT_WRITE_BUFFER_SIZE as WRITE_BUFFER_SIZE_V2;
+/// Corrupts two bytes of a complete disk-v2 record's stored checksum in place.
+#[cfg(feature = "test")]
+pub use variants::disk_v2::corrupt_checksum as corrupt_disk_v2_record_checksum;
 
 use std::fmt::Debug;
 
