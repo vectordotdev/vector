@@ -23,7 +23,10 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
+        util::{
+            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            http::{HttpService, RetryStrategy},
+        },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
@@ -158,6 +161,25 @@ pub struct ClickhouseConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub query_settings: QuerySettingsConfig,
+
+    /// Which HTTP responses are treated as retriable.
+    ///
+    /// A response classified as non-retriable makes the sink drop the batch, which
+    /// finalizes it as `Rejected`. This is not always desirable.
+    ///
+    /// The default strategy treats any non-5xx other than 429/408 as
+    /// non-retriable. Sinks that must not lose events should retry those
+    /// instead, so the batch never resolves and the watermark cannot advance
+    /// past it:
+    ///
+    /// ```yaml
+    /// retry_strategy:
+    ///   type: custom
+    ///   status_codes: [401, 403, 404, 408, 429]
+    /// ```
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 
     #[configurable(derived)]
     #[serde(flatten)]
@@ -327,7 +349,10 @@ impl ValidatedSink for ClickhouseConfig {
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
+            .settings(
+                request_limits,
+                ClickhouseRetryLogic::new(self.retry_strategy.clone()),
+            )
             .service(service);
 
         // Resolve the encoding strategy (format + encoder) based on configuration.

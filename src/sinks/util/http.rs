@@ -688,6 +688,17 @@ impl<Req> Default for HttpRetryLogic<Req> {
     }
 }
 
+impl<Req> HttpRetryLogic<Req> {
+    /// Build the logic with an explicit strategy, for sinks that surface
+    /// `retry_strategy` in their own configuration.
+    pub const fn new(retry_strategy: RetryStrategy) -> Self {
+        Self {
+            request: PhantomData,
+            retry_strategy,
+        }
+    }
+}
+
 impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
     type Error = HttpError;
     type Request = Req;

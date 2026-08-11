@@ -15,7 +15,9 @@ use crate::{
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{
+                HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder, RetryStrategy,
+            },
             retries::RetryAction,
         },
     },
@@ -24,6 +26,19 @@ use crate::{
 #[derive(Debug, Default, Clone)]
 pub struct ClickhouseRetryLogic {
     inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
+}
+
+impl ClickhouseRetryLogic {
+    /// Build the logic with the sink's configured strategy. The 500 handling in
+    /// `should_retry_response` is unaffected: ClickHouse reports malformed data
+    /// as a 500 with a `Code: N` body, and those stay non-retriable whatever the
+    /// strategy, because retrying a poison pill forever would wedge the
+    /// partition behind it.
+    pub const fn new(retry_strategy: RetryStrategy) -> Self {
+        Self {
+            inner: HttpRetryLogic::new(retry_strategy),
+        }
+    }
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
@@ -402,5 +417,78 @@ mod tests {
             QuerySettingsConfig::default(),
         )
         .unwrap_err();
+    }
+
+    fn response(status: StatusCode, body: &'static str) -> HttpResponse {
+        HttpResponse {
+            http_response: http::Response::builder()
+                .status(status)
+                .body(Bytes::from_static(body.as_bytes()))
+                .unwrap(),
+            events_byte_size: GroupedCountByteSize::new_untagged(),
+            raw_byte_size: 0,
+        }
+    }
+
+    // A 404 is what ClickHouse returns for an unknown table. Under the default
+    // strategy the sink drops that batch, which finalizes it as `Rejected` — and
+    // because Kafka commits a single offset watermark per partition, the next
+    // batch that succeeds stores an offset past it and the dropped events are
+    // gone silently. Retrying instead means the batch never resolves, so the
+    // watermark cannot move past it.
+    #[test]
+    fn default_strategy_drops_unknown_table() {
+        let logic = ClickhouseRetryLogic::default();
+        assert!(matches!(
+            logic.should_retry_response(&response(StatusCode::NOT_FOUND, "")),
+            RetryAction::DontRetry(_)
+        ));
+    }
+
+    #[test]
+    fn custom_strategy_retries_unknown_table() {
+        let logic = ClickhouseRetryLogic::new(RetryStrategy::Custom {
+            status_codes: vec![StatusCode::NOT_FOUND],
+        });
+        assert!(matches!(
+            logic.should_retry_response(&response(StatusCode::NOT_FOUND, "")),
+            RetryAction::Retry(_)
+        ));
+    }
+
+    // Malformed data must stay non-retriable whatever the strategy: ClickHouse
+    // reports it as a 500 with a `Code: N` body, and retrying a poison pill
+    // forever would wedge every batch queued behind it.
+    #[test]
+    fn strategy_does_not_override_malformed_data() {
+        for logic in [
+            ClickhouseRetryLogic::default(),
+            ClickhouseRetryLogic::new(RetryStrategy::All),
+        ] {
+            for body in ["Code: 117, e.displayText() = DB::Exception", "Code: 53"] {
+                assert!(
+                    matches!(
+                        logic.should_retry_response(&response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            body
+                        )),
+                        RetryAction::DontRetry(_)
+                    ),
+                    "expected {body} to stay non-retriable"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn strategy_retries_other_server_errors() {
+        let logic = ClickhouseRetryLogic::default();
+        assert!(matches!(
+            logic.should_retry_response(&response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Code: 999, something transient"
+            )),
+            RetryAction::Retry(_)
+        ));
     }
 }
