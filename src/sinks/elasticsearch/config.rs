@@ -21,7 +21,7 @@ use crate::{
         Healthcheck, VectorSink,
         elasticsearch::{
             ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode, VersionType,
+            ElasticsearchCommonMode, ElasticsearchMode, ParseError, VersionType,
             health::ElasticsearchHealthLogic,
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
@@ -757,10 +757,19 @@ impl ValidatedSink for ElasticsearchConfig {
     type Validated = ValidatedElasticsearch;
 
     fn validate(&self) -> crate::Result<ValidatedElasticsearch> {
+        // Mirror the pure endpoint-required/exclusive checks from
+        // `ElasticsearchCommon::parse_many` so configs that deterministically
+        // fail at build time are rejected here instead.
+        match (&self.endpoint, self.endpoints.is_empty()) {
+            (Some(_), false) => return Err(ParseError::EndpointsExclusive.into()),
+            (None, true) => return Err(ParseError::EndpointRequired.into()),
+            _ => {}
+        }
+
         // Run the pure routing-template confinement check for the active mode
-        // so `vector validate --no-environment` catches unconfined `bulk.index`
-        // / `data_stream.*` templates. The confined mode itself is
-        // reconstructed during build (inside `ElasticsearchCommon::parse_many`).
+        // so unconfined `bulk.index` / `data_stream.*` templates are rejected
+        // here. The confined mode itself is reconstructed during build (inside
+        // `ElasticsearchCommon::parse_many`).
         self.common_mode()?;
 
         let request_limits = self.request.tower.into_settings();
@@ -833,6 +842,51 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ElasticsearchConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_missing_endpoints() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str("{}").unwrap();
+        let err = config
+            .validate()
+            .expect_err("an endpoint or endpoints list is required");
+        assert!(
+            err.to_string()
+                .contains("Endpoints option must be specified"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_and_endpoints() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "http://localhost:9200"
+            endpoints: ["http://localhost:9200"]
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("endpoint and endpoints are mutually exclusive");
+        assert!(
+            err.to_string().contains("mutually exclusive"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_endpoints() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            "#,
+        )
+        .unwrap();
+        config.validate().expect("endpoints should validate");
     }
 
     #[test]
