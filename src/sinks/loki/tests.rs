@@ -113,7 +113,8 @@ async fn healthcheck_includes_auth() {
         .clone()
         .parse::<http::Uri>()
         .expect("could not create URI")
-        .into();
+        .try_into()
+        .unwrap();
 
     let (rx, _trigger, server) = build_test_server(addr);
     tokio::spawn(server);

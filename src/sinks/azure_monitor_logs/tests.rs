@@ -37,7 +37,7 @@ async fn component_spec_compliance() {
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config
-        .build_inner(context, mock_endpoint.into())
+        .build_inner(context, mock_endpoint.try_into().unwrap())
         .await
         .unwrap();
 
@@ -184,7 +184,7 @@ async fn correct_request() {
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config
-        .build_inner(context, mock_endpoint.into())
+        .build_inner(context, mock_endpoint.try_into().unwrap())
         .await
         .unwrap();
 
