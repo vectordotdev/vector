@@ -191,7 +191,10 @@ impl ValidatedSink for SocketSinkConfig {
                     transformer,
                 })
             }
-            Mode::Udp(UdpMode { encoding, .. }) => {
+            Mode::Udp(UdpMode { config, encoding }) => {
+                // Mirror the pure host/port check from `UdpSinkConfig::build`
+                // so malformed addresses are rejected here instead.
+                config.parse_address()?;
                 let transformer = encoding.transformer();
                 Ok(ValidatedSocket::Udp { transformer })
             }
@@ -376,6 +379,53 @@ mod test {
             config.validate().is_err(),
             "a TCP address without a port should fail validation"
         );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_udp_address() {
+        let config = SocketSinkConfig {
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address("not a valid address".to_string()),
+                encoding: JsonSerializerConfig::default().into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a malformed UDP address should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_udp_address_without_port() {
+        let config = SocketSinkConfig {
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address("127.0.0.1".to_string()),
+                encoding: JsonSerializerConfig::default().into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a UDP address without a port should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_valid_udp_address() {
+        let config = SocketSinkConfig {
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address("127.0.0.1:5000".to_string()),
+                encoding: JsonSerializerConfig::default().into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        config
+            .validate()
+            .expect("a valid UDP address should validate");
     }
 
     enum DatagramSocket {
