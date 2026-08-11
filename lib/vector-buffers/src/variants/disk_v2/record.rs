@@ -193,3 +193,33 @@ pub fn validate_record_archive(buf: &[u8], checksummer: &Hasher) -> RecordStatus
 pub fn try_as_record_archive(buf: &[u8]) -> Result<&ArchivedRecord<'_>, DeserializeError> {
     try_as_archive::<Record<'_>>(buf)
 }
+
+/// Flips two bytes of an archived record's stored checksum without changing its serialized size.
+///
+/// This is exposed only for tests and fault-injection harnesses. The archive is validated before
+/// mutation so callers cannot accidentally corrupt an arbitrary structural field.
+///
+/// # Errors
+///
+/// Returns an error if `buf` does not end with a complete, structurally valid disk-v2 record.
+#[cfg(any(test, feature = "test"))]
+pub fn corrupt_checksum(buf: &mut [u8]) -> Result<(u32, u32), String> {
+    use std::pin::Pin;
+
+    use rkyv::archived_root_mut;
+
+    try_as_record_archive(buf).map_err(DeserializeError::into_inner)?;
+
+    let pinned = Pin::new(buf);
+    let mut record = unsafe { archived_root_mut::<Record<'_>>(pinned) };
+    let projected_checksum = unsafe {
+        record
+            .as_mut()
+            .map_unchecked_mut(|record| &mut record.checksum)
+    };
+    let checksum = projected_checksum.get_mut();
+    let original = *checksum;
+    *checksum ^= u32::from(u16::MAX);
+
+    Ok((original, *checksum))
+}

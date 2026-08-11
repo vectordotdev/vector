@@ -192,6 +192,9 @@ mod record;
 mod ser;
 mod writer;
 
+#[cfg(feature = "test")]
+pub use record::corrupt_checksum;
+
 #[cfg(test)]
 mod tests;
 

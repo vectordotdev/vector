@@ -67,11 +67,10 @@ services:
       NO_COLOR: "1"
       VECTOR_SOURCE_URL: "http://vector:8080/"
       VECTOR_METRICS_URL: "http://vector:9598/metrics"
-      VECTOR_BUFFER_DIR: "/sut-data/buffer/v2/out"
       ORACLE_URL: "http://oracle:8686"
-    # Read-only access lets the terminal command verify actual data-file sizes,
-    # not just Vector's accounting metrics.
-    volumes: ["vdbs-buffer:/sut-data:ro"]
+    # The corruption driver needs write access to modify the active data file in place.
+    # Other workload commands only inspect this mount.
+    volumes: ["vdbs-buffer:/var/lib/vector"]
     depends_on:
       vector: { condition: service_healthy }
       oracle: { condition: service_healthy }

@@ -55,12 +55,8 @@ async fn corrupt_record_checksum(data_file_path: &PathBuf, record_start: usize, 
     drop(std_data_file);
 
     {
-        let mut backed_record =
-            BackedArchive::<_, Record>::from_backing(&mut data_file_mmap[record_start..record_end])
-                .expect("archive should not fail");
-        let record = backed_record.get_archive_mut();
-        let projected_checksum = unsafe { record.map_unchecked_mut(|record| &mut record.checksum) };
-        *projected_checksum.get_mut() ^= 1 << 15;
+        super::super::record::corrupt_checksum(&mut data_file_mmap[record_start..record_end])
+            .expect("archive should not fail");
     }
 
     data_file_mmap.flush().expect("flush should not fail");
@@ -576,6 +572,64 @@ async fn reader_skips_corrupted_record_and_continues_current_data_file() {
             assert_eq!(final_read, None);
             assert_eq!(0, ledger.get_total_buffer_size());
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn reader_accounts_for_last_record_checksum_modified_in_place() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, mut reader, ledger, usage) =
+                create_default_buffer_v2_with_usage(data_dir).await;
+
+            let first_record = SizedRecord::new(64);
+            let first_bytes = writer
+                .write_record(first_record.clone())
+                .await
+                .expect("first write should not fail");
+            let corrupt_bytes = writer
+                .write_record(SizedRecord::new(65))
+                .await
+                .expect("second write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let data_file_path = ledger.get_current_writer_data_file_path();
+            let data_file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&data_file_path)
+                .await
+                .expect("open should not fail");
+            let std_data_file = data_file.into_std().await;
+            let mut data_file_mmap =
+                unsafe { MmapMut::map_mut(&std_data_file).expect("mmap should not fail") };
+            drop(std_data_file);
+
+            super::super::record::corrupt_checksum(&mut data_file_mmap)
+                .expect("the final record archive should be valid before corruption");
+            data_file_mmap.flush().expect("flush should not fail");
+            assert_eq!(first_bytes + corrupt_bytes, data_file_mmap.len());
+            drop(data_file_mmap);
+
+            let first_read = reader
+                .next()
+                .await
+                .expect("first read should not fail")
+                .expect("first record should exist");
+            assert_eq!(first_record, first_read);
+            acknowledge(first_read).await;
+
+            let bad_read = reader.next().await.expect_err("second read should fail");
+            assert!(matches!(bad_read, ReaderError::Checksum { .. }));
+            assert_eq!(0, ledger.get_total_buffer_size());
+
+            let usage_snapshot = usage.snapshot();
+            assert_eq!(0, usage_snapshot.dropped_event_count);
+            assert_eq!(corrupt_bytes as u64, usage_snapshot.dropped_event_byte_size);
         }
     })
     .await;

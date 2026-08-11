@@ -36,6 +36,7 @@ sinks:
     request:
       # Retry gated requests promptly when the terminal checker reopens the
       # oracle. This caps retry backoff; it does not expire the request.
+      concurrency: 1
       timeout_secs: 5
       retry_max_duration_secs: 1
 
