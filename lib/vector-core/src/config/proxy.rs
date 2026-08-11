@@ -1,5 +1,5 @@
-use headers::Authorization;
-use http::uri::InvalidUri;
+use headers::{Authorization, authorization::Credentials};
+use http::{header::PROXY_AUTHORIZATION, uri::InvalidUri};
 use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
 use no_proxy::NoProxy;
 use url::Url;
@@ -167,7 +167,10 @@ impl ProxyConfig {
                             .expect("username must be valid UTF-8.");
                         let decoded_pw =
                             urlencoding::decode(password).expect("Password must be valid UTF-8.");
-                        proxy.set_authorization(Authorization::basic(&decoded_user, &decoded_pw));
+                        let mut authorization =
+                            Authorization::basic(&decoded_user, &decoded_pw).0.encode();
+                        authorization.set_sensitive(true);
+                        proxy.set_header(PROXY_AUTHORIZATION, authorization);
                     }
                     proxy
                 })
@@ -205,13 +208,8 @@ impl ProxyConfig {
 mod tests {
     use base64::prelude::{BASE64_STANDARD, Engine as _};
     use env_test_util::TempEnvVar;
-    use http::{
-        HeaderName, HeaderValue, Uri,
-        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
-    };
+    use http::{HeaderValue, Uri, header::AUTHORIZATION};
     use proptest::prelude::*;
-
-    const PROXY_HEADERS: [HeaderName; 2] = [AUTHORIZATION, PROXY_AUTHORIZATION];
 
     use super::*;
 
@@ -383,18 +381,22 @@ mod tests {
             Some(first.uri()),
             Uri::try_from("http://user:pass@1.2.3.4:5678").as_ref().ok()
         );
-        for h in &PROXY_HEADERS {
-            assert_eq!(first.headers().get(h), expected_header_value.as_ref().ok());
-        }
+        assert_eq!(
+            first.headers().get(PROXY_AUTHORIZATION),
+            expected_header_value.as_ref().ok()
+        );
+        assert!(!first.headers().contains_key(AUTHORIZATION));
         assert_eq!(
             Some(second.uri()),
             Uri::try_from("https://user:pass@2.3.4.5:9876")
                 .as_ref()
                 .ok()
         );
-        for h in &PROXY_HEADERS {
-            assert_eq!(second.headers().get(h), expected_header_value.as_ref().ok());
-        }
+        assert_eq!(
+            second.headers().get(PROXY_AUTHORIZATION),
+            expected_header_value.as_ref().ok()
+        );
+        assert!(!second.headers().contains_key(AUTHORIZATION));
     }
 
     #[test]
@@ -410,8 +412,10 @@ mod tests {
             .expect("should not be None");
         let encoded_header = format!("Basic {}", BASE64_STANDARD.encode("user:P@ssw0rd"));
         let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
-        for h in &PROXY_HEADERS {
-            assert_eq!(first.headers().get(h), expected_header_value.as_ref().ok());
-        }
+        assert_eq!(
+            first.headers().get(PROXY_AUTHORIZATION),
+            expected_header_value.as_ref().ok()
+        );
+        assert!(!first.headers().contains_key(AUTHORIZATION));
     }
 }
