@@ -69,7 +69,7 @@ impl WebSocketConnector {
     /// Used by callers whose `validate` already parsed the URI, so the parsed
     /// values are plumbed through the validated state rather than re-parsed
     /// here. TLS resolution still happens in this method.
-    pub(crate) fn from_validated(
+    pub(crate) const fn from_validated(
         uri: String,
         host: String,
         port: u16,
