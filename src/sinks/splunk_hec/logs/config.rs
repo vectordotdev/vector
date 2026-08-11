@@ -196,6 +196,8 @@ impl HecLogsSinkConfig {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
 
+        self.endpoint.parse::<http::Uri>()?;
+
         let index = self
             .index
             .clone()
@@ -403,6 +405,34 @@ mod tests {
         );
         assert!(validated.source.is_none());
         assert!(validated.sourcetype.is_none());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        use crate::config::ValidatedSink;
+
+        let config = HecLogsSinkConfig {
+            default_token: "token".to_string().into(),
+            endpoint: "not a uri".to_string(),
+            host_key: None,
+            indexed_fields: vec![],
+            index: None,
+            sourcetype: None,
+            source: None,
+            encoding: JsonSerializerConfig::default().into(),
+            compression: Compression::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            timestamp_nanos_key: None,
+            timestamp_key: None,
+            auto_extract_timestamp: None,
+            endpoint_target: EndpointTarget::Event,
+            confinement: Default::default(),
+        };
+
+        assert!(config.validate().is_err());
     }
 
     #[test]

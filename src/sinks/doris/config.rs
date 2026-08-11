@@ -5,7 +5,7 @@ use super::sink::DorisSink;
 use crate::{
     codecs::EncodingConfigWithFraming,
     config::ValidatedSink,
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         doris::{
             client::DorisSinkClient, common::DorisCommon, health::DorisHealthLogic,
@@ -192,6 +192,7 @@ impl ValidatedSink for DorisConfig {
                     format!("Invalid host: {}, host must include hostname", endpoint.uri).into(),
                 );
             }
+            self.auth.choose_one(&endpoint.auth)?;
         }
         let request_settings = self.request.into_settings();
         let health_config = self.endpoint_health.clone().unwrap_or_default();
@@ -347,6 +348,33 @@ mod tests {
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.database.to_string(), "mydatabase");
         assert_eq!(validated.table.to_string(), "mytable");
+    }
+
+    #[test]
+    fn validate_rejects_auth_conflict_with_endpoint_credentials() {
+        use crate::config::ValidatedSink;
+        let config = DorisConfig {
+            endpoints: vec![
+                "http://user:pass@127.0.0.1:8030"
+                    .parse::<http::Uri>()
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+            ],
+            database: Template::try_from("mydatabase").unwrap(),
+            table: Template::try_from("mytable").unwrap(),
+            auth: Some(crate::http::Auth::Basic {
+                user: "config_user".to_string(),
+                password: vector_common::sensitive_string::SensitiveString::from(
+                    "config_pass".to_string(),
+                ),
+            }),
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_err(),
+            "top-level auth combined with endpoint-embedded credentials must be rejected"
+        );
     }
 
     #[test]

@@ -163,6 +163,8 @@ impl ValidatedSink for GreptimeDBLogsConfig {
     type Validated = ValidatedGreptimeDBLogs;
 
     fn validate(&self) -> crate::Result<ValidatedGreptimeDBLogs> {
+        url::Url::parse(&self.endpoint)?;
+
         let confined_table = self
             .table
             .clone()
@@ -291,6 +293,19 @@ mod tests {
             "greptime_identity"
         );
         assert!(validated.auth.is_none());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = GreptimeDBLogsConfig {
+            endpoint: "not a uri".to_string(),
+            table: "mytable".try_into().unwrap(),
+            dbname: "public".try_into().unwrap(),
+            pipeline_name: "greptime_identity".try_into().unwrap(),
+            ..Default::default()
+        };
+
+        assert!(config.validate().is_err());
     }
 
     #[test]

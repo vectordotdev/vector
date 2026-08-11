@@ -320,9 +320,11 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
 
     fn validate(&self) -> crate::Result<ValidatedChronicleUnstructured> {
         let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
+        endpoint.parse::<Uri>()?;
 
         // For the healthcheck we see if we can fetch the list of available log types.
         let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
+        healthcheck_endpoint.parse::<Uri>()?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -760,6 +762,22 @@ mod unit_tests {
         ))
         .unwrap();
         assert!(SinkConfig::build(&config, cx).await.is_err());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        use crate::config::ValidatedSink;
+
+        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(indoc! {r#"
+            endpoint: "not a uri"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#})
+        .unwrap();
+
+        assert!(config.validate().is_err());
     }
 
     #[test]

@@ -176,6 +176,8 @@ impl ValidatedSink for HecMetricsSinkConfig {
     type Validated = ValidatedHecMetricsSink;
 
     fn validate(&self) -> crate::Result<ValidatedHecMetricsSink> {
+        self.endpoint.parse::<http::Uri>()?;
+
         let templated_field_keys =
             compute_templated_field_keys(&self.index, &self.source, &self.sourcetype);
 
@@ -288,5 +290,59 @@ impl HecMetricsSinkConfig {
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = HecMetricsSinkConfig {
+            default_namespace: None,
+            default_token: "token".to_string().into(),
+            endpoint: "http://localhost:8088".to_string(),
+            host_key: config_host_key(),
+            index: Some("custom_index".try_into().unwrap()),
+            sourcetype: None,
+            source: None,
+            compression: Compression::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            confinement: Default::default(),
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.index.as_ref().unwrap().to_string(),
+            "custom_index"
+        );
+        assert!(validated.source.is_none());
+        assert!(validated.sourcetype.is_none());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = HecMetricsSinkConfig {
+            default_namespace: None,
+            default_token: "token".to_string().into(),
+            endpoint: "not a uri".to_string(),
+            host_key: config_host_key(),
+            index: None,
+            sourcetype: None,
+            source: None,
+            compression: Compression::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            confinement: Default::default(),
+        };
+
+        assert!(config.validate().is_err());
     }
 }

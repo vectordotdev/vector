@@ -158,6 +158,7 @@ impl ValidatedSink for NewRelicConfig {
             .into_batcher_settings()?;
         let request_limits = self.request.into_settings();
         let credentials = Arc::from(NewRelicCredentials::from(self));
+        credentials.try_get_uri()?;
 
         Ok(ValidatedNewRelic {
             batcher_settings,
@@ -212,34 +213,40 @@ pub struct NewRelicCredentials {
 
 impl NewRelicCredentials {
     pub fn get_uri(&self) -> Uri {
+        self.try_get_uri().expect("URI should be valid")
+    }
+
+    pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
-            return override_uri.clone();
+            return Ok(override_uri.clone());
         }
 
         match self.api {
             NewRelicApi::Events => match self.region {
-                NewRelicRegion::Us => format!(
+                NewRelicRegion::Us => Ok(format!(
                     "https://insights-collector.newrelic.com/v1/accounts/{}/events",
                     self.account_id
                 )
-                .parse::<Uri>()
-                .unwrap(),
-                NewRelicRegion::Eu => format!(
+                .parse::<Uri>()?),
+                NewRelicRegion::Eu => Ok(format!(
                     "https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events",
                     self.account_id
                 )
-                .parse::<Uri>()
-                .unwrap(),
+                .parse::<Uri>()?),
             },
             NewRelicApi::Metrics => match self.region {
-                NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
-                NewRelicRegion::Eu => {
-                    Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1")
-                }
+                NewRelicRegion::Us => Ok(Uri::from_static(
+                    "https://metric-api.newrelic.com/metric/v1",
+                )),
+                NewRelicRegion::Eu => Ok(Uri::from_static(
+                    "https://metric-api.eu.newrelic.com/metric/v1",
+                )),
             },
             NewRelicApi::Logs => match self.region {
-                NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
-                NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
+                NewRelicRegion::Us => Ok(Uri::from_static("https://log-api.newrelic.com/log/v1")),
+                NewRelicRegion::Eu => {
+                    Ok(Uri::from_static("https://log-api.eu.newrelic.com/log/v1"))
+                }
             },
         }
     }
@@ -276,5 +283,14 @@ mod tests {
                 .to_string()
                 .starts_with("https://insights-collector.newrelic.com/v1/accounts/")
         );
+    }
+
+    #[test]
+    fn validate_rejects_uri_invalid_account_id() {
+        let mut config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+        config.account_id = SensitiveString::from("bad id".to_string());
+
+        assert!(config.validate().is_err());
     }
 }

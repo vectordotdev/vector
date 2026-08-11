@@ -7,6 +7,7 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
+use http::Uri;
 use hyper::{Body, client::connect::Connect};
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
@@ -94,13 +95,18 @@ impl GenerateConfig for DatadogLogsConfig {
 impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
-    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
-        let base_url = dd_common
-            .endpoint
-            .clone()
-            .unwrap_or_else(|| format!("https://http-intake.logs.{}", dd_common.site));
+    /// Resolve the logs API endpoint URI from the given endpoint/site.
+    fn logs_endpoint(endpoint: Option<&str>, site: &str) -> crate::Result<Uri> {
+        let base_url = endpoint.map_or_else(
+            || format!("https://http-intake.logs.{site}"),
+            |endpoint| endpoint.to_string(),
+        );
 
-        http::Uri::try_from(format!("{base_url}/api/v2/logs")).expect("URI not valid")
+        Ok(http::Uri::try_from(format!("{base_url}/api/v2/logs"))?)
+    }
+
+    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
+        Self::logs_endpoint(dd_common.endpoint.as_deref(), &dd_common.site).expect("URI not valid")
     }
 
     pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
@@ -213,6 +219,13 @@ impl ValidatedSink for DatadogLogsConfig {
     type Validated = ValidatedLogs;
 
     fn validate(&self) -> crate::Result<ValidatedLogs> {
+        let site = self
+            .local_dd_common
+            .site
+            .clone()
+            .unwrap_or_else(datadog::default_site);
+        Self::logs_endpoint(self.local_dd_common.endpoint.as_deref(), &site)?;
+
         let batch = self
             .batch
             .validate()?
@@ -264,6 +277,19 @@ mod test {
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.batch.size_limit, BATCH_GOAL_BYTES);
         assert_eq!(validated.batch.item_limit, BATCH_MAX_EVENTS);
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = DatadogLogsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 
     #[test]
