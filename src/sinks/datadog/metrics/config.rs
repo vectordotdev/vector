@@ -219,6 +219,14 @@ impl ValidatedSink for DatadogMetricsConfig {
         let (batcher_settings, sketches_batcher_settings) =
             resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
 
+        let site = self
+            .local_dd_common
+            .site
+            .clone()
+            .unwrap_or_else(datadog::default_site);
+        let base = Self::metrics_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
+        base.parse::<Uri>()?;
+
         Ok(ValidatedMetrics {
             batcher_settings,
             sketches_batcher_settings,
@@ -254,15 +262,14 @@ impl DatadogMetricsConfig {
     /// doing something wrong, for understanding issues from the API side.
     ///
     /// The `endpoint` configuration field will be used here if it is present.
-    fn get_base_agent_endpoint(&self, dd_common: &DatadogCommonConfig) -> String {
-        dd_common.endpoint.clone().unwrap_or_else(|| {
-            let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
-            format!(
-                "https://{}-vector.agent.{}",
-                version,
-                dd_common.site.as_str()
-            )
-        })
+    fn metrics_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
+        endpoint.map_or_else(
+            || {
+                let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
+                format!("https://{version}-vector.agent.{site}")
+            },
+            |endpoint| endpoint.to_string(),
+        )
     }
 
     /// Generates the `DatadogMetricsEndpointConfiguration`, used for mapping endpoints to their URI.
@@ -270,7 +277,7 @@ impl DatadogMetricsConfig {
         &self,
         dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
-        let base_uri = self.get_base_agent_endpoint(dd_common);
+        let base_uri = Self::metrics_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site);
 
         let series_endpoint = build_uri(&base_uri, self.series_api_version.get_path())?;
         let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
@@ -336,7 +343,7 @@ impl DatadogMetricsConfig {
     }
 
     fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        self.get_base_agent_endpoint(dd_common)
+        Self::metrics_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)
             .parse::<Uri>()
             .unwrap()
             .scheme_str()
@@ -390,6 +397,19 @@ mod tests {
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.batcher_settings.size_limit, 5_242_880); // 5 MiB — Series v2 limit
         assert_eq!(validated.sketches_batcher_settings.size_limit, 62_914_560); // 60 MiB — Sketches limit
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = DatadogMetricsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 
     // When max_bytes is unset, each endpoint gets its own API payload limit.

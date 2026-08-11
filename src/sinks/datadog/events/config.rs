@@ -123,11 +123,6 @@ impl ValidatedSink for DatadogEventsConfig {
     type Validated = ValidatedEvents;
 
     fn validate(&self) -> crate::Result<ValidatedEvents> {
-        // Pure structural check: the locally-configured endpoint/site must form
-        // a parseable events URI. The endpoint actually used for delivery is
-        // derived in `build` after global Datadog options are applied, so a
-        // global site (via `SinkContext.extra_context`) is honored consistently
-        // with the healthcheck.
         let site = self
             .dd_common
             .site

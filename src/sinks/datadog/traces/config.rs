@@ -109,18 +109,18 @@ impl DatadogTracesEndpointConfiguration {
 }
 
 impl DatadogTracesConfig {
-    fn get_base_uri(&self, dd_common: &DatadogCommonConfig) -> String {
-        dd_common
-            .endpoint
-            .clone()
-            .unwrap_or_else(|| format!("https://trace.agent.{}", dd_common.site))
+    fn traces_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
+        endpoint.map_or_else(
+            || format!("https://trace.agent.{site}"),
+            |endpoint| endpoint.to_string(),
+        )
     }
 
     fn generate_traces_endpoint_configuration(
         &self,
         dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogTracesEndpointConfiguration> {
-        let base_uri = self.get_base_uri(dd_common);
+        let base_uri = Self::traces_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site);
         let traces_endpoint = build_uri(&base_uri, "/api/v0.2/traces")?;
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
@@ -201,11 +201,14 @@ impl DatadogTracesConfig {
     }
 
     fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        build_uri(&self.get_base_uri(dd_common), "")
-            .unwrap()
-            .scheme_str()
-            .unwrap_or("http")
-            .to_string()
+        build_uri(
+            &Self::traces_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site),
+            "",
+        )
+        .unwrap()
+        .scheme_str()
+        .unwrap_or("http")
+        .to_string()
     }
 }
 
@@ -238,6 +241,14 @@ impl ValidatedSink for DatadogTracesConfig {
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
+        let site = self
+            .local_dd_common
+            .site
+            .clone()
+            .unwrap_or_else(datadog::default_site);
+        let base = Self::traces_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
+        base.parse::<Uri>()?;
+
         Ok(ValidatedTraces { batcher_settings })
     }
 
@@ -266,7 +277,10 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
 #[cfg(test)]
 mod test {
     use super::{BATCH_GOAL_BYTES, BATCH_MAX_EVENTS, DatadogTracesConfig};
-    use crate::config::ValidatedSink;
+    use crate::{
+        config::ValidatedSink,
+        sinks::datadog::LocalDatadogCommonConfig,
+    };
 
     #[test]
     fn generate_config() {
@@ -279,5 +293,18 @@ mod test {
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.batcher_settings.size_limit, BATCH_GOAL_BYTES);
         assert_eq!(validated.batcher_settings.item_limit, BATCH_MAX_EVENTS);
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = DatadogTracesConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 }
