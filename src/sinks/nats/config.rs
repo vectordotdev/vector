@@ -7,7 +7,7 @@ use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
     config::ValidatedSink,
-    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
+    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config, validate_tls_cert_key_pair},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
 };
@@ -221,6 +221,11 @@ impl ValidatedSink for NatsSinkConfig {
             .clone()
             .confine(&self.confinement, Self::NAME, "subject")?;
         let server_addresses = self.parse_server_addresses()?;
+
+        if let Some(tls) = &self.tls {
+            validate_tls_cert_key_pair(tls).context(ConfigSnafu)?;
+        }
+
         Ok(ValidatedNatsSink {
             subject,
             server_addresses,
@@ -412,6 +417,87 @@ mod tests {
         .unwrap();
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.subject.to_string(), "test-subject");
+    }
+
+    #[test]
+    fn validate_rejects_tls_cert_without_key() {
+        let config: NatsSinkConfig = serde_yaml::from_str(
+            r#"
+            subject: "test-subject"
+            url: "nats://127.0.0.1:4222"
+            encoding:
+                codec: "json"
+            tls:
+                enabled: true
+                crt_file: "/path/to/crt.pem"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "a TLS cert without a key should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_tls_key_without_cert() {
+        let config: NatsSinkConfig = serde_yaml::from_str(
+            r#"
+            subject: "test-subject"
+            url: "nats://127.0.0.1:4222"
+            encoding:
+                codec: "json"
+            tls:
+                enabled: true
+                key_file: "/path/to/key.pem"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "a TLS key without a cert should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_tls_cert_and_key() {
+        let config: NatsSinkConfig = serde_yaml::from_str(
+            r#"
+            subject: "test-subject"
+            url: "nats://127.0.0.1:4222"
+            encoding:
+                codec: "json"
+            tls:
+                enabled: true
+                crt_file: "/path/to/crt.pem"
+                key_file: "/path/to/key.pem"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_ok(),
+            "a complete TLS cert/key pair should pass validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_disabled_tls_with_partial_config() {
+        let config: NatsSinkConfig = serde_yaml::from_str(
+            r#"
+            subject: "test-subject"
+            url: "nats://127.0.0.1:4222"
+            encoding:
+                codec: "json"
+            tls:
+                enabled: false
+                crt_file: "/path/to/crt.pem"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_ok(),
+            "disabled TLS should not fail validation on a lone cert"
+        );
     }
 
     #[test]

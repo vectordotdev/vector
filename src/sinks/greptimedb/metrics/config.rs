@@ -169,12 +169,33 @@ pub struct ValidatedGreptimeDBMetrics {
     use_new_naming: bool,
 }
 
+/// Validate the all-or-none GreptimeDB TLS path requirement without touching the
+/// filesystem.
+///
+/// The greptimedb ingester requires all three TLS paths (`ca_file`, `crt_file`,
+/// `key_file`) to be set. Mirrors the check in `new_client_from_config` so that
+/// `vector validate --no-environment` catches partial TLS configs that would
+/// otherwise only fail at build time.
+pub(super) fn validate_tls_all_or_none(tls: &TlsConfig) -> crate::Result<()> {
+    if tls.ca_file.is_none() || tls.crt_file.is_none() || tls.key_file.is_none() {
+        return Err(
+            "GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set.".into(),
+        );
+    }
+    Ok(())
+}
+
 #[async_trait::async_trait]
 impl ValidatedSink for GreptimeDBMetricsConfig {
     type Validated = ValidatedGreptimeDBMetrics;
 
     fn validate(&self) -> crate::Result<ValidatedGreptimeDBMetrics> {
         let batch_settings = self.batch.into_batcher_settings()?;
+
+        if let Some(tls) = &self.tls {
+            validate_tls_all_or_none(tls)?;
+        }
+
         Ok(ValidatedGreptimeDBMetrics {
             batch_settings,
             use_new_naming: self.new_naming.unwrap_or(false),
@@ -239,5 +260,38 @@ mod tests {
 
         let validated = config.validate().expect("preparation should succeed");
         assert!(!validated.use_new_naming);
+    }
+
+    #[test]
+    fn validate_rejects_partial_tls() {
+        let config = indoc! {r#"
+            endpoint: "example.com:4001"
+            tls:
+                ca_file: "/path/to/ca.pem"
+                crt_file: "/path/to/crt.pem"
+        "#};
+
+        let config = serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+        assert!(
+            config.validate().is_err(),
+            "partial TLS should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_full_tls() {
+        let config = indoc! {r#"
+            endpoint: "example.com:4001"
+            tls:
+                ca_file: "/path/to/ca.pem"
+                crt_file: "/path/to/crt.pem"
+                key_file: "/path/to/key.pem"
+        "#};
+
+        let config = serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+        assert!(
+            config.validate().is_ok(),
+            "complete TLS should pass validation"
+        );
     }
 }
