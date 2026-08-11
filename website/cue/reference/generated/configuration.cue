@@ -719,7 +719,7 @@ generated: configuration: {
 																		backend request. Refer to the documentation of your `backend_type `to see which options
 																		are required to be set.
 																		"""
-								required:      false
+								required:      true
 								relevant_when: "version = \"v1_1\""
 							}
 							backend_type: {
