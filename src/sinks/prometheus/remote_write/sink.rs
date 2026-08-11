@@ -143,7 +143,7 @@ impl BatchData<RemoteWriteMetric> for EventCollection {
 }
 
 pub(super) struct RemoteWriteSink<S> {
-    pub(super) tenant_id: Option<Template>,
+    pub(super) tenant_id: Option<ConfinedTemplate>,
     pub(super) batch_settings: BatcherSettings,
     pub(super) aggregate: bool,
     pub(super) compression: super::Compression,
@@ -220,7 +220,7 @@ where
 }
 
 fn make_remote_write_event(
-    tenant_id: Option<&Template>,
+    tenant_id: Option<&ConfinedTemplate>,
     metric: Metric,
 ) -> Option<RemoteWriteMetric> {
     let tenant_id = match tenant_id {

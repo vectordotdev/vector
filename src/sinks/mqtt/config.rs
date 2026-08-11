@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::Rng;
+use rand::RngExt;
 use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
@@ -116,12 +116,12 @@ impl_generate_config_from_default!(MqttSinkConfig);
 #[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.topic = config
+        let topic = self
             .topic
+            .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
-        let connector = config.build_connector()?;
-        let sink = MqttSink::new(&config, connector.clone())?;
+        let connector = self.build_connector()?;
+        let sink = MqttSink::new(self, topic, connector.clone())?;
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),

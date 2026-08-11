@@ -1,0 +1,5 @@
+transforms:
+  my_transform_id:
+    type: aws_ec2_metadata
+    inputs:
+      - my-source-or-transform-id

@@ -16,15 +16,19 @@ use crate::{
     Configurable, ConfigurableRef, GenerateError, Metadata, ToValue, num::ConfigurableNumber,
 };
 
-/// Applies metadata to the given schema.
-///
-/// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
-/// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_base_metadata(schema: &mut SchemaObject, metadata: Metadata) {
-    apply_metadata(&<()>::as_configurable_ref(), schema, metadata)
+/// Applies metadata that is not associated with a configurable type to the given schema.
+pub fn apply_metadata(schema: &mut SchemaObject, metadata: Metadata) {
+    apply_configurable_metadata(&<()>::as_configurable_ref(), schema, metadata)
 }
 
-fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata: Metadata) {
+/// Applies resolved metadata to the given schema.
+///
+/// All metadata, whether it comes from a type, field, or enum variant, flows through this function.
+fn apply_configurable_metadata(
+    config: &ConfigurableRef,
+    schema: &mut SchemaObject,
+    metadata: Metadata,
+) {
     let type_name = config.type_name();
     let base_metadata = config.make_metadata();
 
@@ -60,26 +64,35 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
         );
     }
 
-    // If a default value was given, serialize it.
-    let schema_default = metadata.default_value().map(ToValue::to_value);
+    apply_custom_attributes(schema, &metadata, type_name);
+    apply_validations(schema, &metadata);
+    apply_schema_metadata(schema, schema_title, schema_description, &metadata);
+}
 
-    // Take the existing schema metadata, if any, or create a default version of it, and then apply
-    // all of our newly-calculated values to it.
-    //
-    // Similar to the above title/description logic, we update both title/description if either of
-    // them have been set, to avoid mixing/matching between base and override metadata.
+fn apply_schema_metadata(
+    schema: &mut SchemaObject,
+    title: Option<&'static str>,
+    description: Option<&'static str>,
+    metadata: &Metadata,
+) {
     let mut schema_metadata = schema.metadata.take().unwrap_or_default();
-    if schema_title.is_some() || schema_description.is_some() {
-        schema_metadata.title = schema_title.map(|s| s.to_string());
-        schema_metadata.description = schema_description.map(|s| s.to_string());
+    if title.is_some() || description.is_some() {
+        schema_metadata.title = title.map(str::to_owned);
+        schema_metadata.description = description.map(str::to_owned);
     }
-    schema_metadata.default = schema_default.or(schema_metadata.default);
+    schema_metadata.default = metadata
+        .default_value()
+        .map(ToValue::to_value)
+        .or(schema_metadata.default);
     schema_metadata.deprecated = metadata.deprecated();
+    schema.metadata = Some(schema_metadata);
+}
 
-    // Set any custom attributes as extensions on the schema. If an attribute is declared multiple
-    // times, we turn the value into an array and merge them together. We _do_ not that, however, if
-    // the original value is a flag, or the value being added to an existing key is a flag, as
-    // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
+fn apply_custom_attributes(
+    schema: &mut SchemaObject,
+    metadata: &Metadata,
+    type_name: &'static str,
+) {
     let map_entries_len = {
         let custom_map = schema
             .extensions
@@ -141,13 +154,12 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
     if map_entries_len == 0 {
         schema.extensions.remove("_metadata");
     }
+}
 
-    // Now apply any relevant validations.
+fn apply_validations(schema: &mut SchemaObject, metadata: &Metadata) {
     for validation in metadata.validations() {
         validation.apply(schema);
     }
-
-    schema.metadata = Some(schema_metadata);
 }
 
 pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: Vec<SchemaObject>) {
@@ -551,7 +563,7 @@ pub fn get_or_generate_schema(
                 // be unwittingly applying a default for all usages of the type that didn't override
                 // the default themselves.
                 let mut schema = config.generate_schema(generator)?;
-                apply_metadata(config, &mut schema, metadata);
+                apply_configurable_metadata(config, &mut schema, metadata);
 
                 generator
                     .borrow_mut()
@@ -585,7 +597,7 @@ pub fn get_or_generate_schema(
         // it was given.
         None => {
             if let Some(metadata) = overrides {
-                apply_metadata(config, &mut schema, metadata);
+                apply_configurable_metadata(config, &mut schema, metadata);
             }
         }
 
@@ -593,8 +605,10 @@ pub fn get_or_generate_schema(
         // metadata here, which we need to merge the override metadata into if it was given. If
         // there was no override metadata, then we just use the base by itself.
         Some(base) => match overrides {
-            None => apply_metadata(config, &mut schema, base),
-            Some(overrides) => apply_metadata(config, &mut schema, base.merge(overrides)),
+            None => apply_configurable_metadata(config, &mut schema, base),
+            Some(overrides) => {
+                apply_configurable_metadata(config, &mut schema, base.merge(overrides))
+            }
         },
     };
 

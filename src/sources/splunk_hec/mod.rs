@@ -149,7 +149,6 @@ pub struct SplunkConfig {
     /// channel, and the authentication token via `%splunk_hec.*` paths and
     /// `get_secret!("splunk_hec_token")` before the program executes.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub event: CodecConfig,
 
@@ -160,7 +159,6 @@ pub struct SplunkConfig {
     /// swallowed and do not return an error to the Splunk client. When unset, the
     /// endpoint preserves its existing behavior of one event per request body.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub raw: CodecConfig,
 }
@@ -175,7 +173,6 @@ pub struct CodecConfig {
     /// Only used when `decoding` is also set. Defaults to a per-codec choice
     /// (typically `bytes`) that produces one event per payload.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
 
@@ -186,7 +183,6 @@ pub struct CodecConfig {
     /// `framing` and `decoding`, and a single payload can fan out to multiple
     /// events.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub decoding: Option<DeserializerConfig>,
 }
