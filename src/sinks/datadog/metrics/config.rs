@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
@@ -6,7 +8,7 @@ use vector_lib::{
 };
 
 use super::{
-    request_builder::DatadogMetricsRequestBuilder,
+    request_builder::{DatadogMetricsRequestBuilder, ShadowBuilderConfig},
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
@@ -34,7 +36,13 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
 
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
+pub(super) const SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
+/// Beta intake endpoint used during V3 shadow rollout.
+pub(super) const SERIES_V3_BETA_PATH: &str = "/api/intake/metrics/v3beta/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
+pub(super) const SKETCHES_V3_PATH: &str = "/api/intake/metrics/v3/sketches";
+/// Beta intake endpoint used during V3 sketches shadow rollout.
+pub(super) const SKETCHES_V3_BETA_PATH: &str = "/api/intake/metrics/v3beta/sketches";
 
 /// The API version to use when submitting series metrics to Datadog.
 #[configurable_component]
@@ -52,14 +60,68 @@ pub enum SeriesApiVersion {
     /// This is the recommended and default endpoint.
     #[default]
     V2,
+
+    /// Use the v3 series endpoint (`/api/intake/metrics/v3beta/series`).
+    ///
+    /// Columnar protobuf format with dictionary-based string deduplication and delta
+    /// encoding. More efficient than v2 for workloads with many metrics that share
+    /// common tags or names.
+    V3,
+
+    /// Use the v3 beta intake endpoint (`/api/intake/metrics/v3beta/series`).
+    ///
+    /// Used for shadow/validation rollout of V3. Prefer `v3_intake` for stable usage.
+    V3Beta,
 }
 
 impl SeriesApiVersion {
-    pub const fn get_path(self) -> &'static str {
+    pub const fn get_path(&self) -> &'static str {
         match self {
             Self::V1 => SERIES_V1_PATH,
             Self::V2 => SERIES_V2_PATH,
+            Self::V3 => SERIES_V3_PATH,
+            Self::V3Beta => SERIES_V3_BETA_PATH,
         }
+    }
+
+    /// Returns true if this version uses the V3 columnar encoding format.
+    pub const fn is_v3_format(self) -> bool {
+        matches!(self, Self::V3 | Self::V3Beta)
+    }
+}
+
+/// The API version to use when submitting sketch metrics (distributions, histograms) to Datadog.
+///
+/// Independent of `series_api_version`: Datadog's intake gates V3 series and V3 sketches
+/// separately, so enabling one does not enable the other.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum SketchesApiVersion {
+    /// Use the legacy sketches endpoint (`/api/beta/sketches`).
+    ///
+    /// This is the recommended and default endpoint.
+    #[default]
+    V2,
+
+    /// Use the v3 sketches endpoint (`/api/intake/metrics/v3/sketches`).
+    ///
+    /// Columnar protobuf format, matching the encoding used for V3 series. Must be enabled
+    /// separately from `series_api_version`.
+    V3,
+}
+
+impl SketchesApiVersion {
+    pub const fn get_path(self) -> &'static str {
+        match self {
+            Self::V2 => SKETCHES_PATH,
+            Self::V3 => SKETCHES_V3_PATH,
+        }
+    }
+
+    /// Returns true if this version uses the V3 columnar encoding format.
+    pub const fn is_v3_format(self) -> bool {
+        matches!(self, Self::V3)
     }
 }
 
@@ -83,7 +145,7 @@ impl DatadogMetricsEndpoint {
     pub const fn content_type(self) -> &'static str {
         match self {
             Self::Series(SeriesApiVersion::V1) => "application/json",
-            Self::Sketches | Self::Series(SeriesApiVersion::V2) => "application/x-protobuf",
+            _ => "application/x-protobuf",
         }
     }
 
@@ -97,6 +159,11 @@ impl DatadogMetricsEndpoint {
                 3_200_000,  // 3.2 MB
             ),
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => (
+                5_242_880, // 5 MiB
+                512_000,   // 512 KB
+            ),
+            // V3/V3Beta all use the same limits as V2 series.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3 | SeriesApiVersion::V3Beta) => (
                 5_242_880, // 5 MiB
                 512_000,   // 512 KB
             ),
@@ -159,6 +226,37 @@ impl DatadogMetricsEndpointConfiguration {
     }
 }
 
+fn default_shadow_every() -> NonZeroU64 {
+    NonZeroU64::new(1000).unwrap()
+}
+
+/// Configuration for the V3 shadow dual-write mode.
+///
+/// When enabled, every `shadow_every`-th legacy series flush, and every `shadow_every`-th
+/// legacy sketches flush, also sends a V3 shadow payload to the corresponding shadow
+/// endpoint. Both payloads in a pair carry the same `X-Metrics-Request-ID` header so the
+/// intake backend can correlate them.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct DualWriteConfig {
+    /// Send a V3 shadow payload once per this many legacy series or sketches flushes.
+    ///
+    /// Set to `1` to shadow every flush (full dual-write). Must be greater than zero.
+    /// Defaults to `1000`.
+    #[serde(default = "default_shadow_every")]
+    pub shadow_every: NonZeroU64,
+}
+
+impl DualWriteConfig {
+    pub(super) const fn get_series_path(&self) -> &'static str {
+        SERIES_V3_BETA_PATH
+    }
+
+    pub(super) const fn get_sketches_path(&self) -> &'static str {
+        SKETCHES_V3_BETA_PATH
+    }
+}
+
 /// Configuration for the `datadog_metrics` sink.
 #[configurable_component(sink("datadog_metrics", "Publish metric events to Datadog."))]
 #[derive(Clone, Debug, Default)]
@@ -182,6 +280,17 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub series_api_version: SeriesApiVersion,
 
+    /// Controls which Datadog sketches API endpoint is used to submit distributions and
+    /// histograms.
+    ///
+    /// Independent of `series_api_version` — Datadog's intake gates V3 series and V3 sketches
+    /// separately, so this must be set explicitly to send sketches via V3, even if
+    /// `series_api_version` is already `v3`.
+    ///
+    /// Defaults to `v2` (`/api/beta/sketches`).
+    #[serde(default)]
+    pub sketches_api_version: SketchesApiVersion,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
@@ -189,6 +298,14 @@ pub struct DatadogMetricsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    /// Optional V3 shadow dual-write configuration.
+    ///
+    /// When set, a sampled fraction of legacy series and sketches flushes are each mirrored
+    /// as V3 payloads to a separate intake endpoint, both stamped with a shared
+    /// `X-Metrics-Request-ID`.
+    #[serde(default)]
+    pub dual_write: Option<DualWriteConfig>,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -243,7 +360,7 @@ impl DatadogMetricsConfig {
         let base_uri = self.get_base_agent_endpoint(dd_common);
 
         let series_endpoint = build_uri(&base_uri, self.series_api_version.get_path())?;
-        let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
+        let sketches_endpoint = build_uri(&base_uri, self.sketches_api_version.get_path())?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
             series_endpoint,
@@ -287,10 +404,29 @@ impl DatadogMetricsConfig {
                 dd_common.default_api_key.inner(),
             ));
 
+        let shadow_config = self
+            .dual_write
+            .as_ref()
+            .map(|dw| -> crate::Result<ShadowBuilderConfig> {
+                let base_uri = self.get_base_agent_endpoint(dd_common);
+                let series_shadow_uri = build_uri(&base_uri, dw.get_series_path())?;
+                let sketches_shadow_uri = build_uri(&base_uri, dw.get_sketches_path())?;
+                Ok(ShadowBuilderConfig {
+                    series_uri: series_shadow_uri,
+                    series_api_version: SeriesApiVersion::V3Beta,
+                    sketches_uri: sketches_shadow_uri,
+                    default_namespace: self.default_namespace.clone(),
+                    shadow_every: dw.shadow_every,
+                })
+            })
+            .transpose()?;
+
         let request_builder = DatadogMetricsRequestBuilder::new(
             endpoint_configuration,
             self.default_namespace.clone(),
             self.series_api_version,
+            self.sketches_api_version,
+            shadow_config,
         );
 
         let protocol = self.get_protocol(dd_common);
@@ -384,5 +520,14 @@ mod tests {
 
         assert_eq!(series.size_limit, 1_000_000);
         assert_eq!(sketches.size_limit, 1_000_000);
+    }
+
+    // `sketches_api_version` is independent of `series_api_version`: Datadog's intake gates V3
+    // series and V3 sketches separately, so each must resolve to its own path regardless of what
+    // the other is set to.
+    #[test]
+    fn sketches_path_is_independent_of_series_api_version() {
+        assert_eq!(SketchesApiVersion::V2.get_path(), SKETCHES_PATH);
+        assert_eq!(SketchesApiVersion::V3.get_path(), SKETCHES_V3_PATH);
     }
 }

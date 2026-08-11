@@ -20,6 +20,7 @@ use vector_lib::{
 
 use crate::{
     http::{BuildRequestSnafu, HttpClient},
+    internal_events::DatadogMetricsRequestError,
     sinks::{datadog::DatadogApiError, util::retries::RetryLogic},
 };
 
@@ -47,6 +48,13 @@ pub struct DatadogMetricsRequest {
     pub content_encoding: &'static str,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
+    /// Shared transaction ID linking a V2 and V3 shadow payload from the same flush.
+    /// When set, `X-Metrics-Request-ID/Seq/Len` headers are included on the request.
+    pub batch_id: Option<Arc<str>>,
+    /// 0-based index of this request within the current flush (for split payloads).
+    pub batch_seq: usize,
+    /// Total number of requests produced by the current flush (for split payloads).
+    pub batch_len: usize,
 }
 
 impl DatadogMetricsRequest {
@@ -64,7 +72,8 @@ impl DatadogMetricsRequest {
                 HeaderValue::from_str(&key).expect("API key should be only valid ASCII characters")
             },
         );
-        let request = Request::post(self.uri)
+
+        let mut builder = Request::post(self.uri)
             .header("DD-API-KEY", api_key)
             // TODO: The Datadog Agent sends this header to indicate the version of the Go library
             // it uses which contains the Protocol Buffers definitions used for the Sketches API.
@@ -80,7 +89,14 @@ impl DatadogMetricsRequest {
             .header(CONTENT_TYPE, self.content_type)
             .header(CONTENT_ENCODING, self.content_encoding);
 
-        request.body(Body::from(self.payload))
+        if let Some(id) = &self.batch_id {
+            builder = builder
+                .header("X-Metrics-Request-ID", id.as_ref())
+                .header("X-Metrics-Request-Seq", self.batch_seq.to_string())
+                .header("X-Metrics-Request-Len", self.batch_len.to_string());
+        }
+
+        builder.body(Body::from(self.payload))
     }
 }
 
@@ -164,14 +180,46 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
 
         Box::pin(async move {
             let request_metadata = std::mem::take(request.metadata_mut());
+            let batch_id = request.batch_id.clone();
+            let uri = request.uri.clone();
+            let batch_seq = request.batch_seq;
+            let batch_len = request.batch_len;
+            let start = std::time::Instant::now();
 
-            let request = request
-                .into_http_request(api_key)
-                .context(BuildRequestSnafu)
-                .map_err(|error| DatadogApiError::HttpError { error })?;
+            let call_result: Result<_, DatadogApiError> = async {
+                let http_request = request
+                    .into_http_request(api_key)
+                    .context(BuildRequestSnafu)
+                    .map_err(|error| DatadogApiError::HttpError { error })?;
 
-            let result = client.send(request).await;
-            let result = DatadogApiError::from_result(result)?;
+                let result = client.send(http_request).await;
+                DatadogApiError::from_result(result)
+            }
+            .await;
+
+            let result = call_result.inspect_err(|error| {
+                emit!(DatadogMetricsRequestError {
+                    error: &error.to_string(),
+                    batch_id: batch_id.as_deref(),
+                    uri: &uri,
+                });
+            })?;
+
+            // Only batch_id-tagged requests are logged on success (dual-write shadow flushes,
+            // which are rare — sampled once per `shadow_every`), so this stays low-volume and
+            // gives visibility into dispatch timing for both the V2 and V3 twins of a flush.
+            if let Some(id) = batch_id.as_deref() {
+                info!(
+                    message = "Sent Datadog metrics request.",
+                    batch_id = id,
+                    %uri,
+                    batch_seq,
+                    batch_len,
+                    status = %result.status(),
+                    elapsed_ms = start.elapsed().as_millis() as u64,
+                    internal_log_rate_limit = false,
+                );
+            }
 
             Ok(DatadogMetricsResponse {
                 status_code: result.status(),

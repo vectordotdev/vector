@@ -85,6 +85,26 @@ generated: components: sinks: datadog_metrics: configuration: {
 		required: false
 		type: string: examples: ["myservice"]
 	}
+	dual_write: {
+		description: """
+			Optional V3 shadow dual-write configuration.
+
+			When set, a sampled fraction of legacy series and sketches flushes are each mirrored
+			as V3 payloads to a separate intake endpoint, both stamped with a shared
+			`X-Metrics-Request-ID`.
+			"""
+		required: false
+		type: object: options: shadow_every: {
+			description: """
+				Send a V3 shadow payload once per this many legacy series or sketches flushes.
+
+				Set to `1` to shadow every flush (full dual-write). Must be greater than zero.
+				Defaults to `1000`.
+				"""
+			required: false
+			type: uint: default: 1000
+		}
+	}
 	endpoint: {
 		description: """
 			The endpoint to send observability data to.
@@ -308,6 +328,18 @@ generated: components: sinks: datadog_metrics: configuration: {
 
 					This is the recommended and default endpoint.
 					"""
+				v3: """
+					Use the v3 series endpoint (`/api/intake/metrics/v3beta/series`).
+
+					Columnar protobuf format with dictionary-based string deduplication and delta
+					encoding. More efficient than v2 for workloads with many metrics that share
+					common tags or names.
+					"""
+				v3_beta: """
+					Use the v3 beta intake endpoint (`/api/intake/metrics/v3beta/series`).
+
+					Used for shadow/validation rollout of V3. Prefer `v3_intake` for stable usage.
+					"""
 			}
 		}
 	}
@@ -325,6 +357,35 @@ generated: components: sinks: datadog_metrics: configuration: {
 			"""
 		required: false
 		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
+	}
+	sketches_api_version: {
+		description: """
+			Controls which Datadog sketches API endpoint is used to submit distributions and
+			histograms.
+
+			Independent of `series_api_version` — Datadog's intake gates V3 series and V3 sketches
+			separately, so this must be set explicitly to send sketches via V3, even if
+			`series_api_version` is already `v3`.
+
+			Defaults to `v2` (`/api/beta/sketches`).
+			"""
+		required: false
+		type: string: {
+			default: "v2"
+			enum: {
+				v2: """
+					Use the legacy sketches endpoint (`/api/beta/sketches`).
+
+					This is the recommended and default endpoint.
+					"""
+				v3: """
+					Use the v3 sketches endpoint (`/api/intake/metrics/v3/sketches`).
+
+					Columnar protobuf format, matching the encoding used for V3 series. Must be enabled
+					separately from `series_api_version`.
+					"""
+			}
+		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
