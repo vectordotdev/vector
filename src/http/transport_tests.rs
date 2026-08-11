@@ -186,7 +186,7 @@ async fn spawn_origin(tls: MaybeTlsSettings) -> TestServer {
                     .serve_connection(stream, service)
                     .await
                 {
-                    tracing::debug!(message = "origin connection closed", %error);
+                    tracing::debug!(message = "Origin connection closed.", %error);
                 }
             });
         }
@@ -226,7 +226,7 @@ async fn spawn_proxy(tls: MaybeTlsSettings, require_authentication: bool) -> Tes
                     .with_upgrades()
                     .await
                 {
-                    tracing::debug!(message = "proxy connection closed", %error);
+                    tracing::debug!(message = "Proxy connection closed.", %error);
                 }
             });
         }
@@ -269,7 +269,7 @@ async fn proxy_request(
                 return;
             };
             if let Err(error) = copy_bidirectional(&mut upgraded, &mut upstream).await {
-                tracing::debug!(message = "proxy tunnel closed", %error);
+                tracing::debug!(message = "Proxy tunnel closed.", %error);
             }
         });
         return Response::new(Body::empty());
@@ -296,7 +296,7 @@ async fn forward_http(mut request: Request<Body>) -> Response<Body> {
     };
     tokio::spawn(async move {
         if let Err(error) = connection.await {
-            tracing::debug!(message = "proxy upstream connection closed", %error);
+            tracing::debug!(message = "Proxy upstream connection closed.", %error);
         }
     });
 
