@@ -162,8 +162,9 @@ async fn append_blob(
                 {
                     warn!(
                         message = "Azure append blob has reached the 50,000-block limit. \
-                        No further data can be appended to this blob. \
-                        Configure `blob_time_format` for time-based rotation, \
+                        No further data can be appended to this blob until `blob_time_format` \
+                        rolls over to a new name. Set a finer-grained `blob_time_format` (the \
+                        default rotates hourly) so blobs rotate before the cap is reached, \
                         or delete the full blob manually.",
                     );
                 }

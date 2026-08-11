@@ -405,10 +405,10 @@ async fn azure_blob_append_blob_json_encoding_with_oauth() {
     assert_append_blob_json_encoding(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
 }
 
-/// Default daily rotation: without explicit blob_time_format or blob_append_uuid overrides,
-/// append blobs use `%Y-%m-%d` and no UUID — two batches both write to today's date blob.
-async fn assert_append_blob_default_daily_rotation(config: AzureBlobSinkConfig) {
-    let blob_prefix = format!("append/daily/{}/", random_string(10));
+/// Default hourly rotation: without explicit blob_time_format or blob_append_uuid overrides,
+/// append blobs use `%Y-%m-%dT%H` and no UUID — two batches both write to the current hour's blob.
+async fn assert_append_blob_default_hourly_rotation(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/hourly/{}/", random_string(10));
     let config = AzureBlobSinkConfig {
         blob_prefix: blob_prefix.clone().try_into().unwrap(),
         blob_type: AzureBlobType::Append,
@@ -422,39 +422,58 @@ async fn assert_append_blob_default_daily_rotation(config: AzureBlobSinkConfig) 
     let (lines1, input1) = random_lines_with_stream(100, 5, None);
     let (lines2, input2) = random_lines_with_stream(100, 5, None);
 
+    // Bracket both runs with the current hour so an hour boundary crossing mid-test is handled
+    // rather than flaking: the batches then legitimately rotate into a second blob.
+    let before = chrono::Utc::now().format("%Y-%m-%dT%H").to_string();
     config.run_assert(input1).await;
     config.run_assert(input2).await;
+    let after = chrono::Utc::now().format("%Y-%m-%dT%H").to_string();
 
-    let blobs = config.list_blobs(blob_prefix.clone()).await;
-    assert_eq!(
-        blobs.len(),
-        1,
-        "both batches must go to the same daily-rotated blob"
-    );
-
-    // The blob name must embed today's date in %Y-%m-%d format.
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    assert!(
-        blobs[0].contains(&today),
-        "blob name '{}' must contain today's date '{}'",
-        blobs[0],
-        today
-    );
-
-    let (_content_type, _content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    // Sorted explicitly: for this time format lexicographic order is chronological, so the two
+    // blobs of an hour-boundary crossing read back in write order.
+    let mut blobs = config.list_blobs(blob_prefix.clone()).await;
+    blobs.sort();
     let expected: Vec<String> = lines1.into_iter().chain(lines2).collect();
+
+    if before == after {
+        assert_eq!(
+            blobs.len(),
+            1,
+            "both batches must go to the same hourly-rotated blob"
+        );
+        assert!(
+            blobs[0].contains(&before),
+            "blob name '{}' must contain the current hour '{}'",
+            blobs[0],
+            before
+        );
+    } else {
+        assert!(
+            blobs.len() <= 2,
+            "expected at most two blobs across an hour boundary, got {blobs:?}"
+        );
+    }
+
+    // Blob listings come back lexicographically, which for this format is chronological.
+    let mut blob_lines = Vec::new();
+    for blob in &blobs {
+        let (_content_type, _content_encoding, lines) = config.get_blob(blob.clone()).await;
+        blob_lines.extend(lines);
+    }
     assert_eq!(blob_lines, expected);
 }
 
 #[tokio::test]
-async fn azure_blob_append_blob_default_daily_rotation() {
-    assert_append_blob_default_daily_rotation(AzureBlobSinkConfig::new_emulator().await).await;
+async fn azure_blob_append_blob_default_hourly_rotation() {
+    assert_append_blob_default_hourly_rotation(AzureBlobSinkConfig::new_emulator().await).await;
 }
 
 #[tokio::test]
-async fn azure_blob_append_blob_default_daily_rotation_with_oauth() {
-    assert_append_blob_default_daily_rotation(AzureBlobSinkConfig::new_emulator_with_oauth().await)
-        .await;
+async fn azure_blob_append_blob_default_hourly_rotation_with_oauth() {
+    assert_append_blob_default_hourly_rotation(
+        AzureBlobSinkConfig::new_emulator_with_oauth().await,
+    )
+    .await;
 }
 
 /// Forced multi-flush: a low batch.max_bytes causes Vector to flush many small blocks within a

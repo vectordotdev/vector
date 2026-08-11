@@ -726,7 +726,7 @@ fn azure_blob_build_request_append_blob_defaults() {
 
     let request_options = AzureBlobRequestOptions {
         container_name,
-        blob_time_format: "%Y-%m-%d".to_string(),
+        blob_time_format: "%Y-%m-%dT%H".to_string(),
         blob_append_uuid: false,
         blob_type: AzureBlobType::Append,
         encoder: (
@@ -750,19 +750,51 @@ fn azure_blob_build_request_append_blob_defaults() {
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
 
-    // Capture the date window around `build_request`, which formats the key with its own
+    // Capture the hour window around `build_request`, which formats the key with its own
     // `Utc::now()`. Comparing against a single later `Utc::now()` would flake if the test
-    // crossed a UTC midnight between the two calls, so accept either side of the boundary.
-    let before = Utc::now().format("%Y-%m-%d").to_string();
+    // crossed an hour boundary between the two calls, so accept either side of the boundary.
+    let before = Utc::now().format("%Y-%m-%dT%H").to_string();
     let request = request_options.build_request(metadata, request_metadata, payload);
-    let after = Utc::now().format("%Y-%m-%d").to_string();
+    let after = Utc::now().format("%Y-%m-%dT%H").to_string();
 
     let key = &request.metadata.partition_key;
     assert!(
         *key == format!("blob/{before}.log") || *key == format!("blob/{after}.log"),
-        "partition_key {key:?} did not match the expected daily key for {before} or {after}"
+        "partition_key {key:?} did not match the expected hourly key for {before} or {after}"
     );
     assert_eq!(request.blob_type, AzureBlobType::Append);
+}
+
+#[test]
+fn azure_blob_append_blob_naming_defaults_are_hourly() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        blob_time_format: None,
+        blob_append_uuid: None,
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+    };
+
+    assert_eq!(
+        config.resolved_blob_naming(),
+        (false, "%Y-%m-%dT%H".to_string()),
+        "append blobs must rotate hourly and omit the UUID so batches share a blob"
+    );
+}
+
+#[test]
+fn azure_blob_block_blob_naming_defaults_unchanged() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Block,
+        blob_time_format: None,
+        blob_append_uuid: None,
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+    };
+
+    assert_eq!(
+        config.resolved_blob_naming(),
+        (true, "%s".to_string()),
+        "block blob defaults must not be affected by the append-mode defaults"
+    );
 }
 
 #[test]
@@ -1180,6 +1212,77 @@ async fn azure_blob_append_blob_partial_batch_without_max_bytes_succeeds() {
     let _ = config.build(cx).await.unwrap_or_else(|e| {
         panic!("build should succeed when [batch] omits max_bytes (only timeout_secs set): {e:?}")
     });
+}
+
+fn append_blob_config_with_compression(compression: &str) -> AzureBlobSinkConfig {
+    toml::from_str(&format!(
+        r#"
+            connection_string = "AccountName=mylogstorage"
+            container_name = "my-logs"
+            blob_type = "append"
+            compression = "{compression}"
+
+            [encoding]
+            codec = "json"
+        "#
+    ))
+    .unwrap_or_else(|e| panic!("Config parsing failed: {e:?}"))
+}
+
+/// Raw Snappy and bare zlib cannot be concatenated, so a compressed append blob would be
+/// unreadable past the first batch. Both must fail at startup rather than at read time.
+#[tokio::test]
+async fn azure_blob_append_blob_rejects_unappendable_compression() {
+    for compression in ["snappy", "zlib"] {
+        let config = append_blob_config_with_compression(compression);
+        let err = match config.build(SinkContext::default()).await {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("build must fail for `compression` = `{compression}` in append mode"),
+        };
+        assert!(
+            err.contains(compression) && err.contains("append"),
+            "expected an append/compression incompatibility error, got: {err}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_accepts_concatenable_compression() {
+    for compression in ["gzip", "zstd", "none"] {
+        let config = append_blob_config_with_compression(compression);
+        let _ = config
+            .build(SinkContext::default())
+            .await
+            .unwrap_or_else(|e| {
+                panic!("build should succeed for `compression` = `{compression}`: {e:?}")
+            });
+    }
+}
+
+/// The restriction is specific to append blobs: block blobs are written whole, so every
+/// compression algorithm stays valid there.
+#[tokio::test]
+async fn azure_blob_block_blob_accepts_any_compression() {
+    for compression in ["snappy", "zlib", "gzip", "zstd", "none"] {
+        let config: AzureBlobSinkConfig = toml::from_str(&format!(
+            r#"
+                connection_string = "AccountName=mylogstorage"
+                container_name = "my-logs"
+                compression = "{compression}"
+
+                [encoding]
+                codec = "json"
+            "#
+        ))
+        .unwrap_or_else(|e| panic!("Config parsing failed: {e:?}"));
+
+        let _ = config
+            .build(SinkContext::default())
+            .await
+            .unwrap_or_else(|e| {
+                panic!("block blob build should succeed for `{compression}`: {e:?}")
+            });
+    }
 }
 
 #[test]

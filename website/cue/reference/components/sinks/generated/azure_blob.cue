@@ -247,7 +247,8 @@ generated: components: sinks: azure_blob: configuration: {
 
 			The default value depends on `blob_type`:
 			- `block`: `%s` (Unix epoch seconds) — each batch gets a unique timestamp.
-			- `append`: `%Y-%m-%d` (ISO date) — batches within the same day share the same blob.
+			- `append`: `%Y-%m-%dT%H` (ISO 8601 date and hour) — batches within the same hour share
+			  the same blob.
 
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
@@ -262,7 +263,7 @@ generated: components: sinks: azure_blob: configuration: {
 			  `blob_append_uuid` defaults to `true`; `blob_time_format` defaults to `%s`.
 			- `append`: each batch appends to the same blob, keyed off `blob_prefix` and
 			  `blob_time_format`. `blob_append_uuid` defaults to `false`; `blob_time_format`
-			  defaults to `%Y-%m-%d`.
+			  defaults to `%Y-%m-%dT%H` (hourly rotation).
 
 			Azure limits each `append_block` call to 4 MiB (4,194,304 bytes), so `batch.max_bytes`
 			defaults to that limit in `append` mode and any explicit value above it is rejected at
@@ -273,11 +274,18 @@ generated: components: sinks: azure_blob: configuration: {
 			push a near-limit batch over the limit and Azure rejects the request; lower
 			`batch.max_bytes` to leave headroom in that case.
 
+			Azure caps an append blob at 50,000 blocks and each flush consumes one, so
+			`blob_time_format` must rotate to a new blob before that cap is hit. The hourly default
+			allows 50,000 flushes per hour, or about 56 MiB/s at the 4 MiB batch limit; daily rotation
+			would cap the same partition near 2.3 MiB/s, after which Azure rejects appends with
+			`BlockCountExceedsLimit` until the name rolls over.
+
 			Appended blocks are persisted in the order Azure receives the requests, so `append` mode
 			defaults `request.concurrency` to `1` to keep flushes to the same blob in order. As with
-			all Vector sinks, delivery is at-least-once: if a flush is retried after Azure already
-			committed the block (a rare server-side error after a successful write), the batch is
-			appended twice. Set `request.retry_attempts` to `0` for at-most-once instead.
+			all Vector sinks, delivery is at-least-once: a flush retried after Azure already committed
+			the block is appended twice. Setting `request.retry_attempts` to `0` disables sink-level
+			retries, but it does not give at-most-once delivery — upstream retries and resending
+			sources can still produce duplicates.
 			"""
 		required: false
 		type: string: {
@@ -290,9 +298,10 @@ generated: components: sinks: azure_blob: configuration: {
 					The blob name stays stable across flushes — suited for continuous log streaming
 					where you want a single growing file per time window.
 
-					When combined with compression, each batch is compressed as an independent frame
-					and appended to the blob. The result is a series of concatenated compressed frames.
-					Use decompressors that support multi-stream decompression (e.g., `gunzip`, `zstd -d`).
+					Each batch is compressed on its own, so a compressed blob is a sequence of concatenated
+					streams. Read it with a multi-stream-aware decompressor such as `gunzip` or `zstd -d`.
+					Only `gzip`, `zstd`, and `none` are supported: `snappy` and `zlib` cannot be concatenated
+					and are rejected at startup.
 					"""
 				block: """
 					Stores data as block blobs.
