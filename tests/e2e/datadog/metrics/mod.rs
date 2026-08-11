@@ -1,14 +1,12 @@
-use std::io::Read;
-
 use async_compression::tokio::bufread::{ZstdDecoder, ZstdEncoder};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use bytes::Bytes;
-use flate2::read::ZlibDecoder;
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, BufReader};
 use tracing::{debug, warn};
 use vector::test_util::{compression::is_zstd, trace_init};
 use vector_common::Result;
+use vector_common::decompression::CappedDecoder;
 
 mod series;
 mod sketches;
@@ -28,17 +26,15 @@ async fn decompress_payload(payload: &[u8]) -> std::io::Result<Vec<u8>> {
         return Ok(decompressed);
     }
 
-    let mut decompressor = ZlibDecoder::new(payload);
-    let mut decompressed = Vec::new();
-    let result = decompressor.read_to_end(&mut decompressed);
-    if let Ok(size) = &result {
+    let result = CappedDecoder::zlib(payload).decompress();
+    if let Ok(ref decompressed) = result {
         debug!(
             "Zlib decompression successful: {} -> {} bytes",
             payload.len(),
-            size
+            decompressed.len()
         );
     }
-    result.map(|_| decompressed)
+    result
 }
 
 async fn unpack_proto_payloads<T>(in_payloads: &FakeIntakeResponseRaw) -> Result<Vec<T>>

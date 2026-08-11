@@ -1,0 +1,3 @@
+Fixed a `disk_v2` buffer bug where a record too large to write (one whose encoded size exceeds the buffer's maximum record size) caused the buffer writer to return an unrecoverable error, which tore down the entire Vector topology and stopped the process. The writer now drops just that record and continues: the record's finalizers are resolved with the default `Dropped` status (which sources with end-to-end acknowledgement treat as `Delivered`, so they ack or checkpoint rather than redelivering the un-writable record), an error is logged, and the drop is counted via the `buffer_discarded_events_total` and `buffer_discarded_bytes_total` metrics (with `intentional="false"`). Every other record and the buffer itself are unaffected.
+
+authors: graphcareful

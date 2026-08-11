@@ -68,7 +68,6 @@ pub struct GlobalOptions {
     ///
     /// Vector must have write permissions to this directory.
     #[serde(default = "crate::default_data_dir")]
-    #[configurable(metadata(docs::common = false))]
     pub data_dir: Option<PathBuf>,
 
     /// Set wildcard matching mode for inputs
@@ -76,7 +75,7 @@ pub struct GlobalOptions {
     /// Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
     /// to be accepted without causing an error.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub wildcard_matching: Option<WildcardMatching>,
 
     /// Default log schema for all events.
@@ -85,7 +84,6 @@ pub struct GlobalOptions {
     /// schema, whether or not the default is used, to assign event fields on incoming events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(
-        docs::common = false,
         docs::required = false,
         docs::warnings = "These settings are ignored when `schema.log_namespace` is set to `true`."
     ))]
@@ -96,7 +94,7 @@ pub struct GlobalOptions {
     /// Determines whether `source` and `service` tags should be emitted with the
     /// `component_sent_*` and `component_received_*` events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub telemetry: Telemetry,
 
     /// The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
@@ -108,12 +106,11 @@ pub struct GlobalOptions {
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false))]
     pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub proxy: ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
@@ -127,7 +124,7 @@ pub struct GlobalOptions {
         deserialize_with = "bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    #[configurable(metadata(docs::common = true, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
@@ -145,7 +142,7 @@ pub struct GlobalOptions {
     /// Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
     /// so metrics live long enough to be emitted and captured.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     /// This allows configuring different expiration intervals for different metric sets.
@@ -171,7 +168,6 @@ pub struct GlobalOptions {
     /// Must be greater than 0.
     #[serde(skip_serializing_if = "is_default_buffer_utilization_ewma_half_life_seconds")]
     #[configurable(validation(range(min = 0.0)))]
-    #[configurable(metadata(docs::advanced))]
     pub buffer_utilization_ewma_half_life_seconds: Option<f64>,
 
     /// The alpha value for the exponential weighted moving average (EWMA) of transform latency
@@ -184,7 +180,6 @@ pub struct GlobalOptions {
     /// Must be between 0 and 1 exclusively (0 < alpha < 1).
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
-    #[configurable(metadata(docs::advanced))]
     pub latency_ewma_alpha: Option<f64>,
 
     /// The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
@@ -217,9 +212,8 @@ impl GlobalOptions {
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
         }
-        let readonly = std::fs::metadata(&data_dir)
-            .map(|meta| meta.permissions().readonly())
-            .unwrap_or(true);
+        let readonly =
+            std::fs::metadata(&data_dir).map_or(true, |meta| meta.permissions().readonly());
         if readonly {
             return Err(DataDirError::NotWritable { data_dir }.into());
         }

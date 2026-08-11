@@ -4,7 +4,6 @@ components: sources: http_server: {
 	_port: 80
 
 	title: "HTTP Server"
-	alias: "http"
 
 	classes: {
 		delivery: "at_least_once"
@@ -91,7 +90,6 @@ components: sources: http_server: {
 				description: "An individual line from an `application/json` request"
 				fields: {
 					"*": {
-						common:        false
 						description:   "Any field contained in your JSON payload"
 						relevant_when: "encoding != \"text\""
 						required:      false

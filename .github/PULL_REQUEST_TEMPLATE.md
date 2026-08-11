@@ -8,14 +8,6 @@ This should help the reviewers give feedback faster and with higher quality. -->
 ## How did you test this PR?
 <!-- Please describe how you tested your changes. Also include any information about your setup. -->
 
-## Change Type
-
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Dependencies
-- [ ] Non-functional (chore, refactoring, docs)
-- [ ] Performance
-
 ## Is this a breaking change?
 
 - [ ] Yes
@@ -52,23 +44,3 @@ Changes to CI, website, playground and similar are generally not considered user
   - For example, you can run `git merge origin master` and `git push`.
 - If this PR introduces changes Vector dependencies (modifies `Cargo.lock`), please
   run `make build-licenses` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details on the [dd-rust-license-tool](https://crates.io/crates/dd-rust-license-tool).
-
-
-<!--
-  Your PR title must conform to the conventional commit spec:
-  https://www.conventionalcommits.org/en/v1.0.0/
-
-  <type>(<scope>)!: <description>
-
-  * `type` = chore, enhancement, feat, fix, docs, revert
-  * `!` = OPTIONAL: signals a breaking change
-  * `scope` = Optional when `type` is "chore" or "docs", available scopes https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L31
-  * `description` = short description of the change
-
-Examples:
-
-  * enhancement(file source): Add `sort` option to sort discovered files
-  * feat(new source): Initial `statsd` source
-  * fix(file source): Fix a bug discovering new files
-  * chore(external docs): Clarify `batch_size` option
--->

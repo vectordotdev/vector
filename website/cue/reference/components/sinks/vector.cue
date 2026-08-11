@@ -23,7 +23,6 @@ components: sinks: vector: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -79,7 +78,5 @@ components: sinks: vector: {
 
 	how_it_works: components.sinks.vector.how_it_works
 
-	telemetry: metrics: {
-		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
-	}
+	telemetry: metrics: {}
 }
