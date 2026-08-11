@@ -6,6 +6,9 @@
     - log: simple message 3
 - name: sad path
   expectation: partial_success
+  # A single malformed request is recorded both as a decoding error and as the
+  # rejected request it causes, so two errors are counted for one failing event.
+  errors_per_failure: 2
   events:
     - log: simple message 1
     - log: simple message 2
