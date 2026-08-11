@@ -14,6 +14,7 @@ use crate::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext, ValidatedSink,
     },
+    template::UnconfinedTemplate,
 };
 
 /// Configuration for the `aws_sqs` sink.
@@ -82,8 +83,10 @@ impl SinkConfig for SqsSinkConfig {
 /// configuration without network/filesystem/credentials/async operations.
 #[derive(Clone)]
 pub struct ValidatedSqsSink {
-    /// Request builder constructed from the validated encoding.
-    request_builder: SSRequestBuilder,
+    /// The validated FIFO message group ID template.
+    message_group_id: Option<UnconfinedTemplate>,
+    /// The validated message deduplication ID template.
+    message_deduplication_id: Option<UnconfinedTemplate>,
 }
 
 impl fmt::Debug for ValidatedSqsSink {
@@ -103,13 +106,11 @@ impl ValidatedSink for SqsSinkConfig {
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
-        let request_builder = SSRequestBuilder::new(
-            message_group_id.clone(),
-            message_deduplication_id.clone(),
-            self.base_config.encoding.clone(),
-        )?;
 
-        Ok(ValidatedSqsSink { request_builder })
+        Ok(ValidatedSqsSink {
+            message_group_id,
+            message_deduplication_id,
+        })
     }
 
     async fn build(
@@ -121,11 +122,12 @@ impl ValidatedSink for SqsSinkConfig {
         let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
         let healthcheck = Box::pin(healthcheck(client.clone(), self.queue_url.clone()));
 
-        let sink = SSSink::new(
-            validated.request_builder.clone(),
-            self.base_config.request,
-            publisher,
+        let request_builder = SSRequestBuilder::new(
+            validated.message_group_id.clone(),
+            validated.message_deduplication_id.clone(),
+            self.base_config.encoding.clone(),
         )?;
+        let sink = SSSink::new(request_builder, self.base_config.request, publisher)?;
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
             healthcheck,

@@ -325,13 +325,11 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
         let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
-        let request_builder = ChronicleRequestBuilder::new(self)?;
 
         Ok(ValidatedChronicleUnstructured {
             endpoint,
             healthcheck_endpoint,
             batch_settings,
-            request_builder,
         })
     }
 
@@ -372,8 +370,6 @@ pub struct ValidatedChronicleUnstructured {
     healthcheck_endpoint: String,
     /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// The request builder with the resolved encoder.
-    request_builder: ChronicleRequestBuilder,
 }
 
 impl ChronicleUnstructuredConfig {
@@ -394,9 +390,10 @@ impl ChronicleUnstructuredConfig {
             .settings(request, GcsRetryLogic::default())
             .service(ChronicleService::new(client, base_url, creds));
 
+        let request_builder = ChronicleRequestBuilder::new(self)?;
         let sink = ChronicleSink::new(
             svc,
-            validated.request_builder.clone(),
+            request_builder,
             partitioner,
             validated.batch_settings,
             "http",
