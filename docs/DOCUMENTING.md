@@ -150,9 +150,7 @@ watchexec "make check-docs"
 Contributors document user-facing changes by adding a fragment under
 [`changelog.d/`](../changelog.d/README.md); the release CUE file's user-facing
 changelog section is assembled from those fragments by `cargo vdev release
-prepare` during release prep. The CUE file's `commits:` array is populated
-from the git log. Titles can follow the [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/)
-schema (`<type>[optional scope]: <description>`).
+prepare` during release prep.
 
 ### Release highlights
 
