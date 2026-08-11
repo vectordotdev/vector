@@ -10,7 +10,10 @@ use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header};
 use hyper::{Body, body::HttpBody as _, client::conn, server::conn::http1, service::service_fn};
 use tokio::{io::copy_bidirectional, net::TcpStream, task::JoinHandle, time::timeout};
 
-use super::HttpClient;
+use super::{
+    HttpClient,
+    client_v1::{HttpClientV1, empty_body},
+};
 use crate::{
     config::ProxyConfig,
     tls::{
@@ -68,15 +71,18 @@ impl Drop for TestServer {
 
 #[derive(Debug)]
 struct TestResponse {
-    status: StatusCode,
+    status: u16,
     body: Vec<u8>,
 }
 
 #[async_trait]
 trait TestClient: Send + Sync {
     async fn get(&self, uri: &str) -> Result<TestResponse, String>;
-    async fn get_with_headers(&self, uri: &str, headers: HeaderMap)
-    -> Result<TestResponse, String>;
+    async fn get_with_headers(
+        &self,
+        uri: &str,
+        headers: &[(&str, &str)],
+    ) -> Result<TestResponse, String>;
 }
 
 trait TestClientFactory: Copy {
@@ -88,6 +94,9 @@ trait TestClientFactory: Copy {
 #[derive(Clone, Copy)]
 struct LegacyClientFactory;
 
+#[derive(Clone, Copy)]
+struct V1ClientFactory;
+
 impl TestClientFactory for LegacyClientFactory {
     type Client = HttpClient;
 
@@ -96,21 +105,37 @@ impl TestClientFactory for LegacyClientFactory {
     }
 }
 
+impl TestClientFactory for V1ClientFactory {
+    type Client = HttpClientV1;
+
+    fn build(self, tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self::Client, String> {
+        HttpClientV1::new(tls, proxy).map_err(|error| error.to_string())
+    }
+}
+
 #[async_trait]
 impl TestClient for HttpClient {
     async fn get(&self, uri: &str) -> Result<TestResponse, String> {
-        self.get_with_headers(uri, HeaderMap::new()).await
+        self.get_with_headers(uri, &[]).await
     }
 
     async fn get_with_headers(
         &self,
         uri: &str,
-        headers: HeaderMap,
+        headers: &[(&str, &str)],
     ) -> Result<TestResponse, String> {
         let mut request = Request::get(uri)
             .body(Body::empty())
             .map_err(|error| error.to_string())?;
-        *request.headers_mut() = headers;
+        for &(name, value) in headers {
+            request.headers_mut().insert(
+                http::header::HeaderName::from_bytes(name.as_bytes())
+                    .map_err(|error| error.to_string())?,
+                value
+                    .parse()
+                    .map_err(|error: http::header::InvalidHeaderValue| error.to_string())?,
+            );
+        }
         let response = timeout(REQUEST_TIMEOUT, self.send(request))
             .await
             .map_err(|_| "request timed out".to_owned())?
@@ -121,6 +146,49 @@ impl TestClient for HttpClient {
             .map_err(|_| "response body timed out".to_owned())?
             .map_err(|error| error.to_string())?
             .to_bytes();
+        Ok(TestResponse {
+            status: status.as_u16(),
+            body: body.to_vec(),
+        })
+    }
+}
+
+#[async_trait]
+impl TestClient for HttpClientV1 {
+    async fn get(&self, uri: &str) -> Result<TestResponse, String> {
+        self.get_with_headers(uri, &[]).await
+    }
+
+    async fn get_with_headers(
+        &self,
+        uri: &str,
+        headers: &[(&str, &str)],
+    ) -> Result<TestResponse, String> {
+        let mut request = http_1::Request::get(uri)
+            .body(empty_body())
+            .map_err(|error| error.to_string())?;
+        for &(name, value) in headers {
+            request.headers_mut().insert(
+                http_1::header::HeaderName::from_bytes(name.as_bytes())
+                    .map_err(|error| error.to_string())?,
+                value
+                    .parse()
+                    .map_err(|error: http_1::header::InvalidHeaderValue| error.to_string())?,
+            );
+        }
+        let response = timeout(REQUEST_TIMEOUT, self.send(request))
+            .await
+            .map_err(|_| "request timed out".to_owned())?
+            .map_err(|error| error.to_string())?;
+        let status = response.status().as_u16();
+        let body = timeout(
+            REQUEST_TIMEOUT,
+            http_body_util::BodyExt::collect(response.into_body()),
+        )
+        .await
+        .map_err(|_| "response body timed out".to_owned())?
+        .map_err(|error| error.to_string())?
+        .to_bytes();
         Ok(TestResponse {
             status,
             body: body.to_vec(),
@@ -338,7 +406,7 @@ fn proxy_config(proxy: &TestServer, tls: bool, auth: bool) -> ProxyConfig {
 }
 
 fn assert_success(response: TestResponse) {
-    assert_eq!(response.status, StatusCode::OK);
+    assert_eq!(response.status, StatusCode::OK.as_u16());
     assert_eq!(response.body, b"origin response");
 }
 
@@ -431,14 +499,12 @@ async fn http_via_authenticated_proxy<F: TestClientFactory>(factory: F) {
         .build(no_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
-    let mut destination_headers = HeaderMap::new();
-    destination_headers.insert(
-        header::AUTHORIZATION,
-        "Bearer destination-token".parse().unwrap(),
-    );
     assert_success(
         client
-            .get_with_headers(&origin.http_uri(), destination_headers)
+            .get_with_headers(
+                &origin.http_uri(),
+                &[("authorization", "Bearer destination-token")],
+            )
             .await
             .unwrap(),
     );
@@ -488,14 +554,12 @@ async fn https_via_authenticated_connect_proxy<F: TestClientFactory>(factory: F)
         .build(trusted_client_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
-    let mut destination_headers = HeaderMap::new();
-    destination_headers.insert(
-        header::AUTHORIZATION,
-        "Bearer destination-token".parse().unwrap(),
-    );
     assert_success(
         client
-            .get_with_headers(&origin.https_uri(), destination_headers)
+            .get_with_headers(
+                &origin.https_uri(),
+                &[("authorization", "Bearer destination-token")],
+            )
             .await
             .unwrap(),
     );
@@ -620,4 +684,64 @@ async fn legacy_http_via_tls_proxy() {
 #[tokio::test]
 async fn legacy_https_via_tls_connect_proxy() {
     https_via_tls_connect_proxy(LegacyClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_direct_http() {
+    direct_http(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_direct_https_with_trusted_ca() {
+    direct_https_with_trusted_ca(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_direct_https_rejects_untrusted_ca() {
+    direct_https_rejects_untrusted_ca(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_direct_https_honors_server_name() {
+    direct_https_honors_server_name(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_direct_https_supports_mtls() {
+    direct_https_supports_mtls(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_http_via_authenticated_proxy() {
+    http_via_authenticated_proxy(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_http_proxy_credentials_do_not_reach_origin() {
+    http_proxy_credentials_do_not_reach_origin(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_https_via_authenticated_connect_proxy() {
+    https_via_authenticated_connect_proxy(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_no_proxy_bypasses_proxy() {
+    no_proxy_bypasses_proxy(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_disabled_proxy_is_bypassed() {
+    disabled_proxy_is_bypassed(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_http_via_tls_proxy() {
+    http_via_tls_proxy(V1ClientFactory).await;
+}
+
+#[tokio::test]
+async fn v1_https_via_tls_connect_proxy() {
+    https_via_tls_connect_proxy(V1ClientFactory).await;
 }
