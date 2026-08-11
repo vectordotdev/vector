@@ -26,7 +26,10 @@ use vector_lib::{
     shutdown::ShutdownSignal,
     source_sender::SourceSender,
     tcp::TcpKeepaliveConfig,
-    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    tls::{
+        CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings,
+        TlsAcceptorReloader,
+    },
 };
 use vrl::value::ObjectMap;
 
@@ -49,10 +52,14 @@ pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     allowlist: Option<Vec<IpNet>>,
 ) -> crate::Result<MaybeTlsListener> {
     match addr {
-        SocketListenAddr::SocketAddr(addr) => tls.bind(&addr).await.map_err(Into::into),
+        SocketListenAddr::SocketAddr(addr) => tls
+            .bind_reloadable(&addr, tls_reloader)
+            .await
+            .map_err(Into::into),
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset)? {
             Some(listener) => TcpListener::from_std(listener)
                 .map(Into::into)
@@ -115,6 +122,7 @@ where
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: Duration,
         tls: MaybeTlsSettings,
+        tls_reloader: Option<TlsAcceptorReloader>,
         tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
         max_connection_duration_secs: Option<u64>,
@@ -129,7 +137,7 @@ where
 
         Ok(Box::pin(async move {
             let listenfd = ListenFd::from_env();
-            let listener = try_bind_tcp_listener(addr, listenfd, &tls, allowlist)
+            let listener = try_bind_tcp_listener(addr, listenfd, &tls, tls_reloader, allowlist)
                 .await
                 .map_err(|error| {
                     emit!(SocketBindError {

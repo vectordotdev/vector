@@ -72,7 +72,7 @@ pub enum LuaConfig {
 }
 
 impl GenerateConfig for LuaConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"version = "2"
             hooks.process = """#,
@@ -119,5 +119,22 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::LuaConfig>();
+    }
+
+    #[test]
+    fn rejects_auto_metric_tag_values() {
+        assert!(
+            serde_yaml::from_str::<super::LuaConfig>(indoc::indoc! {r#"
+                version: "2"
+                metric_tag_values: auto
+                hooks:
+                  process: |
+                    function (event, emit)
+                      emit(event)
+                    end
+            "#})
+            .is_err(),
+            "metric_tag_values = auto must be rejected at parse time"
+        );
     }
 }

@@ -14,6 +14,7 @@ use vector_core::{
     event::{Event, LogEvent, Value},
     schema,
 };
+use vrl::event_path;
 use vrl::value::ObjectMap;
 
 /// Config used to build a `SyslogSerializer`.
@@ -161,7 +162,7 @@ impl<'a> ConfigDecanter<'a> {
 
     fn get_structured_data(&self) -> Option<StructuredData> {
         self.log
-            .get("structured_data")
+            .get(event_path!("structured_data"))
             .and_then(|v| v.clone().into_object())
             .map(StructuredData::from)
     }
@@ -993,7 +994,7 @@ mod tests {
         .unwrap();
 
         let mut log = LogEvent::default();
-        log.insert("syslog.service", "meaning-app");
+        log.insert(event_path!("syslog", "service"), "meaning-app");
 
         let schema = schema::Definition::new_with_default_metadata(
             Kind::object(btreemap! {

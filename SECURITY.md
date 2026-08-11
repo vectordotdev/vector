@@ -92,7 +92,7 @@ All changes to Vector must go through a pull request review process.
 
 All pull requests must be reviewed by at least one Vector team member. The
 review process takes into account many factors, all of which are detailed in
-our [Reviewing guide](REVIEWING.md). In exceptional circumstances, this
+our [Reviewing guide](docs/REVIEWING.md). In exceptional circumstances, this
 approval can be retroactive.
 
 
@@ -125,7 +125,7 @@ linear history with a Vector team member's co-sign.
 ### Education
 
 Vector team members are required to review this security document as well as
-the [contributing](CONTRIBUTING.md) and [reviewing](REVIEWING.md) documents.
+the [contributing](CONTRIBUTING.md) and [reviewing](docs/REVIEWING.md) documents.
 
 ### Policies
 
@@ -176,7 +176,7 @@ documentation always defaults to non-`root` use.
 
 Vector aims to reduce the number of dependencies it relies on. If a dependency
 is added it goes through a comprehensive review process that is detailed in
-the [Reviewing guide](REVIEWING.md#dependencies).
+the [Reviewing guide](docs/REVIEWING.md#dependencies).
 
 ### Automated Checks
 

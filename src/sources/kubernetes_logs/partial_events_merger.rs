@@ -215,14 +215,14 @@ fn merge_partial_events_with_custom_expiration(
 #[cfg(test)]
 mod test {
     use vector_lib::event::LogEvent;
-    use vrl::value;
+    use vrl::{event_path, metadata_path, value};
 
     use super::*;
 
     #[tokio::test]
     async fn merge_single_event_legacy() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
+        e_1.insert(event_path!("foo"), 1);
 
         let input_stream = futures::stream::iter([e_1.into()]);
         let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, None);
@@ -230,7 +230,7 @@ mod test {
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
         assert_eq!(
-            output[0].as_log().get(".message"),
+            output[0].as_log().get(event_path!("message")),
             Some(&value!("test message 1"))
         );
     }
@@ -238,7 +238,7 @@ mod test {
     #[tokio::test]
     async fn merge_single_event_legacy_exceeds_max_merged_line_limit() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
+        e_1.insert(event_path!("foo"), 1);
 
         let input_stream = futures::stream::iter([e_1.into()]);
         let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, Some(1));
@@ -250,11 +250,11 @@ mod test {
     #[tokio::test]
     async fn merge_multiple_events_legacy() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!("foo"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo2", 1);
+        e_2.insert(event_path!("foo2"), 1);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
         let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, None);
@@ -262,7 +262,7 @@ mod test {
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
         assert_eq!(
-            output[0].as_log().get(".message"),
+            output[0].as_log().get(event_path!("message")),
             Some(&value!("test message 1test message 2"))
         );
     }
@@ -270,11 +270,11 @@ mod test {
     #[tokio::test]
     async fn merge_multiple_events_legacy_exceeds_max_merged_line_limit() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!("foo"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo2", 1);
+        e_2.insert(event_path!("foo2"), 1);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
         // 24 > length of first message but less than the two combined
@@ -287,12 +287,12 @@ mod test {
     #[tokio::test]
     async fn multiple_events_flush_legacy() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!("foo"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo2", 1);
-        e_1.insert("_partial", true);
+        e_2.insert(event_path!("foo2"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
         let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, None);
@@ -300,7 +300,7 @@ mod test {
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
         assert_eq!(
-            output[0].as_log().get(".message"),
+            output[0].as_log().get(event_path!("message")),
             Some(&value!("test message 1test message 2"))
         );
     }
@@ -308,12 +308,12 @@ mod test {
     #[tokio::test]
     async fn multiple_events_flush_legacy_exceeds_max_merged_line_limit() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!("foo"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo2", 1);
-        e_1.insert("_partial", true);
+        e_2.insert(event_path!("foo2"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
         // 24 > length of first message but less than the two combined
@@ -326,12 +326,12 @@ mod test {
     #[tokio::test]
     async fn multiple_events_expire_legacy() {
         let mut e_1 = LogEvent::from("test message");
-        e_1.insert(FILE_KEY, "foo1");
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!(FILE_KEY), "foo1");
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("test message");
-        e_2.insert(FILE_KEY, "foo2");
-        e_1.insert("_partial", true);
+        e_2.insert(event_path!(FILE_KEY), "foo2");
+        e_1.insert(event_path!("_partial"), true);
 
         // and input stream that never ends
         let input_stream =
@@ -347,11 +347,11 @@ mod test {
         let output: Vec<Event> = output_stream.take(2).collect().await;
         assert_eq!(output.len(), 2);
         assert_eq!(
-            output[0].as_log().get(".message"),
+            output[0].as_log().get(event_path!("message")),
             Some(&value!("test message"))
         );
         assert_eq!(
-            output[1].as_log().get(".message"),
+            output[1].as_log().get(event_path!("message")),
             Some(&value!("test message"))
         );
     }
@@ -369,9 +369,14 @@ mod test {
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0].as_log().get("."), Some(&value!("test message 1")));
         assert_eq!(
-            output[0].as_log().get("%kubernetes_logs.file"),
+            output[0].as_log().get(event_path!()),
+            Some(&value!("test message 1"))
+        );
+        assert_eq!(
+            output[0]
+                .as_log()
+                .get(metadata_path!("kubernetes_logs", "file")),
             Some(&value!("foo1"))
         );
     }
@@ -400,11 +405,13 @@ mod test {
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
         assert_eq!(
-            output[0].as_log().get("."),
+            output[0].as_log().get(event_path!()),
             Some(&value!("test message 1test message 2"))
         );
         assert_eq!(
-            output[0].as_log().get("%kubernetes_logs.file"),
+            output[0]
+                .as_log()
+                .get(metadata_path!("kubernetes_logs", "file")),
             Some(&value!("foo1"))
         );
     }

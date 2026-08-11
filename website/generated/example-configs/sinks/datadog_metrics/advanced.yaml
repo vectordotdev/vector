@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: datadog_metrics
+    inputs:
+      - my-source-or-transform-id
+    default_api_key: ${DATADOG_API_KEY_ENV_VAR}
+    default_namespace: myservice
+    endpoint: http://127.0.0.1:8080
+    series_api_version: v2
+    site: us3.datadoghq.com

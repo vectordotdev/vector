@@ -109,7 +109,6 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 /// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequestConfigDefaults> {
     #[configurable(derived)]

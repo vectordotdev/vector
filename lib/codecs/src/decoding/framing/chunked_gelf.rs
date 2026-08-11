@@ -1,19 +1,18 @@
 use std::{
     any::Any,
     collections::HashMap,
-    io::Read,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snafu::{ResultExt, Snafu, ensure};
 use tokio::{self, task::JoinHandle};
 use tokio_util::codec::Decoder;
 use tracing::{debug, trace, warn};
 use vector_common::constants::{GZIP_MAGIC, ZLIB_MAGIC};
+use vector_common::decompression::CappedDecoder;
 use vector_config::configurable_component;
 
 use super::{BoxedFramingError, FramingError};
@@ -199,22 +198,14 @@ impl ChunkedGelfDecompression {
 
     pub fn decompress(&self, data: Bytes) -> Result<Bytes, ChunkedGelfDecompressionError> {
         let decompressed = match self {
-            Self::Gzip => {
-                let mut decoder = MultiGzDecoder::new(data.reader());
-                let mut decompressed = Vec::new();
-                decoder
-                    .read_to_end(&mut decompressed)
-                    .context(GzipDecompressionSnafu)?;
-                Bytes::from(decompressed)
-            }
-            Self::Zlib => {
-                let mut decoder = ZlibDecoder::new(data.reader());
-                let mut decompressed = Vec::new();
-                decoder
-                    .read_to_end(&mut decompressed)
-                    .context(ZlibDecompressionSnafu)?;
-                Bytes::from(decompressed)
-            }
+            Self::Gzip => CappedDecoder::gzip(data.reader())
+                .decompress()
+                .map(Bytes::from)
+                .context(GzipDecompressionSnafu)?,
+            Self::Zlib => CappedDecoder::zlib(data.reader())
+                .decompress()
+                .map(Bytes::from)
+                .context(ZlibDecompressionSnafu)?,
             Self::None => data,
         };
         Ok(decompressed)

@@ -7,6 +7,34 @@ The conventions used for this changelog logic follow [towncrier](https://towncri
 
 The changelog fragments are located in `changelog.d/`.
 
+## Quick start
+
+The scaffolder is the recommended workflow for all fragment types, but devs can also hand-write changelog fragments.
+
+Install `vdev`:
+
+    cargo binstall --manifest-path vdev/Cargo.toml vdev
+    # or
+    # cargo install vdev
+    # or use the prefix
+    # cargo vdev <command>
+
+Then scaffold a fragment:
+
+    vdev changelog new <type> <slug>
+
+> `vdev` fills in the filename, the required structure, and your authors line (auto-detected from `git config github.user`, `gh api user`, or a `users.noreply.github.com` email)
+
+Edit the file and validate:
+
+    vdev check changelog-fragments
+
+Examples:
+
+    vdev changelog new fix 42_kafka_ack_race
+    vdev changelog new enhancement retry_backoff_config
+    vdev changelog new breaking env_var_interpolation
+
 ## Process
 
 Fragments for un-released changes are placed in the root of this directory during PRs.
@@ -23,7 +51,7 @@ This is enforced during CI.
 To mark a PR as not requiring user-facing changelog notes, add the label 'no-changelog'.
 
 To run the same check that is run in CI to validate that your changelog fragments have
-the correct syntax, commit the fragment additions and then run ./scripts/check_changelog_fragments.sh
+the correct syntax, commit the fragment additions and then run `vdev check changelog-fragments`.
 
 The format for fragments is: `<unique_name>.<fragment_type>.md`
 
@@ -47,7 +75,6 @@ Filename rules:
 
 - `breaking`: A change that is incompatible with prior versions which requires users to make adjustments.
 - `security`: A change that is has implications for security.
-- `deprecation`: A change that is introducing a deprecation.
 - `feature`: A change that is introducing a new feature.
 - `enhancement`: A change that is enhancing existing functionality in a user perceivable way.
 - `fix`: A change that is fixing a bug.
@@ -62,9 +89,10 @@ as a heading in the main changelog and not the list. Instead, separate content w
 
 ### Breaking changes
 
-When using the type 'breaking' to add notes for a breaking change, these should be more verbose than
-other entries typically. It should include all details that would be relevant for the user to need
-to handle upgrading to the breaking change.
+Breaking fragments (`*.breaking.md`) carry extra structured fields (title, optional anchor, and
+`## Summary` / `## Migration` sections) so the release process can auto-generate the upgrade
+guide from them. See [Examples](#examples) below for the exact shape — or just run the
+scaffolder from [Quick start](#quick-start).
 
 ## Community Contributors
 
@@ -79,12 +107,55 @@ The process for adding this is simply to have the last line of the file be in th
 
 Do not include a leading `@` when specifying your username.
 
-## Example
+## Examples
 
-Here is an example of a changelog fragment that adds a breaking change explanation.
+### Non-breaking
 
-    $ cat changelog.d/42_very_good_words.breaking.md
-    This change is so great. It's such a great change that this sentence
-    explaining the change has to span multiple lines of text.
+`fix`, `feature`, `enhancement`, and `security` fragments are free-form markdown followed by an
+`authors:` line. The whole body becomes a single bullet in the release changelog list, so avoid
+markdown headings inside the body.
 
-    It even necessitates a line break. It is a breaking change after all.
+    $ cat changelog.d/42_kafka_ack_race.fix.md
+    Fix a race in the kafka source where offsets could be committed before acknowledgements were
+    flushed. This resurfaced under high partition rebalance frequency.
+
+    authors: some_contributor
+
+### Breaking
+
+Breaking fragments start with an H1 title (optionally with a Hugo-style `{#anchor}` for a stable
+backlink) followed by `## Summary` and `## Migration` sections. Only the `## Summary` content
+lands in the changelog list; the title, anchor, and `## Migration` body feed the
+auto-generated upgrade guide.
+
+    $ cat changelog.d/env_var_interpolation.breaking.md
+    # Environment variable interpolation disabled by default {#env-var-interpolation}
+
+    ## Summary
+
+    Environment variable interpolation in configuration files is now disabled by default.
+    The `--disable-env-var-interpolation` flag and `VECTOR_DISABLE_ENV_VAR_INTERPOLATION`
+    environment variable have been removed.
+
+    ## Migration
+
+    Pass `--dangerously-allow-env-var-interpolation` (or set
+    `VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true`) on startup to restore the previous
+    behavior:
+
+    #### Old
+
+    ```bash
+    vector --config vector.yaml
+    ```
+
+    #### New
+
+    ```bash
+    vector --config vector.yaml --dangerously-allow-env-var-interpolation
+    ```
+
+    authors: some_contributor
+
+Put `N/A` under `## Migration` for informational-only breakers with nothing to do on the user's
+side.
