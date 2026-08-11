@@ -75,7 +75,7 @@ pub enum SeriesApiVersion {
 }
 
 impl SeriesApiVersion {
-    pub const fn get_path(&self) -> &'static str {
+    pub const fn get_path(self) -> &'static str {
         match self {
             Self::V1 => SERIES_V1_PATH,
             Self::V2 => SERIES_V2_PATH,
@@ -226,7 +226,7 @@ impl DatadogMetricsEndpointConfiguration {
     }
 }
 
-fn default_shadow_every() -> NonZeroU64 {
+const fn default_shadow_every() -> NonZeroU64 {
     NonZeroU64::new(1000).unwrap()
 }
 

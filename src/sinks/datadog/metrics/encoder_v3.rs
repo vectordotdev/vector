@@ -212,20 +212,20 @@ fn encode_metric_to_v3(
         for (key, value) in tags.iter_all() {
             // dd.internal.resource tags become structured resources
             if key == "dd.internal.resource" {
-                if let Some(val) = value {
-                    if let Some((rtype, rname)) = val.split_once(':') {
-                        extra_resources.push((rtype, rname));
-                    }
+                if let Some(val) = value
+                    && let Some((rtype, rname)) = val.split_once(':')
+                {
+                    extra_resources.push((rtype, rname));
                 }
                 continue;
             }
 
             // Host key → host resource
             if host_key.as_deref() == Some(key) {
-                if let Some(host) = value {
-                    if !host.is_empty() {
-                        host_resource = Some(host);
-                    }
+                if let Some(host) = value
+                    && !host.is_empty()
+                {
+                    host_resource = Some(host);
                 }
                 continue;
             }
