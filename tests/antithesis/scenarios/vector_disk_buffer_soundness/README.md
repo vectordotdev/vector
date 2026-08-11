@@ -9,6 +9,12 @@ and a separate test-command workload. Separating the workload from the oracle
 gives ingress and egress independent network paths, allowing the buffer to keep
 filling while Vector's connection to its sink is faulted.
 
+During the fault phase, the producer closes a gate on the oracle's ingest
+endpoint and submits a concurrent burst of separate large HTTP requests. The
+HTTP sink receives retryable responses while ingress remains available, forcing
+the disk buffer through its full-buffer backpressure path. The terminal command
+reopens the gate before checking recovery, drain, and fresh progress.
+
 ## Properties
 
 The scenario makes these universal assertions:

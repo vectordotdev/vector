@@ -29,6 +29,12 @@ pub fn is_progress_probe_payload(id: u64) -> bool {
     payload_length(id) == DISK_V2_WRITE_BUFFER_SIZE + 1
 }
 
+/// True for payload classes large enough to create buffer pressure with a
+/// short burst of individual HTTP requests.
+pub fn is_pressure_payload(id: u64) -> bool {
+    payload_length(id) >= DISK_V2_WRITE_BUFFER_SIZE - 1
+}
+
 /// One splitmix64 step. A full-avalanche mixer, so flipping any input bit
 /// scrambles the whole output. Seeding the stream with this keyed by id means a
 /// length-preserving corruption still changes the bytes the oracle expects.
@@ -111,6 +117,16 @@ mod tests {
             assert_eq!(
                 is_progress_probe_payload(id),
                 payload_length(id) == DISK_V2_WRITE_BUFFER_SIZE + 1
+            );
+        }
+    }
+
+    #[test]
+    fn pressure_payloads_cover_the_largest_classes() {
+        for id in 0..PAYLOAD_LENGTHS.len() as u64 {
+            assert_eq!(
+                is_pressure_payload(id),
+                payload_length(id) >= DISK_V2_WRITE_BUFFER_SIZE - 1
             );
         }
     }

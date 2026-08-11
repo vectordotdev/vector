@@ -34,8 +34,8 @@ sinks:
     acknowledgements:
       enabled: false
     request:
-      # Recover promptly after a partition heals instead of retaining a stale
-      # request for the default 60 seconds.
+      # Retry gated requests promptly when the terminal checker reopens the
+      # oracle. This caps retry backoff; it does not expire the request.
       timeout_secs: 5
       retry_max_duration_secs: 1
 

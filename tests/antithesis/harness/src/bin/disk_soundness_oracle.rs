@@ -61,7 +61,23 @@ struct Sets {
 struct AppState {
     next_id: AtomicU64,
     first_delivery: AtomicBool,
+    ingest_blocked: AtomicBool,
+    first_blocked_attempt: AtomicBool,
+    blocked_attempts: AtomicU64,
     sets: Mutex<Sets>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            next_id: AtomicU64::new(0),
+            first_delivery: AtomicBool::new(true),
+            ingest_blocked: AtomicBool::new(false),
+            first_blocked_attempt: AtomicBool::new(true),
+            blocked_attempts: AtomicU64::new(0),
+            sets: Mutex::new(Sets::default()),
+        }
+    }
 }
 
 struct Delivered {
@@ -108,6 +124,17 @@ async fn claim(State(state): State<Arc<AppState>>) -> String {
 }
 
 async fn ingest(State(state): State<Arc<AppState>>, body: String) -> StatusCode {
+    if state.ingest_blocked.load(Ordering::SeqCst) {
+        let blocked_attempts = state.blocked_attempts.fetch_add(1, Ordering::SeqCst) + 1;
+        if state.first_blocked_attempt.swap(false, Ordering::SeqCst) {
+            assert_reachable!(
+                "the HTTP sink retries while the pressure gate is closed",
+                &json!({ "blocked_attempts": blocked_attempts })
+            );
+        }
+        return StatusCode::SERVICE_UNAVAILABLE;
+    }
+
     let (records, understood) = parse_delivered(&body);
     if !understood {
         return StatusCode::INTERNAL_SERVER_ERROR;
@@ -148,6 +175,19 @@ async fn ingest(State(state): State<Arc<AppState>>, body: String) -> StatusCode 
     StatusCode::OK
 }
 
+async fn close_ingest_gate(State(state): State<Arc<AppState>>) -> &'static str {
+    if state.ingest_blocked.swap(true, Ordering::SeqCst) {
+        "0"
+    } else {
+        "1"
+    }
+}
+
+async fn open_ingest_gate(State(state): State<Arc<AppState>>) -> StatusCode {
+    state.ingest_blocked.store(false, Ordering::SeqCst);
+    StatusCode::NO_CONTENT
+}
+
 async fn report(State(state): State<Arc<AppState>>) -> String {
     let sets = state.sets.lock().unwrap();
     json!({
@@ -157,6 +197,8 @@ async fn report(State(state): State<Arc<AppState>>) -> String {
         "duplicate_count": sets.delivered_total.saturating_sub(sets.delivered.len() as u64),
         "corrupted_count": sets.corrupted,
         "spurious_count": sets.spurious,
+        "ingest_blocked": state.ingest_blocked.load(Ordering::SeqCst),
+        "blocked_attempts": state.blocked_attempts.load(Ordering::SeqCst),
     })
     .to_string()
 }
@@ -195,14 +237,12 @@ async fn main() {
     let args = Args::parse();
     let vector_ready = wait_for_vector(&args.metrics_url, time::Duration::from_secs(180)).await;
 
-    let state = Arc::new(AppState {
-        next_id: AtomicU64::new(0),
-        first_delivery: AtomicBool::new(true),
-        sets: Mutex::new(Sets::default()),
-    });
+    let state = Arc::new(AppState::default());
     let app = Router::new()
         .route("/claim", post(claim))
         .route("/ingest", post(ingest))
+        .route("/ingest/close", post(close_ingest_gate))
+        .route("/ingest/open", post(open_ingest_gate))
         .route("/report", get(report))
         .route("/delivered", get(delivered))
         .layer(DefaultBodyLimit::disable())
@@ -217,4 +257,44 @@ async fn main() {
     );
     assert_reachable!("disk-buffer soundness oracle started");
     server.await.expect("oracle server failed");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{close_ingest_gate, ingest, open_ingest_gate, AppState};
+    use axum::{extract::State, http::StatusCode};
+    use std::sync::{atomic::Ordering, Arc};
+
+    #[tokio::test]
+    async fn ingest_gate_rejects_retriably_until_reopened() {
+        let state = Arc::new(AppState::default());
+        state.sets.lock().unwrap().issued.insert(0);
+
+        assert_eq!(close_ingest_gate(State(Arc::clone(&state))).await, "1");
+        assert_eq!(close_ingest_gate(State(Arc::clone(&state))).await, "0");
+        assert_eq!(
+            ingest(
+                State(Arc::clone(&state)),
+                r#"[{"id":0,"data":""}]"#.to_owned()
+            )
+            .await,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(state.blocked_attempts.load(Ordering::SeqCst), 1);
+        assert!(state.sets.lock().unwrap().delivered.is_empty());
+
+        assert_eq!(
+            open_ingest_gate(State(Arc::clone(&state))).await,
+            StatusCode::NO_CONTENT
+        );
+        assert_eq!(
+            ingest(
+                State(Arc::clone(&state)),
+                r#"[{"id":0,"data":""}]"#.to_owned()
+            )
+            .await,
+            StatusCode::OK
+        );
+        assert!(state.sets.lock().unwrap().delivered.contains(&0));
+    }
 }
