@@ -128,6 +128,28 @@ async fn wait_for_metrics(
     None
 }
 
+async fn open_ingest_gate(
+    client: &reqwest::Client,
+    oracle_url: &str,
+    timeout: time::Duration,
+) -> bool {
+    let deadline = time::Instant::now() + timeout;
+    while time::Instant::now() < deadline {
+        if matches!(
+            client
+                .post(format!("{oracle_url}/ingest/open"))
+                .timeout(time::Duration::from_secs(3))
+                .send()
+                .await,
+            Ok(response) if response.status().is_success()
+        ) {
+            return true;
+        }
+        time::sleep(time::Duration::from_millis(500)).await;
+    }
+    false
+}
+
 async fn wait_for_empty_buffer(
     client: &reqwest::Client,
     metrics_url: &str,
@@ -310,6 +332,17 @@ async fn main() {
     antithesis_init();
     let args = Args::parse();
     let client = reqwest::Client::new();
+
+    let gate_opened =
+        open_ingest_gate(&client, &args.oracle_url, time::Duration::from_secs(60)).await;
+    assert_always!(
+        gate_opened,
+        "the terminal checker reopens the sink retry gate",
+        &json!({ "oracle_url": args.oracle_url })
+    );
+    if !gate_opened {
+        return;
+    }
 
     // Faults have stopped, but a node restart can still be initializing. Serving
     // the disk-buffer metrics proves the process and topology came back.
