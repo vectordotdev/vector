@@ -226,18 +226,10 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 }
 
-/// Purely validated `aws_cloudwatch_logs` sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedCloudwatchLogs {
-    /// Confined group name template.
     group_template: ConfinedTemplate,
-    /// Confined stream name template.
     stream_template: ConfinedTemplate,
-    /// Batch settings computed during validation.
     batcher_settings: BatcherSettings,
 }
 
@@ -272,7 +264,7 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
             group_template,
             stream_template,
             batcher_settings,
-        } = validated;
+        } = validated.clone();
         let request_settings = self.request.tower.into_settings();
         let client = self.create_client(cx.proxy()).await?;
         let svc = ServiceBuilder::new()
@@ -286,10 +278,10 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
         let encoder = Encoder::<()>::new(serializer);
         let healthcheck = healthcheck(self.clone(), client).boxed();
         let sink = CloudwatchSink {
-            batcher_settings: *batcher_settings,
+            batcher_settings,
             request_builder: CloudwatchRequestBuilder {
-                group_template: group_template.clone(),
-                stream_template: stream_template.clone(),
+                group_template,
+                stream_template,
                 transformer,
                 encoder,
             },
