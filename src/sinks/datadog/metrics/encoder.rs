@@ -7,6 +7,7 @@ use std::{
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
+use datadog_agent_metrics_v3::V3EncodeError;
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -104,6 +105,9 @@ pub enum FinishError {
         metrics: Vec<Metric>,
         recommended_splits: usize,
     },
+
+    #[snafu(display("Failed to encode V3 payload to Protocol Buffers: {}", source))]
+    V3EncodingFailed { source: protobuf::Error },
 }
 
 impl FinishError {
@@ -114,7 +118,22 @@ impl FinishError {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
             Self::TooLarge { .. } => "too_large",
+            Self::V3EncodingFailed { .. } => "v3_encoding_failed",
         }
+    }
+}
+
+impl From<V3EncodeError> for FinishError {
+    fn from(err: V3EncodeError) -> Self {
+        FinishError::V3EncodingFailed {
+            source: err.into_inner(),
+        }
+    }
+}
+
+impl From<protobuf::Error> for FinishError {
+    fn from(source: protobuf::Error) -> Self {
+        FinishError::V3EncodingFailed { source }
     }
 }
 
@@ -304,6 +323,13 @@ impl DatadogMetricsEncoder {
                     });
                 }
             },
+            // V3/V3Beta metrics must be routed to DatadogMetricsV3Encoder.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3 | SeriesApiVersion::V3Beta) => {
+                return Err(EncoderError::InvalidMetric {
+                    expected: "v1 or v2 series",
+                    metric_value: "v3",
+                });
+            }
             // Sketches are encoded via ProtoBuf, also in an incremental fashion.
             DatadogMetricsEndpoint::Sketches => match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
@@ -785,7 +811,7 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
 /// set already upstream or not. The generalized struct `DatadogMetricOriginMetadata` is
 /// utilized in this function, which allows the series and sketch encoding to call and map
 /// the result appropriately for the given protocol they operate on.
-fn generate_origin_metadata(
+pub(super) fn generate_origin_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
     maybe_source_type: Option<&str>,
     origin_product_value: u32,
