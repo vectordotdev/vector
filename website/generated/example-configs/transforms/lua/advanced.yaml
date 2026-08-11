@@ -4,7 +4,7 @@ transforms:
     inputs:
       - my-source-or-transform-id
     hooks:
-      process: >-
+      process: |-
         function (event, emit)
           event.log.field = "value" -- set value of a field
           event.log.another_field = nil -- remove field

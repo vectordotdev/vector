@@ -20,7 +20,6 @@ use vector_lib::{configurable::configurable_component, sensitive_string::Sensiti
 
 /// TLS configuration.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobTlsConfig {

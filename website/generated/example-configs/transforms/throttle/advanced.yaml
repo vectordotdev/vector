@@ -6,4 +6,4 @@ transforms:
     key_field: "{{ message }}"
     measure_cpu_usage: false
     threshold: 100
-    window_secs: 1
+    window_secs: 1.0

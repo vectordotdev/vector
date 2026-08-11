@@ -21,7 +21,6 @@ components: sinks: http: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
