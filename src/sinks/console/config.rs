@@ -86,11 +86,6 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
-/// Purely validated `console` sink configuration.
-///
-/// Serializer construction is deferred to `build` because some codecs (e.g.
-/// protobuf) read files at construction time, which must not happen during
-/// `--no-environment` validation.
 #[derive(Clone, Debug)]
 pub struct ValidatedConsoleSink {
     transformer: Transformer,

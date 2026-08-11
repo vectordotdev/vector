@@ -737,18 +737,9 @@ impl SinkConfig for ElasticsearchConfig {
     }
 }
 
-/// Purely validated Elasticsearch sink configuration.
-///
-/// Captures the pure validation results (request limits, endpoint health
-/// settings, and the active mode's routing-template confinement check) so
-/// `build` does not recompute them. The full per-endpoint parsing remains
-/// inside [`ElasticsearchCommon::parse_many`] because that parse performs I/O
-/// (AWS credential resolution and API-version autodetection).
 #[derive(Clone, Debug)]
 pub struct ValidatedElasticsearch {
-    /// Request settings computed during preparation.
     request_limits: TowerRequestSettings,
-    /// Endpoint health settings computed during preparation.
     health_config: HealthConfig,
 }
 

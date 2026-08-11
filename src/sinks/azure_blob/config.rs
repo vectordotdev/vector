@@ -290,26 +290,14 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-/// Purely validated Azure Blob sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone)]
 pub struct ValidatedAzureBlob {
-    /// Resolved connection string (pure validation without network).
     connection_string: String,
-    /// Parsed connection string, validated during `validate`.
     parsed_connection_string: ParsedConnectionString,
-    /// Parsed container URL, validated during `validate`.
     container_url: Url,
-    /// Batch settings computed during validation.
     batcher_settings: BatcherSettings,
-    /// Blob key timestamp format (defaulted).
     blob_time_format: String,
-    /// Whether to append a UUID to blob keys (defaulted).
     blob_append_uuid: bool,
-    /// Confined blob prefix template.
     confined_blob_prefix: ConfinedTemplate,
 }
 

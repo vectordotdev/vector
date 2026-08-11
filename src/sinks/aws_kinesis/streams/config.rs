@@ -126,13 +126,8 @@ impl SinkConfig for KinesisStreamsSinkConfig {
     }
 }
 
-/// Purely validated Kinesis Streams sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
 #[derive(Clone, Debug)]
 pub struct ValidatedKinesisStreams {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 

@@ -304,37 +304,16 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-/// Purely validated `http` sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
-///
-/// Confinement of the URI and templated headers is performed in
-/// `build_from_validated` (not retained here) because the `http` sink is shared
-/// with the `opentelemetry` and `axiom` sinks, which thread their own component
-/// type through confinement so per-template security warnings carry the outer
-/// sink name. `validate` still runs the pure confinement checks so
-/// `vector validate --no-environment` catches unconfined routing templates.
 #[derive(Clone, Debug)]
 pub struct ValidatedHttp {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// Event transformer from the encoding configuration.
     transformer: Transformer,
-    /// Templated (dynamic) request headers, confined at build time.
     template_headers: BTreeMap<String, Template>,
-    /// Validated payload prefix.
     payload_prefix: String,
-    /// Validated payload suffix.
     payload_suffix: String,
-    /// Content type derived from the encoder.
     content_type: Option<String>,
-    /// Content encoding derived from compression.
     content_encoding: Option<String>,
-    /// Static headers converted to HTTP header name/value pairs.
     converted_static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
-    /// Tower request settings.
     request_limits: TowerRequestSettings,
 }
 

@@ -136,11 +136,6 @@ impl SinkConfig for SematextMetricsConfig {
     }
 }
 
-/// Purely validated `sematext_metrics` sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone)]
 pub struct ValidatedSematextMetrics {
     endpoint: String,

@@ -214,20 +214,11 @@ impl SinkConfig for RemoteWriteConfig {
     }
 }
 
-/// Purely validated Prometheus remote write sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedRemoteWrite {
-    /// The confined tenant id template, if any.
     tenant_id: Option<ConfinedTemplate>,
-    /// The parsed endpoint URI.
     endpoint: Uri,
-    /// The validated custom headers.
     validated_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 

@@ -128,14 +128,8 @@ impl SinkConfig for MqttSinkConfig {
     }
 }
 
-/// Purely validated MQTT sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedMqttSink {
-    /// The confined topic template.
     topic: ConfinedTemplate,
 }
 
@@ -172,9 +166,9 @@ impl ValidatedSink for MqttSinkConfig {
         validated: &ValidatedMqttSink,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ValidatedMqttSink { topic } = validated;
+        let ValidatedMqttSink { topic } = validated.clone();
         let connector = self.build_connector()?;
-        let sink = MqttSink::new(self, topic.clone(), connector.clone())?;
+        let sink = MqttSink::new(self, topic, connector.clone())?;
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),

@@ -376,18 +376,10 @@ impl ValidatedSink for StackdriverConfig {
     }
 }
 
-/// Purely validated Stackdriver logs sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedStackdriverLogs {
-    /// The encoder built from the confined templates.
     encoder: StackdriverLogsEncoder,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// The parsed endpoint URI.
     uri: Uri,
 }
 

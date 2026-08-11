@@ -151,29 +151,24 @@ impl SinkConfig for SocketSinkConfig {
     }
 }
 
-/// Purely validated socket sink configuration.
-///
-/// Holds the encoding transformer per socket mode so `build` can construct
-/// the encoder. For TCP, the parsed host/port are also retained so `build`
-/// consumes the validated address rather than re-parsing it. Serializer
-/// construction is deferred to `build` because some codecs (e.g. protobuf)
-/// read files at construction time, which must not happen during validation.
 #[derive(Clone, Debug)]
 pub enum ValidatedSocket {
-    /// TCP mode with its parsed host/port and stream encoding transformer.
     Tcp {
         host: String,
         port: u16,
         transformer: Transformer,
     },
-    /// UDP mode with its message encoding transformer.
-    Udp { transformer: Transformer },
-    /// Unix stream mode with its stream encoding transformer.
+    Udp {
+        transformer: Transformer,
+    },
     #[cfg(unix)]
-    UnixStream { transformer: Transformer },
-    /// Unix datagram mode with its stream encoding transformer.
+    UnixStream {
+        transformer: Transformer,
+    },
     #[cfg(unix)]
-    UnixDatagram { transformer: Transformer },
+    UnixDatagram {
+        transformer: Transformer,
+    },
 }
 
 #[async_trait::async_trait]

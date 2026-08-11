@@ -166,24 +166,12 @@ impl SinkConfig for DorisConfig {
     }
 }
 
-/// Purely validated Doris sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// Per-endpoint `DorisCommon` parsing (which loads TLS certificates from disk)
-/// is deferred to `build`; only the pure endpoint/template/batch checks run
-/// during `validate`.
 #[derive(Clone, Debug)]
 pub struct ValidatedDoris {
-    /// Request settings computed during preparation.
     request_settings: TowerRequestSettings,
-    /// Endpoint health settings computed during preparation.
     health_config: HealthConfig,
-    /// Batch settings computed during preparation.
     batch_settings: BatcherSettings,
-    /// Confined database template.
     database: ConfinedTemplate,
-    /// Confined table template.
     table: ConfinedTemplate,
 }
 
@@ -237,7 +225,7 @@ impl ValidatedSink for DorisConfig {
             batch_settings,
             database,
             table,
-        } = validated;
+        } = validated.clone();
         // `DorisCommon` parsing performs environment-dependent work (TLS
         // certificate loading from disk), so it happens here at build time
         // rather than during `validate`.
@@ -288,10 +276,10 @@ impl ValidatedSink for DorisConfig {
             .filter_map(Result::ok)
             .collect::<Vec<_>>();
 
-        let service = request_settings.clone().distributed_service(
+        let service = request_settings.distributed_service(
             DorisRetryLogic {},
             services,
-            health_config.clone(),
+            health_config,
             DorisHealthLogic,
             1, // Buffer bound is hardcoded to 1 for sinks
         );
@@ -299,9 +287,9 @@ impl ValidatedSink for DorisConfig {
         // Create DorisSink with the pre-validated settings
         let sink = DorisSink::new(
             service,
-            *batch_settings,
-            database.clone(),
-            table.clone(),
+            batch_settings,
+            database,
+            table,
             common.request_builder.clone(),
         );
 

@@ -203,10 +203,8 @@ impl SinkConfig for DatadogLogsConfig {
     }
 }
 
-/// Purely validated Datadog logs sink configuration.
 #[derive(Clone, Debug)]
 pub struct ValidatedLogs {
-    /// Batch settings computed during validation.
     batch: BatcherSettings,
 }
 

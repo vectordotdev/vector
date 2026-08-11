@@ -127,11 +127,6 @@ impl SinkConfig for InfluxDbConfig {
     }
 }
 
-/// Purely validated `influxdb_metrics` sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone)]
 pub struct ValidatedInfluxDbMetrics {
     uri: http::Uri,

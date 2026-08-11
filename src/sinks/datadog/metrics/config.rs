@@ -205,12 +205,9 @@ impl SinkConfig for DatadogMetricsConfig {
     }
 }
 
-/// Purely validated Datadog metrics sink configuration.
 #[derive(Clone, Debug)]
 pub struct ValidatedMetrics {
-    /// Series batcher settings computed during validation.
     batcher_settings: BatcherSettings,
-    /// Sketches batcher settings computed during validation.
     sketches_batcher_settings: BatcherSettings,
 }
 

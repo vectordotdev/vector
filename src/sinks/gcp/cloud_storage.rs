@@ -320,18 +320,10 @@ impl ValidatedSink for GcsSinkConfig {
     }
 }
 
-/// Purely validated GCS sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedGcsSink {
-    /// The resolved object base URL (`endpoint/bucket/`).
     base_url: Uri,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// The confined key-prefix template.
     key_prefix_template: ConfinedTemplate,
 }
 

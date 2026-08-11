@@ -158,11 +158,6 @@ impl SinkConfig for GreptimeDBMetricsConfig {
     }
 }
 
-/// Purely validated `greptimedb_metrics` sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedGreptimeDBMetrics {
     batch_settings: BatcherSettings,
@@ -208,7 +203,7 @@ impl ValidatedSink for GreptimeDBMetricsConfig {
         let ValidatedGreptimeDBMetrics {
             batch_settings,
             use_new_naming,
-        } = validated;
+        } = validated.clone();
 
         let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
@@ -216,10 +211,8 @@ impl ValidatedSink for GreptimeDBMetricsConfig {
             .service(GreptimeDBGrpcService::try_new(self)?);
         let sink = sink::GreptimeDBGrpcSink {
             service,
-            batch_settings: *batch_settings,
-            request_builder_options: RequestBuilderOptions {
-                use_new_naming: *use_new_naming,
-            },
+            batch_settings,
+            request_builder_options: RequestBuilderOptions { use_new_naming },
         };
 
         let healthcheck = healthcheck(self)?;

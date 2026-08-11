@@ -198,16 +198,9 @@ impl SinkConfig for NatsSinkConfig {
     }
 }
 
-/// Purely validated NATS sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedNatsSink {
-    /// The confined subject template.
     subject: ConfinedTemplate,
-    /// The parsed NATS server addresses.
     server_addresses: Vec<async_nats::ServerAddr>,
 }
 

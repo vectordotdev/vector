@@ -134,7 +134,7 @@ impl ValidatedSink for StackdriverConfig {
         let ValidatedStackdriverMetrics {
             batch_settings,
             uri,
-        } = validated;
+        } = validated.clone();
 
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
@@ -155,10 +155,8 @@ impl ValidatedSink for StackdriverConfig {
 
         auth.spawn_regenerate_token();
 
-        let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
-            uri: uri.clone(),
-            auth,
-        };
+        let stackdriver_metrics_service_request_builder =
+            StackdriverMetricsServiceRequestBuilder { uri, auth };
 
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
@@ -169,22 +167,15 @@ impl ValidatedSink for StackdriverConfig {
             )
             .service(service);
 
-        let sink = StackdriverMetricsSink::new(service, *batch_settings, request_builder);
+        let sink = StackdriverMetricsSink::new(service, batch_settings, request_builder);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
-/// Purely validated Stackdriver metrics sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedStackdriverMetrics {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// The parsed time series endpoint URI.
     uri: Uri,
 }
 

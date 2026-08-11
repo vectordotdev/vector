@@ -258,15 +258,6 @@ impl SinkConfig for FileSinkConfig {
     }
 }
 
-/// Purely validated `file` sink configuration.
-///
-/// Holds the built encoding components so `build` does not redo the (pure)
-/// encoding construction. Path confinement is intentionally NOT retained here:
-/// `PathConfinement` is not `Clone`, and `build` receives the validated state by
-/// reference, so the confinement is constructed (from the same pure inputs) in
-/// `build`. The pure confinement checks (relative `base_dir`, unconfined path
-/// template) run during `validate` so `vector validate --no-environment` catches
-/// them.
 #[derive(Clone, Debug)]
 pub struct ValidatedFileSink {
     transformer: Transformer,

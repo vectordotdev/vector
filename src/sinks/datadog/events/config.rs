@@ -113,18 +113,8 @@ impl SinkConfig for DatadogEventsConfig {
     }
 }
 
-/// Purely validated `datadog_events` sink configuration.
-///
-/// Holds the request settings so `build` does not redo the (pure) structural
-/// validation. The delivery endpoint is derived in `build` after global
-/// `datadog::Options` are applied (via `SinkContext`), so a global site is
-/// honored consistently with the healthcheck. The API key is NOT resolved here:
-/// it is a credential that may come from global `datadog::Options` (`DD_API_KEY`
-/// env var) via `SinkContext`, and credential resolution is excluded from
-/// `validate`.
 #[derive(Clone, Debug)]
 pub struct ValidatedEvents {
-    /// Request settings computed during validation.
     request_settings: TowerRequestSettings,
 }
 

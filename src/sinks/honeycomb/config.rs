@@ -115,18 +115,10 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
-/// Purely validated `honeycomb` sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedHoneycomb {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// The endpoint URI built from `endpoint` and `dataset`.
     uri: Uri,
-    /// Tower request settings.
     request_limits: TowerRequestSettings,
 }
 

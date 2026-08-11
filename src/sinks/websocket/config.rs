@@ -58,12 +58,6 @@ impl SinkConfig for WebSocketSinkConfig {
     }
 }
 
-/// Purely validated `websocket` sink configuration.
-///
-/// Holds the encoding transformer and the parsed URI host/port so `build`
-/// consumes the validated address rather than re-parsing it. The connector is
-/// NOT retained here: it resolves TLS settings (which may read certificate
-/// files from disk), so it is built in `build` instead.
 #[derive(Clone, Debug)]
 pub struct ValidatedWebSocketSink {
     host: String,
@@ -96,10 +90,10 @@ impl ValidatedSink for WebSocketSinkConfig {
             host,
             port,
             transformer,
-        } = validated;
-        let connector = self.build_connector(host.clone(), *port)?;
+        } = validated.clone();
+        let connector = self.build_connector(host, port)?;
         let serializer = self.encoding.build()?;
-        let ws_sink = WebSocketSink::new(self, connector.clone(), transformer.clone(), serializer)?;
+        let ws_sink = WebSocketSink::new(self, connector.clone(), transformer, serializer)?;
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),

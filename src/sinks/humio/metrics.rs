@@ -174,11 +174,6 @@ impl SinkConfig for HumioMetricsConfig {
     }
 }
 
-/// Purely validated Humio metrics sink configuration.
-///
-/// The Humio metrics sink is a thin wrapper over the Humio logs sink, so its
-/// validated state is the underlying Splunk HEC logs validated state, produced
-/// with the `humio_metrics` component name.
 #[derive(Clone, Debug)]
 pub struct ValidatedHumioMetrics {
     hec: ValidatedHecLogsSink,

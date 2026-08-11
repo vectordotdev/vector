@@ -149,16 +149,9 @@ impl SinkConfig for AmqpSinkConfig {
     }
 }
 
-/// Purely validated AMQP sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedAmqpSink {
-    /// The confined exchange template.
     exchange: ConfinedTemplate,
-    /// The confined routing key template.
     routing_key: Option<ConfinedTemplate>,
 }
 
@@ -195,8 +188,8 @@ impl ValidatedSink for AmqpSinkConfig {
         let ValidatedAmqpSink {
             exchange,
             routing_key,
-        } = validated;
-        let sink = AmqpSink::new(self.clone(), exchange.clone(), routing_key.clone()).await?;
+        } = validated.clone();
+        let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
         let hc = healthcheck(sink.channels.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }

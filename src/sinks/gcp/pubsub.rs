@@ -166,7 +166,7 @@ impl ValidatedSink for PubsubConfig {
             uri_base,
             batch_settings,
             transformer,
-        } = validated;
+        } = validated.clone();
 
         // We only need to load the credentials if we are not targeting an emulator.
         let auth = self.auth.build(Scope::PubSub).await?;
@@ -176,8 +176,8 @@ impl ValidatedSink for PubsubConfig {
 
         let sink = PubsubSink {
             auth,
-            uri_base: uri_base.clone(),
-            transformer: transformer.clone(),
+            uri_base,
+            transformer,
             encoder,
         };
 
@@ -202,18 +202,10 @@ impl ValidatedSink for PubsubConfig {
     }
 }
 
-/// Purely validated Pub/Sub sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedPubsub {
-    /// The resolved Pub/Sub topic URI base.
     uri_base: Uri,
-    /// Batch settings computed during validation.
     batch_settings: BatchSettings<JsonArrayBuffer>,
-    /// The configured transformer.
     transformer: Transformer,
 }
 

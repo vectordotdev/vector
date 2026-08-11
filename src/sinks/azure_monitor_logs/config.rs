@@ -205,21 +205,11 @@ impl AzureMonitorLogsConfig {
 
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
-/// Purely validated Azure Monitor Logs sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedAzureMonitorLogs {
-    /// The parsed endpoint URI.
     endpoint: Uri,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// The decoded shared key.
     shared_key: pkey::PKey<pkey::Private>,
-    /// The configured time generated key, if any. The `log_schema.timestamp_key`
-    /// fallback is resolved in `build` after global log schema initialization.
     time_generated_key: Option<OwnedValuePath>,
 }
 

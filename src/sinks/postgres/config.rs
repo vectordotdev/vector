@@ -103,20 +103,11 @@ impl SinkConfig for PostgresConfig {
     }
 }
 
-/// Purely validated PostgreSQL sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedPostgres {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// Request settings computed during validation.
     request_settings: TowerRequestSettings,
-    /// The parsed endpoint URI, validated.
     endpoint_uri: UriSerde,
-    /// The parsed PostgreSQL connection options, validated.
     pg_connect_options: PgConnectOptions,
 }
 
@@ -169,11 +160,11 @@ impl ValidatedSink for PostgresConfig {
             request_settings,
             endpoint_uri,
             pg_connect_options,
-        } = validated;
+        } = validated.clone();
 
         let connection_pool = PgPoolOptions::new()
             .max_connections(self.pool_size)
-            .connect_lazy_with(pg_connect_options.clone());
+            .connect_lazy_with(pg_connect_options);
 
         let healthcheck = healthcheck(connection_pool.clone()).boxed();
 
@@ -183,10 +174,10 @@ impl ValidatedSink for PostgresConfig {
             endpoint_uri.to_string(),
         );
         let service = ServiceBuilder::new()
-            .settings(request_settings.clone(), PostgresRetryLogic)
+            .settings(request_settings, PostgresRetryLogic)
             .service(service);
 
-        let sink = PostgresSink::new(service, *batch_settings);
+        let sink = PostgresSink::new(service, batch_settings);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }

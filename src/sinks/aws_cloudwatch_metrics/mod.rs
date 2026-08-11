@@ -152,15 +152,8 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     }
 }
 
-/// Purely validated `aws_cloudwatch_metrics` sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 pub struct ValidatedCloudWatchMetrics {
-    /// Batch settings computed during validation.
     batch: BatchSettings<MetricsBuffer>,
-    /// Validated storage resolutions keyed by metric name.
     storage_resolution: IndexMap<String, i32>,
 }
 

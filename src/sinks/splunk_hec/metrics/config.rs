@@ -162,21 +162,12 @@ impl SinkConfig for HecMetricsSinkConfig {
     }
 }
 
-/// Purely validated Splunk HEC metrics sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
 #[derive(Clone, Debug)]
 pub struct ValidatedHecMetricsSink {
-    /// Confined index template.
     index: Option<ConfinedTemplate>,
-    /// Confined source template.
     source: Option<ConfinedTemplate>,
-    /// Confined sourcetype template.
     sourcetype: Option<ConfinedTemplate>,
-    /// Templated field keys derived from the templates.
     templated_field_keys: Box<[String]>,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 

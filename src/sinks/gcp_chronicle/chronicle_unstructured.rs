@@ -357,18 +357,10 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
     }
 }
 
-/// Purely validated Chronicle unstructured sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedChronicleUnstructured {
-    /// The resolved endpoint for the unstructured log entries API.
     endpoint: String,
-    /// The resolved endpoint for the log types API (used by the healthcheck).
     healthcheck_endpoint: String,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 

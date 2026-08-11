@@ -183,16 +183,9 @@ impl AzureLogsIngestionConfig {
 
 impl_generate_config_from_default!(AzureLogsIngestionConfig);
 
-/// Purely validated Azure Logs Ingestion sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedAzureLogsIngestion {
-    /// The parsed endpoint URI.
     endpoint: Uri,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 

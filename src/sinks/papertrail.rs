@@ -82,12 +82,6 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-/// Purely validated `papertrail` sink configuration.
-///
-/// Holds the resolved endpoint address and TLS settings so `build` can
-/// construct the serializer. Serializer construction is deferred to `build`
-/// because some codecs (e.g. protobuf) read files at construction time, which
-/// must not happen during `--no-environment` validation.
 #[derive(Clone, Debug)]
 pub struct ValidatedPapertrail {
     address: String,
@@ -137,17 +131,12 @@ impl ValidatedSink for PapertrailConfig {
             address,
             tls,
             transformer,
-        } = validated;
+        } = validated.clone();
 
         let pid = std::process::id();
         let process = self.process.clone();
 
-        let sink_config = TcpSinkConfig::new(
-            address.clone(),
-            self.keepalive,
-            tls.clone(),
-            self.send_buffer_bytes,
-        );
+        let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -157,7 +146,7 @@ impl ValidatedSink for PapertrailConfig {
             PapertrailEncoder {
                 pid,
                 process,
-                transformer: transformer.clone(),
+                transformer,
                 encoder,
             },
         )

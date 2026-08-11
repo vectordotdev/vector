@@ -174,11 +174,6 @@ impl SinkConfig for InfluxDbLogsConfig {
     }
 }
 
-/// Purely validated `influxdb_logs` sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedInfluxDbLogs {
     measurement: String,
@@ -187,14 +182,8 @@ pub struct ValidatedInfluxDbLogs {
     uri: Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,
-    /// The configured `host_key`, if any. The `log_schema.host_key` fallback
-    /// is resolved in `build` after global log schema initialization.
     host_key: Option<OwnedValuePath>,
-    /// The configured `message_key`, if any. The `log_schema.message_key`
-    /// fallback is resolved in `build` after global log schema initialization.
     message_key: Option<OwnedValuePath>,
-    /// The configured `source_type_key`, if any. The `log_schema.source_type_key`
-    /// fallback is resolved in `build` after global log schema initialization.
     source_type_key: Option<OwnedValuePath>,
 }
 

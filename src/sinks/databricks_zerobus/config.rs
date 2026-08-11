@@ -225,15 +225,9 @@ impl SinkConfig for ZerobusSinkConfig {
     }
 }
 
-/// Purely validated Zerobus sink configuration.
-///
-/// Captures the pure validation results (structural checks, batch settings,
-/// and request limits) so `build` does not recompute them.
 #[derive(Clone, Debug)]
 pub struct ValidatedZerobus {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// Request settings computed during preparation.
     request_limits: TowerRequestSettings,
 }
 

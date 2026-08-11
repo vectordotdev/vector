@@ -166,15 +166,9 @@ impl SinkConfig for AxiomConfig {
     }
 }
 
-/// Purely validated Axiom sink configuration.
-///
-/// Captures the pure validation results (endpoint URL/region exclusivity and
-/// the resolved ingest URI) so `build` does not recompute them.
 #[derive(Clone, Debug)]
 pub struct ValidatedAxiom {
-    /// The resolved ingest endpoint URI template.
     uri: Template,
-    /// The validated derived HTTP sink configuration.
     http: ValidatedHttp,
 }
 

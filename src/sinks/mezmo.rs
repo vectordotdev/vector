@@ -183,16 +183,9 @@ impl SinkConfig for MezmoConfig {
     }
 }
 
-/// Purely validated Mezmo sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedMezmo {
-    /// Request settings computed during validation.
     request_settings: TowerRequestSettings,
-    /// Batch settings computed during validation.
     batch_settings: BatchSettings<JsonArrayBuffer>,
 }
 

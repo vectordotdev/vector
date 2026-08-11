@@ -139,18 +139,10 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-/// Purely validated `new_relic` sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedNewRelic {
-    /// Batch settings computed during validation.
     batcher_settings: BatcherSettings,
-    /// Tower request settings.
     request_limits: TowerRequestSettings,
-    /// Credentials (license key, account id, resolved region/API and URI).
     credentials: Arc<NewRelicCredentials>,
 }
 

@@ -221,10 +221,8 @@ impl SinkConfig for DatadogTracesConfig {
     }
 }
 
-/// Purely validated Datadog traces sink configuration.
 #[derive(Clone, Debug)]
 pub struct ValidatedTraces {
-    /// Batcher settings computed during validation.
     batcher_settings: BatcherSettings,
 }
 

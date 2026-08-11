@@ -235,16 +235,9 @@ impl SinkConfig for VectorConfig {
     }
 }
 
-/// Purely validated `vector` sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedVector {
-    /// Tower request settings.
     request_settings: TowerRequestSettings,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 
@@ -276,7 +269,7 @@ impl ValidatedSink for VectorConfig {
         let ValidatedVector {
             request_settings,
             batch_settings,
-        } = validated;
+        } = validated.clone();
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uris = self.uris(tls.is_tls())?;
         let endpoint_strategy = self
@@ -287,7 +280,6 @@ impl ValidatedSink for VectorConfig {
         let client = new_client(&tls, cx.proxy(), self.keepalive)?;
 
         let healthcheck = healthchecks(client.clone(), &uris, cx.healthcheck, endpoint_strategy);
-        let request_settings = request_settings.clone();
 
         let services = uris
             .into_iter()
@@ -305,7 +297,7 @@ impl ValidatedSink for VectorConfig {
                     .service(services.into_iter().next().expect("one service").1);
 
                 VectorSinkType::from_event_streamsink(VectorSink {
-                    batch_settings: *batch_settings,
+                    batch_settings,
                     service,
                 })
             }
@@ -322,7 +314,7 @@ impl ValidatedSink for VectorConfig {
                 );
 
                 VectorSinkType::from_event_streamsink(VectorSink {
-                    batch_settings: *batch_settings,
+                    batch_settings,
                     service,
                 })
             }
@@ -353,7 +345,7 @@ impl ValidatedSink for VectorConfig {
                     ));
 
                 VectorSinkType::from_event_streamsink(VectorSink {
-                    batch_settings: *batch_settings,
+                    batch_settings,
                     service,
                 })
             }

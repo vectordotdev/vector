@@ -259,19 +259,11 @@ impl SinkConfig for HecLogsSinkConfig {
     }
 }
 
-/// Purely validated Splunk HEC logs sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
 #[derive(Clone, Debug)]
 pub struct ValidatedHecLogsSink {
-    /// Confined index template.
     index: Option<ConfinedTemplate>,
-    /// Confined source template.
     source: Option<ConfinedTemplate>,
-    /// Confined sourcetype template.
     sourcetype: Option<ConfinedTemplate>,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 

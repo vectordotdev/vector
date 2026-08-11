@@ -452,22 +452,12 @@ impl ClickhouseConfig {
     }
 }
 
-/// Purely validated ClickHouse sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedClickhouse {
-    /// The database template, validated.
     database: Template,
-    /// Resolved auth (pure validation without network).
     auth: Option<Auth>,
-    /// Batch settings computed during preparation.
     batch_settings: BatcherSettings,
-    /// Confined table template.
     confined_table: ConfinedTemplate,
-    /// Confined database template.
     confined_database: ConfinedTemplate,
 }
 

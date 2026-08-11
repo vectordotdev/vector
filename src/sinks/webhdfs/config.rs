@@ -118,16 +118,9 @@ impl SinkConfig for WebHdfsConfig {
     }
 }
 
-/// Purely validated WebHDFS sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedWebHdfs {
-    /// Batch settings computed during validation.
     batcher_settings: BatcherSettings,
-    /// Confined prefix template.
     confined_prefix: ConfinedTemplate,
 }
 
@@ -182,7 +175,7 @@ impl WebHdfsConfig {
         let ValidatedWebHdfs {
             batcher_settings,
             confined_prefix,
-        } = validated;
+        } = validated.clone();
 
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -198,8 +191,8 @@ impl WebHdfsConfig {
         let sink = OpenDalSink::new(
             svc,
             request_builder,
-            KeyPartitioner::new(confined_prefix.clone(), None),
-            *batcher_settings,
+            KeyPartitioner::new(confined_prefix, None),
+            batcher_settings,
         );
 
         Ok(VectorSink::from_event_streamsink(sink))

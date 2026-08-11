@@ -103,17 +103,10 @@ impl SinkConfig for KeepConfig {
     }
 }
 
-/// Purely validated Keep sink configuration.
-///
-/// Captures the pure validation results (batch settings, endpoint URI and
-/// request limits) so `build` does not recompute them.
 #[derive(Clone, Debug)]
 pub struct ValidatedKeep {
-    /// Batch settings computed during preparation.
     batch_settings: BatcherSettings,
-    /// The parsed endpoint URI.
     uri: Uri,
-    /// Request settings computed during preparation.
     request_limits: TowerRequestSettings,
 }
 

@@ -153,15 +153,6 @@ impl SinkConfig for WebSocketListenerSinkConfig {
     }
 }
 
-/// Purely validated `websocket_server` sink configuration.
-///
-/// Holds the resolved TLS settings and the encoding transformer so `build`
-/// does not redo the (pure) structural validation. Serializer construction is
-/// deferred to `build` because some codecs (e.g. protobuf) read files at
-/// construction time, which must not happen during `--no-environment`
-/// validation. The server auth matcher is NOT retained here: it is built from
-/// `cx.enrichment_tables` / `cx.metrics_storage` in `build`, which is
-/// context-dependent.
 #[derive(Clone, Debug)]
 pub struct ValidatedWebSocketListenerSink {
     pub(super) transformer: Transformer,

@@ -251,18 +251,10 @@ impl SinkConfig for S3SinkConfig {
     }
 }
 
-/// Purely validated `aws_s3` sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedAwsS3 {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// Confined key prefix template.
     key_prefix: ConfinedTemplate,
-    /// Confined SSE-KMS key id template, if configured.
     ssekms_key_id: Option<ConfinedTemplate>,
 }
 

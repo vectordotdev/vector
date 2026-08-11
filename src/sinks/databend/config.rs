@@ -115,24 +115,13 @@ impl SinkConfig for DatabendConfig {
     }
 }
 
-/// Purely validated Databend sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedDatabend {
-    /// The fully resolved DSN endpoint, including any embedded credentials.
     endpoint: String,
-    /// Request settings computed during preparation.
     request_settings: TowerRequestSettings,
-    /// Batch settings computed during preparation.
     batch_settings: BatcherSettings,
-    /// File-format options derived from the configured compression/encoding.
     file_format_options: BTreeMap<&'static str, &'static str>,
-    /// The resolved compression algorithm.
     compression: Compression,
-    /// The encoding transformer.
     transformer: Transformer,
 }
 

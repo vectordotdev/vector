@@ -241,26 +241,14 @@ impl SinkConfig for LokiConfig {
     }
 }
 
-/// Purely validated `loki` sink configuration.
-///
-/// Captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedLokiSink {
-    /// Resolved auth (pure validation without network).
     pub(super) auth: Option<Auth>,
-    /// Tower request settings, adjusted for the out-of-order action.
     pub(super) request_limits: TowerRequestSettings,
-    /// Event transformer from the encoding configuration.
     pub(super) transformer: Transformer,
-    /// Confined tenant ID template.
     pub(super) tenant_id: Option<ConfinedTemplate>,
-    /// Confined label templates.
     pub(super) labels: HashMap<ConfinedTemplate, ConfinedTemplate>,
-    /// Confined structured metadata templates.
     pub(super) structured_metadata: HashMap<ConfinedTemplate, ConfinedTemplate>,
-    /// Batch settings computed during validation.
     pub(super) batch_settings: BatcherSettings,
 }
 

@@ -145,18 +145,10 @@ impl SinkConfig for AppsignalConfig {
     }
 }
 
-/// Purely validated AppSignal sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedAppsignal {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
-    /// The events endpoint URI, validated.
     endpoint: Uri,
-    /// The healthcheck endpoint URI, validated.
     healthcheck_endpoint: Uri,
 }
 
@@ -185,19 +177,19 @@ impl ValidatedSink for AppsignalConfig {
             batch_settings,
             endpoint,
             healthcheck_endpoint,
-        } = validated;
+        } = validated.clone();
 
         // TLS settings may read certificate files from disk, so they are
         // resolved at build time rather than during pure validation.
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let client = self.build_client(cx.proxy(), &tls)?;
         let healthcheck = healthcheck(
-            healthcheck_endpoint.clone(),
+            healthcheck_endpoint,
             self.push_api_key.inner().to_string(),
             client.clone(),
         )
         .boxed();
-        let sink = self.build_sink(client, *batch_settings, endpoint.clone())?;
+        let sink = self.build_sink(client, batch_settings, endpoint)?;
 
         Ok((sink, healthcheck))
     }

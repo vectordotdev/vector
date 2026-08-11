@@ -430,14 +430,8 @@ impl SinkConfig for PulsarSinkConfig {
     }
 }
 
-/// Purely validated Pulsar sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedPulsarSink {
-    /// The confined topic template.
     topic: ConfinedTemplate,
 }
 

@@ -214,16 +214,9 @@ impl SinkConfig for RedisSinkConfig {
     }
 }
 
-/// Purely validated Redis sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedRedisSink {
-    /// The confined key template.
     key: ConfinedTemplate,
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 
@@ -257,10 +250,10 @@ impl ValidatedSink for RedisSinkConfig {
         let ValidatedRedisSink {
             key,
             batch_settings,
-        } = validated;
+        } = validated.clone();
         let conn = self.build_connection().await?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = RedisSink::new(self, conn, key.clone(), *batch_settings)?;
+        let sink = RedisSink::new(self, conn, key, batch_settings)?;
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }

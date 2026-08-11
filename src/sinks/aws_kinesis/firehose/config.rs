@@ -131,13 +131,8 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     }
 }
 
-/// Purely validated Kinesis Firehose sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
 #[derive(Clone, Debug)]
 pub struct ValidatedKinesisFirehose {
-    /// Batch settings computed during validation.
     batch_settings: BatcherSettings,
 }
 

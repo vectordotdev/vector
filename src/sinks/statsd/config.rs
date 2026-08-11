@@ -131,16 +131,9 @@ impl SinkConfig for StatsdSinkConfig {
     }
 }
 
-/// Purely validated StatsD sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration. The actual sink building consumes these values without
-/// recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedStatsd {
-    /// Batch settings computed during validation.
     batcher_settings: BatcherSettings,
-    /// The resolved socket mode.
     socket_mode: SocketMode,
 }
 
@@ -166,10 +159,10 @@ impl ValidatedSink for StatsdSinkConfig {
         let ValidatedStatsd {
             batcher_settings,
             socket_mode,
-        } = validated;
+        } = validated.clone();
 
         let request_builder =
-            StatsdRequestBuilder::new(self.default_namespace.clone(), *socket_mode);
+            StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode);
         let protocol = Protocol::from(socket_mode.as_str());
 
         let connector = self.mode.as_connector();
@@ -178,7 +171,7 @@ impl ValidatedSink for StatsdSinkConfig {
 
         let sink = StatsdSink::new(
             StatsdService::from_transport(service),
-            *batcher_settings,
+            batcher_settings,
             request_builder,
             protocol,
         );

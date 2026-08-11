@@ -77,15 +77,9 @@ impl SinkConfig for SqsSinkConfig {
     }
 }
 
-/// Purely validated SQS sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
 #[derive(Clone)]
 pub struct ValidatedSqsSink {
-    /// The validated FIFO message group ID template.
     message_group_id: Option<UnconfinedTemplate>,
-    /// The validated message deduplication ID template.
     message_deduplication_id: Option<UnconfinedTemplate>,
 }
 
