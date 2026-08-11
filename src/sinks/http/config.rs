@@ -373,6 +373,13 @@ impl ValidatedSink for HttpSinkConfig {
             }
         }
 
+        // A static URI can be parsed and checked for embedded credentials up
+        // front; dynamic URIs are only validated at render time.
+        if !self.uri.is_dynamic() {
+            let uri_serde: UriSerde = self.uri.get_ref().parse()?;
+            self.auth.choose_one(&uri_serde.auth)?;
+        }
+
         let (payload_prefix, payload_suffix) = validate_payload_wrapper(
             &self.payload_prefix,
             &self.payload_suffix,
@@ -619,6 +626,57 @@ mod tests {
     }
 
     register_validatable_component!(HttpSinkConfig);
+
+    #[test]
+    fn validate_rejects_static_uri_with_auth_conflict() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://user:pass@localhost:9000/endpoint"
+            auth:
+              strategy: basic
+              user: user
+              password: pass
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "embedded credentials plus auth should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_static_uri() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        config.validate().expect("valid static uri should validate");
+    }
+
+    #[test]
+    fn validate_accepts_dynamic_uri() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://example.com/{{ path }}"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect("dynamic uri validation is deferred to render time");
+    }
 
     #[test]
     fn confinement_rejects_unconfined_uri() {
