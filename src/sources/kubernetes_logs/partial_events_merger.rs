@@ -518,7 +518,7 @@ mod test {
     #[tokio::test]
     async fn truncate_single_event_exceeding_limit() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
+        e_1.insert(event_path!("foo"), 1);
 
         let input_stream = futures::stream::iter([e_1.into()]);
         let output_stream = merge_partial_events(
@@ -530,17 +530,20 @@ mod test {
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0].as_log().get(".message"), Some(&value!("test")));
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("test"))
+        );
     }
 
     #[tokio::test]
     async fn truncate_merged_events_exceeding_limit() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!("foo"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo2", 1);
+        e_2.insert(event_path!("foo2"), 1);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
         // 20 > "test message 1" (14 bytes) but < combined (28 bytes)
@@ -554,7 +557,7 @@ mod test {
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
         assert_eq!(
-            output[0].as_log().get(".message"),
+            output[0].as_log().get(event_path!("message")),
             Some(&value!("test mess..TRUNCATED"))
         );
     }
@@ -562,7 +565,7 @@ mod test {
     #[tokio::test]
     async fn truncate_does_not_affect_events_within_limit() {
         let mut e_1 = LogEvent::from("short");
-        e_1.insert("foo", 1);
+        e_1.insert(event_path!("foo"), 1);
 
         let input_stream = futures::stream::iter([e_1.into()]);
         let output_stream = merge_partial_events(
@@ -574,20 +577,23 @@ mod test {
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0].as_log().get(".message"), Some(&value!("short")));
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("short"))
+        );
     }
 
     #[tokio::test]
     async fn truncate_discards_further_partials() {
         let mut e_1 = LogEvent::from("aaaa");
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("bbbb");
-        e_2.insert("_partial", true);
+        e_2.insert(event_path!("_partial"), true);
 
         // Third event completes the merge — but e_2 should have been discarded
         let mut e_3 = LogEvent::from("cccc");
-        e_3.insert("foo", 1);
+        e_3.insert(event_path!("foo"), 1);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into(), e_3.into()]);
         // Limit at 6: "aaaa" (4) + "bbbb" (4) = 8 > 6, triggers truncation at merge
@@ -601,18 +607,21 @@ mod test {
         let output: Vec<Event> = output_stream.collect().await;
         // The truncated event is emitted when e_3 (non-partial) completes the sequence
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0].as_log().get(".message"), Some(&value!("aaaabb")));
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("aaaabb"))
+        );
     }
 
     #[tokio::test]
     async fn truncate_flush_emits_truncated_events() {
         let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", 1);
-        e_1.insert("_partial", true);
+        e_1.insert(event_path!("foo"), 1);
+        e_1.insert(event_path!("_partial"), true);
 
         let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo2", 1);
-        e_2.insert("_partial", true);
+        e_2.insert(event_path!("foo2"), 1);
+        e_2.insert(event_path!("_partial"), true);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
         // Combined exceeds limit — truncated but emitted on flush
@@ -626,7 +635,7 @@ mod test {
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
         assert_eq!(
-            output[0].as_log().get(".message"),
+            output[0].as_log().get(event_path!("message")),
             Some(&value!("test mess..TRUNCATED"))
         );
     }
