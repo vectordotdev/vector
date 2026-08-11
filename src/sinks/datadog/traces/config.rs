@@ -277,10 +277,7 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
 #[cfg(test)]
 mod test {
     use super::{BATCH_GOAL_BYTES, BATCH_MAX_EVENTS, DatadogTracesConfig};
-    use crate::{
-        config::ValidatedSink,
-        sinks::datadog::LocalDatadogCommonConfig,
-    };
+    use crate::{config::ValidatedSink, sinks::datadog::LocalDatadogCommonConfig};
 
     #[test]
     fn generate_config() {
