@@ -1,5 +1,10 @@
+use std::str::FromStr;
+
 use futures::FutureExt;
-use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
+use sqlx::{
+    Pool, Postgres,
+    postgres::{PgConnectOptions, PgPoolOptions},
+};
 use tower::ServiceBuilder;
 use vector_lib::{
     config::AcknowledgementsConfig,
@@ -111,6 +116,29 @@ pub struct ValidatedPostgres {
     request_settings: TowerRequestSettings,
     /// The parsed endpoint URI, validated.
     endpoint_uri: UriSerde,
+    /// The parsed PostgreSQL connection options, validated.
+    pg_connect_options: PgConnectOptions,
+}
+
+/// Parse and validate a PostgreSQL connection string without touching the
+/// network or filesystem.
+///
+/// Mirrors the DSN parse that `PgPoolOptions::connect_lazy` performs in
+/// `build()`. SQLx's Postgres DSN parser is lenient about the URL scheme, so
+/// non-`postgres` endpoints are rejected explicitly.
+fn parse_pg_connect_options(endpoint: &str) -> crate::Result<PgConnectOptions> {
+    let url = url::Url::parse(endpoint)
+        .map_err(|e| format!("invalid PostgreSQL connection string `{endpoint}`: {e}"))?;
+    if !matches!(url.scheme(), "postgres" | "postgresql") {
+        return Err(format!(
+            "invalid PostgreSQL connection string `{endpoint}`: expected a \
+             `postgres://` or `postgresql://` URL, got scheme `{}`",
+            url.scheme()
+        )
+        .into());
+    }
+    PgConnectOptions::from_str(endpoint)
+        .map_err(|e| format!("invalid PostgreSQL connection string `{endpoint}`: {e}").into())
 }
 
 #[async_trait::async_trait]
@@ -121,11 +149,13 @@ impl ValidatedSink for PostgresConfig {
         let batch_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.into_settings();
         let endpoint_uri: UriSerde = self.endpoint.parse()?;
+        let pg_connect_options = parse_pg_connect_options(&self.endpoint)?;
 
         Ok(ValidatedPostgres {
             batch_settings,
             request_settings,
             endpoint_uri,
+            pg_connect_options,
         })
     }
 
@@ -138,11 +168,12 @@ impl ValidatedSink for PostgresConfig {
             batch_settings,
             request_settings,
             endpoint_uri,
+            pg_connect_options,
         } = validated;
 
         let connection_pool = PgPoolOptions::new()
             .max_connections(self.pool_size)
-            .connect_lazy(&self.endpoint)?;
+            .connect_lazy_with(pg_connect_options.clone());
 
         let healthcheck = healthcheck(connection_pool.clone()).boxed();
 
@@ -199,5 +230,51 @@ mod tests {
         // The parsed endpoint URI redacts the password in its Display output.
         assert_eq!(validated.endpoint_uri.uri.host(), Some("localhost"));
         assert_eq!(validated.endpoint_uri.uri.path(), "/default");
+    }
+
+    #[test]
+    fn validate_accepts_valid_postgres_dsn() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+        "#})
+        .unwrap();
+        cfg.validate().expect("valid postgres DSN should validate");
+    }
+
+    #[test]
+    fn validate_rejects_non_postgres_uri() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "https://example.com"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let err = cfg
+            .validate()
+            .expect_err("generic URI should not validate as a postgres DSN");
+        assert!(
+            err.to_string()
+                .contains("invalid PostgreSQL connection string"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_postgres_dsn() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost:notaport/default"
+            table: "mytable"
+        "#})
+        .unwrap();
+        assert!(
+            cfg.validate().is_err(),
+            "malformed postgres DSN should not validate"
+        );
     }
 }

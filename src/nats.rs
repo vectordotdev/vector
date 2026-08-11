@@ -147,9 +147,7 @@ impl NatsAuthConfig {
 
 /// Validate the NATS TLS cert/key pairing without touching the filesystem.
 ///
-/// Mirrors the pairing check in `from_tls_auth_config` so that `vector validate
-/// --no-environment` catches partial TLS configs that would otherwise only fail
-/// at build time.
+/// Mirrors the pairing check in `from_tls_auth_config`.
 pub(crate) fn validate_tls_cert_key_pair(
     tls_config: &TlsEnableableConfig,
 ) -> Result<(), NatsConfigError> {

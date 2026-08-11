@@ -262,6 +262,7 @@ impl PulsarSinkConfig {
     pub(crate) async fn create_pulsar_client(&self) -> crate::Result<Pulsar<TokioExecutor>> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
+            validate_auth_shape(auth)?;
             builder = match (
                 auth.name.as_ref(),
                 auth.token.as_ref(),
@@ -279,10 +280,7 @@ impl PulsarSinkConfig {
                         scope: oauth2.scope.clone(),
                     }),
                 ),
-                _ => return Err(Box::new(PulsarError::Authentication(AuthenticationError::Custom(
-                    "Invalid auth config: can only specify name and token or oauth2 configuration"
-                        .to_string(),
-                ))))?,
+                _ => unreachable!("auth shape validated by validate_auth_shape"),
             };
         }
 
@@ -385,6 +383,27 @@ impl PulsarSinkConfig {
     }
 }
 
+/// Validate the Pulsar auth configuration shape without touching the network.
+///
+/// Only `name` + `token` (basic/JWT) or `oauth2` alone are valid; partial fields
+/// (e.g. `name` without `token`) or mixing basic/JWT with `oauth2` are rejected.
+/// Mirrors the match in `create_pulsar_client`.
+pub(super) fn validate_auth_shape(auth: &PulsarAuthConfig) -> crate::Result<()> {
+    match (
+        auth.name.as_ref(),
+        auth.token.as_ref(),
+        auth.oauth2.as_ref(),
+    ) {
+        (Some(_), Some(_), None) | (None, None, Some(_)) => Ok(()),
+        _ => Err(Box::new(PulsarError::Authentication(
+            AuthenticationError::Custom(
+                "Invalid auth config: can only specify name and token or oauth2 configuration"
+                    .to_string(),
+            ),
+        ))),
+    }
+}
+
 impl GenerateConfig for PulsarSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self::default()).unwrap()
@@ -427,6 +446,9 @@ impl ValidatedSink for PulsarSinkConfig {
     type Validated = ValidatedPulsarSink;
 
     fn validate(&self) -> crate::Result<ValidatedPulsarSink> {
+        if let Some(auth) = &self.auth {
+            validate_auth_shape(auth)?;
+        }
         let topic = self
             .topic
             .clone()
@@ -466,6 +488,81 @@ mod tests {
         };
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_rejects_name_without_token() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: Some("name".to_string()),
+                token: None,
+                oauth2: None,
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_token_without_name() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: None,
+                token: Some(SensitiveString::from("token".to_string())),
+                oauth2: None,
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_mixing_basic_with_oauth2() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: Some("name".to_string()),
+                token: Some(SensitiveString::from("token".to_string())),
+                oauth2: Some(OAuth2Config {
+                    issuer_url: "https://oauth2.issuer".to_string(),
+                    credentials_url: "https://oauth2.credentials".to_string(),
+                    audience: None,
+                    scope: None,
+                }),
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_valid_basic_auth() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: Some("name".to_string()),
+                token: Some(SensitiveString::from("token".to_string())),
+                oauth2: None,
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_accepts_valid_oauth2_auth() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: None,
+                token: None,
+                oauth2: Some(OAuth2Config {
+                    issuer_url: "https://oauth2.issuer".to_string(),
+                    credentials_url: "https://oauth2.credentials".to_string(),
+                    audience: None,
+                    scope: None,
+                }),
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
     }
 
     #[test]

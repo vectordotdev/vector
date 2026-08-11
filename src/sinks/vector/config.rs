@@ -253,8 +253,9 @@ impl ValidatedSink for VectorConfig {
     type Validated = ValidatedVector;
 
     fn validate(&self) -> crate::Result<ValidatedVector> {
-        // Endpoint options are validated here (a pure structural check). The
-        // URI list itself is computed in `build` because the default scheme
+        // Endpoint options and endpoint syntax are validated here (a pure
+        // structural check using the same parser as `build`). The URI list
+        // itself is still computed in `build` because the default scheme
         // depends on the TLS settings, which require reading certificate
         // files from disk.
         self.validate_endpoint_options()?;
@@ -718,7 +719,19 @@ impl VectorConfig {
             (None, Some(routing)) if routing.endpoints.is_empty() => {
                 Err("`routing.endpoints` must contain at least one endpoint.".into())
             }
-            (Some(_), None) | (None, Some(_)) => Ok(()),
+            (Some(address), None) => {
+                // Parse the endpoint with the same pure parser used at build
+                // time. The `tls` flag only selects the default scheme and
+                // cannot change whether the parse succeeds, so the `Uri` is
+                // discarded.
+                with_default_scheme(address, false).map(|_| ())
+            }
+            (None, Some(routing)) => {
+                for endpoint in &routing.endpoints {
+                    with_default_scheme(endpoint, false)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -1501,5 +1514,57 @@ mod tests {
             err.contains("mutually exclusive"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_address() {
+        let config = VectorConfig {
+            address: Some("not a valid uri".to_owned()),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.downcast_ref::<http::uri::InvalidUri>().is_some(),
+            "expected a URI parse error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_routing_endpoint() {
+        let config = VectorConfig {
+            address: None,
+            routing: Some(RoutingConfig {
+                endpoints: vec![
+                    "http://127.0.0.1:6000".to_owned(),
+                    "not a valid uri".to_owned(),
+                ],
+                ..Default::default()
+            }),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.downcast_ref::<http::uri::InvalidUri>().is_some(),
+            "expected a URI parse error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_valid_endpoints() {
+        let config = VectorConfig {
+            address: None,
+            routing: Some(RoutingConfig {
+                endpoints: vec![
+                    "127.0.0.1:6000".to_owned(),
+                    "http://127.0.0.1:6001".to_owned(),
+                ],
+                ..Default::default()
+            }),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        config.validate().expect("validation should succeed");
     }
 }

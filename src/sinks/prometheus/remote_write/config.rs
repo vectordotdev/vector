@@ -182,6 +182,22 @@ fn validate_headers(
     Ok(headers)
 }
 
+/// Validates that `aws.region` is set when AWS authentication is selected.
+///
+/// Mirrors the check in `build`.
+#[cfg(feature = "aws-core")]
+fn validate_aws_region(
+    auth: &Option<PrometheusRemoteWriteAuth>,
+    aws: &Option<crate::aws::RegionOrEndpoint>,
+) -> crate::Result<()> {
+    if matches!(auth, Some(PrometheusRemoteWriteAuth::Aws(_)))
+        && aws.as_ref().and_then(|config| config.region()).is_none()
+    {
+        return Err(Errors::AwsRegionRequired.into());
+    }
+    Ok(())
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
@@ -239,6 +255,9 @@ impl ValidatedSink for RemoteWriteConfig {
             .validate()?
             .into_batcher_settings()?;
 
+        #[cfg(feature = "aws-core")]
+        validate_aws_region(&self.auth, &self.aws)?;
+
         Ok(ValidatedRemoteWrite {
             tenant_id,
             endpoint,
@@ -281,12 +300,12 @@ impl ValidatedSink for RemoteWriteConfig {
             }
             #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
-                let region = self
-                    .aws
-                    .as_ref()
-                    .map(|config| config.region())
-                    .ok_or(Errors::AwsRegionRequired)?
-                    .ok_or(Errors::AwsRegionRequired)?;
+                let region = match self.aws.as_ref().and_then(|config| config.region()) {
+                    Some(region) => region,
+                    None => {
+                        unreachable!("aws.region validated by validate() when AWS auth is selected")
+                    }
+                };
                 Some(Auth::Aws {
                     credentials_provider: aws_auth
                         .credentials_provider(region.clone(), cx.proxy(), self.tls.as_ref())
@@ -430,5 +449,59 @@ mod tests {
         );
         assert!(validated.tenant_id.is_some());
         assert!(validated.validated_headers.is_empty());
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_rejects_aws_auth_without_region() {
+        use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+
+        let config = RemoteWriteConfig {
+            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
+            aws: Some(RegionOrEndpoint::default()),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "AWS auth without aws.region must be rejected by validate()"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_aws_auth_with_region() {
+        use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+
+        let config = RemoteWriteConfig {
+            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
+            aws: Some(RegionOrEndpoint::with_region("us-east-1".to_string())),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_ok(),
+            "AWS auth with aws.region must be accepted by validate()"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_non_aws_auth_without_region() {
+        let config = RemoteWriteConfig {
+            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            auth: Some(PrometheusRemoteWriteAuth::Basic {
+                user: "user".to_string(),
+                password: "password".to_string(),
+            }),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_ok(),
+            "non-AWS auth without aws.region must be accepted by validate()"
+        );
     }
 }

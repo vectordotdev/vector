@@ -173,9 +173,7 @@ pub struct ValidatedGreptimeDBMetrics {
 /// filesystem.
 ///
 /// The greptimedb ingester requires all three TLS paths (`ca_file`, `crt_file`,
-/// `key_file`) to be set. Mirrors the check in `new_client_from_config` so that
-/// `vector validate --no-environment` catches partial TLS configs that would
-/// otherwise only fail at build time.
+/// `key_file`) to be set. Mirrors the check in `new_client_from_config`.
 pub(super) fn validate_tls_all_or_none(tls: &TlsConfig) -> crate::Result<()> {
     if tls.ca_file.is_none() || tls.crt_file.is_none() || tls.key_file.is_none() {
         return Err(

@@ -345,7 +345,13 @@ mod tests {
     fn validate_produces_usable_values() {
         use crate::config::ValidatedSink;
         let config = DorisConfig {
-            endpoints: vec!["http://127.0.0.1:8030".parse::<http::Uri>().unwrap().into()],
+            endpoints: vec![
+                "http://127.0.0.1:8030"
+                    .parse::<http::Uri>()
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+            ],
             database: Template::try_from("mydatabase").unwrap(),
             table: Template::try_from("mytable").unwrap(),
             ..Default::default()

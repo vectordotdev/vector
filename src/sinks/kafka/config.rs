@@ -164,6 +164,8 @@ fn example_librdkafka_options() -> HashMap<String, String> {
 
 impl KafkaSinkConfig {
     pub(crate) fn to_rdkafka(&self) -> crate::Result<ClientConfig> {
+        self.validate_batch_librdkafka_conflicts()?;
+
         let mut client_config = ClientConfig::new();
         client_config
             .set("bootstrap.servers", &self.bootstrap_servers)
@@ -190,11 +192,6 @@ impl KafkaSinkConfig {
             // messages to accumulate at the expense of increased message delivery latency.
             // Type: float
             let key = "queue.buffering.max.ms";
-            if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{key}={value}`.\
-                                    The config already sets this as `librdkafka_options.queue.buffering.max.ms={val}`.\
-                                    Please delete one.").into());
-            }
             debug!(
                 librdkafka_option = key,
                 batch_option = "timeout_secs",
@@ -208,11 +205,6 @@ impl KafkaSinkConfig {
             // also limited by batch.size and message.max.bytes.
             // Type: integer
             let key = "batch.num.messages";
-            if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{key}={value}`.\
-                                    The config already sets this as `librdkafka_options.batch.num.messages={val}`.\
-                                    Please delete one.").into());
-            }
             debug!(
                 librdkafka_option = key,
                 batch_option = "max_events",
@@ -229,11 +221,6 @@ impl KafkaSinkConfig {
             // batch.num.messages and message.max.bytes.
             // Type: integer
             let key = "batch.size";
-            if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{key}={value}`.\
-                                    The config already sets this as `librdkafka_options.batch.size={val}`.\
-                                    Please delete one.").into());
-            }
             debug!(
                 librdkafka_option = key,
                 batch_option = "max_bytes",
@@ -249,6 +236,59 @@ impl KafkaSinkConfig {
         }
 
         Ok(client_config)
+    }
+
+    /// Validate that no Vector batch option conflicts with a corresponding
+    /// `librdkafka_options` key.
+    ///
+    /// `to_rdkafka` maps each batch option to a specific librdkafka option and
+    /// refuses to set both. This is a pure configuration error, so it is checked
+    /// here (and reused by `to_rdkafka`) without building a producer.
+    fn validate_batch_librdkafka_conflicts(&self) -> crate::Result<()> {
+        if let Some(value) = self.batch.timeout_secs {
+            Self::ensure_no_librdkafka_conflict(
+                "batch.timeout_secs",
+                "queue.buffering.max.ms",
+                value,
+                &self.librdkafka_options,
+            )?;
+        }
+        if let Some(value) = self.batch.max_events {
+            Self::ensure_no_librdkafka_conflict(
+                "batch.max_events",
+                "batch.num.messages",
+                value,
+                &self.librdkafka_options,
+            )?;
+        }
+        if let Some(value) = self.batch.max_bytes {
+            Self::ensure_no_librdkafka_conflict(
+                "batch.max_bytes",
+                "batch.size",
+                value,
+                &self.librdkafka_options,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Reject a Vector batch option that would overwrite a corresponding
+    /// `librdkafka_options` key.
+    fn ensure_no_librdkafka_conflict(
+        batch_option: &str,
+        key: &str,
+        value: impl std::fmt::Display,
+        librdkafka_options: &HashMap<String, String>,
+    ) -> crate::Result<()> {
+        if let Some(val) = librdkafka_options.get(key) {
+            return Err(format!(
+                "Batching setting `{batch_option}` sets `librdkafka_options.{key}={value}`.\
+                The config already sets this as `librdkafka_options.{key}={val}`.\
+                Please delete one."
+            )
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -310,6 +350,7 @@ impl ValidatedSink for KafkaSinkConfig {
     type Validated = ValidatedKafkaSink;
 
     fn validate(&self) -> crate::Result<ValidatedKafkaSink> {
+        self.validate_batch_librdkafka_conflicts()?;
         let topic = self
             .topic
             .clone()
@@ -379,5 +420,91 @@ mod tests {
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "kafka", "topic");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_batch_timeout_secs_conflicting_with_librdkafka_option() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            batch:
+                timeout_secs: 1.0
+            librdkafka_options:
+                queue.buffering.max.ms: "1000"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "batch.timeout_secs conflicting with librdkafka_options.queue.buffering.max.ms should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_batch_max_events_conflicting_with_librdkafka_option() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            batch:
+                max_events: 1000
+            librdkafka_options:
+                batch.num.messages: "1000"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "batch.max_events conflicting with librdkafka_options.batch.num.messages should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_batch_max_bytes_conflicting_with_librdkafka_option() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            batch:
+                max_bytes: 1000000
+            librdkafka_options:
+                batch.size: "1000000"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "batch.max_bytes conflicting with librdkafka_options.batch.size should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_batch_options_without_conflicting_librdkafka_options() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            batch:
+                timeout_secs: 1.0
+                max_events: 1000
+                max_bytes: 1000000
+            librdkafka_options:
+                client.id: "vector"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_ok(),
+            "batch options without conflicting librdkafka options should pass validation"
+        );
     }
 }

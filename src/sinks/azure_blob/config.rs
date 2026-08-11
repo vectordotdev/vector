@@ -376,13 +376,14 @@ impl ValidatedSink for AzureBlobSinkConfig {
             }
         };
 
-        // Parse the resolved connection string and container URL up front so
-        // `vector validate --no-environment` catches malformed connection
-        // strings / container URLs instead of only failing at build time.
+        // Parse the resolved connection string and container URL up front.
         // Credential construction (shared key policy, token credential)
         // remains in `build`.
         let parsed_connection_string = ParsedConnectionString::parse(&connection_string)
             .map_err(|e| format!("Invalid connection string: {e}"))?;
+        // Reject the deterministic conflict between credentials implied by the
+        // connection string (SAS or Shared Key) and an explicit `auth`.
+        validate_auth_conflict(&parsed_connection_string.auth(), &self.auth)?;
         let container_url = parsed_connection_string
             .container_url(&self.container_name)
             .map_err(|e| format!("Failed to build container URL: {e}"))?;
@@ -486,7 +487,38 @@ impl AzureBlobSinkConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::template::ConfinementConfig;
+    use crate::{
+        sinks::azure_common::config::SpecificAzureCredential, template::ConfinementConfig,
+    };
+
+    fn test_config(
+        connection_string: Option<&str>,
+        auth: Option<AzureAuthentication>,
+    ) -> AzureBlobSinkConfig {
+        AzureBlobSinkConfig {
+            auth,
+            connection_string: connection_string.map(|s| s.to_string().into()),
+            tags: None,
+            metadata: None,
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "my-logs".to_string(),
+            blob_prefix: "blob".try_into().unwrap(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+            compression: Compression::gzip_default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+            tls: None,
+            confinement: ConfinementConfig::default(),
+        }
+    }
 
     #[test]
     fn generate_config() {
@@ -591,6 +623,77 @@ mod tests {
         };
 
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_connection_string_sas_with_auth() {
+        let config = test_config(
+            Some(
+                "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=b&srt=sco&sp=rcw&se=2099-01-01T00:00:00Z&sig=...",
+            ),
+            Some(AzureAuthentication::Specific(
+                SpecificAzureCredential::ManagedIdentity {
+                    user_assigned_managed_identity_id: None,
+                    user_assigned_managed_identity_id_type: None,
+                },
+            )),
+        );
+
+        let err = config.validate().expect_err("validation should fail");
+        assert!(
+            err.to_string()
+                .contains("Cannot use both SAS token and another Azure Authentication method"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_connection_string_shared_key_with_auth() {
+        let config = test_config(
+            Some(
+                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=base64key==;EndpointSuffix=core.windows.net",
+            ),
+            Some(AzureAuthentication::Specific(
+                SpecificAzureCredential::ManagedIdentity {
+                    user_assigned_managed_identity_id: None,
+                    user_assigned_managed_identity_id_type: None,
+                },
+            )),
+        );
+
+        let err = config.validate().expect_err("validation should fail");
+        assert!(
+            err.to_string()
+                .contains("Cannot use both Shared Key and another Azure Authentication method"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_connection_string_without_creds_with_auth() {
+        let config = test_config(
+            Some("AccountName=mylogstorage"),
+            Some(AzureAuthentication::Specific(
+                SpecificAzureCredential::ManagedIdentity {
+                    user_assigned_managed_identity_id: None,
+                    user_assigned_managed_identity_id_type: None,
+                },
+            )),
+        );
+
+        config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validate_accepts_connection_string_with_creds_without_auth() {
+        let config = test_config(
+            Some(
+                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=base64key==;EndpointSuffix=core.windows.net",
+            ),
+            None,
+        );
+
+        config.validate().expect("validation should succeed");
     }
 }
 
@@ -701,6 +804,28 @@ pub fn build_healthcheck(
     Ok(healthcheck.boxed())
 }
 
+/// Reject the deterministic conflict between credentials implied by the
+/// connection string (SAS or Shared Key) and an explicit `auth` configuration.
+///
+/// Pure structural check: no credential construction, no I/O, no async. Shared
+/// by `validate` and `build_client`.
+fn validate_auth_conflict(
+    parsed_auth: &Auth,
+    auth: &Option<AzureAuthentication>,
+) -> crate::Result<()> {
+    match (parsed_auth, auth) {
+        (Auth::Sas { .. }, Some(_)) => Err(
+            "Cannot use both SAS token and another Azure Authentication method at the same time"
+                .into(),
+        ),
+        (Auth::SharedKey { .. }, Some(_)) => Err(
+            "Cannot use both Shared Key and another Azure Authentication method at the same time"
+                .into(),
+        ),
+        _ => Ok(()),
+    }
+}
+
 pub async fn build_client(
     auth: Option<AzureAuthentication>,
     parsed: ParsedConnectionString,
@@ -711,6 +836,12 @@ pub async fn build_client(
     // The connection string and container URL were parsed and validated during
     // `validate`; only credential construction remains here.
     let mut credential: Option<Arc<dyn TokenCredential>> = None;
+
+    // The deterministic conflict between connection-string-implied credentials
+    // and an explicit `auth` was already rejected during `validate`; re-check
+    // here so `build_client` stays safe when called directly (e.g. integration
+    // tests).
+    validate_auth_conflict(&parsed.auth(), &auth)?;
 
     // Prepare options; attach Shared Key policy if needed
     let mut options = BlobContainerClientOptions::default();
@@ -754,16 +885,10 @@ pub async fn build_client(
             credential = Some(credential_result);
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::Specific(..))) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both SAS token and another Azure Authentication method at the same time",
-            )));
+            unreachable!("connection string SAS + explicit auth rejected in validate")
         }
         (Auth::SharedKey { .. }, Some(AzureAuthentication::Specific(..))) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both Shared Key and another Azure Authentication method at the same time",
-            )));
+            unreachable!("connection string Shared Key + explicit auth rejected in validate")
         }
         #[cfg(test)]
         (Auth::None, Some(AzureAuthentication::MockCredential)) => {
@@ -772,10 +897,7 @@ pub async fn build_client(
         }
         #[cfg(test)]
         (_, Some(AzureAuthentication::MockCredential)) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both connection string auth and mock credential at the same time",
-            )));
+            unreachable!("connection string auth + mock credential rejected in validate")
         }
     }
 
