@@ -29,4 +29,15 @@ pub struct TestCase {
     pub config_name: Option<String>,
     pub expectation: TestCaseExpectation,
     pub events: Vec<TestEvent>,
+
+    /// How many `component_errors_total` increments the component records for each failing event.
+    ///
+    /// Defaults to one. Some components record several distinct errors for a single failure, such
+    /// as a decoding error followed by the rejected request it causes.
+    #[serde(default = "default_errors_per_failure")]
+    pub errors_per_failure: u64,
+}
+
+const fn default_errors_per_failure() -> u64 {
+    1
 }

@@ -326,6 +326,7 @@ impl Runner {
                 maybe_runner_encoder.as_ref().cloned(),
                 self.configuration.component_type,
                 self.configuration.log_namespace(),
+                test_case.errors_per_failure,
             );
 
             // the number of events we expect to receive from the output.
@@ -565,6 +566,7 @@ fn spawn_input_driver(
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
     component_type: ComponentType,
     log_namespace: LogNamespace,
+    errors_per_failure: u64,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
 
@@ -601,7 +603,7 @@ fn spawn_input_driver(
 
             // account for failure case
             if failure_case {
-                input_runner_metrics.errors_total += 1;
+                input_runner_metrics.errors_total += errors_per_failure;
                 // TODO: this assumption may need to be made configurable at some point
                 if component_type == ComponentType::Sink {
                     input_runner_metrics.discarded_events_total += 1;
