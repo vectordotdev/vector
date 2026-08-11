@@ -1,111 +1,177 @@
-use std::{collections::HashMap, ops::Range};
+use std::net::SocketAddr;
 
-use serde_json::Value;
+use bytes::Bytes;
+use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc};
+use futures_util::StreamExt;
+use http::request::Parts;
+use hyper::{
+    Body, Request, Response, Server,
+    service::{make_service_fn, service_fn},
+};
+use stream_cancel::{Trigger, Tripwire};
+use vector_lib::event::EventStatus;
 
 use super::tests::*;
 use crate::{
-    config::{SinkConfig, SinkContext},
-    event::{Event, metric::MetricValue},
-    sinks::{
-        influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-        prometheus::remote_write::config::RemoteWriteConfig,
+    SourceSender,
+    config::{SinkConfig, SinkContext, SourceConfig, SourceContext},
+    event::Event,
+    sinks::prometheus::remote_write::config::RemoteWriteConfig,
+    sources::prometheus::PrometheusRemoteWriteConfig,
+    test_util::{
+        self,
+        addr::next_addr,
+        components::{HTTP_SINK_TAGS, assert_sink_compliance},
+        wait_for_tcp,
     },
-    test_util::components::{HTTP_SINK_TAGS, assert_sink_compliance},
-    tls::{self, TlsConfig},
+    tls::{self, MaybeTlsSettings, TlsEnableableConfig},
 };
-
-const HTTP_URL: &str = "http://influxdb-v1:8086";
-const HTTPS_URL: &str = "https://influxdb-v1-tls:8087";
 
 #[tokio::test]
 async fn insert_metrics_over_http() {
-    insert_metrics(HTTP_URL).await;
+    insert_metrics(None).await;
 }
 
 #[tokio::test]
 async fn insert_metrics_over_https() {
-    insert_metrics(HTTPS_URL).await;
+    insert_metrics(Some(TlsEnableableConfig::test_config())).await;
 }
 
-async fn insert_metrics(url: &str) {
+async fn insert_metrics(tls: Option<TlsEnableableConfig>) {
+    // Verify the sink emits the expected compliance events while sending to a
+    // remote write endpoint. A mock server is used as the receiver here (rather
+    // than Vector's own source) so that only the sink's internal events are
+    // recorded.
     assert_sink_compliance(&HTTP_SINK_TAGS, async {
-        let database = onboarding_v1(url).await;
+        let (_guard, addr) = next_addr();
+        let (rx, trigger, server) = build_mock_server(addr, tls.clone()).await;
+        tokio::spawn(server);
 
-        let cx = SinkContext::default();
-
+        let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
+            .unwrap()
+            .http_protocol_name();
         let config = RemoteWriteConfig {
-            endpoint: format!("{url}/api/v1/prom/write?db={database}"),
-            tls: Some(TlsConfig {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                ..Default::default()
-            }),
+            endpoint: format!("{proto}://localhost:{}/write", addr.port()),
+            tls: tls.clone().map(|tls| tls.options),
             ..Default::default()
         };
         let events = create_events(0..5, |n| n * 11.0);
-
+        let cx = SinkContext::default();
         let (sink, _) = config.build(cx).await.expect("error building config");
         sink.run_events(events.clone()).await.unwrap();
 
-        let result = query(url, &format!("show series on {database}")).await;
-
-        let values = &result["results"][0]["series"][0]["values"];
-        assert_eq!(values.as_array().unwrap().len(), 5);
-
-        for event in events {
-            let metric = event.into_metric();
-            let result = query(
-                url,
-                &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
-            )
-            .await;
-
-            let metrics = decode_metrics(&result["results"][0]["series"][0]);
-            assert_eq!(metrics.len(), 1);
-            let output = &metrics[0];
-
-            match metric.value() {
-                MetricValue::Gauge { value } => {
-                    assert_eq!(output["value"], Value::Number((*value as u32).into()))
-                }
-                _ => panic!("Unhandled metric value, fix the test"),
-            }
-            for (tag, value) in metric.tags().unwrap().iter_single() {
-                assert_eq!(output[tag], Value::String(value.to_string()));
-            }
-            let timestamp =
-                format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
-            assert_eq!(output["time"], Value::String(timestamp));
-        }
-
-        cleanup_v1(url, &database).await;
+        drop(trigger);
+        let requests = rx.collect::<Vec<_>>().await;
+        assert_eq!(requests.len(), 1);
     })
-    .await
+    .await;
+
+    // Verify the sink's output is accepted by Vector's own
+    // `prometheus_remote_write` source and that the metrics round-trip
+    // correctly.
+    let (_guard, address) = next_addr();
+    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+    let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
+        .unwrap()
+        .http_protocol_name();
+
+    let tls_yaml = tls.as_ref().map(|_| {
+        format!(
+            "tls:\n  enabled: true\n  ca_file: \"{}\"\n  crt_file: \"{}\"\n  key_file: \"{}\"",
+            tls::TEST_PEM_CA_PATH,
+            tls::TEST_PEM_CRT_PATH,
+            tls::TEST_PEM_KEY_PATH
+        )
+    });
+    let source: PrometheusRemoteWriteConfig = serde_yaml::from_str(&format!(
+        "address: \"{address}\"\n{}",
+        tls_yaml.unwrap_or_default()
+    ))
+    .unwrap();
+    let source = source
+        .build(SourceContext::new_test(tx, None))
+        .await
+        .expect("source should not fail to build");
+    tokio::spawn(source);
+    wait_for_tcp(address).await;
+
+    let config = RemoteWriteConfig {
+        endpoint: format!("{proto}://localhost:{}/", address.port()),
+        tls: tls.map(|tls| tls.options),
+        ..Default::default()
+    };
+    let events = create_events(0..5, |n| n * 11.0);
+    let events_copy = events.clone();
+
+    let cx = SinkContext::default();
+    let (sink, _) = config.build(cx).await.expect("error building config");
+
+    let mut output = test_util::spawn_collect_ready(
+        async move {
+            sink.run_events(events_copy).await.unwrap();
+        },
+        rx,
+        1,
+    )
+    .await;
+
+    output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
+
+    assert_eq!(output.len(), events.len());
+
+    for (sent, received) in events.iter().zip(output.iter()) {
+        let sent = sent.as_metric();
+        let received = received.as_metric();
+        assert_eq!(sent.name(), received.name());
+        assert_eq!(sent.value(), received.value());
+        assert_eq!(sent.tags(), received.tags());
+        assert_eq!(
+            sent.timestamp().unwrap().timestamp_millis(),
+            received.timestamp().unwrap().timestamp_millis()
+        );
+    }
 }
 
-async fn query(url: &str, query: &str) -> Value {
-    let result = query_v1(url, query).await;
-    let text = result.text().await.unwrap();
-    serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON")
+/// Builds a mock remote write HTTP server, optionally with TLS enabled.
+async fn build_mock_server(
+    addr: SocketAddr,
+    tls: Option<TlsEnableableConfig>,
+) -> (
+    mpsc::Receiver<(Parts, Bytes)>,
+    Trigger,
+    impl std::future::Future<Output = Result<(), ()>>,
+) {
+    let (tx, rx) = mpsc::channel(100);
+    let service = make_service_fn(move |_| {
+        let tx = tx.clone();
+        async move {
+            Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
+                let mut tx = tx.clone();
+                async move {
+                    let (parts, body) = req.into_parts();
+                    tokio::spawn(async move {
+                        let bytes = http_body::Body::collect(body).await.unwrap().to_bytes();
+                        tx.send((parts, bytes)).await.unwrap();
+                    });
+                    Ok::<_, hyper::Error>(Response::new(Body::empty()))
+                }
+            }))
+        }
+    });
+
+    let settings = MaybeTlsSettings::from_config(tls.as_ref(), true).unwrap();
+    let listener = settings.bind(&addr).await.unwrap();
+    let (trigger, tripwire) = Tripwire::new();
+    let server = Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+        .serve(service)
+        .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
+        .map_err(|error| panic!("Server error: {error}"));
+
+    (rx, trigger, server)
 }
 
-fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
-    let data = data.as_object().expect("Data is not an object");
-    let columns = data["columns"].as_array().expect("Columns is not an array");
-    data["values"]
-        .as_array()
-        .expect("Values is not an array")
-        .iter()
-        .map(|values| {
-            columns
-                .iter()
-                .zip(values.as_array().unwrap().iter())
-                .map(|(column, value)| (column.as_str().unwrap().to_owned(), value.clone()))
-                .collect()
-        })
-        .collect()
-}
-
-fn create_events(name_range: Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
+fn create_events(name_range: std::ops::Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
     name_range
         .map(move |num| create_event(format!("metric_{num}"), value(num as f64)))
         .collect()
