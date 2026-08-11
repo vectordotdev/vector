@@ -56,11 +56,12 @@ pub struct InfluxDbLogsConfig {
     #[configurable(
         deprecated = "This field is deprecated, and `measurement` should be used instead."
     )]
-    #[configurable(metadata(docs::examples = "service"))]
+    #[configurable(required_one_of = "measurement")]
     pub namespace: Option<String>,
 
     /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
+    #[configurable(required_one_of = "measurement")]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
@@ -147,7 +148,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             endpoint = "http://localhost:8086/"
-            namespace = "my-namespace"
+            measurement = "vector-logs"
             tags = []
             org = "my-org"
             bucket = "my-bucket"

@@ -196,7 +196,10 @@ pub(super) struct StackdriverLabelConfig {
 fn labels_examples() -> HashMap<String, String> {
     let mut example = HashMap::new();
     example.insert("label_1".to_string(), "value_1".to_string());
-    example.insert("label_2".to_string(), "{{ template_value_2 }}".to_string());
+    example.insert(
+        "label_2".to_string(),
+        "label-{{ template_value_2 }}".to_string(),
+    );
     example
 }
 
@@ -239,7 +242,7 @@ pub(super) struct StackdriverResource {
 fn label_examples() -> HashMap<String, String> {
     let mut example = HashMap::new();
     example.insert("instanceId".to_string(), "Twilight".to_string());
-    example.insert("zone".to_string(), "{{ zone }}".to_string());
+    example.insert("zone".to_string(), "zone-{{ zone }}".to_string());
     example
 }
 

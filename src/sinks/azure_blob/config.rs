@@ -100,6 +100,7 @@ pub struct AzureBlobSinkConfig {
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
     #[configurable(metadata(docs::examples = "AccountName=mylogstorage"))]
+    #[configurable(required_one_of = "azure_blob_credentials")]
     pub connection_string: Option<SensitiveString>,
 
     /// The Azure Blob Storage Account name.
@@ -107,6 +108,7 @@ pub struct AzureBlobSinkConfig {
     /// If provided, this will be used instead of the `connection_string`.
     /// This is useful for authenticating with an Azure credential.
     #[configurable(metadata(docs::examples = "mylogstorage"))]
+    #[configurable(required_one_of = "azure_blob_credentials")]
     pub(super) account_name: Option<String>,
 
     /// The Azure Blob Storage endpoint.
@@ -114,6 +116,7 @@ pub struct AzureBlobSinkConfig {
     /// If provided, this will be used instead of the `connection_string`.
     /// This is useful for authenticating with an Azure credential.
     #[configurable(metadata(docs::examples = "https://mylogstorage.blob.core.windows.net/"))]
+    #[configurable(required_one_of = "azure_blob_credentials")]
     pub(super) blob_endpoint: Option<String>,
 
     /// The Azure Blob Storage Account container name.

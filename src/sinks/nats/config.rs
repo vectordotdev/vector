@@ -30,7 +30,7 @@ pub struct NatsHeaderConfig {
     /// Can be a template that references fields in the event, e.g., `{{ event_id }}`.
     #[configurable(metadata(docs::templateable))]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[configurable(metadata(docs::examples = "{{ event_id }}"))]
+    #[configurable(metadata(docs::examples = "event-{{ event_id }}"))]
     pub(super) message_id: Option<UnconfinedTemplate>,
 }
 
@@ -105,7 +105,7 @@ pub struct NatsSinkConfig {
     /// [nats_subject]: https://docs.nats.io/nats-concepts/subjects
     #[configurable(metadata(docs::templateable))]
     #[configurable(metadata(
-        docs::examples = "{{ host }}",
+        docs::examples = "events-{{ host }}",
         docs::examples = "foo",
         docs::examples = "time.us.east",
         docs::examples = "time.*.east",
@@ -173,7 +173,7 @@ impl GenerateConfig for NatsSinkConfig {
             jetstream: JetStreamConfig {
                 enabled: true,
                 headers: Some(NatsHeaderConfig {
-                    message_id: Some(UnconfinedTemplate::try_from("{{ event_id }}").unwrap()),
+                    message_id: Some(UnconfinedTemplate::try_from("event-{{ event_id }}").unwrap()),
                 }),
             },
             confinement: ConfinementConfig::default(),

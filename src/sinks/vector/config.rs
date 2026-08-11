@@ -68,8 +68,9 @@ pub struct VectorConfig {
     #[configurable(
         deprecated = "This option has been deprecated, use `routing.endpoints` instead."
     )]
-    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
+    #[configurable(required_one_of = "address_or_routing")]
     #[serde(default)]
     address: Option<String>,
 
@@ -79,6 +80,7 @@ pub struct VectorConfig {
     /// `address` or `routing`.
     #[serde(default)]
     #[configurable(derived)]
+    #[configurable(required_one_of = "address_or_routing")]
     routing: Option<RoutingConfig>,
 
     /// Compression algorithm for requests.
@@ -173,7 +175,7 @@ struct RoutingConfig {
     ///
     /// Each endpoint _must_ include a port.
     #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
     endpoints: Vec<String>,

@@ -138,13 +138,12 @@ fn loki_labels_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
-        "\"pod_labels_*\"".to_string(),
-        "{{ kubernetes.pod_labels }}".to_string(),
+        "pod_labels_*".to_string(),
+        "pod_labels_{{ kubernetes.pod_labels }}".to_string(),
     );
-    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
     examples.insert(
-        "{{ event_field }}".to_string(),
-        "{{ some_other_event_field }}".to_string(),
+        "event_{{ event_field }}".to_string(),
+        "value_{{ some_other_event_field }}".to_string(),
     );
     examples
 }
@@ -153,13 +152,12 @@ fn loki_structured_metadata_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
-        "\"pod_labels_*\"".to_string(),
-        "{{ kubernetes.pod_labels }}".to_string(),
+        "pod_labels_*".to_string(),
+        "pod_labels_{{ kubernetes.pod_labels }}".to_string(),
     );
-    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
     examples.insert(
-        "{{ event_field }}".to_string(),
-        "{{ some_other_event_field }}".to_string(),
+        "event_{{ event_field }}".to_string(),
+        "value_{{ some_other_event_field }}".to_string(),
     );
     examples
 }

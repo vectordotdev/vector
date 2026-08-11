@@ -6,5 +6,6 @@ sinks:
     bucket: vector-bucket
     database: vector-database
     endpoint: http://localhost:8086
+    measurement: vector-logs
     org: my-org
     token: ${INFLUXDB_TOKEN}

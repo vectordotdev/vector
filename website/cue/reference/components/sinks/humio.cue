@@ -108,7 +108,7 @@ components: sinks: _humio: {
 			required:    false
 			type: string: {
 				default: null
-				examples: ["{{ host }}", "custom_index"]
+				examples: ["index-{{ host }}", "custom_index"]
 				syntax: "template"
 			}
 		}

@@ -181,13 +181,15 @@ impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefau
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
     #[configurable(metadata(
-        docs::examples = "127.0.0.1:8080",
-        docs::examples = "example.com:12345"
+        docs::examples = "http://127.0.0.1:8080",
+        docs::examples = "http://example.com:12345"
     ))]
+    #[configurable(required_one_of = "region_or_endpoint")]
     pub endpoint: Option<String>,
 
     /// The GCP region to use.
     #[configurable(derived)]
+    #[configurable(required_one_of = "region_or_endpoint")]
     pub region: Option<Region>,
 
     /// The Unique identifier (UUID) corresponding to the Chronicle instance.
@@ -264,6 +266,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             credentials_path = "/path/to/credentials.json"
             customer_id = "customer_id"
             namespace = "namespace"
+            region = "asia"
             compression = "gzip"
             log_type = "log_type"
             fallback_log_type = "VECTOR_DEV"

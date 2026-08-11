@@ -81,7 +81,7 @@ pub struct HumioMetricsConfig {
     #[configurable(metadata(
         docs::examples = "json",
         docs::examples = "none",
-        docs::examples = "{{ event_type }}"
+        docs::examples = "event_type-{{ event_type }}"
     ))]
     event_type: Option<Template>,
 
@@ -114,7 +114,10 @@ pub struct HumioMetricsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
+    #[configurable(metadata(
+        docs::examples = "index-{{ host }}",
+        docs::examples = "custom_index"
+    ))]
     index: Option<Template>,
 
     #[configurable(derived)]

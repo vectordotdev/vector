@@ -133,8 +133,14 @@ generated: components: sinks: influxdb_logs: configuration: {
 		type: string: examples: ["hostname"]
 	}
 	measurement: {
-		description: "The name of the InfluxDB measurement that is written to."
-		required:    false
+		description: """
+			The name of the InfluxDB measurement that is written to.
+
+			Exactly one of `namespace` or `measurement` must be set.
+			"""
+		required: false
+		required_one_of: ["namespace", "measurement"]
+		required_one_of_group: "measurement"
 		type: string: examples: ["vector-logs"]
 	}
 	message_key: {
@@ -155,9 +161,13 @@ generated: components: sinks: influxdb_logs: configuration: {
 			The namespace of the measurement name to use.
 
 			When specified, the measurement name is `<namespace>.vector`.
+
+			Exactly one of `namespace` or `measurement` must be set.
 			"""
 		required: false
-		type: string: examples: ["service"]
+		required_one_of: ["namespace", "measurement"]
+		required_one_of_group: "measurement"
+		type: string: {}
 	}
 	org: {
 		description: """

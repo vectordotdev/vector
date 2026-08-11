@@ -33,8 +33,8 @@ pub struct DorisConfig {
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a
     /// hostname or IP address and port.
-    #[serde(default)]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8030"))]
+    #[configurable(metadata(docs::required = true))]
     pub endpoints: Vec<UriSerde>,
 
     /// The database that contains the table data will be inserted into.

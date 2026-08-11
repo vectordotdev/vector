@@ -77,6 +77,7 @@ pub struct ElasticsearchConfig {
     #[configurable(
         deprecated = "This option has been deprecated, the `endpoints` option should be used instead."
     )]
+    #[configurable(required_one_of = "endpoint")]
     pub endpoint: Option<String>,
 
     /// A list of Elasticsearch endpoints to send logs to.
@@ -93,6 +94,7 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::examples = "http://10.24.32.122:9000"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]
     #[configurable(metadata(docs::examples = "https://user:password@example.com"))]
+    #[configurable(required_one_of = "endpoint")]
     pub endpoints: Vec<String>,
 
     /// The [`doc_type`][doc_type] for your index data.

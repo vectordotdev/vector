@@ -80,13 +80,19 @@ pub struct HecMetricsSinkConfig {
     /// The name of the index where to send the events to.
     ///
     /// If not specified, the default index defined within Splunk is used.
-    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
+    #[configurable(metadata(
+        docs::examples = "index-{{ host }}",
+        docs::examples = "custom_index"
+    ))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk defaults to `httpevent`.
-    #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
+    #[configurable(metadata(
+        docs::examples = "sourcetype-{{ sourcetype }}",
+        docs::examples = "_json",
+    ))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -95,7 +101,7 @@ pub struct HecMetricsSinkConfig {
     ///
     /// If unset, the Splunk collector sets it.
     #[configurable(metadata(
-        docs::examples = "{{ file }}",
+        docs::examples = "source-{{ file }}",
         docs::examples = "/var/log/syslog",
         docs::examples = "UDP:514"
     ))]

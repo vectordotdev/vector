@@ -9,7 +9,7 @@ sinks:
     event_type: json
     host_key: host
     host_tag: host
-    index: "{{ host }}"
+    index: index-{{ host }}
     metric_tag_values: single
     timezone: local
     token: ${HUMIO_TOKEN}
