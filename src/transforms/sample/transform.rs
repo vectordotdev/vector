@@ -8,6 +8,7 @@ use std::{
 use vector_lib::{
     config::LegacyKey,
     lookup::{OwnedTargetPath, lookup_v2::OptionalValuePath},
+    sampling::RatioSampler,
 };
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
     event::{Event, Value},
     internal_events::SampleEventDiscarded,
     sinks::prelude::TemplateRenderingError,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -30,7 +31,7 @@ pub enum SampleMode {
     },
     Ratio {
         ratio: f64,
-        values: HashMap<Option<String>, f64>,
+        samplers: HashMap<Option<String>, RatioSampler>,
         hash_ratio_threshold: u64,
     },
 }
@@ -46,7 +47,7 @@ impl SampleMode {
     pub fn new_ratio(ratio: f64) -> Self {
         Self::Ratio {
             ratio,
-            values: HashMap::default(),
+            samplers: HashMap::default(),
             // Supports the 'key_field' option, assuming an equal distribution of values for a given
             // field, hashing its contents this component should output events according to the
             // configured ratio.
@@ -66,16 +67,12 @@ impl SampleMode {
                 *counter_value += 1;
                 old_counter_value % *rate == 0
             }
-            Self::Ratio { ratio, values, .. } => {
-                let value = values.entry(group_by_key).or_insert(1.0 - *ratio);
-                let increment: f64 = *value + *ratio;
-                *value = if increment >= 1.0 {
-                    increment - 1.0
-                } else {
-                    increment
-                };
-                increment >= 1.0
-            }
+            Self::Ratio {
+                ratio, samplers, ..
+            } => samplers
+                .entry(group_by_key)
+                .or_insert_with(|| RatioSampler::new(*ratio))
+                .sample(),
         };
         if let Some(value) = value {
             self.hash_within_ratio(value.to_string_lossy().as_bytes())
@@ -131,11 +128,11 @@ impl fmt::Display for SampleMode {
 pub enum SampleKeySource {
     Static {
         key_field: Option<String>,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
     },
     Dynamic {
         fields: DynamicSampleFields,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
     },
 }
 
@@ -157,7 +154,7 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         key_field: Option<String>,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
@@ -177,7 +174,7 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         fields: DynamicSampleFields,
-        group_by: Option<Template>,
+        group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {

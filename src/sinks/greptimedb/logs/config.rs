@@ -93,7 +93,6 @@ pub struct GreptimeDBLogsConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to GreptimeDB.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "extra_params_examples()"))]
     pub extra_params: Option<HashMap<String, String>>,
@@ -101,7 +100,6 @@ pub struct GreptimeDBLogsConfig {
     /// Custom headers to add to the HTTP request sent to GreptimeDB.
     /// Note that these headers will override the existing headers.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "Extra header key-value pairs."
     ))]
@@ -137,27 +135,27 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-        config.table = config
+        let confined_table = self
             .table
+            .clone()
             .confine(&self.confinement, Self::NAME, "table")?;
-        config.dbname = config
-            .dbname
-            .confine(&self.confinement, Self::NAME, "dbname")?;
-        config.pipeline_name =
-            config
-                .pipeline_name
+        let confined_dbname =
+            self.dbname
+                .clone()
+                .confine(&self.confinement, Self::NAME, "dbname")?;
+        let confined_pipeline_name =
+            self.pipeline_name
+                .clone()
                 .confine(&self.confinement, Self::NAME, "pipeline_name")?;
-        config.pipeline_version = config
+        let confined_pipeline_version = self
             .pipeline_version
+            .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "pipeline_version"))
             .transpose()?;
-        let this = &config;
-
-        let tls_settings = TlsSettings::from_options(this.tls.as_ref())?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        let auth = match (this.username.clone(), this.password.clone()) {
+        let auth = match (self.username.clone(), self.password.clone()) {
             (Some(username), Some(password)) => Some(Auth::Basic {
                 user: username,
                 password,
@@ -165,38 +163,38 @@ impl SinkConfig for GreptimeDBLogsConfig {
             _ => None,
         };
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
-            endpoint: this.endpoint.clone(),
+            endpoint: self.endpoint.clone(),
             auth: auth.clone(),
             encoder: (
-                this.encoding.clone(),
+                self.encoding.clone(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoderConfig.build().into(),
                     JsonSerializerConfig::default().build().into(),
                 ),
             ),
-            compression: this.compression,
-            extra_params: this.extra_params.clone(),
-            extra_headers: this.extra_headers.clone(),
+            compression: self.compression,
+            extra_params: self.extra_params.clone(),
+            extra_headers: self.extra_headers.clone(),
         };
 
         let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =
             HttpService::new(client.clone(), request_builder.clone());
 
-        let request_limits = this.request.into_settings();
+        let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, GreptimeDBHttpRetryLogic::default())
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {
-            dbname: this.dbname.clone(),
-            table: this.table.clone(),
-            pipeline_name: this.pipeline_name.clone(),
-            pipeline_version: this.pipeline_version.clone(),
+            dbname: confined_dbname,
+            table: confined_table,
+            pipeline_name: confined_pipeline_name,
+            pipeline_version: confined_pipeline_version,
         };
 
         let sink = GreptimeDBLogsHttpSink::new(
-            this.batch.into_batcher_settings()?,
+            self.batch.into_batcher_settings()?,
             service,
             request_builder,
             logs_sink_setting,
@@ -204,7 +202,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
 
         let healthcheck = Box::pin(http_healthcheck(
             client,
-            this.endpoint.clone(),
+            self.endpoint.clone(),
             auth.clone(),
         ));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))

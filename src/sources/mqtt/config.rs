@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::Rng;
+use rand::RngExt;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::{

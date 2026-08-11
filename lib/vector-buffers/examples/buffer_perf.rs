@@ -11,7 +11,7 @@ use std::{
 use bytes::{Buf, BufMut};
 use clap::{Arg, Command};
 use hdrhistogram::Histogram;
-use rand::Rng;
+use rand::RngExt;
 use tokio::{select, sync::oneshot, task, time};
 use tracing::{Span, debug, info};
 use tracing_subscriber::EnvFilter;

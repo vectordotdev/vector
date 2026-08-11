@@ -628,7 +628,6 @@ urls: {
 	vector_exclusive_route_transform:           "/docs/reference/configuration/transforms/exclusive_route"
 	vector_rpm_source_files:                    "\(vector_repo)/tree/master/distribution/rpm"
 	vector_security_policy:                     "\(vector_repo)/security/policy"
-	vector_semantic_yml:                        "\(vector_repo)/blob/master/.github/semantic.yml"
 	vector_sink:                                "/docs/reference/configuration/sinks/vector"
 	vector_sinks:                               "/docs/reference/configuration/sinks"
 	vector_sink_http_batch:                     "/docs/reference/configuration/sinks/http/#batch"

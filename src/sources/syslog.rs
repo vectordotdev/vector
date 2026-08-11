@@ -164,8 +164,8 @@ impl Default for SyslogConfig {
 }
 
 impl GenerateConfig for SyslogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(SyslogConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(SyslogConfig::default()).unwrap()
     }
 }
 
@@ -468,7 +468,7 @@ mod test {
 
     use chrono::prelude::*;
     use indoc::indoc;
-    use rand::{Rng, rng};
+    use rand::{RngExt, rng};
     use serde::Deserialize;
     use tokio::time::{Duration, Instant, sleep};
     use tokio_util::codec::BytesCodec;

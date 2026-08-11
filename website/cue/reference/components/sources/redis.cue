@@ -75,7 +75,6 @@ components: sources: redis: {
 				redis_key: {
 					description: "The Redis key the event came from"
 					required:    false
-					common:      false
 					type: string: {
 						examples: ["some_key"]
 						default: null

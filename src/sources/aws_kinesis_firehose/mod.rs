@@ -84,12 +84,10 @@ pub struct AwsKinesisFirehoseConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
@@ -128,7 +126,6 @@ const fn access_keys_example() -> [&'static str; 2] {
 
 /// Compression scheme for records in a Firehose message.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Compression {
@@ -283,8 +280,8 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 }
 
 impl GenerateConfig for AwsKinesisFirehoseConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
             access_keys: None,

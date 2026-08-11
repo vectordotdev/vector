@@ -450,6 +450,9 @@ mod tests {
         assert_eq!(params.get("insert_quorum"), Some(&"2".to_string()));
         // Existing params are still present
         assert!(params.contains_key("query"));
-        assert_eq!(params.get("param_database"), Some(&"my_database".to_string()));
+        assert_eq!(
+            params.get("param_database"),
+            Some(&"my_database".to_string())
+        );
     }
 }

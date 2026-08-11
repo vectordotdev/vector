@@ -115,17 +115,14 @@ impl Prepare {
         debug!("create_release_branches");
 
         if self.dry_run {
-            // In dry-run mode the branches (and the commit range fed to
-            // generate_cue) are based on whatever is currently checked out.
-            // Surface that explicitly so a stale or feature branch doesn't
-            // silently land unrelated commits in the generated release CUE.
+            // In dry-run mode the release is based on whatever is currently
+            // checked out. Surface that explicitly so a stale or feature
+            // branch doesn't silently produce a release from the wrong base.
             let head = git::run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])
                 .unwrap_or_else(|_| "<unknown>".to_string());
-            let last = &self.latest_vector_version;
             warn!(
                 "dry-run: using HEAD ({}) as the release base; \
-                 commits in the generated CUE will be `git log v{last}...HEAD`. \
-                 Verify this matches what you'd expect from master.",
+                 verify this matches what you'd expect from master.",
                 head.trim()
             );
         } else {

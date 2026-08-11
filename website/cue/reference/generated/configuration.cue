@@ -14,13 +14,11 @@ generated: configuration: {
 						Vector in a Docker container, bind to `0.0.0.0`. Otherwise
 						the API will not be exposed outside the container.
 						"""
-					common:   true
 					required: false
 				}
 				enabled: {
 					type: bool: default: false
 					description: "Whether the API is enabled for this Vector instance."
-					common:      true
 					required:    false
 				}
 			}
@@ -220,8 +218,9 @@ generated: configuration: {
 						type: object: options: {
 							bucket_size: {
 								type: uint: default: 4
-								description: "Number of slots in each bucket"
-								required:    false
+								description:   "Number of slots in each bucket"
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							concurrent_scanning: {
 								type: bool: default: false
@@ -231,32 +230,38 @@ generated: configuration: {
 
 																		By default, scanning is blocking.
 																		"""
-								required: false
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							counter_bits: {
 								type: uint: default: 8
-								description: "Number of bits to use to track counter. This will limit the max value."
-								required:    false
+								description:   "Number of bits to use to track counter. This will limit the max value."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							counter_enabled: {
 								type: bool: default: false
-								description: "Can be set to true to track a count alongside hashes."
-								required:    false
+								description:   "Can be set to true to track a count alongside hashes."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							counter_field: {
 								type: string: default: ""
-								description: "Field in the incoming value used as the counter increment override."
-								required:    false
+								description:   "Field in the incoming value used as the counter increment override."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							counter_insertion_increment: {
 								type: int: default: 1
-								description: "The amount to increment the counter by on every insertion. Negative values are allowed."
-								required:    false
+								description:   "The amount to increment the counter by on every insertion. Negative values are allowed."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							counter_lookup_increment: {
 								type: int: default: 1
-								description: "The amount to increment the counter by on every lookup. Negative values are allowed."
-								required:    false
+								description:   "The amount to increment the counter by on every lookup. Negative values are allowed."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							export_interval: {
 								type: uint: {}
@@ -265,12 +270,14 @@ generated: configuration: {
 
 																		By default, export is only done on exit.
 																		"""
-								required: false
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							fingerprint_bits: {
 								type: uint: default: 8
-								description: "Number of bits used for fingerprint."
-								required:    false
+								description:   "Number of bits used for fingerprint."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							lru_aging_strategy: {
 								type: object: options: {
@@ -292,8 +299,9 @@ generated: configuration: {
 										description: "The LRU aging strategy to use."
 									}
 								}
-								description: "Strategy to use when aging LRU counters at each scan."
-								required:    false
+								description:   "Strategy to use when aging LRU counters at each scan."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							lru_bits: {
 								type: uint: default: 8
@@ -302,22 +310,26 @@ generated: configuration: {
 																		Low bit count will reduce the maximum LRU counter value, making the items expire sooner if
 																		unused.
 																		"""
-								required: false
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							lru_deletion_enabled: {
 								type: bool: default: false
-								description: "Can be set to true to delete unused items on scan when LRU is used."
-								required:    false
+								description:   "Can be set to true to delete unused items on scan when LRU is used."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							lru_enabled: {
 								type: bool: default: false
-								description: "Can be set to true to use LRU strategy for kicking."
-								required:    false
+								description:   "Can be set to true to use LRU strategy for kicking."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							lru_increment: {
 								type: uint: default: 1
-								description: "Value to increase LRU counter by on each item access."
-								required:    false
+								description:   "Value to increase LRU counter by on each item access."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							lru_starting_value: {
 								type: uint: default: 1
@@ -325,7 +337,8 @@ generated: configuration: {
 																		Starting value for LRU counter on item insertion.
 																		Higher value will give newer items a higher probability to stay in the filter.
 																		"""
-								required: false
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							max_entries: {
 								type: uint: {}
@@ -337,8 +350,9 @@ generated: configuration: {
 							}
 							max_kicks: {
 								type: uint: default: 500
-								description: "Max number of kicks when experiencing hash collisions."
-								required:    false
+								description:   "Max number of kicks when experiencing hash collisions."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							persistence_path: {
 								type: string: {}
@@ -349,7 +363,8 @@ generated: configuration: {
 																		If table `reload_behavior` is set to `clear-state` and this is set, the persisted state will
 																		still be read after reload.
 																		"""
-								required: false
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							scanning_threads: {
 								type: uint: {}
@@ -358,7 +373,8 @@ generated: configuration: {
 
 																		By default, scanning is single threaded.
 																		"""
-								required: false
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							ttl_bits: {
 								type: uint: default: 8
@@ -366,25 +382,30 @@ generated: configuration: {
 																		Number of bits to use to track TTL. Low bit count will reduce maximum TTL and also require a
 																		worse resolution to keep working.
 																		"""
-								required: false
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							ttl_enabled: {
 								type: bool: default: true
-								description: "Can be set to true to also track TTL for entries."
-								required:    false
+								description:   "Can be set to true to also track TTL for entries."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
 							}
 							type: {
-								type: string: enum: cuckoo: """
+								required: true
+								type: string: enum: {
+									cuckoo: """
 																					Cuckoo filter
 
 																					Supports removal by accepting null values for keys, as well as TTL and LRU.
 																					"""
-								description: """
-																		Cuckoo filter
+									bloom: """
+																					Bloom filter
 
-																		Supports removal by accepting null values for keys, as well as TTL and LRU.
-																		"""
-								required: true
+																					Only supports insertion and presence check, no TTL
+																					"""
+								}
+								description: "The probabilistic filter to use."
 							}
 						}
 						description: """
@@ -698,7 +719,7 @@ generated: configuration: {
 																		backend request. Refer to the documentation of your `backend_type `to see which options
 																		are required to be set.
 																		"""
-								required:      false
+								required:      true
 								relevant_when: "version = \"v1_1\""
 							}
 							backend_type: {
@@ -981,7 +1002,6 @@ generated: configuration: {
 					}
 				}
 				description: "A secret backend."
-				common:      false
 				required:    true
 			}
 			description: "All configured secrets backends."
@@ -1496,7 +1516,6 @@ generated: configuration: {
 
 				[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 				"""
-			common:   true
 			required: false
 			group:    "global_options"
 		}
@@ -1531,8 +1550,7 @@ generated: configuration: {
 
 				Vector must have write permissions to this directory.
 				"""
-			common: false
-			group:  "global_options"
+			group: "global_options"
 		}
 		expire_metrics_per_metric_set: {
 			type: array: items: type: object: options: {
@@ -1635,7 +1653,6 @@ generated: configuration: {
 				Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
 				so metrics live long enough to be emitted and captured.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1705,7 +1722,6 @@ generated: configuration: {
 				This is used if a component does not have its own specific log schema. All events use a log
 				schema, whether or not the default is used, to assign event fields on incoming events.
 				"""
-			common:   false
 			required: false
 			warnings: ["These settings are ignored when `schema.log_namespace` is set to `true`."]
 			group: "schema"
@@ -1778,7 +1794,6 @@ generated: configuration: {
 				to use based on the type of traffic being proxied. You can also set specific hosts that
 				should not be proxied.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1813,7 +1828,6 @@ generated: configuration: {
 				Determines whether `source` and `service` tags should be emitted with the
 				`component_sent_*` and `component_received_*` events.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1829,8 +1843,7 @@ generated: configuration: {
 
 				[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 				"""
-			common: false
-			group:  "global_options"
+			group: "global_options"
 		}
 		wildcard_matching: {
 			type: string: enum: {
@@ -1843,7 +1856,6 @@ generated: configuration: {
 				Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
 				to be accepted without causing an error.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}

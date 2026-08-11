@@ -1,5 +1,5 @@
 use futures::stream;
-use rand::Rng;
+use rand::RngExt;
 use redis::AsyncCommands;
 use vector_lib::{
     codecs::JsonSerializerConfig,
@@ -14,6 +14,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent},
     serde::OneOrMany,
     sinks::prelude::*,
+    template::Template,
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
