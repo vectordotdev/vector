@@ -14,7 +14,6 @@ Vector team member will find this document useful.
   - [Git Commits](#git-commits)
     - [Style](#style)
   - [GitHub Pull Requests](#github-pull-requests)
-    - [Title](#title)
     - [Reviews & Approvals](#reviews--approvals)
     - [Merge Style](#merge-style)
   - [CI](#ci)
