@@ -805,7 +805,7 @@ impl AgentDDSketch {
                 count,
             } => {
                 let delta_buckets = mem::take(buckets);
-                let true_sum = sum.unwrap_or(0.0);
+                let true_sum = *sum;
                 let true_count = *count;
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
@@ -826,12 +826,22 @@ impl AgentDDSketch {
                 // `sketch.count()` since both are derived from the same
                 // (possibly incomplete) buckets.
                 //
-                // The exact `sum` also has to actually be a number. Vector's
-                // Prometheus parser accepts `NaN`/`+Inf`/`-Inf` as metric values
-                // (see `parse_value` in `lib/prometheus-parser/src/line.rs`), so a
-                // scraped `_sum` can be non-finite, and OTLP's `sum` is an
+                // The histogram also has to have reported a sum in the first place.
+                // OTLP leaves it unset for histograms recording negative values,
+                // and OpenMetrics allows an exposition to omit the `_sum` series
+                // entirely, so there is often nothing exact to substitute. Those
+                // histograms keep the bucket-derived estimate, which is the best
+                // available answer rather than a confident zero.
+                //
+                // When present, the exact `sum` still has to actually be a number.
+                // Vector's Prometheus parser accepts `NaN`/`+Inf`/`-Inf` as metric
+                // values (see `parse_value` in `lib/prometheus-parser/src/line.rs`),
+                // so a scraped `_sum` can be non-finite, and OTLP's `sum` is an
                 // unvalidated `double`.
-                if true_count > 0 && true_count == u64::from(sketch.count()) && true_sum.is_finite()
+                if let Some(true_sum) = true_sum
+                    && true_count > 0
+                    && true_count == u64::from(sketch.count())
+                    && true_sum.is_finite()
                 {
                     #[allow(
                         clippy::cast_precision_loss,
@@ -1410,6 +1420,57 @@ mod tests {
             sketch.avg(),
             Some(true_sum / f64::from(u32::try_from(true_count).unwrap())),
             "avg must not be derived from the true count while cnt is undercounted"
+        );
+    }
+
+    #[test]
+    fn test_transform_to_sketch_skips_override_when_sum_is_unreported() {
+        // A histogram that reports no sum at all has nothing exact to substitute, so the
+        // bucket-derived estimate has to stand. Reading the absent sum as zero would be far worse
+        // than the estimate it replaced: it would claim a total of zero for observations that are
+        // demonstrably non-zero, and would drag `min` down to zero with it to keep
+        // `min <= avg <= max` satisfied.
+        let true_count: u64 = 4;
+
+        let metric = Metric::new(
+            "source_send_latency_seconds",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![Bucket {
+                    upper_limit: 1.0,
+                    count: true_count,
+                }],
+                count: true_count,
+                sum: None,
+            },
+        );
+
+        let transformed =
+            AgentDDSketch::transform_to_sketch(metric).expect("valid histogram converts");
+        let MetricValue::Sketch { sketch } = transformed.value() else {
+            panic!("expected a sketch value");
+        };
+        let crate::event::metric::MetricSketch::AgentDDSketch(sketch) = sketch;
+
+        let sum = sketch.sum().expect("non-empty sketch has a sum");
+        let avg = sketch.avg().expect("non-empty sketch has an avg");
+
+        assert_eq!(u64::from(sketch.count()), true_count);
+        assert!(
+            sum > 0.0,
+            "an unreported sum must leave the bucket-derived estimate in place, not zero it: \
+             sum={sum}"
+        );
+        assert!(
+            avg > 0.0,
+            "avg follows from the bucket-derived sum, so it must not be zeroed either: avg={avg}"
+        );
+
+        let min = sketch.min().expect("non-empty sketch has a min");
+        let max = sketch.max().expect("non-empty sketch has a max");
+        assert!(
+            min <= avg && avg <= max,
+            "summary stats must stay internally consistent: min={min} avg={avg} max={max}"
         );
     }
 
