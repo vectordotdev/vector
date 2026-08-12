@@ -225,6 +225,9 @@ databricks-zerobus-ingest-sdk,https://github.com/databricks/zerobus-sdk,Apache-2
 dbl,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 deadpool,https://github.com/deadpool-rs/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
 deadpool-runtime,https://github.com/deadpool-rs/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
+defmt,https://github.com/knurling-rs/defmt,MIT OR Apache-2.0,The Knurling-rs developers
+defmt-macros,https://github.com/knurling-rs/defmt,MIT OR Apache-2.0,The Knurling-rs developers
+defmt-parser,https://github.com/knurling-rs/defmt,MIT OR Apache-2.0,The Knurling-rs developers
 der,https://github.com/RustCrypto/formats/tree/master/der,Apache-2.0 OR MIT,RustCrypto Developers
 deranged,https://github.com/jhpratt/deranged,MIT OR Apache-2.0,Jacob Pratt <jacob@jhpratt.dev>
 derivative,https://github.com/mcarton/rust-derivative,MIT OR Apache-2.0,mcarton <cartonmartin+git@gmail.com>
@@ -402,7 +405,10 @@ is_ci,https://github.com/zkat/is_ci,ISC,Kat Marchán <kzm@zkat.tech>
 itertools,https://github.com/rust-itertools/itertools,MIT OR Apache-2.0,bluss
 itoa,https://github.com/dtolnay/itoa,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 jiff,https://github.com/BurntSushi/jiff,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
+jiff-core,https://github.com/BurntSushi/jiff,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 jiff-static,https://github.com/BurntSushi/jiff,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
+jiff-tzdb,https://github.com/BurntSushi/jiff,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
+jiff-tzdb-platform,https://github.com/BurntSushi/jiff,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 jni,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,Josh Chase <josh@prevoty.com>
 jni,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,jni team
 jni-macros,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,The jni-macros Authors
@@ -469,6 +475,7 @@ matchers,https://github.com/hawkw/matchers,MIT,Eliza Weisman <eliza@buoyant.io>
 matchit,https://github.com/ibraheemdev/matchit,MIT AND BSD-3-Clause,Ibraheem Ahmed <ibraheem@ibraheem.ca>
 maxminddb,https://github.com/oschwald/maxminddb-rust,ISC,Gregory J. Oschwald <oschwald@gmail.com>
 md-5,https://github.com/RustCrypto/hashes,MIT OR Apache-2.0,RustCrypto Developers
+mea,https://github.com/fast/mea,Apache-2.0,The mea Authors
 memchr,https://github.com/BurntSushi/memchr,Unlicense OR MIT,"Andrew Gallant <jamslam@gmail.com>, bluss"
 memmap2,https://github.com/RazrFalcon/memmap2-rs,MIT OR Apache-2.0,"Dan Burkert <dan@danburkert.com>, Yevhenii Reizner <razrfalcon@gmail.com>, The Contributors"
 memoffset,https://github.com/Gilnaa/memoffset,MIT,Gilad Naaman <gilad.naaman@gmail.com>
@@ -491,7 +498,7 @@ mongocrypt-sys,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham
 mongodb,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>"
 mongodb-internal-macros,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>"
 murmur3,https://github.com/stusmall/murmur3,MIT OR Apache-2.0,Stu Small <stuart.alan.small@gmail.com>
-native-tls,https://github.com/sfackler/rust-native-tls,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
+native-tls,https://github.com/rust-native-tls/rust-native-tls,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 ndk-context,https://github.com/rust-windowing/android-ndk-rs,MIT OR Apache-2.0,The Rust Windowing contributors
 newtype-uuid,https://github.com/oxidecomputer/newtype-uuid,MIT OR Apache-2.0,The newtype-uuid Authors
 nibble_vec,https://github.com/michaelsproul/rust_nibble_vec,MIT,Michael Sproul <micsproul@gmail.com>
@@ -534,10 +541,15 @@ onig,https://github.com/iwillspeak/rust-onig,MIT,"Will Speak <will@willspeak.me>
 onig_sys,https://github.com/iwillspeak/rust-onig,MIT,"Will Speak <will@willspeak.me>, Ivan Ivashchenko <defuz@me.com>"
 opaque-debug,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 opendal,https://github.com/apache/opendal,Apache-2.0,Apache OpenDAL <dev@opendal.apache.org>
+opendal-core,https://github.com/apache/opendal,Apache-2.0,Apache OpenDAL <dev@opendal.apache.org>
+opendal-http-transport-reqwest,https://github.com/apache/opendal,Apache-2.0,Apache OpenDAL <dev@opendal.apache.org>
+opendal-layer-logging,https://github.com/apache/opendal,Apache-2.0,Apache OpenDAL <dev@opendal.apache.org>
+opendal-service-webhdfs,https://github.com/apache/opendal,Apache-2.0,Apache OpenDAL <dev@opendal.apache.org>
 openidconnect,https://github.com/ramosbugs/openidconnect-rs,MIT,David A. Ramos <ramos@cs.stanford.edu>
 openssl,https://github.com/rust-openssl/rust-openssl,Apache-2.0,Steven Fackler <sfackler@gmail.com>
 openssl-macros,https://github.com/sfackler/rust-openssl,MIT OR Apache-2.0,The openssl-macros Authors
 openssl-probe,https://github.com/alexcrichton/openssl-probe,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
+openssl-probe,https://github.com/rustls/openssl-probe,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 openssl-sys,https://github.com/rust-openssl/rust-openssl,MIT,"Alex Crichton <alex@alexcrichton.com>, Steven Fackler <sfackler@gmail.com>"
 ordered-float,https://github.com/reem/rust-ordered-float,MIT,"Jonathan Reem <jonathan.reem@gmail.com>, Matt Brubeck <mbrubeck@limpet.net>"
 outref,https://github.com/Nugine/outref,MIT,The outref Authors
