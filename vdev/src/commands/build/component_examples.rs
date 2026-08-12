@@ -345,10 +345,8 @@ where
         })
         .collect::<std::collections::HashMap<_, _>>();
 
-    // When fields are split across mutually exclusive `groups` (e.g. the influxdb sinks' v1 and
-    // v2 settings), only one group can appear in a valid example. Pick the group with the most
-    // required fields, breaking ties lexicographically, so the current version (v2, whose fields
-    // are all required) wins over the legacy one.
+    // When fields are split across mutually exclusive `groups`, only one group can appear in a
+    // valid example. Pick the group with the most required fields, breaking ties lexicographically.
     let example_group = select_example_group(params);
 
     let mut selected = HashSet::new();
@@ -404,8 +402,7 @@ where
 }
 
 /// Select the `groups` value to include in an example when a component's fields are split across
-/// mutually exclusive groups (e.g. the influxdb sinks' v1/v2 settings). Returns `None` when fields
-/// are not grouped.
+/// mutually exclusive groups. Returns `None` when fields are not grouped.
 fn select_example_group(params: &Map<String, Value>) -> Option<String> {
     let mut required_by_group: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();

@@ -339,14 +339,12 @@ impl SchemaContext {
                     json!({ "_resolved": { "type": { type_def_kind: {} } }, "annotations": "narrowed_free_form" }),
                 );
             }
-        }
 
-        // Schema pattern: untagged enum with object variants whose fields are disjoint (e.g. the
-        // influxdb sinks' v1/v2 settings). The variants are mutually exclusive, so every field is
-        // tagged with the `groups` metadata naming its variant; example generation then picks a
-        // single group and includes all of its fields. The tagging is derived automatically from
-        // the enum structure rather than annotated per-field.
-        if enum_tagging == "untagged" {
+            // Schema pattern: untagged enum with object variants whose fields are disjoint. The
+            // variants are mutually exclusive, so every field is tagged with the `groups` metadata
+            // naming its variant; example generation then picks a single group and includes all of
+            // its fields. The tagging is derived automatically from the enum structure rather than
+            // annotated per-field.
             let mut resolved_objects: Vec<(Value, Value)> = Vec::new();
             let mut all_objects = true;
             for subschema in &subschemas {
