@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
@@ -11,7 +14,7 @@ use crate::{
     BufferInstrumentation, Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
-    variants::disk_v2::{self, ProductionFilesystem},
+    variants::disk_v2::{self, ProductionFilesystem, TryWriteOutcome},
 };
 
 /// Adapter for papering over various sender backends.
@@ -40,9 +43,13 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
+    pub(crate) async fn send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
         match self {
-            Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
+            Self::InMemory(tx) => tx
+                .send(item)
+                .await
+                .map(|()| TryWriteOutcome::Written)
+                .map_err(Into::into),
             Self::DiskV2(writer) => {
                 let pre_count = item.event_count() as u64;
                 let pre_size = item.size_of() as u64;
@@ -55,7 +62,7 @@ where
                     // `received` / `dropped` metrics — `BufferSender` does not carry
                     // its own handle for backends that `provides_instrumentation()`.
                     writer.track_dropped(pre_count, pre_size);
-                    return Ok(());
+                    return Ok(TryWriteOutcome::Dropped);
                 };
                 if item.event_count() as u64 != pre_count {
                     let dropped_events = pre_count - item.event_count() as u64;
@@ -63,7 +70,12 @@ where
                     writer.track_dropped(dropped_events, dropped_bytes);
                 }
 
-                writer.write_record(item).await.map(|_| ()).map_err(|e| {
+                writer.write_record_outcome(item).await.map_err(|e| {
+                    // Record-level failures that can never succeed (a record too large to encode
+                    // within the max record size) are handled inside the writer and surfaced as a
+                    // dropped outcome. Anything that reaches this point -- I/O errors,
+                    // serialization failures, an inconsistent writer state -- is genuinely
+                    // unrecoverable.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -72,12 +84,12 @@ where
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
+    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
         match self {
             Self::InMemory(tx) => Ok(tx
                 .try_send(item)
-                .err()
-                .map(super::limited_queue::TrySendError::into_inner)),
+                .map(|()| TryWriteOutcome::Written)
+                .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
@@ -89,7 +101,7 @@ where
                 // accept. Holding the writer lock makes the check race-free against
                 // other writers (only writers grow the buffer; readers only shrink).
                 if writer.is_buffer_full() {
-                    return Ok(Some(item));
+                    return Ok(TryWriteOutcome::Full(item));
                 }
 
                 // KNOWN LIMITATION (accepted; tracked as a follow-up): past the
@@ -116,7 +128,7 @@ where
                 let pre_size = item.size_of() as u64;
                 let Some(item) = item.filter_unencodable() else {
                     writer.track_dropped(pre_count, pre_size);
-                    return Ok(None);
+                    return Ok(TryWriteOutcome::Dropped);
                 };
                 if item.event_count() as u64 != pre_count {
                     let dropped_events = pre_count - item.event_count() as u64;
@@ -125,6 +137,11 @@ where
                 }
 
                 writer.try_write_record(item).await.map_err(|e| {
+                    // Record-level failures that can never succeed (a record too large to encode
+                    // within the max record size) are handled inside the writer and surfaced as a
+                    // dropped outcome. Anything that reaches this point -- I/O errors,
+                    // serialization failures, an inconsistent writer state -- is genuinely
+                    // unrecoverable.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -152,6 +169,33 @@ where
         match self {
             Self::InMemory(tx) => Some(tx.available_capacity()),
             Self::DiskV2(_) => None,
+        }
+    }
+}
+
+enum UsageAccounting {
+    Accepted,
+    DroppedNewest,
+    NotAccepted,
+}
+
+impl UsageAccounting {
+    fn record(self, instrumentation: &BufferUsageHandle, item_count: usize, item_size: usize) {
+        match self {
+            Self::Accepted => instrumentation
+                .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64),
+            Self::DroppedNewest => {
+                instrumentation.increment_received_event_count_and_byte_size(
+                    item_count as u64,
+                    item_size as u64,
+                );
+                instrumentation.increment_dropped_event_count_and_byte_size(
+                    item_count as u64,
+                    item_size as u64,
+                    true,
+                );
+            }
+            Self::NotAccepted => {}
         }
     }
 }
@@ -268,32 +312,30 @@ impl<T: Bufferable> BufferSender<T> {
             .as_ref()
             .map(|_| (item.event_count(), item.size_of()));
 
-        let mut was_dropped = false;
-
-        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
-            && let Some((item_count, item_size)) = item_sizing
-        {
-            instrumentation
-                .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64);
-        }
-        match self.when_full {
-            WhenFull::Block => self.base.send(item).await?,
-            WhenFull::DropNewest => {
-                if self.base.try_send(item).await?.is_some() {
-                    was_dropped = true;
-                }
-            }
-            WhenFull::Overflow => {
-                if let Some(item) = self.base.try_send(item).await? {
-                    was_dropped = true;
+        let accounting = match self.when_full {
+            WhenFull::Block => match self.base.send(item).await? {
+                TryWriteOutcome::Written => UsageAccounting::Accepted,
+                TryWriteOutcome::Full(_) => unreachable!("blocking sends wait until space exists"),
+                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+            },
+            WhenFull::DropNewest => match self.base.try_send(item).await? {
+                TryWriteOutcome::Written => UsageAccounting::Accepted,
+                TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
+                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+            },
+            WhenFull::Overflow => match self.base.try_send(item).await? {
+                TryWriteOutcome::Written => UsageAccounting::Accepted,
+                TryWriteOutcome::Full(item) => {
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))
                         .send(item, send_reference)
                         .await?;
+                    UsageAccounting::NotAccepted
                 }
-            }
-        }
+                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+            },
+        };
 
         // Backend filter drops are accounted directly through the backend's own
         // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
@@ -302,13 +344,8 @@ impl<T: Bufferable> BufferSender<T> {
         // drops captured via `was_dropped`.
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
-            && was_dropped
         {
-            instrumentation.increment_dropped_event_count_and_byte_size(
-                item_count as u64,
-                item_size as u64,
-                true,
-            );
+            accounting.record(instrumentation, item_count, item_size);
         }
         if let Some(send_duration) = self.send_duration.as_ref()
             && let Some(send_reference) = send_reference

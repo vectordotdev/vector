@@ -7,6 +7,7 @@ use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
+use vrl::event_path;
 
 use crate::event::event_exceeds_max_nesting_cost;
 use crate::event::ser::{
@@ -71,14 +72,14 @@ fn back_and_forth_through_bytes() {
 #[test]
 fn serialization() {
     let mut event = LogEvent::from("raw log line");
-    event.insert("foo", "bar");
-    event.insert("bar", "baz");
+    event.insert(event_path!("foo"), "bar");
+    event.insert(event_path!("bar"), "baz");
 
     let expected_all = serde_json::json!({
         "message": "raw log line",
         "foo": "bar",
         "bar": "baz",
-        "timestamp": event.get(log_schema().timestamp_key().unwrap().to_string().as_str()),
+        "timestamp": event.get(log_schema().timestamp_key_target_path().unwrap()),
     });
 
     let actual_all = serde_json::to_value(event.all_event_fields().unwrap()).unwrap();
@@ -93,10 +94,10 @@ fn type_serialization() {
     use serde_json::json;
 
     let mut event = LogEvent::from("hello world");
-    event.insert("int", 4);
-    event.insert("float", 5.5);
-    event.insert("bool", true);
-    event.insert("string", "thisisastring");
+    event.insert(event_path!("int"), 4);
+    event.insert(event_path!("float"), 5.5);
+    event.insert(event_path!("bool"), true);
+    event.insert(event_path!("string"), "thisisastring");
 
     let map = serde_json::to_value(event.all_event_fields().unwrap()).unwrap();
     assert_eq!(map["float"], json!(5.5));

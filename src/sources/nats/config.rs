@@ -182,7 +182,7 @@ pub const fn default_subscription_capacity() -> usize {
 }
 
 impl GenerateConfig for NatsSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"
             connection_name = "vector"

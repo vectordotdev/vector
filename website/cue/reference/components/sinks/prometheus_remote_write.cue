@@ -21,7 +21,6 @@ components: sinks: prometheus_remote_write: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   1000
 				timeout_secs: 1.0
 			}

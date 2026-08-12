@@ -127,7 +127,6 @@ pub struct KafkaSourceConfig {
     /// The Kafka session timeout.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Session Timeout"))]
     session_timeout_ms: Duration,
@@ -143,14 +142,12 @@ pub struct KafkaSourceConfig {
     /// Default value is half of `session_timeout_ms`.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[configurable(metadata(docs::examples = 2500, docs::examples = 5000))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::human_name = "Drain Timeout"))]
     drain_timeout_ms: Option<u64>,
 
     /// Timeout for network requests.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_socket_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     socket_timeout_ms: Duration,
@@ -158,7 +155,6 @@ pub struct KafkaSourceConfig {
     /// Maximum time the broker may wait to fill the response.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
     #[configurable(metadata(docs::human_name = "Max Fetch Wait Time"))]
     fetch_wait_max_ms: Duration,
@@ -219,7 +215,6 @@ pub struct KafkaSourceConfig {
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
     ))]
@@ -229,7 +224,6 @@ pub struct KafkaSourceConfig {
     auth: kafka::KafkaAuthConfig,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
@@ -1309,13 +1303,15 @@ impl KafkaSourceContext {
             return;
         }
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsAssigned(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsAssigned(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             // no-op: wait for partition assignment handler to complete
@@ -1329,13 +1325,15 @@ impl KafkaSourceContext {
     /// sender is dropped by the callback handler.
     fn revoke_partitions(&self, tpl: &TopicPartitionList) {
         let (send, rendezvous) = sync_channel(0);
-        let _ = self.callbacks.send(KafkaCallback::PartitionsRevoked(
-            tpl.elements()
-                .iter()
-                .map(|tp| (tp.topic().into(), tp.partition()))
-                .collect(),
-            send,
-        ));
+        self.callbacks
+            .send(KafkaCallback::PartitionsRevoked(
+                tpl.elements()
+                    .iter()
+                    .map(|tp| (tp.topic().into(), tp.partition()))
+                    .collect(),
+                send,
+            ))
+            .ok();
 
         while rendezvous.recv().is_ok() {
             self.commit_consumer_state();
@@ -1567,6 +1565,35 @@ mod integration_test {
     const HEADER_KEY: &str = "my header";
     const HEADER_VALUE: &str = "my header value";
 
+    fn message_indices(events: &[Event]) -> HashSet<usize> {
+        events
+            .iter()
+            .map(|event| {
+                let key = event.as_log()["message_key"].to_string_lossy();
+                key.strip_prefix(&format!("{KEY} "))
+                    .expect("message_key should have the expected prefix")
+                    .parse()
+                    .expect("message_key suffix should be the message index")
+            })
+            .collect()
+    }
+
+    fn message_offsets(events: &[Event]) -> HashSet<(i64, i64)> {
+        events
+            .iter()
+            .map(|event| {
+                let log = event.as_log();
+                let partition = log["partition"].to_string_lossy().parse().expect(
+                    "partition should be an integer, since it was pulled from a `sources::kafka::Keys.partition` field",
+                );
+                let offset = log["offset"].to_string_lossy().parse().expect(
+                    "offset should be an integer, since it was pulled from a `sources::kafka::Keys.offset` field",
+                );
+                (partition, offset)
+            })
+            .collect()
+    }
+
     fn kafka_test_topic() -> String {
         std::env::var("KAFKA_TEST_TOPIC")
             .unwrap_or_else(|_| format!("test-topic-{}", random_string(10)))
@@ -1717,8 +1744,8 @@ mod integration_test {
                     now.trunc_subsecs(3).into()
                 );
                 assert_eq!(event.as_log()["topic"], topic.clone().into());
-                assert!(event.as_log().contains("partition"));
-                assert!(event.as_log().contains("offset"));
+                assert!(event.as_log().contains(event_path!("partition")));
+                assert!(event.as_log().contains(event_path!("offset")));
                 let mut expected_headers = ObjectMap::new();
                 expected_headers.insert(HEADER_KEY.into(), Value::from(HEADER_VALUE));
                 assert_eq!(event.as_log()["headers"], Value::from(expected_headers));
@@ -2030,8 +2057,10 @@ mod integration_test {
 
     async fn consume_with_rebalance(rebalance_strategy: String) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
+        // A larger backlog gives the later consumers a bigger margin against being starved
+        // (see the `events3` assertion below) as CI runners get faster at draining the topic.
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
-            .unwrap_or_else(|_| "125000".into())
+            .unwrap_or_else(|_| "500000".into())
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
@@ -2137,7 +2166,49 @@ mod integration_test {
             0,
             "The first set of consumers should consume and ack all messages."
         );
-        assert_eq!(total, expect_count);
+        // Kafka only guarantees at-least-once delivery: a partition revoked mid-rebalance
+        // can be re-read by the consumer it's reassigned to before the prior consumer's
+        // offset commit lands, so `total` may legitimately exceed `expect_count` if some
+        // messages were delivered more than once.
+        assert!(
+            total >= expect_count,
+            "Consumers should not lose any messages: got {total}, expected at least {expect_count}"
+        );
+        // Duplicates alone could mask a real drop behind an inflated `total`, so also check
+        // that every message was seen by at least one consumer. When we produced the messages
+        // ourselves via `send_events` (their `message_key` is `"{KEY} {index}"`), we can check
+        // this by index. A pre-populated topic (`send_count == 0`, see above) can contain
+        // arbitrary records, so instead we check the number of distinct Kafka
+        // `(partition, offset)` pairs seen: since each source record has a unique offset,
+        // duplicates can't inflate that count the way they inflate `total`, so it must equal
+        // `expect_count` exactly for no message to have been lost.
+        if send_count > 0 {
+            let received: HashSet<usize> = message_indices(&events1)
+                .into_iter()
+                .chain(message_indices(&events2))
+                .chain(message_indices(&events3))
+                .collect();
+            let missing: Vec<usize> = (0..expect_count)
+                .filter(|i| !received.contains(i))
+                .collect();
+            assert!(
+                missing.is_empty(),
+                "Consumers should not lose any messages: got {total} events covering {}/{expect_count} indices, missing: {missing:?}",
+                received.len(),
+            );
+        } else {
+            let received: HashSet<(i64, i64)> = message_offsets(&events1)
+                .into_iter()
+                .chain(message_offsets(&events2))
+                .chain(message_offsets(&events3))
+                .collect();
+            assert_eq!(
+                received.len(),
+                expect_count,
+                "Consumers should not lose any messages: got {total} events covering only {}/{expect_count} unique offsets",
+                received.len(),
+            );
+        }
     }
 
     #[tokio::test]

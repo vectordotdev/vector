@@ -63,7 +63,7 @@ impl UriSerde {
 }
 
 impl TryFrom<String> for UriSerde {
-    type Error = <Uri as FromStr>::Err;
+    type Error = crate::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         value.as_str().parse()
@@ -93,33 +93,44 @@ impl fmt::Display for UriSerde {
 }
 
 impl FromStr for UriSerde {
-    type Err = <Uri as FromStr>::Err;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<Uri>().map(Into::into)
+        let uri: Uri = s.parse()?;
+        uri.try_into()
     }
 }
 
-impl From<Uri> for UriSerde {
-    fn from(uri: Uri) -> Self {
+impl TryFrom<Uri> for UriSerde {
+    type Error = crate::Error;
+
+    /// Fallible construction from a parsed `Uri`, extracting any basic auth
+    /// credentials from the authority.
+    ///
+    /// This can fail: `http::Uri` accepts authorities that `url::Url` rejects
+    /// (e.g. a non-numeric port), in which case the basic auth cannot be
+    /// extracted.
+    fn try_from(uri: Uri) -> Result<Self, Self::Error> {
         match uri.authority() {
-            None => Self { uri, auth: None },
+            None => Ok(Self { uri, auth: None }),
             Some(authority) => {
-                let (authority, auth) = get_basic_auth(authority);
+                let (authority, auth) = get_basic_auth(authority)?;
 
                 let mut parts = uri.into_parts();
                 parts.authority = Some(authority);
-                let uri = Uri::from_parts(parts).unwrap();
+                let uri = Uri::from_parts(parts)?;
 
-                Self { uri, auth }
+                Ok(Self { uri, auth })
             }
         }
     }
 }
 
-fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
-    // We get a valid `Authority` as input, therefore cannot fail here.
-    let mut url = url::Url::parse(&format!("http://{authority}")).expect("invalid authority");
+fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Auth>)> {
+    // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
+    // non-numeric port), so this parse can fail; propagate the error instead
+    // of panicking.
+    let mut url = url::Url::parse(&format!("http://{authority}"))?;
 
     let user = url.username();
     if !user.is_empty() {
@@ -132,25 +143,25 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
 
         // These methods have the same failure condition as `username`,
         // because we have a non-empty username, they cannot fail here.
-        url.set_username("").expect("unexpected empty authority");
-        url.set_password(None).expect("unexpected empty authority");
+        url.set_username("")
+            .map_err(|_| "unexpected empty authority")?;
+        url.set_password(None)
+            .map_err(|_| "unexpected empty authority")?;
 
-        // We get a valid `Authority` as input, therefore cannot fail here.
-        let authority = Uri::from_maybe_shared(String::from(url))
-            .expect("invalid url")
+        let authority = Uri::from_maybe_shared(String::from(url))?
             .authority()
-            .expect("unexpected empty authority")
+            .ok_or_else(|| "unexpected empty authority".to_string())?
             .clone();
 
-        (
+        Ok((
             authority,
             Some(Auth::Basic {
                 user,
                 password: password.into(),
             }),
-        )
+        ))
     } else {
-        (authority.clone(), None)
+        Ok((authority.clone(), None))
     }
 }
 
@@ -228,6 +239,14 @@ mod tests {
         );
 
         test_parse("user@example.com", "example.com", Some(("user", "")));
+    }
+
+    #[test]
+    fn parse_rejects_malformed_authority_without_panicking() {
+        // `http::Uri` accepts a non-numeric port in the authority, but
+        // `url::Url` rejects it. This must be a parse error, not a panic.
+        let result = "http://user:pass@localhost:notaport/path".parse::<UriSerde>();
+        assert!(result.is_err());
     }
 
     #[test]

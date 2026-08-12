@@ -2,7 +2,6 @@ package metadata
 
 components: sinks: splunk_hec_logs: {
 	title: "Splunk HEC logs"
-	alias: "splunk_hec"
 
 	classes: {
 		delivery:      "at_least_once"
@@ -19,7 +18,6 @@ components: sinks: splunk_hec_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -72,7 +70,9 @@ components: sinks: splunk_hec_logs: {
 		notices: []
 	}
 
-	configuration: generated.components.sinks.splunk_hec_logs.configuration
+	configuration: generated.components.sinks.splunk_hec_logs.configuration & {
+		default_token: type: string: examples: ["SECRET[splunk_secrets.token]"]
+	}
 
 	input: {
 		logs:    true
