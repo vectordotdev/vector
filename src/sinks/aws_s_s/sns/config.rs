@@ -26,6 +26,9 @@ use crate::{
 pub(super) struct SnsSinkConfig {
     /// The ARN of the Amazon SNS topic to which messages are sent.
     #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(
+        docs::examples = "arn:aws:sns:us-east-2:123456789012:FifoTopic.fifo"
+    ))]
     #[configurable(metadata(docs::examples = "arn:aws:sns:us-east-2:123456789012:MyTopic"))]
     pub(super) topic_arn: String,
 

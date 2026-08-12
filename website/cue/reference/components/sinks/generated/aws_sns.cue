@@ -908,6 +908,6 @@ generated: components: sinks: aws_sns: configuration: {
 	topic_arn: {
 		description: "The ARN of the Amazon SNS topic to which messages are sent."
 		required:    true
-		type: string: examples: ["arn:aws:sns:us-east-2:123456789012:MyTopic"]
+		type: string: examples: ["arn:aws:sns:us-east-2:123456789012:FifoTopic.fifo", "arn:aws:sns:us-east-2:123456789012:MyTopic"]
 	}
 }
