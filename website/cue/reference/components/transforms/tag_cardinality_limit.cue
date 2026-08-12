@@ -214,9 +214,9 @@ components: transforms: tag_cardinality_limit: {
 				  would expire a full slice early. Eviction therefore lands in
 				  `[ttl_secs, ttl_secs + ttl_secs / ttl_generations)` — never early.
 				  Reduce `cache_size_per_key` if you want to keep total memory flat.
-				  `ttl_generations: 1` produces a tumbling window (everything resets
-				  at once every `ttl_secs`), which can be useful for matching a strict
-				  billing-window boundary. The `value_limit` cap is enforced against an
+				  `ttl_generations: 1` instead uses one shard and produces a tumbling
+				  window (everything resets at once every `ttl_secs`) with the same
+				  memory cost as no TTL. The `value_limit` cap is enforced against an
 				  upper-bound estimate of the union cardinality across shards. Under
 				  refresh-on-sighting, hot continuously-seen values may be counted in
 				  more than one shard, so the effective cap can be as low as

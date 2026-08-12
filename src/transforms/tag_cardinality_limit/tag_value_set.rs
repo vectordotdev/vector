@@ -256,17 +256,19 @@ impl TtlExactStorage {
     }
 }
 
-/// Sliding-window bloom: `generations` closed shards plus the open one being
-/// written, each a full `cache_size_per_key` bloom filter. Front of the deque is
-/// the oldest shard; back is the current. On rotation, the front shard is dropped
-/// and a fresh empty one is pushed at the back. Membership is the OR across
-/// shards; refresh-on-sighting writes hits into the current shard so hot values
-/// survive future rotations.
+/// Sliding-window bloom: for more than one generation, `generations` closed
+/// shards plus the open one being written. A single generation is a tumbling
+/// window with one shard. Each shard is a full `cache_size_per_key` bloom filter.
+/// Front of the deque is the oldest shard; back is the current. On rotation, the
+/// front shard is dropped and a fresh empty one is pushed at the back. Membership
+/// is the OR across shards; refresh-on-sighting writes hits into the current
+/// shard so hot values survive future rotations.
 struct RollingBloomStorage {
     shards: VecDeque<BloomFilterStorage>,
     generations: u8,
-    /// `generations + 1`: the closed shards spanning the window, plus the open
-    /// one currently accepting writes.
+    /// For sliding windows, `generations + 1`: the closed shards spanning the
+    /// window, plus the open one currently accepting writes. A single generation
+    /// deliberately uses one shard to provide the documented tumbling behavior.
     ///
     /// The open shard only covers part of a slice at any moment, so retiring at
     /// `generations` shards would evict a value inserted just before a rotation
@@ -287,7 +289,11 @@ impl RollingBloomStorage {
     fn new(cache_size_per_key: usize, generations: u8, ttl: Duration) -> Self {
         // Cap generations so `slice >= 1s` and `slice * generations == ttl`.
         let (generations, slice) = compute_ttl_slices(ttl, generations);
-        let max_shards = generations as usize + 1;
+        let max_shards = if generations == 1 {
+            1
+        } else {
+            generations as usize + 1
+        };
         let mut shards = VecDeque::with_capacity(max_shards);
         shards.push_back(BloomFilterStorage::new(cache_size_per_key));
         let now = Instant::now();
@@ -775,6 +781,24 @@ mod tests {
         let s = RollingBloomStorage::new(default_cache_size(), 0, Duration::from_secs(60));
         assert_eq!(s.generations, 1);
         assert_eq!(s.shards.len(), 1);
+    }
+
+    #[test]
+    fn rolling_bloom_single_generation_is_a_tumbling_window() {
+        let ttl = Duration::from_secs(60);
+        let mut s = RollingBloomStorage::new(default_cache_size(), 1, ttl);
+        let t0 = Instant::now();
+        s.shards.back_mut().unwrap().insert(&v("old"));
+        s.next_rotate = t0 + ttl;
+
+        s.rotate_if_needed(t0 + ttl);
+
+        assert_eq!(s.max_shards, 1);
+        assert_eq!(s.shards.len(), 1);
+        assert!(
+            !s.shards.back().unwrap().contains(&v("old")),
+            "a single generation must clear the complete window on rotation"
+        );
     }
 
     #[test]

@@ -129,9 +129,10 @@ pub struct Inner {
     /// tag-key) pair. The extra shard is the one currently being written: it
     /// covers only part of a slice, so retiring without it would expire values
     /// after `ttl_secs - (ttl_secs / ttl_generations)` instead of the full TTL.
-    /// `1` produces a tumbling window: all tracked values are dropped at once
-    /// every `ttl_secs`. Ignored when `ttl_secs` is unset, or when mode is
-    /// `exact` (which uses precise per-value timestamps).
+    /// `1` produces a one-shard tumbling window: all tracked values are dropped
+    /// at once every `ttl_secs`, using `cache_size_per_key` memory. Ignored when
+    /// `ttl_secs` is unset, or when mode is `exact` (which uses precise
+    /// per-value timestamps).
     #[serde(default = "default_ttl_generations")]
     #[configurable(metadata(docs::human_name = "TTL Generations"))]
     pub ttl_generations: u8,
