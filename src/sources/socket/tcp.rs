@@ -16,7 +16,7 @@ use crate::{
     codecs::Decoder,
     event::Event,
     serde::default_decoding,
-    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource},
+    sources::util::net::{DisconnectMode, SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsSourceConfig,
 };
@@ -80,6 +80,10 @@ pub struct TcpConfig {
     pub connection_limit: Option<u32>,
 
     #[configurable(derived)]
+    #[serde(default)]
+    disconnect_mode: DisconnectMode,
+
+    #[configurable(derived)]
     pub(super) framing: Option<FramingConfig>,
 
     #[configurable(derived)]
@@ -115,6 +119,7 @@ impl TcpConfig {
             framing: None,
             decoding: default_decoding(),
             connection_limit: None,
+            disconnect_mode: DisconnectMode::Drain,
             log_namespace: None,
         }
     }
@@ -159,8 +164,17 @@ impl TcpConfig {
         self.max_connection_duration_secs
     }
 
+    pub const fn disconnect_mode(&self) -> DisconnectMode {
+        self.disconnect_mode
+    }
+
     pub const fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
         self.max_connection_duration_secs = val;
+        self
+    }
+
+    pub const fn set_disconnect_mode(&mut self, val: DisconnectMode) -> &mut Self {
+        self.disconnect_mode = val;
         self
     }
 
