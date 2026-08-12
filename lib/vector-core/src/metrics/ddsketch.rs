@@ -805,7 +805,7 @@ impl AgentDDSketch {
                 count,
             } => {
                 let delta_buckets = mem::take(buckets);
-                let true_sum = *sum;
+                let true_sum = sum.unwrap_or(0.0);
                 let true_count = *count;
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
@@ -1317,7 +1317,7 @@ mod tests {
                     },
                 ],
                 count: true_count,
-                sum: true_sum,
+                sum: Some(true_sum),
             },
         );
 
@@ -1384,7 +1384,7 @@ mod tests {
                     count: undercounted_buckets_count,
                 }],
                 count: true_count,
-                sum: true_sum,
+                sum: Some(true_sum),
             },
         );
 
@@ -1431,7 +1431,7 @@ mod tests {
                     count: true_count,
                 }],
                 count: true_count,
-                sum: true_sum,
+                sum: Some(true_sum),
             },
         );
 
@@ -1472,7 +1472,7 @@ mod tests {
                         count: true_count,
                     }],
                     count: true_count,
-                    sum: non_finite_sum,
+                    sum: Some(non_finite_sum),
                 },
             );
 

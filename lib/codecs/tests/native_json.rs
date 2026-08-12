@@ -37,7 +37,7 @@ fn histogram_metric_roundtrip() {
         MetricKind::Absolute,
         MetricValue::AggregatedHistogram {
             count: 1,
-            sum: 1.0,
+            sum: Some(1.0),
             buckets: buckets!(
                 f64::NEG_INFINITY => 10 ,
                 f64::MIN => 10, 1.5 => 10,

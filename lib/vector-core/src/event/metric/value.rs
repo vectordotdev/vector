@@ -6,7 +6,7 @@ use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
 use super::{samples_to_buckets, write_list, write_word};
-use crate::{float_eq, metrics::AgentDDSketch};
+use crate::{float_eq, metrics::AgentDDSketch, opt_float_eq};
 
 const INFINITY: &str = "inf";
 const NEG_INFINITY: &str = "-inf";
@@ -47,7 +47,8 @@ pub enum MetricValue {
 
     /// A set of observations which are counted into buckets.
     ///
-    /// It also contains the total count of all observations and their sum to allow calculating the mean.
+    /// It also contains the total count of all observations, and their sum where the source reported
+    /// one, to allow calculating the mean.
     AggregatedHistogram {
         /// The buckets within this histogram.
         buckets: Vec<Bucket>,
@@ -56,7 +57,13 @@ pub enum MetricValue {
         count: u64,
 
         /// The sum of all observations contained within this histogram.
-        sum: f64,
+        ///
+        /// `None` when the source did not report a sum. OTLP makes the histogram sum optional, and
+        /// `OpenMetrics` only recommends the `_sum` series -- forbidding it outright for histograms
+        /// with negative bucket thresholds -- so a histogram without a sum is a legitimate input
+        /// rather than an error. Consumers must not substitute zero for it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sum: Option<f64>,
     },
 
     /// A set of observations which are represented by quantiles.
@@ -133,7 +140,7 @@ impl MetricValue {
                 Some(MetricValue::AggregatedHistogram {
                     buckets,
                     count,
-                    sum,
+                    sum: Some(sum),
                 })
             }
             _ => None,
@@ -181,7 +188,9 @@ impl MetricValue {
                     bucket.count = 0;
                 }
                 *count = 0;
-                *sum = 0.0;
+                // Zeroing the observations says nothing about whether the source reports a sum, so a
+                // histogram that never had one must not acquire one here.
+                *sum = sum.map(|_| 0.0);
             }
             Self::AggregatedSummary {
                 quantiles,
@@ -253,7 +262,9 @@ impl MetricValue {
                     b1.count += b2.count;
                 }
                 *count += count2;
-                *sum += sum2;
+                // The sum of a known and an unknown quantity is unknown, so absence on either side
+                // has to win. Treating a missing sum as zero would silently under-report the total.
+                *sum = (*sum).zip(*sum2).map(|(s1, s2)| s1 + s2);
                 true
             }
             (Self::Sketch { sketch }, Self::Sketch { sketch: sketch2 }) => {
@@ -354,7 +365,10 @@ impl MetricValue {
                     b1.count -= b2.count;
                 }
                 *count -= count2;
-                *sum -= sum2;
+                // As in `add`, a delta against an unknown quantity is unknown. This matters for the
+                // absolute-to-incremental conversion feeding sketch-based sinks: the sketch
+                // conversion needs to see the absent sum to know it must estimate one.
+                *sum = (*sum).zip(*sum2).map(|(s1, s2)| s1 - s2);
                 true
             }
             _ => false,
@@ -406,7 +420,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_buckets == r_buckets && l_count == r_count && float_eq(*l_sum, *r_sum),
+            ) => l_buckets == r_buckets && l_count == r_count && opt_float_eq(*l_sum, *r_sum),
             (
                 Self::AggregatedSummary {
                     quantiles: l_quantiles,
@@ -454,6 +468,7 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
+                let sum = sum.unwrap_or(0.0);
                 write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", buckets, |fmt, bucket| {
                     write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)

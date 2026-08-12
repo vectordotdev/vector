@@ -448,7 +448,7 @@ mod test {
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
-                        sum: 8.0,
+                        sum: Some(8.0),
                     },
                 )
                 .with_tags(Some(

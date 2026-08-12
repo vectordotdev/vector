@@ -753,7 +753,7 @@ async fn receive_histogram_metric() {
                         },
                     ],
                     count: 9,
-                    sum: 123.45,
+                    sum: Some(123.45),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
@@ -880,7 +880,7 @@ async fn receive_histogram_delta_metric() {
                         },
                     ],
                     count: 9,
-                    sum: 123.45,
+                    sum: Some(123.45),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
@@ -1020,7 +1020,7 @@ async fn receive_exponential_histogram_metric() {
                         },
                     ],
                     count: 7,
-                    sum: 700.00,
+                    sum: Some(700.00),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))

@@ -160,7 +160,7 @@ pub(super) trait MetricCollector {
                         tags,
                         Some(("le", "+Inf".to_string())),
                     );
-                    self.emit_value(timestamp, name, "_sum", *sum, tags, None);
+                    self.emit_value(timestamp, name, "_sum", sum.unwrap_or(0.0), tags, None);
                     self.emit_value(timestamp, name, "_count", *count as f64, tags, None);
                 }
                 MetricValue::AggregatedSummary {
@@ -765,7 +765,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets: histogram.buckets(),
                 count: histogram.count(),
-                sum: histogram.sum(),
+                sum: Some(histogram.sum()),
             },
         )
         .with_timestamp(Some(timestamp()));

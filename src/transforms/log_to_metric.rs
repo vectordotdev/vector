@@ -703,7 +703,7 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     Ok(MetricValue::AggregatedHistogram {
         buckets,
         count: count as u64,
-        sum: *sum,
+        sum: Some(*sum),
     })
 }
 
@@ -1914,7 +1914,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
                     count: 5,
-                    sum: 18.0,
+                    sum: Some(18.0),
                     buckets: vec![
                         Bucket {
                             upper_limit: 1.0,

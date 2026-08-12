@@ -186,7 +186,7 @@ impl IntoLua for LuaMetric {
                 aggregated_histogram.raw_set("buckets", buckets)?;
                 aggregated_histogram.raw_set("counts", counts)?;
                 aggregated_histogram.raw_set("count", count)?;
-                aggregated_histogram.raw_set("sum", sum)?;
+                aggregated_histogram.raw_set("sum", sum.unwrap_or(0.0))?;
                 tbl.raw_set("aggregated_histogram", aggregated_histogram)?;
             }
             MetricValue::AggregatedSummary {
@@ -552,7 +552,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_metric(
@@ -770,7 +770,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);

@@ -566,7 +566,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets: vector_lib::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
-                sum: 50.0,
+                sum: Some(50.0),
             },
             event_metadata(),
         )

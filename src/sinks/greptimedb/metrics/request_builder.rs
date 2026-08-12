@@ -118,7 +118,7 @@ pub fn metric_to_insert_request(
         } => {
             encode_histogram(buckets.as_ref(), &mut schema, &mut columns);
             encode_f64_value("count", *count as f64, &mut schema, &mut columns);
-            encode_f64_value("sum", *sum, &mut schema, &mut columns);
+            encode_f64_value("sum", sum.unwrap_or(0.0), &mut schema, &mut columns);
         }
         MetricValue::AggregatedSummary {
             quantiles,
@@ -431,7 +431,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: 4,
-                sum: 8.0,
+                sum: Some(8.0),
             },
         );
         let options = RequestBuilderOptions {

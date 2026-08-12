@@ -150,7 +150,7 @@ fn reparse_groups(
                                     })
                                     .collect(),
                                 count: metric.count,
-                                sum: metric.sum,
+                                sum: Some(metric.sum),
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
@@ -780,7 +780,7 @@ mod test {
                             0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
                         ],
                         count: 144320,
-                        sum: 53423.0,
+                        sum: Some(53423.0),
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -823,7 +823,7 @@ mod test {
                             })
                             .collect(),
                         count: 0,
-                        sum: 0.0,
+                        sum: Some(0.0),
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -851,7 +851,7 @@ mod test {
                     MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![1.0 => 133988],
                         count: 144320,
-                        sum: 53423.0,
+                        sum: Some(53423.0),
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -880,7 +880,7 @@ mod test {
                     MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![1.0 => 2000, 10.0 => 0],
                         count: 2000,
-                        sum: 2000.0,
+                        sum: Some(2000.0),
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
@@ -952,7 +952,7 @@ mod test {
                             36000.0 => 0
                         ],
                         count: 536,
-                        sum: 19690.129384881966,
+                        sum: Some(19690.129384881966),
                     },
                 )
                     .with_tags(Some(metric_tags!("runner" => "z")))
@@ -972,7 +972,7 @@ mod test {
                             36000.0 => 0
                         ],
                         count: 1,
-                        sum: 28.975436316,
+                        sum: Some(28.975436316),
                     },
                 )
                     .with_tags(Some(metric_tags!("runner" => "x")))
@@ -984,7 +984,7 @@ mod test {
                             7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
                         ],
                         count: 3255,
-                        sum: 381111.7498891335,
+                        sum: Some(381111.7498891335),
                     },
                 )
                     .with_tags(Some(metric_tags!("runner" => "y")))
@@ -1314,7 +1314,7 @@ mod test {
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
-                        sum: 8.0,
+                        sum: Some(8.0),
                     },
                 )
                 .with_tags(Some(metric_tags! { "type" => "a" }))
@@ -1383,7 +1383,7 @@ mod test {
                             1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
                         ],
                         count: 1,
-                        sum: 8.0,
+                        sum: Some(8.0),
                     },
                 )
                 .with_tags(Some(metric_tags! { "type" => "a" }))

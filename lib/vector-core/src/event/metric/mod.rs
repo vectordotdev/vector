@@ -847,7 +847,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
                 buckets: buckets!(2.0 => 1),
             },
         );
@@ -857,7 +857,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 3,
-                sum: 3.0,
+                sum: Some(3.0),
                 buckets: buckets!(2.0 => 3),
             },
         );
@@ -867,7 +867,7 @@ mod test {
             new_histogram.value(),
             &MetricValue::AggregatedHistogram {
                 count: 2,
-                sum: 2.0,
+                sum: Some(2.0),
                 buckets: buckets!(2.0 => 2),
             }
         );
@@ -878,7 +878,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 3,
-                sum: 3.0,
+                sum: Some(3.0),
                 buckets: buckets!(2.0 => 3),
             },
         );
@@ -888,7 +888,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
                 buckets: buckets!(2.0 => 1),
             },
         );
@@ -904,7 +904,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 15,
-                sum: 15.0,
+                sum: Some(15.0),
                 buckets: buckets!(1.0 => 10, 2.0 => 5),
             },
         );
@@ -914,7 +914,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 20,
-                sum: 20.0,
+                sum: Some(20.0),
                 // Total count is higher (20 > 15), but bucket1 count is lower (8 < 10)
                 buckets: buckets!(1.0 => 8, 2.0 => 12),
             },
@@ -1017,7 +1017,7 @@ mod test {
                     MetricValue::AggregatedHistogram {
                         buckets: buckets![51.0 => 53, 52.0 => 54],
                         count: 107,
-                        sum: 103.0,
+                        sum: Some(103.0),
                     }
                 )
             ),
@@ -1119,7 +1119,7 @@ mod test {
                         count: 0,
                     },
                 ],
-                sum: 30.0,
+                sum: Some(30.0),
                 count: 17,
             })
         );
