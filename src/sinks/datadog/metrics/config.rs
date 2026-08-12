@@ -92,6 +92,13 @@ impl SeriesApiVersion {
 ///
 /// Independent of `series_api_version`: Datadog's intake gates V3 series and V3 sketches
 /// separately, so enabling one does not enable the other.
+///
+/// `V3` is deliberately kept in this enum (and fully wired through the encoder and request
+/// builder) but marked `#[serde(skip)]` below, so it cannot currently be configured. Datadog's
+/// V3 sketches intake routes don't exist yet: both `/api/intake/metrics/v3/sketches` and
+/// `/api/intake/metrics/v3beta/sketches` return 404, and a 404 maps to a *retriable*
+/// `ClientError`, so sketches sent this way retry forever without ever delivering. Remove the
+/// `#[serde(skip)]` once the intake side supports it.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
@@ -106,6 +113,11 @@ pub enum SketchesApiVersion {
     ///
     /// Columnar protobuf format, matching the encoding used for V3 series. Must be enabled
     /// separately from `series_api_version`.
+    ///
+    /// Not currently configurable — see the `#[serde(skip)]` note on this enum's doc comment.
+    /// The variant, `get_path()`, `is_v3_format()`, and the request builder's V3 sketches
+    /// encoder path are all still fully implemented; only the config surface is disabled.
+    #[serde(skip)]
     V3,
 }
 
@@ -225,7 +237,7 @@ impl DatadogMetricsEndpointConfiguration {
 }
 
 const fn default_shadow_every() -> NonZeroU64 {
-    NonZeroU64::new(1000).unwrap()
+    NonZeroU64::new(1).unwrap()
 }
 
 const fn default_dual_write_enabled() -> bool {
@@ -303,11 +315,9 @@ pub struct DatadogMetricsConfig {
     /// Controls which Datadog sketches API endpoint is used to submit distributions and
     /// histograms.
     ///
-    /// Independent of `series_api_version` — Datadog's intake gates V3 series and V3 sketches
-    /// separately, so this must be set explicitly to send sketches via V3, even if
-    /// `series_api_version` is already `v3`.
-    ///
-    /// Defaults to `v2` (`/api/beta/sketches`).
+    /// Only `v2` (`/api/beta/sketches`) can currently be configured. The V3 sketches intake
+    /// routes do not exist yet (`/api/intake/metrics/v3/sketches` and its beta counterpart both
+    /// 404), so V3 sketches support is temporarily disabled at the configuration level.
     #[serde(default)]
     pub sketches_api_version: SketchesApiVersion,
 
@@ -551,5 +561,40 @@ mod tests {
     fn sketches_path_is_independent_of_series_api_version() {
         assert_eq!(SketchesApiVersion::V2.get_path(), SKETCHES_PATH);
         assert_eq!(SketchesApiVersion::V3.get_path(), SKETCHES_V3_PATH);
+    }
+
+    // The V3 sketches intake routes don't exist (404 -> retriable ClientError -> endless
+    // retry loop that never delivers), so `sketches_api_version: v3` must be rejected at
+    // config-load time rather than accepted and failed at runtime. `SketchesApiVersion::V3`
+    // itself stays fully implemented (see the previous test) -- only the config surface, via
+    // `#[serde(skip)]` on the variant, is disabled.
+    #[test]
+    fn sketches_api_version_v3_is_not_configurable() {
+        let err = toml::from_str::<DatadogMetricsConfig>(
+            r#"
+            default_api_key = "unused"
+            sketches_api_version = "v3"
+            "#,
+        )
+        .expect_err("sketches_api_version = \"v3\" must be rejected");
+
+        assert!(
+            err.to_string().contains("unknown variant"),
+            "expected an unknown-variant error, got: {err}"
+        );
+    }
+
+    // `v2` -- the only configurable value -- and the unset default must both still work.
+    #[test]
+    fn sketches_api_version_v2_and_default_are_configurable() {
+        for toml in [
+            r#"default_api_key = "unused""#,
+            r#"default_api_key = "unused"
+            sketches_api_version = "v2""#,
+        ] {
+            let config = toml::from_str::<DatadogMetricsConfig>(toml)
+                .expect("v2 and the unset default must both parse");
+            assert_eq!(config.sketches_api_version, SketchesApiVersion::V2);
+        }
     }
 }
