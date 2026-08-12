@@ -31,7 +31,8 @@ pub use framing::{
     ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
     NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
-    OctetCountingDecoderOptions, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
+    OctetCountingDecoderOptions, OversizedAction, VarintLengthDelimitedDecoder,
+    VarintLengthDelimitedDecoderConfig,
 };
 use smallvec::SmallVec;
 use vector_config::configurable_component;
@@ -492,6 +493,7 @@ impl DeserializerConfig {
                         CharacterDelimitedDecoderOptions {
                             delimiter: b',',
                             max_length: Some(usize::MAX),
+                            ..
                         },
                 }),
             ) => "application/json",
@@ -598,6 +600,7 @@ mod tests {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: 0,
                     max_length: None,
+                    ..
                 }
             })
         ));
