@@ -11,7 +11,7 @@ Replace `encoding` with `decoding` and `framing`:
 
 | Previous `encoding` | `decoding.codec` | `framing.method` |
 | --- | --- | --- |
-| `text` | `text` | `newline_delimited` |
+| `text` | `bytes` | `newline_delimited` |
 | `json` | `json` | `bytes` |
 | `ndjson` | `json` | `newline_delimited` |
 | `binary` | `bytes` | `bytes` |
