@@ -1,6 +1,4 @@
-mod config;
-
-pub use config::{AggregateConfig, AggregationMode};
+use super::{AggregateConfig, AggregationMode};
 
 use std::{
     collections::{HashMap, hash_map::Entry},
@@ -332,6 +330,3 @@ impl TaskTransform<Event> for Aggregate {
         })
     }
 }
-
-#[cfg(test)]
-mod tests;
