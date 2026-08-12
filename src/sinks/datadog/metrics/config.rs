@@ -41,8 +41,6 @@ pub(super) const SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
 pub(super) const SERIES_V3_BETA_PATH: &str = "/api/intake/metrics/v3beta/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 pub(super) const SKETCHES_V3_PATH: &str = "/api/intake/metrics/v3/sketches";
-/// Beta intake endpoint used during V3 sketches shadow rollout.
-pub(super) const SKETCHES_V3_BETA_PATH: &str = "/api/intake/metrics/v3beta/sketches";
 
 /// The API version to use when submitting series metrics to Datadog.
 #[configurable_component]
@@ -236,24 +234,30 @@ const fn default_dual_write_enabled() -> bool {
 
 /// Configuration for the V3 shadow dual-write mode.
 ///
-/// When enabled, every `shadow_every`-th legacy series flush, and every `shadow_every`-th
-/// legacy sketches flush, also sends a V3 shadow payload to the corresponding shadow
-/// endpoint. Both payloads in a pair carry the same `X-Metrics-Request-ID` header so the
-/// intake backend can correlate them.
+/// When enabled, every `shadow_every`-th legacy (V1/V2) *series* flush also sends a V3
+/// shadow payload to the shadow series endpoint. Both payloads in a pair carry the same
+/// `X-Metrics-Request-ID` header so the intake backend can correlate them.
+///
+/// Sketches are never dual-written. The V3 sketches intake routes do not exist — both
+/// `/api/intake/metrics/v3/sketches` and `/api/intake/metrics/v3beta/sketches` return 404,
+/// and a 404 maps to a *retriable* `ClientError`, so shadowing sketches produced an
+/// endless retry loop that never delivered anything.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct DualWriteConfig {
     /// Whether to enable V3 shadow dual-write.
     ///
-    /// Enabled by default, sampling a fraction of legacy flushes to validate the V3 intake
-    /// path. Set to `false` to disable V3 shadow dual-write entirely.
+    /// Enabled by default, sampling a fraction of legacy series flushes to validate the V3
+    /// intake path. Set to `false` to disable V3 shadow dual-write entirely.
+    ///
+    /// This only ever affects series. Sketches are never dual-written.
     #[serde(default = "default_dual_write_enabled")]
     pub enabled: bool,
 
-    /// Send a V3 shadow payload once per this many legacy series or sketches flushes.
+    /// Send a V3 shadow payload once per this many legacy (V1/V2) series flushes.
     ///
-    /// Set to `1` to shadow every flush (full dual-write). Must be greater than zero.
-    /// Defaults to `1000`.
+    /// Set to `1` to shadow every series flush (full dual-write). Must be greater than zero.
+    /// Defaults to `1000`. Sketches flushes are never counted or shadowed.
     #[serde(default = "default_shadow_every")]
     pub shadow_every: NonZeroU64,
 }
@@ -270,10 +274,6 @@ impl Default for DualWriteConfig {
 impl DualWriteConfig {
     pub(super) const fn get_series_path(&self) -> &'static str {
         SERIES_V3_BETA_PATH
-    }
-
-    pub(super) const fn get_sketches_path(&self) -> &'static str {
-        SKETCHES_V3_BETA_PATH
     }
 }
 
@@ -321,9 +321,11 @@ pub struct DatadogMetricsConfig {
 
     /// V3 shadow dual-write configuration.
     ///
-    /// Enabled by default: a sampled fraction of legacy series and sketches flushes are each
-    /// mirrored as V3 payloads to a separate intake endpoint, both stamped with a shared
+    /// Enabled by default: a sampled fraction of legacy series flushes is mirrored as V3
+    /// payloads to a separate intake endpoint, both stamped with a shared
     /// `X-Metrics-Request-ID`. Set `dual_write.enabled` to `false` to disable it.
+    ///
+    /// Sketches are never dual-written, regardless of this setting.
     #[configurable(derived)]
     #[serde(default)]
     pub dual_write: DualWriteConfig,
@@ -432,11 +434,9 @@ impl DatadogMetricsConfig {
             .map(|dw| -> crate::Result<ShadowBuilderConfig> {
                 let base_uri = self.get_base_agent_endpoint(dd_common);
                 let series_shadow_uri = build_uri(&base_uri, dw.get_series_path())?;
-                let sketches_shadow_uri = build_uri(&base_uri, dw.get_sketches_path())?;
                 Ok(ShadowBuilderConfig {
                     series_uri: series_shadow_uri,
                     series_api_version: SeriesApiVersion::V3Beta,
-                    sketches_uri: sketches_shadow_uri,
                     default_namespace: self.default_namespace.clone(),
                     shadow_every: dw.shadow_every,
                 })

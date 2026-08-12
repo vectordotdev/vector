@@ -89,9 +89,11 @@ generated: components: sinks: datadog_metrics: configuration: {
 		description: """
 			V3 shadow dual-write configuration.
 
-			Enabled by default: a sampled fraction of legacy series and sketches flushes are each
-			mirrored as V3 payloads to a separate intake endpoint, both stamped with a shared
+			Enabled by default: a sampled fraction of legacy series flushes is mirrored as V3
+			payloads to a separate intake endpoint, both stamped with a shared
 			`X-Metrics-Request-ID`. Set `dual_write.enabled` to `false` to disable it.
+
+			Sketches are never dual-written, regardless of this setting.
 			"""
 		required: false
 		type: object: options: {
@@ -99,18 +101,20 @@ generated: components: sinks: datadog_metrics: configuration: {
 				description: """
 					Whether to enable V3 shadow dual-write.
 
-					Enabled by default, sampling a fraction of legacy flushes to validate the V3 intake
-					path. Set to `false` to disable V3 shadow dual-write entirely.
+					Enabled by default, sampling a fraction of legacy series flushes to validate the V3
+					intake path. Set to `false` to disable V3 shadow dual-write entirely.
+
+					This only ever affects series. Sketches are never dual-written.
 					"""
 				required: false
 				type: bool: default: true
 			}
 			shadow_every: {
 				description: """
-					Send a V3 shadow payload once per this many legacy series or sketches flushes.
+					Send a V3 shadow payload once per this many legacy (V1/V2) series flushes.
 
-					Set to `1` to shadow every flush (full dual-write). Must be greater than zero.
-					Defaults to `1000`.
+					Set to `1` to shadow every series flush (full dual-write). Must be greater than zero.
+					Defaults to `1000`. Sketches flushes are never counted or shadowed.
 					"""
 				required: false
 				type: uint: default: 1000

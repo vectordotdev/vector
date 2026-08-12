@@ -132,17 +132,19 @@ impl MetricsEncoder for EncoderKind {
 }
 
 /// Shadow write configuration passed from `DatadogMetricsConfig::build_sink`.
+///
+/// Series only. Sketches are deliberately never dual-written: the V3 sketches intake routes
+/// don't exist (they 404, and a 404 maps to a *retriable* `ClientError`, so a sketches
+/// shadow retried forever without ever delivering).
 pub struct ShadowBuilderConfig {
     /// The URI for the V3 shadow series endpoint (e.g. `/api/intake/metrics/v3/series`).
     pub series_uri: Uri,
     /// The `SeriesApiVersion` variant matching the shadow series endpoint.
     /// Used to set the correct payload limits and compression on the shadow encoder.
     pub series_api_version: SeriesApiVersion,
-    /// The URI for the V3 shadow sketches endpoint (e.g. `/api/intake/metrics/v3/sketches`).
-    pub sketches_uri: Uri,
-    /// Default metric namespace for the shadow encoders.
+    /// Default metric namespace for the shadow encoder.
     pub default_namespace: Option<String>,
-    /// Send a V3 shadow once per this many legacy (V1/V2 series, or non-V3 sketches) flushes.
+    /// Send a V3 shadow once per this many legacy (V1/V2) series flushes.
     pub shadow_every: NonZeroU64,
 }
 
@@ -153,7 +155,7 @@ struct ShadowEncoder {
     encoder: DatadogMetricsV3Encoder,
     uri: Uri,
     every: NonZeroU64,
-    /// Running count of legacy flushes seen since sink startup.
+    /// Running count of legacy series flushes seen since sink startup.
     flush_count: u64,
 }
 
@@ -185,15 +187,9 @@ pub struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
     series_encoder: EncoderKind,
     sketches_encoder: EncoderKind,
-    /// Present only when `DualWriteConfig` is set on the sink.
+    /// Series-only V3 shadow encoder, present only when `dual_write` is enabled.
+    /// There is deliberately no sketches equivalent; see `ShadowBuilderConfig`.
     shadow: Option<ShadowEncoder>,
-    /// Present only when `DualWriteConfig` is set on the sink.
-    sketches_shadow: Option<ShadowEncoder>,
-    /// True when `sketches_api_version` is the legacy (non-V3) format, i.e. when a V3
-    /// sketches shadow write is meaningful. `DatadogMetricsEndpoint::Sketches` doesn't carry
-    /// the api version the way `DatadogMetricsEndpoint::Series` does, so this has to be
-    /// tracked separately.
-    sketches_is_legacy: bool,
 }
 
 impl DatadogMetricsRequestBuilder {
@@ -230,31 +226,22 @@ impl DatadogMetricsRequestBuilder {
             )))
         };
 
-        let (shadow, sketches_shadow) = match shadow_config {
-            Some(config) => (
-                Some(ShadowEncoder::new(
-                    DatadogMetricsEndpoint::Series(config.series_api_version),
-                    config.series_uri,
-                    config.shadow_every,
-                    config.default_namespace.clone(),
-                )),
-                Some(ShadowEncoder::new(
-                    DatadogMetricsEndpoint::Sketches,
-                    config.sketches_uri,
-                    config.shadow_every,
-                    config.default_namespace,
-                )),
-            ),
-            None => (None, None),
-        };
+        // Series only: no sketches shadow encoder is ever constructed, so an enabled
+        // `dual_write` cannot produce sketches traffic.
+        let shadow = shadow_config.map(|config| {
+            ShadowEncoder::new(
+                DatadogMetricsEndpoint::Series(config.series_api_version),
+                config.series_uri,
+                config.shadow_every,
+                config.default_namespace,
+            )
+        });
 
         Self {
             endpoint_configuration,
             series_encoder,
             sketches_encoder,
             shadow,
-            sketches_shadow,
-            sketches_is_legacy: !sketches_api_version.is_v3_format(),
         }
     }
 }
@@ -274,26 +261,18 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
         let (tmp, metrics) = input;
         let (api_key, endpoint) = tmp;
 
-        // Determine whether this flush triggers a shadow. Only legacy (non-V3) batches are
-        // counted — V3 series and V3 sketches are already on the target wire format, so
-        // shadowing them would be redundant.
+        // Determine whether this flush triggers a shadow. Only legacy (V1/V2) *series*
+        // batches count: V3 series is already on the target wire format, and sketches are
+        // never shadowed at all because the V3 sketches intake routes don't exist.
         let is_v1v2_series = matches!(
             endpoint,
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1 | SeriesApiVersion::V2)
         );
-        let is_legacy_sketches =
-            matches!(endpoint, DatadogMetricsEndpoint::Sketches) && self.sketches_is_legacy;
-        let is_shadow_flush = if is_v1v2_series {
-            self.shadow
+        let is_shadow_flush = is_v1v2_series
+            && self
+                .shadow
                 .as_mut()
-                .is_some_and(ShadowEncoder::should_flush)
-        } else if is_legacy_sketches {
-            self.sketches_shadow
-                .as_mut()
-                .is_some_and(ShadowEncoder::should_flush)
-        } else {
-            false
-        };
+                .is_some_and(ShadowEncoder::should_flush);
 
         // UUIDv7 generated once per shadow flush; shared across primary + shadow requests.
         let batch_id: Option<Arc<str>> =
@@ -315,20 +294,17 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
         stamp_batch_id(batch_id.as_ref(), &mut results);
         stamp_sequence(&mut results);
 
-        // ── Shadow encode (V3) ────────────────────────────────────────────────
-        let shadow_target = if is_v1v2_series {
-            self.shadow
-                .as_mut()
-                .map(|shadow| (shadow, DatadogMetricsEndpoint::Series(SeriesApiVersion::V3)))
-        } else {
-            self.sketches_shadow
-                .as_mut()
-                .map(|shadow| (shadow, DatadogMetricsEndpoint::Sketches))
-        };
-
-        if let (Some(shadow_m), Some((shadow, shadow_endpoint))) = (shadow_metrics, shadow_target) {
-            let mut shadow_results =
-                encode_batch(&mut shadow.encoder, api_key, shadow_endpoint, shadow_m);
+        // ── Shadow encode (V3 series only) ────────────────────────────────────
+        // `shadow_metrics` is populated only on a shadow flush, which already implies a
+        // legacy series batch with the sampling cadence satisfied, so this can never emit
+        // sketches traffic.
+        if let (Some(shadow_m), Some(shadow)) = (shadow_metrics, self.shadow.as_mut()) {
+            let mut shadow_results = encode_batch(
+                &mut shadow.encoder,
+                api_key,
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+                shadow_m,
+            );
 
             // Override the URI so these requests go to the shadow endpoint, not V3 public API.
             for ((meta, _), _) in shadow_results.iter_mut().flatten() {
@@ -568,7 +544,11 @@ fn encode_chunk<E: MetricsEncoder>(
 
 #[cfg(test)]
 mod tests {
-    use vector_lib::request_metadata::GroupedCountByteSize;
+    use vector_lib::{
+        event::{MetricKind, MetricValue, metric::MetricSketch},
+        metrics::AgentDDSketch,
+        request_metadata::GroupedCountByteSize,
+    };
 
     use super::*;
 
@@ -629,5 +609,165 @@ mod tests {
             .collect();
 
         assert_eq!(stamped, vec![(0, 2), (1, 2)]);
+    }
+
+    // ── Shadow dual-write is series-only ────────────────────────────────────────
+
+    fn builder_with_shadow_every(every: u64) -> DatadogMetricsRequestBuilder {
+        let endpoint_configuration = DatadogMetricsEndpointConfiguration::new(
+            "https://example.com/api/v2/series".parse().unwrap(),
+            "https://example.com/api/beta/sketches".parse().unwrap(),
+        );
+
+        DatadogMetricsRequestBuilder::new(
+            endpoint_configuration,
+            None,
+            SeriesApiVersion::V2,
+            SketchesApiVersion::V2,
+            Some(ShadowBuilderConfig {
+                series_uri: "https://example.com/api/intake/metrics/v3beta/series"
+                    .parse()
+                    .unwrap(),
+                series_api_version: SeriesApiVersion::V3Beta,
+                default_namespace: None,
+                shadow_every: NonZeroU64::new(every).unwrap(),
+            }),
+        )
+    }
+
+    fn counter_metric() -> Metric {
+        Metric::new(
+            "test.counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+    }
+
+    fn sketch_metric() -> Metric {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        sketch.insert(1.0);
+        Metric::new(
+            "test.sketch",
+            MetricKind::Incremental,
+            MetricValue::Sketch {
+                sketch: MetricSketch::AgentDDSketch(sketch),
+            },
+        )
+    }
+
+    fn encode(
+        builder: &mut DatadogMetricsRequestBuilder,
+        endpoint: DatadogMetricsEndpoint,
+        metrics: Vec<Metric>,
+    ) -> Vec<(DDMetricsMetadata, RequestMetadata)> {
+        builder
+            .encode_events_incremental(((None, endpoint), metrics))
+            .into_iter()
+            .filter_map(Result::ok)
+            .map(|(metadata, _payload)| metadata)
+            .collect()
+    }
+
+    /// The V3 sketches intake routes don't exist (404 -> retriable `ClientError` -> infinite
+    /// retry loop), so a sketches flush must never produce a shadow request even when
+    /// `dual_write` is fully enabled and sampling every flush.
+    #[test]
+    fn sketches_are_never_shadowed_even_with_dual_write_enabled() {
+        let mut builder = builder_with_shadow_every(1);
+
+        let encoded = encode(
+            &mut builder,
+            DatadogMetricsEndpoint::Sketches,
+            vec![sketch_metric()],
+        );
+
+        assert_eq!(
+            encoded.len(),
+            1,
+            "a sketches flush must yield only the primary request, got {} requests",
+            encoded.len()
+        );
+        let (meta, _) = &encoded[0];
+        assert_eq!(meta.endpoint, DatadogMetricsEndpoint::Sketches);
+        assert!(
+            meta.batch_id.is_none(),
+            "sketches must not be stamped with a shadow X-Metrics-Request-ID"
+        );
+        assert!(
+            meta.target_uri.is_none(),
+            "sketches must never be retargeted at a V3 shadow endpoint"
+        );
+    }
+
+    /// Series shadowing is unaffected by the sketches removal: a legacy series flush still
+    /// emits a V2 primary plus a V3 shadow sharing one request ID.
+    #[test]
+    fn legacy_series_is_still_shadowed() {
+        let mut builder = builder_with_shadow_every(1);
+
+        let encoded = encode(
+            &mut builder,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+            vec![counter_metric()],
+        );
+
+        assert_eq!(encoded.len(), 2, "expected a V2 primary and a V3 shadow");
+        let ids: Vec<Option<Arc<str>>> = encoded
+            .iter()
+            .map(|(meta, _)| meta.batch_id.clone())
+            .collect();
+        assert!(
+            ids.iter().all(Option::is_some),
+            "both halves of the pair must carry a batch id"
+        );
+        assert_eq!(ids[0], ids[1], "the pair must share one request ID");
+        assert_eq!(
+            encoded
+                .iter()
+                .filter(|(meta, _)| meta.target_uri.is_some())
+                .count(),
+            1,
+            "exactly one half of the pair is retargeted to the shadow URI"
+        );
+    }
+
+    /// The shadow cadence counter must only advance on series flushes. If sketches flushes
+    /// still ticked it, the sampling rate would drift with the sketch/series mix.
+    #[test]
+    fn sketches_flushes_do_not_advance_the_series_shadow_cadence() {
+        let mut builder = builder_with_shadow_every(2);
+
+        for _ in 0..5 {
+            let encoded = encode(
+                &mut builder,
+                DatadogMetricsEndpoint::Sketches,
+                vec![sketch_metric()],
+            );
+            assert!(
+                encoded.iter().all(|(meta, _)| meta.batch_id.is_none()),
+                "sketches flush produced shadow traffic"
+            );
+        }
+
+        // With `shadow_every: 2`, the first series flush is #1 and must not shadow...
+        let first = encode(
+            &mut builder,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+            vec![counter_metric()],
+        );
+        assert_eq!(
+            first.len(),
+            1,
+            "series flush #1 should not shadow; the 5 sketches flushes must not have \
+             advanced the counter"
+        );
+
+        // ...and the second is #2, which does.
+        let second = encode(
+            &mut builder,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+            vec![counter_metric()],
+        );
+        assert_eq!(second.len(), 2, "series flush #2 should shadow");
     }
 }
