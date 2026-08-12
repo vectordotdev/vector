@@ -137,12 +137,12 @@ pub struct AxiomConfig {
 
 impl GenerateConfig for AxiomConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"token = "${AXIOM_TOKEN}"
-            dataset = "${AXIOM_DATASET}"
-            url = "${AXIOM_URL}"
-            org_id = "${AXIOM_ORG_ID}""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"token: ${AXIOM_TOKEN}
+            dataset: ${AXIOM_DATASET}
+            url: ${AXIOM_URL}
+            org_id: ${AXIOM_ORG_ID}"#,
+        })
         .unwrap()
     }
 }

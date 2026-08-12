@@ -44,8 +44,8 @@ pub struct DatadogEventsConfig {
 
 impl GenerateConfig for DatadogEventsConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(indoc! {r#"
-            default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
+        serde_yaml::from_str(indoc! {r#"
+            default_api_key: ${DATADOG_API_KEY_ENV_VAR}
         "#})
         .unwrap()
     }

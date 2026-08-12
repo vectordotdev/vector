@@ -64,8 +64,8 @@ pub struct SematextLogsConfig {
 
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(indoc! {r#"
-            token = "${SEMATEXT_TOKEN}"
+        serde_yaml::from_str(indoc! {r#"
+            token: ${SEMATEXT_TOKEN}
         "#})
         .unwrap()
     }
