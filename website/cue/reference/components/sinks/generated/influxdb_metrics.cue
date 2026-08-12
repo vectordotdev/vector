@@ -65,6 +65,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v2.x and above.
 			"""
+		groups: [
+			"v2",
+		]
 		required: true
 		type: string: examples: ["vector-bucket", "4d2225e4d3d49f75"]
 	}
@@ -74,6 +77,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
+		groups: [
+			"v1",
+		]
 		required: false
 		type: string: examples: ["any", "one", "quorum", "all"]
 	}
@@ -83,6 +89,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
+		groups: [
+			"v1",
+		]
 		required: true
 		type: string: examples: ["vector-database", "iot-store"]
 	}
@@ -111,6 +120,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v2.x and above.
 			"""
+		groups: [
+			"v2",
+		]
 		required: true
 		type: string: examples: ["my-org", "33f2cff0a28e5b63"]
 	}
@@ -120,6 +132,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
+		groups: [
+			"v1",
+		]
 		required: false
 		type: string: examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 	}
@@ -323,6 +338,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
+		groups: [
+			"v1",
+		]
 		required: false
 		type: string: examples: ["autogen", "one_day_only"]
 	}
@@ -442,6 +460,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
+		groups: [
+			"v2",
+		]
 		required: true
 		type: string: examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
@@ -451,6 +472,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
+		groups: [
+			"v1",
+		]
 		required: false
 		type: string: examples: ["todd", "vector-source"]
 	}

@@ -2,6 +2,7 @@ use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, future::BoxFuture, stream};
+use indoc::indoc;
 use tower::Service;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -10,7 +11,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
@@ -20,8 +21,8 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         influxdb::{
-            Field, InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion, encode_timestamp,
-            healthcheck, influx_line_protocol, influxdb_settings,
+            Field, InfluxDbSettings, ProtocolVersion, encode_timestamp, healthcheck,
+            influx_line_protocol, influxdb_settings,
         },
         util::{
             BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
@@ -52,8 +53,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 
 /// Configuration for the `influxdb_metrics` sink.
 #[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
-#[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct InfluxDbConfig {
     /// Sets the default namespace for any metrics sent.
     ///
@@ -70,10 +70,7 @@ pub struct InfluxDbConfig {
     pub endpoint: String,
 
     #[serde(flatten)]
-    pub influxdb1_settings: Option<InfluxDb1Settings>,
-
-    #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDb2Settings>,
+    pub settings: InfluxDbSettings,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -112,7 +109,17 @@ pub fn example_tags() -> HashMap<String, String> {
     HashMap::from([("region".to_string(), "us-west-1".to_string())])
 }
 
-impl_generate_config_from_default!(InfluxDbConfig);
+impl GenerateConfig for InfluxDbConfig {
+    fn generate_config() -> serde_json::Value {
+        toml::from_str(indoc! {r#"
+            endpoint = "http://localhost:8086/"
+            org = "my-org"
+            bucket = "my-bucket"
+            token = "${INFLUXDB_TOKEN}"
+        "#})
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
@@ -120,12 +127,8 @@ impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(
-            self.clone().endpoint,
-            self.clone().influxdb1_settings,
-            self.clone().influxdb2_settings,
-            client.clone(),
-        )?;
+        let healthcheck =
+            healthcheck(self.clone().endpoint, self.settings.clone(), client.clone())?;
         validate_quantiles(&self.quantiles)?;
         let sink = InfluxDbSvc::new(self.clone(), client)?;
         Ok((sink, healthcheck))
@@ -142,10 +145,7 @@ impl SinkConfig for InfluxDbConfig {
 
 impl InfluxDbSvc {
     pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
-        let settings = influxdb_settings(
-            config.influxdb1_settings.clone(),
-            config.influxdb2_settings.clone(),
-        )?;
+        let settings = influxdb_settings(config.settings.clone());
 
         let endpoint = config.endpoint.clone();
         let token = settings.token();
@@ -451,6 +451,9 @@ mod tests {
         let config = indoc! {r#"
             namespace: "vector"
             endpoint: "http://localhost:9999"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
             tags:
               region: "us-west-1"
         "#};
@@ -968,7 +971,7 @@ mod integration_tests {
         },
         http::HttpClient,
         sinks::influxdb::{
-            InfluxDb1Settings, InfluxDb2Settings,
+            InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings,
             metrics::{InfluxDbConfig, InfluxDbSvc, default_summary_quantiles},
             test_util::{
                 BUCKET, ORG, TOKEN, address_v1, address_v2, cleanup_v1, format_timestamp,
@@ -1004,14 +1007,13 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint: url.to_string(),
-            influxdb1_settings: Some(InfluxDb1Settings {
+            settings: InfluxDbSettings::V1(InfluxDb1Settings {
                 consistency: None,
                 database: database.clone(),
                 retention_policy_name: Some("autogen".to_string()),
                 username: None,
                 password: None,
             }),
-            influxdb2_settings: None,
             batch: Default::default(),
             request: Default::default(),
             tls,
@@ -1098,8 +1100,7 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint,
-            influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDb2Settings {
+            settings: InfluxDbSettings::V2(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string().into(),

@@ -7,7 +7,7 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 use tower::Service;
 use vector_lib::{
     configurable::configurable_component,
@@ -38,24 +38,10 @@ pub(in crate::sinks) enum ProtocolVersion {
     V2,
 }
 
-#[derive(Debug, Snafu)]
-enum ConfigError {
-    #[snafu(display("InfluxDB v1 or v2 should be configured as endpoint."))]
-    MissingConfiguration,
-    #[snafu(display(
-        "Unclear settings. Both version configured v1: {:?}, v2: {:?}.",
-        v1_settings,
-        v2_settings
-    ))]
-    BothConfiguration {
-        v1_settings: InfluxDb1Settings,
-        v2_settings: InfluxDb2Settings,
-    },
-}
-
 /// Configuration settings for InfluxDB v0.x/v1.x.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct InfluxDb1Settings {
     /// The name of the database to write into.
     ///
@@ -98,6 +84,7 @@ pub struct InfluxDb1Settings {
 /// Configuration settings for InfluxDB v2.x.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct InfluxDb2Settings {
     /// The name of the organization to write into.
     ///
@@ -123,14 +110,28 @@ pub struct InfluxDb2Settings {
     token: SensitiveString,
 }
 
-trait InfluxDbSettings: std::fmt::Debug {
+/// InfluxDB connection settings, either for v0.x/v1.x or v2.x.
+///
+/// The two versions have disjoint configuration fields, so exactly one version's
+/// settings must be provided. Providing both or neither is a configuration error.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum InfluxDbSettings {
+    /// Settings for InfluxDB v0.x/v1.x.
+    V1(InfluxDb1Settings),
+    /// Settings for InfluxDB v2.x.
+    V2(InfluxDb2Settings),
+}
+
+trait InfluxDbConnection: std::fmt::Debug {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
     fn token(&self) -> SensitiveString;
     fn protocol_version(&self) -> ProtocolVersion;
 }
 
-impl InfluxDbSettings for InfluxDb1Settings {
+impl InfluxDbConnection for InfluxDb1Settings {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
@@ -159,7 +160,7 @@ impl InfluxDbSettings for InfluxDb1Settings {
     }
 }
 
-impl InfluxDbSettings for InfluxDb2Settings {
+impl InfluxDbConnection for InfluxDb2Settings {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
@@ -185,19 +186,10 @@ impl InfluxDbSettings for InfluxDb2Settings {
     }
 }
 
-fn influxdb_settings(
-    influxdb1_settings: Option<InfluxDb1Settings>,
-    influxdb2_settings: Option<InfluxDb2Settings>,
-) -> Result<Box<dyn InfluxDbSettings>, crate::Error> {
-    match (influxdb1_settings, influxdb2_settings) {
-        (Some(v1_settings), Some(v2_settings)) => Err(ConfigError::BothConfiguration {
-            v1_settings,
-            v2_settings,
-        }
-        .into()),
-        (None, None) => Err(ConfigError::MissingConfiguration.into()),
-        (Some(settings), _) => Ok(Box::new(settings)),
-        (_, Some(settings)) => Ok(Box::new(settings)),
+fn influxdb_settings(settings: InfluxDbSettings) -> Box<dyn InfluxDbConnection> {
+    match settings {
+        InfluxDbSettings::V1(settings) => Box::new(settings),
+        InfluxDbSettings::V2(settings) => Box::new(settings),
     }
 }
 
@@ -205,11 +197,10 @@ fn influxdb_settings(
 // V2: https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
 fn healthcheck(
     endpoint: String,
-    influxdb1_settings: Option<InfluxDb1Settings>,
-    influxdb2_settings: Option<InfluxDb2Settings>,
+    settings: InfluxDbSettings,
     mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
-    let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
+    let settings = influxdb_settings(settings);
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
@@ -573,40 +564,29 @@ mod tests {
     use super::*;
     use crate::sinks::influxdb::test_util::{assert_fields, tags, ts};
 
-    #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-    #[serde(deny_unknown_fields)]
+    #[derive(Deserialize, Serialize, Debug, Clone)]
     pub struct InfluxDbTestConfig {
         #[serde(flatten)]
-        pub influxdb1_settings: Option<InfluxDb1Settings>,
-        #[serde(flatten)]
-        pub influxdb2_settings: Option<InfluxDb2Settings>,
+        pub settings: InfluxDbSettings,
     }
 
     #[test]
     fn test_influxdb_settings_both() {
+        // Configuring both v1 and v2 settings must be rejected.
         let config = indoc::indoc! {r#"
         bucket: "my-bucket"
         org: "my-org"
         token: "my-token"
         database: "my-database"
         "#};
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        assert_eq!(
-            settings.expect_err("expected error").to_string(),
-            "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"**REDACTED**\" }.".to_owned()
-        );
+        assert!(serde_yaml::from_str::<InfluxDbTestConfig>(config).is_err());
     }
 
     #[test]
     fn test_influxdb_settings_missing() {
+        // Configuring neither v1 nor v2 settings must be rejected.
         let config = "{}";
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        assert_eq!(
-            settings.expect_err("expected error").to_string(),
-            "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
-        );
+        assert!(serde_yaml::from_str::<InfluxDbTestConfig>(config).is_err());
     }
 
     #[test]
@@ -615,7 +595,7 @@ mod tests {
         database: "my-database"
         "#};
         let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        _ = influxdb_settings(config.settings);
     }
 
     #[test]
@@ -626,7 +606,7 @@ mod tests {
         token: "my-token"
         "#};
         let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        _ = influxdb_settings(config.settings);
     }
 
     #[test]
@@ -908,7 +888,7 @@ mod integration_tests {
         config::ProxyConfig,
         http::HttpClient,
         sinks::influxdb::{
-            InfluxDb1Settings, InfluxDb2Settings, healthcheck,
+            InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, healthcheck,
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
     };
@@ -919,8 +899,7 @@ mod integration_tests {
         onboarding_v2(&endpoint).await;
 
         let endpoint = address_v2();
-        let influxdb1_settings = None;
-        let influxdb2_settings = Some(InfluxDb2Settings {
+        let settings = InfluxDbSettings::V2(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string().into(),
@@ -928,7 +907,7 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(endpoint, settings, client)
             .unwrap()
             .await
             .unwrap()
@@ -940,8 +919,7 @@ mod integration_tests {
         let endpoint = "http://127.0.0.1:9999".to_string();
         onboarding_v2(&endpoint).await;
 
-        let influxdb1_settings = None;
-        let influxdb2_settings = Some(InfluxDb2Settings {
+        let settings = InfluxDbSettings::V2(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string().into(),
@@ -949,7 +927,7 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(endpoint, settings, client)
             .unwrap()
             .await
             .unwrap();
@@ -959,18 +937,17 @@ mod integration_tests {
     async fn influxdb1_healthchecks_ok() {
         let endpoint = address_v1(false);
 
-        let influxdb1_settings = Some(InfluxDb1Settings {
+        let settings = InfluxDbSettings::V1(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
             retention_policy_name: None,
             username: None,
             password: None,
         });
-        let influxdb2_settings = None;
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(endpoint, settings, client)
             .unwrap()
             .await
             .unwrap();
@@ -980,18 +957,17 @@ mod integration_tests {
     #[should_panic]
     async fn influxdb1_healthchecks_fail() {
         let endpoint = "http://127.0.0.1:8086".to_string();
-        let influxdb1_settings = Some(InfluxDb1Settings {
+        let settings = InfluxDbSettings::V1(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
             retention_policy_name: None,
             username: None,
             password: None,
         });
-        let influxdb2_settings = None;
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(endpoint, settings, client)
             .unwrap()
             .await
             .unwrap();

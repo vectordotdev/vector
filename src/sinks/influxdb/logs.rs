@@ -13,8 +13,8 @@ use vector_lib::{
 use vrl::{event_path, path::OwnedValuePath, value::Kind};
 
 use super::{
-    Field, InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion, encode_timestamp, healthcheck,
-    influx_line_protocol, influxdb_settings,
+    Field, InfluxDbSettings, ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol,
+    influxdb_settings,
 };
 use crate::{
     codecs::Transformer,
@@ -43,8 +43,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 
 /// Configuration for the `influxdb_logs` sink.
 #[configurable_component(sink("influxdb_logs", "Deliver log event data to InfluxDB."))]
-#[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct InfluxDbLogsConfig {
     /// The namespace of the measurement name to use.
     ///
@@ -76,10 +75,7 @@ pub struct InfluxDbLogsConfig {
     pub tags: Vec<KeyString>,
 
     #[serde(flatten)]
-    pub influxdb1_settings: Option<InfluxDb1Settings>,
-
-    #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDb2Settings>,
+    pub settings: InfluxDbSettings,
 
     #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
@@ -168,11 +164,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let batch = self.batch.into_batch_settings()?;
         let request = self.request.into_settings();
 
-        let settings = influxdb_settings(
-            self.influxdb1_settings.clone(),
-            self.influxdb2_settings.clone(),
-        )
-        .unwrap();
+        let settings = influxdb_settings(self.settings.clone());
 
         let endpoint = self.endpoint.clone();
         let uri = settings.write_uri(endpoint).unwrap();
@@ -367,12 +359,7 @@ impl InfluxDbLogsConfig {
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
-        let healthcheck = healthcheck(
-            config.endpoint,
-            config.influxdb1_settings,
-            config.influxdb2_settings,
-            client,
-        )?;
+        let healthcheck = healthcheck(config.endpoint, config.settings, client)?;
 
         Ok(healthcheck)
     }
@@ -438,6 +425,9 @@ mod tests {
         let config = indoc! {r#"
             namespace: "ns"
             endpoint: "http://localhost:9999"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
         "#};
 
         let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
@@ -898,7 +888,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
-            InfluxDb2Settings,
+            InfluxDb2Settings, InfluxDbSettings,
             logs::InfluxDbLogsConfig,
             test_util::{BUCKET, ORG, TOKEN, address_v2, onboarding_v2},
         },
@@ -923,8 +913,7 @@ mod integration_tests {
             measurement: Some(measure.clone()),
             endpoint: endpoint.clone(),
             tags: Default::default(),
-            influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDb2Settings {
+            settings: InfluxDbSettings::V2(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string().into(),

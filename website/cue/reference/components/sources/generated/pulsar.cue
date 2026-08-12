@@ -33,12 +33,14 @@ generated: components: sources: pulsar: configuration: {
 					This can be used either for basic authentication (username/password) or JWT authentication.
 					When used for JWT, the value should be `token`.
 					"""
+				groups: ["basic"]
 				required: true
 				type: string: examples: ["${PULSAR_NAME}", "name123"]
 			}
 			oauth2: {
 				description: "OAuth2-specific authentication configuration."
-				required:    true
+				groups: ["oauth"]
+				required: true
 				type: object: options: {
 					audience: {
 						description: "The OAuth2 audience."
@@ -73,6 +75,7 @@ generated: components: sources: pulsar: configuration: {
 					This can be used either for basic authentication (username/password) or JWT authentication.
 					When used for JWT, the value should be the signed JWT, in the compact representation.
 					"""
+				groups: ["basic"]
 				required: true
 				type: string: examples: ["${PULSAR_TOKEN}", "123456789"]
 			}

@@ -345,6 +345,12 @@ where
         })
         .collect::<std::collections::HashMap<_, _>>();
 
+    // When fields are split across mutually exclusive `groups` (e.g. the influxdb sinks' v1 and
+    // v2 settings), only one group can appear in a valid example. Pick the group with the most
+    // required fields, breaking ties lexicographically, so the current version (v2, whose fields
+    // are all required) wins over the legacy one.
+    let example_group = select_example_group(params);
+
     let mut selected = HashSet::new();
     let mut groups = HashSet::new();
     for param in params.values() {
@@ -369,7 +375,7 @@ where
             })
             .or_else(|| group[0].as_str());
         if let Some(member) = member {
-            selected.insert(member);
+            selected.insert(member.to_string());
         }
     }
 
@@ -380,14 +386,50 @@ where
                 .get("required_one_of")
                 .and_then(Value::as_array)
                 .is_some_and(|group| !group.is_empty());
+            let group_matches = example_group.as_ref().is_none_or(|selected_group| {
+                param
+                    .get("groups")
+                    .and_then(Value::as_array)
+                    .is_none_or(|groups| groups.iter().any(|g| g.as_str() == Some(selected_group)))
+            });
             (!in_group || selected.contains(key.as_str()))
                 && (filter(param) || selected.contains(key.as_str()))
+                && group_matches
                 && matches_relevant_when(param, &discriminators)
         })
         .filter_map(|(key, param)| {
             get_example_value(param, &deep_filter).map(|value| (key.clone(), value))
         })
         .collect()
+}
+
+/// Select the `groups` value to include in an example when a component's fields are split across
+/// mutually exclusive groups (e.g. the influxdb sinks' v1/v2 settings). Returns `None` when fields
+/// are not grouped.
+fn select_example_group(params: &Map<String, Value>) -> Option<String> {
+    let mut required_by_group: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    for param in params.values() {
+        let Some(groups) = param.get("groups").and_then(Value::as_array) else {
+            continue;
+        };
+        let required = param
+            .get("required")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        for group in groups.iter().filter_map(Value::as_str) {
+            *required_by_group.entry(group.to_owned()).or_default() += usize::from(required);
+        }
+    }
+    if required_by_group.len() < 2 {
+        return None;
+    }
+    required_by_group
+        .into_iter()
+        .max_by(|(name, count), (other_name, other_count)| {
+            count.cmp(other_count).then_with(|| name.cmp(other_name))
+        })
+        .map(|(name, _)| name)
 }
 
 fn matches_relevant_when(
