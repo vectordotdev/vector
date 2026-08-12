@@ -122,8 +122,9 @@ the `Some`/`Some` case so the existing NaN and 1-ULP tolerance behavior is uncha
 
 ### `Display` — `value.rs:457`
 
-Emits `count={count} sum={sum} ` today. When `sum` is `None`, the `sum=` token is dropped entirely,
-leaving `count={count} `. This is the only cosmetic output change in the design. Rendering
+Emits `count={count} sum={sum}` today, with a trailing space. When `sum` is `None`, the `sum=` token
+is dropped entirely, leaving `count={count}` and its trailing space. This is the only cosmetic output
+change in the design. Rendering
 `sum=None` was rejected as user-facing debug noise; omission reads as "not reported", which is what
 it means.
 
