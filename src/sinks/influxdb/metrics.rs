@@ -73,9 +73,13 @@ pub struct InfluxDbConfig {
     pub endpoint: String,
 
     /// The InfluxDB API version to use.
+    ///
+    /// This option is deprecated and will be required in a future release. When unset, the
+    /// version is inferred from the configured settings.
     #[configurable(metadata(docs::examples = "2"))]
     #[configurable(metadata(docs::examples = "1"))]
-    pub version: InfluxDbVersion,
+    #[configurable(metadata(docs::minimal = true))]
+    pub version: Option<InfluxDbVersion>,
 
     /// The name of the database to write into.
     ///
@@ -190,7 +194,17 @@ impl GenerateConfig for InfluxDbConfig {
 
 impl InfluxDbConfig {
     fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        match self.version {
+        let version = match self.version {
+            Some(version) => version,
+            None => {
+                warn!(
+                    "The `version` option is deprecated and will be required in a future release. \
+                     Set it to `1` or `2` to match your InfluxDB settings."
+                );
+                self.infer_version()?
+            }
+        };
+        match version {
             InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
                 database: self
                     .database
@@ -215,6 +229,24 @@ impl InfluxDbConfig {
                     .clone()
                     .ok_or("the `token` option is required when using InfluxDB v2")?,
             })),
+        }
+    }
+
+    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
+        let has_v1 = self.database.is_some()
+            || self.consistency.is_some()
+            || self.retention_policy_name.is_some()
+            || self.username.is_some()
+            || self.password.is_some();
+        let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
+        match (has_v1, has_v2) {
+            (true, true) => Err(
+                "Unclear settings. Both InfluxDB v1 and v2 settings are configured; configure only one version."
+                    .into(),
+            ),
+            (false, false) => Err("InfluxDB v1 or v2 should be configured as endpoint.".into()),
+            (true, false) => Ok(InfluxDbVersion::V1),
+            (false, true) => Ok(InfluxDbVersion::V2),
         }
     }
 }
@@ -1105,7 +1137,7 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint: url.to_string(),
-            version: InfluxDbVersion::V1,
+            version: Some(InfluxDbVersion::V1),
             database: Some(database.clone()),
             consistency: None,
             retention_policy_name: Some("autogen".to_string()),
@@ -1200,7 +1232,7 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint,
-            version: InfluxDbVersion::V2,
+            version: Some(InfluxDbVersion::V2),
             database: None,
             consistency: None,
             retention_policy_name: None,

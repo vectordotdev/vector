@@ -77,9 +77,13 @@ pub struct InfluxDbLogsConfig {
     pub tags: Vec<KeyString>,
 
     /// The InfluxDB API version to use.
+    ///
+    /// This option is deprecated and will be required in a future release. When unset, the
+    /// version is inferred from the configured settings.
     #[configurable(metadata(docs::examples = "2"))]
     #[configurable(metadata(docs::examples = "1"))]
-    pub version: InfluxDbVersion,
+    #[configurable(metadata(docs::minimal = true))]
+    pub version: Option<InfluxDbVersion>,
 
     /// The name of the database to write into.
     ///
@@ -404,7 +408,17 @@ impl HttpSink for InfluxDbLogsSink {
 
 impl InfluxDbLogsConfig {
     fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        match self.version {
+        let version = match self.version {
+            Some(version) => version,
+            None => {
+                warn!(
+                    "The `version` option is deprecated and will be required in a future release. \
+                     Set it to `1` or `2` to match your InfluxDB settings."
+                );
+                self.infer_version()?
+            }
+        };
+        match version {
             InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
                 database: self
                     .database
@@ -429,6 +443,24 @@ impl InfluxDbLogsConfig {
                     .clone()
                     .ok_or("the `token` option is required when using InfluxDB v2")?,
             })),
+        }
+    }
+
+    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
+        let has_v1 = self.database.is_some()
+            || self.consistency.is_some()
+            || self.retention_policy_name.is_some()
+            || self.username.is_some()
+            || self.password.is_some();
+        let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
+        match (has_v1, has_v2) {
+            (true, true) => Err(
+                "Unclear settings. Both InfluxDB v1 and v2 settings are configured; configure only one version."
+                    .into(),
+            ),
+            (false, false) => Err("InfluxDB v1 or v2 should be configured as endpoint.".into()),
+            (true, false) => Ok(InfluxDbVersion::V1),
+            (false, true) => Ok(InfluxDbVersion::V2),
         }
     }
 
@@ -529,6 +561,50 @@ mod tests {
 
         let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
         assert_eq!("ns.vector", sink_config.get_measurement().unwrap());
+    }
+
+    #[test]
+    fn test_infer_version_v2() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert_eq!(config.infer_version().unwrap(), InfluxDbVersion::V2);
+    }
+
+    #[test]
+    fn test_infer_version_v1() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            database: "my-database"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert_eq!(config.infer_version().unwrap(), InfluxDbVersion::V1);
+    }
+
+    #[test]
+    fn test_infer_version_missing() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert!(config.infer_version().is_err());
+    }
+
+    #[test]
+    fn test_infer_version_both() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            database: "my-database"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert!(config.infer_version().is_err());
     }
 
     #[test]
@@ -1018,7 +1094,7 @@ mod integration_tests {
             measurement: Some(measure.clone()),
             endpoint: endpoint.clone(),
             tags: Default::default(),
-            version: InfluxDbVersion::V2,
+            version: Some(InfluxDbVersion::V2),
             database: None,
             consistency: None,
             retention_policy_name: None,
