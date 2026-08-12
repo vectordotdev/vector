@@ -468,8 +468,11 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                let sum = sum.unwrap_or(0.0);
-                write!(fmt, "count={count} sum={sum} ")?;
+                write!(fmt, "count={count} ")?;
+                // A histogram that reports no sum has no `sum=` to show, rather than a sum of zero.
+                if let Some(sum) = sum {
+                    write!(fmt, "sum={sum} ")?;
+                }
                 write_list(fmt, " ", buckets, |fmt, bucket| {
                     write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
                 })

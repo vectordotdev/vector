@@ -1024,6 +1024,23 @@ mod test {
             r"five{} = count=107 sum=103 53@51 54@52"
         );
 
+        // A histogram that reports no sum shows no `sum=` at all, rather than `sum=0`.
+        assert_eq!(
+            format!(
+                "{}",
+                Metric::new(
+                    "five",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets![51.0 => 53, 52.0 => 54],
+                        count: 107,
+                        sum: None,
+                    }
+                )
+            ),
+            r"five{} = count=107 53@51 54@52"
+        );
+
         assert_eq!(
             format!(
                 "{}",

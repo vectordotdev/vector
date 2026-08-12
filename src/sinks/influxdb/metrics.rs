@@ -332,7 +332,9 @@ fn get_type_and_fields(
                 })
                 .collect();
             fields.insert("count".into(), Field::UnsignedInt(*count));
-            fields.insert("sum".into(), Field::Float(sum.unwrap_or(0.0)));
+            if let Some(sum) = sum {
+                fields.insert("sum".into(), Field::Float(*sum));
+            }
 
             ("histogram", Some(fields))
         }
