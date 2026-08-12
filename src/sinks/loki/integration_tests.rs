@@ -330,10 +330,9 @@ async fn many_streams() {
 
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
-            labels = {test_name = "{{ stream_id }}"}
+            labels = {test_name = "stream-{{ stream_id }}"}
             encoding.codec = "text"
             tenant_id = "default"
-            dangerously_allow_unconfined_template_resolution = true
         "#;
     let (config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
@@ -359,8 +358,8 @@ async fn many_streams() {
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
-    let (_, outputs1) = fetch_stream(stream1.to_string(), "default").await;
-    let (_, outputs2) = fetch_stream(stream2.to_string(), "default").await;
+    let (_, outputs1) = fetch_stream(format!("stream-{stream1}"), "default").await;
+    let (_, outputs2) = fetch_stream(format!("stream-{stream2}"), "default").await;
 
     assert_eq!(outputs1.len() + outputs2.len(), lines.len());
 
@@ -391,14 +390,13 @@ async fn interpolate_stream_key() {
 
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
-            labels = {"{{ stream_key }}" = "placeholder"}
+            labels = {"key_{{ stream_key }}" = "placeholder"}
             encoding.codec = "text"
             tenant_id = "default"
-            dangerously_allow_unconfined_template_resolution = true
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.labels.insert(
-        Template::try_from("{{ stream_key }}").unwrap(),
+        Template::try_from("key_{{ stream_key }}").unwrap(),
         Template::try_from(stream.to_string()).unwrap(),
     );
 
@@ -421,7 +419,7 @@ async fn interpolate_stream_key() {
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
-    let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+    let (_, outputs) = fetch_stream_with_key("key_test_name", stream.to_string(), "default").await;
 
     assert_eq!(outputs.len(), lines.len());
 
@@ -683,7 +681,11 @@ fn get_timestamp(event: &Event) -> DateTime<Utc> {
 }
 
 async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
-    let query = format!("%7Btest_name%3D\"{stream}\"%7D");
+    fetch_stream_with_key("test_name", stream, tenant).await
+}
+
+async fn fetch_stream_with_key(key: &str, stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
+    let query = format!("%7B{key}%3D\"{stream}\"%7D");
     let query = format!(
         "{}/loki/api/v1/query_range?query={}&direction=forward",
         loki_address(),

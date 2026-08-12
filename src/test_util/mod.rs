@@ -20,7 +20,7 @@ use std::{
 use chrono::{DateTime, SubsecRound, Utc};
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, stream, task::noop_waker_ref};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},

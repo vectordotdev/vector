@@ -1,5 +1,5 @@
 {{ $colored := .color }}
-<div class="flex items-center gap-3.5">
+<div class="social-buttons flex items-center gap-3.5">
   {{ range site.Menus.comms }}
   {{ $color := .Params.color }}
   {{ $iconColor := cond $colored $color "gray-300" }}
