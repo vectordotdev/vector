@@ -2,7 +2,7 @@ Let's write a basic sink for Vector. Currently, there are two styles of sink in
 Vector - 'event' and 'event streams'. The 'event' style sinks are deprecated,
 but currently a significant portion of Vector's sinks are still developed in
 this style. A tracking issue that covers which sinks have been converted to
-'event streams' can be found [here][event_streams_tracking].
+'event streams' can be found in the [event streams tracking issue][event_streams_tracking].
 
 This tutorial covers writing an 'event stream' Sink.
 
@@ -300,8 +300,8 @@ Change the body of `run_inner` to look like the following:
     }
 ```
 
-More details about instrumenting Vector can be found
-[here](https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md).
+More details about instrumenting Vector can be found in the
+[instrumentation specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md).
 
 # Running our sink
 
@@ -324,7 +324,7 @@ This simply connects a `stdin` source to our `basic` sink.
 ## vdev
 
 Vector provides a build tool `vdev` that simplifies the task of building Vector. Install
-`vdev` using the instructions [here][vdev_install].
+`vdev` using the [installation instructions][vdev_install].
 
 With `vdev` installed we can run Vector using:
 

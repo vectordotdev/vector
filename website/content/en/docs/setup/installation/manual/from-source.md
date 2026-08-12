@@ -93,7 +93,7 @@ Build Vector in release mode:
 
 ```shell
 set RUSTFLAGS=-Ctarget-feature=+crt-static
-cargo build --no-default-features --features default-msvc --release
+cargo build --release
 ```
 
 Start Vector. After these steps, a binary `vector.exe` in `target\release` would be created. It can be started by running:
@@ -235,7 +235,7 @@ To update Vector, follow the same [installation](#installation) instructions abo
 
 Vector supports many feature flags to customize which features are included in a build. By default,
 all sources, transforms, and sinks are enabled. To view a complete list of features, they are listed
-under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
+under "[features]" in [Cargo.toml](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
 
 Example of building with only specific components:
 

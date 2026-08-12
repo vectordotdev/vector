@@ -470,6 +470,11 @@ impl MetricTags {
         self.0.iter().map(|(key, value)| (key.as_str(), value))
     }
 
+    /// Iterates over all the tag value sets, consuming the tags.
+    pub fn into_iter_sets(self) -> impl Iterator<Item = (String, TagValueSet)> {
+        self.0.into_iter()
+    }
+
     /// Iterate over references to all values of each tag.
     pub fn iter_all(&self) -> impl Iterator<Item = (&str, TagValueRef<'_>)> {
         self.0
@@ -526,6 +531,12 @@ impl MetricTags {
 
     pub fn remove(&mut self, name: &str) -> Option<String> {
         self.0.remove(name).and_then(TagValueSet::into_single)
+    }
+
+    /// Remove a tag and return its full [`TagValueSet`], preserving all values rather than reducing
+    /// to a single string like [`Self::remove`].
+    pub fn remove_set(&mut self, name: &str) -> Option<TagValueSet> {
+        self.0.remove(name)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &str> {
@@ -603,13 +614,13 @@ impl ByteSizeOf for MetricTags {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "generate-fixtures"))]
 mod test_support {
     use std::collections::HashSet;
 
     use quickcheck::{Arbitrary, Gen};
 
-    use super::*;
+    use super::{BTreeMap, MetricTags, TagValue, TagValueSet};
 
     impl Arbitrary for TagValue {
         fn arbitrary(g: &mut Gen) -> Self {
@@ -639,6 +650,33 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    fn make_tags(pairs: &[(&str, &str)]) -> MetricTags {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn remove_set_returns_full_value_set() {
+        let mut tags = MetricTags::default();
+        tags.insert("k".to_string(), TagValue::Value("a".to_string()));
+        tags.insert("k".to_string(), TagValue::Value("b".to_string()));
+
+        let removed = tags.remove_set("k").expect("tag should exist");
+        assert_eq!(removed.len(), 2);
+        assert!(removed.contains(&TagValue::Value("a".to_string())));
+        assert!(removed.contains(&TagValue::Value("b".to_string())));
+        assert!(!tags.contains_key("k"));
+    }
+
+    #[test]
+    fn remove_set_missing_returns_none() {
+        let mut tags = make_tags(&[("a", "1")]);
+        assert!(tags.remove_set("missing").is_none());
+        assert!(tags.contains_key("a"));
+    }
 
     proptest! {
         #[test]

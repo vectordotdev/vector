@@ -23,6 +23,7 @@ use crate::{
         prelude::*,
         pulsar::sink::{PulsarSink, healthcheck},
     },
+    template::ConfinementConfig,
 };
 
 /// Configuration for the `pulsar` sink.
@@ -89,6 +90,10 @@ pub struct PulsarSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub(crate) tls: Option<PulsarTlsOptions>,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 /// Event batching behavior.
@@ -162,12 +167,11 @@ pub struct OAuth2Config {
 
 /// Supported compression types for Pulsar.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PulsarCompression {
     /// No compression.
-    #[derivative(Default)]
+    #[default]
     None,
 
     /// LZ4.
@@ -248,6 +252,7 @@ impl Default for PulsarSinkConfig {
             acknowledgements: Default::default(),
             connection_retry_options: None,
             tls: None,
+            confinement: ConfinementConfig::default(),
         }
     }
 }
@@ -310,6 +315,7 @@ impl PulsarSinkConfig {
                             .map_or(default_retry_options.keep_alive, |secs| {
                                 Duration::from_secs(secs)
                             }),
+                        connection_max_idle: Default::default(),
                     }
                 });
 
@@ -338,6 +344,9 @@ impl PulsarSinkConfig {
             batch_size: self.batch.max_events,
             batch_byte_size: self.batch.max_bytes,
             compression: None,
+            batch_timeout: Default::default(),
+            block_queue_if_full: Default::default(),
+            routing_policy: Default::default(),
         };
 
         match &self.compression {
@@ -376,8 +385,8 @@ impl PulsarSinkConfig {
 }
 
 impl GenerateConfig for PulsarSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::default()).unwrap()
     }
 }
 
@@ -385,15 +394,23 @@ impl GenerateConfig for PulsarSinkConfig {
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let topic = self
+            .topic
+            .clone()
+            .confine(&self.confinement, Self::NAME, "topic")?;
+
         let client = self
             .create_pulsar_client()
             .await
             .map_err(|e| super::sink::BuildError::CreatePulsarSink { source: e })?;
 
-        let sink = PulsarSink::new(client, self.clone())?;
-        let hc = healthcheck(self.clone()).boxed();
-
+        let sink = PulsarSink::new(client, self.clone(), topic.clone())?;
+        let hc = healthcheck(self.clone(), topic).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -406,5 +423,36 @@ impl SinkConfig for PulsarSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn confinement_rejects_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "pulsar", "topic");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "pulsar", "topic");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_topic() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "pulsar", "topic");
+        assert!(result.is_ok());
     }
 }

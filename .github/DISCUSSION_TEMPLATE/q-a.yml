@@ -1,5 +1,5 @@
 title: "Q&A"
-labels: [ q-a ]
+labels: [q-a]
 body:
   - type: markdown
     attributes:

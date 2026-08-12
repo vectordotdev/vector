@@ -11,7 +11,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
@@ -37,8 +37,7 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
-use futures_util::FutureExt;
-use http::HeaderMap;
+use http::{HeaderMap, HeaderName, header::HeaderValue};
 use http_body::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
@@ -49,7 +48,13 @@ pub use timeout::AwsTimeout;
 use crate::{
     config::ProxyConfig,
     http::{build_proxy_connector, build_tls_connector, status},
-    internal_events::AwsBytesSent,
+    internal_events::{
+        AwsBytesSent,
+        http_client::{
+            AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning, HttpRequestTelemetry,
+            HttpResponseTelemetry,
+        },
+    },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
@@ -134,6 +139,7 @@ pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
 ) -> crate::Result<impl ProvideRegion + use<>> {
+    // Region is not yet known here, so we cannot wrap with AwsHttpClient for observability.
     let config = aws_config::provider_config::ProviderConfig::default()
         .with_http_client(connector(proxy, tls_options)?);
 
@@ -210,6 +216,7 @@ where
     let connector = AwsHttpClient {
         http: connector,
         region: region.clone(),
+        emit_bytes_sent: true,
     };
 
     // Build the configuration first.
@@ -324,6 +331,10 @@ pub async fn sign_request(
 struct AwsHttpClient<T> {
     http: T,
     region: Region,
+    /// When `false`, the connector skips `AwsBytesSent` so that control-plane
+    /// traffic (STS AssumeRole, IMDS, SSO token exchange) does not inflate
+    /// `component_sent_bytes_total`.
+    emit_bytes_sent: bool,
 }
 
 impl<T> HttpClient for AwsHttpClient<T>
@@ -340,6 +351,7 @@ where
         SharedHttpConnector::new(AwsConnector {
             region: self.region.clone(),
             http: http_connector,
+            emit_bytes_sent: self.emit_bytes_sent,
         })
     }
 }
@@ -348,6 +360,122 @@ where
 struct AwsConnector<T> {
     http: T,
     region: Region,
+    emit_bytes_sent: bool,
+}
+
+// ── Telemetry trait implementations for the AWS SDK HTTP types ────────────────
+//
+// `HttpRequest` and `HttpResponse` are the SDK's own structs (not `http::Request`
+// / `http::Response`), so they cannot implement the hyper-specific body/version
+// accessors.  The required method impls (method/uri and status) are enough for
+// metric labels; the optional rich-logging fields fall back to `None`.
+
+impl HttpRequestTelemetry for HttpRequest {
+    fn method(&self) -> &str {
+        self.method()
+    }
+
+    fn uri(&self) -> String {
+        self.uri().to_string()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        smithy_headers_to_map(self.headers())
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = Body::size_hint(self.body());
+        (hint.lower(), hint.upper())
+    }
+
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &AWS_EXTRA_SENSITIVE_HEADERS
+    }
+}
+
+impl HttpResponseTelemetry for HttpResponse {
+    fn status_u16(&self) -> u16 {
+        self.status().as_u16()
+    }
+
+    fn headers(&self) -> HeaderMap<HeaderValue> {
+        smithy_headers_to_map(self.headers())
+    }
+
+    fn body_size_hint(&self) -> (u64, Option<u64>) {
+        let hint = Body::size_hint(self.body());
+        (hint.lower(), hint.upper())
+    }
+
+    fn extra_sensitive_headers(&self) -> &'static [HeaderName] {
+        &AWS_EXTRA_SENSITIVE_HEADERS
+    }
+}
+
+/// AWS-specific headers that carry credential material and must never appear in
+/// logs.
+///
+/// - `x-amz-security-token`    — STS temporary session token
+/// - `x-amz-sso_bearer_token`  — IAM Identity Center access token (exchangeable for role credentials)
+/// - `x-aws-ec2-metadata-token` — IMDSv2 session token (valid for up to 6 h)
+static AWS_EXTRA_SENSITIVE_HEADERS: [HeaderName; 3] = [
+    HeaderName::from_static("x-amz-security-token"),
+    HeaderName::from_static("x-amz-sso_bearer_token"),
+    HeaderName::from_static("x-aws-ec2-metadata-token"),
+];
+
+/// Converts the AWS SDK's string-pair header iterator into an `http::HeaderMap`.
+/// Sanitization (marking sensitive headers) is handled by the trait's default
+/// `sanitized_headers` method.
+fn smithy_headers_to_map(
+    headers: &aws_smithy_runtime_api::http::Headers,
+) -> HeaderMap<HeaderValue> {
+    let mut map = HeaderMap::with_capacity(headers.len());
+    for (name, value) in headers {
+        let Ok(header_name) = http::HeaderName::from_bytes(name.as_bytes()) else {
+            continue;
+        };
+        let Ok(header_value) = HeaderValue::from_str(value) else {
+            continue;
+        };
+        map.insert(header_name, header_value);
+    }
+    map
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+impl<T> AwsConnector<T>
+where
+    T: HttpConnector,
+{
+    /// Calls the inner HTTP connector and emits common telemetry.
+    /// Does not emit `AwsBytesSent` telemetry.
+    fn call_inner(&self, req: HttpRequest) -> HttpConnectorFuture {
+        emit!(AboutToSendHttpRequest { request: &req });
+
+        let fut: HttpConnectorFuture = self.http.call(req);
+
+        HttpConnectorFuture::new(async move {
+            let before = Instant::now();
+            let result = fut.await;
+            let roundtrip = before.elapsed();
+
+            match &result {
+                Ok(response) => {
+                    emit!(GotHttpResponse {
+                        response,
+                        roundtrip
+                    });
+                }
+                Err(error) => {
+                    emit!(GotHttpWarning { error, roundtrip });
+                }
+            }
+
+            result
+        })
+    }
 }
 
 impl<T> HttpConnector for AwsConnector<T>
@@ -355,7 +483,12 @@ where
     T: HttpConnector,
 {
     fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
-        let bytes_sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        if !self.emit_bytes_sent {
+            return HttpConnectorFuture::new(self.call_inner(req));
+        }
+
+        let bytes_sent = Arc::new(AtomicUsize::new(0));
+
         let req = req.map(|body| {
             let bytes_sent = Arc::clone(&bytes_sent);
             body.map_preserve_contents(move |body| {
@@ -364,20 +497,25 @@ where
             })
         });
 
-        let fut = self.http.call(req);
+        let fut = self.call_inner(req);
         let region = self.region.clone();
 
-        HttpConnectorFuture::new(fut.inspect(move |result| {
-            let byte_size = bytes_sent.load(Ordering::Relaxed);
-            if let Ok(result) = result
-                && result.status().is_success()
+        HttpConnectorFuture::new(async move {
+            let result = fut.await;
+
+            if let Ok(response) = &result
+                && response.status().is_success()
             {
+                let byte_size = bytes_sent.load(Ordering::Relaxed);
+
                 emit!(AwsBytesSent {
                     byte_size,
                     region: Some(region),
                 });
-            }
-        }))
+            };
+
+            result
+        })
     }
 }
 

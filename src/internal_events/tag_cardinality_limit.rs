@@ -1,6 +1,7 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent};
+use vector_lib::{
+    NamedInternalEvent, counter, gauge,
+    internal_event::{ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent},
+};
 
 #[derive(NamedInternalEvent)]
 pub struct TagCardinalityLimitRejectingEvent<'a> {
@@ -20,13 +21,13 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
         );
         if self.include_extended_tags {
             counter!(
-                "tag_value_limit_exceeded_total",
+                CounterName::TagValueLimitExceededTotal,
                 "metric_name" => self.metric_name.to_string(),
                 "tag_key" => self.tag_key.to_string(),
             )
             .increment(1);
         } else {
-            counter!("tag_value_limit_exceeded_total").increment(1);
+            counter!(CounterName::TagValueLimitExceededTotal).increment(1);
         }
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -54,13 +55,13 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
         );
         if self.include_extended_tags {
             counter!(
-                "tag_value_limit_exceeded_total",
+                CounterName::TagValueLimitExceededTotal,
                 "metric_name" => self.metric_name.to_string(),
                 "tag_key" => self.tag_key.to_string(),
             )
             .increment(1);
         } else {
-            counter!("tag_value_limit_exceeded_total").increment(1);
+            counter!(CounterName::TagValueLimitExceededTotal).increment(1);
         }
     }
 }
@@ -76,6 +77,29 @@ impl InternalEvent for TagCardinalityValueLimitReached<'_> {
             message = "Value_limit reached for key. New values for this key will be rejected.",
             key = %self.key,
         );
-        counter!("value_limit_reached_total").increment(1);
+        counter!(CounterName::ValueLimitReachedTotal).increment(1);
+    }
+}
+
+#[derive(NamedInternalEvent)]
+pub struct TagCardinalityLimitUntracked;
+
+impl InternalEvent for TagCardinalityLimitUntracked {
+    fn emit(self) {
+        debug!(
+            message = "Max tracked keys limit reached; forwarding one or more metric tags without cardinality checks."
+        );
+        counter!(CounterName::TagCardinalityUntrackedEventsTotal).increment(1);
+    }
+}
+
+#[derive(NamedInternalEvent)]
+pub struct TagCardinalityTrackedKeys {
+    pub count: usize,
+}
+
+impl InternalEvent for TagCardinalityTrackedKeys {
+    fn emit(self) {
+        gauge!(GaugeName::TagCardinalityTrackedKeys).set(self.count as f64);
     }
 }

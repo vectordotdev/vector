@@ -11,7 +11,7 @@ use crate::{
     schema,
     sinks::util::{UriSerde, tcp::TcpSinkConfig},
     tcp::TcpKeepaliveConfig,
-    template::Template,
+    template::UnconfinedTemplate,
     tls::TlsEnableableConfig,
 };
 
@@ -39,7 +39,7 @@ pub struct PapertrailConfig {
     /// The value to use as the `process` in Papertrail.
     #[configurable(metadata(docs::examples = "{{ process }}", docs::examples = "my-process",))]
     #[serde(default = "default_process")]
-    process: Template,
+    process: UnconfinedTemplate,
 
     #[configurable(derived)]
     #[serde(
@@ -50,12 +50,12 @@ pub struct PapertrailConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_process() -> Template {
-    Template::try_from("vector").unwrap()
+fn default_process() -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from("vector").unwrap()
 }
 
 impl GenerateConfig for PapertrailConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"endpoint = "logs.papertrailapp.com:12345"
             encoding.codec = "json""#,
@@ -125,7 +125,7 @@ impl SinkConfig for PapertrailConfig {
 #[derive(Debug, Clone)]
 struct PapertrailEncoder {
     pid: u32,
-    process: Template,
+    process: UnconfinedTemplate,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
@@ -182,16 +182,14 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
-
     use bytes::BytesMut;
     use futures::{future::ready, stream};
-    use serde::Deserialize;
     use tokio_util::codec::Encoder as _;
     use vector_lib::{
         codecs::JsonSerializerConfig,
         event::{Event, LogEvent},
     };
+    use vrl::event_path;
 
     use super::*;
     use crate::test_util::{
@@ -208,12 +206,10 @@ mod tests {
     async fn component_spec_compliance() {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-        let config = PapertrailConfig::generate_config().to_string();
-        let mut config = PapertrailConfig::deserialize(
-            toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-        )
-        .expect("config should be valid");
-        config.endpoint = mock_endpoint.into();
+        let mut config: PapertrailConfig =
+            serde_json::from_value(PapertrailConfig::generate_config())
+                .expect("config should be valid");
+        config.endpoint = mock_endpoint.try_into().unwrap();
         config.tls = Some(TlsEnableableConfig::default());
 
         let context = SinkContext::default();
@@ -226,12 +222,12 @@ mod tests {
     #[test]
     fn encode_event_apply_rules() {
         let mut evt = Event::Log(LogEvent::from("vector"));
-        evt.as_mut_log().insert("magic", "key");
-        evt.as_mut_log().insert("process", "foo");
+        evt.as_mut_log().insert(event_path!("magic"), "key");
+        evt.as_mut_log().insert(event_path!("process"), "foo");
 
         let mut encoder = PapertrailEncoder {
             pid: 0,
-            process: Template::try_from("{{ process }}").unwrap(),
+            process: UnconfinedTemplate::try_from("{{ process }}").unwrap(),
             transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         };

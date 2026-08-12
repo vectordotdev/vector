@@ -1,9 +1,8 @@
 # Quick Reference for Vector Development
 
-This guide provides quick commands and coding conventions for Vector development. It's designed to help both AI assistants and human
-contributors get started quickly.
+This guide provides quick commands and coding conventions for Vector development.
 
-**For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).**
+For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Project Summary
 
@@ -21,7 +20,7 @@ reduction and improved data quality for observability infrastructure.
   - `sinks/` - Data output destinations
   - `config/` - Configuration system and validation
   - `topology/` - Component graph management
-  - `api/` - GraphQL API for management and monitoring
+  - `api/` - gRPC API for management and monitoring
   - `cli.rs` - Command-line interface
 
 - `/lib/` - Modular library crates
@@ -58,65 +57,84 @@ When working on Vector's Rust codebase, follow this iterative development cycle:
 
 Run this cycle after any code modification.
 
-When editing markdown files (*.md), run `make check-markdown` after changes.
+### Final validation step
 
-## Two Different Workflows
+After the task is complete run the following `make` commands to check for errors in tests and other
+targets.
+
+1. Run `make fmt` to format your code.
+2. Run `make test SCOPE="<scope>"` to run tests. `<scope>` is a test filter passed to `cargo nextest`.
+
+## Code change workflows and validation
 
 ### Rust Development (Most Common)
 
-If you're working on Vector's Rust codebase (sources, sinks, transforms, core functionality):
+If you're working on Vector's Rust codebase:
 
-**Format your code:**
-
-```bash
-make fmt
-```
-
-**Check formatting:**
+#### Running tests
 
 ```bash
-make check-fmt
-```
-
-**Run Clippy (linter):**
-
-```bash
-make check-clippy
-```
-
-**Auto-fix Clippy issues:**
-
-```bash
-make clippy-fix
-```
-
-**Run unit tests:**
-
-```bash
+# Run all tests
 make test
-# or
-cargo nextest run --workspace --no-default-features --features "${FEATURES}"
+
+# Target a single test
+make test SCOPE="test_some_function"
+
+# Filter to a specific package
+make test SCOPE="-p vector"
+
+# Use a nextest filter expression (note the quoting)
+make test SCOPE="-E 'test(foo) and not test(bar)'"
+
+# Run tests for a specific feature only
+make test FEATURES="sources-file"
+
+# Run tests matching a substring for a specific feature only
+make test FEATURES="sources-file" SCOPE="truncate"
 ```
 
-**Run integration tests:**
+#### Running integration tests
 
 ```bash
 # See available integration tests:
-# cargo vdev int show
-./scripts/run-integration-test.sh <integration-name>
+cargo vdev int show
+
+# Run a specific integration test
+cargo vdev int run <integration-name>
 ```
 
 See [Integration Tests](#integration-tests) section below for more details.
 
-**Before committing (recommended checks):**
+#### If editing any markdown files
+
+```bash
+make check-markdown
+```
+
+#### If changing any user facing documentation, including examples, component configuration or VRL functions
+
+```bash
+make generate-docs
+```
+
+#### If modifying any external dependencies
+
+Requires `dd-rust-license-tool`
+
+```bash
+make build-licenses
+```
+
+
+#### Before committing (recommended checks)
 
 ```bash
 make fmt                      # Format code
 make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
-make check-component-docs     # Check component documentation
-./scripts/check_changelog_fragments.sh  # Verify changelog
+make check-generated-docs     # Check generated documentation
+make check-changelog-fragments  # Verify changelog
 ```
 
 ### Website/Docs Development (Separate Process)
@@ -133,8 +151,8 @@ If you're working on vector.dev website or documentation content:
 **Run the site locally:**
 
 ```bash
-cd website
-make serve
+make generate-docs
+cd website && make serve
 # Navigate to http://localhost:1313
 ```
 
@@ -146,6 +164,10 @@ make cue-build
 ```
 
 **Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
+
+## Configuration Format
+
+Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.
 
 ## Common Patterns
 
@@ -179,9 +201,8 @@ make check-licenses
 make check-fmt
 make check-clippy
 make check-markdown
-make check-component-docs
-
-./scripts/check_changelog_fragments.sh
+make check-generated-docs
+make check-changelog-fragments
 ```
 
 Then: `chmod +x .git/hooks/pre-push`
@@ -189,8 +210,14 @@ Then: `chmod +x .git/hooks/pre-push`
 ## Detailed Documentation
 
 | Topic | Document |
-|-------|----------|
+| ----- | -------- |
 | Rust style patterns | [docs/RUST_STYLE.md](docs/RUST_STYLE.md) |
+| Code style rules (formatting, const strings, organization) | [STYLE.md](STYLE.md) |
+| System architecture (sources, transforms, sinks, topology) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Component specification (naming, configuration, health checks) | [docs/specs/component.md](docs/specs/component.md) |
+| Instrumentation requirements (event/metric naming) | [docs/specs/instrumentation.md](docs/specs/instrumentation.md) |
+| How to document code changes | [docs/DOCUMENTING.md](docs/DOCUMENTING.md) |
+| Adding changelog entries | [changelog.d/README.md](changelog.d/README.md) |
 
 ## Architecture Notes
 
@@ -200,7 +227,7 @@ Then: `chmod +x .git/hooks/pre-push`
 - **Transforms**: Modify, filter, or enrich event data
 - **Sinks**: Send data to external systems
 
-Component docs are auto-generated from code annotations. Run `make check-component-docs` after changes.
+Component docs are auto-generated from code annotations. Run `make check-generated-docs` after changes.
 
 ### Integration Tests
 
@@ -219,63 +246,23 @@ cargo vdev int test aws
 
 See [docs/DEVELOPING.md](docs/DEVELOPING.md#integration-tests) for adding new integration tests.
 
-### Key Files
+## Git Conventions
 
-- `Makefile` - Common build/test/check targets
-- `vdev/` - Custom development CLI tool
-- `src/` - Rust source code
-- `website/` - Hugo-based documentation site
-- `tests/` - Integration and behavior tests
+- **Commit messages:** Do NOT include co-authoring information from coding agents (i.e. avoid "Co-Authored-By: Claude" attribution)
+- **Pull requests:** Do NOT add "Generated with Claude Code" or similar footers — keep PR descriptions focused on the technical changes
 
-## Common Issues
+### Preserve Open Pull Request History
 
-### Formatting Fails
-
-Run `make fmt` before committing. Formatting must be exact.
-
-### Clippy Errors
-
-Run `make clippy-fix` to auto-fix many issues. Manual fixes may be required.
-
-### Component Docs Out of Sync
-
-Component documentation is generated from code. Run:
+Before rewriting a branch that has been pushed, use `gh` when available to check whether the branch has an open pull request:
 
 ```bash
-make check-component-docs
+gh pr list --head "$(git branch --show-current)" --state open --json number,url
 ```
 
-### License Check Fails
+If `gh` is unavailable or the check fails, assume an open pull request exists.
 
-After adding/updating dependencies:
+When an open pull request exists, never rewrite published commits or force-push the branch. Push additional commits normally to preserve incremental review.
 
-```bash
-cargo install dd-rust-license-tool --locked
-make build-licenses
-```
+## Creating Pull Requests
 
-## Reference Documentation
-
-These documents provide context that AI agents and developers need when working on Vector code.
-
-### Essential for Code Changes
-
-- **[STYLE.md](STYLE.md)** - Code style rules (formatting, const strings, code organization)
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture (sources, transforms, sinks, topology)
-- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** - Development workflow and testing
-
-### Component Development
-
-- **[docs/specs/component.md](docs/specs/component.md)** - Component specification (naming, configuration, health checks)
-- **[docs/specs/instrumentation.md](docs/specs/instrumentation.md)** - Instrumentation requirements (event/metric naming)
-- **[src/internal_events](src/internal_events)** - Internal event examples for telemetry
-
-### Adding Documentation
-
-- **[docs/DOCUMENTING.md](docs/DOCUMENTING.md)** - How to document code changes
-- **[changelog.d/README.md](changelog.d/README.md)** - Adding changelog entries
-
-### Full Guides
-
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete contributing guide
-- **[website/README.md](website/README.md)** - Website development only (separate from Rust code)
+Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.

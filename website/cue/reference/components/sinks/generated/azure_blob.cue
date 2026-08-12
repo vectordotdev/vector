@@ -1,6 +1,16 @@
 package metadata
 
 generated: components: sinks: azure_blob: configuration: {
+	account_name: {
+		description: """
+			The Azure Blob Storage Account name.
+
+			If provided, this will be used instead of the `connection_string`.
+			This is useful for authenticating with an Azure credential.
+			"""
+		required: false
+		type: string: examples: ["mylogstorage"]
+	}
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
@@ -25,6 +35,123 @@ generated: components: sinks: azure_blob: configuration: {
 				"""
 			required: false
 			type: bool: {}
+		}
+	}
+	auth: {
+		description: "Azure service principal authentication."
+		required:    false
+		type: object: options: {
+			azure_client_id: {
+				description: """
+					The [Azure Client ID][azure_client_id].
+
+					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\" or azure_credential_kind = \"client_secret_credential\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_CLIENT_ID:?err}"]
+			}
+			azure_client_secret: {
+				description: """
+					The [Azure Client Secret][azure_client_secret].
+
+					[azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"client_secret_credential\""
+				required:      true
+				type: string: examples: ["00-00~000000-0000000~0000000000000000000", "${AZURE_CLIENT_SECRET:?err}"]
+			}
+			azure_credential_kind: {
+				description: "The kind of Azure credential to use."
+				required:    true
+				type: string: enum: {
+					azure_cli:                         "Use Azure CLI credentials"
+					client_certificate_credential:     "Use certificate credentials"
+					client_secret_credential:          "Use client ID/secret credentials"
+					managed_identity:                  "Use Managed Identity credentials"
+					managed_identity_client_assertion: "Use Managed Identity with Client Assertion credentials"
+					workload_identity:                 "Use Workload Identity credentials"
+				}
+			}
+			azure_tenant_id: {
+				description: """
+					The [Azure Tenant ID][azure_tenant_id].
+
+					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\" or azure_credential_kind = \"client_secret_credential\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_TENANT_ID:?err}"]
+			}
+			certificate_password: {
+				description:   "The password for the client certificate, if applicable."
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      false
+				type: string: examples: ["${AZURE_CLIENT_CERTIFICATE_PASSWORD}"]
+			}
+			certificate_path: {
+				description:   "PKCS12 certificate with RSA private key."
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      true
+				type: string: examples: ["path/to/certificate.pfx", "${AZURE_CLIENT_CERTIFICATE_PATH:?err}"]
+			}
+			client_assertion_client_id: {
+				description:   "The target Client ID to use."
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			client_assertion_tenant_id: {
+				description:   "The target Tenant ID to use."
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			client_id: {
+				description: """
+					The [Azure Client ID][azure_client_id]. Defaults to the value of the environment variable `AZURE_CLIENT_ID`.
+
+					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_CLIENT_ID}"]
+			}
+			tenant_id: {
+				description: """
+					The [Azure Tenant ID][azure_tenant_id]. Defaults to the value of the environment variable `AZURE_TENANT_ID`.
+
+					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_TENANT_ID}"]
+			}
+			token_file_path: {
+				description:   "Path of a file containing a Kubernetes service account token. Defaults to the value of the environment variable `AZURE_FEDERATED_TOKEN_FILE`."
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["/var/run/secrets/azure/tokens/azure-identity-token", "${AZURE_FEDERATED_TOKEN_FILE}"]
+			}
+			user_assigned_managed_identity_id: {
+				description:   "The User Assigned Managed Identity to use."
+				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			user_assigned_managed_identity_id_type: {
+				description: """
+					The type of the User Assigned Managed Identity ID provided (Client ID, Object ID,
+					or Resource ID). Defaults to Client ID.
+					"""
+				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      false
+				type: string: enum: {
+					client_id:   "Client ID"
+					object_id:   "Object ID"
+					resource_id: "Resource ID"
+				}
+			}
 		}
 	}
 	batch: {
@@ -73,6 +200,16 @@ generated: components: sinks: azure_blob: configuration: {
 			"""
 		required: false
 		type: bool: {}
+	}
+	blob_endpoint: {
+		description: """
+			The Azure Blob Storage endpoint.
+
+			If provided, this will be used instead of the `connection_string`.
+			This is useful for authenticating with an Azure credential.
+			"""
+		required: false
+		type: string: examples: ["https://mylogstorage.blob.core.windows.net/"]
 	}
 	blob_prefix: {
 		description: """
@@ -164,14 +301,36 @@ generated: components: sinks: azure_blob: configuration: {
 			| Allowed services       | Blob               |
 			| Allowed resource types | Container & Object |
 			| Allowed permissions    | Read & Create      |
+
+			If you also configure the `tags` option, the SAS must include the
+			`Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
+			the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
+			uploads fail with an authorization error even when the health check still passes.
 			"""
-		required: true
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"]
+		required: false
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
+		warnings: ["Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep connection strings secure and not expose them in logs, error messages, or version control systems."]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
 		required:    true
 		type: string: examples: ["my-logs"]
+	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	encoding: {
 		description: """
@@ -235,7 +394,7 @@ generated: components: sinks: azure_blob: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -490,12 +649,18 @@ generated: components: sinks: azure_blob: configuration: {
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
 					metric. When set to `full`, all metric tags are exposed as separate assignments.
+					When set to `auto`, tag values are encoded using their underlying shape.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+															force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
@@ -674,6 +839,25 @@ generated: components: sinks: azure_blob: configuration: {
 						"""
 				}
 			}
+		}
+	}
+	metadata: {
+		description: """
+			The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
+
+			Each entry becomes an `x-ms-meta-{key}` header. Azure limits the total size of all
+			metadata and restricts key names to ASCII alphanumeric characters and underscores,
+			starting with a letter. Non-ASCII values must be Base64-encoded before being set.
+			The service rejects invalid configurations. See the [Azure documentation][blob_metadata]
+			for current limits.
+
+			[blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "A key/value pair."
+			required:    true
+			type: string: {}
 		}
 	}
 	request: {
@@ -860,6 +1044,54 @@ generated: components: sinks: azure_blob: configuration: {
 					unit:    "seconds"
 				}
 			}
+		}
+	}
+	tags: {
+		description: """
+			The set of [blob index tags][blob_index_tags] to apply to created blobs.
+
+			Each entry becomes a tag in the `x-ms-tags` header. Azure limits blobs to 10 tags,
+			with restricted character sets for keys and values; the service rejects invalid
+			configurations.
+
+			When authenticating with a shared access signature (SAS), the token must include the
+			`Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
+			authorization requirement to the `Put Blob` request that carries these tags, so without
+			it tagged uploads fail with an authorization error even when the health check still passes.
+
+			When authenticating with an Azure credential (managed identity, workload identity, and so
+			on), the identity needs the
+			`Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write` RBAC action.
+			The least-privileged built-in role that grants it is *Storage Blob Data Owner*; the
+			*Storage Blob Data Contributor* role commonly sufficient for uploads does not include it.
+
+			[blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				Classification: "confidential"
+				PHI:            "True"
+				Project:        "Blue"
+			}]
+			options: "*": {
+				description: "A single tag."
+				required:    true
+				type: string: {}
+			}
+		}
+	}
+	tls: {
+		description: "TLS configuration."
+		required:    false
+		type: object: options: ca_file: {
+			description: """
+				Absolute path to an additional CA certificate file.
+
+				The certificate must be in PEM (X.509) format.
+				"""
+			required: false
+			type: string: examples: ["/path/to/certificate_authority.crt"]
 		}
 	}
 }

@@ -22,7 +22,7 @@ use crate::{
         Client as VectorClient, HealthCheckRequest, HealthCheckResponse, PushEventsRequest,
         PushEventsResponse, Server as VectorServer, Service as VectorService, ServingStatus,
     },
-    sources::util::grpc::run_grpc_server,
+    sources::util::grpc::{GrpcKeepaliveConfig, run_grpc_server},
 };
 
 #[derive(Clone)]
@@ -165,7 +165,9 @@ pub fn spawn_grpc_server<S>(
         let server = run_grpc_server(
             listen_addr.as_socket_addr(),
             tls_settings,
+            None,
             service,
+            GrpcKeepaliveConfig::default(),
             shutdown_signal,
         );
         pin!(server);

@@ -11,7 +11,7 @@ sources:
 
 sinks:
   out:
-    inputs: [ "in" ]
+    inputs: ["in"]
     type: "console"
     encoding:
       codec: "text"

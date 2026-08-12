@@ -277,6 +277,22 @@ generated: components: sinks: http: configuration: {
 			}
 		}
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	encoding: {
 		description: """
 			Encoding configuration.
@@ -339,7 +355,7 @@ generated: components: sinks: http: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -594,12 +610,18 @@ generated: components: sinks: http: configuration: {
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
 					metric. When set to `full`, all metric tags are exposed as separate assignments.
+					When set to `auto`, tag values are encoded using their underlying shape.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+															force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
@@ -778,17 +800,6 @@ generated: components: sinks: http: configuration: {
 						"""
 				}
 			}
-		}
-	}
-	headers: {
-		deprecated:         true
-		deprecated_message: "This option has been deprecated, use `request.headers` instead."
-		description:        "A list of custom headers to add to each request."
-		required:           false
-		type: object: options: "*": {
-			description: "An HTTP request header and it's value."
-			required:    true
-			type: string: {}
 		}
 	}
 	method: {
@@ -1031,6 +1042,37 @@ generated: components: sinks: http: configuration: {
 				type: uint: {
 					default: 60
 					unit:    "seconds"
+				}
+			}
+		}
+	}
+	retry_strategy: {
+		description: """
+			Configurable retry strategy for `http` based sinks.
+
+			For more information about error responses, see [Client Error Responses][error_responses].
+
+			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+			"""
+		required: false
+		type: object: options: {
+			status_codes: {
+				description:   "Retry on these specific HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
+				type: array: items: type: uint: {}
+			}
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "default"
+					enum: {
+						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
+						custom:  "Custom retry strategy"
+						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
+						none:    "Don't retry any errors, including request timeouts."
+					}
 				}
 			}
 		}

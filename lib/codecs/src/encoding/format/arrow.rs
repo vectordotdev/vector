@@ -6,6 +6,7 @@
 
 use arrow::{
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
+    error::ArrowError,
     ipc::writer::StreamWriter,
     json::reader::ReaderBuilder,
     record_batch::RecordBatch,
@@ -39,12 +40,12 @@ pub struct ArrowStreamSerializerConfig {
 
     /// Allow null values for non-nullable fields in the schema.
     ///
-    /// When enabled, missing or incompatible values will be encoded as null even for fields
+    /// When enabled, missing or incompatible values are encoded as null, even for fields
     /// marked as non-nullable in the Arrow schema. This is useful when working with downstream
     /// systems that can handle null values through defaults, computed columns, or other mechanisms.
     ///
-    /// When disabled (default), missing values for non-nullable fields will cause encoding errors,
-    /// ensuring all required data is present before sending to the sink.
+    /// When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
+    /// help ensure all required data is present before sending it to the sink.
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
@@ -92,6 +93,19 @@ pub struct ArrowStreamSerializer {
 }
 
 impl ArrowStreamSerializer {
+    /// Encode events into a `RecordBatch` without writing to IPC stream format.
+    pub fn encode_to_record_batch(
+        &self,
+        events: &[Event],
+    ) -> Result<RecordBatch, ArrowEncodingError> {
+        let values = vector_log_events_to_json_values(events).map_err(|e| {
+            ArrowEncodingError::RecordBatchCreation {
+                source: arrow::error::ArrowError::JsonError(e.to_string()),
+            }
+        })?;
+        build_record_batch(self.schema.clone(), &values)
+    }
+
     /// Create a new ArrowStreamSerializer with the given configuration
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
         let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
@@ -203,7 +217,13 @@ pub fn encode_events_to_arrow_ipc_stream(
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let record_batch = build_record_batch(schema, events)?;
+    let json_values = vector_log_events_to_json_values(events).map_err(|e| {
+        ArrowEncodingError::RecordBatchCreation {
+            source: ArrowError::JsonError(e.to_string()),
+        }
+    })?;
+
+    let record_batch = build_record_batch(schema, &json_values)?;
 
     let mut buffer = BytesMut::new().writer();
     let mut writer =
@@ -271,7 +291,7 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
 /// Find non-nullable schema fields that are missing or null in any of the given events.
 pub fn find_null_non_nullable_fields<'a>(
     schema: &'a Schema,
-    values: &[&vrl::value::Value],
+    values: &[serde_json::Value],
 ) -> Vec<&'a str> {
     schema
         .fields()
@@ -282,38 +302,40 @@ pub fn find_null_non_nullable_fields<'a>(
                     value
                         .as_object()
                         .and_then(|map| map.get(field.name().as_str()))
-                        .is_none_or(vrl::value::Value::is_null)
+                        .is_none_or(serde_json::Value::is_null)
                 })
         })
         .map(|field| field.name().as_str())
         .collect()
 }
 
-/// Build an Arrow RecordBatch from a slice of events using the provided schema.
-fn build_record_batch(
-    schema: SchemaRef,
+pub(crate) fn vector_log_events_to_json_values(
     events: &[Event],
-) -> Result<RecordBatch, ArrowEncodingError> {
-    let values: Vec<_> = events
+) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+    events
         .iter()
         .filter_map(Event::maybe_as_log)
-        .map(|log| log.value())
-        .collect();
+        .map(serde_json::to_value)
+        .collect()
+}
 
+/// Build an Arrow RecordBatch from a slice of events using the provided schema.
+pub(crate) fn build_record_batch(
+    schema: SchemaRef,
+    values: &[serde_json::Value],
+) -> Result<RecordBatch, ArrowEncodingError> {
     if values.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let missing = find_null_non_nullable_fields(&schema, &values);
+    let missing = find_null_non_nullable_fields(&schema, values);
     if !missing.is_empty() {
-        for field_name in &missing {
-            let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
-                field_name: field_name.to_string(),
-            });
-            vector_common::internal_event::emit(
-                crate::internal_events::EncoderNullConstraintError { error: &error },
-            );
-        }
+        let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
+            field_name: missing.join(", "),
+        });
+        vector_common::internal_event::emit(crate::internal_events::EncoderNullConstraintError {
+            error: &error,
+        });
         return Err(ArrowEncodingError::NullConstraint {
             field_name: missing.join(", "),
         });
@@ -321,12 +343,32 @@ fn build_record_batch(
 
     let mut decoder = ReaderBuilder::new(schema)
         .build_decoder()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_record_batch_creation",
+            });
+        })
         .context(RecordBatchCreationSnafu)?;
 
-    decoder.serialize(&values).context(ArrowJsonDecodeSnafu)?;
+    decoder
+        .serialize(values)
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
+        .context(ArrowJsonDecodeSnafu)?;
 
     decoder
         .flush()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
         .context(ArrowJsonDecodeSnafu)?
         .ok_or(ArrowEncodingError::NoEvents)
 }
@@ -342,6 +384,7 @@ mod tests {
     use chrono::Utc;
     use std::io::Cursor;
     use vector_core::event::{LogEvent, Value};
+    use vrl::event_path;
 
     /// Helper to encode events and return the decoded RecordBatch
     fn encode_and_decode(
@@ -361,7 +404,7 @@ mod tests {
     {
         let mut log = LogEvent::default();
         for (key, value) in fields {
-            log.insert(key, value.into());
+            log.insert(&vrl::path::parse_target_path(key).unwrap(), value.into());
         }
         Event::Log(log)
     }
@@ -403,25 +446,28 @@ mod tests {
 
             let mut log = LogEvent::default();
             // Primitive types
-            log.insert("string_field", "test");
-            log.insert("int8_field", 127);
-            log.insert("int16_field", 32000);
-            log.insert("int32_field", 1000000);
-            log.insert("int64_field", 42);
-            log.insert("uint8_field", 255);
-            log.insert("uint16_field", 65535);
-            log.insert("uint32_field", 4000000);
-            log.insert("uint64_field", 9000000000_i64);
-            log.insert("float32_field", 3.15);
-            log.insert("float64_field", 3.15);
-            log.insert("bool_field", true);
-            log.insert("timestamp_field", now);
-            log.insert("decimal_field", 99.99);
+            log.insert(event_path!("string_field"), "test");
+            log.insert(event_path!("int8_field"), 127);
+            log.insert(event_path!("int16_field"), 32000);
+            log.insert(event_path!("int32_field"), 1000000);
+            log.insert(event_path!("int64_field"), 42);
+            log.insert(event_path!("uint8_field"), 255);
+            log.insert(event_path!("uint16_field"), 65535);
+            log.insert(event_path!("uint32_field"), 4000000);
+            log.insert(event_path!("uint64_field"), 9000000000_i64);
+            log.insert(event_path!("float32_field"), 3.15);
+            log.insert(event_path!("float64_field"), 3.15);
+            log.insert(event_path!("bool_field"), true);
+            log.insert(event_path!("timestamp_field"), now);
+            log.insert(event_path!("decimal_field"), 99.99);
             // Complex types
-            log.insert("list_field", list_value);
-            log.insert("struct_field", Value::Object(tuple_value));
-            log.insert("named_struct_field", Value::Object(named_tuple_value));
-            log.insert("map_field", Value::Object(map_value));
+            log.insert(event_path!("list_field"), list_value);
+            log.insert(event_path!("struct_field"), Value::Object(tuple_value));
+            log.insert(
+                event_path!("named_struct_field"),
+                Value::Object(named_tuple_value),
+            );
+            log.insert(event_path!("map_field"), Value::Object(map_value));
 
             let events = vec![Event::Log(log)];
 
@@ -597,10 +643,10 @@ mod tests {
         fn test_encode_timestamp_precisions() {
             let now = Utc::now();
             let mut log = LogEvent::default();
-            log.insert("ts_second", now);
-            log.insert("ts_milli", now);
-            log.insert("ts_micro", now);
-            log.insert("ts_nano", now);
+            log.insert(event_path!("ts_second"), now);
+            log.insert(event_path!("ts_milli"), now);
+            log.insert(event_path!("ts_micro"), now);
+            log.insert(event_path!("ts_nano"), now);
 
             let events = vec![Event::Log(log)];
 
@@ -655,13 +701,13 @@ mod tests {
             let now = Utc::now();
 
             let mut log1 = LogEvent::default();
-            log1.insert("ts", "2025-10-22T10:18:44.256Z"); // RFC3339 String
+            log1.insert(event_path!("ts"), "2025-10-22T10:18:44.256Z"); // RFC3339 String
 
             let mut log2 = LogEvent::default();
-            log2.insert("ts", now); // Native Timestamp
+            log2.insert(event_path!("ts"), now); // Native Timestamp
 
             let mut log3 = LogEvent::default();
-            log3.insert("ts", 1729594724256000000_i64); // Integer (nanoseconds)
+            log3.insert(event_path!("ts"), 1729594724256000000_i64); // Integer (nanoseconds)
 
             let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
@@ -705,7 +751,7 @@ mod tests {
         #[test]
         fn test_config_allow_nullable_fields_overrides_schema() {
             let mut log1 = LogEvent::default();
-            log1.insert("strict_field", 42);
+            log1.insert(event_path!("strict_field"), 42);
             let log2 = LogEvent::default();
             let events = vec![Event::Log(log1), Event::Log(log2)];
 
@@ -885,8 +931,10 @@ mod tests {
                 ("a", Value::Bytes("val".into())),
                 ("b", Value::Integer(42)),
             ]);
-            let value = event.as_log().value();
-            let missing = find_null_non_nullable_fields(&schema, &[value]);
+            let missing = find_null_non_nullable_fields(
+                &schema,
+                &vector_log_events_to_json_values(&[event]).unwrap(),
+            );
             assert!(
                 missing.is_empty(),
                 "Expected no missing fields, got: {missing:?}"
@@ -898,8 +946,10 @@ mod tests {
             let schema = Schema::new(vec![Field::new("a", DataType::Utf8, false)]);
 
             let event = create_event(vec![("a", Value::Null)]);
-            let value = event.as_log().value();
-            let missing = find_null_non_nullable_fields(&schema, &[value]);
+            let missing = find_null_non_nullable_fields(
+                &schema,
+                &vector_log_events_to_json_values(&[event]).unwrap(),
+            );
             assert_eq!(missing, vec!["a"]);
         }
     }

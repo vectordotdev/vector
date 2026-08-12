@@ -8,6 +8,8 @@ use vector_lib::config::log_schema;
 use azure_core::credentials::{AccessToken, TokenCredential};
 use azure_core::time::OffsetDateTime;
 
+use crate::sinks::azure_common::config::{AzureAuthentication, SpecificAzureCredential};
+
 use super::config::AzureLogsIngestionConfig;
 
 use crate::{
@@ -26,50 +28,20 @@ fn generate_config() {
 
 #[tokio::test]
 async fn basic_config_error_with_no_auth() {
-    let config: AzureLogsIngestionConfig = toml::from_str::<AzureLogsIngestionConfig>(
-        r#"
-            endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
-            dcr_immutable_id = "dcr-00000000000000000000000000000000"
-            stream_name = "Custom-UnitTest"
-        "#,
-    )
-    .expect("Config parsing failed");
+    let config: Result<AzureLogsIngestionConfig, _> =
+        serde_yaml::from_str::<AzureLogsIngestionConfig>(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+        "#});
 
-    assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
-    );
-    assert_eq!(
-        config.dcr_immutable_id,
-        "dcr-00000000000000000000000000000000"
-    );
-    assert_eq!(config.stream_name, "Custom-UnitTest");
-    assert_eq!(config.token_scope, "https://monitor.azure.com/.default");
-    assert_eq!(config.timestamp_field, "TimeGenerated");
-
-    match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::ClientSecretCredential {
-            azure_tenant_id,
-            azure_client_id,
-            azure_client_secret,
-        } => {
-            assert_eq!(azure_tenant_id, "");
-            assert_eq!(azure_client_id, "");
-            let secret: String = azure_client_secret.inner().into();
-            assert_eq!(secret, "");
-        }
-        _ => panic!("Expected ClientSecretCredential variant"),
-    }
-
-    let cx = SinkContext::default();
-    let sink = config.build(cx).await;
-    match sink {
-        Ok(_) => panic!("Config build should have errored due to missing auth info"),
+    match config {
+        Ok(_) => panic!("Config parsing should have failed due to missing auth config"),
         Err(e) => {
             let err_str = e.to_string();
             assert!(
-                err_str.contains("`auth.azure_tenant_id` is blank"),
-                "Config build did not complain about azure_tenant_id being blank: {}",
+                err_str.contains("missing field `auth`"),
+                "Config parsing did not complain about missing auth field: {}",
                 err_str
             );
         }
@@ -78,19 +50,18 @@ async fn basic_config_error_with_no_auth() {
 
 #[test]
 fn basic_config_with_client_credentials() {
-    let config: AzureLogsIngestionConfig = toml::from_str::<AzureLogsIngestionConfig>(
-        r#"
-            endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
-            dcr_immutable_id = "dcr-00000000000000000000000000000000"
-            stream_name = "Custom-UnitTest"
-
-            [auth]
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .expect("Config parsing failed");
+    let config: AzureLogsIngestionConfig =
+        serde_yaml::from_str::<AzureLogsIngestionConfig>(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .expect("Config parsing failed");
 
     assert_eq!(
         config.endpoint,
@@ -105,33 +76,31 @@ fn basic_config_with_client_credentials() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::ClientSecretCredential {
+        AzureAuthentication::Specific(SpecificAzureCredential::ClientSecretCredential {
             azure_tenant_id,
             azure_client_id,
             azure_client_secret,
-        } => {
+        }) => {
             assert_eq!(azure_tenant_id, "00000000-0000-0000-0000-000000000000");
             assert_eq!(azure_client_id, "mock-client-id");
             let secret: String = azure_client_secret.inner().into();
             assert_eq!(secret, "mock-client-secret");
         }
-        _ => panic!("Expected ClientSecretCredential variant"),
+        _ => panic!("Expected Specific(ClientSecretCredential) variant"),
     }
 }
 
 #[test]
 fn basic_config_with_managed_identity() {
-    let config: AzureLogsIngestionConfig = toml::from_str::<AzureLogsIngestionConfig>(
-        r#"
-            endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
-            dcr_immutable_id = "dcr-00000000000000000000000000000000"
-            stream_name = "Custom-UnitTest"
-
-            [auth]
-            azure_credential_kind = "managed_identity"
-        "#,
-    )
-    .expect("Config parsing failed");
+    let config: AzureLogsIngestionConfig =
+        serde_yaml::from_str::<AzureLogsIngestionConfig>(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: managed_identity
+        "#})
+        .expect("Config parsing failed");
 
     assert_eq!(
         config.endpoint,
@@ -146,11 +115,7 @@ fn basic_config_with_managed_identity() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::Specific(
-            crate::sinks::azure_logs_ingestion::config::SpecificAzureCredential::ManagedIdentity {
-                ..
-            },
-        ) => {
+        AzureAuthentication::Specific(SpecificAzureCredential::ManagedIdentity { .. }) => {
             // Expected variant
         }
         _ => panic!("Expected Specific(ManagedIdentity) variant"),
@@ -175,18 +140,16 @@ fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
 async fn correct_request() {
     let credential = std::sync::Arc::new(create_mock_credential());
 
-    let config: AzureLogsIngestionConfig = toml::from_str(
-        r#"
-            endpoint = "http://localhost:9001"
-            dcr_immutable_id = "dcr-00000000000000000000000000000000"
-            stream_name = "Custom-UnitTest"
-
-            [auth]
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "http://localhost:9001"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
     .unwrap();
 
     let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
@@ -213,7 +176,7 @@ async fn correct_request() {
     let (sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            mock_endpoint.try_into().unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -285,18 +248,16 @@ fn create_mock_credential() -> impl TokenCredential {
 
 #[tokio::test]
 async fn mock_healthcheck_with_400_response() {
-    let config: AzureLogsIngestionConfig = toml::from_str(
-        r#"
-            endpoint = "http://localhost:9001"
-            dcr_immutable_id = "dcr-00000000000000000000000000000000"
-            stream_name = "Custom-UnitTest"
-
-            [auth]
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "http://localhost:9001"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
     .unwrap();
 
     let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
@@ -327,7 +288,7 @@ async fn mock_healthcheck_with_400_response() {
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            mock_endpoint.try_into().unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -354,18 +315,16 @@ async fn mock_healthcheck_with_400_response() {
 
 #[tokio::test]
 async fn mock_healthcheck_with_403_response() {
-    let config: AzureLogsIngestionConfig = toml::from_str(
-        r#"
-            endpoint = "http://localhost:9001"
-            dcr_immutable_id = "dcr-00000000000000000000000000000000"
-            stream_name = "Custom-UnitTest"
-
-            [auth]
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "http://localhost:9001"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
     .unwrap();
 
     let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
@@ -396,7 +355,7 @@ async fn mock_healthcheck_with_403_response() {
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            mock_endpoint.try_into().unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,

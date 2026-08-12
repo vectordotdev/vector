@@ -29,7 +29,7 @@ use vector_lib::{
 use crate::{
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
-    template::{Template, TemplateParseError},
+    template::{ConfinedTemplate, TemplateParseError, UnconfinedTemplate},
 };
 
 /// Elasticsearch Authentication strategies.
@@ -80,7 +80,7 @@ pub enum ElasticsearchMode {
 
 /// Bulk API actions.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
     /// The `index` action.
@@ -127,7 +127,7 @@ impl TryFrom<&str> for BulkAction {
 
 /// Elasticsearch version types.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum VersionType {
     /// The `internal` type.
@@ -169,13 +169,13 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
     Bulk {
-        index: Template,
+        index: ConfinedTemplate,
         template_fallback_index: Option<String>,
-        action: Template,
-        version: Option<Template>,
+        action: UnconfinedTemplate,
+        version: Option<UnconfinedTemplate>,
         version_type: VersionType,
     },
-    DataStream(DataStreamConfig),
+    DataStream(DataStreamMode),
 }
 
 #[derive(NamedInternalEvent)]
@@ -205,6 +205,19 @@ impl ElasticsearchCommonMode {
             } => index
                 .render_string(log)
                 .or_else(|error| {
+                    // Confined errors are intentional security drops — never fall back
+                    // to the default index, as that would silently accept an attack event.
+                    if matches!(
+                        error,
+                        crate::template::TemplateRenderingError::Confined { .. }
+                    ) {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("index"),
+                            drop_event: true,
+                        });
+                        return Err(());
+                    }
                     if let Some(fallback) = template_fallback_index {
                         emit!(TemplateRenderingError {
                             error,
@@ -280,7 +293,7 @@ impl ElasticsearchCommonMode {
         }
     }
 
-    const fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
+    const fn as_data_stream_config(&self) -> Option<&DataStreamMode> {
         match self {
             Self::DataStream(value) => Some(value),
             _ => None,

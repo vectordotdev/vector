@@ -20,7 +20,7 @@ use futures::{
     future::{self, BoxFuture},
     stream,
 };
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Exp1;
 use rstest::*;
 use serde::Deserialize;
@@ -50,11 +50,10 @@ use crate::{
 
 /// Request handling action when the request limit has been exceeded.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 enum Action {
-    #[derivative(Default)]
+    #[default]
     /// Additional requests will return with an error.
     Defer,
 
@@ -674,14 +673,14 @@ async fn run_compare(input: TestInput) {
 
 #[rstest]
 #[tokio::test]
-async fn all_tests(#[files("tests/data/adaptive-concurrency/*.toml")] file_path: PathBuf) {
+async fn all_tests(#[files("tests/data/adaptive-concurrency/*.yaml")] file_path: PathBuf) {
     let mut data = String::new();
     File::open(&file_path)
         .unwrap()
         .read_to_string(&mut data)
         .unwrap();
-    let input: TestInput = toml::from_str(&data)
-        .unwrap_or_else(|error| panic!("Invalid TOML in {file_path:?}: {error:?}"));
+    let input: TestInput = serde_yaml::from_str(&data)
+        .unwrap_or_else(|error| panic!("Invalid YAML in {file_path:?}: {error:?}"));
 
     time::pause();
 

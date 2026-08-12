@@ -44,7 +44,7 @@ There's a variety of helper commands available for working with CUE. Run `make c
 
 For the most part, vector.dev uses the [Alpine] framework for interactive functionality. If you see directives like `x-show`, `x-data`, `@click`, and `:class` in HTML templates, those are Alpine directives. Alpine was chosen over jQuery and other frameworks for the sake of maintainability. Alpine directives live inside your HTML rather than in separate JavaScript files, which enables you to see how a component behaves without referring to an external `.js` file.
 
-The [Spruce] library is used for all JavaScript state management. It stores things like light/dark mode preferences in `localStorage` and makes those values available in Alpine-wired components. See the [`app.js`](./assets/js/app.js) for managed state values.
+Alpine's persistence plugin stores global JavaScript state, such as light/dark-mode preferences, in `localStorage` and makes it available in Alpine-wired components. See [`app.js`](./assets/js/app.js) for managed state values.
 
 The [Tocbot] library is used to auto-generate documentation table of contents on each page. The TOC is generated at page load time.
 
@@ -54,7 +54,7 @@ All JavaScript for the site is built using [Hugo Pipes] rather than tools like W
 
 ### CSS
 
-Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. The Tailwind configuration is in [`tailwind.config.js`](./tailwind.config.js); it mostly consists of default values but there are some custom colors, sizes, and other attributes provided there. Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
+Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. Tailwind configuration, including custom colors, sizes, and other attributes, is defined in [`assets/css/style.css`](./assets/css/style.css). Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
 
 In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files are in [`assets/sass`](./assets/sass)):
 
@@ -129,6 +129,7 @@ Below is a list of common tasks that maintainers will need to carry out from tim
 ### Run the site locally
 
 ```shell
+make generate-docs # Note: required only when schema or VRL documentation was changed
 make serve
 ```
 
@@ -136,11 +137,31 @@ This builds all the necessary [prereqs](#prerequisites) for the site and starts 
 
 When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
 
+### Run the site with Docker
+
+If you don't want to install Hugo, CUE, Node.js, Rust, or [vdev] locally, you can use Docker instead. The first startup installs the matching vdev version (or builds the checkout when it is unreleased), then runs `make generate-docs` and generates CUE JSON inside the container.
+
+> **Note:** This Docker setup is experimental and not currently enforced by CI. It may break as dependencies or the build process evolve.
+
+Build and start the site:
+
+```shell
+cd website
+docker compose build
+docker compose up
+```
+
+Navigate to http://localhost:1313. The repository is mounted as a volume so Hugo's live-reload works for Markdown, CSS, and JavaScript changes. If you modify [structured data](#structured-data) sources, restart the container.
+
 ### Add a new version of Vector
 
-1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue). Make sure to preserve reverse ordering.
-1. Generate a new CUE file for the release by running `make release-prepare` in the root directory of the Vector repo. This generates a CUE file at `cue/releases/{VERSION}.cue`.
-1. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
+This is automated by `cargo vdev release prepare` (see the
+[release issue templates](../.github/ISSUE_TEMPLATE)). The steps it performs, listed
+here for reference:
+
+1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue), preserving reverse ordering.
+2. Generate a new CUE file at `cue/reference/releases/{VERSION}.cue`.
+3. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
 
     ```markdown
     ---
@@ -153,7 +174,7 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
 ## Known issues
 
-* Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
+* Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in [`assets/css/style.css`](./assets/css/style.css), but it will take some time to iron all of these issues out.
 
 ## CUE pro tips
 
@@ -215,7 +236,6 @@ description: """
 [react.js]: https://reactjs.org
 [reference documentation]: https://vector.dev/docs/reference
 [sass]: https://sass-lang.com
-[spruce]: https://spruce.ryangjchandler.co.uk
 [tailwind]: https://tailwindcss.com
 [tocbot]: https://tscanlin.github.io/tocbot
 [typescript]: https://www.typescriptlang.org

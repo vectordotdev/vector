@@ -2,7 +2,7 @@ use vector_lib::{configurable::configurable_component, sensitive_string::Sensiti
 
 use crate::sinks::{
     greptimedb::{
-        GreptimeDBDefaultBatchSettings, default_dbname,
+        GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
         metrics::{
             request::GreptimeDBGrpcRetryLogic,
             request_builder::RequestBuilderOptions,
@@ -18,11 +18,11 @@ use crate::sinks::{
 #[configurable(metadata(
     deprecated = "The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
 ))]
-#[derive(Clone, Debug, Derivative)]
+#[derive(Clone, Debug, Default)]
 pub struct GreptimeDBConfig(GreptimeDBMetricsConfig);
 
 impl GenerateConfig for GreptimeDBConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         <GreptimeDBMetricsConfig as GenerateConfig>::generate_config()
     }
 }
@@ -85,11 +85,9 @@ pub struct GreptimeDBMetricsConfig {
     #[configurable(metadata(docs::examples = "password"))]
     #[serde(default)]
     pub password: Option<SensitiveString>,
-    /// Set gRPC compression encoding for the request
-    /// Default to none, `gzip` or `zstd` is supported.
-    #[configurable(metadata(docs::examples = "gzip"))]
+    /// Set gRPC compression encoding for the request.
     #[serde(default)]
-    pub grpc_compression: Option<String>,
+    pub grpc_compression: GrpcCompression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -175,10 +173,10 @@ mod tests {
     #[test]
     fn test_config_with_username() {
         let config = indoc! {r#"
-            endpoint = "foo-bar.ap-southeast-1.aws.greptime.cloud:4001"
-            dbname = "foo-bar"
+            endpoint: "foo-bar.ap-southeast-1.aws.greptime.cloud:4001"
+            dbname: "foo-bar"
         "#};
 
-        toml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+        serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
     }
 }

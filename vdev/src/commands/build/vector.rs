@@ -16,9 +16,12 @@ pub struct Cli {
     #[arg(short, long)]
     release: bool,
 
-    /// The feature to activate (multiple allowed)
-    #[arg(short = 'F', long)]
-    feature: Vec<String>,
+    /// Features to activate (comma-separated, or set FEATURES env var)
+    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
+    features: Vec<String>,
+
+    #[arg(long)]
+    no_default_features: bool,
 }
 
 impl Cli {
@@ -31,7 +34,17 @@ impl Cli {
             command.arg("--release");
         }
 
-        command.features(&self.feature);
+        if self.no_default_features {
+            command.arg("--no-default-features");
+        }
+        let features: Vec<String> = self
+            .features
+            .into_iter()
+            .filter(|f| !f.is_empty())
+            .collect();
+        if !features.is_empty() {
+            command.args(["--features", &features.join(",")]);
+        }
 
         let target = self.target.unwrap_or_else(platform::default_target);
         command.args(["--target", &target]);

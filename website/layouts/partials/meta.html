@@ -1,7 +1,7 @@
 {{ $url := .Permalink }}
 {{ $favicon := site.Params.favicon | absURL }}
 {{ $desc := (cond .IsHome site.Params.description .Description) | markdownify | plainify }}
-{{ $author := site.Author }}
+{{ $author := site.Params.author }}
 {{ $img := site.Params.site_logo | absURL }}
 {{ $imgAlt := printf "Logo for %s" site.Title }}
 {{ $twitter := printf "@%s" site.Params.social.twitter_handle }}

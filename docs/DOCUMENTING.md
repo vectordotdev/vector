@@ -62,7 +62,7 @@ Much of Vector's reference documentation is automatically compiled from source c
 To regenerate this content, run:
 
 ```bash
-make generate-component-docs
+make generate-docs
 ```
 
 ### Adding Documentation for New Components
@@ -96,7 +96,7 @@ When introducing a new source, sink, or transform, you need to create documentat
 5. **Verify your documentation** is correct:
 
    ```bash
-   make check-component-docs
+   make check-generated-docs
    ```
 
 6. It is recommended to `cd website && make serve` to view how the documentation renders on the Vector website.
@@ -147,9 +147,10 @@ watchexec "make check-docs"
 
 ### Changelog
 
-Contributors do not need to maintain a changelog. This is automatically generated
-via the `make release` command, made possible by the use of
-[conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) titles.
+Contributors document user-facing changes by adding a fragment under
+[`changelog.d/`](../changelog.d/README.md); the release CUE file's user-facing
+changelog section is assembled from those fragments by `cargo vdev release
+prepare` during release prep.
 
 ### Release highlights
 

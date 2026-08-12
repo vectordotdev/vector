@@ -15,9 +15,11 @@ use crate::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            http::{RequestConfig, RetryStrategy},
         },
     },
+    template::ConfinementConfig,
     tls::TlsConfig,
 };
 
@@ -124,10 +126,17 @@ pub struct AxiomConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl GenerateConfig for AxiomConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"token = "${AXIOM_TOKEN}"
             dataset = "${AXIOM_DATASET}"
@@ -170,7 +179,6 @@ impl SinkConfig for AxiomConfig {
             request,
             acknowledgements: self.acknowledgements,
             batch: self.batch,
-            headers: None,
             encoding: EncodingConfigWithFraming::new(
                 Some(FramingConfig::NewlineDelimited),
                 SerializerConfig::Json(JsonSerializerConfig {
@@ -181,9 +189,20 @@ impl SinkConfig for AxiomConfig {
             ),
             payload_prefix: "".into(), // Always newline delimited JSON
             payload_suffix: "".into(), // Always newline delimited JSON
+            retry_strategy: self.retry_strategy.clone(),
+            confinement: self.confinement.clone(),
         };
 
-        http_sink_config.build(cx).await
+        // Route through the HTTP builder threaded with our own component type,
+        // so per-template security warnings carry `component_type=axiom` rather
+        // than `http`.
+        http_sink_config
+            .build_with_component_type(cx, Self::NAME)
+            .await
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -323,13 +342,11 @@ mod test {
     #[test]
     fn test_url_or_region_deserialization_with_url() {
         // Test that url can be deserialized at the top level (flattened)
-        let config: super::AxiomConfig = toml::from_str(
-            r#"
-            token = "test-token"
-            dataset = "test-dataset"
-            url = "https://api.eu.axiom.co"
-            "#,
-        )
+        let config: super::AxiomConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            token: "test-token"
+            dataset: "test-dataset"
+            url: "https://api.eu.axiom.co"
+        "#})
         .unwrap();
 
         assert_eq!(config.endpoint.url(), Some("https://api.eu.axiom.co"));
@@ -339,13 +356,11 @@ mod test {
     #[test]
     fn test_url_or_region_deserialization_with_region() {
         // Test that region can be deserialized at the top level (flattened)
-        let config: super::AxiomConfig = toml::from_str(
-            r#"
-            token = "test-token"
-            dataset = "test-dataset"
-            region = "mumbai.axiom.co"
-            "#,
-        )
+        let config: super::AxiomConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            token: "test-token"
+            dataset: "test-dataset"
+            region: "mumbai.axiom.co"
+        "#})
         .unwrap();
 
         assert_eq!(config.endpoint.url(), None);

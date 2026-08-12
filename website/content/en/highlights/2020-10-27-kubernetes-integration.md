@@ -23,14 +23,14 @@ Kubernetes observability data.
 
 ## Feature highlights
 
-1.  [**A new `kubernetes_logs` source**][kubernetes_logs_source] - A new source
+1. [**A new `kubernetes_logs` source**][kubernetes_logs_source] - A new source
     designed to handle the intricacies of Kubernetes log collection. It'll
     collect all Pod logs, merge split logs together, and enrich them with k8s
     metadata.
-2.  [**YAML config support**][config_formats_highlight] -
+2. [**YAML config support**][config_formats_highlight] -
     To ensure Vector fits cleanly into your existing K8s workflows, Vector now
     accepts YAML and JSON config formats.
-3.  [**Adaptive Request Currency (ARC)**][adaptive_concurrency_post] -
+3. [**Adaptive Request Currency (ARC)**][adaptive_concurrency_post] -
     A new Vector feature designed to automatically optimize HTTP communication
     in the face of ever changing environments like Kubernetes. It does away with
     static rate limits and raises the performance and reliability of your entire

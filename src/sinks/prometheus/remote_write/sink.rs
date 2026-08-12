@@ -143,7 +143,7 @@ impl BatchData<RemoteWriteMetric> for EventCollection {
 }
 
 pub(super) struct RemoteWriteSink<S> {
-    pub(super) tenant_id: Option<Template>,
+    pub(super) tenant_id: Option<ConfinedTemplate>,
     pub(super) batch_settings: BatcherSettings,
     pub(super) aggregate: bool,
     pub(super) compression: super::Compression,
@@ -182,10 +182,14 @@ where
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
-            .batched_partitioned(PrometheusTenantIdPartitioner, || {
-                batch_settings
-                    .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
-            })
+            .batched_partitioned(
+                PrometheusTenantIdPartitioner,
+                batch_settings.timeout,
+                |_| {
+                    batch_settings
+                        .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
+                },
+            )
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -216,21 +220,30 @@ where
 }
 
 fn make_remote_write_event(
-    tenant_id: Option<&Template>,
+    tenant_id: Option<&ConfinedTemplate>,
     metric: Metric,
 ) -> Option<RemoteWriteMetric> {
-    let tenant_id = tenant_id.and_then(|template| {
-        template
-            .render_string(&metric)
-            .map_err(|error| {
+    let tenant_id = match tenant_id {
+        None => None,
+        Some(template) => match template.render_string(&metric) {
+            Ok(s) => Some(s),
+            Err(error) => {
+                let confined = matches!(
+                    error,
+                    crate::template::TemplateRenderingError::Confined { .. }
+                );
                 emit!(TemplateRenderingError {
                     error,
                     field: Some("tenant_id"),
-                    drop_event: true,
-                })
-            })
-            .ok()
-    });
+                    drop_event: confined,
+                });
+                if confined {
+                    return None; // Confined — intentional security drop
+                }
+                None
+            }
+        },
+    };
 
     Some(RemoteWriteMetric { metric, tenant_id })
 }

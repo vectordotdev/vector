@@ -75,7 +75,7 @@ pub struct DatadogTracesConfig {
 }
 
 impl GenerateConfig for DatadogTracesConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
         "#})
@@ -178,7 +178,7 @@ impl DatadogTracesConfig {
         // Send the APM stats payloads independently of the sink framework.
         // This is necessary to comply with what the APM stats backend of Datadog expects with
         // respect to receiving stats payloads.
-        tokio::spawn(flush_apm_stats_thread(
+        crate::spawn_in_current_span(flush_apm_stats_thread(
             tripwire,
             client,
             compression,

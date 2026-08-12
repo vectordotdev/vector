@@ -93,9 +93,7 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
-        .load_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
@@ -105,17 +103,14 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let secrets_backends_loader = loading::loader_from_paths(
-        loading::SecretBackendLoader::default().interpolate_env(true),
-        paths,
-    )?;
+    let secrets_backends_loader =
+        loading::loader_from_paths(loading::SecretBackendLoader::default(), paths)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
     let config_builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
         .secrets(secrets)
         .load_from_paths(paths)?;
 
@@ -293,14 +288,17 @@ impl UnitTestBuildMetadata {
         let mut template_sinks = IndexMap::new();
         let mut test_result_rxs = Vec::new();
         // Add sinks with checks
-        for (ids, checks) in outputs {
+        for (ids, built) in outputs {
             let (tx, rx) = oneshot::channel();
             let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
                 transform_ids: ids.iter().map(|id| id.to_string()).collect(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
-                check: UnitTestSinkCheck::Checks(checks),
+                check: UnitTestSinkCheck::Checks {
+                    conditions: built.conditions,
+                    expected_event_count: built.expected_event_count,
+                },
             };
 
             test_result_rxs.push(rx);
@@ -439,7 +437,7 @@ async fn build_unit_test(
         .enrichment_tables
         .iter()
         .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
-        .for_each(|i| valid_components.extend(i.into_iter()));
+        .for_each(|i| valid_components.extend(i));
 
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder
@@ -567,10 +565,16 @@ fn build_and_validate_inputs(
     }
 }
 
+#[derive(Default)]
+pub(super) struct BuiltOutput {
+    pub(super) expected_event_count: Option<usize>,
+    pub(super) conditions: Vec<Vec<Condition>>,
+}
+
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<Vec<OutputId>, Vec<Vec<Condition>>>, Vec<String>> {
-    let mut outputs: IndexMap<Vec<OutputId>, Vec<Vec<Condition>>> = IndexMap::new();
+) -> Result<IndexMap<Vec<OutputId>, BuiltOutput>, Vec<String>> {
+    let mut outputs: IndexMap<Vec<OutputId>, BuiltOutput> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -590,10 +594,47 @@ fn build_outputs(
             }
         }
 
+        let expected_event_count = output.expected_event_count;
+        if expected_event_count == Some(0) && !conditions.is_empty() {
+            errors.push(format!(
+                "output for {:?} has expected_event_count of 0 but also defines conditions; \
+                 conditions cannot be evaluated when no events are expected",
+                output.extract_from
+            ));
+        }
         outputs
             .entry(output.extract_from.clone().to_vec())
-            .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
-            .or_insert(vec![conditions.clone()]);
+            .and_modify(|existing| {
+                if let (Some(prev), Some(new)) =
+                    (existing.expected_event_count, expected_event_count)
+                {
+                    if prev != new {
+                        errors.push(format!(
+                            "conflicting expected_event_count for extract_from {:?}: {} vs {}",
+                            output.extract_from, prev, new
+                        ));
+                    }
+                } else if existing.expected_event_count.is_none() {
+                    existing.expected_event_count = expected_event_count;
+                }
+                existing.conditions.push(conditions.clone());
+            })
+            .or_insert_with(|| BuiltOutput {
+                expected_event_count,
+                conditions: vec![conditions.clone()],
+            });
+    }
+
+    // Post-merge validation: after merging entries that share the same
+    // extract_from, reject any that ended up with expected_event_count of 0 and
+    // non-empty conditions (which would pass vacuously against zero events).
+    for (extract_from, built) in &outputs {
+        if built.expected_event_count == Some(0) && built.conditions.iter().any(|c| !c.is_empty()) {
+            errors.push(format!(
+                "output for {extract_from:?} has expected_event_count of 0 but also defines conditions; \
+                 conditions cannot be evaluated when no events are expected",
+            ));
+        }
     }
 
     if errors.is_empty() {

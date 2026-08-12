@@ -7,6 +7,8 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
+use hyper::{Body, client::connect::Connect};
+
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     common::datadog,
@@ -69,7 +71,7 @@ pub struct DatadogLogsConfig {
 
     /// When enabled this sink will normalize events to conform to the Datadog Agent standard. This
     /// also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
-    /// will be overidden as `true` if this header has already been set in the request.headers
+    /// will be overridden as `true` if this header has already been set in the request.headers
     /// configuration setting.
     #[serde(default)]
     pub conforms_as_agent: bool,
@@ -80,7 +82,7 @@ const fn default_compression() -> Option<Compression> {
 }
 
 impl GenerateConfig for DatadogLogsConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
         "#})
@@ -107,12 +109,15 @@ impl DatadogLogsConfig {
             .to_string()
     }
 
-    pub fn build_processor(
+    pub fn build_processor<C>(
         &self,
         dd_common: &DatadogCommonConfig,
-        client: HttpClient,
+        client: HttpClient<Body, C>,
         dd_evp_origin: String,
-    ) -> crate::Result<VectorSink> {
+    ) -> crate::Result<VectorSink>
+    where
+        C: Connect + Clone + Send + Sync + 'static,
+    {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.into_settings();
 

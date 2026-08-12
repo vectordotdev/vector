@@ -117,12 +117,9 @@ impl SchemaGenerator {
                 ..
             }) => {
                 let definitions_path = &self.settings().definitions_path;
-                if schema_ref.starts_with(definitions_path) {
-                    let name = &schema_ref[definitions_path.len()..];
-                    self.definitions.get(name)
-                } else {
-                    None
-                }
+                schema_ref
+                    .strip_prefix(definitions_path.as_str())
+                    .and_then(|name| self.definitions.get(name))
             }
             _ => None,
         }

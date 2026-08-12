@@ -5,13 +5,13 @@ use std::{
     time,
 };
 
-use async_compression::tokio::bufread::GzipDecoder;
 use crc::Crc;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader},
 };
+use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
@@ -128,7 +128,7 @@ impl UncompressedReader for UncompressedReaderImpl {
         // To support new compression algorithms, add them below
         match Self::check(fp).await? {
             Some(SupportedCompressionAlgorithms::Gzip) => Ok(Box::new(BufReader::new(
-                GzipDecoder::new(BufReader::new(fp)),
+                gzip_multiple_decoder(BufReader::new(fp)),
             ))),
             // No compression, or read the raw bytes
             None => Ok(Box::new(BufReader::new(fp))),

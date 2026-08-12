@@ -127,9 +127,9 @@ supported in the presence of multi-valued tags, which will be selectable with co
 
 1. The individual values are tracked as before. Events are dropped when any one tag's cardinality
    exceeds the limit, but only the tags that would exceed the limit are dropped.
-1. The individual values are tracked as before. Events are dropped when any one tag's cardinality
+2. The individual values are tracked as before. Events are dropped when any one tag's cardinality
    exceeds the limit, and all values of tags that would exceed the limit are dropped.
-1. Values of multi-valued tags are combined before tracking. Events are dropped as before and all
+3. Values of multi-valued tags are combined before tracking. Events are dropped as before and all
    values of tags that would exceed the limit are dropped.
 
 #### Sinks
@@ -191,7 +191,7 @@ transform, and use the value to inform which conversion mode to use on tags.
 The guiding rationale for all of the external changes is to maximize backwards compatibility while
 adding support for the new functionality. This means that, where possible, Vector should accept all
 existing tag assignments as-is using current formats, understanding that output representations will
-have to change to accomodate the new capabilities of the data set.
+have to change to accommodate the new capabilities of the data set.
 
 The proposed Protobuf representation allows all possible combination of values for a tag set, and
 minimizes the encoded size in the presence of repeated tag names. It also requires no further
@@ -215,7 +215,7 @@ The use of an `IndexSet` for the tag value provides us with two useful invariant
 
 1. Only unique values for each tag will be stored, which prevents repeated values from showing up in
    the output.
-1. The values can be retrieved in the order they first appeared, which allows us to trivially
+2. The values can be retrieved in the order they first appeared, which allows us to trivially
    retrieve either the first or last stored value.
 
 ## Drawbacks
@@ -257,16 +257,16 @@ which will cause problems for users:
 1. Unconditionally expose the tags as arrays of values using the existing naming, but still accept
    assignments using either single values or arrays of values. This will cause breakage to existing
    scripts that relies on the existing single value tag values.
-1. For Lua or VRL scripts, conditionally expose the tags as single values or arrays, as described in
+2. For Lua or VRL scripts, conditionally expose the tags as single values or arrays, as described in
    the proposal, but accept assignments following the native JSON codec scheme. In Lua, this could
    cause a breaking change where scripts that emit metrics that have the wrong tabs type to be
    accepted for transmission. In VRL, this would create headaches for type definitions, at best
    preventing proper validation of programs.
-1. Expose the tags as single values using the existing naming, picking some arbitrary value when a
+3. Expose the tags as single values using the existing naming, picking some arbitrary value when a
    tag has multiple values, and set up a secondary tags structure that exposes the arrays. This will
    lead to all kinds of confusion and conflicts when the same tag is assigned through different
    variables.
-1. Add functions specifically for manipulating tag sets. This continues to make metrics management
+4. Add functions specifically for manipulating tag sets. This continues to make metrics management
    look like a second-class afterthought, and doesn't ease any compatibility problems for existing
    scripts.
 
@@ -284,8 +284,8 @@ that would support this feature but with different semantics:
 
 1. `Vec<String>` — Retains the ordering of tags as they appear, but allows for duplicate values and
    cannot support both bare tags and multiple values simultaneously.
-1. `Vec<Option<String>>` — Same as above but supports bare tags and mutiple values simultaneously.
-1. `BTreeSet<Option<String>>` — Duplicate values are merged but are sorted, likely putting the bare
+2. `Vec<Option<String>>` — Same as above but supports bare tags and multiple values simultaneously.
+3. `BTreeSet<Option<String>>` — Duplicate values are merged but are sorted, likely putting the bare
    tag first for single-value uses.
 
 There are also at least two other container types that could possibly support this use case:
@@ -352,7 +352,7 @@ increased complexity when accessing a particular named tag.
 
 Metric tag sets are most often repeated a great number of times across different metrics. This
 suggests that a shared copy-on-write storage scheme where the individual metrics would contain just
-a handle to the shared value. This would improve Vector's memory efficience at least, and possibly
+a handle to the shared value. This would improve Vector's memory efficiency at least, and possibly
 run-time performance as well.
 
 The schema definitions that are already present on sinks could be enhanced to add support for what

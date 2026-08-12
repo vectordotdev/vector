@@ -4,7 +4,6 @@ components: sinks: azure_monitor_logs: {
 	title: "Azure Monitor Logs"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "deprecated"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: azure_monitor_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}

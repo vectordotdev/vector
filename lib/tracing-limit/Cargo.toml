@@ -6,8 +6,8 @@ edition = "2024"
 publish = false
 license = "MPL-2.0"
 
-[lints.clippy]
-unwrap-used = "forbid"
+[lints]
+workspace = true
 
 [dependencies]
 tracing-core = { version = "0.1", default-features = false }
@@ -15,7 +15,7 @@ tracing-subscriber = { workspace = true, features = ["registry", "std"] }
 dashmap = { version = "6.1.0", default-features = false }
 
 [dev-dependencies]
-criterion = "0.7"
+criterion.workspace = true
 mock_instant.workspace = true
 serial_test.workspace = true
 tracing = "0.1.44"

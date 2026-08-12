@@ -25,10 +25,10 @@ service:
   pipelines:
     logs:
       receivers: [otlp]
-      exporters: [otlp,otlphttp]
+      exporters: [otlp, otlphttp]
     traces:
       receivers: [otlp]
-      exporters: [otlp,otlphttp]
+      exporters: [otlp, otlphttp]
     metrics:
       receivers: [otlp]
-      exporters: [otlp,otlphttp]
+      exporters: [otlp, otlphttp]

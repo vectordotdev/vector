@@ -25,7 +25,6 @@ pub struct ConfigBuilder {
     pub api: api::Options,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub schema: schema::Options,
 
@@ -34,22 +33,27 @@ pub struct ConfigBuilder {
     pub healthchecks: HealthcheckOptions,
 
     /// All configured enrichment tables.
+    #[configurable(metadata(docs::additional_props_description = "An enrichment table."))]
     #[serde(default)]
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter<String>>,
 
     /// All configured sources.
+    #[configurable(metadata(docs::additional_props_description = "A source."))]
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
 
     /// All configured sinks.
+    #[configurable(metadata(docs::additional_props_description = "A sink."))]
     #[serde(default)]
     pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
 
     /// All configured transforms.
+    #[configurable(metadata(docs::additional_props_description = "A transform."))]
     #[serde(default)]
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
 
     /// All configured unit tests.
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
 
@@ -57,9 +61,11 @@ pub struct ConfigBuilder {
     ///
     /// Configuration providers allow sourcing configuration information from a source other than
     /// the typical configuration files that must be passed to Vector.
+    #[configurable(metadata(docs::hidden))]
     pub provider: Option<Providers>,
 
     /// All configured secrets backends.
+    #[configurable(metadata(docs::additional_props_description = "A secret backend."))]
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, SecretBackends>,
 
