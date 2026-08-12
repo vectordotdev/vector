@@ -88,3 +88,48 @@ fn histogram_metric_roundtrip() {
         expected_json_value,
     )
 }
+
+/// A histogram that reports no sum omits the key rather than emitting `"sum": null`, and an absent
+/// key decodes back to an absent sum. Those two have to agree, or the value would not survive a
+/// round-trip -- which is also why the field's serde default must be "absent" and not zero.
+#[test]
+fn histogram_without_sum_metric_roundtrip() {
+    let histogram_event = Event::from(Metric::new(
+        "histogram",
+        MetricKind::Absolute,
+        MetricValue::AggregatedHistogram {
+            count: 3,
+            sum: None,
+            buckets: buckets!(1.0 => 1, 2.0 => 2),
+        },
+    ));
+
+    let expected_json_value = serde_json::from_str(
+        r#"
+        {
+            "aggregated_histogram":  {
+                "buckets": [
+                    {
+                        "count": 1,
+                        "upper_limit": 1.0
+                    },
+                    {
+                        "count": 2,
+                        "upper_limit": 2.0
+                    }
+                ],
+                "count": 3
+            },
+            "kind": "absolute",
+            "name": "histogram"
+        }"#,
+    )
+    .unwrap();
+
+    assert_roundtrip(
+        histogram_event,
+        &mut NativeJsonSerializerConfig.build(),
+        &NativeJsonDeserializerConfig::default().build(),
+        expected_json_value,
+    )
+}

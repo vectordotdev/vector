@@ -923,6 +923,67 @@ mod test {
         assert!(!new_histogram_with_redistribution.subtract(&old_histogram));
     }
 
+    fn histogram_with_sum(count: u64, sum: Option<f64>) -> MetricValue {
+        MetricValue::AggregatedHistogram {
+            count,
+            sum,
+            buckets: buckets!(2.0 => count),
+        }
+    }
+
+    /// The sum of a known and an unknown quantity is unknown, so absence on either side has to win.
+    /// Reading a missing sum as zero would quietly skew the total instead.
+    #[test]
+    fn add_aggregated_histograms_propagates_an_unreported_sum() {
+        for (left, right, expected) in [
+            (Some(1.0), Some(2.0), Some(3.0)),
+            (Some(1.0), None, None),
+            (None, Some(2.0), None),
+            (None, None, None),
+        ] {
+            let mut value = histogram_with_sum(1, left);
+            assert!(value.add(&histogram_with_sum(2, right)));
+            assert_eq!(
+                value,
+                histogram_with_sum(3, expected),
+                "adding {left:?} and {right:?}"
+            );
+        }
+    }
+
+    /// Matters for the absolute-to-incremental conversion that feeds sketch-based sinks: the sketch
+    /// conversion has to see the absent sum to know it must estimate one.
+    #[test]
+    fn subtract_aggregated_histograms_propagates_an_unreported_sum() {
+        for (left, right, expected) in [
+            (Some(3.0), Some(2.0), Some(1.0)),
+            (Some(3.0), None, None),
+            (None, Some(2.0), None),
+            (None, None, None),
+        ] {
+            let mut value = histogram_with_sum(3, left);
+            assert!(value.subtract(&histogram_with_sum(2, right)));
+            assert_eq!(
+                value,
+                histogram_with_sum(1, expected),
+                "subtracting {right:?} from {left:?}"
+            );
+        }
+    }
+
+    /// Zeroing the observations says nothing about whether the source reports a sum, so a histogram
+    /// that never had one must not acquire one.
+    #[test]
+    fn zero_aggregated_histogram_preserves_whether_a_sum_was_reported() {
+        let mut reported = histogram_with_sum(3, Some(7.0));
+        reported.zero();
+        assert_eq!(reported, histogram_with_sum(0, Some(0.0)));
+
+        let mut unreported = histogram_with_sum(3, None);
+        unreported.zero();
+        assert_eq!(unreported, histogram_with_sum(0, None));
+    }
+
     #[test]
     // `too_many_lines` is mostly just useful for production code but we're not
     // able to flag the lint on only for non-test.
