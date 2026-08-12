@@ -53,7 +53,6 @@ pub struct KinesisSinkBaseConfig {
 
     /// Whether or not to retry successful requests containing partial failures.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub request_retry_partial: bool,
 
     #[configurable(derived)]

@@ -2653,7 +2653,7 @@ async fn series_v2_split_metric_namespace_false() {
 }
 
 #[tokio::test]
-async fn series_v2_device_resource_preserved_as_tag() {
+async fn series_v2_resources_preserved_as_tags() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let (rx, _, _, addr, _guard) =
             source(EventStatus::Delivered, true, true, false, false).await;
@@ -2668,9 +2668,20 @@ async fn series_v2_device_resource_preserved_as_tag() {
                     r#type: "device".to_string(),
                     name: "sda".to_string(),
                 },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "database_instance".to_string(),
+                    name: "mongo-repro-01".to_string(),
+                },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "database_instance".to_string(),
+                    name: "mongo-repro-02".to_string(),
+                },
             ],
             metric: "system.disk.free".to_string(),
-            tags: vec!["env:prod".to_string()],
+            tags: vec![
+                "env:prod".to_string(),
+                "resource.database_instance:custom".to_string(),
+            ],
             points: vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: 100.0,
                 timestamp: 1542182950,
@@ -2706,6 +2717,18 @@ async fn series_v2_device_resource_preserved_as_tag() {
         assert!(
             tags.get("resource.device").is_none(),
             "device should not be prefixed with 'resource.'"
+        );
+        let database_instances: Vec<_> = tags
+            .iter_all()
+            .filter_map(|(name, value)| (name == "resource.database_instance").then_some(value))
+            .collect();
+        assert_eq!(
+            database_instances,
+            vec![
+                Some("custom"),
+                Some("mongo-repro-01"),
+                Some("mongo-repro-02")
+            ]
         );
         assert_eq!(tags.get("env"), Some("prod"));
     })

@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: vector
+    inputs:
+      - my-source-or-transform-id
+    address: 92.12.333.224:6000
+    compression: none
