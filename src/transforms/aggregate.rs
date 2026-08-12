@@ -27,7 +27,7 @@ use crate::{
 
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
@@ -213,6 +213,19 @@ const fn default_mode() -> AggregationMode {
 
 const fn default_interval_ms() -> u64 {
     10 * 1000
+}
+
+impl Default for AggregateConfig {
+    fn default() -> Self {
+        Self {
+            interval_ms: default_interval_ms(),
+            mode: default_mode(),
+            time_source: default_time_source(),
+            allowed_lateness_ms: 0,
+            use_system_time_for_missing_timestamps: false,
+            max_future_ms: default_max_future_ms(),
+        }
+    }
 }
 
 impl_generate_config_from_default!(AggregateConfig);
@@ -1096,6 +1109,18 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<AggregateConfig>();
+    }
+
+    #[test]
+    fn generated_config_uses_max_future_ms_default() {
+        use crate::config::GenerateConfig;
+
+        let generated = AggregateConfig::generate_config();
+        assert_eq!(
+            generated.get("max_future_ms").and_then(|v| v.as_u64()),
+            Some(default_max_future_ms()),
+            "generated config must match the serde/missing-config default for max_future_ms"
+        );
     }
 
     /// `interval_ms` is `u64` but is cast to `i64` for bucket-key arithmetic
