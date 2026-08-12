@@ -1,6 +1,7 @@
 use std::{num::NonZeroU64, sync::Arc};
 
 use bytes::Bytes;
+use chrono::Utc;
 use http::Uri;
 use snafu::Snafu;
 use uuid::Uuid;
@@ -261,6 +262,8 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
         let (tmp, metrics) = input;
         let (api_key, endpoint) = tmp;
 
+        let metrics = stamp_missing_timestamps(metrics);
+
         // Determine whether this flush triggers a shadow. Only legacy (V1/V2) *series*
         // batches count: V3 series is already on the target wire format, and sketches are
         // never shadowed at all because the V3 sketches intake routes don't exist.
@@ -341,6 +344,33 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             batch_len: ddmetrics_metadata.batch_len,
         }
     }
+}
+
+/// Fills in a single shared timestamp on every metric that doesn't carry one.
+///
+/// Sources such as `statsd` never set a timestamp, and both encoders independently fall back
+/// to `Utc::now()` *per metric* (`encoder::encode_timestamp` / `encoder_v3::encode_timestamp`).
+/// Because the primary and V3 shadow payloads are encoded sequentially from the same batch,
+/// any flush whose encoding straddles a second boundary ends up with different timestamps in
+/// each payload, which the intake's V2/V3 comparison reports as a large set of
+/// present-in-one-side-only series. It also means a single flush's points can be split across
+/// two seconds within the V2 payload alone.
+///
+/// Resolving the fallback once per flush makes the primary and shadow payloads agree exactly,
+/// and gives every point in a flush one coherent timestamp.
+fn stamp_missing_timestamps(metrics: Vec<Metric>) -> Vec<Metric> {
+    if metrics.iter().all(|metric| metric.timestamp().is_some()) {
+        return metrics;
+    }
+
+    let now = Utc::now();
+    metrics
+        .into_iter()
+        .map(|metric| match metric.timestamp() {
+            Some(_) => metric,
+            None => metric.with_timestamp(Some(now)),
+        })
+        .collect()
 }
 
 // ── Batch ID and sequence stamping ────────────────────────────────────────────
@@ -729,6 +759,70 @@ mod tests {
             1,
             "exactly one half of the pair is retargeted to the shadow URI"
         );
+    }
+
+    // ── Timestamp resolution ───────────────────────────────────────────────
+
+    /// `statsd` and friends emit metrics with no timestamp, and both encoders fall back to
+    /// `Utc::now()` per metric. Encoding the primary and the shadow sequentially therefore
+    /// produced different timestamps whenever the flush straddled a second boundary, which
+    /// the intake's V2/V3 comparison reported as thousands of one-sided series. Every
+    /// timestamp-less metric in a flush must come out with one identical timestamp.
+    #[test]
+    fn missing_timestamps_are_resolved_once_per_flush() {
+        let metrics: Vec<Metric> = (0..64).map(|_| counter_metric()).collect();
+        assert!(metrics.iter().all(|m| m.timestamp().is_none()));
+
+        let stamped = stamp_missing_timestamps(metrics);
+
+        let stamps: Vec<_> = stamped.iter().map(|m| m.timestamp()).collect();
+        assert!(
+            stamps.iter().all(Option::is_some),
+            "every metric must end up with a timestamp"
+        );
+        assert_eq!(
+            stamps
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            1,
+            "all timestamp-less metrics in one flush must share a single timestamp"
+        );
+    }
+
+    /// Metrics that already carry a timestamp must be left exactly as-is — we're only
+    /// resolving the `now()` fallback, not rewriting real source timestamps.
+    #[test]
+    fn existing_timestamps_are_preserved() {
+        let explicit = Utc::now() - chrono::Duration::hours(3);
+        let metrics = vec![
+            counter_metric().with_timestamp(Some(explicit)),
+            counter_metric(),
+            counter_metric().with_timestamp(Some(explicit)),
+        ];
+
+        let stamped = stamp_missing_timestamps(metrics);
+
+        assert_eq!(stamped[0].timestamp(), Some(explicit));
+        assert_eq!(stamped[2].timestamp(), Some(explicit));
+        let filled = stamped[1].timestamp().expect("gap should be filled");
+        assert_ne!(
+            filled, explicit,
+            "the filled timestamp is `now`, not the explicit one"
+        );
+    }
+
+    /// A batch that already has timestamps everywhere is returned untouched.
+    #[test]
+    fn fully_timestamped_batch_is_unchanged() {
+        let explicit = Utc::now();
+        let metrics: Vec<Metric> = (0..4)
+            .map(|_| counter_metric().with_timestamp(Some(explicit)))
+            .collect();
+
+        let stamped = stamp_missing_timestamps(metrics);
+
+        assert!(stamped.iter().all(|m| m.timestamp() == Some(explicit)));
     }
 
     /// The shadow cadence counter must only advance on series flushes. If sketches flushes
