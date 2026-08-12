@@ -20,7 +20,7 @@ use vector_lib::{
 
 use crate::{
     http::{BuildRequestSnafu, HttpClient},
-    internal_events::DatadogMetricsRequestError,
+    internal_events::DatadogMetricsRequestFailed,
     sinks::{datadog::DatadogApiError, util::retries::RetryLogic},
 };
 
@@ -198,7 +198,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             .await;
 
             let result = call_result.inspect_err(|error| {
-                emit!(DatadogMetricsRequestError {
+                emit!(DatadogMetricsRequestFailed {
                     error: &error.to_string(),
                     batch_id: batch_id.as_deref(),
                     uri: &uri,
