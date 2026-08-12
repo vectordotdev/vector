@@ -52,4 +52,5 @@ ignore = [
   { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic-time duplicate attribute check - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
   { id = "RUSTSEC-2026-0195", reason = "quick-xml unbounded namespace-declaration allocation in NsReader - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
   { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7 is vulnerable but unmaintained; upgrading vector-buffers to rkyv 0.8 requires a breaking serialization migration" },
+  { id = "RUSTSEC-2026-0253", reason = "lru 0.18.2 fixes this, but aws-sdk-s3 still requires lru ^0.16.3, including in its latest release" },
 ]
