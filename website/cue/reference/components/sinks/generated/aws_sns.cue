@@ -605,7 +605,7 @@ generated: components: sinks: aws_sns: configuration: {
 			[deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
 			"""
 		required: false
-		type: string: examples: ["{{ transaction_id }}"]
+		type: string: {}
 	}
 	message_group_id: {
 		description: """
@@ -614,7 +614,7 @@ generated: components: sinks: aws_sns: configuration: {
 			Can be applied only to FIFO queues.
 			"""
 		required: false
-		type: string: examples: ["vector", "vector-%Y-%m-%d"]
+		type: string: {}
 	}
 	region: {
 		description: """
@@ -908,6 +908,6 @@ generated: components: sinks: aws_sns: configuration: {
 	topic_arn: {
 		description: "The ARN of the Amazon SNS topic to which messages are sent."
 		required:    true
-		type: string: examples: ["arn:aws:sns:us-east-2:123456789012:FifoTopic.fifo", "arn:aws:sns:us-east-2:123456789012:MyTopic"]
+		type: string: examples: ["arn:aws:sns:us-east-2:123456789012:MyTopic", "arn:aws:sns:us-east-2:123456789012:FifoTopic.fifo"]
 	}
 }

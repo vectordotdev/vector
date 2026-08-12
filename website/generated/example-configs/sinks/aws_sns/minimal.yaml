@@ -5,4 +5,4 @@ sinks:
       - my-source-or-transform-id
     encoding:
       codec: json
-    topic_arn: arn:aws:sns:us-east-2:123456789012:FifoTopic.fifo
+    topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic
