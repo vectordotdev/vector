@@ -325,7 +325,9 @@ impl Aggregate {
         // Range-validated in `Aggregate::new` to fit in i64.
         let interval_ms = i64::try_from(self.config.interval_ms)
             .expect("interval_ms validated to fit in i64 in Aggregate::new");
-        timestamp_ms.div_euclid(interval_ms).saturating_mul(interval_ms)
+        timestamp_ms
+            .div_euclid(interval_ms)
+            .saturating_mul(interval_ms)
     }
 
     /// Returns `true` if `bucket_key` belongs to a window that has already
@@ -404,9 +406,7 @@ impl Aggregate {
                 // Compare drift in millis: `now + Duration::milliseconds(max_future_ms)`
                 // panics when the sum exceeds `NaiveDateTime`'s representable range,
                 // which a `max_future_ms` close to `i64::MAX` reliably triggers.
-                let drift_ms = ts
-                    .timestamp_millis()
-                    .saturating_sub(now.timestamp_millis());
+                let drift_ms = ts.timestamp_millis().saturating_sub(now.timestamp_millis());
                 if drift_ms > max_future_ms {
                     emit!(AggregateEventDropped {
                         reason: "Event timestamp too far in the future."
@@ -700,12 +700,7 @@ impl Aggregate {
         }
     }
 
-    fn record_count(
-        &mut self,
-        series: MetricSeries,
-        data: MetricData,
-        metadata: EventMetadata,
-    ) {
+    fn record_count(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
         Self::record_count_in_map(&mut self.map, series, data, metadata);
     }
 
@@ -941,11 +936,8 @@ impl Aggregate {
                 if matches!(self.config.mode, AggregationMode::Diff) {
                     let prev_bucket_key = bucket_key.saturating_sub(interval_ms);
                     for (series, entry) in &bucket_map {
-                        let mut metric = Metric::from_parts(
-                            series.clone(),
-                            entry.0.clone(),
-                            entry.1.clone(),
-                        );
+                        let mut metric =
+                            Metric::from_parts(series.clone(), entry.0.clone(), entry.1.clone());
                         if let Some(prev_bucket) =
                             self.event_time_prev_buckets.get(&prev_bucket_key)
                             && let Some(prev_entry) = prev_bucket.get(metric.series())
@@ -2594,8 +2586,7 @@ mod tests {
 
         let now_ms = Utc::now().timestamp_millis();
         let interval_i64 = interval_ms as i64;
-        let ended_bucket_key =
-            (now_ms / interval_i64) * interval_i64 - interval_i64 * 2;
+        let ended_bucket_key = (now_ms / interval_i64) * interval_i64 - interval_i64 * 2;
         assert!(
             agg.is_past_bucket_cutoff(ended_bucket_key, now_ms),
             "wall clock must be past a bucket two intervals old"
@@ -2697,9 +2688,7 @@ mod tests {
             agg.record(incremental_no_ts).is_some(),
             "mean-mode incremental must pass through without a timestamp"
         );
-        assert!(
-            agg.event_time_buckets.is_empty() && agg.event_time_multi_buckets.is_empty()
-        );
+        assert!(agg.event_time_buckets.is_empty() && agg.event_time_multi_buckets.is_empty());
     }
 
     #[test]
@@ -2965,7 +2954,10 @@ time_source = "event_time"
         let mut count = 0_u8;
         while let Some(ev) = out_stream.next().await {
             count += 1;
-            assert_eq!(ev.as_metric().series().name.name.as_str(), "shutdown_drain_probe");
+            assert_eq!(
+                ev.as_metric().series().name.name.as_str(),
+                "shutdown_drain_probe"
+            );
             if let MetricValue::Counter { value } = ev.as_metric().value() {
                 assert_eq!(*value, 41.0);
             } else {
@@ -3197,8 +3189,10 @@ time_source = "event_time"
         let base_time = open_bucket_timestamp(10_000);
         let next_bucket_time = event_time_bucket_timestamp(10_000, 1);
 
-        let bucket1: Vec<(&str, f64)> = vec![("series_a", 10.0), ("series_b", 20.0), ("series_c", 5.0)];
-        let bucket2: Vec<(&str, f64)> = vec![("series_a", 25.0), ("series_b", 22.0), ("series_c", 5.0)];
+        let bucket1: Vec<(&str, f64)> =
+            vec![("series_a", 10.0), ("series_b", 20.0), ("series_c", 5.0)];
+        let bucket2: Vec<(&str, f64)> =
+            vec![("series_a", 25.0), ("series_b", 22.0), ("series_c", 5.0)];
 
         for (name, value) in &bucket1 {
             agg.record(make_metric_with_timestamp(
@@ -3221,7 +3215,11 @@ time_source = "event_time"
         agg.flush_final(&mut out);
 
         // Three series x two buckets = six emitted metrics.
-        assert_eq!(6, out.len(), "every series in every flushed bucket should emit");
+        assert_eq!(
+            6,
+            out.len(),
+            "every series in every flushed bucket should emit"
+        );
 
         // Group emitted gauges by series name (preserving emission order).
         // Per series we expect [bucket1_raw, bucket2_delta] -- the first flush
@@ -3247,7 +3245,11 @@ time_source = "event_time"
             let emissions = by_series
                 .get(*name)
                 .unwrap_or_else(|| panic!("no emissions for {name}"));
-            assert_eq!(2, emissions.len(), "{name}: expected one emission per bucket");
+            assert_eq!(
+                2,
+                emissions.len(),
+                "{name}: expected one emission per bucket"
+            );
             assert!(
                 emissions.iter().any(|v| (v - raw1).abs() < 1e-9),
                 "{name}: missing bucket1 raw={raw1}, got {emissions:?}"
@@ -3330,7 +3332,11 @@ time_source = "event_time"
         agg.record(older);
         out.clear();
         agg.flush_final(&mut out);
-        assert_eq!(0, out.len(), "Older bucket below watermark must be rejected");
+        assert_eq!(
+            0,
+            out.len(),
+            "Older bucket below watermark must be rejected"
+        );
 
         // Watermark must not have regressed.
         assert_eq!(

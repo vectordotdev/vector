@@ -25,7 +25,8 @@ generated: components: transforms: aggregate: configuration: {
 		description: """
 			The interval between flushes, in milliseconds.
 
-			Must be greater than zero. During this time frame, metrics (beta) with the same series data (name, namespace, tags, and so on) are aggregated.
+			Must be greater than zero. During this time frame, metrics (beta) with the same series data
+			(name, namespace, tags, and so on) are aggregated.
 			"""
 		required: false
 		type: uint: default: 10000
