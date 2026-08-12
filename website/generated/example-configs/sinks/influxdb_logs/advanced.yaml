@@ -14,3 +14,4 @@ sinks:
     tags:
       - field1
     token: ${INFLUXDB_TOKEN}
+    version: "2"

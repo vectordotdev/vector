@@ -353,6 +353,9 @@ _values: {
 	required_one_of?: [...string]
 	required_one_of_group?: string
 
+	// `minimal` marks an option as part of the minimal example configuration.
+	minimal?: bool
+
 	// `required` requires the option to be set.
 	required: bool
 

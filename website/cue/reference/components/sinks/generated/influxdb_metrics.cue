@@ -65,11 +65,10 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v2.x and above.
 			"""
-		groups: [
-			"v2",
-		]
-		required: true
-		type: string: examples: ["vector-bucket", "4d2225e4d3d49f75"]
+		minimal:       true
+		relevant_when: "version = \"2\""
+		required:      false
+		type: string: examples: ["vector-bucket"]
 	}
 	consistency: {
 		description: """
@@ -77,11 +76,11 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		groups: [
-			"v1",
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: [
+			"any",
 		]
-		required: false
-		type: string: examples: ["any", "one", "quorum", "all"]
 	}
 	database: {
 		description: """
@@ -89,11 +88,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		groups: [
-			"v1",
-		]
-		required: true
-		type: string: examples: ["vector-database", "iot-store"]
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: ["vector-database"]
 	}
 	default_namespace: {
 		description: """
@@ -120,11 +117,12 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v2.x and above.
 			"""
-		groups: [
-			"v2",
+		minimal:       true
+		relevant_when: "version = \"2\""
+		required:      false
+		type: string: examples: [
+			"my-org",
 		]
-		required: true
-		type: string: examples: ["my-org", "33f2cff0a28e5b63"]
 	}
 	password: {
 		description: """
@@ -132,11 +130,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		groups: [
-			"v1",
-		]
-		required: false
-		type: string: examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: ["${INFLUXDB_PASSWORD}"]
 	}
 	quantiles: {
 		description: "The list of quantiles to calculate when sending distribution metrics."
@@ -338,11 +334,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		groups: [
-			"v1",
-		]
-		required: false
-		type: string: examples: ["autogen", "one_day_only"]
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: ["autogen"]
 	}
 	tags: {
 		description: "A map of additional tags, in the key/value pair format, to add to each measurement."
@@ -460,11 +454,10 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
-		groups: [
-			"v2",
-		]
-		required: true
-		type: string: examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
+		minimal:       true
+		relevant_when: "version = \"2\""
+		required:      false
+		type: string: examples: ["${INFLUXDB_TOKEN}"]
 	}
 	username: {
 		description: """
@@ -472,10 +465,21 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		groups: [
-			"v1",
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: [
+			"todd",
 		]
-		required: false
-		type: string: examples: ["todd", "vector-source"]
+	}
+	version: {
+		description: "The InfluxDB API version to use."
+		required:    true
+		type: string: {
+			enum: {
+				"1": "InfluxDB v0.x/v1.x."
+				"2": "InfluxDB v2.x."
+			}
+			examples: ["2", "1"]
+		}
 	}
 }

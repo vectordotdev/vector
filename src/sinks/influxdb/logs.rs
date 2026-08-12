@@ -9,12 +9,13 @@ use vector_lib::{
     configurable::configurable_component,
     lookup::{PathPrefix, lookup_v2::OptionalValuePath},
     schema,
+    sensitive_string::SensitiveString,
 };
 use vrl::{event_path, path::OwnedValuePath, value::Kind};
 
 use super::{
-    Field, InfluxDbSettings, ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol,
-    influxdb_settings,
+    Field, InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, InfluxDbVersion,
+    ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
 };
 use crate::{
     codecs::Transformer,
@@ -44,6 +45,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 /// Configuration for the `influxdb_logs` sink.
 #[configurable_component(sink("influxdb_logs", "Deliver log event data to InfluxDB."))]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
     /// The namespace of the measurement name to use.
     ///
@@ -74,8 +76,71 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "parent.child_field"))]
     pub tags: Vec<KeyString>,
 
-    #[serde(flatten)]
-    pub settings: InfluxDbSettings,
+    /// The InfluxDB API version to use.
+    #[configurable(metadata(docs::examples = "2"))]
+    #[configurable(metadata(docs::examples = "1"))]
+    pub version: InfluxDbVersion,
+
+    /// The name of the database to write into.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "vector-database"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub database: Option<String>,
+
+    /// The consistency level to use for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "any"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub consistency: Option<String>,
+
+    /// The target retention policy for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "autogen"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub retention_policy_name: Option<String>,
+
+    /// The username to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "todd"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub username: Option<String>,
+
+    /// The password to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub password: Option<SensitiveString>,
+
+    /// The name of the organization to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "my-org"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub org: Option<String>,
+
+    /// The name of the bucket to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "vector-bucket"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub bucket: Option<String>,
+
+    /// The [token][token_docs] to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    ///
+    /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
+    #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub token: Option<SensitiveString>,
 
     #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
@@ -142,6 +207,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
             endpoint = "http://localhost:8086/"
             namespace = "my-namespace"
             tags = []
+            version = "2"
             org = "my-org"
             bucket = "my-bucket"
             token = "${INFLUXDB_TOKEN}"
@@ -164,7 +230,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let batch = self.batch.into_batch_settings()?;
         let request = self.request.into_settings();
 
-        let settings = influxdb_settings(self.settings.clone());
+        let settings = influxdb_settings(self.settings()?);
 
         let endpoint = self.endpoint.clone();
         let uri = settings.write_uri(endpoint).unwrap();
@@ -337,6 +403,35 @@ impl HttpSink for InfluxDbLogsSink {
 }
 
 impl InfluxDbLogsConfig {
+    fn settings(&self) -> crate::Result<InfluxDbSettings> {
+        match self.version {
+            InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
+                database: self
+                    .database
+                    .clone()
+                    .ok_or("the `database` option is required when using InfluxDB v1")?,
+                consistency: self.consistency.clone(),
+                retention_policy_name: self.retention_policy_name.clone(),
+                username: self.username.clone(),
+                password: self.password.clone(),
+            })),
+            InfluxDbVersion::V2 => Ok(InfluxDbSettings::V2(InfluxDb2Settings {
+                org: self
+                    .org
+                    .clone()
+                    .ok_or("the `org` option is required when using InfluxDB v2")?,
+                bucket: self
+                    .bucket
+                    .clone()
+                    .ok_or("the `bucket` option is required when using InfluxDB v2")?,
+                token: self
+                    .token
+                    .clone()
+                    .ok_or("the `token` option is required when using InfluxDB v2")?,
+            })),
+        }
+    }
+
     fn get_measurement(&self) -> Result<String, &'static str> {
         match (self.measurement.as_ref(), self.namespace.as_ref()) {
             (Some(measure), Some(_)) => {
@@ -359,7 +454,7 @@ impl InfluxDbLogsConfig {
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
-        let healthcheck = healthcheck(config.endpoint, config.settings, client)?;
+        let healthcheck = healthcheck(config.endpoint.clone(), config.settings()?, client)?;
 
         Ok(healthcheck)
     }
@@ -412,6 +507,7 @@ mod tests {
         let config = indoc! {r#"
             namespace: "vector-logs"
             endpoint: "http://localhost:9999"
+            version: "2"
             bucket: "my-bucket"
             org: "my-org"
             token: "my-token"
@@ -425,6 +521,7 @@ mod tests {
         let config = indoc! {r#"
             namespace: "ns"
             endpoint: "http://localhost:9999"
+            version: "2"
             bucket: "my-bucket"
             org: "my-org"
             token: "my-token"
@@ -694,7 +791,10 @@ mod tests {
     #[tokio::test]
     async fn smoke_v1() {
         let rx = smoke_test(
-            r#"database = "my-database""#,
+            indoc! {r#"
+            version = "1"
+            database = "my-database"
+        "#},
             StatusCode::OK,
             BatchStatus::Delivered,
         )
@@ -708,7 +808,10 @@ mod tests {
     #[tokio::test]
     async fn smoke_v1_failure() {
         smoke_test(
-            r#"database = "my-database""#,
+            indoc! {r#"
+            version = "1"
+            database = "my-database"
+        "#},
             StatusCode::BAD_REQUEST,
             BatchStatus::Rejected,
         )
@@ -719,6 +822,7 @@ mod tests {
     async fn smoke_v2() {
         let rx = smoke_test(
             indoc! {r#"
+            version = "2"
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
@@ -738,6 +842,7 @@ mod tests {
     async fn smoke_v2_failure() {
         smoke_test(
             indoc! {r#"
+            version = "2"
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
@@ -888,7 +993,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
-            InfluxDb2Settings, InfluxDbSettings,
+            InfluxDbVersion,
             logs::InfluxDbLogsConfig,
             test_util::{BUCKET, ORG, TOKEN, address_v2, onboarding_v2},
         },
@@ -913,11 +1018,15 @@ mod integration_tests {
             measurement: Some(measure.clone()),
             endpoint: endpoint.clone(),
             tags: Default::default(),
-            settings: InfluxDbSettings::V2(InfluxDb2Settings {
-                org: ORG.to_string(),
-                bucket: BUCKET.to_string(),
-                token: TOKEN.to_string().into(),
-            }),
+            version: InfluxDbVersion::V2,
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            org: Some(ORG.to_string()),
+            bucket: Some(BUCKET.to_string()),
+            token: Some(TOKEN.to_string().into()),
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),

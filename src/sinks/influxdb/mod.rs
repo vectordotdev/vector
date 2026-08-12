@@ -32,9 +32,21 @@ pub(in crate::sinks) enum Field {
     Bool(bool),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::sinks) enum ProtocolVersion {
     V1,
+    V2,
+}
+
+/// The InfluxDB API version to use.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InfluxDbVersion {
+    /// InfluxDB v0.x/v1.x.
+    #[serde(rename = "1")]
+    V1,
+    /// InfluxDB v2.x.
+    #[serde(rename = "2")]
     V2,
 }
 
@@ -559,54 +571,31 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use serde::{Deserialize, Serialize};
-
     use super::*;
     use crate::sinks::influxdb::test_util::{assert_fields, tags, ts};
 
-    #[derive(Deserialize, Serialize, Debug, Clone)]
-    pub struct InfluxDbTestConfig {
-        #[serde(flatten)]
-        pub settings: InfluxDbSettings,
-    }
-
-    #[test]
-    fn test_influxdb_settings_both() {
-        // Configuring both v1 and v2 settings must be rejected.
-        let config = indoc::indoc! {r#"
-        bucket: "my-bucket"
-        org: "my-org"
-        token: "my-token"
-        database: "my-database"
-        "#};
-        assert!(serde_yaml::from_str::<InfluxDbTestConfig>(config).is_err());
-    }
-
-    #[test]
-    fn test_influxdb_settings_missing() {
-        // Configuring neither v1 nor v2 settings must be rejected.
-        let config = "{}";
-        assert!(serde_yaml::from_str::<InfluxDbTestConfig>(config).is_err());
-    }
-
     #[test]
     fn test_influxdb1_settings() {
-        let config = indoc::indoc! {r#"
-        database: "my-database"
-        "#};
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        _ = influxdb_settings(config.settings);
+        let settings = InfluxDbSettings::V1(InfluxDb1Settings {
+            database: "my-database".to_owned(),
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+        });
+        let connection = influxdb_settings(settings);
+        assert_eq!(connection.protocol_version(), ProtocolVersion::V1);
     }
 
     #[test]
     fn test_influxdb2_settings() {
-        let config = indoc::indoc! {r#"
-        bucket: "my-bucket"
-        org: "my-org"
-        token: "my-token"
-        "#};
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        _ = influxdb_settings(config.settings);
+        let settings = InfluxDbSettings::V2(InfluxDb2Settings {
+            org: "my-org".to_owned(),
+            bucket: "my-bucket".to_owned(),
+            token: "my-token".to_owned().into(),
+        });
+        let connection = influxdb_settings(settings);
+        assert_eq!(connection.protocol_version(), ProtocolVersion::V2);
     }
 
     #[test]

@@ -331,6 +331,7 @@ impl SchemaContext {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn apply_schema_metadata(&self, source_schema: &Value, resolved_schema: &mut Value) {
         let is_templateable = get_schema_metadata(source_schema, "docs::templateable")
             .and_then(Value::as_bool)
@@ -426,6 +427,22 @@ impl SchemaContext {
                 "required_one_of_group".to_string(),
                 Value::String(group.clone()),
             );
+        }
+
+        if let Some(Value::String(condition)) =
+            get_schema_metadata(source_schema, "docs::relevant_when")
+        {
+            resolved_schema.as_object_mut().unwrap().insert(
+                "relevant_when".to_string(),
+                Value::String(condition.clone()),
+            );
+        }
+
+        if let Some(minimal) = get_schema_metadata(source_schema, "docs::minimal") {
+            resolved_schema
+                .as_object_mut()
+                .unwrap()
+                .insert("minimal".to_string(), minimal.clone());
         }
     }
 
