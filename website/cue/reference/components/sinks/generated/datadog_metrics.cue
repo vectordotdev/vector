@@ -379,28 +379,18 @@ generated: components: sinks: datadog_metrics: configuration: {
 			Controls which Datadog sketches API endpoint is used to submit distributions and
 			histograms.
 
-			Independent of `series_api_version` — Datadog's intake gates V3 series and V3 sketches
-			separately, so this must be set explicitly to send sketches via V3, even if
-			`series_api_version` is already `v3`.
-
-			Defaults to `v2` (`/api/beta/sketches`).
+			Only `v2` (`/api/beta/sketches`) can currently be configured. The V3 sketches intake
+			routes do not exist yet (`/api/intake/metrics/v3/sketches` and its beta counterpart both
+			404), so V3 sketches support is temporarily disabled at the configuration level.
 			"""
 		required: false
 		type: string: {
 			default: "v2"
-			enum: {
-				v2: """
-					Use the legacy sketches endpoint (`/api/beta/sketches`).
+			enum: v2: """
+				Use the legacy sketches endpoint (`/api/beta/sketches`).
 
-					This is the recommended and default endpoint.
-					"""
-				v3: """
-					Use the v3 sketches endpoint (`/api/intake/metrics/v3/sketches`).
-
-					Columnar protobuf format, matching the encoding used for V3 series. Must be enabled
-					separately from `series_api_version`.
-					"""
-			}
+				This is the recommended and default endpoint.
+				"""
 		}
 	}
 	tls: {
