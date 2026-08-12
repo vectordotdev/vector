@@ -76,7 +76,7 @@ impl PartialEventMergeState {
                         }
                         OversizedAction::Truncate => {
                             let original_size = bytes_mut.len();
-                            if max_merged_line_bytes > TRUNCATED_SUFFIX.len() {
+                            if max_merged_line_bytes >= TRUNCATED_SUFFIX.len() {
                                 bytes_mut.truncate(max_merged_line_bytes - TRUNCATED_SUFFIX.len());
                                 bytes_mut.extend_from_slice(TRUNCATED_SUFFIX);
                             } else {
@@ -117,7 +117,7 @@ impl PartialEventMergeState {
                         }
                         OversizedAction::Truncate => {
                             let original_size = bytes_mut.len();
-                            if max_merged_line_bytes > TRUNCATED_SUFFIX.len() {
+                            if max_merged_line_bytes >= TRUNCATED_SUFFIX.len() {
                                 bytes_mut.truncate(max_merged_line_bytes - TRUNCATED_SUFFIX.len());
                                 bytes_mut.extend_from_slice(TRUNCATED_SUFFIX);
                             } else {
@@ -533,6 +533,54 @@ mod test {
         assert_eq!(
             output[0].as_log().get(event_path!("message")),
             Some(&value!("test"))
+        );
+    }
+
+    #[tokio::test]
+    async fn truncate_emits_suffix_when_limit_equals_suffix_len() {
+        // When the limit equals TRUNCATED_SUFFIX.len(), the marker still fits and
+        // must be emitted instead of the first N bytes of content.
+        let mut e_1 = LogEvent::from("test message that exceeds the limit");
+        e_1.insert(event_path!("foo"), 1);
+
+        let input_stream = futures::stream::iter([e_1.into()]);
+        let output_stream = merge_partial_events(
+            input_stream,
+            LogNamespace::Legacy,
+            Some(TRUNCATED_SUFFIX.len()),
+            OversizedAction::Truncate,
+        );
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("..TRUNCATED"))
+        );
+    }
+
+    #[tokio::test]
+    async fn truncate_merged_emits_suffix_when_limit_equals_suffix_len() {
+        let mut e_1 = LogEvent::from("aaaa");
+        e_1.insert(event_path!("_partial"), true);
+
+        let mut e_2 = LogEvent::from("bbbbbbbbbbbb");
+        e_2.insert(event_path!("foo"), 1);
+
+        let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
+        // Combined "aaaabbbbbbbbbbbb" (16 bytes) exceeds limit == suffix len (11)
+        let output_stream = merge_partial_events(
+            input_stream,
+            LogNamespace::Legacy,
+            Some(TRUNCATED_SUFFIX.len()),
+            OversizedAction::Truncate,
+        );
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("..TRUNCATED"))
         );
     }
 
