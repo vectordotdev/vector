@@ -319,7 +319,8 @@ async fn handle_stream<T>(
     loop {
         let mut permit = tokio::select! {
             _ = &mut tripwire => break,
-            Some(_) = &mut connection_close_timeout  => {
+            Some(_) = &mut connection_close_timeout => {
+                connection_close_timeout.set(OptionFuture::from(None::<tokio::time::Sleep>));
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
