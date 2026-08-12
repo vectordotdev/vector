@@ -116,7 +116,8 @@ fn reparse_groups(
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
                     if skip_nan_values
-                        && (metric.sum.is_nan() || metric.buckets.iter().any(|b| b.bucket.is_nan()))
+                        && (metric.sum.is_some_and(f64::is_nan)
+                            || metric.buckets.iter().any(|b| b.bucket.is_nan()))
                     {
                         continue;
                     }
@@ -150,7 +151,7 @@ fn reparse_groups(
                                     })
                                     .collect(),
                                 count: metric.count,
-                                sum: Some(metric.sum),
+                                sum: metric.sum,
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
@@ -823,7 +824,8 @@ mod test {
                             })
                             .collect(),
                         count: 0,
-                        sum: Some(0.0),
+                        // This exposition carries only `_bucket` lines, so there is no reported sum.
+                        sum: None,
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))
