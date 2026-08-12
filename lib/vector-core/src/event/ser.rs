@@ -309,6 +309,12 @@ impl Encodable for EventArray {
 }
 
 impl Bufferable for EventArray {
+    /// Reuses the same budget walk as the encode-time gate, so the routing decision and
+    /// the eventual encode can never disagree about what is persistable.
+    fn is_fully_encodable(&self) -> bool {
+        check_event_array_nesting_cost(self).is_ok()
+    }
+
     fn filter_unencodable(self) -> Option<Self> {
         let exceeds =
             |value: &Value, budget: usize| check_value_nesting_cost(value, 0, budget).is_err();
