@@ -580,7 +580,11 @@ mod tests {
         batch_encoding: Option<ClickhouseBatchEncoding>,
     ) -> ClickhouseConfig {
         ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "test_table".try_into().unwrap(),
             database: Some("test_db".try_into().unwrap()),
             format,
@@ -617,7 +621,11 @@ mod tests {
     #[test]
     fn preparation_error_on_invalid_batch_encoding_combination() {
         let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "test_table".try_into().unwrap(),
             format: Format::JsonEachRow, // Incompatible with batch_encoding
             batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
@@ -642,7 +650,11 @@ mod tests {
     #[test]
     fn prepares_valid_config() {
         let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "test_table".try_into().unwrap(),
             database: Some("test_db".try_into().unwrap()),
             format: Format::JsonEachRow,
@@ -660,7 +672,11 @@ mod tests {
     #[test]
     fn rejects_incompatible_batch_encoding() {
         let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "test_table".try_into().unwrap(),
             format: Format::JsonEachRow, // Incompatible with batch_encoding
             batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
@@ -679,7 +695,11 @@ mod tests {
     fn rejects_dynamic_targets_with_arrow_batch_encoding() {
         // Dynamic table (with a static prefix, so it passes confinement)
         let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "events-{{ tenant }}".try_into().unwrap(),
             format: Format::ArrowStream,
             batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
@@ -702,7 +722,11 @@ mod tests {
 
         // Dynamic database
         let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "test_table".try_into().unwrap(),
             database: Some("events-{{ tenant }}".try_into().unwrap()),
             format: Format::ArrowStream,
@@ -728,7 +752,11 @@ mod tests {
     #[test]
     fn accepts_static_targets_with_arrow_batch_encoding() {
         let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "test_table".try_into().unwrap(),
             database: Some("test_db".try_into().unwrap()),
             format: Format::ArrowStream,
@@ -744,7 +772,11 @@ mod tests {
     #[test]
     fn rejects_unconfined_template() {
         let config = ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: "http://localhost:8123"
+                .parse::<http::Uri>()
+                .unwrap()
+                .try_into()
+                .unwrap(),
             table: "{{ table }}".try_into().unwrap(), // No static prefix
             format: Format::JsonEachRow,
             ..Default::default()

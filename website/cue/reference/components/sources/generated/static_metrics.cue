@@ -30,7 +30,7 @@ generated: components: sources: static_metrics: configuration: {
 				}
 				tags: {
 					description: "Key-value pairs representing tags and their values to add to the metric."
-					required:    false
+					required:    true
 					type: object: options: "*": {
 						description: "An individual tag - value pair."
 						required:    true
