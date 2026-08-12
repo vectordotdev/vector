@@ -3435,7 +3435,7 @@ dependencies = [
 [[package]]
 name = "datadog-agent-metrics-v3"
 version = "0.1.0"
-source = "git+ssh://git@github.com/DataDog/saluki.git?tag=1.3.0#f546aa02aaaef60037c7b24f44756e34a3dcfa3f"
+source = "git+https://github.com/DataDog/saluki.git?tag=1.3.0#f546aa02aaaef60037c7b24f44756e34a3dcfa3f"
 dependencies = [
  "foldhash 0.2.0",
  "protobuf",
