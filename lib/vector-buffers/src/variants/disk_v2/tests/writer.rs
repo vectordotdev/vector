@@ -34,15 +34,12 @@ struct FlushControl {
 
 impl FlushControl {
     fn allow_flush(&self) {
-        let waker = {
-            let mut state = self
-                .state
-                .lock()
-                .expect("flush state should not be poisoned");
-            state.flush_allowed = true;
-            state.flush_waker.take()
-        };
-        if let Some(waker) = waker {
+        let mut state = self
+            .state
+            .lock()
+            .expect("flush state should not be poisoned");
+        state.flush_allowed = true;
+        if let Some(waker) = state.flush_waker.take() {
             waker.wake();
         }
     }
