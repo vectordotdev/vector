@@ -9,6 +9,7 @@ pub mod compressor;
 pub mod datagram;
 pub mod encoding;
 pub mod http;
+pub mod http_1;
 pub mod metadata;
 pub mod normalizer;
 pub mod partitioner;
