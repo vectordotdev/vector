@@ -63,7 +63,7 @@ impl InternalEvent for DatadogMetricsRequestFailed<'_> {
             stage = error_stage::SENDING,
             batch_id = self.batch_id.unwrap_or("none"),
             uri = %self.uri,
-            internal_log_rate_limit = false,
+            internal_log_rate_limit = true,
         );
     }
 }
