@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{Metric, MetricValue, metric::MetricSketch},
+    event::{Metric, MetricTags, MetricValue, metric::MetricSketch},
     metrics::AgentDDSketch,
     request_metadata::GroupedCountByteSize,
 };
@@ -209,6 +209,8 @@ fn encode_metric_to_v3(
     let host_key = log_schema.host_key().map(|k| k.to_string());
 
     if let Some(tags) = metric.tags() {
+        device_resource = resolve_device_resource(tags);
+
         for (key, value) in tags.iter_all() {
             // dd.internal.resource tags become structured resources
             if key == "dd.internal.resource" {
@@ -230,11 +232,10 @@ fn encode_metric_to_v3(
                 continue;
             }
 
-            // device / resource.device → device resource
+            // device / resource.device are resolved once, up front, via `resolve_device_resource`
+            // -- just consume them here so they don't fall through to the generic tag handling
+            // below.
             if key == "device" || key == "resource.device" {
-                if let Some(dev) = value {
-                    device_resource = Some(dev);
-                }
                 continue;
             }
 
@@ -332,6 +333,21 @@ fn encode_metric_to_v3(
 
     builder.close();
     Ok(())
+}
+
+/// Resolves a metric's `device` resource, matching V2's explicit
+/// `tags.remove("device").or(tags.remove("resource.device"))` precedence in
+/// `series_to_proto_message`: `device` always wins over `resource.device` when a metric
+/// carries both. In the `datadog_agent` source, the tag is added as `device` for the V1
+/// endpoint and `resource.device` for the V2 endpoint.
+///
+/// Resolved once via direct lookup, independent of `MetricTags`' key-iteration order --
+/// `resource.device` sorts after `device` alphabetically, so an order-dependent overwrite
+/// inside the tag-iteration loop would silently prefer the wrong one whenever a metric
+/// carries both, producing a different device resource than V2 for the same metric and
+/// mismatching the paired V2/V3 shadow payloads for the same flush.
+fn resolve_device_resource(tags: &MetricTags) -> Option<&str> {
+    tags.get("device").or_else(|| tags.get("resource.device"))
 }
 
 /// Assembles the final resource list in a fixed host-then-device order, matching V2's
@@ -459,6 +475,35 @@ mod tests {
                 ("extra", "tag")
             ]
         );
+    }
+
+    // Regression test: V2's `series_to_proto_message` gives `device` explicit precedence over
+    // `resource.device` via `tags.remove("device").or(tags.remove("resource.device"))`. V3 used
+    // to resolve this inside its tag-iteration loop, where `MetricTags`' key-ordered iteration
+    // visits `device` before `resource.device` (alphabetically) and unconditionally overwrote
+    // whichever was seen last -- silently preferring `resource.device` instead, and mismatching
+    // the paired V2/V3 shadow payloads for the same flush whenever a metric carried both.
+    #[test]
+    fn v3_device_resource_prefers_device_over_resource_device() {
+        // Only `device` present.
+        let tags = MetricTags::from([("device".to_string(), "/dev/sda1".to_string())]);
+        assert_eq!(resolve_device_resource(&tags), Some("/dev/sda1"));
+
+        // Only `resource.device` present.
+        let tags = MetricTags::from([("resource.device".to_string(), "/dev/sdb2".to_string())]);
+        assert_eq!(resolve_device_resource(&tags), Some("/dev/sdb2"));
+
+        // Both present: `device` must win, matching V2 -- regardless of which one a naive,
+        // iteration-order-dependent implementation would happen to visit last.
+        let tags = MetricTags::from([
+            ("device".to_string(), "/dev/sda1".to_string()),
+            ("resource.device".to_string(), "/dev/sdb2".to_string()),
+        ]);
+        assert_eq!(resolve_device_resource(&tags), Some("/dev/sda1"));
+
+        // Neither present.
+        let tags = MetricTags::from([("unrelated".to_string(), "tag".to_string())]);
+        assert_eq!(resolve_device_resource(&tags), None);
     }
 
     #[test]
