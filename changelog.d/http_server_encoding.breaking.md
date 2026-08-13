@@ -2,8 +2,8 @@
 
 ## Summary
 
-The deprecated `encoding` option has been removed from the `http` and
-`http_server` sources. Configurations using it now fail validation.
+The deprecated `encoding` option has been removed from the `http_server` source
+and its deprecated `http` alias. Configurations using it now fail validation.
 
 ## Migration
 
