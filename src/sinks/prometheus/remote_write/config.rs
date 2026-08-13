@@ -236,6 +236,17 @@ impl ValidatedSink for RemoteWriteConfig {
             .transpose()?;
 
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
+
+        // Reject endpoints that parse but lack a scheme or authority (e.g.
+        // `/api/v1/write`). `http::Uri` accepts them, but the request path hands
+        // them to the HTTP client as a non-absolute target that deterministically
+        // fails at build/healthcheck time.
+        if endpoint.scheme().is_none() || endpoint.authority().is_none() {
+            return Err(format!(
+                "endpoint must include a scheme and host, e.g. `https://localhost:8087/api/v1/write`; got `{endpoint}`"
+            )
+            .into());
+        }
         let validated_headers = Arc::new(validate_headers(
             &self.request.headers,
             self.auth.is_some(),
@@ -440,6 +451,35 @@ mod tests {
         );
         assert!(validated.tenant_id.is_some());
         assert!(validated.validated_headers.is_empty());
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        let config = RemoteWriteConfig {
+            endpoint: "/api/v1/write".to_string(),
+            ..Default::default()
+        };
+
+        let err = config
+            .validate()
+            .expect_err("a relative endpoint must be rejected");
+        assert!(
+            err.to_string().contains("scheme and host"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_authority() {
+        let config = RemoteWriteConfig {
+            endpoint: "https:///api/v1/write".to_string(),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "an endpoint without a host must be rejected"
+        );
     }
 
     #[cfg(feature = "aws-core")]

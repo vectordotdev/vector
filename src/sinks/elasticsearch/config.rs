@@ -759,6 +759,32 @@ impl ValidatedSink for ElasticsearchConfig {
             _ => {}
         }
 
+        // Mirror the pure Serverless checks from `ElasticsearchCommon::parse_config`
+        // (auth strategy, region, and API-version) so configs that deterministically
+        // fail at build time are rejected here instead.
+        if self.opensearch_service_type == OpenSearchServiceType::Serverless {
+            match &self.auth {
+                #[cfg(feature = "aws-core")]
+                Some(ElasticsearchAuthConfig::Aws(_)) => (),
+                _ => return Err(ParseError::OpenSearchServerlessRequiresAwsAuth.into()),
+            }
+        }
+        if self.opensearch_service_type == OpenSearchServiceType::Serverless
+            && self.api_version != ElasticsearchApiVersion::Auto
+        {
+            return Err(ParseError::ServerlessElasticsearchApiVersionMustBeAuto.into());
+        }
+
+        // Mirror the pure region check from `ElasticsearchCommon::extract_auth` so
+        // AWS auth configs without a region are rejected during validation instead
+        // of failing at build time.
+        #[cfg(feature = "aws-core")]
+        if matches!(self.auth, Some(ElasticsearchAuthConfig::Aws(_)))
+            && self.aws.as_ref().and_then(|aws| aws.region()).is_none()
+        {
+            return Err(ParseError::RegionRequired.into());
+        }
+
         // Run the pure routing-template confinement check for the active mode
         // so unconfined `bulk.index` / `data_stream.*` templates are rejected
         // here. The confined mode itself is reconstructed during build (inside
@@ -880,6 +906,87 @@ mod tests {
         )
         .unwrap();
         config.validate().expect("endpoints should validate");
+    }
+
+    #[test]
+    fn validate_rejects_serverless_without_aws_auth() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: [""]
+            opensearch_service_type: serverless
+            api_version: auto
+            "#,
+        )
+        .unwrap();
+        let err = config.validate().expect_err("serverless requires AWS auth");
+        assert!(
+            err.to_string().contains("auth.strategy"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_rejects_serverless_with_non_auto_api_version() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: [""]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            api_version: v8
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("serverless requires api_version auto");
+        assert!(
+            err.to_string().contains("api_version"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_rejects_aws_auth_without_region() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: [""]
+            auth:
+              strategy: aws
+            "#,
+        )
+        .unwrap();
+        let err = config.validate().expect_err("AWS auth requires aws.region");
+        assert!(
+            err.to_string().contains("aws.region"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_serverless_with_aws_auth_and_auto_api_version() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: [""]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            aws:
+              region: us-east-1
+            api_version: auto
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect("valid serverless config should validate");
     }
 
     #[test]

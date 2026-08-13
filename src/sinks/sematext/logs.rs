@@ -106,13 +106,13 @@ impl ValidatedSink for SematextLogsConfig {
             (None, Region::Eu) => EU_ENDPOINT.to_owned(),
         };
 
-        let index =
-            Template::try_from(self.token.inner()).expect("unable to parse token as Template");
+        let index = Template::try_from(self.token.inner())
+            .map_err(|error| format!("unable to parse token as Template: {error}"))?;
 
         // Validate the derived Elasticsearch config (template confinement of
-        // `bulk.index`) so `vector validate --no-environment` catches unconfined
-        // routing templates such as a token of `{{ index }}` rather than
-        // failing at startup.
+        // `bulk.index`) so structural validation catches unconfined routing
+        // templates such as a token of `{{ index }}` rather than failing at
+        // startup.
         self.derived_elasticsearch_config(&endpoint, &index)
             .common_mode()?;
 
@@ -237,8 +237,8 @@ mod tests {
     fn validate_rejects_unconfined_token_template() {
         // A token that is an unconfined routing template (no literal prefix)
         // passes template parsing but is rejected by the derived Elasticsearch
-        // config's confinement check. `vector validate --no-environment` must
-        // catch it here rather than deferring the error to startup.
+        // config's confinement check. Structural validation must catch it here
+        // rather than deferring the error to startup.
         let config = SematextLogsConfig {
             region: Region::Us,
             endpoint: None,
@@ -252,6 +252,31 @@ mod tests {
         assert!(
             config.validate().is_err(),
             "an unconfined token template should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_token_template() {
+        // A token with invalid template syntax (a dangling `%` is an invalid
+        // strftime item) must surface a validation error rather than panic
+        // during structural validation.
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: "%".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let err = config
+            .validate()
+            .expect_err("a malformed token template should fail validation");
+        assert!(
+            err.to_string()
+                .contains("unable to parse token as Template"),
+            "unexpected error: {err}"
         );
     }
 
