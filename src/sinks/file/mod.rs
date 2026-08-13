@@ -60,7 +60,7 @@ pub struct FileSinkConfig {
     /// File path to write events to.
     ///
     /// Compression format extension must be explicit.
-    #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log"))]
+    #[configurable(metadata(docs::examples = "/var/log/vector/vector-%Y-%m-%d.log"))]
     #[configurable(metadata(
         docs::examples = "/tmp/application-{{ application_id }}-%Y-%m-%d.log"
     ))]
