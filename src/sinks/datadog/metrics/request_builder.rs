@@ -282,7 +282,19 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             is_shadow_flush.then(|| Arc::from(Uuid::now_v7().to_string().as_str()));
 
         // Clone metrics before primary encoding consumes them, if we need a shadow copy.
-        let shadow_metrics = is_shadow_flush.then(|| metrics.clone());
+        // The shadow copy must not carry the production `EventFinalizers`: cloning a `Metric`
+        // clones its `Arc<EventFinalizer>` pointers, so without stripping them here, the
+        // validation-only shadow batch would share finalizers with the primary batch. A
+        // shadow-only failure could then reject (or indefinitely delay) acknowledgement for
+        // events whose primary V1/V2 request already succeeded. Dropping the taken finalizers
+        // detaches the shadow copy from acknowledgement entirely.
+        let shadow_metrics = is_shadow_flush.then(|| {
+            let mut shadow_m = metrics.clone();
+            for metric in &mut shadow_m {
+                drop(metric.take_finalizers());
+            }
+            shadow_m
+        });
 
         // ── Primary encode ────────────────────────────────────────────────────
         // V3Beta uses the same columnar encoder path as V3; only the
@@ -759,6 +771,53 @@ mod tests {
             1,
             "exactly one half of the pair is retargeted to the shadow URI"
         );
+    }
+
+    /// The shadow copy of a series flush must not carry the production `EventFinalizers`.
+    /// If it did, a shadow-only failure (e.g. the validation-only V3beta endpoint rejecting
+    /// or erroring on a request whose V1/V2 twin was delivered fine) would update the same
+    /// shared `EventFinalizer`s as the primary and could reject or indefinitely delay
+    /// acknowledgement for events that were already successfully delivered.
+    #[test]
+    fn shadow_copy_does_not_carry_production_finalizers() {
+        use vector_lib::event::{BatchNotifier, BatchStatus};
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let finalized_metric = counter_metric().with_batch_notifier(&batch);
+        drop(batch);
+
+        let mut builder = builder_with_shadow_every(1);
+        let mut encoded = builder.encode_events_incremental((
+            (None, DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)),
+            vec![finalized_metric],
+        ));
+
+        assert_eq!(encoded.len(), 2, "expected a V2 primary and a V3 shadow");
+
+        let metas: Vec<DDMetricsMetadata> = encoded
+            .drain(..)
+            .filter_map(Result::ok)
+            .map(|((meta, _), _)| meta)
+            .collect();
+
+        let with_finalizers = metas.iter().filter(|m| !m.finalizers.is_empty()).count();
+        let without_finalizers = metas.iter().filter(|m| m.finalizers.is_empty()).count();
+        assert_eq!(
+            with_finalizers, 1,
+            "exactly the primary request should carry the production finalizers"
+        );
+        assert_eq!(
+            without_finalizers, 1,
+            "the shadow request must not carry any finalizers"
+        );
+
+        // Dropping every `DDMetricsMetadata` (and therefore every retained `EventFinalizers`)
+        // must resolve the batch exactly once, with its untouched default status of
+        // `Delivered` — proving the shadow copy held no live reference into the same
+        // finalizer (an extra live reference would keep the batch notifier alive and this
+        // `try_recv` would still return `Empty`).
+        drop(metas);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
     // ── Timestamp resolution ───────────────────────────────────────────────
