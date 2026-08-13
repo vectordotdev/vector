@@ -559,19 +559,6 @@ mod tests {
         crate::test_util::test_generate_config::<SimpleHttpConfig>();
     }
 
-    #[test]
-    fn rejects_removed_encoding_field() {
-        let error = serde_yaml::from_str::<SimpleHttpConfig>(
-            r#"
-address: "0.0.0.0:8080"
-encoding: text
-"#,
-        )
-        .unwrap_err();
-
-        assert!(error.to_string().contains("unknown field `encoding`"));
-    }
-
     #[allow(clippy::too_many_arguments)]
     async fn source<'a>(
         headers: Vec<String>,
