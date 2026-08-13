@@ -290,6 +290,11 @@ impl ValidatedSink for GcsSinkConfig {
         // Parse the base URL up front so `vector validate --no-environment`
         // rejects a malformed endpoint instead of panicking at build time.
         let base_url = format!("{}/{}/", self.endpoint, self.bucket).parse::<Uri>()?;
+        if !matches!(base_url.scheme_str(), Some("http" | "https"))
+            || base_url.authority().is_none()
+        {
+            return Err("GCS endpoint must be an absolute http(s) URL".into());
+        }
         let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix_template = self.key_prefix_template()?;
 
@@ -573,10 +578,14 @@ mod tests {
         let config = GcsSinkConfig {
             bucket: "my-bucket".into(),
             key_prefix: Some("date=%F/".into()),
+            endpoint: "https://storage.googleapis.com".into(),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
-        assert_eq!(validated.base_url, "/my-bucket/");
+        assert_eq!(
+            validated.base_url,
+            "https://storage.googleapis.com/my-bucket/"
+        );
         assert_eq!(validated.key_prefix_template.to_string(), "date=%F/");
     }
 
@@ -590,8 +599,10 @@ mod tests {
         let client =
             HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
 
-        let config =
-            default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into());
+        let config = GcsSinkConfig {
+            endpoint: mock_endpoint.to_string(),
+            ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+        };
         let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(

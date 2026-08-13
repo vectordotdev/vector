@@ -305,6 +305,24 @@ impl ZerobusSinkConfig {
             });
         }
 
+        // The build-time healthcheck resolves `{endpoint}/oidc/v1/token` and
+        // `{endpoint}/api/2.1/unity-catalog/tables/{name}` as `http::Uri`s, so the
+        // endpoint must be an absolute http(s) URL. Validate here (pure, env-free)
+        // so `vector validate --no-environment` catches misconfigurations at
+        // validate time instead of deferring to the healthcheck at build.
+        let uri = self
+            .unity_catalog_endpoint
+            .parse::<http::Uri>()
+            .map_err(|e| ZerobusSinkError::ConfigError {
+                message: format!("Invalid Unity Catalog endpoint URL: {}", e),
+            })?;
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err(ZerobusSinkError::ConfigError {
+                message: "Databricks Unity Catalog endpoint must be an absolute http(s) URL"
+                    .to_string(),
+            });
+        }
+
         // Validate authentication credentials
         match &self.auth {
             DatabricksAuthentication::OAuth {
@@ -520,6 +538,49 @@ mod tests {
             assert!(message.contains("unity_catalog_endpoint cannot be empty"));
         } else {
             panic!("Expected ConfigError for empty unity_catalog_endpoint");
+        }
+    }
+
+    #[test]
+    fn test_config_validation_invalid_unity_catalog_endpoint_uri() {
+        let mut config = create_test_config();
+        config.unity_catalog_endpoint = "not a uri".to_string();
+
+        let result = config.validate();
+        assert!(result.is_err());
+
+        if let Err(crate::sinks::databricks_zerobus::error::ZerobusSinkError::ConfigError {
+            message,
+        }) = result
+        {
+            assert!(message.contains("Invalid Unity Catalog endpoint URL"));
+        } else {
+            panic!("Expected ConfigError for malformed unity_catalog_endpoint");
+        }
+    }
+
+    #[test]
+    fn test_config_validation_unity_catalog_endpoint_requires_scheme_and_authority() {
+        // The healthcheck builds absolute http(s) URLs from this value, so a
+        // relative path (no scheme/authority) or a non-http scheme must be
+        // rejected at validate time.
+        for bad in [
+            "my-unity-catalog",
+            "//workspace.databricks.com",
+            "ftp://workspace.databricks.com",
+        ] {
+            let mut config = create_test_config();
+            config.unity_catalog_endpoint = bad.to_string();
+            let result = config.validate();
+            assert!(result.is_err(), "expected error for endpoint={bad:?}");
+            if let Err(crate::sinks::databricks_zerobus::error::ZerobusSinkError::ConfigError {
+                message,
+            }) = result
+            {
+                assert!(message.contains("absolute http(s) URL"));
+            } else {
+                panic!("Expected ConfigError for endpoint={bad:?}");
+            }
         }
     }
 

@@ -164,6 +164,9 @@ impl ValidatedSink for SematextMetricsConfig {
         };
 
         let uri = write_uri(&endpoint)?;
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err("Sematext Metrics endpoint must be an absolute http(s) URL".into());
+        }
         let batch = self.batch.into_batch_settings()?;
 
         Ok(ValidatedSematextMetrics {
@@ -387,6 +390,28 @@ mod tests {
                 .uri
                 .to_string()
                 .starts_with("http://localhost:9999/write?db=metrics&v=vector-")
+        );
+    }
+
+    #[test]
+    fn rejects_non_absolute_endpoint() {
+        let config = |endpoint: &str| SematextMetricsConfig {
+            default_namespace: "ns".to_string(),
+            region: Region::Us,
+            endpoint: Some(endpoint.to_string()),
+            token: "atoken".to_string().into(),
+            batch: Default::default(),
+            request: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        // Schemeless endpoints produce a relative write URI with no authority.
+        assert!(config("spm-receiver.sematext.com").validate().is_err());
+        // Non-http(s) schemes are rejected as well.
+        assert!(
+            config("ftp://spm-receiver.sematext.com")
+                .validate()
+                .is_err()
         );
     }
 

@@ -300,6 +300,12 @@ impl ValidatedSink for LokiConfig {
             "structured_metadata[value]",
         )?;
 
+        if !matches!(self.endpoint.uri.scheme_str(), Some("http" | "https"))
+            || self.endpoint.uri.authority().is_none()
+        {
+            return Err("Loki endpoint must be an absolute http(s) URL".into());
+        }
+
         self.endpoint.append_path(&self.path)?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -443,6 +449,25 @@ mod tests {
         assert!(validated.auth.is_none()); // Default has no auth
         assert_eq!(validated.labels.len(), 1);
         assert!(validated.batch_settings.timeout > std::time::Duration::ZERO);
+    }
+
+    #[test]
+    fn validate_rejects_non_http_endpoint() {
+        let config: LokiConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "ftp://example.com"
+            labels:
+              test_name: "placeholder"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+
+        assert!(
+            config.validate().is_err(),
+            "a non-http(s) endpoint must be rejected before it reaches the HTTP client"
+        );
     }
 
     #[test]

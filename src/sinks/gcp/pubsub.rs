@@ -143,6 +143,18 @@ impl ValidatedSink for PubsubConfig {
         )
         .parse::<Uri>()?;
 
+        // Reject a relative or authority-less endpoint up front so `vector validate
+        // --no-environment` fails instead of deferring the error to HttpClient.
+        if !matches!(uri_base.scheme_str(), Some("http" | "https"))
+            || uri_base.authority().is_none()
+        {
+            return Err(format!(
+                "endpoint must be an absolute `http(s)` URL, e.g. `https://pubsub.googleapis.com`; got `{}`",
+                self.endpoint
+            )
+            .into());
+        }
+
         let batch_settings = self
             .batch
             .validate()?
@@ -304,6 +316,48 @@ mod tests {
         assert_eq!(
             validated.uri_base.to_string(),
             "https://pubsub.googleapis.com/v1/projects/project/topics/topic"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        use crate::config::ValidatedSink;
+
+        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
+                project: project
+                topic: topic
+                endpoint: pubsub.googleapis.com
+                encoding:
+                  codec: json
+            "#})
+        .unwrap();
+
+        let err = config
+            .validate()
+            .expect_err("a relative endpoint must be rejected");
+        assert!(
+            err.to_string().contains("absolute `http(s)` URL")
+                || err.to_string().contains("invalid format"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_authority() {
+        use crate::config::ValidatedSink;
+
+        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
+                project: project
+                topic: topic
+                endpoint: https:///v1/projects/project/topics/topic
+                encoding:
+                  codec: json
+            "#})
+        .unwrap();
+
+        assert!(
+            config.validate().is_err(),
+            "an endpoint without a host must be rejected"
         );
     }
 

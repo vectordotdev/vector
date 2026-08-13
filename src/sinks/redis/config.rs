@@ -238,6 +238,11 @@ impl ValidatedSink for RedisSinkConfig {
         if self.endpoint.clone().to_vec().is_empty() {
             return Err("`endpoint` cannot be empty.".into());
         }
+        for endpoint in self.endpoint.clone().to_vec() {
+            if redis::parse_redis_url(&endpoint).is_none() {
+                return Err(format!("`endpoint` is not a valid redis URL: {endpoint}").into());
+            }
+        }
         let batch_settings = self.batch.into_batcher_settings()?;
         Ok(ValidatedRedisSink {
             key,
@@ -457,6 +462,23 @@ mod tests {
         assert!(
             config.validate().is_err(),
             "an empty endpoint list should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_endpoint() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "not a url"
+            key: "test-key"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "an invalid endpoint URL should fail validation"
         );
     }
 

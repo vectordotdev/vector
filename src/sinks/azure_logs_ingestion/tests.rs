@@ -44,6 +44,25 @@ fn validate_accepts_valid_config() {
     config.validate().expect("validation should succeed");
 }
 
+#[test]
+fn validate_rejects_non_http_endpoint() {
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "ftp://example.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+    .unwrap();
+
+    config
+        .validate()
+        .expect_err("validation should fail for non-http endpoint");
+}
+
 #[tokio::test]
 async fn basic_config_error_with_no_auth() {
     let config: Result<AzureLogsIngestionConfig, _> =

@@ -212,6 +212,12 @@ impl ValidatedSink for AzureLogsIngestionConfig {
         let endpoint: UriSerde = self.endpoint.parse()?;
         let endpoint = endpoint.with_default_parts().uri;
 
+        if !matches!(endpoint.scheme_str(), Some("http" | "https"))
+            || endpoint.authority().is_none()
+        {
+            return Err("Azure Logs Ingestion endpoint must be an absolute http(s) URL".into());
+        }
+
         let batch_settings = self
             .batch
             .validate()?

@@ -223,7 +223,7 @@ impl ValidatedSink for DatadogLogsConfig {
             .local_dd_common
             .site
             .clone()
-            .unwrap_or_else(datadog::default_site);
+            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
         Self::logs_endpoint(self.local_dd_common.endpoint.as_deref(), &site)?;
 
         let batch = self

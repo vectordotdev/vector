@@ -127,7 +127,7 @@ impl ValidatedSink for DatadogEventsConfig {
             .dd_common
             .site
             .clone()
-            .unwrap_or_else(datadog::default_site);
+            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
         Self::events_endpoint(self.dd_common.endpoint.as_deref(), &site)?;
         let request_settings = self.request.into_settings();
         Ok(ValidatedEvents { request_settings })
@@ -174,7 +174,7 @@ mod tests {
         assert_eq!(
             DatadogEventsConfig::events_endpoint(
                 Some("http://127.0.0.1:8080"),
-                &datadog::default_site(),
+                datadog::DD_US_SITE,
             )
             .expect("endpoint should parse")
             .to_string(),

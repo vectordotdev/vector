@@ -223,7 +223,7 @@ impl ValidatedSink for DatadogMetricsConfig {
             .local_dd_common
             .site
             .clone()
-            .unwrap_or_else(datadog::default_site);
+            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
         let base = Self::metrics_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
         base.parse::<Uri>()?;
 
