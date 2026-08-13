@@ -210,6 +210,7 @@ fn encode_metric_to_v3(
 
     if let Some(tags) = metric.tags() {
         device_resource = resolve_device_resource(tags);
+        host_resource = resolve_host_resource(tags, host_key.as_deref());
 
         for (key, value) in tags.iter_all() {
             // dd.internal.resource tags become structured resources
@@ -222,13 +223,9 @@ fn encode_metric_to_v3(
                 continue;
             }
 
-            // Host key → host resource
+            // Host key already resolved above via `resolve_host_resource` -- just consume it
+            // here so it doesn't fall through to the generic tag handling below.
             if host_key.as_deref() == Some(key) {
-                if let Some(host) = value
-                    && !host.is_empty()
-                {
-                    host_resource = Some(host);
-                }
                 continue;
             }
 
@@ -348,6 +345,25 @@ fn encode_metric_to_v3(
 /// mismatching the paired V2/V3 shadow payloads for the same flush.
 fn resolve_device_resource(tags: &MetricTags) -> Option<&str> {
     tags.get("device").or_else(|| tags.get("resource.device"))
+}
+
+/// Resolves a metric's `host` resource tag value, matching V2's `tags.remove(key)` lookup in
+/// `series_to_proto_message`. For a multi-valued host tag, `TagValueSet`'s single-value
+/// conversion resolves to whichever value was inserted *last*, regardless of whether that
+/// value happens to be an empty string -- it does not skip backward looking for an earlier
+/// non-empty one. V3 used to resolve the host tag inside its own tag-iteration loop with an
+/// explicit "skip if empty" filter applied *per visited value*, which instead kept whichever
+/// non-empty value it saw and ignored a later, chronologically-last empty one. That divergence
+/// meant a metric whose host tag's last-inserted value happened to be empty produced a
+/// non-empty host resource in V3 but an empty one in V2 for the same metric, mismatching the
+/// paired V2/V3 shadow payloads for the same flush.
+///
+/// An absent, empty, or empty-after-resolution host tag all come out `None` here; the caller
+/// fills in an empty host resource once a host key is configured at all, matching V2's
+/// behavior of always including a host resource (even with an empty name) in that case.
+fn resolve_host_resource<'a>(tags: &'a MetricTags, host_key: Option<&str>) -> Option<&'a str> {
+    let host_key = host_key?;
+    tags.get(host_key).filter(|host| !host.is_empty())
 }
 
 /// Assembles the final resource list in a fixed host-then-device order, matching V2's
@@ -504,6 +520,48 @@ mod tests {
         // Neither present.
         let tags = MetricTags::from([("unrelated".to_string(), "tag".to_string())]);
         assert_eq!(resolve_device_resource(&tags), None);
+    }
+
+    // Regression test: for a multi-valued host tag, V2's `series_to_proto_message` calls
+    // `tags.remove(host_key)`, whose single-value conversion (`TagValueSet::into_single`)
+    // finds the *last inserted* value tag, regardless of whether that value happens to be an
+    // empty string -- it does not skip backward to find an earlier non-empty value. V3 used to
+    // resolve the host tag inside its tag-iteration loop with an explicit `!host.is_empty()`
+    // filter *per visited value*, which instead kept whichever non-empty value it saw, ignoring
+    // any later, chronologically-last empty value. Confirmed against the real `series_to_proto_
+    // message` output: inserting `("host", "host1")` then `("host", "")` produces an *empty*
+    // V2 host resource, not `"host1"`.
+    #[test]
+    fn v3_host_resource_matches_v2_single_value_lookup_for_multivalue_tags() {
+        // Single value: passes straight through.
+        let mut tags = MetricTags::default();
+        tags.insert("host".to_string(), "myhost".to_string());
+        assert_eq!(resolve_host_resource(&tags, Some("host")), Some("myhost"));
+
+        // Multiple non-empty values: resolves to the last-inserted one, matching V2's
+        // `into_single` (`TagValueSet::Set`'s `rfind` over insertion order).
+        let mut tags = MetricTags::default();
+        tags.insert("host".to_string(), "host1".to_string());
+        tags.insert("host".to_string(), "host2".to_string());
+        assert_eq!(resolve_host_resource(&tags, Some("host")), Some("host2"));
+
+        // Multiple values where the *last-inserted* one is empty: V2's `into_single` still
+        // finds that empty value (it doesn't skip backward looking for a non-empty one), so
+        // the host resource comes out empty here too -- not "host1", which is what V3's old
+        // per-value `!host.is_empty()` filter inside the tag loop would have produced.
+        let mut tags = MetricTags::default();
+        tags.insert("host".to_string(), "host1".to_string());
+        tags.insert("host".to_string(), String::new());
+        assert_eq!(resolve_host_resource(&tags, Some("host")), None);
+
+        // No host tag at all.
+        let tags = MetricTags::from([("unrelated".to_string(), "tag".to_string())]);
+        assert_eq!(resolve_host_resource(&tags, Some("host")), None);
+
+        // No host key configured at all (log_schema.host_key() is None).
+        let mut tags = MetricTags::default();
+        tags.insert("host".to_string(), "myhost".to_string());
+        assert_eq!(resolve_host_resource(&tags, None), None);
     }
 
     #[test]
