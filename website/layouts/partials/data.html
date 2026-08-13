@@ -17,6 +17,8 @@
               <span class="flex justify-between space-x-1">
                 {{ if $v.required }}
                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                {{ else if $v.required_when }}
+                  {{ partial "badge.html" (dict "word" (printf "required (when: %s)" $v.required_when) "color" "orange") }}
                 {{ else if $v.required_one_of }}
                   {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                 {{ else }}
@@ -206,13 +208,6 @@
                   {{ template "default" . }}
                 </div>
               {{ end }}
-            {{ end }}
-
-            {{/* "Required when" conditions */}}
-            {{ with .required_when }}
-              <div class="mt-2 text-sm flex justify-end">
-                <span> Required when: <code>{{ . }}</code> </span>
-              </div>
             {{ end }}
 
             {{/* "Relevant when" conditions */}}
@@ -519,6 +514,8 @@
             <span class="flex space-x-1">
               {{ if $v.required }}
                 {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+              {{ else if $v.required_when }}
+                {{ partial "badge.html" (dict "word" (printf "required (when: %s)" $v.required_when) "color" "orange") }}
               {{ else if $v.required_one_of }}
                 {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
               {{ else }}
@@ -623,6 +620,8 @@
                 <span class="flex space-x-1">
                   {{ if $v.required }}
                     {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                  {{ else if $v.required_when }}
+                    {{ partial "badge.html" (dict "word" (printf "required (when: %s)" $v.required_when) "color" "orange") }}
                   {{ else if $v.required_one_of }}
                     {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                   {{ else }}
@@ -663,6 +662,8 @@
                               <span class="flex space-x-1">
                                 {{ if $v.required }}
                                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                                {{ else if $v.required_when }}
+                                  {{ partial "badge.html" (dict "word" (printf "required (when: %s)" $v.required_when) "color" "orange") }}
                                 {{ else if $v.required_one_of }}
                                   {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                                 {{ else }}
@@ -2043,6 +2044,8 @@
           <span class="flex space-x-1">
             {{ if $v.required }}
               {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+            {{ else if $v.required_when }}
+              {{ partial "badge.html" (dict "word" (printf "required (when: %s)" $v.required_when) "color" "orange") }}
             {{ else if $v.required_one_of }}
               {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
             {{ else }}
@@ -2120,12 +2123,6 @@
             <strong>Note</strong>: This parameter supports Vector's
             <a href="/docs/reference/configuration/template-syntax">template syntax</a>, which enables you to use
             dynamic per-event values.
-          </div>
-        {{ end }}
-
-        {{ with $v.required_when }}
-          <div class="mt-2">
-            <span> Required when: <code>{{ . }}</code> </span>
           </div>
         {{ end }}
 
