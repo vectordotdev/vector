@@ -26,7 +26,7 @@ use vrl::{
 };
 
 use super::{
-    EventFinalizers, Finalizable, KeyString, ObjectMap, Value,
+    EventFinalizers, Finalizable, KeyString, MergeFinalizable, ObjectMap, Value,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
@@ -221,6 +221,12 @@ impl ByteSizeOf for LogEvent {
 impl Finalizable for LogEvent {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.metadata.take_finalizers()
+    }
+}
+
+impl MergeFinalizable for LogEvent {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
     }
 }
 
@@ -894,8 +900,8 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let one = expected_value.remove("one", true).unwrap();
-        expected_value.insert("three", one);
+        let one = expected_value.remove(path!("one"), true).unwrap();
+        expected_value.insert(path!("three"), one);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
         base.rename_key(event_path!("one"), event_path!("three"));
@@ -914,8 +920,8 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let val = expected_value.remove("one", true).unwrap();
-        expected_value.insert("two", val);
+        let val = expected_value.remove(path!("one"), true).unwrap();
+        expected_value.insert(path!("two"), val);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
         base.rename_key(event_path!("one"), event_path!("two"));
@@ -928,20 +934,20 @@ mod test {
     fn insert() {
         let mut log = LogEvent::default();
 
-        let old = log.insert("foo", "foo");
+        let old = log.insert(event_path!("foo"), "foo");
 
-        assert_eq!(log.get("foo"), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
         assert_eq!(old, None);
     }
 
     #[test]
     fn insert_existing() {
         let mut log = LogEvent::default();
-        log.insert("foo", "foo");
+        log.insert(event_path!("foo"), "foo");
 
-        let old = log.insert("foo", "bar");
+        let old = log.insert(event_path!("foo"), "bar");
 
-        assert_eq!(log.get("foo"), Some(&"bar".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"bar".into()));
         assert_eq!(old, Some("foo".into()));
     }
 
@@ -949,39 +955,39 @@ mod test {
     fn try_insert() {
         let mut log = LogEvent::default();
 
-        log.try_insert("foo", "foo");
+        log.try_insert(event_path!("foo"), "foo");
 
-        assert_eq!(log.get("foo"), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
     fn try_insert_existing() {
         let mut log = LogEvent::default();
-        log.insert("foo", "foo");
+        log.insert(event_path!("foo"), "foo");
 
-        log.try_insert("foo", "bar");
+        log.try_insert(event_path!("foo"), "bar");
 
-        assert_eq!(log.get("foo"), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
-    fn try_insert_dotted() {
+    fn try_insert_nested() {
         let mut log = LogEvent::default();
 
-        log.try_insert("foo.bar", "foo");
+        log.try_insert(event_path!("foo", "bar"), "foo");
 
-        assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo", "bar")), Some(&"foo".into()));
         assert_eq!(log.get(event_path!("foo.bar")), None);
     }
 
     #[test]
-    fn try_insert_existing_dotted() {
+    fn try_insert_existing_nested() {
         let mut log = LogEvent::default();
-        log.insert("foo.bar", "foo");
+        log.insert(event_path!("foo", "bar"), "foo");
 
-        log.try_insert("foo.bar", "bar");
+        log.try_insert(event_path!("foo", "bar"), "bar");
 
-        assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo", "bar")), Some(&"foo".into()));
         assert_eq!(log.get(event_path!("foo.bar")), None);
     }
 
@@ -1011,7 +1017,6 @@ mod test {
         log.try_insert(event_path!("foo.bar"), "foo");
 
         assert_eq!(log.get(event_path!("foo.bar")), Some(&"foo".into()));
-        assert_eq!(log.get("foo.bar"), None);
     }
 
     #[test]
@@ -1022,7 +1027,6 @@ mod test {
         log.try_insert(event_path!("foo.bar"), "bar");
 
         assert_eq!(log.get(event_path!("foo.bar")), Some(&"foo".into()));
-        assert_eq!(log.get("foo.bar"), None);
     }
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
@@ -1092,14 +1096,14 @@ mod test {
         let current = {
             let mut log = LogEvent::default();
 
-            log.insert("merge", "hello "); // will be concatenated with the `merged` from `incoming`.
-            log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
+            log.insert(event_path!("merge"), "hello "); // will be concatenated with the `merged` from `incoming`.
+            log.insert(event_path!("do_not_merge"), "my_first_value"); // will remain as is, since it's not selected for merging.
 
-            log.insert("merge_a", true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
-            log.insert("merge_b", 123i64); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
+            log.insert(event_path!("merge_a"), true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
+            log.insert(event_path!("merge_b"), 123i64); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
 
-            log.insert("a", true); // will remain as is since it's not selected for merge.
-            log.insert("b", 123i64); // will remain as is since it's not selected for merge.
+            log.insert(event_path!("a"), true); // will remain as is since it's not selected for merge.
+            log.insert(event_path!("b"), 123i64); // will remain as is since it's not selected for merge.
 
             // `c` is not present in the `current`, and not selected for merge,
             // so it won't be included in the final event.
@@ -1110,16 +1114,16 @@ mod test {
         let incoming = {
             let mut log = LogEvent::default();
 
-            log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
-            log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
+            log.insert(event_path!("merge"), "world"); // will be concatenated to the `merge` from `current`.
+            log.insert(event_path!("do_not_merge"), "my_second_value"); // will be ignored, since it's not selected for merge.
 
-            log.insert("merge_b", 456i64); // will be merged in as `456`.
-            log.insert("merge_c", false); // will be merged in as `false`.
+            log.insert(event_path!("merge_b"), 456i64); // will be merged in as `456`.
+            log.insert(event_path!("merge_c"), false); // will be merged in as `false`.
 
             // `a` will remain as-is, since it's not marked for merge and
             // neither is it specified in the `incoming` event.
-            log.insert("b", 456i64); // `b` not marked for merge, will not change.
-            log.insert("c", true); // `c` not marked for merge, will be ignored.
+            log.insert(event_path!("b"), 456i64); // `b` not marked for merge, will not change.
+            log.insert(event_path!("c"), true); // `c` not marked for merge, will be ignored.
 
             log
         };
@@ -1129,13 +1133,13 @@ mod test {
 
         let expected = {
             let mut log = LogEvent::default();
-            log.insert("merge", "hello world");
-            log.insert("do_not_merge", "my_first_value");
-            log.insert("a", true);
-            log.insert("b", 123i64);
-            log.insert("merge_a", true);
-            log.insert("merge_b", 456i64);
-            log.insert("merge_c", false);
+            log.insert(event_path!("merge"), "hello world");
+            log.insert(event_path!("do_not_merge"), "my_first_value");
+            log.insert(event_path!("a"), true);
+            log.insert(event_path!("b"), 123i64);
+            log.insert(event_path!("merge_a"), true);
+            log.insert(event_path!("merge_b"), 456i64);
+            log.insert(event_path!("merge_c"), false);
             log
         };
 
@@ -1145,9 +1149,9 @@ mod test {
     #[test]
     fn event_fields_iter() {
         let mut log = LogEvent::default();
-        log.insert("a", 0);
-        log.insert("a.b", 1);
-        log.insert("c", 2);
+        log.insert(event_path!("a"), 0);
+        log.insert(event_path!("a", "b"), 1);
+        log.insert(event_path!("c"), 2);
         let actual: Vec<(KeyString, Value)> = log
             .all_event_fields()
             .unwrap()
@@ -1162,9 +1166,9 @@ mod test {
     #[test]
     fn metadata_fields_iter() {
         let mut log = LogEvent::default();
-        log.insert("%a", 0);
-        log.insert("%a.b", 1);
-        log.insert("%c", 2);
+        log.insert(metadata_path!("a"), 0);
+        log.insert(metadata_path!("a", "b"), 1);
+        log.insert(metadata_path!("c"), 2);
         let actual: Vec<(KeyString, Value)> = log
             .all_metadata_fields()
             .unwrap()

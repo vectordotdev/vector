@@ -70,6 +70,7 @@ pub struct GcsRequestSettings {
     pub content_type: HeaderValue,
     pub content_encoding: Option<HeaderValue>,
     pub storage_class: HeaderValue,
+    pub cache_control: Option<HeaderValue>,
     pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
@@ -129,6 +130,9 @@ impl Service<GcsRequest> for GcsService {
             .content_encoding
             .map(|ce| headers.insert("content-encoding", ce));
         settings.acl.map(|acl| headers.insert("x-goog-acl", acl));
+        settings
+            .cache_control
+            .map(|cc| headers.insert("cache-control", cc));
         headers.insert("x-goog-storage-class", settings.storage_class);
         for (p, v) in settings.headers {
             headers.insert(p, v);

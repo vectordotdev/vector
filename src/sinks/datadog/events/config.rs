@@ -14,7 +14,10 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{ServiceBuilderExt, TowerRequestConfig, http::HttpStatusRetryLogic},
+        util::{
+            ServiceBuilderExt, TowerRequestConfig,
+            http::{HttpStatusRetryLogic, RetryStrategy},
+        },
     },
     tls::MaybeTlsSettings,
 };
@@ -33,12 +36,16 @@ pub struct DatadogEventsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 impl GenerateConfig for DatadogEventsConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            default_api_key: ${DATADOG_API_KEY_ENV_VAR}
         "#})
         .unwrap()
     }
@@ -64,7 +71,10 @@ impl DatadogEventsConfig {
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
-        let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse| req.http_status);
+        let retry_logic = HttpStatusRetryLogic::new(
+            |req: &DatadogEventsResponse| req.http_status,
+            self.retry_strategy.clone(),
+        );
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)

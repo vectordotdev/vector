@@ -21,6 +21,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct RequestConfig {
     /// HTTP headers to add to the request.
+    #[configurable(metadata(docs::additional_props_description = "An HTTP header."))]
     #[serde(default)]
     pub headers: IndexMap<String, String>,
 }

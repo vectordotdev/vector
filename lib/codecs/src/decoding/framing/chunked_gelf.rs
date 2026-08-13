@@ -1,19 +1,18 @@
 use std::{
     any::Any,
     collections::HashMap,
-    io::Read,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snafu::{ResultExt, Snafu, ensure};
 use tokio::{self, task::JoinHandle};
 use tokio_util::codec::Decoder;
 use tracing::{debug, trace, warn};
 use vector_common::constants::{GZIP_MAGIC, ZLIB_MAGIC};
+use vector_common::decompression::CappedDecoder;
 use vector_config::configurable_component;
 
 use super::{BoxedFramingError, FramingError};
@@ -54,7 +53,7 @@ impl ChunkedGelfDecoderConfig {
 #[derivative(Default)]
 pub struct ChunkedGelfDecoderOptions {
     /// The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
-    /// decoder drops all the received chunks of the timed out message.
+    /// decoder drops all received chunks for the timed-out message.
     #[serde(default = "default_timeout_secs")]
     #[derivative(Default(value = "default_timeout_secs()"))]
     pub timeout_secs: f64,
@@ -66,15 +65,15 @@ pub struct ChunkedGelfDecoderOptions {
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub pending_messages_limit: Option<usize>,
 
-    /// The maximum length of a single GELF message, in bytes. Messages longer than this length will
-    /// be dropped. If this option is not set, the decoder does not limit the length of messages and
+    /// The maximum length of a single GELF message, in bytes. Messages longer than this length are
+    /// dropped. If this option is not set, the decoder does not limit the length of messages and
     /// the per-message memory is unbounded.
     ///
-    /// **Note**: A message can be composed of multiple chunks and this limit is applied to the whole
+    /// **Note**: A message can be composed of multiple chunks, and this limit applies to the whole
     /// message, not to individual chunks.
     ///
-    /// This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
-    /// The message's payload is the concatenation of all the chunks' payloads.
+    /// This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
+    /// The message payload is the concatenation of all chunk payloads.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub max_length: Option<usize>,
 
@@ -85,11 +84,10 @@ pub struct ChunkedGelfDecoderOptions {
 
 /// Decompression options for ChunkedGelfDecoder.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ChunkedGelfDecompressionConfig {
     /// Automatically detect the decompression method based on the magic bytes of the message.
-    #[derivative(Default)]
+    #[default]
     Auto,
     /// Use Gzip decompression.
     Gzip,
@@ -200,22 +198,14 @@ impl ChunkedGelfDecompression {
 
     pub fn decompress(&self, data: Bytes) -> Result<Bytes, ChunkedGelfDecompressionError> {
         let decompressed = match self {
-            Self::Gzip => {
-                let mut decoder = MultiGzDecoder::new(data.reader());
-                let mut decompressed = Vec::new();
-                decoder
-                    .read_to_end(&mut decompressed)
-                    .context(GzipDecompressionSnafu)?;
-                Bytes::from(decompressed)
-            }
-            Self::Zlib => {
-                let mut decoder = ZlibDecoder::new(data.reader());
-                let mut decompressed = Vec::new();
-                decoder
-                    .read_to_end(&mut decompressed)
-                    .context(ZlibDecompressionSnafu)?;
-                Bytes::from(decompressed)
-            }
+            Self::Gzip => CappedDecoder::gzip(data.reader())
+                .decompress()
+                .map(Bytes::from)
+                .context(GzipDecompressionSnafu)?,
+            Self::Zlib => CappedDecoder::zlib(data.reader())
+                .decompress()
+                .map(Bytes::from)
+                .context(ZlibDecompressionSnafu)?,
             Self::None => data,
         };
         Ok(decompressed)

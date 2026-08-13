@@ -4,11 +4,9 @@ components: sources: http_server: {
 	_port: 80
 
 	title: "HTTP Server"
-	alias: "http"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -92,7 +90,6 @@ components: sources: http_server: {
 				description: "An individual line from an `application/json` request"
 				fields: {
 					"*": {
-						common:        false
 						description:   "Any field contained in your JSON payload"
 						relevant_when: "encoding != \"text\""
 						required:      false

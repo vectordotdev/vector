@@ -407,10 +407,7 @@ fn annotate_from_pod_status(
             .map(|k| &k.path)
             .map(LegacyKey::Overwrite);
 
-        let value = value
-            .iter()
-            .filter_map(|k| k.ip.clone())
-            .collect::<Vec<String>>();
+        let value = value.iter().map(|k| k.ip.clone()).collect::<Vec<String>>();
 
         log_namespace.insert_source_metadata(Config::NAME, log, legacy_key, path!("pod_ips"), value)
     }
@@ -889,7 +886,7 @@ mod tests {
                 FieldsSpec::default(),
                 PodStatus {
                     pod_ips: Some(vec![PodIP {
-                        ip: Some("192.168.1.2".to_owned()),
+                        ip: "192.168.1.2".to_owned(),
                     }]),
                     ..Default::default()
                 },
@@ -919,10 +916,10 @@ mod tests {
                     pod_ip: Some("192.168.1.2".to_owned()),
                     pod_ips: Some(vec![
                         PodIP {
-                            ip: Some("192.168.1.2".to_owned()),
+                            ip: "192.168.1.2".to_owned(),
                         },
                         PodIP {
-                            ip: Some("192.168.1.3".to_owned()),
+                            ip: "192.168.1.3".to_owned(),
                         },
                     ]),
                     ..Default::default()
@@ -945,10 +942,10 @@ mod tests {
                     pod_ip: Some("192.168.1.2".to_owned()),
                     pod_ips: Some(vec![
                         PodIP {
-                            ip: Some("192.168.1.2".to_owned()),
+                            ip: "192.168.1.2".to_owned(),
                         },
                         PodIP {
-                            ip: Some("192.168.1.3".to_owned()),
+                            ip: "192.168.1.3".to_owned(),
                         },
                     ]),
                     ..Default::default()

@@ -144,7 +144,7 @@ releases: "0.28.0": {
 			type: "feat"
 			scopes: ["vrl: stdlib"]
 			description: """
-				`encode_gzip` and `decode_gzip` functions were added to VRL to interact with gzip'd
+				`encode_gzip` and `decode_gzip` functions were added to VRL to interact with gzip'ed
 				data.
 				"""
 			contributors: ["zamazan4ik"]

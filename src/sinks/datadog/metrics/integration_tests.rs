@@ -2,13 +2,13 @@ use std::num::NonZeroU32;
 
 use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
-use flate2::read::ZlibDecoder;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
@@ -29,6 +29,7 @@ use crate::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
             assert_sink_compliance,
         },
+        compression::is_zstd,
         map_event_batch_stream,
     },
 };
@@ -142,10 +143,11 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 }
 
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
-    let mut decompressor = ZlibDecoder::new(&payload[..]);
-    let mut decompressed = Vec::new();
-    let result = std::io::copy(&mut decompressor, &mut decompressed);
-    result.map(|_| decompressed)
+    if is_zstd(&payload) {
+        CappedDecoder::zstd(&payload[..])?.decompress()
+    } else {
+        CappedDecoder::zlib(&payload[..]).decompress()
+    }
 }
 
 #[tokio::test]
@@ -321,7 +323,9 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
             ddmetric_proto::metric_payload::MetricType::Gauge
         );
         assert_eq!(gauge.points[0].value, 5678.0);
-        assert_eq!(gauge.interval, 10);
+        // interval_ms is dropped during normalization (incremental → absolute conversion
+        // via into_absolute() sets interval_ms: None), so interval is always 0 for gauges.
+        assert_eq!(gauge.interval, 0);
     }
 
     // validate counter w interval = rate

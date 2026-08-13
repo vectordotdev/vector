@@ -10,6 +10,16 @@ use super::{
 };
 use crate::serde::bool_or_struct;
 
+#[expect(
+    clippy::ref_option,
+    reason = "we have to follow the serde calling convention"
+)]
+fn is_default_buffer_utilization_ewma_half_life_seconds(value: &Option<f64>) -> bool {
+    value.is_none_or(|seconds| {
+        seconds == vector_buffers::topology::channel::DEFAULT_EWMA_HALF_LIFE_SECONDS
+    })
+}
+
 #[derive(Debug, Snafu)]
 pub(crate) enum DataDirError {
     #[snafu(display("data_dir option required, but not given here or globally"))]
@@ -48,7 +58,7 @@ pub enum WildcardMatching {
 //
 // If this is modified, make sure those changes are reflected in the `ConfigBuilder::append`
 // function!
-#[configurable_component(global_option("global_option"))]
+#[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GlobalOptions {
     /// The directory used for persisting Vector state data.
@@ -58,7 +68,6 @@ pub struct GlobalOptions {
     ///
     /// Vector must have write permissions to this directory.
     #[serde(default = "crate::default_data_dir")]
-    #[configurable(metadata(docs::common = false))]
     pub data_dir: Option<PathBuf>,
 
     /// Set wildcard matching mode for inputs
@@ -66,7 +75,7 @@ pub struct GlobalOptions {
     /// Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
     /// to be accepted without causing an error.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub wildcard_matching: Option<WildcardMatching>,
 
     /// Default log schema for all events.
@@ -74,7 +83,10 @@ pub struct GlobalOptions {
     /// This is used if a component does not have its own specific log schema. All events use a log
     /// schema, whether or not the default is used, to assign event fields on incoming events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(
+        docs::required = false,
+        docs::warnings = "These settings are ignored when `schema.log_namespace` is set to `true`."
+    ))]
     pub log_schema: LogSchema,
 
     /// Telemetry options.
@@ -82,7 +94,7 @@ pub struct GlobalOptions {
     /// Determines whether `source` and `service` tags should be emitted with the
     /// `component_sent_*` and `component_received_*` events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub telemetry: Telemetry,
 
     /// The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
@@ -94,12 +106,11 @@ pub struct GlobalOptions {
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false))]
     pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub proxy: ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
@@ -113,7 +124,7 @@ pub struct GlobalOptions {
         deserialize_with = "bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    #[configurable(metadata(docs::common = true, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
@@ -131,7 +142,7 @@ pub struct GlobalOptions {
     /// Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
     /// so metrics live long enough to be emitted and captured.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     /// This allows configuring different expiration intervals for different metric sets.
@@ -140,18 +151,24 @@ pub struct GlobalOptions {
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
 
-    /// The alpha value for the exponential weighted moving average (EWMA) of source and transform
-    /// buffer utilization metrics.
+    /// The half-life, in seconds, for the exponential weighted moving average (EWMA) of source
+    /// and transform buffer utilization metrics.
     ///
     /// This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
-    /// observations. Values closer to 1.0 retain more of the previous value, leading to slower
-    /// adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+    /// observations. Longer half-lives retain more of the previous value, leading to slower
+    /// adjustments.
     ///
-    /// Must be between 0 and 1 exclusively (0 < alpha < 1).
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(validation(range(min = 0.0, max = 1.0)))]
-    #[configurable(metadata(docs::advanced))]
-    pub buffer_utilization_ewma_alpha: Option<f64>,
+    /// - Lower values (< 1): Metrics update quickly but may be volatile
+    /// - Default (5): Balanced between responsiveness and stability
+    /// - Higher values (> 5): Smooth, stable metrics that update slowly
+    ///
+    /// Adjust based on whether you need fast detection of buffer issues (lower)
+    /// or want to see sustained trends without noise (higher).
+    ///
+    /// Must be greater than 0.
+    #[serde(skip_serializing_if = "is_default_buffer_utilization_ewma_half_life_seconds")]
+    #[configurable(validation(range(min = 0.0)))]
+    pub buffer_utilization_ewma_half_life_seconds: Option<f64>,
 
     /// The alpha value for the exponential weighted moving average (EWMA) of transform latency
     /// metrics.
@@ -163,7 +180,6 @@ pub struct GlobalOptions {
     /// Must be between 0 and 1 exclusively (0 < alpha < 1).
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
-    #[configurable(metadata(docs::advanced))]
     pub latency_ewma_alpha: Option<f64>,
 
     /// The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
@@ -196,9 +212,8 @@ impl GlobalOptions {
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
         }
-        let readonly = std::fs::metadata(&data_dir)
-            .map(|meta| meta.permissions().readonly())
-            .unwrap_or(true);
+        let readonly =
+            std::fs::metadata(&data_dir).map_or(true, |meta| meta.permissions().readonly());
         if readonly {
             return Err(DataDirError::NotWritable { data_dir }.into());
         }
@@ -321,9 +336,9 @@ impl GlobalOptions {
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
                 expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
-                buffer_utilization_ewma_alpha: self
-                    .buffer_utilization_ewma_alpha
-                    .or(with.buffer_utilization_ewma_alpha),
+                buffer_utilization_ewma_half_life_seconds: self
+                    .buffer_utilization_ewma_half_life_seconds
+                    .or(with.buffer_utilization_ewma_half_life_seconds),
                 latency_ewma_alpha: self.latency_ewma_alpha.or(with.latency_ewma_alpha),
                 metrics_storage_refresh_period: self
                     .metrics_storage_refresh_period

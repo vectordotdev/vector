@@ -1,16 +1,22 @@
 use std::{sync::Arc, task::Poll};
 
 use greptimedb_ingester::{
-    Client, ClientBuilder, Compression, Database, Error as GreptimeError,
-    api::v1::{auth_header::AuthScheme, *},
-    channel_manager::*,
+    Error as GreptimeError, GrpcCompression as IngesterGrpcCompression,
+    api::v1::Basic,
+    api::v1::auth_header::AuthScheme,
+    channel_manager::{ChannelConfig, ChannelManager, ClientTlsOption},
+    client::Client,
+    database::Database,
 };
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::{
-    greptimedb::metrics::{
-        config::GreptimeDBMetricsConfig,
-        request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+    greptimedb::{
+        GrpcCompression,
+        metrics::{
+            config::GreptimeDBMetricsConfig,
+            request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+        },
     },
     prelude::*,
 };
@@ -22,49 +28,63 @@ pub struct GreptimeDBGrpcService {
 }
 
 fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result<Client> {
-    let mut builder = ClientBuilder::default().peers(vec![&config.endpoint]);
+    let send_compression_encoding = match config.compression {
+        GrpcCompression::None => None,
+        GrpcCompression::Gzip => Some(IngesterGrpcCompression::Gzip),
+        GrpcCompression::Zstd => Some(IngesterGrpcCompression::Zstd),
+    };
 
-    if let Some(compression) = config.compression.as_ref() {
-        let compression = match compression.as_str() {
-            "gzip" => Compression::Gzip,
-            "zstd" => Compression::Zstd,
-            _ => {
-                warn!(message = "Unknown gRPC compression type: {compression}, disabled.");
-                Compression::None
+    let mut channel_config = ChannelConfig {
+        send_compression_encoding,
+        ..Default::default()
+    };
+
+    let channel_manager = if let Some(tls_config) = &config.tls {
+        let TlsConfig {
+            verify_certificate,
+            verify_hostname,
+            alpn_protocols,
+            ca_file,
+            crt_file,
+            key_file,
+            key_pass,
+            server_name,
+        } = tls_config;
+
+        if verify_certificate.is_some()
+            || verify_hostname.is_some()
+            || alpn_protocols.is_some()
+            || key_pass.is_some()
+            || server_name.is_some()
+        {
+            warn!(
+                message = "TlsConfig: verify_certificate, verify_hostname, alpn_protocols, key_pass and server_name are not supported by greptimedb client at the moment."
+            );
+        }
+
+        // The greptimedb ingester requires all three TLS paths (ca_file, crt_file,
+        // key_file) to be set. Refuse a partial config rather than downgrading to plaintext.
+        match (ca_file, crt_file, key_file) {
+            (Some(ca), Some(crt), Some(key)) => {
+                channel_config.client_tls = Some(ClientTlsOption {
+                    server_ca_cert_path: ca.to_string_lossy().into_owned(),
+                    client_cert_path: crt.to_string_lossy().into_owned(),
+                    client_key_path: key.to_string_lossy().into_owned(),
+                });
+                ChannelManager::with_tls_config(channel_config).map_err(Box::new)?
             }
-        };
-        builder = builder.compression(compression);
-    }
+            _ => {
+                return Err(
+                    "GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set.".into(),
+                );
+            }
+        }
+    } else {
+        ChannelManager::with_config(channel_config)
+    };
+    let client = Client::with_manager_and_urls(channel_manager, vec![&config.endpoint]);
 
-    if let Some(tls_config) = &config.tls {
-        let channel_config = ChannelConfig {
-            client_tls: Some(try_from_tls_config(tls_config)?),
-            ..Default::default()
-        };
-
-        builder = builder
-            .channel_manager(ChannelManager::with_tls_config(channel_config).map_err(Box::new)?);
-    }
-
-    Ok(builder.build())
-}
-
-fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
-    if tls_config.key_pass.is_some()
-        || tls_config.alpn_protocols.is_some()
-        || tls_config.verify_certificate.is_some()
-        || tls_config.verify_hostname.is_some()
-    {
-        warn!(
-            message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
-        );
-    }
-
-    Ok(ClientTlsOption {
-        server_ca_cert_path: tls_config.ca_file.clone(),
-        client_cert_path: tls_config.crt_file.clone(),
-        client_key_path: tls_config.key_file.clone(),
-    })
+    Ok(client)
 }
 
 impl GreptimeDBGrpcService {
@@ -103,7 +123,7 @@ impl Service<GreptimeDBGrpcRequest> for GreptimeDBGrpcService {
 
         Box::pin(async move {
             let metadata = req.metadata;
-            let result = client.row_insert(req.items).await?;
+            let result = client.insert(req.items).await?;
 
             Ok(GreptimeDBGrpcBatchOutput {
                 _item_count: result,
@@ -119,7 +139,7 @@ pub(super) struct GreptimeDBGrpcServiceConfig {
     dbname: String,
     username: Option<String>,
     password: Option<SensitiveString>,
-    compression: Option<String>,
+    compression: GrpcCompression,
     tls: Option<TlsConfig>,
 }
 
@@ -130,7 +150,7 @@ impl From<&GreptimeDBMetricsConfig> for GreptimeDBGrpcServiceConfig {
             dbname: val.dbname.clone(),
             username: val.username.clone(),
             password: val.password.clone(),
-            compression: val.grpc_compression.clone(),
+            compression: val.grpc_compression,
             tls: val.tls.clone(),
         }
     }

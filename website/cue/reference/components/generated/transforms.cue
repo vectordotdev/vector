@@ -8,23 +8,58 @@ generated: components: transforms: configuration: {
 			Configure output for component when generated with graph command
 			"""
 		required: false
-		type: object: options: node_attributes: {
-			description: """
-				Node attributes to add to this component's node in resulting graph
+		type: object: options: {
+			edge_attributes: {
+				description: """
+					Edge attributes to add to the edges linked to this component's node in resulting graph
 
-				They are added to the node as provided
-				"""
-			required: false
-			type: object: {
-				examples: [{
-					color: "red"
-					name:  "Example Node"
-					width: "5.0"
-				}]
-				options: "*": {
-					description: "A single graph node attribute in graphviz DOT language."
-					required:    true
-					type: string: {}
+					They are added to the edge as provided
+					"""
+				required: false
+				type: object: {
+					examples: [{
+						example_input: {
+							color: "red"
+							label: "Example Edge"
+							width: "5.0"
+						}
+					}]
+					options: "*": {
+						description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
+						required:    true
+						type: object: {
+							examples: [{
+								color: "red"
+								label: "Example Edge"
+								width: "5.0"
+							}]
+							options: "*": {
+								description: "A single graph edge attribute in graphviz DOT language."
+								required:    true
+								type: string: {}
+							}
+						}
+					}
+				}
+			}
+			node_attributes: {
+				description: """
+					Node attributes to add to this component's node in resulting graph
+
+					They are added to the node as provided
+					"""
+				required: false
+				type: object: {
+					examples: [{
+						color: "red"
+						name:  "Example Node"
+						width: "5.0"
+					}]
+					options: "*": {
+						description: "A single graph node attribute in graphviz DOT language."
+						required:    true
+						type: string: {}
+					}
 				}
 			}
 		}
@@ -43,5 +78,19 @@ generated: components: transforms: configuration: {
 			"""
 		required: true
 		type: array: items: type: string: examples: ["my-source-or-transform-id", "prefix-*"]
+	}
+	measure_cpu_usage: {
+		description: """
+			Enable CPU usage metrics for this transform.
+
+			When set to `true`, each poll of the transform task is timed using the OS thread CPU clock
+			and the accumulated nanoseconds are reported as the `component_cpu_usage_ns_total` counter,
+			tagged with `component_id`, `component_kind`, and `component_type`.
+
+			Defaults to `false`. Enable only for transforms where CPU attribution is needed, as it
+			adds a `clock_gettime` call on every future poll.
+			"""
+		required: false
+		type: bool: default: false
 	}
 }

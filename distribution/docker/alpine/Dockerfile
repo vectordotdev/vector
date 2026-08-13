@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.23 AS builder
+FROM docker.io/alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS builder
 
 WORKDIR /vector
 
@@ -12,7 +12,7 @@ RUN ARCH=$(if [ "$TARGETPLATFORM" = "linux/arm/v6" ]; then echo "arm"; else cat 
 
 RUN mkdir -p /var/lib/vector
 
-FROM docker.io/alpine:3.23
+FROM docker.io/alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md
 LABEL org.opencontainers.image.url="https://vector.dev"
@@ -24,7 +24,7 @@ LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
-COPY --from=builder /vector/config/vector.yaml /etc/vector/vector.yaml
+COPY --from=builder /vector/config/vector.yaml /usr/share/vector/examples/vector.yaml
 COPY --from=builder /var/lib/vector /var/lib/vector
 
 # Smoke test

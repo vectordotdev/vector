@@ -12,13 +12,17 @@ mod cli;
 #[cfg(feature = "shutdown-tests")]
 mod shutdown;
 
-// Top tests use Unix signals (SIGTERM, SIGHUP) via the nix crate
-#[cfg(all(feature = "top", target_family = "unix"))]
-mod top;
-
 /// Creates a file with given content
 pub fn create_file(config: &str) -> PathBuf {
     let path = temp_file();
+    overwrite_file(path.clone(), config);
+    path
+}
+
+/// Creates a YAML config file (`.yaml` extension so Vector parses it as YAML)
+pub fn create_yaml_file(config: &str) -> PathBuf {
+    let mut path = temp_file();
+    path.set_extension("yaml");
     overwrite_file(path.clone(), config);
     path
 }

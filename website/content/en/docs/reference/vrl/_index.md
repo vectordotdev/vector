@@ -166,14 +166,14 @@ flexibility. This makes VRL ideal for critical, performance-sensitive
 infrastructure, like observability pipelines. To illustrate how we achieve these,
 below is a VRL feature matrix across these principles:
 
-| Feature                                       | Safety | Performance |
-| :-------------------------------------------- | :----- | :---------- |
-| [Compilation](#compilation)                   | ✅      | ✅           |
-| [Ergonomic safety](#ergonomic-safety)         | ✅      | ✅           |
-| [Fail safety](#fail-safety)                   | ✅      |             |
-| [Memory safety](#memory-safety)               | ✅      |             |
-| [Vector and Rust native](#vector-rust-native) | ✅      | ✅           |
-| [Statelessness](#stateless)                   | ✅      | ✅           |
+| Feature | Safety | Performance |
+| :-- | :----- | :---------- |
+| [Compilation](#compilation) | ✅ | ✅ |
+| [Ergonomic safety](#ergonomic-safety) | ✅ | ✅ |
+| [Fail safety](#fail-safety) | ✅ | |
+| [Memory safety](#memory-safety) | ✅ | |
+| [Vector and Rust native](#vector-rust-native) | ✅ | ✅ |
+| [Statelessness](#stateless) | ✅ | ✅ |
 
 ## Concepts
 

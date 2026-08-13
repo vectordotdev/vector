@@ -1,4 +1,7 @@
 CUE = ../scripts/cue.sh
+VDEV ?= cargo vdev
+
+export CI ?= false
 
 # Override to specify which network address to use in Hugo/HTTP servers for binding
 export SERVER_BIND ?= 127.0.0.1
@@ -8,7 +11,12 @@ export SERVER_PORT ?= 1313
 clean:
 	rm -rf public resources data/cargo-lock.toml data/docs.json
 
-setup:
+.PHONY: setup-vdev
+setup-vdev:
+	cd .. && scripts/environment/prepare.sh --modules=vdev,prettier
+
+.PHONY: setup
+setup: setup-vdev
 	yarn
 
 # Copy Cargo data such as the dependency information file
@@ -16,13 +24,24 @@ cargo-data:
 	cp -f ../Cargo.lock data/cargo-lock.toml
 
 # Build JSON from CUE sources with `make cue-build`. Run other commands with `make cue-*`
+cue-build:
+	$(VDEV) build docs-json
+
 cue-%:
 	${CUE} $*
 
-config-examples:
-	yarn config-examples
+.PHONY: config-examples
+config-examples: setup-vdev
+	$(VDEV) build component-examples website/generated/example-configs
 
-structured-data: cue-build config-examples
+generate-vrl-docs:
+	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
+		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
+
+generate-deprecations-json:
+	$(VDEV) deprecation generate
+
+structured-data: generate-vrl-docs generate-deprecations-json config-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \

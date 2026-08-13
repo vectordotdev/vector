@@ -294,6 +294,22 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 			}
 		}
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	default_namespace: {
 		description: """
 			The default namespace for any metrics sent.
@@ -318,7 +334,6 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
 	expire_metrics_secs: {
-		common: false
 		description: """
 			The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
 			after having not been updated before they expire and are removed.
@@ -341,14 +356,8 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 		}
 	}
 	request: {
-		description: """
-			Middleware settings for outbound requests.
-
-			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
-
-			Note that the retry backoff policy follows the Fibonacci sequence.
-			"""
-		required: false
+		description: "Outbound HTTP request settings for the Prometheus remote write sink."
+		required:    false
 		type: object: options: {
 			adaptive_concurrency: {
 				description: """
@@ -447,6 +456,25 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 					uint: {}
 				}
 			}
+			headers: {
+				description: """
+					Additional HTTP headers to add to every HTTP request.
+
+					Values are applied verbatim; template expansion is not supported.
+					"""
+				required: false
+				type: object: {
+					examples: [{
+						Accept:               "text/plain"
+						"X-My-Custom-Header": "A-Value"
+					}]
+					options: "*": {
+						description: "An HTTP request header and its static value."
+						required:    true
+						type: string: {}
+					}
+				}
+			}
 			rate_limit_duration_secs: {
 				description: "The time window used for the `rate_limit_num` option."
 				required:    false
@@ -522,6 +550,37 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 				type: uint: {
 					default: 60
 					unit:    "seconds"
+				}
+			}
+		}
+	}
+	retry_strategy: {
+		description: """
+			Configurable retry strategy for `http` based sinks.
+
+			For more information about error responses, see [Client Error Responses][error_responses].
+
+			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+			"""
+		required: false
+		type: object: options: {
+			status_codes: {
+				description:   "Retry on these specific HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
+				type: array: items: type: uint: {}
+			}
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "default"
+					enum: {
+						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
+						custom:  "Custom retry strategy"
+						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
+						none:    "Don't retry any errors, including request timeouts."
+					}
 				}
 			}
 		}

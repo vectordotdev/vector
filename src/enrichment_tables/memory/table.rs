@@ -1,6 +1,8 @@
 #![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
 
 use std::{
+    num::NonZeroU64,
+    pin::Pin,
     sync::{Arc, Mutex, MutexGuard},
     time::{Duration, Instant},
 };
@@ -12,7 +14,10 @@ use evmap::{
     {self},
 };
 use evmap_derive::ShallowCopy;
-use futures::{StreamExt, stream::BoxStream};
+use futures::{
+    Stream, StreamExt,
+    stream::{self, BoxStream},
+};
 use thread_local::ThreadLocal;
 use tokio::{
     sync::broadcast::{Receiver, Sender},
@@ -22,7 +27,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    enrichment::{Case, Condition, IndexHandle, Table},
+    enrichment::{Case, Condition, Error, IndexHandle, InternalError, Table},
     event::{Event, EventStatus, Finalizable},
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
@@ -60,7 +65,7 @@ impl ByteSizeOf for MemoryEntry {
 }
 
 impl MemoryEntry {
-    pub(super) fn as_object_map(&self, now: Instant, key: &str) -> Result<ObjectMap, String> {
+    pub(super) fn as_object_map(&self, now: Instant, key: &str) -> Result<ObjectMap, Error> {
         let ttl = self
             .ttl
             .saturating_sub(now.duration_since(*self.update_time).as_secs());
@@ -71,8 +76,12 @@ impl MemoryEntry {
             ),
             (
                 KeyString::from("value"),
-                serde_json::from_str::<Value>(&self.value)
-                    .map_err(|_| "Failed to read value from memory!")?,
+                // Unreachable in normal operation: `value` was serialized by `handle_value`.
+                serde_json::from_str::<Value>(&self.value).map_err(|source| Error::Internal {
+                    source: InternalError::FailedToDecode {
+                        details: source.to_string(),
+                    },
+                })?,
             ),
             (
                 KeyString::from("ttl"),
@@ -135,6 +144,25 @@ impl Memory {
             })),
             expired_items_sender: expired_tx,
             expired_items_receiver: expired_rx,
+        }
+    }
+
+    /// Creates a new [Memory] based on the provided config and previous state.
+    pub fn from_previous_state(
+        config: MemoryConfig,
+        prev_state: Box<dyn std::any::Any + Send + Sync>,
+    ) -> Self {
+        if let Ok(prev_memory) = prev_state.downcast::<Memory>() {
+            Self {
+                config,
+                read_handle_factory: prev_memory.read_handle_factory,
+                read_handle: prev_memory.read_handle,
+                write_handle: prev_memory.write_handle,
+                expired_items_sender: prev_memory.expired_items_sender,
+                expired_items_receiver: prev_memory.expired_items_receiver,
+            }
+        } else {
+            Self::new(config)
         }
     }
 
@@ -321,13 +349,13 @@ impl Table for Memory {
         select: Option<&'a [String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
-            Some(_) => Err("More than 1 row found".to_string()),
-            None => Err("Key not found".to_string()),
+            Some(_) => Err(Error::MoreThanOneRowFound),
+            None => Err(Error::NoRowsFound),
         }
     }
 
@@ -338,9 +366,9 @@ impl Table for Memory {
         _select: Option<&'a [String]>,
         _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         match condition.first() {
-            Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
+            Some(_) if condition.len() > 1 => Err(Error::OnlyOneConditionAllowed),
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy();
                 match self.get_read_handle().get_one(key.as_ref()) {
@@ -360,16 +388,16 @@ impl Table for Memory {
                     }
                 }
             }
-            Some(_) => Err("Only equality condition is allowed".to_string()),
-            None => Err("Key condition must be specified".to_string()),
+            Some(_) => Err(Error::OnlyEqualityConditionAllowed),
+            None => Err(Error::MissingCondition { kind: "Key" }),
         }
     }
 
-    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         match fields.len() {
-            0 => Err("Key field is required".to_string()),
+            0 => Err(Error::MissingRequiredField { field: "Key" }),
             1 => Ok(IndexHandle(0)),
-            _ => Err("Only one field is allowed".to_string()),
+            _ => Err(Error::OnlyOneFieldAllowed),
         }
     }
 
@@ -381,6 +409,12 @@ impl Table for Memory {
     /// Doesn't need reload, data is written directly
     fn needs_reload(&self) -> bool {
         false
+    }
+
+    fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        let writer = self.write_handle.lock().expect("mutex poisoned");
+        self.flush(writer);
+        Some(Box::new(self.clone()))
     }
 }
 
@@ -395,12 +429,15 @@ impl StreamSink<Event> for Memory {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
-        let mut flush_interval = IntervalStream::new(interval(
-            self.config
-                .flush_interval
-                .map(Duration::from_secs)
-                .unwrap_or(Duration::MAX),
-        ));
+        let mut flush_interval: Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>> = self
+            .config
+            .flush_interval
+            .map(NonZeroU64::get)
+            .map(Duration::from_secs)
+            .map::<Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>>, _>(|d| {
+                Box::pin(IntervalStream::new(interval(d)))
+            })
+            .unwrap_or(Box::pin(stream::empty()));
         let mut scan_interval = IntervalStream::new(interval(Duration::from_secs(
             self.config.scan_interval.into(),
         )));
@@ -461,6 +498,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::EnrichmentTableConfig,
         enrichment_tables::memory::{
             config::MemorySourceConfig, internal_events::InternalMetricsConfig,
         },
@@ -494,6 +532,43 @@ mod tests {
                 ("value".into(), Value::from(5)),
             ])),
             memory.find_table_row(Case::Sensitive, &[condition], None, None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn extract_state_preserves_data() {
+        let memory = Memory::new(Default::default());
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        let expected = ObjectMap::from([
+            ("key".into(), Value::from("test_key")),
+            ("ttl".into(), Value::from(memory.config.ttl)),
+            ("value".into(), Value::from(5)),
+        ]);
+        assert_eq!(
+            Ok(expected.clone()),
+            memory.find_table_row(
+                Case::Sensitive,
+                std::slice::from_ref(&condition),
+                None,
+                None,
+                None
+            )
+        );
+
+        // Now build a new table using old state
+        let new_memory = MemoryConfig::default()
+            .build(&Default::default(), memory.extract_state())
+            .await
+            .unwrap();
+        assert_eq!(
+            Ok(expected),
+            new_memory.find_table_row(Case::Sensitive, &[condition], None, None, None)
         );
     }
 
@@ -640,7 +715,7 @@ mod tests {
         let ttl = 100;
         let memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
-            c.flush_interval = Some(10);
+            c.flush_interval = NonZeroU64::new(10);
         }));
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -879,7 +954,7 @@ mod tests {
         )])));
 
         let memory = Memory::new(build_memory_config(|c| {
-            c.flush_interval = Some(1);
+            c.flush_interval = NonZeroU64::new(1);
         }));
 
         run_and_assert_sink_compliance(
@@ -1019,7 +1094,7 @@ mod tests {
             export_expired_items: false,
             source_key: "test".to_string(),
         });
-        let memory = memory_config.get_or_build_memory().await;
+        let memory = memory_config.get_or_build_memory(None).await;
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let mut events: Vec<Event> = run_and_assert_source_compliance(

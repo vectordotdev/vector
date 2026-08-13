@@ -1,9 +1,13 @@
 mod experiment;
 mod experiment_no_truncations;
 
-use std::str;
+use std::{path::PathBuf, str, thread};
 
+use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
+use tokio::time::Instant;
+
+use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, null_reader};
 
 // Welcome.
 //
@@ -169,6 +173,113 @@ impl Arbitrary for FileWatcherAction {
             _ => FileWatcherAction::Exit,
         }
     }
+}
+
+#[tokio::test]
+async fn gzip_multi_stream_reads_all_members() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use std::fs;
+    use tokio::io::AsyncReadExt as _;
+
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("multi.gz");
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    // Write two separate gzip members into one file — the bug dropped the second.
+    let mut bytes = encode(b"first\n").await;
+    bytes.extend(encode(b"second\n").await);
+    fs::write(&path, &bytes).unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        100_000,
+        Bytes::from("\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let mut lines = Vec::new();
+    for _ in 0..10 {
+        fw.track_read_attempt();
+        let result = fw.read_line().await.expect("read_line error");
+        if let Some(raw) = result.raw_line {
+            lines.push(String::from_utf8(raw.bytes.to_vec()).unwrap());
+        }
+        if lines.len() == 2 {
+            break;
+        }
+    }
+
+    assert_eq!(lines, vec!["first", "second"]);
+}
+
+fn watcher_for_timing() -> FileWatcher {
+    let now = Instant::now();
+
+    FileWatcher {
+        path: PathBuf::new(),
+        findable: true,
+        reader: Box::new(null_reader()),
+        file_position: 0,
+        devno: 0,
+        inode: 0,
+        is_dead: false,
+        reached_eof: false,
+        last_read_attempt: now,
+        last_read_success: now,
+        read_retry_delay: EOF_READ_BACKOFF_MIN,
+        last_seen: now,
+        max_line_bytes: 1024,
+        line_delimiter: Bytes::from_static(b"\n"),
+        buf: BytesMut::new(),
+    }
+}
+
+#[test]
+fn backs_off_after_eof() {
+    let mut watcher = watcher_for_timing();
+
+    watcher.track_read_attempt();
+    watcher.track_read_eof();
+
+    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+    assert!(!watcher.should_read());
+
+    thread::sleep(EOF_READ_BACKOFF_MIN);
+
+    assert!(watcher.should_read());
+
+    watcher.track_read_attempt();
+    watcher.track_read_eof();
+
+    assert_eq!(
+        watcher.read_retry_delay,
+        EOF_READ_BACKOFF_MIN.saturating_mul(2)
+    );
+}
+
+#[test]
+fn caps_and_resets_eof_backoff() {
+    let mut watcher = watcher_for_timing();
+
+    for _ in 0..16 {
+        watcher.track_read_attempt();
+        watcher.track_read_eof();
+    }
+
+    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
+
+    watcher.track_read_success();
+
+    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+    assert!(!watcher.reached_eof());
 }
 
 #[inline]

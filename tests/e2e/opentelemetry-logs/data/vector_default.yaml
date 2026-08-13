@@ -46,10 +46,9 @@ transforms:
         ]
       }
 
-
 sinks:
   otel_sink:
-    inputs: [ "remap_otel" ]
+    inputs: ["remap_otel"]
     type: opentelemetry
     protocol:
       type: http

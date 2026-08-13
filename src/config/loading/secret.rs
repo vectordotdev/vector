@@ -8,13 +8,15 @@ use futures::TryFutureExt;
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use toml::value::Table;
 use vector_lib::config::ComponentKey;
 
 use crate::{
     config::{
         SecretBackend,
-        loading::{ComponentHint, Loader, deserialize_table, prepare_input, process::Process},
+        loading::{
+            ComponentHint, Loader, deserialize_config_map, prepare_input, process::Process,
+            representation::ConfigMap,
+        },
     },
     secrets::SecretBackends,
     signal,
@@ -23,12 +25,14 @@ use crate::{
 // The following regex aims to extract a pair of strings, the first being the secret backend name
 // and the second being the secret key. Here are some matching & non-matching examples:
 // - "SECRET[backend.secret_name]" will match and capture "backend" and "secret_name"
+// - "SECRET[my-backend.secret_name]" will match and capture "my-backend" and "secret_name"
 // - "SECRET[backend.secret.name]" will match and capture "backend" and "secret.name"
 // - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
+// - "SECRET[backend.path/to/secret]" will match and capture "backend" and "path/to/secret"
 // - "SECRET[secret_name]" will not match
 // - "SECRET[.secret.name]" will not match
 pub static COLLECTOR: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].-]+)\]").unwrap());
+    LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]").unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -96,13 +100,11 @@ impl SecretBackendLoader {
 }
 
 impl Default for SecretBackendLoader {
-    /// Creates a new SecretBackendLoader with default settings.
-    /// By default, environment variable interpolation is enabled.
     fn default() -> Self {
         Self {
             backends: IndexMap::new(),
             secret_keys: HashMap::new(),
-            interpolate_env: true,
+            interpolate_env: super::env_var_interpolation_enabled(),
         }
     }
 }
@@ -115,9 +117,9 @@ impl Process for SecretBackendLoader {
         Ok(config_string)
     }
 
-    fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if table.contains_key("secret") {
-            let additional = deserialize_table::<SecretBackendOuter>(table)?;
+    fn merge(&mut self, map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        if map.contains_key("secret") {
+            let additional = deserialize_config_map::<SecretBackendOuter>(map)?;
             self.backends.extend(additional.secret);
         }
         Ok(())
@@ -182,6 +184,9 @@ mod tests {
         let secrets: HashMap<String, String> = vec![
             ("a.secret.key".into(), "value".into()),
             ("a...key".into(), "a...value".into()),
+            ("backend.path/to/secret".into(), "secret_value".into()),
+            ("backend.nested/dir/file".into(), "nested_value".into()),
+            ("my-backend.secret.key".into(), "hyphenated_value".into()),
         ]
         .into_iter()
         .collect();
@@ -202,6 +207,18 @@ mod tests {
         assert_eq!(
             Ok("a...value".into()),
             interpolate("SECRET[a...key]", &secrets)
+        );
+        assert_eq!(
+            Ok("secret_value".into()),
+            interpolate("SECRET[backend.path/to/secret]", &secrets)
+        );
+        assert_eq!(
+            Ok("nested_value".into()),
+            interpolate("SECRET[backend.nested/dir/file]", &secrets)
+        );
+        assert_eq!(
+            Ok("hyphenated_value".into()),
+            interpolate("SECRET[my-backend.secret.key]", &secrets)
         );
         assert_eq!(
             Ok("xxxSECRET[non_matching_syntax]yyy".into()),
@@ -227,27 +244,39 @@ mod tests {
             SECRET[second_backend.secret.key]
             SECRET[first_backend.a_third.secret_key]
             SECRET[first_backend...an_extra_secret_key]
+            SECRET[third-backend.secret_key]
+            SECRET[first_backend.path/to/secret]
+            SECRET[second_backend.nested/dir/secret]
+            SECRET[third-backend.another-secret]
             SECRET[non_matching_syntax]
             SECRET[.non.matching.syntax]
         "},
             &mut keys,
         );
-        assert_eq!(keys.len(), 2);
+        assert_eq!(keys.len(), 3);
         assert!(keys.contains_key("first_backend"));
         assert!(keys.contains_key("second_backend"));
+        assert!(keys.contains_key("third-backend"));
 
         let first_backend_keys = keys.get("first_backend").unwrap();
-        assert_eq!(first_backend_keys.len(), 5);
+        assert_eq!(first_backend_keys.len(), 6);
         assert!(first_backend_keys.contains("secret_key"));
         assert!(first_backend_keys.contains("secret-key"));
         assert!(first_backend_keys.contains("another_secret_key"));
         assert!(first_backend_keys.contains("a_third.secret_key"));
         assert!(first_backend_keys.contains("..an_extra_secret_key"));
+        assert!(first_backend_keys.contains("path/to/secret"));
 
         let second_backend_keys = keys.get("second_backend").unwrap();
-        assert_eq!(second_backend_keys.len(), 2);
+        assert_eq!(second_backend_keys.len(), 3);
         assert!(second_backend_keys.contains("secret_key"));
         assert!(second_backend_keys.contains("secret.key"));
+        assert!(second_backend_keys.contains("nested/dir/secret"));
+
+        let third_backend_keys = keys.get("third-backend").unwrap();
+        assert_eq!(third_backend_keys.len(), 2);
+        assert!(third_backend_keys.contains("secret_key"));
+        assert!(third_backend_keys.contains("another-secret"));
     }
 
     #[test]

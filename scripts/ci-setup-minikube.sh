@@ -14,7 +14,7 @@ CONTAINER_RUNTIME="${CONTAINER_RUNTIME:?required}"
 set -x
 
 curl -Lo kubectl \
-  "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl"
+  "https://dl.k8s.io/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl"
 sudo install kubectl /usr/local/bin/ && rm kubectl
 
 curl -Lo minikube \

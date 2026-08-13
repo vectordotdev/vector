@@ -40,7 +40,7 @@ A **trace** event can be thought of as a special kind of log event. The componen
 **Note**: Support for traces is limited and is in alpha.
 
 If you’re interested in using traces with a Vector component that doesn’t yet support them,
-please check the list of open issues [here](https://github.com/vectordotdev/vector/issues?q=is%3Aissue+state%3Aopen+label%3A%22domain%3A%20traces%22).
+please check the [list of open traces issues](https://github.com/vectordotdev/vector/issues?q=is%3Aissue+state%3Aopen+label%3A%22domain%3A%20traces%22).
 If you don’t see your use case covered, feel free to [open a new issue](https://github.com/vectordotdev/vector/issues/new?template=feature.yml).
 
 
@@ -88,7 +88,7 @@ This is the default behavior. When a buffer fills up, backpressure will be appli
 `buffer.when_full = drop_newest`
 When a buffer fills up, new events will be dropped. This does _not_ provide backpressure.
 
-View the full configuration options for buffers [here](/docs/reference/configuration/sinks/vector/#buffer).
+View the [full buffer configuration options](/docs/reference/configuration/sinks/vector/#buffer).
 
 ## Backpressure
 

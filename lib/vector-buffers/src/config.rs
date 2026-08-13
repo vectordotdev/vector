@@ -153,8 +153,11 @@ impl<'de> Deserialize<'de> for BufferType {
     }
 }
 
+/// # Panics
+///
+/// Never panics; the value 500 is non-zero.
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(500) }
+    NonZeroUsize::new(500).expect("500 is non-zero")
 }
 
 /// Disk usage configuration for disk-backed buffers.
@@ -371,6 +374,13 @@ impl Default for BufferConfig {
 }
 
 impl BufferConfig {
+    /// Returns true if any stage in this buffer configuration uses disk-based storage.
+    pub fn has_disk_stage(&self) -> bool {
+        self.stages()
+            .iter()
+            .any(|stage| matches!(stage, BufferType::DiskV2 { .. }))
+    }
+
     /// Gets all of the configured stages for this buffer.
     pub fn stages(&self) -> &[BufferType] {
         match self {

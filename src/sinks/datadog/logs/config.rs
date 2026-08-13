@@ -7,6 +7,8 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
+use hyper::{Body, client::connect::Connect};
+
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     common::datadog,
@@ -43,14 +45,16 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 
 /// Configuration for the `datadog_logs` sink.
 #[configurable_component(sink("datadog_logs", "Publish log events to Datadog."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[derivative(Default(value = "default_compression()"))]
+    #[serde(default = "default_compression")]
     pub compression: Option<Compression>,
 
     #[configurable(derived)]
@@ -67,16 +71,20 @@ pub struct DatadogLogsConfig {
 
     /// When enabled this sink will normalize events to conform to the Datadog Agent standard. This
     /// also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
-    /// will be overidden as `true` if this header has already been set in the request.headers
+    /// will be overridden as `true` if this header has already been set in the request.headers
     /// configuration setting.
     #[serde(default)]
     pub conforms_as_agent: bool,
 }
 
+const fn default_compression() -> Option<Compression> {
+    Some(Compression::zstd_default())
+}
+
 impl GenerateConfig for DatadogLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            default_api_key: ${DATADOG_API_KEY_ENV_VAR}
         "#})
         .unwrap()
     }
@@ -101,12 +109,15 @@ impl DatadogLogsConfig {
             .to_string()
     }
 
-    pub fn build_processor(
+    pub fn build_processor<C>(
         &self,
         dd_common: &DatadogCommonConfig,
-        client: HttpClient,
+        client: HttpClient<Body, C>,
         dd_evp_origin: String,
-    ) -> crate::Result<VectorSink> {
+    ) -> crate::Result<VectorSink>
+    where
+        C: Connect + Clone + Send + Sync + 'static,
+    {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.into_settings();
 
@@ -155,7 +166,7 @@ impl DatadogLogsConfig {
             protocol,
             conforms_as_agent,
         )
-        .compression(self.compression.unwrap_or_default())
+        .compression(self.compression.or_else(default_compression).unwrap())
         .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -226,6 +237,56 @@ mod test {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
 
+    #[test]
+    fn compression_config_field() {
+        // Verify the default compression function returns zstd
+        assert_eq!(default_compression(), Some(Compression::zstd_default()));
+
+        // Test 1: Config deserialized without compression field gets zstd default
+        // (due to #[serde(default = "default_compression")])
+        let config_yaml = indoc! {r#"
+            default_api_key: "test_key"
+        "#};
+
+        let config: DatadogLogsConfig = serde_yaml::from_str(config_yaml).unwrap();
+        // The serde default applies immediately during deserialization
+        assert!(matches!(config.compression, Some(Compression::Zstd(_))));
+
+        // Test 2: When explicitly set to "none", it should be Some(Compression::None)
+        let config_yaml_with_none = indoc! {r#"
+            default_api_key: "test_key"
+            compression: "none"
+        "#};
+
+        let config_no_compression: DatadogLogsConfig =
+            serde_yaml::from_str(config_yaml_with_none).unwrap();
+        assert_eq!(config_no_compression.compression, Some(Compression::None));
+
+        // Test 3: When explicitly set to "zstd", it should be Some(Compression::Zstd)
+        let config_yaml_with_zstd = indoc! {r#"
+            default_api_key: "test_key"
+            compression: "zstd"
+        "#};
+
+        let config_zstd: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_zstd).unwrap();
+        assert!(matches!(
+            config_zstd.compression,
+            Some(Compression::Zstd(_))
+        ));
+
+        // Test 4: When explicitly set to "gzip", it should be Some(Compression::Gzip)
+        let config_yaml_with_gzip = indoc! {r#"
+            default_api_key: "test_key"
+            compression: "gzip"
+        "#};
+
+        let config_gzip: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_gzip).unwrap();
+        assert!(matches!(
+            config_gzip.compression,
+            Some(Compression::Gzip(_))
+        ));
+    }
+
     impl ValidatableComponent for DatadogLogsConfig {
         fn validation_configuration() -> ValidationConfiguration {
             let endpoint = "http://127.0.0.1:9005".to_string();
@@ -235,6 +296,8 @@ mod test {
                     default_api_key: Some("unused".to_string().into()),
                     ..Default::default()
                 },
+                // Disable compression for validation tests to ensure byte counting is accurate
+                compression: Some(Compression::None),
                 ..Default::default()
             };
 

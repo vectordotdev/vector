@@ -4,11 +4,10 @@ use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        DecoderFramedRead, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -58,6 +57,22 @@ pub struct UdpConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = "['224.0.0.2', '224.0.0.4']"))]
     pub(super) multicast_groups: Vec<Ipv4Addr>,
+
+    /// The IPv4 interface address used when joining multicast groups.
+    ///
+    /// Specifies which local network interface to use for receiving multicast traffic.
+    /// When not set, defaults to the socket's binding address.
+    ///
+    /// Set this explicitly when the host has multiple interfaces and you need to control
+    /// which one receives multicast traffic. For example, `127.0.0.1` restricts multicast
+    /// reception to the loopback interface.
+    ///
+    /// On macOS, specifying `0.0.0.0` only joins on the default network interface (typically
+    /// the primary Ethernet or Wi-Fi interface), unlike Linux, which joins on all interfaces.
+    /// If multicast traffic is expected on a specific interface (including loopback), set this
+    /// field explicitly.
+    #[serde(default)]
+    pub(super) multicast_interface: Option<Ipv4Addr>,
 
     /// The maximum buffer size of incoming messages.
     ///
@@ -137,6 +152,7 @@ impl UdpConfig {
         Self {
             address,
             multicast_groups: Vec::new(),
+            multicast_interface: None,
             max_length: default_max_length(),
             host_key: None,
             port_key: default_port_key(),
@@ -186,7 +202,7 @@ pub(super) fn udp(
                 }
             };
             for group_addr in config.multicast_groups {
-                let interface = *listen_addr.ip();
+                let interface = config.multicast_interface.unwrap_or(*listen_addr.ip());
                 socket
                     .join_multicast_v4(group_addr, interface)
                     .map_err(|error| {
@@ -246,7 +262,8 @@ pub(super) fn udp(
                     bytes_received.emit(ByteSize(byte_size));
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
-                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone()).peekable();
+                    let mut stream =
+                        DecoderFramedRead::new(payload.as_ref(), decoder.clone()).peekable();
 
                     while let Some(result) = stream.next().await {
                         let last = Pin::new(&mut stream).peek().await.is_none();
