@@ -188,7 +188,21 @@ impl HoneycombConfig {
             self.endpoint.trim_end_matches('/'),
             self.dataset
         );
-        uri.parse::<Uri>().map_err(Into::into)
+        let uri = uri
+            .parse::<Uri>()
+            .map_err(|e| -> crate::Error { e.into() })?;
+        // Reject endpoints that parse but lack a scheme or authority (e.g.
+        // `api.honeycomb.io`). `http::Uri` accepts them, but the request path
+        // hands them to the HTTP client as a non-absolute target that
+        // deterministically fails at build time.
+        if uri.scheme().is_none() || uri.authority().is_none() {
+            return Err(format!(
+                "endpoint must include a scheme and host, e.g. `https://api.honeycomb.io`; got `{}`",
+                self.endpoint
+            )
+            .into());
+        }
+        Ok(uri)
     }
 }
 
@@ -231,6 +245,22 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        let mut config: HoneycombConfig =
+            serde_json::from_value(HoneycombConfig::generate_config())
+                .expect("config should be valid");
+        config.endpoint = "/foo".to_string();
+
+        let err = config
+            .validate()
+            .expect_err("a relative endpoint must be rejected");
+        assert!(
+            err.to_string().contains("scheme and host"),
+            "unexpected error: {err}"
+        );
+    }
 
     #[test]
     fn validate_returns_usable_values() {

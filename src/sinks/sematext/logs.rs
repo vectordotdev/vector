@@ -109,12 +109,11 @@ impl ValidatedSink for SematextLogsConfig {
         let index = Template::try_from(self.token.inner())
             .map_err(|error| format!("unable to parse token as Template: {error}"))?;
 
-        // Validate the derived Elasticsearch config (template confinement of
-        // `bulk.index`) so structural validation catches unconfined routing
-        // templates such as a token of `{{ index }}` rather than failing at
-        // startup.
+        // Run the derived Elasticsearch config's full structural validation
+        // (endpoints, batch, versioning, confinement) so a malformed endpoint
+        // or token template is rejected here rather than at startup.
         self.derived_elasticsearch_config(&endpoint, &index)
-            .common_mode()?;
+            .validate()?;
 
         Ok(ValidatedSematextLogs { endpoint, index })
     }
@@ -276,6 +275,30 @@ mod tests {
         assert!(
             err.to_string()
                 .contains("unable to parse token as Template"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        // A custom endpoint that parses as a URI but has no host must be
+        // rejected by the derived Elasticsearch config's structural validation
+        // rather than failing at startup.
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: Some("/path".to_string()),
+            token: "mylogtoken".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let err = config
+            .validate()
+            .expect_err("an endpoint without a host should fail validation");
+        assert!(
+            err.to_string().contains("must include hostname"),
             "unexpected error: {err}"
         );
     }

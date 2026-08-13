@@ -300,6 +300,8 @@ impl ValidatedSink for LokiConfig {
             "structured_metadata[value]",
         )?;
 
+        self.endpoint.append_path(&self.path)?;
+
         let batch_settings = self.batch.into_batcher_settings()?;
 
         Ok(ValidatedLokiSink {
@@ -441,5 +443,25 @@ mod tests {
         assert!(validated.auth.is_none()); // Default has no auth
         assert_eq!(validated.labels.len(), 1);
         assert!(validated.batch_settings.timeout > std::time::Duration::ZERO);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_path() {
+        let config: LokiConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "http://localhost:3100"
+            path: "foo bar"
+            labels:
+              test_name: "placeholder"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+
+        assert!(
+            config.validate().is_err(),
+            "a path containing a space cannot be appended into a valid URI and must be rejected"
+        );
     }
 }

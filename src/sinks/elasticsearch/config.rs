@@ -8,6 +8,7 @@ use vector_lib::{
     configurable::configurable_component,
     lookup::{event_path, lookup_v2::ConfigValuePath},
     schema::Requirement,
+    stream::BatcherSettings,
 };
 use vrl::value::Kind;
 
@@ -29,7 +30,7 @@ use crate::{
         },
         util::{
             BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings,
-            http::RequestConfig, service::HealthConfig,
+            UriSerde, http::RequestConfig, service::HealthConfig,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
@@ -743,6 +744,7 @@ impl SinkConfig for ElasticsearchConfig {
 pub struct ValidatedElasticsearch {
     request_limits: TowerRequestSettings,
     health_config: HealthConfig,
+    batch_settings: BatcherSettings,
 }
 
 #[async_trait::async_trait]
@@ -757,6 +759,27 @@ impl ValidatedSink for ElasticsearchConfig {
             (Some(_), false) => return Err(ParseError::EndpointsExclusive.into()),
             (None, true) => return Err(ParseError::EndpointRequired.into()),
             _ => {}
+        }
+
+        // Mirror the pure endpoint parsing from `ElasticsearchCommon::parse_config`
+        // (`Self::check_endpoint` + `endpoint.parse::<UriSerde>()`) so endpoints
+        // without a host are rejected here instead of at build time.
+        let endpoints = match &self.endpoint {
+            Some(endpoint) => vec![endpoint.as_str()],
+            None => self
+                .endpoints
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        };
+        for endpoint in endpoints {
+            let uri = endpoint.parse::<UriSerde>()?;
+            if uri.uri.host().is_none() {
+                return Err(ParseError::HostMustIncludeHostname {
+                    host: endpoint.to_string(),
+                }
+                .into());
+            }
         }
 
         // Mirror the pure Serverless checks from `ElasticsearchCommon::parse_config`
@@ -791,12 +814,35 @@ impl ValidatedSink for ElasticsearchConfig {
         // `ElasticsearchCommon::parse_many`).
         self.common_mode()?;
 
+        // Mirror the pure batch-settings and versioning checks from
+        // `ElasticsearchCommon::parse_config` so configs that deterministically
+        // fail at build time are rejected here instead.
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        if self.bulk.version.is_some() && self.bulk.version_type == VersionType::Internal {
+            return Err(ParseError::ExternalVersionIgnoredWithInternalVersioning.into());
+        }
+        if self.bulk.version.is_some()
+            && (self.bulk.version_type == VersionType::External
+                || self.bulk.version_type == VersionType::ExternalGte)
+            && self.id_key.is_none()
+        {
+            return Err(ParseError::ExternalVersioningWithoutDocumentID.into());
+        }
+        if self.bulk.version.is_none()
+            && (self.bulk.version_type == VersionType::External
+                || self.bulk.version_type == VersionType::ExternalGte)
+        {
+            return Err(ParseError::ExternalVersioningWithoutVersion.into());
+        }
+
         let request_limits = self.request.tower.into_settings();
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         Ok(ValidatedElasticsearch {
             request_limits,
             health_config,
+            batch_settings,
         })
     }
 
@@ -838,7 +884,7 @@ impl ValidatedSink for ElasticsearchConfig {
             1,
         );
 
-        let sink = ElasticsearchSink::new(&common, self, service)?;
+        let sink = ElasticsearchSink::new(&common, self, service, validated.batch_settings)?;
 
         let stream = VectorSink::from_event_streamsink(sink);
 
@@ -909,11 +955,88 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_endpoint_without_host() {
+        use crate::config::ValidatedSink;
+        // A path-only endpoint parses as a `Uri` but has no host, mirroring
+        // `ElasticsearchCommon::check_endpoint`'s rejection at build time.
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["/path"]
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("an endpoint without a host should fail validation");
+        assert!(
+            err.to_string().contains("must include hostname"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_batch_settings() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            batch:
+              max_events: 0
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect_err("invalid batch settings should fail validation");
+    }
+
+    #[test]
+    fn validate_rejects_external_versioning_without_version() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            bulk:
+              version_type: external
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("external versioning without a version should fail validation");
+        assert!(
+            err.to_string().contains("version"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_external_versioning_without_id_key() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            bulk:
+              version: "{{ obj_version }}"
+              version_type: external
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("external versioning without an id_key should fail validation");
+        assert!(
+            err.to_string().contains("document ID"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn validate_rejects_serverless_without_aws_auth() {
         use crate::config::ValidatedSink;
         let config: ElasticsearchConfig = serde_yaml::from_str(
             r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             opensearch_service_type: serverless
             api_version: auto
             "#,
@@ -932,7 +1055,7 @@ mod tests {
         use crate::config::ValidatedSink;
         let config: ElasticsearchConfig = serde_yaml::from_str(
             r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             opensearch_service_type: serverless
             auth:
               strategy: aws
@@ -955,7 +1078,7 @@ mod tests {
         use crate::config::ValidatedSink;
         let config: ElasticsearchConfig = serde_yaml::from_str(
             r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             auth:
               strategy: aws
             "#,
@@ -974,7 +1097,7 @@ mod tests {
         use crate::config::ValidatedSink;
         let config: ElasticsearchConfig = serde_yaml::from_str(
             r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             opensearch_service_type: serverless
             auth:
               strategy: aws
@@ -1109,7 +1232,7 @@ mod tests {
     fn validate_produces_request_limits_and_health() {
         use crate::config::ValidatedSink;
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
         "#})
         .unwrap();
         let validated = config.validate().expect("validation should succeed");

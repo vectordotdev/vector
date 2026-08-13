@@ -117,6 +117,17 @@ impl ValidatedSink for KeepConfig {
     fn validate(&self) -> crate::Result<ValidatedKeep> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
         let uri: Uri = self.endpoint.clone().try_into()?;
+        // Reject endpoints that parse but lack a scheme or authority (e.g.
+        // `backend.keep.com`). `http::Uri` accepts them, but the request path
+        // hands them to the HTTP client as a non-absolute target that
+        // deterministically fails at build time.
+        if uri.scheme().is_none() || uri.authority().is_none() {
+            return Err(format!(
+                "endpoint must include a scheme and host, e.g. `https://backend.keep.com`; got `{}`",
+                self.endpoint
+            )
+            .into());
+        }
         let request_limits = self.request.into_settings();
 
         Ok(ValidatedKeep {
@@ -209,6 +220,24 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
 mod tests {
     use super::*;
     use crate::config::ValidatedSink;
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        let config: KeepConfig = serde_yaml::from_str(
+            r#"
+            api_key: "test-key"
+            endpoint: "backend.keep.com"
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("a relative endpoint must be rejected");
+        assert!(
+            err.to_string().contains("scheme and host"),
+            "unexpected error: {err}"
+        );
+    }
 
     #[test]
     fn validate_produces_usable_values() {

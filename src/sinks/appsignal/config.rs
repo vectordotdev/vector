@@ -211,10 +211,21 @@ pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<Uri> {
     } else {
         format!("{endpoint}/{path}")
     };
-    match uri.parse::<Uri>() {
-        Ok(u) => Ok(u),
-        Err(e) => Err(Box::new(BuildError::UriParseError { source: e })),
+    let uri = match uri.parse::<Uri>() {
+        Ok(u) => u,
+        Err(e) => return Err(Box::new(BuildError::UriParseError { source: e })),
+    };
+    // Reject endpoints that parse but lack a scheme or authority (e.g.
+    // `appsignal-endpoint.net`). `http::Uri` accepts them, but the request
+    // path hands them to the HTTP client as a non-absolute target that
+    // deterministically fails at build time.
+    if uri.scheme().is_none() || uri.authority().is_none() {
+        return Err(format!(
+            "endpoint must include a scheme and host, e.g. `https://appsignal-endpoint.net`; got `{endpoint}`"
+        )
+        .into());
     }
+    Ok(uri)
 }
 
 #[cfg(test)]
@@ -241,6 +252,23 @@ mod test {
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        use crate::config::ValidatedSink;
+
+        let config = AppsignalConfig {
+            endpoint: "/vector".to_string(),
+            ..Default::default()
+        };
+        let err = config
+            .validate()
+            .expect_err("a relative endpoint must be rejected");
+        assert!(
+            err.to_string().contains("scheme and host"),
+            "unexpected error: {err}"
         );
     }
 
