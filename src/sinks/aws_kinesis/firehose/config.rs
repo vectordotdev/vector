@@ -181,10 +181,11 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
 
 impl GenerateConfig for KinesisFirehoseSinkConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"stream_name = "my-stream"
-            encoding.codec = "json""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"stream_name: my-stream
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }

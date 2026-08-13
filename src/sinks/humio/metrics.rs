@@ -153,10 +153,10 @@ fn default_endpoint() -> String {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(indoc! {r#"
-                host_key = "hostname"
-                token = "${HUMIO_TOKEN}"
-            "#})
+        serde_yaml::from_str(indoc! {r#"
+            host_key: hostname
+            token: ${HUMIO_TOKEN}
+        "#})
         .unwrap()
     }
 }

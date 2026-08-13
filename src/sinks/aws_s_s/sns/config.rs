@@ -41,11 +41,12 @@ pub(super) struct SnsSinkConfig {
 
 impl GenerateConfig for SnsSinkConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"topic_arn = "arn:aws:sns:us-east-2:123456789012:MyTopic"
-            region = "us-east-2"
-            encoding.codec = "json""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic
+            region: us-east-2
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }

@@ -146,13 +146,13 @@ struct InfluxDbLogsSink {
 
 impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(indoc! {r#"
-            endpoint = "http://localhost:8086/"
-            measurement = "vector-logs"
-            tags = []
-            org = "my-org"
-            bucket = "my-bucket"
-            token = "${INFLUXDB_TOKEN}"
+        serde_yaml::from_str(indoc! {r#"
+            endpoint: http://localhost:8086/
+            measurement: vector-logs
+            tags: []
+            org: my-org
+            bucket: my-bucket
+            token: ${INFLUXDB_TOKEN}
         "#})
         .unwrap()
     }

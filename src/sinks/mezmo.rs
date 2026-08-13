@@ -159,10 +159,10 @@ fn default_env() -> String {
 
 impl GenerateConfig for MezmoConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"hostname = "hostname"
-            api_key = "${LOGDNA_API_KEY}""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"hostname: hostname
+            api_key: ${LOGDNA_API_KEY}"#,
+        })
         .unwrap()
     }
 }

@@ -94,11 +94,11 @@ pub struct DatabendConfig {
 
 impl GenerateConfig for DatabendConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"endpoint = "databend://localhost:8000/default?sslmode=disable"
-            table = "default"
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: "databend://localhost:8000/default?sslmode=disable"
+            table: default
         "#,
-        )
+        })
         .unwrap()
     }
 }

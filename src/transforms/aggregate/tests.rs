@@ -1,6 +1,6 @@
-use std::{collections::BTreeSet, sync::Arc, task::Poll};
+use std::{collections::BTreeSet, sync::Arc, task::Poll, time::Duration};
 
-use futures::stream;
+use futures::{StreamExt, stream};
 use indoc::indoc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;

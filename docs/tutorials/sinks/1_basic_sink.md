@@ -66,8 +66,8 @@ our struct:
 
 ```rust
 impl GenerateConfig for BasicConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str("").unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str("{}").unwrap()
     }
 }
 ```
