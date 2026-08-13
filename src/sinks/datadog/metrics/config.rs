@@ -252,7 +252,7 @@ impl DatadogMetricsEndpointConfiguration {
 }
 
 const fn default_shadow_every() -> NonZeroU64 {
-    NonZeroU64::new(1).unwrap()
+    NonZeroU64::new(1000).unwrap()
 }
 
 /// Configuration for the V3 shadow dual-write mode.
