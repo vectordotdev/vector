@@ -183,7 +183,6 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -1513,9 +1512,11 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(SinkConfig::build(&config, SinkContext::default())
-            .await
-            .is_ok());
+        assert!(
+            SinkConfig::build(&config, SinkContext::default())
+                .await
+                .is_ok()
+        );
     }
 }
 
