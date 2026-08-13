@@ -265,7 +265,9 @@ impl MemoryConfig {
             Some(TableFilter::Bloom(_)) if self.source_config.is_some() => {
                 return Err("Source functionality is not supported for bloom filter".into());
             }
-            Some(TableFilter::Bloom(_)) if self.ttl_field.path.is_some() || self.ttl != default_ttl() => {
+            Some(TableFilter::Bloom(_))
+                if self.ttl_field.path.is_some() || self.ttl != default_ttl() =>
+            {
                 return Err("TTL functionality is not supported for bloom filter.".into());
             }
             Some(TableFilter::Bloom(_)) if self.scan_interval != default_scan_interval() => {
