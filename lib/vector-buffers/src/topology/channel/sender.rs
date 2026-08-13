@@ -41,51 +41,9 @@ impl<T: Bufferable> DiskV2Sender<T> {
         let (commands, mut command_rx) = mpsc::channel(DISK_V2_WRITER_QUEUE_CAPACITY);
         let (shutdown, shutdown_rx) = watch::channel(());
         writer.set_shutdown(shutdown_rx);
-        // The task is the cancellation boundary for disk I/O. While the topology is active, once
-        // the queue accepts a command, this owner finishes the write and its visibility flush even
-        // if the requesting future is dropped. When the last sender is dropped, only waits for
-        // reader progress are interrupted; any file I/O already in progress still finishes.
         vector_common::spawn_in_current_span(async move {
             while let Some(command) = command_rx.recv().await {
-                let (failed, shutting_down) = match command {
-                    DiskV2WriterCommand::Write {
-                        item,
-                        blocking,
-                        response,
-                    } => {
-                        let result = if blocking {
-                            writer.write_record_outcome(item).await
-                        } else {
-                            writer.try_write_record(item).await
-                        };
-                        let result = match result {
-                            Ok(outcome) => writer
-                                .flush()
-                                .await
-                                .map(|()| outcome)
-                                .map_err(|source| disk_v2::WriterError::Io { source }),
-                            other => other,
-                        };
-                        let shutting_down = matches!(&result, Err(disk_v2::WriterError::Shutdown));
-                        let failed = result.is_err() && !shutting_down;
-                        if failed {
-                            writer.fail();
-                        }
-                        let _ = response.send(result);
-                        (failed, shutting_down)
-                    }
-                    DiskV2WriterCommand::Flush { response } => {
-                        let result = writer.flush().await;
-                        let failed = result.is_err();
-                        if failed {
-                            writer.fail();
-                        }
-                        let _ = response.send(result);
-                        (failed, false)
-                    }
-                };
-
-                if failed || shutting_down {
+                if Self::process_command(&mut writer, command).await {
                     break;
                 }
             }
@@ -94,6 +52,53 @@ impl<T: Bufferable> DiskV2Sender<T> {
         Self {
             commands,
             _shutdown: shutdown,
+        }
+    }
+
+    // The task is the cancellation boundary for disk I/O. While the topology is active, once
+    // the queue accepts a command, this owner finishes the write and its visibility flush even
+    // if the requesting future is dropped. When the last sender is dropped, only waits for
+    // reader progress are interrupted; any file I/O already in progress still finishes.
+    async fn process_command(
+        writer: &mut disk_v2::BufferWriter<T, ProductionFilesystem>,
+        command: DiskV2WriterCommand<T>,
+    ) -> bool {
+        match command {
+            DiskV2WriterCommand::Write {
+                item,
+                blocking,
+                response,
+            } => {
+                let result = if blocking {
+                    writer.write_record_outcome(item).await
+                } else {
+                    writer.try_write_record(item).await
+                };
+                let result = match result {
+                    Ok(outcome) => writer
+                        .flush()
+                        .await
+                        .map(|()| outcome)
+                        .map_err(|source| disk_v2::WriterError::Io { source }),
+                    other => other,
+                };
+                let shutting_down = matches!(&result, Err(disk_v2::WriterError::Shutdown));
+                let failed = result.is_err() && !shutting_down;
+                if failed {
+                    writer.fail();
+                }
+                let _ = response.send(result);
+                failed || shutting_down
+            }
+            DiskV2WriterCommand::Flush { response } => {
+                let result = writer.flush().await;
+                let failed = result.is_err();
+                if failed {
+                    writer.fail();
+                }
+                let _ = response.send(result);
+                failed
+            }
         }
     }
 
