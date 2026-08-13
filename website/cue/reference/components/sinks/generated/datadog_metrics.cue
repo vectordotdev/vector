@@ -89,9 +89,12 @@ generated: components: sinks: datadog_metrics: configuration: {
 		description: """
 			V3 shadow dual-write configuration.
 
-			Enabled by default: a sampled fraction of legacy series flushes is mirrored as V3
-			payloads to a separate intake endpoint, both stamped with a shared
-			`X-Metrics-Request-ID`. Set `dual_write.enabled` to `false` to disable it.
+			By default, a sampled fraction of legacy series flushes is mirrored as V3 payloads to
+			a separate intake endpoint, both stamped with a shared `X-Metrics-Request-ID` — but
+			only when submitting directly to Datadog. If `endpoint` is set to a custom Agent,
+			relay, or test collector, dual-write defaults to disabled instead, since the shadow
+			route isn't guaranteed to exist there. Set `dual_write.enabled` explicitly to override
+			either default in either direction.
 
 			Sketches are never dual-written, regardless of this setting.
 			"""
@@ -101,13 +104,19 @@ generated: components: sinks: datadog_metrics: configuration: {
 				description: """
 					Whether to enable V3 shadow dual-write.
 
-					Enabled by default, sampling a fraction of legacy series flushes to validate the V3
-					intake path. Set to `false` to disable V3 shadow dual-write entirely.
+					When unset, this defaults to `true` when submitting directly to Datadog (no custom
+					`endpoint` set), and to `false` when a custom `endpoint` is configured (for example, a
+					Datadog Agent, relay, or test collector). The shadow route
+					(`/api/intake/metrics/v3beta/series`) is only guaranteed to exist on Datadog's own
+					intake; hitting it on a custom endpoint that doesn't implement it 404s, which is
+					treated as a retriable error, so every sampled flush would add a request that retries
+					forever. Set this explicitly to `true` to opt in to shadow traffic against a custom
+					endpoint anyway, or to `false` to disable it even when submitting directly to Datadog.
 
 					This only ever affects series. Sketches are never dual-written.
 					"""
 				required: false
-				type: bool: default: true
+				type: bool: {}
 			}
 			shadow_every: {
 				description: """

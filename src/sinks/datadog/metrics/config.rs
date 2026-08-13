@@ -240,10 +240,6 @@ const fn default_shadow_every() -> NonZeroU64 {
     NonZeroU64::new(1).unwrap()
 }
 
-const fn default_dual_write_enabled() -> bool {
-    true
-}
-
 /// Configuration for the V3 shadow dual-write mode.
 ///
 /// When enabled, every `shadow_every`-th legacy (V1/V2) *series* flush also sends a V3
@@ -259,12 +255,18 @@ const fn default_dual_write_enabled() -> bool {
 pub struct DualWriteConfig {
     /// Whether to enable V3 shadow dual-write.
     ///
-    /// Enabled by default, sampling a fraction of legacy series flushes to validate the V3
-    /// intake path. Set to `false` to disable V3 shadow dual-write entirely.
+    /// When unset, this defaults to `true` when submitting directly to Datadog (no custom
+    /// `endpoint` set), and to `false` when a custom `endpoint` is configured (for example, a
+    /// Datadog Agent, relay, or test collector). The shadow route
+    /// (`/api/intake/metrics/v3beta/series`) is only guaranteed to exist on Datadog's own
+    /// intake; hitting it on a custom endpoint that doesn't implement it 404s, which is
+    /// treated as a retriable error, so every sampled flush would add a request that retries
+    /// forever. Set this explicitly to `true` to opt in to shadow traffic against a custom
+    /// endpoint anyway, or to `false` to disable it even when submitting directly to Datadog.
     ///
     /// This only ever affects series. Sketches are never dual-written.
-    #[serde(default = "default_dual_write_enabled")]
-    pub enabled: bool,
+    #[serde(default)]
+    pub enabled: Option<bool>,
 
     /// Send a V3 shadow payload once per this many legacy (V1/V2) series flushes.
     ///
@@ -277,7 +279,7 @@ pub struct DualWriteConfig {
 impl Default for DualWriteConfig {
     fn default() -> Self {
         Self {
-            enabled: default_dual_write_enabled(),
+            enabled: None,
             shadow_every: default_shadow_every(),
         }
     }
@@ -286,6 +288,16 @@ impl Default for DualWriteConfig {
 impl DualWriteConfig {
     pub(super) const fn get_series_path(&self) -> &'static str {
         SERIES_V3_BETA_PATH
+    }
+
+    /// Resolves whether shadow dual-write should actually run for this sink instance.
+    ///
+    /// An explicit `enabled` setting always wins. When unset, dual-write defaults to `true`
+    /// only when submitting directly to Datadog; a custom endpoint (Agent, relay, test
+    /// collector, ...) defaults to `false`, since the beta shadow route isn't guaranteed to
+    /// exist there and a 404 would otherwise retry forever. See `enabled`'s docs for details.
+    pub(super) fn is_enabled(&self, has_custom_endpoint: bool) -> bool {
+        self.enabled.unwrap_or(!has_custom_endpoint)
     }
 }
 
@@ -331,9 +343,12 @@ pub struct DatadogMetricsConfig {
 
     /// V3 shadow dual-write configuration.
     ///
-    /// Enabled by default: a sampled fraction of legacy series flushes is mirrored as V3
-    /// payloads to a separate intake endpoint, both stamped with a shared
-    /// `X-Metrics-Request-ID`. Set `dual_write.enabled` to `false` to disable it.
+    /// By default, a sampled fraction of legacy series flushes is mirrored as V3 payloads to
+    /// a separate intake endpoint, both stamped with a shared `X-Metrics-Request-ID` — but
+    /// only when submitting directly to Datadog. If `endpoint` is set to a custom Agent,
+    /// relay, or test collector, dual-write defaults to disabled instead, since the shadow
+    /// route isn't guaranteed to exist there. Set `dual_write.enabled` explicitly to override
+    /// either default in either direction.
     ///
     /// Sketches are never dual-written, regardless of this setting.
     #[configurable(derived)]
@@ -439,7 +454,7 @@ impl DatadogMetricsConfig {
 
         let shadow_config = self
             .dual_write
-            .enabled
+            .is_enabled(dd_common.endpoint.is_some())
             .then_some(&self.dual_write)
             .map(|dw| -> crate::Result<ShadowBuilderConfig> {
                 let base_uri = self.get_base_agent_endpoint(dd_common);
@@ -552,6 +567,73 @@ mod tests {
 
         assert_eq!(series.size_limit, 1_000_000);
         assert_eq!(sketches.size_limit, 1_000_000);
+    }
+
+    // The internal V3 beta shadow route isn't guaranteed to exist on a custom endpoint
+    // (Agent, relay, test collector, ...), so leaving `dual_write.enabled` unset must not
+    // silently turn on shadow traffic there: a 404 is retriable, so every sampled flush would
+    // add a permanently retrying request against a target that never implements the route.
+    // Submitting directly to Datadog (no custom `endpoint`) is unaffected -- shadow dual-write
+    // stays enabled by default there, since Datadog's own intake does implement the route.
+    #[test]
+    fn dual_write_defaults_to_disabled_only_for_custom_endpoints() {
+        let unset = DualWriteConfig::default();
+        assert!(
+            unset.is_enabled(false),
+            "unset `enabled` must default to on when submitting directly to Datadog"
+        );
+        assert!(
+            !unset.is_enabled(true),
+            "unset `enabled` must default to off for a custom endpoint"
+        );
+    }
+
+    // An explicit `enabled` setting always overrides the endpoint-based default, in either
+    // direction: opting in to shadow traffic against a custom endpoint, or opting out of it
+    // even when submitting directly to Datadog.
+    #[test]
+    fn dual_write_explicit_enabled_overrides_the_endpoint_based_default() {
+        let explicit_on = DualWriteConfig {
+            enabled: Some(true),
+            ..DualWriteConfig::default()
+        };
+        assert!(
+            explicit_on.is_enabled(true),
+            "explicit `enabled = true` must opt in even for a custom endpoint"
+        );
+
+        let explicit_off = DualWriteConfig {
+            enabled: Some(false),
+            ..DualWriteConfig::default()
+        };
+        assert!(
+            !explicit_off.is_enabled(false),
+            "explicit `enabled = false` must opt out even when submitting directly to Datadog"
+        );
+    }
+
+    // `dual_write.enabled` must still parse as a plain TOML boolean -- the `Option<bool>`
+    // representation is an internal resolution detail, not a schema change users need to know
+    // about.
+    #[test]
+    fn dual_write_enabled_parses_as_a_plain_bool() {
+        let config = toml::from_str::<DatadogMetricsConfig>(
+            r#"
+            default_api_key = "unused"
+            [dual_write]
+            enabled = true
+            "#,
+        )
+        .expect("`dual_write.enabled = true` must parse");
+        assert_eq!(config.dual_write.enabled, Some(true));
+
+        let config = toml::from_str::<DatadogMetricsConfig>(
+            r#"
+            default_api_key = "unused"
+            "#,
+        )
+        .expect("omitting `dual_write` entirely must still parse");
+        assert_eq!(config.dual_write.enabled, None);
     }
 
     // `sketches_api_version` is independent of `series_api_version`: Datadog's intake gates V3
