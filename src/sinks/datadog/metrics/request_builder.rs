@@ -493,7 +493,7 @@ fn encode_batch<E: MetricsEncoder>(
                 }
                 Err(FinishError::TooLarge {
                     mut metrics,
-                    mut recommended_splits,
+                    recommended_splits,
                 }) => {
                     // The encoder informed us that the resulting payload was too big, so we're
                     // being given a chance here to split it into smaller input batches in the
@@ -513,14 +513,31 @@ fn encode_batch<E: MetricsEncoder>(
                     // Protocol Buffers data, similar to how the Datadog Agent does it with
                     // `molecule`, we can wrap all of the sketch encoding into the same
                     // incremental encoding paradigm and avoid this.
+                    //
+                    // `recommended_splits` is derived from a *byte-size* ratio and is unbounded
+                    // by the number of metrics actually in this batch: a single metric whose
+                    // encoded size alone exceeds the limit (e.g. one very high-cardinality
+                    // sketch) can report a `recommended_splits` far larger than `metrics.len()`.
+                    // Without capping it, `stride = metrics.len() / recommended_splits`
+                    // truncates to `0`, so every iteration of the loop below calls
+                    // `metrics.split_off(split_idx)` with an unchanged `split_idx` — producing
+                    // `recommended_splits - 1` *empty* chunks that each "succeed" as a
+                    // zero-metric request, while the real oversized chunk is pushed unchanged
+                    // at the end and fails again. Capping to `metrics.len()` guarantees each
+                    // chunk gets at least one metric; when there's only one metric to begin
+                    // with, the cap collapses the loop entirely and that single unsplittable
+                    // metric is sent through `encode_chunk` on its own, where it fails cleanly
+                    // as `FailedToSplit` instead of spawning empty requests first.
+                    let recommended_splits = recommended_splits.min(metrics.len());
                     let mut split_idx = metrics.len();
                     let stride = split_idx / recommended_splits;
 
-                    while recommended_splits > 1 {
+                    let mut remaining_splits = recommended_splits;
+                    while remaining_splits > 1 {
                         split_idx -= stride;
                         let chunk = metrics.split_off(split_idx);
                         results.push(encode_chunk(encoder, api_key.clone(), endpoint, chunk));
-                        recommended_splits -= 1;
+                        remaining_splits -= 1;
                     }
                     results.push(encode_chunk(encoder, api_key.clone(), endpoint, metrics));
                 }
@@ -818,6 +835,105 @@ mod tests {
         // `try_recv` would still return `Empty`).
         drop(metas);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    // ── TooLarge split handling ────────────────────────────────────────
+
+    /// Test double for [`MetricsEncoder`] whose `finish()` reports `TooLarge` with an
+    /// arbitrary, caller-chosen `recommended_splits` for any non-empty batch — regardless of
+    /// how many metrics are actually pending. This lets us exercise `encode_batch`'s split
+    /// arithmetic in isolation, including the case a real encoder hits when a *single* metric
+    /// (e.g. one huge sketch) alone exceeds the size limit: `recommended_splits` is derived
+    /// from a byte-size ratio and can be larger than the metric count.
+    struct AlwaysTooLargeEncoder {
+        pending: Vec<Metric>,
+        recommended_splits: usize,
+    }
+
+    impl MetricsEncoder for AlwaysTooLargeEncoder {
+        fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+            self.pending.push(metric);
+            Ok(None)
+        }
+
+        fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
+            let metrics = std::mem::take(&mut self.pending);
+            if metrics.is_empty() {
+                // Matches every real encoder's behavior: finishing an empty batch always
+                // succeeds trivially, producing an empty payload.
+                return Ok((
+                    EncodeResult::compressed(Bytes::new(), 0, GroupedCountByteSize::new_untagged()),
+                    Vec::new(),
+                ));
+            }
+            Err(FinishError::TooLarge {
+                metrics,
+                recommended_splits: self.recommended_splits,
+            })
+        }
+    }
+
+    /// A single metric that's too large on its own can report a `recommended_splits` far
+    /// larger than the metric count (it's derived from a byte-size ratio, not from counting
+    /// metrics). Splitting must never emit more chunks than there are metrics to put in them:
+    /// this metric must come out as exactly one failed result, not four phantom "successful"
+    /// empty requests followed by one failure.
+    #[test]
+    fn too_large_split_never_exceeds_the_metric_count() {
+        let mut encoder = AlwaysTooLargeEncoder {
+            pending: Vec::new(),
+            recommended_splits: 5,
+        };
+
+        let results = encode_batch(
+            &mut encoder,
+            None,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+            vec![counter_metric()],
+        );
+
+        assert_eq!(
+            results.len(),
+            1,
+            "an unsplittable single metric must yield exactly one result, not {} \
+             (a fixed `recommended_splits` split count would otherwise emit \
+             `recommended_splits - 1` empty successes before the real failure)",
+            results.len()
+        );
+        assert!(
+            results[0].is_err(),
+            "the single oversized metric must be reported as failed, not silently dropped \
+             behind a successful empty payload"
+        );
+    }
+
+    /// With more metrics than the recommended split count, splitting proceeds exactly as
+    /// before: each of the `recommended_splits` chunks gets a non-empty share of the metrics.
+    #[test]
+    fn too_large_split_with_enough_metrics_produces_no_empty_chunks() {
+        let mut encoder = AlwaysTooLargeEncoder {
+            pending: Vec::new(),
+            recommended_splits: 3,
+        };
+
+        let metrics: Vec<Metric> = (0..3).map(|_| counter_metric()).collect();
+        let results = encode_batch(
+            &mut encoder,
+            None,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+            metrics,
+        );
+
+        assert_eq!(
+            results.len(),
+            3,
+            "3 metrics split 3 ways must produce exactly 3 results, one per metric"
+        );
+        assert!(
+            results.iter().all(Result::is_err),
+            "this encoder always reports TooLarge for non-empty input, so every \
+             single-metric chunk must fail as unsplittable, not succeed"
+        );
     }
 
     // ── Timestamp resolution ───────────────────────────────────────────────
