@@ -156,17 +156,6 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"text",
 		]
 	}
-	namespace: {
-		deprecated:         true
-		deprecated_message: "This field is deprecated, and `measurement` should be used instead."
-		description: """
-			The namespace of the measurement name to use.
-
-			When specified, the measurement name is `<namespace>.vector`.
-			"""
-		required: false
-		type: string: examples: ["service"]
-	}
 	org: {
 		description: """
 			The name of the organization to write into.
