@@ -58,10 +58,10 @@ pub enum MetricValue {
 
         /// The sum of all observations contained within this histogram.
         ///
-        /// `None` when the source did not report a sum. OTLP makes the histogram sum optional, and
-        /// `OpenMetrics` only recommends the `_sum` series -- forbidding it outright for histograms
-        /// with negative bucket thresholds -- so a histogram without a sum is a legitimate input
-        /// rather than an error. Consumers must not substitute zero for it.
+        /// Optional, because not every source reports one: OTLP makes the histogram sum optional,
+        /// and `OpenMetrics` only recommends the `_sum` series -- forbidding it outright for
+        /// histograms with negative bucket thresholds. A histogram without a sum is a legitimate
+        /// input rather than an error, and consumers must not substitute zero for it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sum: Option<f64>,
     },
