@@ -39,6 +39,13 @@
         {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
         {{ if eq $version "nightly" }}
           {{ $url = .nightly_download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
+        {{ else if and .legacy_download_url .legacy_max_minor }}
+          {{/* Historical Vector releases on this site are all 0.x. */}}
+          {{ $versionParts := split $version "." }}
+          {{ $minorVersion := int (index $versionParts 1) }}
+          {{ if le $minorVersion .legacy_max_minor }}
+            {{ $url = .legacy_download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
+          {{ end }}
         {{ end }}
 
         <a
