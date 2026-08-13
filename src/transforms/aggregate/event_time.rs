@@ -34,12 +34,18 @@ impl Aggregate {
             return None;
         }
 
+        // Capture one wall-clock instant for fallback synthesis and all subsequent
+        // skew/cutoff checks so a missing timestamp cannot be assigned to bucket B
+        // via `now` and then rejected because a later `Utc::now()` crosses B's end.
+        let now = Utc::now();
+        let now_ms = now.timestamp_millis();
+
         // Handle missing timestamp — only required for metrics that are bucketed.
         let ts = match timestamp {
             Some(ts) => ts,
             None => {
                 if self.config.use_system_time_for_missing_timestamps {
-                    Utc::now()
+                    now
                 } else {
                     emit!(AggregateEventDropped {
                         reason: "Event missing timestamp required for event-time aggregation."
@@ -54,10 +60,9 @@ impl Aggregate {
 
         // Check for future timestamps (bucketed metrics only; passthrough is above).
         if self.config.max_future_ms > 0 {
-            let now = Utc::now();
             let max_future_ms = i64::try_from(self.config.max_future_ms)
                 .expect("max_future_ms validated to fit in i64 in Aggregate::new");
-            let drift_ms = ts.timestamp_millis().saturating_sub(now.timestamp_millis());
+            let drift_ms = ts.timestamp_millis().saturating_sub(now_ms);
             if drift_ms > max_future_ms {
                 emit!(AggregateEventDropped {
                     reason: "Event timestamp too far in the future."
@@ -75,7 +80,6 @@ impl Aggregate {
             return None;
         }
 
-        let now_ms = Utc::now().timestamp_millis();
         if self.is_past_bucket_cutoff(bucket_key, now_ms) {
             emit!(AggregateEventDropped {
                 reason: "Event timestamp is too late; bucket window has ended."

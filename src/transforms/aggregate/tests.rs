@@ -2063,6 +2063,55 @@ assert_eq!(
 );
 }
 
+/// Regression for the case where fallback `Utc::now()` and cutoff `Utc::now()`
+/// were separate reads: with `allowed_lateness_ms = 0`, a second read one
+/// millisecond after the bucket end would reject an event whose synthesized
+/// timestamp still lies inside the bucket.
+#[test]
+fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
+    let interval_ms = 1_000_u64;
+    let interval_i64 = interval_ms as i64;
+
+    let agg = Aggregate::new(&AggregateConfig {
+        interval_ms,
+        mode: AggregationMode::Auto,
+        time_source: TimeSource::EventTime,
+        allowed_lateness_ms: 0,
+        use_system_time_for_missing_timestamps: true,
+        max_future_ms: 10_000,
+    })
+    .unwrap();
+
+    let now_ms = Utc::now().timestamp_millis();
+    let bucket_key = now_ms.div_euclid(interval_i64).saturating_mul(interval_i64);
+    let last_ms_in_bucket = bucket_key + interval_i64 - 1;
+
+    assert!(
+        !agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket),
+        "same-instant cutoff must accept timestamps still inside the bucket"
+    );
+    assert!(
+        agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket + 1),
+        "a later clock read crosses the bucket boundary — the race this fix avoids"
+    );
+
+    let mut agg = agg;
+    let event = make_metric(
+        "counter_no_ts",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    );
+    assert!(
+        agg.record(event).is_none(),
+        "missing-timestamp fallback must be bucketed, not dropped by a later cutoff read"
+    );
+    assert_eq!(
+        agg.event_time_buckets.len(),
+        1,
+        "fallback event must land in the current bucket"
+    );
+}
+
 #[test]
 fn event_time_diff_first_bucket_no_previous() {
 let mut agg = Aggregate::new(&AggregateConfig {
