@@ -18,7 +18,7 @@
                 {{ if $v.required }}
                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
                 {{ else if $v.required_when }}
-                  {{ partial "badge.html" (dict "word" "required (when:" "code" $v.required_when "suffix" ")" "code_class" "badge-code" "color" "orange") }}
+                  {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
                 {{ else if $v.required_one_of }}
                   {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                 {{ else }}
@@ -515,7 +515,7 @@
               {{ if $v.required }}
                 {{ partial "badge.html" (dict "word" "required" "color" "red") }}
               {{ else if $v.required_when }}
-                {{ partial "badge.html" (dict "word" "required (when:" "code" $v.required_when "suffix" ")" "code_class" "badge-code" "color" "orange") }}
+                {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
               {{ else if $v.required_one_of }}
                 {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
               {{ else }}
@@ -621,7 +621,7 @@
                   {{ if $v.required }}
                     {{ partial "badge.html" (dict "word" "required" "color" "red") }}
                   {{ else if $v.required_when }}
-                    {{ partial "badge.html" (dict "word" "required (when:" "code" $v.required_when "suffix" ")" "code_class" "badge-code" "color" "orange") }}
+                    {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
                   {{ else if $v.required_one_of }}
                     {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                   {{ else }}
@@ -663,7 +663,7 @@
                                 {{ if $v.required }}
                                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
                                 {{ else if $v.required_when }}
-                                  {{ partial "badge.html" (dict "word" "required (when:" "code" $v.required_when "suffix" ")" "code_class" "badge-code" "color" "orange") }}
+                                  {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
                                 {{ else if $v.required_one_of }}
                                   {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                                 {{ else }}
@@ -2045,7 +2045,7 @@
             {{ if $v.required }}
               {{ partial "badge.html" (dict "word" "required" "color" "red") }}
             {{ else if $v.required_when }}
-              {{ partial "badge.html" (dict "word" "required (when:" "code" $v.required_when "suffix" ")" "code_class" "badge-code" "color" "orange") }}
+              {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
             {{ else if $v.required_one_of }}
               {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
             {{ else }}
