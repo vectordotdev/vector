@@ -267,13 +267,16 @@ impl ValidatedSink for InfluxDbLogsConfig {
 
         let batch = self.batch.into_batch_settings()?;
 
-        let settings = influxdb_settings(
-            self.influxdb1_settings.clone(),
-            self.influxdb2_settings.clone(),
-        )?;
+        let settings = influxdb_settings(self.settings()?);
 
         let endpoint = self.endpoint.clone();
         let uri = settings.write_uri(endpoint)?;
+
+        // The write URI must be an absolute `http`/`https` URL; a relative or
+        // non-HTTP URI would be rejected by `HttpClient` at build/first send.
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err("InfluxDB endpoint must be an absolute http(s) URL".into());
+        }
 
         let token = settings.token();
         let protocol_version = settings.protocol_version();
@@ -655,12 +658,25 @@ mod tests {
         let config = InfluxDbLogsConfig {
             measurement: Some("vector".to_string()),
             endpoint: "http://localhost:9999".to_string(),
-            influxdb2_settings: Some(InfluxDb2Settings {
-                org: "my-org".to_string(),
-                bucket: "my-bucket".to_string(),
-                token: "my-token".to_string().into(),
-            }),
-            ..Default::default()
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
+            namespace: None,
+            tags: vec![],
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            encoding: Default::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            host_key: None,
+            message_key: None,
+            source_type_key: None,
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -673,17 +689,61 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_relative_endpoint() {
+        let config = InfluxDbLogsConfig {
+            measurement: Some("vector".to_string()),
+            endpoint: "influxdb".to_string(),
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
+            namespace: None,
+            tags: vec![],
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            encoding: Default::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            host_key: None,
+            message_key: None,
+            source_type_key: None,
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a scheme-less endpoint must be rejected during validation"
+        );
+    }
+
+    #[test]
     fn validate_retains_config_keys_without_log_schema_fallback() {
         let config = InfluxDbLogsConfig {
             measurement: Some("vector".to_string()),
             endpoint: "http://localhost:9999".to_string(),
-            influxdb2_settings: Some(InfluxDb2Settings {
-                org: "my-org".to_string(),
-                bucket: "my-bucket".to_string(),
-                token: "my-token".to_string().into(),
-            }),
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
             host_key: Some(OptionalValuePath::new("custom_host")),
-            ..Default::default()
+            namespace: None,
+            tags: vec![],
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            encoding: Default::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            message_key: None,
+            source_type_key: None,
         };
 
         let validated = config.validate().expect("validation should succeed");

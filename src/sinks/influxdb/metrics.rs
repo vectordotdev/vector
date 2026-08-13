@@ -12,7 +12,9 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
@@ -283,7 +285,6 @@ impl InfluxDbConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -318,13 +319,17 @@ impl ValidatedSink for InfluxDbConfig {
     fn validate(&self) -> crate::Result<ValidatedInfluxDbMetrics> {
         validate_quantiles(&self.quantiles)?;
 
-        let settings = influxdb_settings(
-            self.influxdb1_settings.clone(),
-            self.influxdb2_settings.clone(),
-        )?;
+        let settings = influxdb_settings(self.settings()?);
 
         let endpoint = self.endpoint.clone();
         let uri = settings.write_uri(endpoint)?;
+
+        // The write URI must be an absolute `http`/`https` URL; a relative or
+        // non-HTTP URI would be rejected by `HttpClient` at build/first send.
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err("InfluxDB endpoint must be an absolute http(s) URL".into());
+        }
+
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
@@ -345,12 +350,7 @@ impl ValidatedSink for InfluxDbConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(
-            self.clone().endpoint,
-            self.clone().influxdb1_settings,
-            self.clone().influxdb2_settings,
-            client.clone(),
-        )?;
+        let healthcheck = healthcheck(self.clone().endpoint, self.settings()?, client.clone())?;
         let sink = InfluxDbSvc::from_validated(self.clone(), validated, client)?;
         Ok((sink, healthcheck))
     }
@@ -689,12 +689,22 @@ mod tests {
     fn prepares_valid_config() {
         let config = InfluxDbConfig {
             endpoint: "http://localhost:9999".to_string(),
-            influxdb2_settings: Some(InfluxDb2Settings {
-                org: "my-org".to_string(),
-                bucket: "my-bucket".to_string(),
-                token: "my-token".to_string().into(),
-            }),
-            ..Default::default()
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
+            default_namespace: None,
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            batch: Default::default(),
+            request: Default::default(),
+            tags: None,
+            tls: None,
+            quantiles: default_summary_quantiles(),
+            acknowledgements: Default::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -702,6 +712,34 @@ mod tests {
         assert_eq!(
             validated.uri.to_string(),
             "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        let config = InfluxDbConfig {
+            endpoint: "influxdb".to_string(),
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
+            default_namespace: None,
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            batch: Default::default(),
+            request: Default::default(),
+            tags: None,
+            tls: None,
+            quantiles: default_summary_quantiles(),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "a scheme-less endpoint must be rejected during validation"
         );
     }
 
