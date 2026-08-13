@@ -419,8 +419,8 @@ impl InfluxDbLogsConfig {
             }
             None => {
                 warn!(
-                    "The `version` option is deprecated and will be required in a future release. \
-                     Set it to `1` or `2` to match your InfluxDB settings."
+                    "The `version` option is currently optional but will be required in a future release. \
+                     Please set it to `1` or `2` to match your InfluxDB settings."
                 );
                 self.infer_version()?
             }
