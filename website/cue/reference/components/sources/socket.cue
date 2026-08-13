@@ -80,7 +80,6 @@ components: sources: socket: {
 				port: {
 					description: "The peer source port."
 					required:    false
-					common:      true
 					type: uint: {
 						default: null
 						unit:    null

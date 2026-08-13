@@ -127,7 +127,6 @@ pub struct KafkaSourceConfig {
     /// The Kafka session timeout.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Session Timeout"))]
     session_timeout_ms: Duration,
@@ -143,14 +142,12 @@ pub struct KafkaSourceConfig {
     /// Default value is half of `session_timeout_ms`.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[configurable(metadata(docs::examples = 2500, docs::examples = 5000))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::human_name = "Drain Timeout"))]
     drain_timeout_ms: Option<u64>,
 
     /// Timeout for network requests.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_socket_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     socket_timeout_ms: Duration,
@@ -158,7 +155,6 @@ pub struct KafkaSourceConfig {
     /// Maximum time the broker may wait to fill the response.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
     #[configurable(metadata(docs::human_name = "Max Fetch Wait Time"))]
     fetch_wait_max_ms: Duration,
@@ -219,7 +215,6 @@ pub struct KafkaSourceConfig {
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
     ))]
@@ -229,7 +224,6 @@ pub struct KafkaSourceConfig {
     auth: kafka::KafkaAuthConfig,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,

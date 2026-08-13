@@ -95,7 +95,6 @@ _values: {
 #Enum: [Name=_]: #EnumVariant
 
 #EnvVars: #Schema & {[Type=string]: {
-	common:   true
 	required: false
 }}
 
@@ -362,13 +361,6 @@ _values: {
 	// For example, the `tls.verify_hostname` option has a warning about
 	// reduced security if the option is disabled.
 	warnings: [...string] | *[]
-
-	if !required {
-		// `common` specifies that the option is commonly used. It will bring the
-		// option to the top of the documents, surfacing it from other
-		// less common, options.
-		common?: bool
-	}
 
 	// `sort` sorts the option, otherwise options will be sorted alphabetically.
 	sort?: int8
