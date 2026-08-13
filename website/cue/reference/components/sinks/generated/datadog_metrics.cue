@@ -354,16 +354,11 @@ generated: components: sinks: datadog_metrics: configuration: {
 					This is the recommended and default endpoint.
 					"""
 				v3: """
-					Use the v3 series endpoint (`/api/intake/metrics/v3beta/series`).
+					Use the v3 series endpoint (`/api/intake/metrics/v3/series`).
 
 					Columnar protobuf format with dictionary-based string deduplication and delta
 					encoding. More efficient than v2 for workloads with many metrics that share
 					common tags or names.
-					"""
-				v3_beta: """
-					Use the v3 beta intake endpoint (`/api/intake/metrics/v3beta/series`).
-
-					Used for shadow/validation rollout of V3. Prefer `v3_intake` for stable usage.
 					"""
 			}
 		}
