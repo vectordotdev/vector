@@ -74,8 +74,8 @@ pub struct InfluxDbConfig {
 
     /// The InfluxDB API version to use.
     ///
-    /// This option is deprecated and will be required in a future release. When unset, the
-    /// version is inferred from the configured settings.
+    /// Omitting this option is deprecated and it will be required in a future release. When
+    /// unset, the version is temporarily inferred from the configured settings.
     #[configurable(metadata(docs::examples = "2"))]
     #[configurable(metadata(docs::examples = "1"))]
     #[configurable(metadata(docs::minimal = true))]

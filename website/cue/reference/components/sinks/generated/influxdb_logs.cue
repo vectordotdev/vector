@@ -535,8 +535,8 @@ generated: components: sinks: influxdb_logs: configuration: {
 		description: """
 			The InfluxDB API version to use.
 
-			This option is deprecated and will be required in a future release. When unset, the
-			version is inferred from the configured settings.
+			Omitting this option is deprecated and it will be required in a future release. When
+			unset, the version is temporarily inferred from the configured settings.
 			"""
 		minimal:  true
 		required: false
