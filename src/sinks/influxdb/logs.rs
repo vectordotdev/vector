@@ -453,7 +453,7 @@ impl InfluxDbLogsConfig {
         }
     }
 
-    fn settings_present(&self) -> (bool, bool) {
+    const fn settings_present(&self) -> (bool, bool) {
         let has_v1 = self.database.is_some()
             || self.consistency.is_some()
             || self.retention_policy_name.is_some()
