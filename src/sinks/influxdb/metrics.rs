@@ -2,6 +2,7 @@ use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, future::BoxFuture, stream};
+use indoc::indoc;
 use tower::Service;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -21,8 +22,9 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         influxdb::{
-            Field, InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion, encode_timestamp,
-            healthcheck, influx_line_protocol, influxdb_settings,
+            Field, InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, InfluxDbVersion,
+            ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol,
+            influxdb_settings,
         },
         util::{
             BatchConfig, BatchSettings, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
@@ -53,7 +55,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 
 /// Configuration for the `influxdb_metrics` sink.
 #[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
     /// Sets the default namespace for any metrics sent.
@@ -70,11 +72,79 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: String,
 
-    #[serde(flatten)]
-    pub influxdb1_settings: Option<InfluxDb1Settings>,
+    /// The InfluxDB API version to use.
+    ///
+    /// Omitting this option is deprecated and it will be required in a future release. When
+    /// unset, the version is temporarily inferred from the configured settings.
+    #[configurable(metadata(docs::examples = "2"))]
+    #[configurable(metadata(docs::examples = "1"))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub version: Option<InfluxDbVersion>,
 
-    #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDb2Settings>,
+    /// The name of the database to write into.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "vector-database"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    #[configurable(metadata(docs::required_when = "version = \"1\""))]
+    pub database: Option<String>,
+
+    /// The consistency level to use for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "any"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub consistency: Option<String>,
+
+    /// The target retention policy for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "autogen"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub retention_policy_name: Option<String>,
+
+    /// The username to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "todd"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub username: Option<String>,
+
+    /// The password to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub password: Option<SensitiveString>,
+
+    /// The name of the organization to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "my-org"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub org: Option<String>,
+
+    /// The name of the bucket to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "vector-bucket"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub bucket: Option<String>,
+
+    /// The [token][token_docs] to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    ///
+    /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
+    #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub token: Option<SensitiveString>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -113,11 +183,107 @@ pub fn example_tags() -> HashMap<String, String> {
     HashMap::from([("region".to_string(), "us-west-1".to_string())])
 }
 
-impl_generate_config_from_default!(InfluxDbConfig);
+impl GenerateConfig for InfluxDbConfig {
+    fn generate_config() -> serde_json::Value {
+        toml::from_str(indoc! {r#"
+            endpoint = "http://localhost:8086/"
+            version = "2"
+            org = "my-org"
+            bucket = "my-bucket"
+            token = "${INFLUXDB_TOKEN}"
+        "#})
+        .unwrap()
+    }
+}
+
+impl InfluxDbConfig {
+    fn settings(&self) -> crate::Result<InfluxDbSettings> {
+        let version = match self.version {
+            Some(version) => {
+                self.validate_version(version)?;
+                version
+            }
+            None => {
+                warn!(
+                    "The `version` option is currently optional but will be required in a future release. \
+                     Please set it to `1` or `2` to match your InfluxDB settings."
+                );
+                self.infer_version()?
+            }
+        };
+        match version {
+            InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
+                database: self
+                    .database
+                    .clone()
+                    .ok_or("the `database` option is required when using InfluxDB v1")?,
+                consistency: self.consistency.clone(),
+                retention_policy_name: self.retention_policy_name.clone(),
+                username: self.username.clone(),
+                password: self.password.clone(),
+            })),
+            InfluxDbVersion::V2 => Ok(InfluxDbSettings::V2(InfluxDb2Settings {
+                org: self
+                    .org
+                    .clone()
+                    .ok_or("the `org` option is required when using InfluxDB v2")?,
+                bucket: self
+                    .bucket
+                    .clone()
+                    .ok_or("the `bucket` option is required when using InfluxDB v2")?,
+                token: self
+                    .token
+                    .clone()
+                    .ok_or("the `token` option is required when using InfluxDB v2")?,
+            })),
+        }
+    }
+
+    const fn settings_present(&self) -> (bool, bool) {
+        let has_v1 = self.database.is_some()
+            || self.consistency.is_some()
+            || self.retention_policy_name.is_some()
+            || self.username.is_some()
+            || self.password.is_some();
+        let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
+        (has_v1, has_v2)
+    }
+
+    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
+        let (has_v1, has_v2) = self.settings_present();
+        match (has_v1, has_v2) {
+            (true, true) => Err(
+                "Unclear settings. Both InfluxDB v1 and v2 settings are configured; configure only one version."
+                    .into(),
+            ),
+            (false, false) => Err("InfluxDB v1 or v2 should be configured as endpoint.".into()),
+            (true, false) => Ok(InfluxDbVersion::V1),
+            (false, true) => Ok(InfluxDbVersion::V2),
+        }
+    }
+
+    /// Rejects settings that belong to the version that was not selected, so that
+    /// an explicit `version` cannot silently ignore stale settings for the other version.
+    fn validate_version(&self, version: InfluxDbVersion) -> crate::Result<()> {
+        let (has_v1, has_v2) = self.settings_present();
+        match version {
+            InfluxDbVersion::V1 if has_v2 => Err(
+                "InfluxDB v1 settings are configured, but v2 settings were also provided; configure only one version."
+                    .into(),
+            ),
+            InfluxDbVersion::V2 if has_v1 => Err(
+                "InfluxDB v2 settings are configured, but v1 settings were also provided; configure only one version."
+                    .into(),
+            ),
+            _ => Ok(()),
+        }
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
+
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -508,6 +674,10 @@ mod tests {
         let config = indoc! {r#"
             namespace: "vector"
             endpoint: "http://localhost:9999"
+            version: "2"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
             tags:
               region: "us-west-1"
         "#};
@@ -1045,7 +1215,7 @@ mod integration_tests {
         },
         http::HttpClient,
         sinks::influxdb::{
-            InfluxDb1Settings, InfluxDb2Settings,
+            InfluxDbVersion,
             metrics::{InfluxDbConfig, InfluxDbSvc, default_summary_quantiles},
             test_util::{
                 BUCKET, ORG, TOKEN, address_v1, address_v2, cleanup_v1, format_timestamp,
@@ -1081,14 +1251,15 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint: url.to_string(),
-            influxdb1_settings: Some(InfluxDb1Settings {
-                consistency: None,
-                database: database.clone(),
-                retention_policy_name: Some("autogen".to_string()),
-                username: None,
-                password: None,
-            }),
-            influxdb2_settings: None,
+            version: Some(InfluxDbVersion::V1),
+            database: Some(database.clone()),
+            consistency: None,
+            retention_policy_name: Some("autogen".to_string()),
+            username: None,
+            password: None,
+            org: None,
+            bucket: None,
+            token: None,
             batch: Default::default(),
             request: Default::default(),
             tls,
@@ -1175,12 +1346,15 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint,
-            influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDb2Settings {
-                org: ORG.to_string(),
-                bucket: BUCKET.to_string(),
-                token: TOKEN.to_string().into(),
-            }),
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            org: Some(ORG.to_string()),
+            bucket: Some(BUCKET.to_string()),
+            token: Some(TOKEN.to_string().into()),
             quantiles: default_summary_quantiles(),
             batch: Default::default(),
             request: Default::default(),
