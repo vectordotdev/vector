@@ -169,17 +169,22 @@ impl Aggregate {
                             entry.insert((data, metadata));
                         }
                         Entry::Occupied(mut entry) => {
-                            // In event-time mode, "latest" means latest *event timestamp*
-                            // within the time bucket, not latest arrival order.
-                            let new_ts = data.timestamp().cloned();
-                            let existing_ts = entry.get().0.timestamp().cloned();
-                            let should_replace = match (new_ts, existing_ts) {
-                                (Some(n), Some(e)) => n >= e,
-                                (Some(_), None) => true,
-                                _ => false,
-                            };
-                            if should_replace {
+                            if entry.get().0.kind != data.kind {
+                                emit!(AggregateUpdateFailed);
                                 *entry.get_mut() = (data, metadata);
+                            } else {
+                                // In event-time mode, "latest" means latest *event timestamp*
+                                // within the time bucket, not latest arrival order.
+                                let new_ts = data.timestamp().cloned();
+                                let existing_ts = entry.get().0.timestamp().cloned();
+                                let should_replace = match (new_ts, existing_ts) {
+                                    (Some(n), Some(e)) => n >= e,
+                                    (Some(_), None) => true,
+                                    _ => false,
+                                };
+                                if should_replace {
+                                    *entry.get_mut() = (data, metadata);
+                                }
                             }
                         }
                     },

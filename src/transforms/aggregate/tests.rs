@@ -2113,6 +2113,52 @@ fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
 }
 
 #[test]
+fn event_time_auto_replaces_on_kind_change_before_timestamp_compare() {
+    let interval_ms = 10_000_u64;
+    let mut agg = Aggregate::new(&AggregateConfig {
+        interval_ms,
+        mode: AggregationMode::Auto,
+        time_source: TimeSource::EventTime,
+        allowed_lateness_ms: 0,
+        use_system_time_for_missing_timestamps: false,
+        max_future_ms: 10_000,
+    })
+    .unwrap();
+
+    let bucket_start = open_bucket_timestamp(interval_ms);
+    let ts_older = bucket_start + chrono::Duration::milliseconds(100);
+    let ts_newer = bucket_start + chrono::Duration::milliseconds(200);
+
+    // Incremental stored first with a newer event timestamp.
+    agg.record(make_metric_with_timestamp(
+        "the-thing",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 10.0 },
+        ts_newer,
+    ));
+
+    // Absolute with an older timestamp must replace the incremental entry (matching
+    // system-time Auto), not be silently dropped by timestamp-only comparison.
+    agg.record(make_metric_with_timestamp(
+        "the-thing",
+        MetricKind::Absolute,
+        MetricValue::Counter { value: 99.0 },
+        ts_older,
+    ));
+
+    let mut out = vec![];
+    agg.flush_final(&mut out);
+    assert_eq!(out.len(), 1);
+    let metric = out[0].as_metric();
+    assert_eq!(metric.kind(), MetricKind::Absolute);
+    if let MetricValue::Counter { value } = metric.value() {
+        assert_eq!(*value, 99.0);
+    } else {
+        panic!("expected absolute counter");
+    }
+}
+
+#[test]
 fn event_time_diff_first_bucket_no_previous() {
 let mut agg = Aggregate::new(&AggregateConfig {
     interval_ms: 10000_u64,
