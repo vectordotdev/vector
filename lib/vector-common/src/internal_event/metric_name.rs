@@ -26,6 +26,11 @@ pub enum CounterName {
     AggregateFailedUpdates,
     AggregateFlushesTotal,
     ApiStartedTotal,
+    AzureBlobEventIgnoredTotal,
+    AzureQueueMessageDeleteSucceededTotal,
+    AzureQueueMessageProcessingSucceededTotal,
+    AzureQueueMessageReceiveSucceededTotal,
+    AzureQueueMessageReceivedMessagesTotal,
     CheckpointsTotal,
     ChecksumErrorsTotal,
     CollectCompletedTotal,
@@ -122,6 +127,8 @@ pub enum HistogramName {
     AdaptiveConcurrencyObservedRtt,
     AdaptiveConcurrencyPastRttMean,
     AdaptiveConcurrencyReachedLimit,
+    AzureBlobProcessingSucceededDurationSeconds,
+    AzureBlobProcessingFailedDurationSeconds,
     S3ObjectProcessingSucceededDurationSeconds,
     S3ObjectProcessingFailedDurationSeconds,
     CollectDurationSeconds,
@@ -153,6 +160,12 @@ impl HistogramName {
             Self::AdaptiveConcurrencyObservedRtt => "adaptive_concurrency_observed_rtt",
             Self::AdaptiveConcurrencyPastRttMean => "adaptive_concurrency_past_rtt_mean",
             Self::AdaptiveConcurrencyReachedLimit => "adaptive_concurrency_reached_limit",
+            Self::AzureBlobProcessingSucceededDurationSeconds => {
+                "azure_blob_processing_succeeded_duration_seconds"
+            }
+            Self::AzureBlobProcessingFailedDurationSeconds => {
+                "azure_blob_processing_failed_duration_seconds"
+            }
             Self::S3ObjectProcessingSucceededDurationSeconds => {
                 "s3_object_processing_succeeded_duration_seconds"
             }
@@ -287,6 +300,19 @@ impl CounterName {
             Self::AggregateFailedUpdates => "aggregate_failed_updates",
             Self::AggregateFlushesTotal => "aggregate_flushes_total",
             Self::ApiStartedTotal => "api_started_total",
+            Self::AzureBlobEventIgnoredTotal => "azure_blob_event_ignored_total",
+            Self::AzureQueueMessageDeleteSucceededTotal => {
+                "azure_queue_message_delete_succeeded_total"
+            }
+            Self::AzureQueueMessageProcessingSucceededTotal => {
+                "azure_queue_message_processing_succeeded_total"
+            }
+            Self::AzureQueueMessageReceiveSucceededTotal => {
+                "azure_queue_message_receive_succeeded_total"
+            }
+            Self::AzureQueueMessageReceivedMessagesTotal => {
+                "azure_queue_message_received_messages_total"
+            }
             Self::CheckpointsTotal => "checkpoints_total",
             Self::ChecksumErrorsTotal => "checksum_errors_total",
             Self::CollectCompletedTotal => "collect_completed_total",

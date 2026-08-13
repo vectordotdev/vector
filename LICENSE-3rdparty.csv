@@ -103,6 +103,7 @@ azure_core,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_core_macros,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_identity,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_storage_blob,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
+azure_storage_queue,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 backon,https://github.com/Xuanwo/backon,Apache-2.0,The backon Authors
 base16,https://github.com/thomcc/rust-base16,CC0-1.0,Thom Chiovoloni <tchiovoloni@mozilla.com>
 base16ct,https://github.com/RustCrypto/formats/tree/master/base16ct,Apache-2.0 OR MIT,RustCrypto Developers

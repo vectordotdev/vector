@@ -323,11 +323,12 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "1.0", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
+azure_core = { version = "1.0", default-features = false, features = ["reqwest", "hmac_openssl", "tokio"], optional = true }
 azure_identity = { version = "1.0", default-features = false, features = ["client_certificate"], optional = true }
 
 # Azure Storage
 azure_storage_blob = { version = "1.0", default-features = false, optional = true }
+azure_storage_queue = { version = "1.0", default-features = false, optional = true }
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -686,6 +687,7 @@ sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
   "sources-aws_sqs",
+  "sources-azure_blob",
   "sources-datadog_agent",
   "sources-demo_logs",
   "sources-docker_logs",
@@ -739,6 +741,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64", "sources-http_server", "sources-utils-http-encoding"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
+sources-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob", "dep:azure_storage_queue", "dep:async-compression", "dep:base64", "tokio-util/io"]
 sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost", "vector-vrl-functions/dnstap"]
@@ -1069,7 +1072,7 @@ aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs"]
 aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
-azure-blob-integration-tests = ["sinks-azure_blob"]
+azure-blob-integration-tests = ["sinks-azure_blob", "sources-azure_blob"]
 azure-logs-ingestion-integration-tests = ["sinks-azure_logs_ingestion"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]
