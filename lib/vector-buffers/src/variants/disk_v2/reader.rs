@@ -1028,6 +1028,13 @@ where
         let mut force_check_pending_data_files = false;
 
         let token = loop {
+            // Mark the latest writer/acknowledgement notification as observed immediately before
+            // processing the state it may represent. Any notification published after this
+            // snapshot remains unseen, so a later `changed()` call returns immediately and drives
+            // another loop iteration instead of losing an acknowledgement wake at the published
+            // byte boundary.
+            let writer_progress = *self.writer_progress.borrow_and_update();
+
             // Handle any pending acknowledgements first.
             self.handle_pending_acknowledgements(force_check_pending_data_files)
                 .context(IoSnafu)?;
@@ -1043,7 +1050,6 @@ where
             // corrupted records, but hadn't yet had a "good" record that we could read, since the
             // "we skipped records due to corruption" logic requires performing valid read to
             // detect, and calculate a valid delta from.
-            let writer_progress = *self.writer_progress.borrow();
             if writer_progress.is_failed() {
                 return Err(ReaderError::Io {
                     source: io::Error::other("disk buffer writer failed"),
@@ -1075,11 +1081,10 @@ where
 
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
 
-            // The watch value is the latest completed writer boundary. Mark this revision as
-            // observed before checking it so a concurrent publication makes `changed()` return
+            // The snapshot is the completed writer boundary observed before acknowledgement
+            // processing. A concurrent publication remains unseen and makes `changed()` return
             // immediately. The buffered file reader may have prefetched later physical bytes, but
             // record delivery remains bounded by both this byte position and the record-ID gate.
-            let writer_progress = *self.writer_progress.borrow_and_update();
             if self.ready_to_read
                 && let Some((published_file_id, published_byte_offset)) =
                     writer_progress.published_position()
