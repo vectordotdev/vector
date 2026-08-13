@@ -1,13 +1,16 @@
 // Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
 #![allow(clippy::let_underscore_must_use)]
 
-use std::{fmt, io, sync::Arc, time::Instant};
+use std::{error::Error, fmt, io, sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
 use derivative::Derivative;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::Span;
-use vector_common::internal_event::{InternalEventHandle, Registered, register};
+use vector_common::{
+    finalization::EventStatus,
+    internal_event::{InternalEventHandle, Registered, register},
+};
 
 use super::limited_queue::LimitedSender;
 use crate::{
@@ -18,6 +21,40 @@ use crate::{
 };
 
 const DISK_V2_WRITER_QUEUE_CAPACITY: usize = 1;
+
+#[derive(Clone, Copy)]
+enum DiskV2WriterExit {
+    Failed,
+    Shutdown,
+}
+
+#[derive(Debug)]
+struct DiskV2WriterTaskStopped<E> {
+    source: E,
+}
+
+impl<E: fmt::Display> fmt::Display for DiskV2WriterTaskStopped<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "disk buffer writer task stopped: {}",
+            self.source
+        )
+    }
+}
+
+impl<E: Error + 'static> Error for DiskV2WriterTaskStopped<E> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+fn disk_v2_writer_task_stopped<E>(source: E) -> io::Error
+where
+    E: Error + Send + Sync + 'static,
+{
+    io::Error::other(DiskV2WriterTaskStopped { source })
+}
 
 enum DiskV2WriterCommand<T: Bufferable> {
     Write {
@@ -43,7 +80,11 @@ impl<T: Bufferable> DiskV2Sender<T> {
         writer.set_shutdown(shutdown_rx);
         vector_common::spawn_in_current_span(async move {
             while let Some(command) = command_rx.recv().await {
-                if Self::process_command(&mut writer, command).await {
+                if let Some(exit) = Self::process_command(&mut writer, command).await {
+                    command_rx.close();
+                    while let Some(command) = command_rx.recv().await {
+                        Self::fail_pending_command(command, exit);
+                    }
                     break;
                 }
             }
@@ -57,12 +98,14 @@ impl<T: Bufferable> DiskV2Sender<T> {
 
     // The task is the cancellation boundary for disk I/O. While the topology is active, once
     // the queue accepts a command, this owner finishes the write and its visibility flush even
-    // if the requesting future is dropped. When the last sender is dropped, only waits for
-    // reader progress are interrupted; any file I/O already in progress still finishes.
+    // if the requesting future is dropped. When the actor stops, it closes and drains the queue so
+    // every accepted command receives a response and every unwritten record is finalized as
+    // errored. When the last sender is dropped, only waits for reader progress are interrupted;
+    // any file I/O already in progress still finishes.
     async fn process_command(
         writer: &mut disk_v2::BufferWriter<T, ProductionFilesystem>,
         command: DiskV2WriterCommand<T>,
-    ) -> bool {
+    ) -> Option<DiskV2WriterExit> {
         match command {
             DiskV2WriterCommand::Write {
                 item,
@@ -88,7 +131,13 @@ impl<T: Bufferable> DiskV2Sender<T> {
                     writer.fail();
                 }
                 let _ = response.send(result);
-                failed || shutting_down
+                if failed {
+                    Some(DiskV2WriterExit::Failed)
+                } else if shutting_down {
+                    Some(DiskV2WriterExit::Shutdown)
+                } else {
+                    None
+                }
             }
             DiskV2WriterCommand::Flush { response } => {
                 let result = writer.flush().await;
@@ -97,7 +146,42 @@ impl<T: Bufferable> DiskV2Sender<T> {
                     writer.fail();
                 }
                 let _ = response.send(result);
-                failed
+                failed.then_some(DiskV2WriterExit::Failed)
+            }
+        }
+    }
+
+    fn mark_command_errored(command: &mut DiskV2WriterCommand<T>) {
+        if let DiskV2WriterCommand::Write { item, .. } = command {
+            item.take_finalizer_groups()
+                .update_status(EventStatus::Errored);
+        }
+    }
+
+    fn fail_pending_command(mut command: DiskV2WriterCommand<T>, exit: DiskV2WriterExit) {
+        Self::mark_command_errored(&mut command);
+        match command {
+            DiskV2WriterCommand::Write { response, .. } => {
+                let error = match exit {
+                    DiskV2WriterExit::Failed => disk_v2::WriterError::Io {
+                        source: io::Error::other(
+                            "disk buffer writer task failed before queued write was processed",
+                        ),
+                    },
+                    DiskV2WriterExit::Shutdown => disk_v2::WriterError::Shutdown,
+                };
+                let _ = response.send(Err(error));
+            }
+            DiskV2WriterCommand::Flush { response } => {
+                let message = match exit {
+                    DiskV2WriterExit::Failed => {
+                        "disk buffer writer task failed before queued flush was processed"
+                    }
+                    DiskV2WriterExit::Shutdown => {
+                        "disk buffer writer task shut down before queued flush was processed"
+                    }
+                };
+                let _ = response.send(Err(io::Error::other(message)));
             }
         }
     }
@@ -111,11 +195,14 @@ impl<T: Bufferable> DiskV2Sender<T> {
                 response,
             })
             .await
-            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?;
+            .map_err(|mut error| {
+                Self::mark_command_errored(&mut error.0);
+                disk_v2_writer_task_stopped(error)
+            })?;
 
         response_rx
             .await
-            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?
+            .map_err(disk_v2_writer_task_stopped)?
             .map_err(|error| {
                 error!(%error, "Disk buffer writer encountered an unrecoverable error.");
                 error.into()
@@ -127,11 +214,11 @@ impl<T: Bufferable> DiskV2Sender<T> {
         self.commands
             .send(DiskV2WriterCommand::Flush { response })
             .await
-            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?;
+            .map_err(disk_v2_writer_task_stopped)?;
 
         response_rx
             .await
-            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?
+            .map_err(disk_v2_writer_task_stopped)?
             .map_err(|error| {
                 error!(%error, "Disk buffer writer encountered an unrecoverable error.");
                 error.into()
@@ -401,6 +488,8 @@ mod tests {
     use std::time::Duration;
 
     use super::{DiskV2Sender, DiskV2WriterCommand, TryWriteOutcome, oneshot};
+    use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
+
     use crate::{
         buffer_usage_data::BufferUsageHandle,
         test::{SizedRecord, with_temp_dir},
@@ -514,8 +603,26 @@ mod tests {
                     .await
                     .expect("writer task should accept the blocking command");
 
+                // Fill the actor's one-slot queue while the first command waits for reader
+                // progress. This command has already been accepted and must be finalized if the
+                // actor exits before processing it.
+                let mut queued_item = SizedRecord::new(128);
+                let (batch, mut queued_status) = BatchNotifier::new_with_receiver();
+                queued_item.add_batch_notifier(batch);
+                let (queued_response, queued_response_rx) = oneshot::channel();
+                sender
+                    .commands
+                    .send(DiskV2WriterCommand::Write {
+                        item: queued_item,
+                        blocking: true,
+                        response: queued_response,
+                    })
+                    .await
+                    .expect("writer task should accept the queued command");
+
                 // Closing the final sender is the topology shutdown signal. It must interrupt the
-                // reader-progress wait without cancelling any file I/O already in progress.
+                // reader-progress wait without cancelling any file I/O already in progress, then
+                // explicitly fail commands it had already accepted.
                 drop(sender);
 
                 let result = tokio::time::timeout(Duration::from_secs(2), response_rx)
@@ -526,6 +633,21 @@ mod tests {
                     result,
                     Err(crate::variants::disk_v2::WriterError::Shutdown)
                 ));
+
+                let queued_result =
+                    tokio::time::timeout(Duration::from_secs(2), queued_response_rx)
+                        .await
+                        .expect("writer task should drain the queued command")
+                        .expect("writer task should return the queued command response");
+                assert!(matches!(
+                    queued_result,
+                    Err(crate::variants::disk_v2::WriterError::Shutdown)
+                ));
+                assert_eq!(
+                    queued_status.try_recv(),
+                    Ok(BatchStatus::Errored),
+                    "an accepted write that is not processed must not resolve as Delivered",
+                );
             }
         })
         .await;
