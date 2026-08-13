@@ -347,6 +347,15 @@ _values: {
 	//              relevant_when: 'strategy = "fingerprint" or "inode"'
 	relevant_when?: string
 
+	// `required_when` clarifies when an option is required.
+	//
+	// For example, if an option is only required when another option has a
+	// specific value, you can specify that here. We accept a string to allow
+	// for the expression of complex requirements.
+	//
+	//              required_when: 'strategy = "fingerprint"'
+	required_when?: string
+
 	// `required_one_of` documents that exactly one field from the listed group
 	// must be set. All members share the same list. The field itself is optional
 	// in isolation; the constraint is expressed at the schema level via oneOf.

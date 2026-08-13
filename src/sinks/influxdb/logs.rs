@@ -90,6 +90,7 @@ pub struct InfluxDbLogsConfig {
     /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "vector-database"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    #[configurable(metadata(docs::required_when = "version = \"1\""))]
     pub database: Option<String>,
 
     /// The consistency level to use for writes.
@@ -125,6 +126,7 @@ pub struct InfluxDbLogsConfig {
     /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "my-org"))]
     #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
     #[configurable(metadata(docs::minimal = true))]
     pub org: Option<String>,
 
@@ -133,6 +135,7 @@ pub struct InfluxDbLogsConfig {
     /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "vector-bucket"))]
     #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
     #[configurable(metadata(docs::minimal = true))]
     pub bucket: Option<String>,
 
@@ -143,6 +146,7 @@ pub struct InfluxDbLogsConfig {
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
     #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
     #[configurable(metadata(docs::minimal = true))]
     pub token: Option<SensitiveString>,
 
@@ -409,7 +413,10 @@ impl HttpSink for InfluxDbLogsSink {
 impl InfluxDbLogsConfig {
     fn settings(&self) -> crate::Result<InfluxDbSettings> {
         let version = match self.version {
-            Some(version) => version,
+            Some(version) => {
+                self.validate_version(version)?;
+                version
+            }
             None => {
                 warn!(
                     "The `version` option is deprecated and will be required in a future release. \
@@ -446,13 +453,18 @@ impl InfluxDbLogsConfig {
         }
     }
 
-    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
+    fn settings_present(&self) -> (bool, bool) {
         let has_v1 = self.database.is_some()
             || self.consistency.is_some()
             || self.retention_policy_name.is_some()
             || self.username.is_some()
             || self.password.is_some();
         let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
+        (has_v1, has_v2)
+    }
+
+    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
+        let (has_v1, has_v2) = self.settings_present();
         match (has_v1, has_v2) {
             (true, true) => Err(
                 "Unclear settings. Both InfluxDB v1 and v2 settings are configured; configure only one version."
@@ -461,6 +473,23 @@ impl InfluxDbLogsConfig {
             (false, false) => Err("InfluxDB v1 or v2 should be configured as endpoint.".into()),
             (true, false) => Ok(InfluxDbVersion::V1),
             (false, true) => Ok(InfluxDbVersion::V2),
+        }
+    }
+
+    /// Rejects settings that belong to the version that was not selected, so that
+    /// an explicit `version` cannot silently ignore stale settings for the other version.
+    fn validate_version(&self, version: InfluxDbVersion) -> crate::Result<()> {
+        let (has_v1, has_v2) = self.settings_present();
+        match version {
+            InfluxDbVersion::V1 if has_v2 => Err(
+                "InfluxDB v1 settings are configured, but v2 settings were also provided; configure only one version."
+                    .into(),
+            ),
+            InfluxDbVersion::V2 if has_v1 => Err(
+                "InfluxDB v2 settings are configured, but v1 settings were also provided; configure only one version."
+                    .into(),
+            ),
+            _ => Ok(()),
         }
     }
 
@@ -605,6 +634,59 @@ mod tests {
         "#};
         let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
         assert!(config.infer_version().is_err());
+    }
+
+    #[test]
+    fn test_settings_explicit_v2_rejects_v1_settings() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
+            database: "stale-v1-database"
+            username: "stale-v1-user"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert!(config.settings().is_err());
+    }
+
+    #[test]
+    fn test_settings_explicit_v1_rejects_v2_settings() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            version: "1"
+            database: "my-database"
+            org: "stale-v2-org"
+            bucket: "stale-v2-bucket"
+            token: "stale-v2-token"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert!(config.settings().is_err());
+    }
+
+    #[test]
+    fn test_settings_explicit_v2_accepts_only_v2_settings() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert!(config.settings().is_ok());
+    }
+
+    #[test]
+    fn test_settings_explicit_v1_accepts_only_v1_settings() {
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            version: "1"
+            database: "my-database"
+        "#};
+        let config: InfluxDbLogsConfig = serde_yaml::from_str(config).unwrap();
+        assert!(config.settings().is_ok());
     }
 
     #[test]

@@ -208,6 +208,13 @@
               {{ end }}
             {{ end }}
 
+            {{/* "Required when" conditions */}}
+            {{ with .required_when }}
+              <div class="mt-2 text-sm flex justify-end">
+                <span> Required when: <code>{{ . }}</code> </span>
+              </div>
+            {{ end }}
+
             {{/* "Relevant when" conditions */}}
             {{ with .relevant_when }}
               <div class="mt-2 text-sm flex justify-end">
@@ -2113,6 +2120,12 @@
             <strong>Note</strong>: This parameter supports Vector's
             <a href="/docs/reference/configuration/template-syntax">template syntax</a>, which enables you to use
             dynamic per-event values.
+          </div>
+        {{ end }}
+
+        {{ with $v.required_when }}
+          <div class="mt-2">
+            <span> Required when: <code>{{ . }}</code> </span>
           </div>
         {{ end }}
 

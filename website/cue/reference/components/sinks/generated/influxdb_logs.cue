@@ -68,6 +68,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 		minimal:       true
 		relevant_when: "version = \"2\""
 		required:      false
+		required_when: "version = \"2\""
 		type: string: examples: ["vector-bucket"]
 	}
 	consistency: {
@@ -90,6 +91,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"""
 		relevant_when: "version = \"1\""
 		required:      false
+		required_when: "version = \"1\""
 		type: string: examples: ["vector-database"]
 	}
 	encoding: {
@@ -174,6 +176,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 		minimal:       true
 		relevant_when: "version = \"2\""
 		required:      false
+		required_when: "version = \"2\""
 		type: string: examples: [
 			"my-org",
 		]
@@ -513,6 +516,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 		minimal:       true
 		relevant_when: "version = \"2\""
 		required:      false
+		required_when: "version = \"2\""
 		type: string: examples: ["${INFLUXDB_TOKEN}"]
 	}
 	username: {

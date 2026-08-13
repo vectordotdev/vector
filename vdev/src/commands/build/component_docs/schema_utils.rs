@@ -438,6 +438,15 @@ impl SchemaContext {
             );
         }
 
+        if let Some(Value::String(condition)) =
+            get_schema_metadata(source_schema, "docs::required_when")
+        {
+            resolved_schema.as_object_mut().unwrap().insert(
+                "required_when".to_string(),
+                Value::String(condition.clone()),
+            );
+        }
+
         if let Some(minimal) = get_schema_metadata(source_schema, "docs::minimal") {
             resolved_schema
                 .as_object_mut()
