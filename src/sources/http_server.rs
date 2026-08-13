@@ -67,7 +67,6 @@ impl SourceConfig for HttpConfig {
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct SimpleHttpConfig {
     /// The socket address to listen for connections on.
     ///
