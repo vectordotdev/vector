@@ -150,44 +150,49 @@ pub async fn run_nats_jetstream(
     let mut messages = initial_messages;
 
     loop {
-        let mut message_stream = messages.take_until(&mut shutdown);
+        // `ShutdownSignal` fires once then polls `Pending` forever, so shutdown must be handled here via `select!`, not re-polled afterwards.
+        loop {
+            tokio::select! {
+                biased;
 
-        while let Some(result) = message_stream.next().await {
-            match result {
-                Ok(msg) => {
-                    backoff.reset();
-                    bytes_received.emit(ByteSize(msg.payload.len()));
+                _ = &mut shutdown => return Ok(()),
 
-                    let status = process_message(
-                        &msg,
-                        &config,
-                        &decoder,
-                        log_namespace,
-                        &mut out,
-                        &events_received,
-                    )
-                    .await;
+                maybe_msg = messages.next() => {
+                    match maybe_msg {
+                        Some(Ok(msg)) => {
+                            backoff.reset();
+                            bytes_received.emit(ByteSize(msg.payload.len()));
 
-                    match status {
-                        ProcessingStatus::Success => {
-                            if let Err(err) = msg.ack().await {
-                                error!(message = "Failed to acknowledge JetStream message.", %err);
+                            let status = process_message(
+                                &msg,
+                                &config,
+                                &decoder,
+                                log_namespace,
+                                &mut out,
+                                &events_received,
+                            )
+                            .await;
+
+                            match status {
+                                ProcessingStatus::Success => {
+                                    if let Err(err) = msg.ack().await {
+                                        error!(message = "Failed to acknowledge JetStream message.", %err);
+                                    }
+                                }
+                                ProcessingStatus::ChannelClosed => return Err(()),
+                                // Do not acknowledge on failure; the message will be redelivered.
+                                ProcessingStatus::Failed => {}
                             }
                         }
-                        ProcessingStatus::ChannelClosed => return Err(()),
-                        // Do not acknowledge on failure; the message will be redelivered.
-                        ProcessingStatus::Failed => {}
+                        Some(Err(err)) => {
+                            warn!(message = "JetStream consumer stream error, recreating.", %err);
+                            break;
+                        }
+                        // The pull stream ended; recover the consumer.
+                        None => break,
                     }
                 }
-                Err(err) => {
-                    warn!(message = "JetStream consumer stream error, recreating.", %err);
-                    break;
-                }
             }
-        }
-
-        if futures::poll!(&mut shutdown).is_ready() {
-            return Ok(());
         }
 
         // Reconnect: rebuild the consumer stream with backoff.

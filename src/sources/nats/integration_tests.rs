@@ -944,6 +944,125 @@ async fn nats_jetstream_shutdown_during_recovery() {
     shutdown_done.await;
 }
 
+/// Ensures the source shuts down cleanly while actively consuming a healthy
+/// stream (i.e. not in the recovery loop).
+///
+/// `take_until` consumes the single-shot `ShutdownSignal`, so re-polling it
+/// afterwards always reports `Pending`. Without the fix the source misses the
+/// shutdown, falls into the recovery loop, and never exits.
+#[tokio::test]
+async fn nats_jetstream_shutdown_during_consumption() {
+    use futures::StreamExt;
+    use tokio::time::{Duration, timeout};
+
+    use crate::{
+        codecs::DecodingConfig,
+        sources::nats::source::{create_consumer_stream, run_nats_jetstream},
+    };
+
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let (subject, stream_name, consumer_name) = random_jetstream_id("test_shutdown_consume");
+
+    let setup_client = async_nats::connect(&url)
+        .await
+        .expect("Failed to connect to NATS for setup");
+    let js = async_nats::jetstream::new(setup_client.clone());
+
+    js.get_or_create_stream(async_nats::jetstream::stream::Config {
+        name: stream_name.clone(),
+        subjects: vec![subject.clone()],
+        storage: StorageType::Memory,
+        ..Default::default()
+    })
+    .await
+    .expect("Failed to create stream");
+
+    let stream = js.get_stream(&stream_name).await.unwrap();
+    stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(consumer_name.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let conf = NatsSourceConfig {
+        url: url.clone(),
+        subject: subject.clone(),
+        framing: default_framing_message_based(),
+        decoding: default_decoding(),
+        subject_key_field: default_subject_key_field(),
+        jetstream: Some(JetStreamConfig {
+            stream: stream_name.clone(),
+            consumer: consumer_name.clone(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let (shutdown_trigger, shutdown_signal, shutdown_done) = ShutdownSignal::new_wired();
+
+    let connection = conf.connect().await.unwrap();
+    let js_config = conf.jetstream.clone().unwrap();
+    let initial_messages = create_consumer_stream(&connection, &js_config)
+        .await
+        .unwrap();
+
+    let decoder = DecodingConfig::new(
+        conf.framing.clone(),
+        conf.decoding.clone(),
+        LogNamespace::Legacy,
+    )
+    .build()
+    .unwrap();
+
+    let (tx, mut rx) = SourceSender::new_test();
+
+    let source_handle = tokio::spawn(run_nats_jetstream(
+        conf.clone(),
+        connection,
+        initial_messages,
+        decoder,
+        LogNamespace::Legacy,
+        shutdown_signal,
+        tx,
+    ));
+
+    // Deliver one message to prove the source is actively consuming a healthy stream.
+    js.publish(subject.clone(), Bytes::from_static(b"alive"))
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    let event = timeout(Duration::from_secs(5), rx.next())
+        .await
+        .expect("Timed out waiting for initial message")
+        .expect("Stream ended unexpectedly");
+    assert_eq!(
+        event.as_log()[log_schema().message_key().unwrap().to_string()],
+        "alive".into()
+    );
+
+    // Signal shutdown while the stream is healthy — the consumer is never deleted.
+    shutdown_trigger.cancel();
+
+    // The source must exit promptly rather than falling through to recovery.
+    let result = timeout(Duration::from_secs(10), source_handle)
+        .await
+        .expect("Source did not shut down within 10 seconds — shutdown missed during consumption")
+        .expect("Source task panicked");
+
+    assert!(
+        result.is_ok(),
+        "Source should return Ok(()) on clean shutdown, got Err"
+    );
+
+    shutdown_done.await;
+}
+
 /// Verifies that messages published while the consumer is deleted (but the
 /// stream still exists) are delivered after the consumer is recreated.
 ///
