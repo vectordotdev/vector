@@ -130,7 +130,9 @@ impl<T: Bufferable> DiskV2Sender<T> {
                 if failed {
                     writer.fail();
                 }
-                let _ = response.send(result);
+                if let Err(Ok(TryWriteOutcome::Full(mut item))) = response.send(result) {
+                    Self::mark_item_errored(&mut item);
+                }
                 if failed {
                     Some(DiskV2WriterExit::Failed)
                 } else if shutting_down {
@@ -151,10 +153,14 @@ impl<T: Bufferable> DiskV2Sender<T> {
         }
     }
 
+    fn mark_item_errored(item: &mut T) {
+        item.take_finalizer_groups()
+            .update_status(EventStatus::Errored);
+    }
+
     fn mark_command_errored(command: &mut DiskV2WriterCommand<T>) {
         if let DiskV2WriterCommand::Write { item, .. } = command {
-            item.take_finalizer_groups()
-                .update_status(EventStatus::Errored);
+            Self::mark_item_errored(item);
         }
     }
 
@@ -551,6 +557,63 @@ mod tests {
                     .expect("second read should succeed");
 
                 assert_eq!(second_read, Some(second));
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn disk_writer_errors_full_item_after_request_is_cancelled() {
+        with_temp_dir(|data_dir| {
+            let data_dir = data_dir.to_path_buf();
+
+            async move {
+                let config = DiskBufferConfigBuilder::from_path(data_dir)
+                    .max_buffer_size(4096)
+                    .max_data_file_size(1024)
+                    .max_record_size(1024)
+                    .build()
+                    .expect("disk buffer config should be valid");
+                let (writer, _reader) =
+                    Buffer::<SizedRecord>::from_config(config, BufferUsageHandle::noop())
+                        .await
+                        .expect("disk buffer should initialize");
+                let sender = DiskV2Sender::new(writer);
+
+                let mut full_item = loop {
+                    let item = SizedRecord::new(128);
+                    match sender
+                        .write(item, false)
+                        .await
+                        .expect("nonblocking write should succeed")
+                    {
+                        TryWriteOutcome::Written => {}
+                        TryWriteOutcome::Full(item) => break item,
+                        TryWriteOutcome::Dropped => panic!("record should fit in the buffer"),
+                    }
+                };
+
+                let (batch, mut status) = BatchNotifier::new_with_receiver();
+                full_item.add_batch_notifier(batch);
+                let (response, response_rx) = oneshot::channel();
+                sender
+                    .commands
+                    .send(DiskV2WriterCommand::Write {
+                        item: full_item,
+                        blocking: false,
+                        response,
+                    })
+                    .await
+                    .expect("writer task should accept the command");
+                drop(response_rx);
+
+                // A later command acts as a barrier proving the cancelled write was processed.
+                sender.flush().await.expect("writer flush should succeed");
+                assert_eq!(
+                    status.try_recv(),
+                    Ok(BatchStatus::Errored),
+                    "a full item whose requester was cancelled must not resolve as Delivered",
+                );
             }
         })
         .await;
