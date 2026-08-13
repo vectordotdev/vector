@@ -38,11 +38,12 @@ pub(super) struct SqsSinkConfig {
 
 impl GenerateConfig for SqsSinkConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
-            region = "us-east-2"
-            encoding.codec = "json""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
+            region: us-east-2
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }

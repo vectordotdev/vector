@@ -814,6 +814,9 @@ impl IntoIterator for QueryParameterValue {
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
 #[cfg(test)]
+mod transport_tests;
+
+#[cfg(test)]
 mod tests {
     use std::convert::Infallible;
 
