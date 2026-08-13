@@ -43,6 +43,22 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
+    /// Whether this backend can only persist items satisfying [`Bufferable::is_fully_encodable`].
+    ///
+    /// In-memory stages hold the in-memory representation and have no wire format, so they can
+    /// accept any item regardless of its nesting depth. Disk stages encode to protobuf on write
+    /// and cannot.
+    ///
+    /// Callers use this to avoid assuming a stage is constrained: an item that one stage cannot
+    /// encode may be perfectly storable by another, so the check must be asked of the specific
+    /// stage rather than applied to every topology.
+    pub(crate) fn requires_encodable_items(&self) -> bool {
+        match self {
+            Self::InMemory(_) => false,
+            Self::DiskV2(_) => true,
+        }
+    }
+
     pub(crate) async fn send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
         match self {
             Self::InMemory(tx) => tx
@@ -306,10 +322,13 @@ impl<T: Bufferable> BufferSender<T> {
                 // letting the backend filter it, is what makes the behaviour
                 // state-independent: previously an over-nested item was pruned while the
                 // disk had room and forwarded whole once the disk reported full, so the
-                // same item took different paths at 99% and 100%. The overflow stage may
-                // have no wire-format constraint at all (an in-memory stage does not), so
-                // pruning sub-items on its behalf would discard events it could accept.
-                if !item.is_fully_encodable() {
+                // same item took different paths at 99% and 100%.
+                //
+                // The check is gated on the base stage actually having a wire-format
+                // constraint. A memory stage overflowing to disk can store an over-nested
+                // item perfectly well, so diverting it past memory would send an item the
+                // base could have kept to a stage that must drop it.
+                if self.base.requires_encodable_items() && !item.is_fully_encodable() {
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))

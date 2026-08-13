@@ -187,7 +187,7 @@ fn ts_leaf() -> Value {
 /// Create a [`LogEvent`] with event data at `value_depth` and metadata at `metadata_depth`.
 fn create_saturated_log(value_depth: usize, metadata_depth: usize) -> LogEvent {
     let mut event = LogEvent::default();
-    event.insert("data", create_nested_value(value_depth - 1));
+    event.insert(event_path!("data"), create_nested_value(value_depth - 1));
     *event.metadata_mut().value_mut() = create_nested_value(metadata_depth);
     event
 }
@@ -195,7 +195,7 @@ fn create_saturated_log(value_depth: usize, metadata_depth: usize) -> LogEvent {
 /// Create a [`TraceEvent`] with event data at `value_depth` and metadata at `metadata_depth`.
 fn create_saturated_trace(value_depth: usize, metadata_depth: usize) -> TraceEvent {
     let mut trace = TraceEvent::default();
-    trace.insert("data", create_nested_value(value_depth - 1));
+    trace.insert(event_path!("data"), create_nested_value(value_depth - 1));
     *trace.metadata_mut().value_mut() = create_nested_value(metadata_depth);
     trace
 }
@@ -383,7 +383,7 @@ fn nesting_gate_rejects_above_max_depth() {
 fn per_path_boundaries() {
     let roundtrip_value = |value: Value| -> bool {
         let mut event = LogEvent::default();
-        event.insert("data", value);
+        event.insert(event_path!("data"), value);
         let array = EventArray::Logs(LogArray::from(vec![event]));
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
@@ -455,7 +455,7 @@ fn nesting_gate_accepts_deep_array_nesting() {
     // An array depth 40 = 80 frames, comfortably under the 99-frame value budget but well
     // over the 33-depth limit the old uniform check would have applied.
     let mut event = LogEvent::default();
-    event.insert("data", create_nested_array(40));
+    event.insert(event_path!("data"), create_nested_array(40));
     let array = EventArray::Logs(LogArray::from(vec![event]));
     let mut buf = BytesMut::with_capacity(65536);
     assert!(
@@ -518,7 +518,7 @@ fn nesting_gate_handles_mixed_array_object_nesting() {
 fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
     let roundtrip_log = |value: Value| -> bool {
         let mut event = LogEvent::default();
-        event.insert("data", value);
+        event.insert(event_path!("data"), value);
         let array = EventArray::Logs(LogArray::from(vec![event]));
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
@@ -544,7 +544,7 @@ fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
     );
 
     let mut event = LogEvent::default();
-    event.insert("data", event_data_ts);
+    event.insert(event_path!("data"), event_data_ts);
     let array = EventArray::Logs(LogArray::from(vec![event]));
     let mut buf = BytesMut::with_capacity(65536);
     assert!(
@@ -583,7 +583,7 @@ fn nesting_gate_accepts_timestamp_leaf_below_max_object_depth() {
     // Event data: depth (max-1) Object + Timestamp leaf = (max-1)*3 + 1 frames.
     let mut event = LogEvent::default();
     event.insert(
-        "data",
+        event_path!("data"),
         create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 2, ts_leaf()),
     );
     let array = EventArray::Logs(LogArray::from(vec![event]));
@@ -623,12 +623,15 @@ fn nesting_gate_accepts_timestamp_leaf_below_max_object_depth() {
 fn filter_unencodable_drops_only_over_budget_events() {
     let good = || {
         let mut event = LogEvent::default();
-        event.insert("data", "ok");
+        event.insert(event_path!("data"), "ok");
         event
     };
     let bad = || {
         let mut event = LogEvent::default();
-        event.insert("data", create_nested_value(MAX_OBJECT_DEPTH_VALUE));
+        event.insert(
+            event_path!("data"),
+            create_nested_value(MAX_OBJECT_DEPTH_VALUE),
+        );
         event
     };
 
@@ -645,7 +648,9 @@ fn filter_unencodable_drops_only_over_budget_events() {
     };
     for log in &surviving {
         assert_eq!(
-            log.value().get("data").and_then(|v| v.as_bytes()),
+            log.value()
+                .get(vrl::path!("data"))
+                .and_then(|v| v.as_bytes()),
             Some(&bytes::Bytes::from_static(b"ok")),
             "only good events should remain",
         );
@@ -661,7 +666,7 @@ fn event_exceeds_max_nesting_cost_charges_timestamp_leaf() {
     let log_at_max_with_ts = {
         let mut event = LogEvent::default();
         event.insert(
-            "data",
+            event_path!("data"),
             create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf()),
         );
         Event::Log(event)
@@ -674,7 +679,7 @@ fn event_exceeds_max_nesting_cost_charges_timestamp_leaf() {
     let trace_at_max_with_ts = {
         let mut trace = TraceEvent::default();
         trace.insert(
-            "data",
+            event_path!("data"),
             create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 1, ts_leaf()),
         );
         Event::Trace(trace)
@@ -703,7 +708,7 @@ fn event_exceeds_max_nesting_cost_charges_timestamp_leaf() {
     let log_below_max_with_ts = {
         let mut event = LogEvent::default();
         event.insert(
-            "data",
+            event_path!("data"),
             create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE - 2, ts_leaf()),
         );
         Event::Log(event)
@@ -736,13 +741,13 @@ fn check_value_nesting_cost_charges_timestamp_leaf() {
 #[test]
 fn nesting_gate_accepts_flat_events() {
     let mut log = LogEvent::from("hello world");
-    log.insert("foo", "bar");
+    log.insert(event_path!("foo"), "bar");
     let events = EventArray::Logs(LogArray::from(vec![log]));
     let mut buf = BytesMut::with_capacity(1024);
     assert!(events.encode(&mut buf).is_ok());
 
     let mut trace = TraceEvent::default();
-    trace.insert("foo", "bar");
+    trace.insert(event_path!("foo"), "bar");
     let events = EventArray::Traces(TraceArray::from(vec![trace]));
     let mut buf = BytesMut::with_capacity(1024);
     assert!(events.encode(&mut buf).is_ok());

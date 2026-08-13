@@ -158,6 +158,7 @@ mod tests {
         Event, LogEvent, MAX_METADATA_VALUE_NESTING_FRAMES, MAX_VALUE_NESTING_FRAMES, ObjectMap,
         Value, event_exceeds_max_nesting_cost,
     };
+    use vrl::event_path;
 
     use super::EventWrapper;
     use crate::proto::vector as proto_vector;
@@ -184,7 +185,7 @@ mod tests {
         // `log.value()` (one outer Object from the inserted key), cost = 99 =
         // MAX_VALUE_NESTING_FRAMES.
         let mut log = LogEvent::default();
-        log.insert("data", build_nested_value(32));
+        log.insert(event_path!("data"), build_nested_value(32));
         let event = Event::Log(log);
         assert!(
             event_exceeds_max_nesting_cost(&event).is_none(),
@@ -211,7 +212,7 @@ mod tests {
     fn push_events_request_decode_one_past_value_budget_fails() {
         // 33 nested objects under "data" → 34 effective object levels, cost 102.
         let mut log = LogEvent::default();
-        log.insert("data", build_nested_value(33));
+        log.insert(event_path!("data"), build_nested_value(33));
         let event = Event::Log(log);
 
         let request = proto_vector::PushEventsRequest {

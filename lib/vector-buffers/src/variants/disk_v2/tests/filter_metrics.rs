@@ -6,9 +6,10 @@
 //! queued on disk. Without that, a single rejected event makes the buffer report
 //! one queued event forever.
 
-use std::{error, fmt, num::NonZeroUsize};
+use std::{error, fmt, num::NonZeroUsize, time::Duration};
 
 use bytes::{Buf, BufMut};
+use tokio::time::timeout;
 use vector_common::{
     byte_size_of::ByteSizeOf,
     finalization::{
@@ -308,5 +309,66 @@ async fn unencodable_item_overflows_intact_when_base_is_full() {
             post_filter: 0,
         },
         "a full base stage must not change how an unencodable item is routed",
+    );
+}
+
+/// A base stage without a wire-format constraint must keep an unencodable item rather than
+/// pass it to the overflow stage.
+///
+/// The encodability check is a property of the *base* stage, not of the item alone. In a
+/// `memory -> disk` overflow topology the memory stage can hold an arbitrarily nested item
+/// safely, so diverting it past memory would hand an item the base could have kept to a
+/// stage that has no choice but to drop it. This is the mirror image of the
+/// `disk -> memory` cases above and guards against reintroducing that assumption.
+#[tokio::test]
+async fn unencodable_item_stays_in_base_when_base_has_no_encoding_constraint() {
+    let _a = install_tracing_helpers();
+
+    let (base_tx, mut base_rx) = limited::<FilterableBatch>(
+        MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
+        None,
+        None,
+    );
+    let (overflow_tx, mut overflow_rx) = limited(
+        MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
+        None,
+        None,
+    );
+
+    let mut sender = BufferSender::with_overflow(
+        SenderAdapter::from(base_tx),
+        BufferSender::new(SenderAdapter::from(overflow_tx), WhenFull::Block),
+    );
+
+    // The base is in-memory and empty, so it can hold this item despite the item being
+    // unencodable for a protobuf-backed stage.
+    sender
+        .send(
+            FilterableBatch {
+                events: 5,
+                post_filter: 0,
+            },
+            None,
+        )
+        .await
+        .expect("send should succeed");
+
+    let received = timeout(Duration::from_secs(5), base_rx.next())
+        .await
+        .expect("item must stay in the base stage rather than be diverted to overflow")
+        .expect("base stage should yield the item");
+    assert_eq!(
+        received,
+        FilterableBatch {
+            events: 5,
+            post_filter: 0,
+        },
+        "an unconstrained base stage must keep the item intact",
+    );
+    assert!(
+        timeout(Duration::from_millis(50), overflow_rx.next())
+            .await
+            .is_err(),
+        "the overflow stage must not be involved when the base can hold the item",
     );
 }
