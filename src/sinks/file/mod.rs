@@ -421,6 +421,10 @@ impl FileSink {
         loop {
             let input_next = input.next();
 
+            let next_timer_deadline = flush_deadlines.peek()
+                .map(|r| (r.0).0)
+                .copied();
+
             tokio::select! {
                 event = input_next => {
                     match event {
@@ -478,7 +482,7 @@ impl FileSink {
                                     || events.len() >= batch_settings.item_limit
                                 {
                                     // Buffer is full — flush old batch and start fresh.
-                                    let (old_events, _old_gen) = buffers.remove(&path).unwrap();
+                                    let (old_events, _old_generation) = buffers.remove(&path).unwrap();
                                     self.process_batch(path.clone(), old_events).await;
                                     let generation = per_path_gen.entry(path.clone()).or_insert(0);
                                     let deadline = tokio::time::Instant::now()
@@ -554,7 +558,7 @@ impl FileSink {
                             debug!(message = "Receiver exhausted, flushing remaining buffers.");
                             let paths: Vec<Bytes> = buffers.keys().cloned().collect();
                             for p in paths {
-                                if let Some((events, _gen)) = buffers.remove(&p) {
+                                if let Some((events, _generation)) = buffers.remove(&p) {
                                     self.process_batch(p, events).await;
                                 }
                             }
@@ -585,6 +589,15 @@ impl FileSink {
                         }
                     }
                 }
+                _ = async {
+                    tokio::time::sleep_until(
+                        next_timer_deadline
+                            .unwrap_or_else(|| {
+                                tokio::time::Instant::now()
+                                    + std::time::Duration::from_secs(3600)
+                            }),
+                    ).await;
+                }, if next_timer_deadline.is_some() => {}
             }
 
             // Flush any expired buffers after every wake-up.
