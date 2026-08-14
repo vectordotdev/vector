@@ -11,11 +11,6 @@
       "description": "The boolean syntax (`compression: true` / `compression: false`) is deprecated.\nUse the string syntax instead: `compression: \"gzip\"`, `compression: \"zstd\"`, or `compression: \"none\"`.\n\nThe `bool_or_vector_compression` deserializer will be removed once the boolean syntax is no longer supported."
     },
     {
-      "what": "`buffer_byte_size` and `buffer_events` gauge metrics",
-      "deprecated_since": "0.53.0",
-      "description": "The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the\n`buffer_size_bytes` and `buffer_size_events` metrics."
-    },
-    {
       "what": "`series_api_version: v1` option on the `datadog_metrics` sink",
       "deprecated_since": "0.56.0",
       "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
@@ -43,6 +38,12 @@
       "deprecated_since": "0.50.0",
       "removed_in": "0.58.0",
       "description": "The `encoding` field will be removed. Use `decoding` and `framing` instead."
+    },
+    {
+      "what": "`buffer_byte_size` and `buffer_events` gauge metrics",
+      "deprecated_since": "0.53.0",
+      "removed_in": "0.58.0",
+      "description": "The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the\n`buffer_size_bytes` and `buffer_size_events` metrics."
     }
   ]
 }
