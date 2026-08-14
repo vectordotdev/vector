@@ -342,6 +342,32 @@ impl HttpEndpoint {
         })?;
         Self::new(uri)
     }
+
+    /// Appends `suffix` directly to the path without inserting a separator.
+    ///
+    /// Unlike [`HttpEndpoint::append_path`], this does not add a `/`. It is for
+    /// API method suffixes that attach directly to a resource path, such as
+    /// Google's `:publish` convention.
+    pub fn append_raw_suffix(&self, suffix: &str) -> Result<Self, HttpEndpointError> {
+        if suffix.is_empty() {
+            return Ok(self.clone());
+        }
+        let mut parts = self.0.clone().into_parts();
+        let base_path = parts
+            .path_and_query
+            .as_ref()
+            .map(PathAndQuery::path)
+            .unwrap_or_default();
+        let joined = format!("{base_path}{suffix}");
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
+            endpoint: self.0.to_string(),
+            path: joined,
+        })?);
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
+            endpoint: self.0.to_string(),
+        })?;
+        Self::new(uri)
+    }
 }
 
 impl fmt::Display for HttpEndpoint {
@@ -545,5 +571,19 @@ mod tests {
             "https://user:pass@example.com:8088/base/sub/path"
         );
         assert!(matches!(appended.as_uri().scheme_str(), Some("https")));
+    }
+
+    #[test]
+    fn http_endpoint_append_raw_suffix_attaches_without_separator() {
+        let base = HttpEndpoint::parse("https://example.com/v1/projects/p/topics/t").unwrap();
+        assert_eq!(
+            base.append_raw_suffix(":publish").unwrap().to_string(),
+            "https://example.com/v1/projects/p/topics/t:publish"
+        );
+        // An empty suffix returns the endpoint unchanged.
+        assert_eq!(
+            base.append_raw_suffix("").unwrap().to_string(),
+            base.to_string()
+        );
     }
 }

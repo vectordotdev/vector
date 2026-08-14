@@ -184,7 +184,9 @@ impl PubsubSink {
     }
 
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
-        let mut uri = self.uri_base.append_path(suffix)?.into_uri();
+        // The suffix is a Google API method (for example `:publish`) that
+        // attaches directly to the topic path without a separator.
+        let mut uri = self.uri_base.append_raw_suffix(suffix)?.into_uri();
         self.auth.apply_uri(&mut uri);
         Ok(uri)
     }
