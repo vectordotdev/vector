@@ -98,7 +98,7 @@ impl AvroOcfSerializerConfig {
     pub fn build(&self) -> Result<AvroOcfSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro OCF serializer: {error}"))?;
-        Ok(AvroOcfSerializer::new(schema, self.avro.schema.clone()))
+        Ok(AvroOcfSerializer::new(schema))
     }
 
     /// The data type of events that are accepted by `AvroOcfSerializer`.
@@ -124,18 +124,12 @@ impl AvroOcfSerializerConfig {
 #[derive(Debug, Clone)]
 pub struct AvroOcfSerializer {
     schema: apache_avro::Schema,
-    /// The original schema JSON string, preserved to embed in the OCF header as-is.
-    /// (Using `schema.canonical_form()` would strip doc strings, aliases, and defaults.)
-    schema_json: String,
 }
 
 impl AvroOcfSerializer {
     /// Creates a new `AvroOcfSerializer`.
-    pub fn new(schema: apache_avro::Schema, schema_json: String) -> Self {
-        Self {
-            schema,
-            schema_json,
-        }
+    pub const fn new(schema: apache_avro::Schema) -> Self {
+        Self { schema }
     }
 }
 
@@ -143,12 +137,7 @@ impl Encoder<Vec<Event>> for AvroOcfSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        // Parse the schema from the original JSON so that apache_avro::Writer embeds the full
-        // schema (including doc strings, aliases, defaults) rather than canonical form.
-        let schema = apache_avro::Schema::parse_str(&self.schema_json)
-            .map_err(|e| vector_common::Error::from(format!("Failed to parse Avro schema: {e}")))?;
-
-        let mut writer = apache_avro::Writer::new(&schema, Vec::new());
+        let mut writer = apache_avro::Writer::new(&self.schema, Vec::new());
 
         for event in events {
             let log = event.into_log();

@@ -13185,6 +13185,7 @@ name = "vector"
 version = "0.58.0"
 dependencies = [
  "antithesis-instrumentation",
+ "apache-avro",
  "approx",
  "arc-swap",
  "arr_macro",
