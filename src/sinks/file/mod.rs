@@ -357,12 +357,16 @@ impl FileSink {
             path: self.path.clone(),
         };
         let batch_settings = self.batch_settings;
-        // Per-path event buffers (unordered). Flush deadlines live in a BinaryHeap
-        // so peeking the earliest deadline is O(1) regardless of partition count.
-        let mut buffers: std::collections::HashMap<Bytes, Vec<Event>> =
+        // Per-path event buffers with a generation counter that increments each
+        // time the buffer is flushed and recreated.  The generation lets us detect stale
+        // deadline entries in the BinaryHeap so that a completed batch's deadline
+        // is never applied to a later batch for the same path.
+        let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64)> =
+            std::collections::HashMap::new();
+        let mut per_path_gen: std::collections::HashMap<Bytes, u64> =
             std::collections::HashMap::new();
         let mut flush_deadlines: std::collections::BinaryHeap<
-            std::cmp::Reverse<(tokio::time::Instant, Bytes)>,
+            std::cmp::Reverse<(tokio::time::Instant, Bytes, u64)>,
         > = std::collections::BinaryHeap::new();
 
         tokio::pin!(input);
@@ -419,7 +423,7 @@ impl FileSink {
                                 }
                             };
                             let event_size = event.estimated_json_encoded_size_of().get();
-                            if let Some(events) = buffers.get_mut(&path) {
+                            if let Some((events, _)) = buffers.get_mut(&path) {
                                 let current_size: usize = events.iter()
                                     .map(|e| e.estimated_json_encoded_size_of().get())
                                     .sum();
@@ -427,26 +431,34 @@ impl FileSink {
                                     || events.len() >= batch_settings.item_limit
                                 {
                                     // Buffer is full — flush old batch and start fresh.
-                                    let old_events = buffers.remove(&path).unwrap();
+                                    let (old_events, _old_gen) = buffers.remove(&path).unwrap();
                                     self.process_batch(path.clone(), old_events).await;
+                                    let generation = per_path_gen.entry(path.clone()).or_insert(0);
                                     let deadline = tokio::time::Instant::now()
                                         + batch_settings.timeout;
-                                    buffers.insert(path.clone(), vec![event]);
-                                    flush_deadlines.push(std::cmp::Reverse((deadline, path.clone())));
+                                    buffers.insert(path.clone(), (vec![event], *generation));
+                                    flush_deadlines.push(
+                                        std::cmp::Reverse((deadline, path.clone(), *generation)),
+                                    );
+                                    *generation += 1;
                                 } else {
                                     events.push(event);
                                 }
                             } else {
+                                let generation = per_path_gen.entry(path.clone()).or_insert(0);
                                 let deadline = tokio::time::Instant::now()
                                     + batch_settings.timeout;
-                                buffers.insert(path.clone(), vec![event]);
-                                flush_deadlines.push(std::cmp::Reverse((deadline, path.clone())));
+                                buffers.insert(path.clone(), (vec![event], *generation));
+                                flush_deadlines.push(
+                                    std::cmp::Reverse((deadline, path.clone(), *generation)),
+                                );
+                                *generation += 1;
                             }
                             // Reset the file-handle idle deadline so the file stays open while
                             // events accumulate for this path.
                             self.files.reset_at(&path, self.deadline_at());
                             // Flush immediately when the batch reaches the item or byte limit.
-                            let needs_flush = buffers.get(&path).map_or(false, |events| {
+                            let needs_flush = buffers.get(&path).map_or(false, |(events, _)| {
                                 let total_size: usize = events.iter()
                                     .map(|e| e.estimated_json_encoded_size_of().get())
                                     .sum();
@@ -454,36 +466,50 @@ impl FileSink {
                                     || events.len() >= batch_settings.item_limit
                             });
                             if needs_flush {
-                                let batch = buffers.remove(&path).unwrap();
-                                self.process_batch(path, batch).await;
+                                let (events, _generation) = buffers.remove(&path).unwrap();
+                                self.process_batch(path.clone(), events).await;
+                                // The stale deadline entry (generation) remains in the heap but won't
+                                // match the new generation if this path receives more events.
                             }
                             // Bound active-buffer memory under high-cardinality templates.
-                            let now = tokio::time::Instant::now();
-                            loop {
-                                let expired = flush_deadlines.peek().map_or(false,
-                                    |std::cmp::Reverse((d, _))| *d <= now,
-                                );
-                                let over_capacity = flush_deadlines.peek().map_or(false, |_|
-                                    buffers.len() > 1000,
-                                );
-                                if !expired && !over_capacity {
-                                    break;
-                                }
-                                let std::cmp::Reverse((_, old_path)) =
-                                    match flush_deadlines.pop() {
-                                        Some(e) => e,
-                                        None => break,
-                                    };
-                                if let Some(events) = buffers.remove(&old_path) {
-                                    self.process_batch(old_path, events).await;
+                            // Also flush expired buffers inline.
+                            {
+                                let now = tokio::time::Instant::now();
+                                loop {
+                                    let expire_or_cap =
+                                        flush_deadlines.peek().map_or(false,
+                                            |std::cmp::Reverse((d, _, _))| {
+                                                *d <= now || buffers.len() > 1000
+                                            },
+                                        );
+                                    if !expire_or_cap {
+                                        break;
+                                    }
+                                    let std::cmp::Reverse((_, path, generation)) =
+                                        match flush_deadlines.pop() {
+                                            Some(e) => e,
+                                            None => break,
+                                        };
+                                    if let Some((events, current_generation)) =
+                                        buffers.remove(&path)
+                                    {
+                                        if current_generation == generation {
+                                            self.process_batch(path, events).await;
+                                        } else {
+                                            buffers.insert(path, (events, current_generation));
+                                        }
+                                    }
                                 }
                             }
                         }
                         None => {
                             // Stream exhausted — flush all remaining buffers, then close files.
                             debug!(message = "Receiver exhausted, flushing remaining buffers.");
-                            for (path, events) in buffers.drain() {
-                                self.process_batch(path, events).await;
+                            let paths: Vec<Bytes> = buffers.keys().cloned().collect();
+                            for p in paths {
+                                if let Some((events, _gen)) = buffers.remove(&p) {
+                                    self.process_batch(p, events).await;
+                                }
                             }
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
@@ -518,18 +544,22 @@ impl FileSink {
             let now = tokio::time::Instant::now();
             loop {
                 let expired = flush_deadlines.peek().map_or(false,
-                    |std::cmp::Reverse((d, _))| *d <= now,
+                    |std::cmp::Reverse((d, _, _))| *d <= now,
                 );
                 if !expired {
                     break;
                 }
-                let std::cmp::Reverse((_, path)) =
+                let std::cmp::Reverse((_, path, generation)) =
                     match flush_deadlines.pop() {
                         Some(e) => e,
                         None => break,
                     };
-                if let Some(events) = buffers.remove(&path) {
-                    self.process_batch(path, events).await;
+                if let Some((events, current_generation)) = buffers.remove(&path) {
+                    if current_generation == generation {
+                        self.process_batch(path, events).await;
+                    } else {
+                        buffers.insert(path, (events, current_generation));
+                    }
                 }
             }
         }
