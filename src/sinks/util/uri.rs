@@ -338,9 +338,9 @@ impl HttpEndpoint {
         let joined = if base_path.is_empty() {
             path.to_string()
         } else if base_path.ends_with('/') {
-            format!("{base_path}{}", path.trim_start_matches('/'))
+            format!("{base_path}{}", path.strip_prefix('/').unwrap_or(path))
         } else {
-            format!("{base_path}/{}", path.trim_start_matches('/'))
+            format!("{base_path}/{}", path.strip_prefix('/').unwrap_or(path))
         };
         parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
             endpoint: self.0.to_string(),
@@ -635,6 +635,16 @@ mod tests {
                 .unwrap()
                 .to_string(),
             "https://proxy/prefix/api/v1/series"
+        );
+        // Only the single boundary slash is removed; significant leading
+        // slashes in the appended path are preserved (GCS object keys).
+        assert_eq!(
+            HttpEndpoint::parse("https://storage.googleapis.com/bucket/")
+                .unwrap()
+                .append_path("//archive/")
+                .unwrap()
+                .to_string(),
+            "https://storage.googleapis.com/bucket//archive/"
         );
     }
 
