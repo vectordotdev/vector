@@ -29,50 +29,6 @@ use crate::{
 
 const PATH: &str = "/logs/ingest";
 
-/// Configuration for the `logdna` sink.
-#[configurable_component(sink("logdna", "Deliver log event data to LogDNA."))]
-#[configurable(metadata(
-    deprecated = "The `logdna` sink has been renamed. Please use `mezmo` instead."
-))]
-#[derive(Clone, Debug)]
-pub struct LogdnaConfig(MezmoConfig);
-
-impl GenerateConfig for LogdnaConfig {
-    fn generate_config() -> serde_json::Value {
-        <MezmoConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "logdna")]
-impl SinkConfig for LogdnaConfig {
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.0.acknowledgements()
-    }
-}
-
-#[async_trait::async_trait]
-impl ValidatedSink for LogdnaConfig {
-    type Validated = ();
-
-    fn validate(&self) -> crate::Result<()> {
-        Ok(())
-    }
-
-    async fn build(
-        &self,
-        _validated: &(),
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        warn!("DEPRECATED: The `logdna` sink has been renamed. Please use `mezmo` instead.");
-        SinkConfig::build(&self.0, cx).await
-    }
-}
-
 /// Configuration for the `mezmo` (formerly `logdna`) sink.
 #[configurable_component(sink("mezmo", "Deliver log event data to Mezmo."))]
 #[derive(Clone, Debug)]

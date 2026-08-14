@@ -5,4 +5,3 @@ sinks:
       - my-source-or-transform-id
     dataset: ${AXIOM_DATASET}
     token: ${AXIOM_TOKEN}
-    url: https://api.eu.axiom.co
