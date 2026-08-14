@@ -279,10 +279,25 @@ impl HttpEndpoint {
     }
 
     /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
+    ///
+    /// A missing scheme is defaulted to `https`, so `example.com:8080` becomes
+    /// `https://example.com:8080`. An explicit `http`/`https` scheme is
+    /// preserved. Endpoints that still lack a host after defaulting (for
+    /// example `/path`) are rejected.
     pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
-        let uri = endpoint
-            .parse::<Uri>()
-            .context(InvalidUriSnafu { endpoint })?;
+        // Default a missing scheme to https. `http::Uri` cannot parse
+        // `host:port/path` without a scheme (it reads `host` as a scheme), so
+        // the scheme is added up front rather than relying on the parser to
+        // accept authority-form input.
+        let uri = if endpoint.contains("://") {
+            endpoint
+                .parse::<Uri>()
+                .context(InvalidUriSnafu { endpoint })?
+        } else {
+            format!("https://{endpoint}")
+                .parse::<Uri>()
+                .context(InvalidUriSnafu { endpoint })?
+        };
         Self::new(uri)
     }
 
@@ -417,6 +432,11 @@ mod tests {
             // IPv6 hosts are returned bracketed (`[::1]`) and must be accepted.
             "http://[::1]:8080",
             "https://[::1]/path",
+            // A missing scheme is defaulted to https.
+            "example.com",
+            "example.com:8088/services/collector",
+            "localhost:8080",
+            "[::1]:8080",
         ] {
             let endpoint =
                 HttpEndpoint::parse(endpoint).expect("should accept absolute http(s) URL");
@@ -429,11 +449,37 @@ mod tests {
     }
 
     #[test]
+    fn http_endpoint_defaults_missing_scheme_to_https() {
+        for endpoint in [
+            "example.com",
+            "example.com:8080",
+            "localhost:8080/path",
+            "[::1]:8080",
+        ] {
+            let endpoint =
+                HttpEndpoint::parse(endpoint).expect("should default a missing scheme to https");
+            assert_eq!(endpoint.as_uri().scheme_str(), Some("https"));
+            assert!(
+                endpoint
+                    .as_uri()
+                    .host()
+                    .is_some_and(|host| !host.is_empty())
+            );
+        }
+        // An explicit scheme is preserved.
+        assert_eq!(
+            HttpEndpoint::parse("http://example.com")
+                .unwrap()
+                .as_uri()
+                .scheme_str(),
+            Some("http")
+        );
+    }
+
+    #[test]
     fn http_endpoint_rejects_non_absolute_http_urls() {
         for endpoint in [
-            // No scheme: `http::Uri` parses these as authority-form or as a path.
-            "example.com:8088",
-            "localhost:8080",
+            // No scheme and no host: `http::Uri` parses these as a path.
             "/services/collector",
             "",
             // Absolute, but not a scheme `HttpClient` can dial.
@@ -451,6 +497,7 @@ mod tests {
                     HttpEndpoint::parse(endpoint),
                     Err(HttpEndpointError::NotAbsoluteHttp { .. })
                         | Err(HttpEndpointError::InvalidUri { .. })
+                        | Err(HttpEndpointError::InvalidUriParts { .. })
                 ),
                 "expected `{endpoint}` to be rejected"
             );

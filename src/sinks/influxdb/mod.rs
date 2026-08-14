@@ -851,11 +851,6 @@ mod tests {
             "http://localhost:9999/api/v2/write?org=Organization+name&bucket=Bucket%3Dname"
         );
     }
-
-    #[test]
-    fn test_encode_uri_invalid() {
-        assert!(HttpEndpoint::parse("localhost:9999").is_err());
-    }
 }
 
 #[cfg(feature = "influxdb-integration-tests")]
