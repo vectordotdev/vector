@@ -199,6 +199,9 @@ pub async fn run_nats_jetstream(
         // The durable consumer on the server tracks delivery state,
         // so we pick up where we left off.
         warn!(message = "JetStream pull stream terminated. Recovering consumer...");
+        // Drop the failed stream so its background pull task stops issuing pulls and
+        // buffering ack-pending deliveries while we back off.
+        drop(messages);
         loop {
             let delay = backoff.next().expect("backoff never ends");
             tokio::select! {
