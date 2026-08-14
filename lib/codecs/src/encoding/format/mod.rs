@@ -36,8 +36,8 @@ pub use arrow::{
     find_null_non_nullable_fields,
 };
 pub use avro::{
-    AvroOcfSerializer, AvroOcfSerializerConfig, AvroSerializer, AvroSerializerConfig,
-    AvroSerializerOptions,
+    AvroOcfCompression, AvroOcfSerializer, AvroOcfSerializerConfig, AvroSerializer,
+    AvroSerializerConfig, AvroSerializerOptions,
 };
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;

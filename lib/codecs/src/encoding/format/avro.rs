@@ -174,11 +174,8 @@ impl Encoder<Vec<Event>> for AvroOcfSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let mut writer = apache_avro::Writer::with_codec(
-            &self.schema,
-            Vec::new(),
-            self.compression.clone(),
-        );
+        let mut writer =
+            apache_avro::Writer::with_codec(&self.schema, Vec::new(), self.compression.clone());
 
         for event in events {
             let log = event.into_log();
@@ -364,7 +361,9 @@ mod tests {
                 .unwrap();
 
             assert!(
-                bytes.windows(codec_name.len()).any(|window| window == codec_name.as_bytes()),
+                bytes
+                    .windows(codec_name.len())
+                    .any(|window| window == codec_name.as_bytes()),
                 "OCF header must advertise {codec_name} compression"
             );
 

@@ -3,10 +3,7 @@ use tower::ServiceBuilder;
 use vector_lib::codecs::BatchEncoder;
 #[cfg(feature = "codecs-parquet")]
 use vector_lib::codecs::encoding::format::ParquetSerializerConfig;
-use vector_lib::codecs::encoding::{
-    BatchSerializerConfig,
-    format::AvroOcfSerializerConfig,
-};
+use vector_lib::codecs::encoding::{BatchSerializerConfig, format::AvroOcfSerializerConfig};
 use vector_lib::{
     TimeZone,
     codecs::{
@@ -621,6 +618,31 @@ mod tests {
             ),
             "expected AvroOcf variant"
         );
+    }
+
+    #[test]
+    fn avro_ocf_batch_encoding_parses_compression() {
+        use crate::sinks::util::Compression;
+        use vector_lib::codecs::encoding::format::AvroOcfCompression;
+
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: gzip
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: avro_ocf
+              schema: '{"type":"record","name":"test","fields":[{"name":"message","type":"string"}]}'
+              compression:
+                algorithm: deflate
+            "#})
+        .expect("Avro OCF compression configuration should parse");
+
+        let Some(super::S3BatchEncoding::AvroOcf(avro)) = config.batch_encoding else {
+            panic!("expected Avro OCF batch encoding");
+        };
+        assert_eq!(avro.compression, AvroOcfCompression::Deflate);
+        assert!(matches!(config.compression, Compression::Gzip(_)));
     }
 
     #[cfg(feature = "codecs-arrow")]

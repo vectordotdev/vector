@@ -484,9 +484,7 @@ async fn s3_flush_on_exhaustion() {
 
 #[tokio::test]
 async fn s3_avro_ocf_insert_message() {
-    use vector_lib::codecs::encoding::format::{
-        AvroOcfSerializerConfig, AvroSerializerOptions,
-    };
+    use vector_lib::codecs::encoding::format::{AvroOcfSerializerConfig, AvroSerializerOptions};
     use vrl::event_path;
 
     let cx = SinkContext::default();
