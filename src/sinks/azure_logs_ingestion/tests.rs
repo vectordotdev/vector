@@ -65,7 +65,7 @@ fn basic_config_with_client_credentials() {
 
     assert_eq!(
         config.endpoint.to_string(),
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
@@ -104,7 +104,7 @@ fn basic_config_with_managed_identity() {
 
     assert_eq!(
         config.endpoint.to_string(),
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
