@@ -12,7 +12,7 @@ use std::{
 
 use bytes::Bytes;
 use http_1::{
-    HeaderValue, Method, Request, Response, StatusCode, Uri,
+    HeaderValue, Method, Request, Response, Uri,
     header::{ACCEPT_ENCODING, HOST, PROXY_AUTHORIZATION, USER_AGENT},
 };
 use http_body_util::{BodyExt, Empty, combinators::UnsyncBoxBody};
@@ -37,6 +37,7 @@ use crate::{
 
 type BoxError = Box<dyn Error + Send + Sync>;
 pub(crate) type RequestBody = UnsyncBoxBody<Bytes, BoxError>;
+const HTTP1_ALPN: &[u8] = b"\x08http/1.1";
 
 pub(crate) fn empty_body() -> RequestBody {
     Empty::<Bytes>::new()
@@ -296,14 +297,11 @@ impl HttpProxyConnectorV1 {
             }
         });
 
-        let authority = destination
-            .authority()
-            .ok_or_else(|| invalid_input("HTTPS destination must contain an authority"))?
-            .clone();
+        let authority = connect_authority(&destination)?;
         let mut request = Request::builder()
             .method(Method::CONNECT)
-            .uri(authority.as_str())
-            .header(HOST, authority.as_str())
+            .uri(&authority)
+            .header(HOST, &authority)
             .body(Empty::<Bytes>::new())?;
         if let Some(authorization) = authorization {
             request
@@ -312,7 +310,7 @@ impl HttpProxyConnectorV1 {
         }
 
         let mut response = sender.send_request(request).await?;
-        if response.status() != StatusCode::OK {
+        if !response.status().is_success() {
             return Err(invalid_input(format!(
                 "proxy CONNECT failed with status {}",
                 response.status()
@@ -390,7 +388,13 @@ fn https_connector(
 ) -> Result<BaseConnector, BoxError> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
-    let mut https = HttpsConnector::with_connector(http, tls_connector_builder(tls)?)?;
+    let mut tls_builder = tls_connector_builder(tls)?;
+    if skip_server_name {
+        // Proxy connections are driven through HTTP/1.1, including CONNECT. Do not allow a TLS
+        // proxy to negotiate h2 from the destination's configured ALPN list.
+        tls_builder.set_alpn_protos(HTTP1_ALPN)?;
+    }
+    let mut https = HttpsConnector::with_connector(http, tls_builder)?;
     let settings = tls.tls().cloned();
     https.set_callback(move |configuration, _uri| {
         if let Some(settings) = &settings {
@@ -399,6 +403,17 @@ fn https_connector(
         Ok(())
     });
     Ok(https)
+}
+
+fn connect_authority(destination: &Uri) -> Result<String, BoxError> {
+    let authority = destination
+        .authority()
+        .ok_or_else(|| invalid_input("HTTPS destination must contain an authority"))?;
+    Ok(if authority.port_u16().is_some() {
+        authority.as_str().to_owned()
+    } else {
+        format!("{authority}:443")
+    })
 }
 
 trait ConnectionIo: rt::Read + rt::Write + Connection + Unpin + Send {}
@@ -568,4 +583,25 @@ impl<T> Connection for TunnelIo<T> {
 
 fn invalid_input(message: impl Into<String>) -> BoxError {
     Box::new(io::Error::new(io::ErrorKind::InvalidInput, message.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::connect_authority;
+
+    #[test]
+    fn connect_authority_includes_a_port() {
+        assert_eq!(
+            connect_authority(&"https://example.com/path".parse().unwrap()).unwrap(),
+            "example.com:443"
+        );
+        assert_eq!(
+            connect_authority(&"https://example.com:8443/path".parse().unwrap()).unwrap(),
+            "example.com:8443"
+        );
+        assert_eq!(
+            connect_authority(&"https://[::1]/path".parse().unwrap()).unwrap(),
+            "[::1]:443"
+        );
+    }
 }

@@ -208,6 +208,13 @@ fn trusted_client_tls() -> MaybeTlsSettings {
 }
 
 fn server_tls(require_client_certificate: bool) -> MaybeTlsSettings {
+    server_tls_with_alpn(require_client_certificate, None)
+}
+
+fn server_tls_with_alpn(
+    require_client_certificate: bool,
+    alpn_protocols: Option<Vec<String>>,
+) -> MaybeTlsSettings {
     MaybeTlsSettings::from_config(
         Some(&TlsEnableableConfig {
             enabled: Some(true),
@@ -216,6 +223,7 @@ fn server_tls(require_client_certificate: bool) -> MaybeTlsSettings {
                 ca_file: require_client_certificate.then(|| TEST_PEM_CA_PATH.into()),
                 crt_file: Some(TEST_PEM_CRT_PATH.into()),
                 key_file: Some(TEST_PEM_KEY_PATH.into()),
+                alpn_protocols,
                 ..Default::default()
             },
         }),
@@ -264,6 +272,14 @@ async fn spawn_origin(tls: MaybeTlsSettings) -> TestServer {
 }
 
 async fn spawn_proxy(tls: MaybeTlsSettings, require_authentication: bool) -> TestServer {
+    spawn_proxy_with_connect_status(tls, require_authentication, StatusCode::OK).await
+}
+
+async fn spawn_proxy_with_connect_status(
+    tls: MaybeTlsSettings,
+    require_authentication: bool,
+    connect_status: StatusCode,
+) -> TestServer {
     let addr = "127.0.0.1:0".parse().unwrap();
     let mut listener = tls.bind(&addr).await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -281,7 +297,13 @@ async fn spawn_proxy(tls: MaybeTlsSettings, require_authentication: bool) -> Tes
                     let observations = Arc::clone(&observations);
                     async move {
                         Ok::<_, Infallible>(
-                            proxy_request(request, observations, require_authentication).await,
+                            proxy_request(
+                                request,
+                                observations,
+                                require_authentication,
+                                connect_status,
+                            )
+                            .await,
                         )
                     }
                 });
@@ -307,6 +329,7 @@ async fn proxy_request(
     mut request: Request<Body>,
     observations: Arc<Mutex<Vec<RequestObservation>>>,
     require_authentication: bool,
+    connect_status: StatusCode,
 ) -> Response<Body> {
     observations.lock().unwrap().push(RequestObservation {
         method: request.method().clone(),
@@ -336,7 +359,10 @@ async fn proxy_request(
                 tracing::debug!(message = "Proxy tunnel closed.", %error);
             }
         });
-        return Response::new(Body::empty());
+        return Response::builder()
+            .status(connect_status)
+            .body(Body::empty())
+            .unwrap();
     }
 
     forward_http(request).await
@@ -608,6 +634,39 @@ async fn https_via_authenticated_connect_proxy(#[case] client_version: ClientVer
         origin_headers.get(header::AUTHORIZATION).unwrap(),
         "Bearer destination-token"
     );
+}
+
+#[tokio::test]
+async fn v1_accepts_any_successful_connect_status() {
+    let origin = spawn_origin(server_tls(false)).await;
+    let proxy = spawn_proxy_with_connect_status(no_tls(), false, StatusCode::CREATED).await;
+    let client = ClientVersion::V1
+        .build(trusted_client_tls(), &proxy_config(&proxy, false, false))
+        .unwrap();
+
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+}
+
+#[tokio::test]
+async fn v1_tls_proxy_uses_http1_alpn() {
+    let origin = spawn_origin(server_tls(false)).await;
+    let proxy = spawn_proxy(
+        server_tls_with_alpn(false, Some(vec!["h2".to_owned(), "http/1.1".to_owned()])),
+        false,
+    )
+    .await;
+    let client = ClientVersion::V1
+        .build(
+            client_tls(TlsConfig {
+                ca_file: Some(TEST_PEM_CA_PATH.into()),
+                alpn_protocols: Some(vec!["h2".to_owned(), "http/1.1".to_owned()]),
+                ..Default::default()
+            }),
+            &proxy_config(&proxy, true, false),
+        )
+        .unwrap();
+
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
 }
 
 #[rstest]
