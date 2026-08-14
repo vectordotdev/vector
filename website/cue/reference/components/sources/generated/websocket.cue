@@ -227,15 +227,6 @@ generated: components: sources: websocket: configuration: {
 							}
 						}
 					}
-					max_ocf_bytes: {
-						description: """
-																Maximum number of bytes accepted for a single Avro Object Container File.
-
-																Applies only when `encoding` is `object_container_file`.
-																"""
-						required: false
-						type: uint: default: 67108864
-					}
 					max_ocf_records: {
 						description: """
 																Maximum number of records decoded from a single Avro Object Container File.

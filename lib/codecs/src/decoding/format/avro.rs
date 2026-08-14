@@ -3,6 +3,7 @@ use chrono::Utc;
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
+use vector_common::decompression::max_decompressed_size_bytes;
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace, log_schema},
@@ -20,7 +21,6 @@ type AvroValue = apache_avro::types::Value;
 
 const CONFLUENT_MAGIC_BYTE: u8 = 0;
 const CONFLUENT_SCHEMA_PREFIX_LEN: usize = 5;
-const DEFAULT_MAX_OCF_BYTES: usize = 64 * 1024 * 1024;
 const DEFAULT_MAX_OCF_RECORDS: usize = 100_000;
 
 /// Config used to build a `AvroDeserializer`.
@@ -39,7 +39,6 @@ impl AvroDeserializerConfig {
                 strip_schema_id_prefix,
                 encoding: AvroEncoding::Datum,
                 schema_source: AvroSchemaSource::Provided,
-                max_ocf_bytes: DEFAULT_MAX_OCF_BYTES,
                 max_ocf_records: DEFAULT_MAX_OCF_RECORDS,
             },
         }
@@ -58,7 +57,6 @@ impl AvroDeserializerConfig {
                 strip_schema_id_prefix,
                 encoding,
                 schema_source,
-                max_ocf_bytes: DEFAULT_MAX_OCF_BYTES,
                 max_ocf_records: DEFAULT_MAX_OCF_RECORDS,
             },
         }
@@ -80,11 +78,10 @@ impl AvroDeserializerConfig {
         }
 
         if self.avro_options.encoding == AvroEncoding::ObjectContainerFile
-            && (self.avro_options.max_ocf_bytes == 0 || self.avro_options.max_ocf_records == 0)
+            && self.avro_options.max_ocf_records == 0
         {
             return Err(vector_common::Error::from(
-                "`max_ocf_bytes` and `max_ocf_records` must be greater than zero for \
-                 `object_container_file` encoding.",
+                "`max_ocf_records` must be greater than zero for `object_container_file` encoding.",
             ));
         }
 
@@ -105,7 +102,7 @@ impl AvroDeserializerConfig {
             strip_schema_id_prefix: self.avro_options.strip_schema_id_prefix,
             encoding: self.avro_options.encoding,
             schema_source: self.avro_options.schema_source,
-            max_ocf_bytes: self.avro_options.max_ocf_bytes,
+            max_ocf_bytes: max_decompressed_size_bytes(),
             max_ocf_records: self.avro_options.max_ocf_records,
         })
     }
@@ -179,21 +176,11 @@ pub struct AvroDeserializerOptions {
     #[serde(default)]
     pub schema_source: AvroSchemaSource,
 
-    /// Maximum number of bytes accepted for a single Avro Object Container File.
-    ///
-    /// Applies only when `encoding` is `object_container_file`.
-    #[serde(default = "default_max_ocf_bytes")]
-    pub max_ocf_bytes: usize,
-
     /// Maximum number of records decoded from a single Avro Object Container File.
     ///
     /// Applies only when `encoding` is `object_container_file`.
     #[serde(default = "default_max_ocf_records")]
     pub max_ocf_records: usize,
-}
-
-const fn default_max_ocf_bytes() -> usize {
-    DEFAULT_MAX_OCF_BYTES
 }
 
 const fn default_max_ocf_records() -> usize {
@@ -233,7 +220,7 @@ impl AvroDeserializer {
             strip_schema_id_prefix,
             encoding,
             schema_source,
-            max_ocf_bytes: DEFAULT_MAX_OCF_BYTES,
+            max_ocf_bytes: max_decompressed_size_bytes(),
             max_ocf_records: DEFAULT_MAX_OCF_RECORDS,
         }
     }
@@ -659,6 +646,18 @@ mod tests {
     }
 
     #[test]
+    fn avro_ocf_uses_global_decompressed_size_limit() {
+        let deserializer = AvroDeserializer::new(
+            None,
+            false,
+            AvroEncoding::ObjectContainerFile,
+            AvroSchemaSource::Embedded,
+        );
+
+        assert_eq!(deserializer.max_ocf_bytes, max_decompressed_size_bytes());
+    }
+
+    #[test]
     fn deserialize_avro_ocf_rejects_oversized_payload() {
         let bytes = ocf_bytes(&[Log {
             message: "too large".to_owned(),
@@ -682,7 +681,7 @@ mod tests {
                 message: "second".to_owned(),
             },
         ]);
-        let deserializer = ocf_deserializer(DEFAULT_MAX_OCF_BYTES, 1);
+        let deserializer = ocf_deserializer(max_decompressed_size_bytes(), 1);
 
         let error = deserializer
             .parse(bytes, LogNamespace::Vector)
@@ -693,7 +692,7 @@ mod tests {
 
     #[test]
     fn deserialize_avro_ocf_rejects_truncated_payload() {
-        let error = ocf_deserializer(DEFAULT_MAX_OCF_BYTES, DEFAULT_MAX_OCF_RECORDS)
+        let error = ocf_deserializer(max_decompressed_size_bytes(), DEFAULT_MAX_OCF_RECORDS)
             .parse(Bytes::from_static(b"Obj\x01"), LogNamespace::Vector)
             .expect_err("truncated OCF payload must be rejected");
 
@@ -708,12 +707,12 @@ mod tests {
             AvroEncoding::ObjectContainerFile,
             AvroSchemaSource::Embedded,
         );
-        config.avro_options.max_ocf_bytes = 0;
+        config.avro_options.max_ocf_records = 0;
 
         let error = config
             .build()
-            .expect_err("zero OCF limits must be rejected during configuration build");
+            .expect_err("zero OCF record limit must be rejected during configuration build");
 
-        assert!(error.to_string().contains("max_ocf_bytes"));
+        assert!(error.to_string().contains("max_ocf_records"));
     }
 }
