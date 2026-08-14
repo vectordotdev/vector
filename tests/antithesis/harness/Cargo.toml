@@ -8,6 +8,9 @@ publish = false
 # and the eventually-phase conservation/liveness judge. They are buffer-agnostic,
 # so each scenario builds them with `-p antithesis-harness` and points them at its own
 # topology through environment variables.
+[lints]
+workspace = true
+
 [dependencies]
 antithesis_sdk = { workspace = true, features = ["full"] }
 axum = { workspace = true, features = ["http1", "tokio"] }

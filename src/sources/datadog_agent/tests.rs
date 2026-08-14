@@ -31,7 +31,7 @@ use vector_lib::{
 };
 use vrl::{
     compiler::value::Collection,
-    value,
+    event_path, value,
     value::{Kind, ObjectMap},
 };
 
@@ -574,7 +574,7 @@ async fn api_key_in_url() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -632,7 +632,7 @@ async fn api_key_in_query_params() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -690,7 +690,7 @@ async fn api_key_in_header() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -989,7 +989,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1015,7 +1015,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1046,7 +1046,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1084,7 +1084,7 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(metric.namespace(), Some("system"));
 
             assert_eq!(
-                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[3].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
         }
@@ -1180,7 +1180,7 @@ async fn decode_sketches() {
             }
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1312,7 +1312,7 @@ async fn decode_traces() {
             assert_eq!(trace_v1.as_map()["host"], "a_hostname".into());
             assert_eq!(trace_v1.as_map()["env"], "an_environment".into());
             assert_eq!(trace_v1.as_map()["language_name"], "ada".into());
-            assert!(trace_v1.contains("spans"));
+            assert!(trace_v1.contains(vrl::event_path!("spans")));
             assert_eq!(trace_v1.as_map()["spans"].as_array().unwrap().len(), 1);
             let span_from_trace_v1 = trace_v1.as_map()["spans"].as_array().unwrap()[0]
                 .as_object()
@@ -1343,12 +1343,12 @@ async fn decode_traces() {
                 0.577.into()
             );
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
             let apm_event = events[1].as_trace();
-            assert!(apm_event.contains("spans"));
+            assert!(apm_event.contains(event_path!("spans")));
             assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
             assert_eq!(apm_event.as_map()["env"], "an_environment".into());
             assert_eq!(apm_event.as_map()["language_name"], "ada".into());
@@ -1361,7 +1361,7 @@ async fn decode_traces() {
             assert_eq!(span_from_apm_event["resource"], "a_resource".into());
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1392,7 +1392,7 @@ async fn decode_traces() {
                 trace_v2.as_map()["error_tps"],
                 Value::Float(NotNan::new(10.0f64).unwrap())
             );
-            assert!(trace_v2.contains("spans"));
+            assert!(trace_v2.contains(vrl::event_path!("spans")));
             assert_eq!(trace_v2.as_map()["spans"].as_array().unwrap().len(), 1);
             let span_from_trace_v2 = trace_v2.as_map()["spans"].as_array().unwrap()[0]
                 .as_object()
@@ -1423,7 +1423,7 @@ async fn decode_traces() {
                 0.577.into()
             );
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
         }
@@ -1512,7 +1512,7 @@ async fn split_outputs() {
                 ),
             );
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 "abcdefgh12345678abcdefgh12345678"
             );
         }
@@ -1535,7 +1535,7 @@ async fn split_outputs() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -2201,7 +2201,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2231,7 +2231,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2264,7 +2264,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("another_namespace"));
 
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2296,7 +2296,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), None);
 
             assert_eq!(
-                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[3].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2653,7 +2653,7 @@ async fn series_v2_split_metric_namespace_false() {
 }
 
 #[tokio::test]
-async fn series_v2_device_resource_preserved_as_tag() {
+async fn series_v2_resources_preserved_as_tags() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let (rx, _, _, addr, _guard) =
             source(EventStatus::Delivered, true, true, false, false).await;
@@ -2668,9 +2668,20 @@ async fn series_v2_device_resource_preserved_as_tag() {
                     r#type: "device".to_string(),
                     name: "sda".to_string(),
                 },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "database_instance".to_string(),
+                    name: "mongo-repro-01".to_string(),
+                },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "database_instance".to_string(),
+                    name: "mongo-repro-02".to_string(),
+                },
             ],
             metric: "system.disk.free".to_string(),
-            tags: vec!["env:prod".to_string()],
+            tags: vec![
+                "env:prod".to_string(),
+                "resource.database_instance:custom".to_string(),
+            ],
             points: vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: 100.0,
                 timestamp: 1542182950,
@@ -2706,6 +2717,18 @@ async fn series_v2_device_resource_preserved_as_tag() {
         assert!(
             tags.get("resource.device").is_none(),
             "device should not be prefixed with 'resource.'"
+        );
+        let database_instances: Vec<_> = tags
+            .iter_all()
+            .filter_map(|(name, value)| (name == "resource.database_instance").then_some(value))
+            .collect();
+        assert_eq!(
+            database_instances,
+            vec![
+                Some("custom"),
+                Some("mongo-repro-01"),
+                Some("mongo-repro-02")
+            ]
         );
         assert_eq!(tags.get("env"), Some("prod"));
     })
@@ -2788,6 +2811,7 @@ impl ValidatableComponent for DatadogAgentConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: b',',
                     max_length: Some(usize::MAX),
+                    oversized_action: Default::default(),
                 },
             }
             .into(),

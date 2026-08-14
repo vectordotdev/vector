@@ -89,12 +89,12 @@ pub struct DatabendConfig {
 }
 
 impl GenerateConfig for DatabendConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"endpoint = "databend://localhost:8000/default?sslmode=disable"
-            table = "default"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: "databend://localhost:8000/default?sslmode=disable"
+            table: default
         "#,
-        )
+        })
         .unwrap()
     }
 }
@@ -125,8 +125,9 @@ impl SinkConfig for DatabendConfig {
         let mut endpoint = url::Url::parse(&endpoint)?;
         match auth {
             Some(Auth::Basic { user, password }) => {
-                let _ = endpoint.set_username(&user);
-                let _ = endpoint.set_password(Some(password.inner()));
+                // Only fails for host-less URLs, which cannot happen given the scheme validation above.
+                endpoint.set_username(&user).ok();
+                endpoint.set_password(Some(password.inner())).ok();
             }
             Some(Auth::Bearer { .. }) => {
                 return Err("Bearer authentication is not supported currently".into());

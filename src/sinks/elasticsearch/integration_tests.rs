@@ -10,6 +10,7 @@ use vector_lib::{
     config::{Tags, Telemetry, init_telemetry, log_schema},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
+use vrl::event_path;
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
@@ -20,6 +21,7 @@ use crate::{
         HealthcheckError,
         util::{BatchConfig, Compression, SinkBatchSettings, auth::Auth},
     },
+    template::Template,
     test_util::{
         components::{
             COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
@@ -61,7 +63,7 @@ impl ElasticsearchCommon {
         }
 
         for (header, value) in &self.request.headers {
-            builder = builder.header(&header[..], &value[..]);
+            builder = builder.header(header.as_str(), value.as_str());
         }
 
         let mut request = builder.body(Bytes::new())?;
@@ -192,8 +194,8 @@ async fn structures_events_correctly() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut input_event = LogEvent::from("raw log line").with_batch_notifier(&batch);
-    input_event.insert("my_id", "42");
-    input_event.insert("foo", "bar");
+    input_event.insert(event_path!("my_id"), "42");
+    input_event.insert(event_path!("foo"), "bar");
     drop(batch);
 
     let timestamp = input_event[crate::config::log_schema()
@@ -660,9 +662,12 @@ async fn run_insert_tests_with_config(
                 if doit {
                     events.iter_logs_mut().for_each(|log| {
                         // _type: 1 is invalid for elasticsearch
-                        log.insert("_type", 1);
+                        log.insert(event_path!("_type"), 1);
                         // opensearch has a 512 character limit on _id
-                        log.insert("_id", "invalid id because it is too long".repeat(16));
+                        log.insert(
+                            event_path!("_id"),
+                            "invalid id because it is too long".repeat(16),
+                        );
                     });
                 }
                 doit = true;

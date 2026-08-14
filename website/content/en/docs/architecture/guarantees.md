@@ -92,13 +92,10 @@ The `stable` status is a _subjective_ status defined by the Vector team. It's in
 general idea of a feature's suitability for production environments. A feature is considered stable
 if it meets the following criteria:
 
-1. A meaningful number of users (generally over 50) have been using the feature in a production
-    environment for a sustained period of time without issue.
-2. The feature has had sufficient time (generally more than 4 months) to be community tested.
-
-3. The feature API is stable and unlikely to change.
-
-4. There are no major [open bugs][bugs] for the feature.
+1. The feature has had sufficient time (generally more than 4 months) to be community tested.
+2. The feature API is stable and unlikely to change.
+3. There are no major [open bugs][bugs] for the feature.
+4. There is positive community signal that the feature is being used successfully in production environments.
 
 ### Beta
 

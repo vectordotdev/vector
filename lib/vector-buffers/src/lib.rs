@@ -41,7 +41,10 @@ use std::fmt::Debug;
 
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
-use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{AddBatchNotifier, Finalizable, GroupedFinalizable},
+};
 
 /// Event handling behavior when a buffer is full.
 #[configurable_component]
@@ -95,23 +98,41 @@ impl Arbitrary for WhenFull {
 /// It is a relaxed version of `Bufferable` that allows for items that are not `Encodable` (e.g., `Instant`),
 /// which is an unnecessary constraint for memory buffers.
 pub trait InMemoryBufferable:
-    AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
+    AddBatchNotifier
+    + Finalizable
+    + ByteSizeOf
+    + EventCount
+    + Debug
+    + Send
+    + Sync
+    + Unpin
+    + Sized
+    + 'static
 {
 }
 
 // Blanket implementation for anything that is already in-memory bufferable.
 impl<T> InMemoryBufferable for T where
-    T: AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
+    T: AddBatchNotifier
+        + Finalizable
+        + ByteSizeOf
+        + EventCount
+        + Debug
+        + Send
+        + Sync
+        + Unpin
+        + Sized
+        + 'static
 {
 }
 
 /// An item that can be buffered.
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
-pub trait Bufferable: InMemoryBufferable + Encodable {}
+pub trait Bufferable: InMemoryBufferable + Encodable + GroupedFinalizable {}
 
 // Blanket implementation for anything that is already bufferable.
-impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
+impl<T> Bufferable for T where T: InMemoryBufferable + Encodable + GroupedFinalizable {}
 
 /// Hook for observing items as they are sent into a `BufferSender`.
 pub trait BufferInstrumentation<T: Bufferable>: Send + Sync + 'static {

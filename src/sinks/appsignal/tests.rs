@@ -1,5 +1,4 @@
 use futures::{future::ready, stream};
-use serde::Deserialize;
 use vector_lib::{
     configurable::component::GenerateConfig,
     event::{Event, LogEvent},
@@ -18,11 +17,8 @@ use crate::{
 async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-    let config = AppsignalConfig::generate_config().to_string();
-    let mut config = AppsignalConfig::deserialize(
-        toml::de::ValueDeserializer::parse(&config).expect("value should deserialize"),
-    )
-    .expect("config should be valid");
+    let mut config: AppsignalConfig =
+        serde_json::from_value(AppsignalConfig::generate_config()).expect("config should be valid");
     config.endpoint = mock_endpoint.to_string();
 
     let context = SinkContext::default();

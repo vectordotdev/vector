@@ -8,6 +8,7 @@ use vector_lib::{
 };
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
+
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
@@ -23,7 +24,7 @@ use crate::{
             BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig, http::HttpRetryLogic,
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, Template},
     tls::TlsConfig,
 };
 
@@ -71,7 +72,6 @@ pub struct HecMetricsSinkConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "config_host_key")]
     pub host_key: OptionalValuePath,
 
@@ -84,7 +84,6 @@ pub struct HecMetricsSinkConfig {
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk defaults to `httpevent`.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
@@ -93,7 +92,6 @@ pub struct HecMetricsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector sets it.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::examples = "{{ file }}",
         docs::examples = "/var/log/syslog",
@@ -119,11 +117,15 @@ pub struct HecMetricsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: crate::template::ConfinementConfig,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             default_namespace: None,
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "http://localhost:8088".to_owned(),
@@ -136,6 +138,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             request: TowerRequestConfig::default(),
             tls: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         })
         .unwrap()
     }
@@ -145,6 +148,25 @@ impl GenerateConfig for HecMetricsSinkConfig {
 #[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let templated_field_keys =
+            compute_templated_field_keys(&self.index, &self.source, &self.sourcetype);
+
+        let confined_sourcetype = self
+            .sourcetype
+            .clone()
+            .map(|t| t.confine(&self.confinement, Self::NAME, "sourcetype"))
+            .transpose()?;
+        let confined_source = self
+            .source
+            .clone()
+            .map(|t| t.confine(&self.confinement, Self::NAME, "source"))
+            .transpose()?;
+        let confined_index = self
+            .index
+            .clone()
+            .map(|t| t.confine(&self.confinement, Self::NAME, "index"))
+            .transpose()?;
+
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
@@ -152,8 +174,19 @@ impl SinkConfig for HecMetricsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = self.build_processor(client, cx)?;
+        let sink = self.build_processor(
+            client,
+            cx,
+            confined_sourcetype,
+            confined_source,
+            confined_index,
+            templated_field_keys, // passed to encoder, not per-event metadata
+        )?;
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -165,17 +198,37 @@ impl SinkConfig for HecMetricsSinkConfig {
     }
 }
 
+pub(super) fn compute_templated_field_keys(
+    index: &Option<Template>,
+    source: &Option<Template>,
+    sourcetype: &Option<Template>,
+) -> Box<[String]> {
+    [index, source, sourcetype]
+        .iter()
+        .filter_map(|t| t.as_ref())
+        .filter_map(|t| t.get_fields())
+        .flatten()
+        .map(|f| f.replace("tags.", ""))
+        .collect()
+}
+
 impl HecMetricsSinkConfig {
-    pub fn build_processor(&self, client: HttpClient, _: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        client: HttpClient,
+        _: SinkContext,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
+        templated_field_keys: Box<[String]>,
+    ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
             None
         };
 
-        let request_builder = HecMetricsRequestBuilder {
-            compression: self.compression,
-        };
+        let request_builder = HecMetricsRequestBuilder::new(self.compression, templated_field_keys);
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
@@ -206,9 +259,9 @@ impl HecMetricsSinkConfig {
             service,
             batch_settings,
             request_builder,
-            sourcetype: self.sourcetype.clone(),
-            source: self.source.clone(),
-            index: self.index.clone(),
+            sourcetype,
+            source,
+            index,
             host_key: self.host_key.path.clone(),
             default_namespace: self.default_namespace.clone(),
         };

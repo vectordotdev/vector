@@ -106,6 +106,24 @@ impl TransformConfig for DelayConfig {
             clone_input_definitions(input_definitions),
         )]
     }
+
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        if self.delay_ms.as_millis() == 0 {
+            Err(vec!["delay must not be zero".to_string()])
+        } else {
+            Ok(())
+        }
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        self.condition
+            .as_ref()
+            .map(|c| {
+                c.validate(&context.enrichment_tables, &context.metrics_storage)
+                    .map_err(|e| vec![format!("condition: {e}")])
+            })
+            .unwrap_or(Ok(()))
+    }
 }
 
 pub struct Delay {

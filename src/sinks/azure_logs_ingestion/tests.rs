@@ -176,7 +176,7 @@ async fn correct_request() {
     let (sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            mock_endpoint.try_into().unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -288,7 +288,7 @@ async fn mock_healthcheck_with_400_response() {
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            mock_endpoint.try_into().unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -355,7 +355,7 @@ async fn mock_healthcheck_with_403_response() {
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            mock_endpoint.try_into().unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,

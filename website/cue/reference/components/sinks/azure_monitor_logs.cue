@@ -18,7 +18,6 @@ components: sinks: azure_monitor_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}

@@ -91,11 +91,11 @@ impl SinkBatchSettings for HoneycombDefaultBatchSettings {
 }
 
 impl GenerateConfig for HoneycombConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"api_key = "${HONEYCOMB_API_KEY}"
-            dataset = "my-honeycomb-dataset""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"api_key: ${HONEYCOMB_API_KEY}
+            dataset: my-honeycomb-dataset"#,
+        })
         .unwrap()
     }
 }

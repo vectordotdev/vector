@@ -87,6 +87,7 @@ pub struct RouteConfig {
     /// Otherwise, the unmatched event is instead silently discarded.
     #[configurable(metadata(docs::additional_props_description = "An individual route."))]
     #[configurable(metadata(docs::examples = "route_examples()"))]
+    #[configurable(metadata(docs::required = true))]
     route: IndexMap<String, AnyCondition>,
 }
 
@@ -110,8 +111,8 @@ fn route_examples() -> IndexMap<String, AnyCondition> {
 }
 
 impl GenerateConfig for RouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             reroute_unmatched: true,
             route: route_examples(),
         })
@@ -131,13 +132,32 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         if self.route.contains_key(UNMATCHED_ROUTE) {
             Err(vec![format!(
                 "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
             )])
         } else {
             Ok(())
+        }
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let errors: Vec<String> = self
+            .route
+            .iter()
+            .filter_map(|(name, condition)| {
+                condition
+                    .validate(&context.enrichment_tables, &context.metrics_storage)
+                    .err()
+                    .map(|e| format!("route \"{name}\": {e}"))
+            })
+            .collect();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
         }
     }
 

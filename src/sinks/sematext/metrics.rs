@@ -93,10 +93,10 @@ pub struct SematextMetricsConfig {
 }
 
 impl GenerateConfig for SematextMetricsConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            default_namespace = "vector"
-            token = "${SEMATEXT_TOKEN}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            default_namespace: vector
+            token: ${SEMATEXT_TOKEN}
         "#})
         .unwrap()
     }

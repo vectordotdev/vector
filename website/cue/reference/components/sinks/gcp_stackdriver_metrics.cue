@@ -18,7 +18,6 @@ components: sinks: gcp_stackdriver_metrics: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   1
 				timeout_secs: 1.0
 			}
@@ -64,7 +63,9 @@ components: sinks: gcp_stackdriver_metrics: {
 		notices: []
 	}
 
-	configuration: generated.components.sinks.gcp_stackdriver_metrics.configuration
+	configuration: generated.components.sinks.gcp_stackdriver_metrics.configuration & {
+		project_id: type: string: examples: ["my-project"]
+	}
 
 	input: {
 		logs: false
