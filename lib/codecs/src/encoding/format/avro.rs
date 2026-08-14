@@ -83,6 +83,9 @@ impl Encoder<Event> for AvroSerializer {
 /// Compression algorithm applied to Avro Object Container File data blocks.
 #[configurable_component]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[configurable(metadata(
+    docs::enum_tag_description = "The compression algorithm to use for Avro OCF data blocks."
+))]
 #[serde(tag = "algorithm", rename_all = "snake_case")]
 pub enum AvroOcfCompression {
     /// Writes uncompressed OCF blocks.
