@@ -21,6 +21,11 @@
       "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
     },
     {
+      "what": "omitting the `version` field on `influxdb_logs` and `influxdb_metrics` sinks",
+      "deprecated_since": "0.58.0",
+      "description": "The `version` field selects the InfluxDB API version whose settings are used. It will be required\nin a future release. Until then, when `version` is unset the version is inferred from the\nconfigured settings.\n\n- `version: \"1\"` uses the v1 settings: `database`, `consistency`, `retention_policy_name`,\n  `username`, and `password`.\n- `version: \"2\"` uses the v2 settings: `org`, `bucket`, and `token`.\n\nMigrate by adding `version: \"1\"` or `version: \"2\"` to match the settings already present:\n\n```yaml\nsinks:\n  my_sink:\n    type: influxdb_logs\n    version: \"2\"\n    org: my-org\n    bucket: vector-bucket\n    token: ${INFLUXDB_TOKEN}\n```"
+    },
+    {
       "what": "Environment-variable and secret placeholders in non-string positions",
       "deprecated_since": "0.57.0",
       "description": "Placeholders (`${VAR}` and `SECRET[backend.key]`) in structural positions of\na Vector configuration file are deprecated and will be removed in a future\nrelease. Current behavior is unchanged.\n\nAffected patterns:\n\n- Unquoted placeholders in non-string fields (`count = ${MY_COUNT}`).\n- Placeholders in map keys (`${KEY} = value`).\n- Placeholders in TOML table headers (`[${SECTION}]`).\n- Placeholders as inline array elements that expand to multiple values\n  (`inputs = [${VECTOR_INPUTS}]` where `VECTOR_INPUTS=a,b`).\n\nMigration guidance will accompany the removal PR. `envsubst` can be used today\nto pre-expand env-var placeholders into a fully static config as a workaround.\n\nSee [RFC: parse-first config interpolation](https://github.com/vectordotdev/vector/blob/master/rfcs/2026-06-09-parse-first-config-interpolation.md)\nfor the full rationale."

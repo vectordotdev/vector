@@ -549,6 +549,16 @@ impl SourceConfig for Config {
             )
             .with_source_metadata(
                 Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(
+                    "kubernetes",
+                    "pod_log_directory_id"
+                ))),
+                &owned_value_path!("pod_log_directory_id"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("stream"))),
                 &owned_value_path!("stream"),
                 Kind::bytes(),
@@ -1507,6 +1517,11 @@ mod tests {
                         None
                     )
                     .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "pod_log_directory_id"),
+                        Kind::bytes().or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "stream"),
                         Kind::bytes(),
                         None
@@ -1619,6 +1634,11 @@ mod tests {
                 )
                 .with_event_field(
                     &owned_value_path!("kubernetes", "pod_uid"),
+                    Kind::bytes().or_undefined(),
+                    None
+                )
+                .with_event_field(
+                    &owned_value_path!("kubernetes", "pod_log_directory_id"),
                     Kind::bytes().or_undefined(),
                     None
                 )
