@@ -1,9 +1,12 @@
 use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
 use vector_lib::codecs::BatchEncoder;
-use vector_lib::codecs::encoding::BatchSerializerConfig;
-#[cfg(all(test, feature = "codecs-parquet"))]
+#[cfg(feature = "codecs-parquet")]
 use vector_lib::codecs::encoding::format::ParquetSerializerConfig;
+use vector_lib::codecs::encoding::{
+    BatchSerializerConfig,
+    format::{AvroOcfSerializerConfig, AvroSerializerOptions},
+};
 use vector_lib::{
     TimeZone,
     codecs::{
@@ -18,7 +21,10 @@ use super::sink::S3RequestOptions;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::{
         Healthcheck,
         s3_common::{
@@ -37,11 +43,46 @@ use crate::{
     tls::TlsConfig,
 };
 
-/// Batch encoding configuration for the `aws_s3` sink.
-///
-/// This is an alias for `BatchSerializerConfig` which supports both
-/// `avro_ocf` (Avro Object Container File) and `parquet` codecs.
-pub type S3BatchEncoding = BatchSerializerConfig;
+/// Batch encodings explicitly supported by the `aws_s3` sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The codec to use for batch encoding events."
+))]
+pub enum S3BatchEncoding {
+    /// Encodes events as a complete Avro Object Container File (OCF).
+    #[serde(rename = "avro_ocf")]
+    AvroOcf(AvroSerializerOptions),
+
+    /// Encodes events in Apache Parquet columnar format.
+    #[cfg(feature = "codecs-parquet")]
+    Parquet(ParquetSerializerConfig),
+}
+
+impl S3BatchEncoding {
+    fn serializer_config(&self) -> BatchSerializerConfig {
+        match self {
+            Self::AvroOcf(options) => {
+                BatchSerializerConfig::AvroOcf(AvroOcfSerializerConfig::new(options.clone()))
+            }
+            #[cfg(feature = "codecs-parquet")]
+            Self::Parquet(config) => BatchSerializerConfig::Parquet(config.clone()),
+        }
+    }
+
+    fn input_type(&self) -> DataType {
+        self.serializer_config().input_type()
+    }
+
+    const fn filename_extension(&self) -> &'static str {
+        match self {
+            Self::AvroOcf(_) => "avro",
+            #[cfg(feature = "codecs-parquet")]
+            Self::Parquet(_) => "parquet",
+        }
+    }
+}
 
 /// Configuration for the `aws_s3` sink.
 #[configurable_component(sink(
@@ -284,7 +325,7 @@ impl S3SinkConfig {
         // When batch_encoding is configured (e.g., AvroOcf, Parquet), use batch mode
         // with internal structure and appropriate file extension.
         if let Some(batch_config) = &self.batch_encoding {
-            let batch_serializer = batch_config.build_batch_serializer()?;
+            let batch_serializer = batch_config.serializer_config().build_batch_serializer()?;
             let batch_encoder = BatchEncoder::new(batch_serializer);
 
             // Auto-detect Content-Type from batch format. Users can still
@@ -296,17 +337,11 @@ impl S3SinkConfig {
 
             let encoder = EncoderKind::Batch(batch_encoder);
 
-            // Auto-detect file extension from batch format
-            let filename_extension =
-                self.filename_extension
-                    .clone()
-                    .or_else(|| match batch_config {
-                        BatchSerializerConfig::AvroOcf(_) => Some("avro".to_string()),
-                        #[cfg(feature = "codecs-parquet")]
-                        BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
-                        #[allow(unreachable_patterns)]
-                        _ => None,
-                    });
+            // Auto-detect file extension from the explicitly supported S3 batch format.
+            let filename_extension = self
+                .filename_extension
+                .clone()
+                .or_else(|| Some(batch_config.filename_extension().to_owned()));
 
             if self.compression != Compression::None {
                 warn!("Top level compression setting ignored when batch_encoding is set.")
@@ -393,7 +428,9 @@ mod tests {
         let batch_enc = config
             .batch_encoding
             .expect("batch_encoding should be Some");
-        let super::S3BatchEncoding::Parquet(ref p) = batch_enc;
+        let super::S3BatchEncoding::Parquet(ref p) = batch_enc else {
+            panic!("expected Parquet batch encoding");
+        };
         use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSchemaMode};
         assert_eq!(p.schema_mode, ParquetSchemaMode::AutoInfer);
         assert_eq!(p.compression, ParquetCompression::Snappy);
@@ -441,7 +478,9 @@ mod tests {
             confinement: ConfinementConfig::default(),
         };
 
-        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
+        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap() else {
+            panic!("expected Parquet batch encoding");
+        };
         let batch_config = BatchSerializerConfig::Parquet(p.clone());
         let batch_serializer = batch_config.build_batch_serializer().unwrap();
         let batch_encoder = vector_lib::codecs::BatchEncoder::new(batch_serializer);
@@ -477,7 +516,9 @@ mod tests {
             "#})
         .unwrap();
 
-        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
+        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap() else {
+            panic!("expected Parquet batch encoding");
+        };
         let batch_config = vector_lib::codecs::encoding::BatchSerializerConfig::Parquet(p.clone());
         let batch_serializer = batch_config.build_batch_serializer().unwrap();
         let batch_encoder = vector_lib::codecs::BatchEncoder::new(batch_serializer);
@@ -552,7 +593,9 @@ mod tests {
             "#})
         .unwrap();
 
-        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
+        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap() else {
+            panic!("expected Parquet batch encoding");
+        };
         assert_eq!(p.schema_mode, ParquetSchemaMode::Relaxed);
     }
 
@@ -576,9 +619,28 @@ mod tests {
         assert!(
             matches!(
                 config.batch_encoding,
-                Some(vector_lib::codecs::encoding::BatchSerializerConfig::AvroOcf(_))
+                Some(super::S3BatchEncoding::AvroOcf(_))
             ),
             "expected AvroOcf variant"
+        );
+    }
+
+    #[cfg(feature = "codecs-arrow")]
+    #[test]
+    fn s3_batch_encoding_rejects_arrow_stream() {
+        let error = serde_yaml::from_str::<S3SinkConfig>(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: arrow_stream
+            "#})
+        .expect_err("S3 must reject unsupported Arrow Stream batch encoding");
+
+        assert!(
+            error.to_string().contains("arrow_stream"),
+            "unexpected error: {error}"
         );
     }
 
@@ -608,13 +670,7 @@ mod tests {
         let extension = config
             .filename_extension
             .clone()
-            .or_else(|| match batch_config {
-                vector_lib::codecs::encoding::BatchSerializerConfig::AvroOcf(_) => {
-                    Some("avro".to_string())
-                }
-                #[allow(unreachable_patterns)]
-                _ => None,
-            });
+            .or_else(|| Some(batch_config.filename_extension().to_owned()));
 
         assert_eq!(extension.as_deref(), Some("avro"));
     }
@@ -637,7 +693,9 @@ mod tests {
             "#})
         .unwrap();
 
-        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
+        let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap() else {
+            panic!("expected Parquet batch encoding");
+        };
         assert_eq!(p.schema_mode, ParquetSchemaMode::Strict);
     }
 

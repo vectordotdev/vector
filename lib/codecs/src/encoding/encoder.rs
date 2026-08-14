@@ -66,14 +66,14 @@ impl BatchEncoder {
     }
 
     /// Encode a batch of events into a `BatchOutput`.
-    pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
+    pub fn encode_batch(&self, _events: &[Event]) -> Result<BatchOutput, Error> {
         match &self.serializer {
             BatchSerializer::AvroOcf(_) => Err(Error::SerializingError(Box::from(
                 "AvroOcf serializer does not support encode_batch; use the tokio Encoder interface instead",
             ))),
             #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
-                let record_batch = serializer.encode_to_record_batch(events).map_err(|err| {
+                let record_batch = serializer.encode_to_record_batch(_events).map_err(|err| {
                     use crate::encoding::ArrowEncodingError;
                     match err {
                         ArrowEncodingError::NullConstraint { .. } => {
