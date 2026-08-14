@@ -42,7 +42,6 @@ pub struct UrlOrRegion {
     #[configurable(metadata(docs::examples = "https://api.eu.axiom.co"))]
     #[configurable(metadata(docs::examples = "http://localhost:3400/ingest"))]
     #[configurable(metadata(docs::examples = "${AXIOM_URL}"))]
-    #[configurable(required_one_of = "url_or_region")]
     pub url: Option<String>,
 
     /// The Axiom regional edge domain to use for ingestion.
@@ -53,7 +52,6 @@ pub struct UrlOrRegion {
     #[configurable(metadata(docs::examples = "${AXIOM_REGION}"))]
     #[configurable(metadata(docs::examples = "mumbai.axiom.co"))]
     #[configurable(metadata(docs::examples = "eu-central-1.aws.edge.axiom.co"))]
-    #[configurable(required_one_of = "url_or_region")]
     pub region: Option<String>,
 }
 

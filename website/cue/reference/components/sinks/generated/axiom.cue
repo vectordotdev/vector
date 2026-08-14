@@ -120,12 +120,8 @@ generated: components: sinks: axiom: configuration: {
 			Specify the domain name only (no scheme, no path).
 			When set, data is sent to `https://{region}/v1/ingest/{dataset}`.
 			Cannot be used together with `url`.
-
-			Exactly one of `url` or `region` must be set.
 			"""
 		required: false
-		required_one_of: ["url", "region"]
-		required_one_of_group: "url_or_region"
 		type: string: examples: ["${AXIOM_REGION}", "mumbai.axiom.co", "eu-central-1.aws.edge.axiom.co"]
 	}
 	request: {
@@ -466,12 +462,8 @@ generated: components: sinks: axiom: configuration: {
 			If a path is provided, the URL is used as-is.
 			If no path (or only `/`) is provided, `/v1/datasets/{dataset}/ingest` is appended for backwards compatibility.
 			This takes precedence over `region` if both are set (but both should not be set).
-
-			Exactly one of `url` or `region` must be set.
 			"""
 		required: false
-		required_one_of: ["url", "region"]
-		required_one_of_group: "url_or_region"
 		type: string: examples: ["https://api.eu.axiom.co", "http://localhost:3400/ingest", "${AXIOM_URL}"]
 	}
 }

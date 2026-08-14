@@ -358,6 +358,13 @@ impl ValidatedSink for HttpSinkConfig {
         if !self.uri.is_dynamic() {
             let uri_serde: UriSerde = self.uri.get_ref().parse()?;
             self.auth.choose_one(&uri_serde.auth)?;
+            if uri_serde.uri.scheme().is_none() || uri_serde.uri.authority().is_none() {
+                return Err(format!(
+                    "uri must include a scheme and host, e.g. `https://example.com/endpoint`; got `{}`",
+                    self.uri.get_ref()
+                )
+                .into());
+            }
         }
 
         let (payload_prefix, payload_suffix) = validate_payload_wrapper(
@@ -656,6 +663,23 @@ mod tests {
         config
             .validate()
             .expect("dynamic uri validation is deferred to render time");
+    }
+
+    #[test]
+    fn validate_rejects_relative_static_uri() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "/ingest"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "relative static uri should fail validation"
+        );
     }
 
     #[test]
