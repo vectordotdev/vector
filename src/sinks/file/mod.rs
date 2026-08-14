@@ -417,7 +417,7 @@ impl FileSink {
         Ok(())
     }
 
-    async fn process_batch(&mut self, path: Bytes, events: Vec<Event>) {
+    async fn process_batch(&mut self, path: Bytes, mut events: Vec<Event>) {
         let next_deadline = self.deadline_at();
         trace!(message = "Computed next deadline.", next_deadline = ?next_deadline, path = ?path);
 
@@ -442,9 +442,9 @@ impl FileSink {
                         path: &path,
                         dropped_events,
                     });
-                    // for event in events {
-                    //     event.metadata().update_status(EventStatus::Errored);
-                    // }
+                    events.iter_mut().for_each(|event| {
+                        event.metadata().update_status(EventStatus::Errored);
+                    });
                     return;
                 }
                 Err(OpenError::Confine(error)) => {
@@ -459,9 +459,9 @@ impl FileSink {
                         base_dir: &base,
                         error,
                     });
-                    // for event in events.iter_mut() {
-                    //     event.metadata_mut().update_status(EventStatus::Errored);
-                    // }
+                    events.iter_mut().for_each(|event| {
+                        event.metadata().update_status(EventStatus::Errored);
+                    });
                     return;
                 }
             };
