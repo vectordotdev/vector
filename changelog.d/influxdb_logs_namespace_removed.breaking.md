@@ -7,12 +7,8 @@ deprecated since v0.24.0 in favor of `measurement`. Configurations using it now 
 
 ## Migration
 
-If your configuration sets both `namespace` and `measurement`, the old sink used `measurement` and
-ignored `namespace`; remove the `namespace` option and leave `measurement` unchanged.
-
-If your configuration only sets `namespace`, replace it with `measurement`. Previously, `namespace`
-prefixed the measurement name with `<namespace>.vector`, so set `measurement` to
-`<namespace>.vector` for the same effect:
+Replace `namespace` with `measurement`. Previously, `namespace` prefixed the measurement name
+with `<namespace>.vector`, so set `measurement` to `<namespace>.vector` for the same effect:
 
 #### Old
 
@@ -33,5 +29,8 @@ sinks:
     measurement: my-namespace.vector
     endpoint: http://localhost:8086
 ```
+
+Note: if your configuration sets both `namespace` and `measurement`, the old sink used `measurement`
+and ignored `namespace`; remove the `namespace` option and leave `measurement` unchanged.
 
 authors: thomasqueirozb
