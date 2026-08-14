@@ -145,6 +145,37 @@ impl Default for SerializerConfig {
     }
 }
 
+/// Compression algorithm used by file-oriented batch serializers.
+#[configurable_component]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[configurable(metadata(
+    docs::enum_tag_description = "The compression algorithm to use for the encoded batch file."
+))]
+#[serde(tag = "algorithm", rename_all = "snake_case")]
+pub enum BatchSerializerCompression {
+    /// Writes uncompressed batch files.
+    #[default]
+    None,
+    /// Uses Snappy compression.
+    Snappy,
+    /// Uses Avro OCF Deflate compression.
+    Deflate,
+    /// Uses Zstd compression. Level must be between 1 and 21.
+    Zstd {
+        /// Compression level (1–21). Higher values compress more but are slower.
+        #[configurable(validation(range(min = 1, max = 21)))]
+        level: u8,
+    },
+    /// Uses Gzip compression. Level must be between 1 and 9.
+    Gzip {
+        /// Compression level (1–9). Higher values compress more but are slower.
+        #[configurable(validation(range(min = 1, max = 9)))]
+        level: u8,
+    },
+    /// Uses LZ4 raw compression.
+    Lz4,
+}
+
 /// Batch serializer configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]

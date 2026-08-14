@@ -40,7 +40,9 @@ pub use framing::{
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
 };
-pub use serializer::{BatchSerializerConfig, Serializer, SerializerConfig};
+pub use serializer::{
+    BatchSerializerCompression, BatchSerializerConfig, Serializer, SerializerConfig,
+};
 pub use transformer::{TimestampFormat, Transformer};
 
 /// An error that occurred while building an encoder.

@@ -3,7 +3,7 @@ use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
-use crate::encoding::BuildError;
+use crate::encoding::{BuildError, serializer::BatchSerializerCompression};
 
 /// Config used to build a `AvroSerializer`.
 #[configurable_component]
@@ -80,30 +80,24 @@ impl Encoder<Event> for AvroSerializer {
     }
 }
 
-/// Compression algorithm applied to Avro Object Container File data blocks.
-#[configurable_component]
-#[derive(Default, Copy, Clone, Debug, PartialEq)]
-#[configurable(metadata(
-    docs::enum_tag_description = "The compression algorithm to use for Avro OCF data blocks."
-))]
-#[serde(tag = "algorithm", rename_all = "snake_case")]
-pub enum AvroOcfCompression {
-    /// Writes uncompressed OCF blocks.
-    #[default]
-    None,
-    /// Writes OCF blocks compressed with the Avro Deflate codec.
-    Deflate,
-    /// Writes OCF blocks compressed with the Avro Snappy codec.
-    Snappy,
-}
+/// Compatibility alias for the shared batch-file compression configuration.
+pub type AvroOcfCompression = BatchSerializerCompression;
 
-impl From<AvroOcfCompression> for apache_avro::Codec {
-    fn from(compression: AvroOcfCompression) -> Self {
-        match compression {
-            AvroOcfCompression::None => Self::Null,
-            AvroOcfCompression::Deflate => Self::Deflate(apache_avro::DeflateSettings::default()),
-            AvroOcfCompression::Snappy => Self::Snappy,
+fn resolve_ocf_compression(
+    compression: BatchSerializerCompression,
+) -> Result<apache_avro::Codec, BuildError> {
+    match compression {
+        BatchSerializerCompression::None => Ok(apache_avro::Codec::Null),
+        BatchSerializerCompression::Deflate => {
+            Ok(apache_avro::Codec::Deflate(apache_avro::DeflateSettings::default()))
         }
+        BatchSerializerCompression::Snappy => Ok(apache_avro::Codec::Snappy),
+        BatchSerializerCompression::Zstd { .. }
+        | BatchSerializerCompression::Gzip { .. }
+        | BatchSerializerCompression::Lz4 => Err(format!(
+            "Avro OCF does not support {compression:?} compression; supported algorithms are none, deflate, and snappy"
+        )
+        .into()),
     }
 }
 
@@ -118,7 +112,7 @@ pub struct AvroOcfSerializerConfig {
     /// Compression codec applied to OCF data blocks.
     #[serde(default)]
     #[configurable(derived)]
-    pub compression: AvroOcfCompression,
+    pub compression: BatchSerializerCompression,
 }
 
 impl AvroOcfSerializerConfig {
@@ -126,7 +120,7 @@ impl AvroOcfSerializerConfig {
     pub const fn new(options: AvroSerializerOptions) -> Self {
         Self {
             avro: options,
-            compression: AvroOcfCompression::None,
+            compression: BatchSerializerCompression::None,
         }
     }
 
@@ -134,7 +128,10 @@ impl AvroOcfSerializerConfig {
     pub fn build(&self) -> Result<AvroOcfSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro OCF serializer: {error}"))?;
-        Ok(AvroOcfSerializer::new(schema, self.compression.into()))
+        Ok(AvroOcfSerializer::new(
+            schema,
+            resolve_ocf_compression(self.compression)?,
+        ))
     }
 
     /// The data type of events that are accepted by `AvroOcfSerializer`.
@@ -376,6 +373,21 @@ mod tests {
                 .unwrap();
             assert_eq!(records.len(), 1, "round trip failed for {codec_name}");
         }
+    }
+
+    #[test]
+    fn avro_ocf_rejects_unsupported_shared_compression() {
+        let config = AvroOcfSerializerConfig {
+            avro: AvroSerializerOptions {
+                schema: schema_str(),
+            },
+            compression: BatchSerializerCompression::Zstd { level: 1 },
+        };
+
+        let error = config
+            .build()
+            .expect_err("Avro OCF must reject unsupported Zstd compression");
+        assert!(error.to_string().contains("does not support"));
     }
 
     #[test]
