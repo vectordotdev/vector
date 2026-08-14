@@ -558,6 +558,8 @@ mod tests {
             // A non-numeric port parses with a nonempty host but cannot be dialed.
             "http://localhost:notaport",
             "https://example.com:notaport/path",
+            // Multiple port separators are rejected by the URI parser.
+            "http://localhost:notaport:8080",
         ] {
             assert!(
                 matches!(
