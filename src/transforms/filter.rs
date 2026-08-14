@@ -35,8 +35,8 @@ impl From<AnyCondition> for FilterConfig {
 }
 
 impl GenerateConfig for FilterConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(r#"condition = ".message == \"value\"""#).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(r#"condition: '.message == "value"'"#).unwrap()
     }
 }
 
@@ -50,7 +50,7 @@ impl TransformConfig for FilterConfig {
         )?)))
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         self.condition
             .validate(&context.enrichment_tables, &context.metrics_storage)
             .map_err(|e| vec![e.to_string()])

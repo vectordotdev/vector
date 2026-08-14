@@ -52,7 +52,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::{Template, TemplateParseError},
+    template::{TemplateParseError, UnconfinedTemplate},
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -200,8 +200,7 @@ pub struct ChronicleUnstructuredConfig {
         docs::examples = "production",
         docs::examples = "production-{{ namespace }}",
     ))]
-    #[configurable(metadata(docs::advanced))]
-    pub namespace: Option<Template>,
+    pub namespace: Option<UnconfinedTemplate>,
 
     /// A set of labels that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "chronicle_labels_examples()"))]
@@ -236,7 +235,7 @@ pub struct ChronicleUnstructuredConfig {
     ///
     /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
     #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
-    pub log_type: Template,
+    pub log_type: UnconfinedTemplate,
 
     /// The default `log_type` to attach to events if the template in `log_type` cannot be resolved.
     #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
@@ -259,15 +258,16 @@ fn chronicle_labels_examples() -> HashMap<String, String> {
 }
 
 impl GenerateConfig for ChronicleUnstructuredConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            credentials_path = "/path/to/credentials.json"
-            customer_id = "customer_id"
-            namespace = "namespace"
-            compression = "gzip"
-            log_type = "log_type"
-            fallback_log_type = "VECTOR_DEV"
-            encoding.codec = "text"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            credentials_path: /path/to/credentials.json
+            customer_id: customer_id
+            namespace: namespace
+            compression: gzip
+            log_type: log_type
+            fallback_log_type: VECTOR_DEV
+            encoding:
+              codec: text
         "#})
         .unwrap()
     }

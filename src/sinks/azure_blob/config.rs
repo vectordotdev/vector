@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
@@ -43,7 +44,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -79,6 +80,11 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
+    ///
+    /// If you also configure the `tags` option, the SAS must include the
+    /// `Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
+    /// the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
+    /// uploads fail with an authorization error even when the health check still passes.
     #[configurable(metadata(
         docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
         resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
@@ -167,6 +173,43 @@ pub struct AzureBlobSinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
+    /// The set of [blob index tags][blob_index_tags] to apply to created blobs.
+    ///
+    /// Each entry becomes a tag in the `x-ms-tags` header. Azure limits blobs to 10 tags,
+    /// with restricted character sets for keys and values; the service rejects invalid
+    /// configurations.
+    ///
+    /// When authenticating with a shared access signature (SAS), the token must include the
+    /// `Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
+    /// authorization requirement to the `Put Blob` request that carries these tags, so without
+    /// it tagged uploads fail with an authorization error even when the health check still passes.
+    ///
+    /// When authenticating with an Azure credential (managed identity, workload identity, and so
+    /// on), the identity needs the
+    /// `Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write` RBAC action.
+    /// The least-privileged built-in role that grants it is *Storage Blob Data Owner*; the
+    /// *Storage Blob Data Contributor* role commonly sufficient for uploads does not include it.
+    ///
+    /// [blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
+    #[configurable(metadata(docs::additional_props_description = "A single tag."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
+    #[serde(default)]
+    pub tags: Option<BTreeMap<String, String>>,
+
+    /// The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
+    ///
+    /// Each entry becomes an `x-ms-meta-{key}` header. Azure limits the total size of all
+    /// metadata and restricts key names to ASCII alphanumeric characters and underscores,
+    /// starting with a letter. Non-ASCII values must be Base64-encoded before being set.
+    /// The service rejects invalid configurations. See the [Azure documentation][blob_metadata]
+    /// for current limits.
+    ///
+    /// [blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub metadata: Option<HashMap<String, String>>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
@@ -186,6 +229,9 @@ pub struct AzureBlobSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<AzureBlobTlsConfig>,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 pub fn default_blob_prefix() -> Template {
@@ -193,8 +239,8 @@ pub fn default_blob_prefix() -> Template {
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             auth: None,
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             account_name: None,
@@ -205,13 +251,24 @@ impl GenerateConfig for AzureBlobSinkConfig {
             blob_append_uuid: Some(true),
             encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
+            tags: None,
+            metadata: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
             tls: None,
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
+}
+
+fn example_tags() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([
+        ("Project".to_string(), "Blue".to_string()),
+        ("Classification".to_string(), "confidential".to_string()),
+        ("PHI".to_string(), "True".to_string()),
+    ])
 }
 
 #[async_trait::async_trait]
@@ -274,6 +331,10 @@ impl SinkConfig for AzureBlobSinkConfig {
         Ok((sink, healthcheck))
     }
 
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
@@ -316,6 +377,8 @@ impl AzureBlobSinkConfig {
             blob_append_uuid,
             encoder: (transformer, encoder),
             compression: self.compression,
+            tags: self.tags.clone(),
+            metadata: self.metadata.clone(),
         };
 
         let sink = AzureBlobSink::new(
@@ -329,7 +392,60 @@ impl AzureBlobSinkConfig {
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        Ok(KeyPartitioner::new(self.blob_prefix.clone(), None))
+        let tpl = self
+            .blob_prefix
+            .clone()
+            .confine(&self.confinement, Self::NAME, "blob_prefix")?;
+        Ok(KeyPartitioner::new(tpl, None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::template::ConfinementConfig;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureBlobSinkConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_blob_prefix() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let err = template
+            .confine(&ConfinementConfig::default(), "azure_blob", "blob_prefix")
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("no literal string prefix"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_blob_prefix() {
+        let cfg = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        assert!(template.confine(&cfg, "azure_blob", "blob_prefix").is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::Event;
+        use vector_lib::event::LogEvent;
+        use vrl::event_path;
+
+        let template = Template::try_from("safe/{{ tenant }}/").unwrap();
+        let template = template
+            .confine(&ConfinementConfig::default(), "azure_blob", "blob_prefix")
+            .unwrap();
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../escape");
+        assert!(template.render_string(&event).is_err());
     }
 }
 
@@ -340,6 +456,10 @@ pub struct AzureBlobRequest {
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
     pub request_metadata: RequestMetadata,
+    /// Pre-encoded `x-ms-tags` header value (`k=v&k=v`), or `None` to omit the header.
+    pub tags: Option<String>,
+    /// Custom blob metadata. Each entry becomes an `x-ms-meta-{key}` header.
+    pub blob_metadata: Option<std::collections::HashMap<String, String>>,
 }
 
 impl Finalizable for AzureBlobRequest {

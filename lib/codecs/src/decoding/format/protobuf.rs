@@ -186,6 +186,7 @@ mod tests {
     use std::{env, fs, path::PathBuf};
 
     use vector_core::config::log_schema;
+    use vrl::event_path;
 
     use super::*;
 
@@ -279,10 +280,10 @@ mod tests {
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
             // No field will be set.
-            assert!(!log.contains("name"));
-            assert!(!log.contains("id"));
-            assert!(!log.contains("email"));
-            assert!(!log.contains("phones"));
+            assert!(!log.contains(event_path!("name")));
+            assert!(!log.contains(event_path!("id")));
+            assert!(!log.contains(event_path!("email")));
+            assert!(!log.contains(event_path!("phones")));
         };
 
         parse_and_validate(

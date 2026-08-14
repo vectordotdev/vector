@@ -103,11 +103,12 @@ fn default_endpoint() -> String {
 }
 
 impl GenerateConfig for PubsubConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            project = "my-project"
-            topic = "my-topic"
-            encoding.codec = "json"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            project: my-project
+            topic: my-topic
+            encoding:
+              codec: json
         "#})
         .unwrap()
     }

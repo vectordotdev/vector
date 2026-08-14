@@ -75,12 +75,12 @@ pub struct PostgresConfig {
 }
 
 impl GenerateConfig for PostgresConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"endpoint = "postgres://user:password@localhost/default"
-            table = "table"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: "postgres://user:password@localhost/default"
+            table: table
         "#,
-        )
+        })
         .unwrap()
     }
 }

@@ -50,7 +50,7 @@ use vector_lib::{
         resource::v1::{Resource, Resource as OtelResource},
     },
 };
-use vrl::value;
+use vrl::{event_path, value};
 
 fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
     Request::new(ExportLogsServiceRequest {
@@ -252,7 +252,10 @@ async fn receive_grpc_logs_vector_namespace() {
         let event = output.pop().unwrap();
         schema_definitions.unwrap().assert_valid_for_event(&event);
 
-        assert_eq!(event.as_log().get(".").unwrap(), &value!("log body"));
+        assert_eq!(
+            event.as_log().get(event_path!()).unwrap(),
+            &value!("log body")
+        );
 
         let meta = event.as_log().metadata().value();
         assert_eq!(
@@ -1413,7 +1416,7 @@ async fn http_headers_metrics_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("AbsentHeader")
+                .get(path!("AbsentHeader"))
                 .unwrap(),
             &Value::Null
         );
@@ -1423,7 +1426,7 @@ async fn http_headers_metrics_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("User-Agent")
+                .get(path!("User-Agent"))
                 .unwrap(),
             &value!("Test")
         );
@@ -1465,7 +1468,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("AbsentHeader")
+                .get(path!("AbsentHeader"))
                 .unwrap(),
             &Value::Null
         );
@@ -1475,7 +1478,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("User-Agent")
+                .get(path!("User-Agent"))
                 .unwrap(),
             &value!("Test")
         );
@@ -1500,7 +1503,7 @@ async fn http_headers_traces_use_otlp_decoding_true() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("AbsentHeader")
+                .get(path!("AbsentHeader"))
                 .unwrap(),
             &Value::Null
         );
@@ -1510,7 +1513,7 @@ async fn http_headers_traces_use_otlp_decoding_true() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("User-Agent")
+                .get(path!("User-Agent"))
                 .unwrap(),
             &value!("Test")
         );

@@ -14,6 +14,22 @@ fn scalar_const_key(value: &Value) -> Option<String> {
     }
 }
 
+fn format_required_one_of_note(members: &[&str]) -> String {
+    match members {
+        [] | [_] => String::new(),
+        [a, b] => format!("Exactly one of `{a}` or `{b}` must be set."),
+        _ => {
+            let all_but_last = members[..members.len() - 1]
+                .iter()
+                .map(|m| format!("`{m}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let last = members.last().unwrap();
+            format!("Exactly one of {all_but_last}, or `{last}` must be set.")
+        }
+    }
+}
+
 impl SchemaContext {
     pub fn get_rendered_description_from_schema(&self, schema: &Value) -> String {
         let raw_description = schema
@@ -22,10 +38,27 @@ impl SchemaContext {
             .unwrap_or("");
         let raw_title = schema.get("title").and_then(|v| v.as_str()).unwrap_or("");
 
-        let description = if raw_title.is_empty() {
+        let base = if raw_title.is_empty() {
             raw_description.to_string()
         } else {
             format!("{raw_title}\n\n{raw_description}")
+        };
+
+        let note = if let Some(Value::Array(members)) =
+            get_schema_metadata(schema, "docs::required_one_of")
+        {
+            let names: Vec<&str> = members.iter().filter_map(|m| m.as_str()).collect();
+            format_required_one_of_note(&names)
+        } else {
+            String::new()
+        };
+
+        let description = if note.is_empty() {
+            base
+        } else if base.trim().is_empty() {
+            note
+        } else {
+            format!("{}\n\n{note}", base.trim())
         };
         description.trim().to_string()
     }
@@ -35,7 +68,7 @@ impl SchemaContext {
         schema_name: &str,
         friendly_name: &str,
     ) -> Result<Map<String, Value>> {
-        info!("[*] Resolving schema definition for {}...", friendly_name);
+        debug!("[*] Resolving schema definition for {}...", friendly_name);
 
         let resolved_schema = self.resolve_schema_by_name(schema_name)?;
 
@@ -298,6 +331,7 @@ impl SchemaContext {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn apply_schema_metadata(&self, source_schema: &Value, resolved_schema: &mut Value) {
         let is_templateable = get_schema_metadata(source_schema, "docs::templateable")
             .and_then(Value::as_bool)
@@ -377,6 +411,48 @@ impl SchemaContext {
                 string_def.insert("syntax".to_string(), Value::String(syntax_str));
             }
         }
+
+        if let Some(Value::Array(arr)) = get_schema_metadata(source_schema, "docs::required_one_of")
+        {
+            resolved_schema
+                .as_object_mut()
+                .unwrap()
+                .insert("required_one_of".to_string(), Value::Array(arr.clone()));
+        }
+
+        if let Some(Value::String(group)) =
+            get_schema_metadata(source_schema, "docs::required_one_of_group")
+        {
+            resolved_schema.as_object_mut().unwrap().insert(
+                "required_one_of_group".to_string(),
+                Value::String(group.clone()),
+            );
+        }
+
+        if let Some(Value::String(condition)) =
+            get_schema_metadata(source_schema, "docs::relevant_when")
+        {
+            resolved_schema.as_object_mut().unwrap().insert(
+                "relevant_when".to_string(),
+                Value::String(condition.clone()),
+            );
+        }
+
+        if let Some(Value::String(condition)) =
+            get_schema_metadata(source_schema, "docs::required_when")
+        {
+            resolved_schema.as_object_mut().unwrap().insert(
+                "required_when".to_string(),
+                Value::String(condition.clone()),
+            );
+        }
+
+        if let Some(minimal) = get_schema_metadata(source_schema, "docs::minimal") {
+            resolved_schema
+                .as_object_mut()
+                .unwrap()
+                .insert("minimal".to_string(), minimal.clone());
+        }
     }
 
     pub fn sort_hash_nested(
@@ -416,6 +492,10 @@ impl SchemaContext {
         let is_required = required_properties
             .is_some_and(|reqs| reqs.contains(&Value::String(property_name.to_string())))
             || property_schema
+                .get("required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            || property
                 .get("required")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);

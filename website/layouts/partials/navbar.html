@@ -12,7 +12,7 @@
   <div class="mx-auto px-4 sm:px-6 lg:px-10 py-1 md:py-1.5 lg:py-2">
     <div class="relative flex items-center justify-between h-16">
       <div class="flex items-center">
-        <div class="flex-shrink-0">
+        <div class="shrink-0">
           <a href="{{ site.BaseURL }}">
             {{ range $modes }}
             {{ $src := printf "/img/logos/vector-logo-%s.svg" (. | lower) }}
@@ -37,12 +37,12 @@
       </div>
 
 
-      <div class="flex justify-end flex-grow items-center lg:ml-6 h-full">
+      <div class="flex justify-end grow items-center lg:ml-6 h-full">
         {{/* Dark/light mode toggler */}}
         {{ partial "navbar/mode-toggler.html" . }}
 
         {{/* Search bar */}}
-        <div class="max-w-xxs xl:flex-grow ml-4">
+        <div class="max-w-xxs xl:grow ml-4">
           <label for="search" class="sr-only">
             Search
           </label>
@@ -60,7 +60,7 @@
         {{/* Mobile dropdown toggle */}}
         <div class="flex lg:hidden ml-4">
           <button @click="open = !open" type="button"
-            class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+            class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-white"
             aria-controls="mobile-menu" aria-expanded="false">
             <span class="sr-only">
               Open navbar dropdown menu
