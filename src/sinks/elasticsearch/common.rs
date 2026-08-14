@@ -379,6 +379,15 @@ async fn get_version(
     tls_settings: &TlsSettings,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<usize> {
+    #[derive(Deserialize)]
+    struct Version {
+        number: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct ResponsePayload {
+        version: Option<Version>,
+    }
+
     let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
     let response = get(
         base_url,
@@ -395,27 +404,7 @@ async fn get_version(
     let (_, body) = response.into_parts();
     let mut body = body.collect().await?.aggregate();
     let body = body.copy_to_bytes(body.remaining());
-    parse_version_response(&body)
-}
-
-fn parse_version_response(body: &[u8]) -> crate::Result<usize> {
-    #[derive(Deserialize)]
-    struct Version {
-        distribution: Option<String>,
-        number: Option<String>,
-    }
-    #[derive(Deserialize)]
-    struct ResponsePayload {
-        version: Option<Version>,
-    }
-
-    let ResponsePayload { version } = serde_json::from_slice(body)?;
-    if let Some(version) = version.as_ref()
-        && version.distribution.as_deref() == Some("opensearch")
-    {
-        // OpenSearch uses the typeless bulk API compatible with Elasticsearch 7.x.
-        return Ok(7);
-    }
+    let ResponsePayload { version } = serde_json::from_slice(&body)?;
     if let Some(version) = version
         && let Some(number) = version.number
     {
@@ -464,23 +453,4 @@ async fn get(
         .send(request.map(hyper::Body::from))
         .await
         .map_err(Into::into)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_version_response;
-
-    #[test]
-    fn parses_elasticsearch_version() {
-        let body = br#"{"version":{"number":"8.19.0"}}"#;
-
-        assert_eq!(parse_version_response(body).unwrap(), 8);
-    }
-
-    #[test]
-    fn maps_opensearch_to_compatible_api_version() {
-        let body = br#"{"version":{"distribution":"opensearch","number":"3.6.0"}}"#;
-
-        assert_eq!(parse_version_response(body).unwrap(), 7);
-    }
 }

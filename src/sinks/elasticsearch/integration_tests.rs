@@ -41,10 +41,20 @@ fn http_password() -> String {
     std::env::var("ELASTICSEARCH_PASSWORD").unwrap_or_else(|_| "vector".into())
 }
 
-fn aws_api_version() -> ElasticsearchApiVersion {
-    match std::env::var("ELASTICSEARCH_AWS_API_VERSION").as_deref() {
+fn api_version() -> ElasticsearchApiVersion {
+    match std::env::var("ELASTICSEARCH_API_VERSION").as_deref() {
+        Ok("v6") => ElasticsearchApiVersion::V6,
         Ok("v7") => ElasticsearchApiVersion::V7,
-        _ => ElasticsearchApiVersion::V6,
+        Ok("v8") => ElasticsearchApiVersion::V8,
+        Ok(version) => panic!("Unsupported Elasticsearch API version: {version}"),
+        Err(_) => ElasticsearchApiVersion::Auto,
+    }
+}
+
+fn aws_api_version() -> ElasticsearchApiVersion {
+    match api_version() {
+        ElasticsearchApiVersion::Auto => ElasticsearchApiVersion::V6,
+        version => version,
     }
 }
 
@@ -161,6 +171,7 @@ async fn ensure_pipeline_in_params() {
             ..Default::default()
         },
         pipeline: Some(pipeline.clone()),
+        api_version: api_version(),
         batch: batch_settings(),
         ..Default::default()
     };
@@ -186,6 +197,7 @@ async fn ensure_empty_pipeline_not_in_params() {
             ..Default::default()
         },
         pipeline: Some(pipeline.clone()),
+        api_version: api_version(),
         batch: batch_settings(),
         ..Default::default()
     };
@@ -208,6 +220,7 @@ async fn structures_events_correctly() {
         doc_type: "log_lines".to_string(),
         id_key: Some("my_id".into()),
         compression: Compression::None,
+        api_version: api_version(),
         batch: batch_settings(),
         ..Default::default()
     };
@@ -358,6 +371,7 @@ async fn insert_events_over_http() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::None,
+            api_version: api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -376,6 +390,7 @@ async fn insert_events_with_data_volume() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::None,
+            api_version: api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -394,6 +409,7 @@ async fn insert_events_over_http_with_gzip_compression() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::gzip_default(),
+            api_version: api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -420,6 +436,7 @@ async fn insert_events_over_https() {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
+            api_version: api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -491,6 +508,7 @@ async fn insert_events_with_failure() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::None,
+            api_version: api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -509,6 +527,7 @@ async fn insert_events_with_failure_and_gzip_compression() {
             endpoints: vec![http_server()],
             doc_type: "log_lines".into(),
             compression: Compression::gzip_default(),
+            api_version: api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -534,6 +553,7 @@ async fn insert_events_in_data_stream() {
             namespace: index,
             ..Default::default()
         }),
+        api_version: api_version(),
         batch: batch_settings(),
         ..Default::default()
     };
@@ -576,6 +596,7 @@ async fn distributed_insert_events() {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
         }),
+        api_version: api_version(),
         batch: batch_settings(),
         ..Default::default()
     };
@@ -607,6 +628,7 @@ async fn distributed_insert_events_failover() {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
         }),
+        api_version: api_version(),
         batch: batch_settings(),
         ..Default::default()
     };
