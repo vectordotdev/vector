@@ -70,7 +70,7 @@ pub struct PubsubConfig {
     /// [pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "https://us-central1-pubsub.googleapis.com"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
@@ -99,8 +99,8 @@ pub struct PubsubConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_endpoint() -> String {
-    PUBSUB_URL.to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse(PUBSUB_URL).expect("static default endpoint should be a valid http(s) URL")
 }
 
 impl GenerateConfig for PubsubConfig {
@@ -166,7 +166,7 @@ impl PubsubSink {
         // We only need to load the credentials if we are not targeting an emulator.
         let auth = config.auth.build(Scope::PubSub).await?;
 
-        let uri_base = HttpEndpoint::parse(&config.endpoint)?.append_path(&format!(
+        let uri_base = config.endpoint.clone().append_path(&format!(
             "/v1/projects/{}/topics/{}",
             config.project, config.topic,
         ))?;
@@ -295,7 +295,7 @@ mod integration_tests {
         PubsubConfig {
             project: PROJECT.into(),
             topic: topic.into(),
-            endpoint: gcp::PUBSUB_ADDRESS.clone(),
+            endpoint: HttpEndpoint::parse(&gcp::PUBSUB_ADDRESS).unwrap(),
             auth: GcpAuthConfig {
                 skip_authentication: true,
                 ..Default::default()

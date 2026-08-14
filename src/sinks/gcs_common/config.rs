@@ -12,12 +12,16 @@ use crate::{
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
-        util::{HttpEndpoint, retries::{RetryAction, RetryLogic}},
+        util::{
+            HttpEndpoint,
+            retries::{RetryAction, RetryLogic},
+        },
     },
 };
 
-pub fn default_endpoint() -> String {
-    "https://storage.googleapis.com".to_string()
+pub fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://storage.googleapis.com")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 /// GCS Predefined ACLs.

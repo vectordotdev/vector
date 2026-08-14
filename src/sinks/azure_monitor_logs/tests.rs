@@ -12,7 +12,10 @@ use super::{
 };
 use crate::{
     event::LogEvent,
-    sinks::{prelude::*, util::{encoding::Encoder, HttpEndpoint}},
+    sinks::{
+        prelude::*,
+        util::{HttpEndpoint, encoding::Encoder},
+    },
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},

@@ -18,9 +18,9 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
+            HttpEndpoint,
             auth::Auth,
             http::{HttpResponse, OrderedHeaderName},
-            HttpEndpoint,
         },
     },
 };

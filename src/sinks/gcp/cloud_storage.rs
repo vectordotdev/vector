@@ -2,9 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::{
-    header::{HeaderName, HeaderValue},
-};
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -36,9 +34,9 @@ use crate::{
         },
         util::{
             BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint, RequestBuilder,
-            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
-            partitioner::KeyPartitioner, request_builder::EncodeResult,
-            service::TowerRequestConfigDefaults, timezone_to_offset,
+            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
     template::{ConfinementConfig, Template, TemplateParseError},
@@ -188,7 +186,7 @@ pub struct GcsSinkConfig {
     #[configurable(metadata(docs::examples = "http://localhost:9000"))]
     #[configurable(validation(format = "uri"))]
     #[serde(default = "default_endpoint")]
-    endpoint: String,
+    endpoint: HttpEndpoint,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -237,7 +235,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
-        endpoint: Default::default(),
+        endpoint: default_endpoint(),
         request: Default::default(),
         auth: Default::default(),
         tls: Default::default(),
@@ -266,7 +264,7 @@ impl GenerateConfig for GcsSinkConfig {
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
-        let base_url = HttpEndpoint::parse(&self.endpoint)?.append_path(&format!("{}/", self.bucket))?;
+        let base_url = self.endpoint.append_path(&format!("{}/", self.bucket))?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
         let healthcheck = build_healthcheck(

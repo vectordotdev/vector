@@ -103,7 +103,9 @@ impl GenerateConfig for SematextMetricsConfig {
 }
 
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
-    let uri = HttpEndpoint::parse(&endpoint)?.append_path("health")?.into_uri();
+    let uri = HttpEndpoint::parse(&endpoint)?
+        .append_path("health")?
+        .into_uri();
 
     let request = Request::get(uri)
         .body(Body::empty())
@@ -135,6 +137,7 @@ impl SinkConfig for SematextMetricsConfig {
         };
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
+        let endpoint = HttpEndpoint::parse(&endpoint)?;
         let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, client)?;
 
         Ok((sink, healthcheck))
@@ -149,7 +152,7 @@ impl SinkConfig for SematextMetricsConfig {
     }
 }
 
-fn write_uri(endpoint: &str) -> Result<Uri> {
+fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
     encode_uri(
         endpoint,
         "write",

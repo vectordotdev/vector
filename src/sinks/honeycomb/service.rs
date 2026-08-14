@@ -9,9 +9,9 @@ use super::config::HTTP_HEADER_HONEYCOMB;
 use crate::sinks::{
     HTTPRequestBuilderSnafu,
     util::{
+        HttpEndpoint,
         buffer::compression::Compression,
         http::{HttpRequest, HttpServiceRequestBuilder},
-        HttpEndpoint,
     },
 };
 

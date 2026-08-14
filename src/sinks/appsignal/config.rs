@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use futures::FutureExt;
 use http::{Request, header::AUTHORIZATION};
 use hyper::Body;
@@ -29,13 +30,15 @@ use crate::{
 
 /// Configuration for the `appsignal` sink.
 #[configurable_component(sink("appsignal", "Deliver log and metric event data to AppSignal."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 pub(super) struct AppsignalConfig {
     /// The URI for the AppSignal API to send data to.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// A valid app-level AppSignal Push API key.
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
@@ -74,8 +77,8 @@ pub(super) struct AppsignalConfig {
     retry_strategy: RetryStrategy,
 }
 
-pub(super) fn default_endpoint() -> String {
-    "https://appsignal-endpoint.net".to_string()
+pub(super) fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://appsignal-endpoint.net").unwrap()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -152,8 +155,13 @@ impl SinkConfig for AppsignalConfig {
     }
 }
 
-async fn healthcheck(uri: HttpEndpoint, push_api_key: String, client: HttpClient) -> crate::Result<()> {
-    let request = Request::get(uri.as_uri()).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
+async fn healthcheck(
+    uri: HttpEndpoint,
+    push_api_key: String,
+    client: HttpClient,
+) -> crate::Result<()> {
+    let request =
+        Request::get(uri.as_uri()).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
     match response.status() {
@@ -162,13 +170,13 @@ async fn healthcheck(uri: HttpEndpoint, push_api_key: String, client: HttpClient
     }
 }
 
-pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<HttpEndpoint> {
-    Ok(HttpEndpoint::parse(endpoint)?.append_path(path)?)
+pub fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
+    Ok(endpoint.append_path(path)?)
 }
 
 #[cfg(test)]
 mod test {
-    use super::{AppsignalConfig, endpoint_uri};
+    use super::{AppsignalConfig, HttpEndpoint, endpoint_uri};
 
     #[test]
     fn generate_config() {
@@ -177,7 +185,10 @@ mod test {
 
     #[test]
     fn endpoint_uri_with_path() {
-        let uri = endpoint_uri("https://appsignal-endpoint.net", "vector/events");
+        let uri = endpoint_uri(
+            &HttpEndpoint::parse("https://appsignal-endpoint.net").unwrap(),
+            "vector/events",
+        );
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"
@@ -186,7 +197,10 @@ mod test {
 
     #[test]
     fn endpoint_uri_with_trailing_slash() {
-        let uri = endpoint_uri("https://appsignal-endpoint.net/", "vector/events");
+        let uri = endpoint_uri(
+            &HttpEndpoint::parse("https://appsignal-endpoint.net/").unwrap(),
+            "vector/events",
+        );
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"

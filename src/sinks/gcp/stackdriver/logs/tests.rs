@@ -27,6 +27,7 @@ use crate::{
         },
         prelude::*,
         util::{
+            HttpEndpoint,
             encoding::Encoder as _,
             http::{HttpRequest, HttpServiceRequestBuilder},
         },
@@ -67,7 +68,7 @@ async fn component_spec_compliance() {
     // Metadata API, which we clearly don't have in unit tests. :)
     config.auth.credentials_path = None;
     config.auth.api_key = Some("fake".to_string().into());
-    config.endpoint = mock_endpoint.to_string();
+    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -216,7 +217,7 @@ fn severity_remaps_strings() {
 
 #[tokio::test]
 async fn correct_request() {
-    let uri: Uri = default_endpoint().parse().unwrap();
+    let uri: Uri = default_endpoint().into_uri();
 
     let transformer = Transformer::default();
     let encoder = StackdriverLogsEncoder::new(

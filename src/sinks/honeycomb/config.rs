@@ -34,7 +34,7 @@ pub struct HoneycombConfig {
         docs::examples = "https://api.eu1.honeycomb.io",
     ))]
     #[configurable(validation(format = "uri"))]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The API key that is used to authenticate against Honeycomb.
     #[configurable(metadata(docs::examples = "${HONEYCOMB_API_KEY}"))]
@@ -77,8 +77,9 @@ pub struct HoneycombConfig {
     pub retry_strategy: RetryStrategy,
 }
 
-fn default_endpoint() -> String {
-    "https://api.honeycomb.io".to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://api.honeycomb.io")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -154,7 +155,9 @@ impl SinkConfig for HoneycombConfig {
 
 impl HoneycombConfig {
     fn build_uri(&self) -> crate::Result<HttpEndpoint> {
-        Ok(HttpEndpoint::parse(&self.endpoint)?.append_path(&format!("1/batch/{}", self.dataset))?)
+        Ok(self
+            .endpoint
+            .append_path(&format!("1/batch/{}", self.dataset))?)
     }
 }
 

@@ -233,12 +233,32 @@ pub enum HttpEndpointError {
 /// through `HttpClient` need this invariant, since `HttpClient` rejects such
 /// URIs at request time, deferring a pure configuration error to runtime.
 ///
+/// As a configuration type it deserializes from a string, so an invalid
+/// endpoint is rejected at config load time with the config path in the error.
+///
 /// Path composition goes through [`HttpEndpoint::append_path`], which
 /// manipates `Uri` parts directly instead of string-concatenating and
 /// re-parsing, so the scheme and authority are preserved and the result is
 /// still an absolute `http(s)` URL.
+#[configurable_component]
+#[configurable(title = "An absolute http(s) URL.", description = "")]
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[serde(try_from = "String", into = "String")]
 pub struct HttpEndpoint(Uri);
+
+impl TryFrom<String> for HttpEndpoint {
+    type Error = HttpEndpointError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::parse(&value)
+    }
+}
+
+impl From<HttpEndpoint> for String {
+    fn from(value: HttpEndpoint) -> Self {
+        value.to_string()
+    }
+}
 
 impl HttpEndpoint {
     /// Requires `uri` to be an absolute `http`/`https` URL.
@@ -292,14 +312,10 @@ impl HttpEndpoint {
         } else {
             format!("{base_path}/{path}")
         };
-        parts.path_and_query = Some(
-            joined
-                .parse::<PathAndQuery>()
-                .context(InvalidPathSnafu {
-                    endpoint: self.0.to_string(),
-                    path: joined,
-                })?,
-        );
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
+            endpoint: self.0.to_string(),
+            path: joined,
+        })?);
         let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
             endpoint: self.0.to_string(),
         })?;
@@ -393,8 +409,12 @@ mod tests {
             "http://127.0.0.1:9000/endpoint?query=1",
             "https://user:pass@example.com/path",
         ] {
-            let endpoint = HttpEndpoint::parse(endpoint).expect("should accept absolute http(s) URL");
-            assert!(matches!(endpoint.as_uri().scheme_str(), Some("http" | "https")));
+            let endpoint =
+                HttpEndpoint::parse(endpoint).expect("should accept absolute http(s) URL");
+            assert!(matches!(
+                endpoint.as_uri().scheme_str(),
+                Some("http" | "https")
+            ));
             assert!(endpoint.as_uri().authority().is_some());
         }
     }
@@ -460,7 +480,10 @@ mod tests {
             .unwrap()
             .append_path("sub/path")
             .unwrap();
-        assert_eq!(appended.to_string(), "https://user:pass@example.com:8088/base/sub/path");
+        assert_eq!(
+            appended.to_string(),
+            "https://user:pass@example.com:8088/base/sub/path"
+        );
         assert!(matches!(appended.as_uri().scheme_str(), Some("https")));
     }
 }
