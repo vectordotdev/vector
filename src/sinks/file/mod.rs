@@ -29,7 +29,7 @@ use vector_lib::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
     json_size::JsonSize,
     partition::Partitioner,
-    stream::{BatcherSettings, batcher::limiter::ItemBatchSize},
+    stream::BatcherSettings,
 };
 
 use crate::{
@@ -42,7 +42,7 @@ use crate::{
         FilePathOutsideBaseDirError, TemplateRenderingError,
     },
     sinks::util::{
-        BatchConfig, RealtimeSizeBasedDefaultBatchSettings, SinkBuilderExt, StreamSink,
+        BatchConfig, RealtimeSizeBasedDefaultBatchSettings, StreamSink,
         path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
@@ -356,34 +356,99 @@ impl FileSink {
         let partitioner = FilePathPartitioner {
             path: self.path.clone(),
         };
-        // Copy batch_settings so the closure below doesn't hold a borrow on `self`
-        // while the select loop needs `&mut self` for process_batch.
         let batch_settings = self.batch_settings;
-        let mut batched =
-            input.batched_partitioned(partitioner, batch_settings.timeout, move |_| {
-                batch_settings.as_item_size_config(FileBatchSizer)
-            });
+        // Per-path event buffers with a max-age deadline (absolute Instant).
+        // The deadline is set when the first event for a path arrives and is
+        // never reset, so `batch.timeout` is a true maximum batch age.
+        let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, tokio::time::Instant)> =
+            std::collections::HashMap::new();
 
-        // Batches for different partitions are independent and could be written
-        // concurrently (tokio::join_all across partitions), but process_batch requires
-        // &mut self for the file-handle map. A follow-up could lift the handle map into
-        // an Arc<Mutex<ExpiringHashMap>> to enable parallel partition writes.
+        tokio::pin!(input);
+
         loop {
+            // Earliest flush deadline across all paths.
+            let flush_deadline = buffers.values().map(|(_, deadline)| *deadline).min();
+            let input_next = input.next();
+
             tokio::select! {
-                batch = batched.next() => {
-                    match batch {
-                        Some((None, events)) => {
-                            // Path template rendering failed — partitioner already emitted
-                            // the error; drain finalizers so upstream gets delivery status.
-                            for event in events {
-                                event.metadata().update_status(EventStatus::Errored);
+                event = input_next => {
+                    match event {
+                        Some(event) => {
+                            let path = match partitioner.partition(&event) {
+                                Some(raw_path) => {
+                                    if let Some(ref confinement) = self.confinement {
+                                        match confinement.confine(&bytes_to_path(&raw_path)) {
+                                            Ok(confined) => {
+                                                // Convert the normalised PathBuf back to Bytes
+                                                // for use as the buffer key.
+                                                #[cfg(unix)]
+                                                {
+                                                    use std::os::unix::ffi::OsStrExt;
+                                                    Bytes::copy_from_slice(
+                                                        confined.as_os_str().as_bytes(),
+                                                    )
+                                                }
+                                                #[cfg(not(unix))]
+                                                {
+                                                    Bytes::from(
+                                                        confined
+                                                            .to_string_lossy()
+                                                            .as_bytes()
+                                                            .to_vec(),
+                                                    )
+                                                }
+                                            }
+                                            Err(error) => {
+                                                let rendered = bytes_to_path(&raw_path);
+                                                let base = confinement.base_dir().to_path_buf();
+                                                emit!(FilePathOutsideBaseDirError {
+                                                    path: &rendered,
+                                                    base_dir: &base,
+                                                    error,
+                                                });
+                                                event.metadata()
+                                                    .update_status(EventStatus::Errored);
+                                                continue;
+                                            }
+                                        }
+                                    } else {
+                                        raw_path
+                                    }
+                                }
+                                None => {
+                                    event.metadata().update_status(EventStatus::Errored);
+                                    continue;
+                                }
+                            };
+                            let event_size = event.estimated_json_encoded_size_of().get();
+                            if let Some((events, _)) = buffers.get_mut(&path) {
+                                let current_size: usize = events.iter()
+                                    .map(|e| e.estimated_json_encoded_size_of().get())
+                                    .sum();
+                                if current_size + event_size > batch_settings.size_limit
+                                    || events.len() >= batch_settings.item_limit
+                                {
+                                    // Size limit reached — flush and start a new batch.
+                                    let (old_events, _) = buffers.remove(&path).unwrap();
+                                    self.process_batch(path.clone(), old_events).await;
+                                    let deadline = tokio::time::Instant::now()
+                                        + batch_settings.timeout;
+                                    buffers.insert(path, (vec![event], deadline));
+                                } else {
+                                    events.push(event);
+                                }
+                            } else {
+                                let deadline = tokio::time::Instant::now()
+                                    + batch_settings.timeout;
+                                buffers.insert(path, (vec![event], deadline));
                             }
                         }
-                        Some((Some(path), events)) => {
-                            self.process_batch(path, events).await;
-                        }
                         None => {
-                            debug!(message = "Receiver exhausted, terminating the processing loop.");
+                            // Stream exhausted — flush all remaining buffers, then close files.
+                            debug!(message = "Receiver exhausted, flushing remaining buffers.");
+                            for (path, (events, _)) in buffers.drain() {
+                                self.process_batch(path, events).await;
+                            }
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
                                 if let Err(error) = file.close().await {
@@ -400,6 +465,20 @@ impl FileSink {
                             }
                             emit!(FileOpen { count: 0 });
                             break;
+                        }
+                    }
+                }
+                _ = tokio::time::sleep_until(
+                    flush_deadline.unwrap_or(tokio::time::Instant::now() + Duration::from_secs(3600))
+                ), if flush_deadline.is_some() => {
+                    let now = tokio::time::Instant::now();
+                    let expired: Vec<Bytes> = buffers.iter()
+                        .filter(|(_, (_, deadline))| *deadline <= now)
+                        .map(|(path, _)| path.clone())
+                        .collect();
+                    for path in expired {
+                        if let Some((events, _)) = buffers.remove(&path) {
+                            self.process_batch(path, events).await;
                         }
                     }
                 }
@@ -745,15 +824,6 @@ impl Partitioner for FilePathPartitioner {
                 None
             }
         }
-    }
-}
-
-#[derive(Clone)]
-struct FileBatchSizer;
-
-impl ItemBatchSize<Event> for FileBatchSizer {
-    fn size(&self, event: &Event) -> usize {
-        event.estimated_json_encoded_size_of().get()
     }
 }
 
