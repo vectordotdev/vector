@@ -208,8 +208,9 @@ pub async fn run_nats_jetstream(
 
             match create_consumer_stream(&connection, js_config).await {
                 Ok(m) => {
+                    // Don't reset backoff on construction; a built stream hasn't pulled
+                    // yet. Backoff is reset only after a message is successfully pulled.
                     messages = m;
-                    backoff.reset();
                     break;
                 }
                 Err(err) => {
