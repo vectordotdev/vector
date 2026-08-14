@@ -484,7 +484,9 @@ async fn s3_flush_on_exhaustion() {
 
 #[tokio::test]
 async fn s3_avro_ocf_insert_message() {
-    use vector_lib::codecs::encoding::format::AvroSerializerOptions;
+    use vector_lib::codecs::encoding::format::{
+        AvroOcfSerializerConfig, AvroSerializerOptions,
+    };
     use vrl::event_path;
 
     let cx = SinkContext::default();
@@ -492,14 +494,16 @@ async fn s3_avro_ocf_insert_message() {
     create_bucket(&bucket, false).await;
 
     let config = S3SinkConfig {
-        batch_encoding: Some(S3BatchEncoding::AvroOcf(AvroSerializerOptions {
-            schema: r#"{
-                "type": "record",
-                "name": "Log",
-                "fields": [{"name": "message", "type": "string"}]
-            }"#
-            .to_owned(),
-        })),
+        batch_encoding: Some(S3BatchEncoding::AvroOcf(AvroOcfSerializerConfig::new(
+            AvroSerializerOptions {
+                schema: r#"{
+                    "type": "record",
+                    "name": "Log",
+                    "fields": [{"name": "message", "type": "string"}]
+                }"#
+                .to_owned(),
+            },
+        ))),
         ..config(&bucket, 100, 5.0)
     };
 

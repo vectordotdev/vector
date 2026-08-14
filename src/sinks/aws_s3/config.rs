@@ -5,7 +5,7 @@ use vector_lib::codecs::BatchEncoder;
 use vector_lib::codecs::encoding::format::ParquetSerializerConfig;
 use vector_lib::codecs::encoding::{
     BatchSerializerConfig,
-    format::{AvroOcfSerializerConfig, AvroSerializerOptions},
+    format::AvroOcfSerializerConfig,
 };
 use vector_lib::{
     TimeZone,
@@ -53,7 +53,7 @@ use crate::{
 pub enum S3BatchEncoding {
     /// Encodes events as a complete Avro Object Container File (OCF).
     #[serde(rename = "avro_ocf")]
-    AvroOcf(AvroSerializerOptions),
+    AvroOcf(AvroOcfSerializerConfig),
 
     /// Encodes events in Apache Parquet columnar format.
     #[cfg(feature = "codecs-parquet")]
@@ -63,9 +63,7 @@ pub enum S3BatchEncoding {
 impl S3BatchEncoding {
     fn serializer_config(&self) -> BatchSerializerConfig {
         match self {
-            Self::AvroOcf(options) => {
-                BatchSerializerConfig::AvroOcf(AvroOcfSerializerConfig::new(options.clone()))
-            }
+            Self::AvroOcf(config) => BatchSerializerConfig::AvroOcf(config.clone()),
             #[cfg(feature = "codecs-parquet")]
             Self::Parquet(config) => BatchSerializerConfig::Parquet(config.clone()),
         }

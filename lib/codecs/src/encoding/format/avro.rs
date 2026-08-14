@@ -80,25 +80,58 @@ impl Encoder<Event> for AvroSerializer {
     }
 }
 
+/// Compression algorithm applied to Avro Object Container File data blocks.
+#[configurable_component]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[serde(tag = "algorithm", rename_all = "snake_case")]
+pub enum AvroOcfCompression {
+    /// Writes uncompressed OCF blocks.
+    #[default]
+    None,
+    /// Writes OCF blocks compressed with the Avro Deflate codec.
+    Deflate,
+    /// Writes OCF blocks compressed with the Avro Snappy codec.
+    Snappy,
+}
+
+impl From<AvroOcfCompression> for apache_avro::Codec {
+    fn from(compression: AvroOcfCompression) -> Self {
+        match compression {
+            AvroOcfCompression::None => Self::Null,
+            AvroOcfCompression::Deflate => Self::Deflate(apache_avro::DeflateSettings::default()),
+            AvroOcfCompression::Snappy => Self::Snappy,
+        }
+    }
+}
+
 /// Config used to build an `AvroOcfSerializer`.
 #[configurable_component]
 #[derive(Debug, Clone)]
 pub struct AvroOcfSerializerConfig {
-    /// Options for the Avro OCF serializer.
+    /// Avro schema options used to encode OCF records.
+    #[serde(flatten)]
     pub avro: AvroSerializerOptions,
+
+    /// Compression codec applied to OCF data blocks.
+    #[serde(default)]
+    #[configurable(derived)]
+    pub compression: AvroOcfCompression,
 }
 
 impl AvroOcfSerializerConfig {
     /// Creates a new `AvroOcfSerializerConfig`.
     pub const fn new(options: AvroSerializerOptions) -> Self {
-        Self { avro: options }
+        Self {
+            avro: options,
+            compression: AvroOcfCompression::None,
+        }
     }
 
     /// Build the `AvroOcfSerializer` from this configuration.
     pub fn build(&self) -> Result<AvroOcfSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro OCF serializer: {error}"))?;
-        Ok(AvroOcfSerializer::new(schema))
+        Ok(AvroOcfSerializer::new(schema, self.compression.into()))
     }
 
     /// The data type of events that are accepted by `AvroOcfSerializer`.
@@ -124,12 +157,16 @@ impl AvroOcfSerializerConfig {
 #[derive(Debug, Clone)]
 pub struct AvroOcfSerializer {
     schema: apache_avro::Schema,
+    compression: apache_avro::Codec,
 }
 
 impl AvroOcfSerializer {
     /// Creates a new `AvroOcfSerializer`.
-    pub const fn new(schema: apache_avro::Schema) -> Self {
-        Self { schema }
+    pub fn new(schema: apache_avro::Schema, compression: apache_avro::Codec) -> Self {
+        Self {
+            schema,
+            compression,
+        }
     }
 }
 
@@ -137,7 +174,11 @@ impl Encoder<Vec<Event>> for AvroOcfSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let mut writer = apache_avro::Writer::new(&self.schema, Vec::new());
+        let mut writer = apache_avro::Writer::with_codec(
+            &self.schema,
+            Vec::new(),
+            self.compression.clone(),
+        );
 
         for event in events {
             let log = event.into_log();
@@ -294,6 +335,45 @@ mod tests {
         let reader = apache_avro::Reader::new(result.as_ref()).unwrap();
         let records: Vec<_> = reader.collect::<Result<_, _>>().unwrap();
         assert_eq!(records.len(), 1, "Should decode exactly one record");
+    }
+
+    #[test]
+    fn serialize_avro_ocf_compression_variants_roundtrip() {
+        let variants = [
+            (AvroOcfCompression::None, "null"),
+            (AvroOcfCompression::Deflate, "deflate"),
+            (AvroOcfCompression::Snappy, "snappy"),
+        ];
+
+        for (compression, codec_name) in variants {
+            let config = AvroOcfSerializerConfig {
+                avro: AvroSerializerOptions {
+                    schema: schema_str(),
+                },
+                compression,
+            };
+            let mut serializer = config.build().unwrap();
+            let mut bytes = BytesMut::new();
+            serializer
+                .encode(
+                    vec![Event::Log(LogEvent::from(
+                        btreemap! { "foo" => Value::from("compressed") },
+                    ))],
+                    &mut bytes,
+                )
+                .unwrap();
+
+            assert!(
+                bytes.windows(codec_name.len()).any(|window| window == codec_name.as_bytes()),
+                "OCF header must advertise {codec_name} compression"
+            );
+
+            let records = apache_avro::Reader::new(bytes.as_ref())
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert_eq!(records.len(), 1, "round trip failed for {codec_name}");
+        }
     }
 
     #[test]
