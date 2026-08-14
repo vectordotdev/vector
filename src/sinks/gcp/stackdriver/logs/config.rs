@@ -24,7 +24,7 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
+            BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
@@ -310,7 +310,7 @@ impl SinkConfig for StackdriverConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let uri: Uri = self.endpoint.parse()?;
+        let uri = HttpEndpoint::parse(&self.endpoint)?.into_uri();
 
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
             uri: uri.clone(),

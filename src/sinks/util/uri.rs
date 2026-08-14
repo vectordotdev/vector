@@ -2,6 +2,7 @@ use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
+use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
 
 use crate::http::Auth;
@@ -196,6 +197,122 @@ pub fn protocol_endpoint(uri: Uri) -> (String, String) {
     )
 }
 
+/// Error returned when a configured endpoint cannot be used as an absolute HTTP URL.
+#[derive(Debug, Snafu)]
+pub enum HttpEndpointError {
+    #[snafu(display("endpoint `{endpoint}` is not a valid URI: {source}"))]
+    InvalidUri {
+        endpoint: String,
+        source: http::uri::InvalidUri,
+    },
+
+    #[snafu(display("endpoint `{endpoint}` has an invalid path `{path}`: {source}"))]
+    InvalidPath {
+        endpoint: String,
+        path: String,
+        source: http::uri::InvalidUri,
+    },
+
+    #[snafu(display("endpoint `{endpoint}` cannot be reassembled from its parts: {source}"))]
+    InvalidUriParts {
+        endpoint: String,
+        source: http::uri::InvalidUriParts,
+    },
+
+    #[snafu(display(
+        "endpoint must be an absolute http(s) URL, for example `https://example.com`; got `{endpoint}`"
+    ))]
+    NotAbsoluteHttp { endpoint: String },
+}
+
+/// A `Uri` proven to be an absolute `http`/`https` URL.
+///
+/// Constructing an `HttpEndpoint` is the only way to obtain one: both
+/// [`HttpEndpoint::new`] and [`HttpEndpoint::parse`] reject URIs without an
+/// `http`/`https` scheme or without an authority. Sinks that issue requests
+/// through `HttpClient` need this invariant, since `HttpClient` rejects such
+/// URIs at request time, deferring a pure configuration error to runtime.
+///
+/// Path composition goes through [`HttpEndpoint::append_path`], which
+/// manipates `Uri` parts directly instead of string-concatenating and
+/// re-parsing, so the scheme and authority are preserved and the result is
+/// still an absolute `http(s)` URL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HttpEndpoint(Uri);
+
+impl HttpEndpoint {
+    /// Requires `uri` to be an absolute `http`/`https` URL.
+    pub fn new(uri: Uri) -> Result<Self, HttpEndpointError> {
+        if matches!(uri.scheme_str(), Some("http" | "https")) && uri.authority().is_some() {
+            Ok(Self(uri))
+        } else {
+            Err(HttpEndpointError::NotAbsoluteHttp {
+                endpoint: uri.to_string(),
+            })
+        }
+    }
+
+    /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
+    pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
+        let uri = endpoint
+            .parse::<Uri>()
+            .context(InvalidUriSnafu { endpoint })?;
+        Self::new(uri)
+    }
+
+    /// Returns the underlying `Uri`.
+    pub const fn as_uri(&self) -> &Uri {
+        &self.0
+    }
+
+    /// Consumes the endpoint, returning the underlying `Uri`.
+    pub fn into_uri(self) -> Uri {
+        self.0
+    }
+
+    /// Appends `path` to this endpoint, preserving the scheme and authority.
+    ///
+    /// `path` may include a leading slash and a query. The existing query, if
+    /// any, is dropped (as with `UriSerde::append_path`), but the scheme and
+    /// authority are preserved and the result is still an absolute `http(s)` URL.
+    pub fn append_path(&self, path: &str) -> Result<Self, HttpEndpointError> {
+        if path.is_empty() {
+            return Ok(self.clone());
+        }
+        let mut parts = self.0.clone().into_parts();
+        let base_path = parts
+            .path_and_query
+            .as_ref()
+            .map(PathAndQuery::path)
+            .unwrap_or_default();
+        let joined = if base_path.is_empty() {
+            path.to_string()
+        } else if base_path.ends_with('/') {
+            format!("{base_path}{}", path.trim_start_matches('/'))
+        } else {
+            format!("{base_path}/{path}")
+        };
+        parts.path_and_query = Some(
+            joined
+                .parse::<PathAndQuery>()
+                .context(InvalidPathSnafu {
+                    endpoint: self.0.to_string(),
+                    path: joined,
+                })?,
+        );
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
+            endpoint: self.0.to_string(),
+        })?;
+        Self::new(uri)
+    }
+}
+
+impl fmt::Display for HttpEndpoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,5 +382,85 @@ mod tests {
             parse("gopher://example.net:123/path?query#frag,emt"),
             ("gopher".into(), "gopher://example.net:123/path".into())
         );
+    }
+
+    #[test]
+    fn http_endpoint_accepts_absolute_http_urls() {
+        for endpoint in [
+            "http://example.com",
+            "https://example.com",
+            "https://example.com:8088/services/collector",
+            "http://127.0.0.1:9000/endpoint?query=1",
+            "https://user:pass@example.com/path",
+        ] {
+            let endpoint = HttpEndpoint::parse(endpoint).expect("should accept absolute http(s) URL");
+            assert!(matches!(endpoint.as_uri().scheme_str(), Some("http" | "https")));
+            assert!(endpoint.as_uri().authority().is_some());
+        }
+    }
+
+    #[test]
+    fn http_endpoint_rejects_non_absolute_http_urls() {
+        for endpoint in [
+            // No scheme: `http::Uri` parses these as authority-form or as a path.
+            "example.com:8088",
+            "localhost:8080",
+            "/services/collector",
+            "",
+            // Absolute, but not a scheme `HttpClient` can dial.
+            "gopher://example.com",
+            "unix:///var/run/vector.sock",
+            // Scheme but no authority.
+            "http:///path",
+        ] {
+            assert!(
+                matches!(
+                    HttpEndpoint::parse(endpoint),
+                    Err(HttpEndpointError::NotAbsoluteHttp { .. })
+                        | Err(HttpEndpointError::InvalidUri { .. })
+                ),
+                "expected `{endpoint}` to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn http_endpoint_reports_unparseable_endpoints() {
+        let error = HttpEndpoint::parse("http://exa mple.com").unwrap_err();
+        assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
+    }
+
+    #[test]
+    fn http_endpoint_append_path_joins_without_string_concatenation() {
+        let base = HttpEndpoint::parse("https://example.com").unwrap();
+
+        assert_eq!(
+            base.append_path("vector/events").unwrap().to_string(),
+            "https://example.com/vector/events"
+        );
+        assert_eq!(
+            base.append_path("/api/v1/series").unwrap().to_string(),
+            "https://example.com/api/v1/series"
+        );
+        assert_eq!(
+            HttpEndpoint::parse("https://example.com/")
+                .unwrap()
+                .append_path("vector/events")
+                .unwrap()
+                .to_string(),
+            "https://example.com/vector/events"
+        );
+        // The query is carried in the appended path.
+        assert_eq!(
+            base.append_path("/write?db=mydb").unwrap().to_string(),
+            "https://example.com/write?db=mydb"
+        );
+        // The scheme and authority survive appending.
+        let appended = HttpEndpoint::parse("https://user:pass@example.com:8088/base")
+            .unwrap()
+            .append_path("sub/path")
+            .unwrap();
+        assert_eq!(appended.to_string(), "https://user:pass@example.com:8088/base/sub/path");
+        assert!(matches!(appended.as_uri().scheme_str(), Some("https")));
     }
 }

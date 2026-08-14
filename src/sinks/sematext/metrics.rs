@@ -25,7 +25,7 @@ use crate::{
         Healthcheck, HealthcheckError, VectorSink,
         influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
-            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, EncodedEvent, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
         },
@@ -103,7 +103,7 @@ impl GenerateConfig for SematextMetricsConfig {
 }
 
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
-    let uri = format!("{endpoint}/health");
+    let uri = HttpEndpoint::parse(&endpoint)?.append_path("health")?.into_uri();
 
     let request = Request::get(uri)
         .body(Body::empty())

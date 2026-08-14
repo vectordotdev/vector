@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use futures::FutureExt;
-use http::{StatusCode, Uri};
+use http::StatusCode;
 use hyper::Body;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
@@ -12,7 +12,7 @@ use crate::{
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
-        util::retries::{RetryAction, RetryLogic},
+        util::{HttpEndpoint, retries::{RetryAction, RetryLogic}},
     },
 };
 
@@ -108,11 +108,11 @@ pub enum GcsError {
 pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
-    base_url: String,
+    base_url: HttpEndpoint,
     auth: GcpAuthenticator,
 ) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
-        let uri = base_url.parse::<Uri>()?;
+        let uri = base_url.into_uri();
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
         auth.apply(&mut request);

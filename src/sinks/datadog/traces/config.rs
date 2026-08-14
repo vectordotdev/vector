@@ -1,8 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use http::Uri;
 use indoc::indoc;
-use snafu::ResultExt;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -19,7 +17,7 @@ use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        Healthcheck, UriParseSnafu, VectorSink,
+        Healthcheck, VectorSink,
         datadog::{
             DatadogCommonConfig, LocalDatadogCommonConfig,
             traces::{
@@ -28,7 +26,7 @@ use crate::{
             },
         },
         util::{
-            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             service::ServiceBuilderExt,
         },
     },
@@ -94,12 +92,12 @@ pub enum DatadogTracesEndpoint {
 /// Store traces & APM stats endpoints actual URIs.
 #[derive(Clone)]
 pub struct DatadogTracesEndpointConfiguration {
-    traces_endpoint: Uri,
-    stats_endpoint: Uri,
+    traces_endpoint: HttpEndpoint,
+    stats_endpoint: HttpEndpoint,
 }
 
 impl DatadogTracesEndpointConfiguration {
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> Uri {
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> HttpEndpoint {
         match endpoint {
             DatadogTracesEndpoint::Traces => self.traces_endpoint.clone(),
             DatadogTracesEndpoint::APMStats => self.stats_endpoint.clone(),
@@ -172,7 +170,7 @@ impl DatadogTracesConfig {
             request_builder,
             batcher_settings,
             shutdown,
-            self.get_protocol(dd_common),
+            self.get_protocol(dd_common)?,
         );
 
         // Send the APM stats payloads independently of the sink framework.
@@ -205,12 +203,13 @@ impl DatadogTracesConfig {
         Ok(HttpClient::new(tls_settings, proxy)?)
     }
 
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        build_uri(&self.get_base_uri(dd_common), "")
-            .unwrap()
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
+        let endpoint = HttpEndpoint::parse(&self.get_base_uri(dd_common))?;
+        Ok(endpoint
+            .as_uri()
             .scheme_str()
             .unwrap_or("http")
-            .to_string()
+            .to_string())
     }
 }
 
@@ -236,11 +235,8 @@ impl SinkConfig for DatadogTracesConfig {
     }
 }
 
-fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{host}{endpoint}")
-        .parse::<Uri>()
-        .context(UriParseSnafu)?;
-    Ok(result)
+fn build_uri(host: &str, endpoint: &str) -> crate::Result<HttpEndpoint> {
+    Ok(HttpEndpoint::parse(host)?.append_path(endpoint)?)
 }
 
 #[cfg(test)]

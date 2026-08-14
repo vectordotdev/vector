@@ -5,7 +5,7 @@ use http::{Request, Uri};
 use hyper::Body;
 use indoc::indoc;
 use serde_json::{Value, json};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use vector_lib::configurable::configurable_component;
 
@@ -16,10 +16,11 @@ use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     http::HttpClient,
     sinks::{
-        Healthcheck, UriParseSnafu, VectorSink,
+        Healthcheck, VectorSink,
         gcs_common::config::healthcheck_response,
         util::{
-            BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BoxedRawValue, HttpEndpoint, JsonArrayBuffer, SinkBatchSettings,
+            TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },
@@ -155,7 +156,7 @@ impl SinkConfig for PubsubConfig {
 
 struct PubsubSink {
     auth: GcpAuthenticator,
-    uri_base: String,
+    uri_base: HttpEndpoint,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
@@ -165,10 +166,10 @@ impl PubsubSink {
         // We only need to load the credentials if we are not targeting an emulator.
         let auth = config.auth.build(Scope::PubSub).await?;
 
-        let uri_base = format!(
-            "{}/v1/projects/{}/topics/{}",
-            config.endpoint, config.project, config.topic,
-        );
+        let uri_base = HttpEndpoint::parse(&config.endpoint)?.append_path(&format!(
+            "/v1/projects/{}/topics/{}",
+            config.project, config.topic,
+        ))?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
@@ -183,8 +184,7 @@ impl PubsubSink {
     }
 
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
-        let uri = format!("{}{}", self.uri_base, suffix);
-        let mut uri = uri.parse::<Uri>().context(UriParseSnafu)?;
+        let mut uri = self.uri_base.append_path(suffix)?.into_uri();
         self.auth.apply_uri(&mut uri);
         Ok(uri)
     }

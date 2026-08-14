@@ -1,5 +1,5 @@
 use futures::FutureExt;
-use http::{Request, Uri, header::AUTHORIZATION};
+use http::{Request, header::AUTHORIZATION};
 use hyper::Body;
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -17,10 +17,11 @@ use crate::{
     codecs::Transformer,
     http::HttpClient,
     sinks::{
-        BuildError, Healthcheck, HealthcheckError, VectorSink,
+        Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},
         util::{
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
@@ -151,8 +152,8 @@ impl SinkConfig for AppsignalConfig {
     }
 }
 
-async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
-    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
+async fn healthcheck(uri: HttpEndpoint, push_api_key: String, client: HttpClient) -> crate::Result<()> {
+    let request = Request::get(uri.as_uri()).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
     match response.status() {
@@ -161,16 +162,8 @@ async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crat
     }
 }
 
-pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<Uri> {
-    let uri = if endpoint.ends_with('/') {
-        format!("{endpoint}{path}")
-    } else {
-        format!("{endpoint}/{path}")
-    };
-    match uri.parse::<Uri>() {
-        Ok(u) => Ok(u),
-        Err(e) => Err(Box::new(BuildError::UriParseError { source: e })),
-    }
+pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<HttpEndpoint> {
+    Ok(HttpEndpoint::parse(endpoint)?.append_path(path)?)
 }
 
 #[cfg(test)]

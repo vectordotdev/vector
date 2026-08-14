@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http::{Request, StatusCode, Uri};
+use http::{Request, StatusCode};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
@@ -15,7 +15,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            BatchConfig, BoxedRawValue,
+            BatchConfig, BoxedRawValue, HttpEndpoint,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
@@ -153,18 +153,17 @@ impl SinkConfig for HoneycombConfig {
 }
 
 impl HoneycombConfig {
-    fn build_uri(&self) -> crate::Result<Uri> {
-        let uri = format!(
-            "{}/1/batch/{}",
-            self.endpoint.trim_end_matches('/'),
-            self.dataset
-        );
-        uri.parse::<Uri>().map_err(Into::into)
+    fn build_uri(&self) -> crate::Result<HttpEndpoint> {
+        Ok(HttpEndpoint::parse(&self.endpoint)?.append_path(&format!("1/batch/{}", self.dataset))?)
     }
 }
 
-async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> crate::Result<()> {
-    let request = Request::post(uri).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
+async fn healthcheck(
+    uri: HttpEndpoint,
+    api_key: SensitiveString,
+    client: HttpClient,
+) -> crate::Result<()> {
+    let request = Request::post(uri.as_uri()).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();

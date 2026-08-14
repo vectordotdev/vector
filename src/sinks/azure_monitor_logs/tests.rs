@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     event::LogEvent,
-    sinks::{prelude::*, util::encoding::Encoder},
+    sinks::{prelude::*, util::{encoding::Encoder, HttpEndpoint}},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -37,7 +37,7 @@ async fn component_spec_compliance() {
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config
-        .build_inner(context, mock_endpoint.try_into().unwrap())
+        .build_inner(context, HttpEndpoint::new(mock_endpoint).unwrap())
         .await
         .unwrap();
 
@@ -184,7 +184,7 @@ async fn correct_request() {
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config
-        .build_inner(context, mock_endpoint.try_into().unwrap())
+        .build_inner(context, HttpEndpoint::new(mock_endpoint).unwrap())
         .await
         .unwrap();
 

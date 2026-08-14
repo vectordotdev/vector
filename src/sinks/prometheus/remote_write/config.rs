@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use http::{HeaderValue, Uri, header::AUTHORIZATION};
-use snafu::prelude::*;
 
 #[cfg(feature = "aws-core")]
 use super::Errors;
@@ -12,13 +11,13 @@ use super::{
 use crate::{
     http::HttpClient,
     sinks::{
-        UriParseSnafu,
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
             auth::Auth,
             http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
+            HttpEndpoint,
         },
     },
     template::ConfinementConfig,
@@ -197,7 +196,7 @@ impl SinkConfig for RemoteWriteConfig {
             })
             .transpose()?;
 
-        let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
+        let endpoint = HttpEndpoint::parse(&self.endpoint)?;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let request_settings = self.request.tower.into_settings();
         let validated_headers = Arc::new(validate_headers(
@@ -242,7 +241,7 @@ impl SinkConfig for RemoteWriteConfig {
 
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
-            None => endpoint.clone(),
+            None => endpoint.as_uri().clone(),
         };
 
         let healthcheck = healthcheck(

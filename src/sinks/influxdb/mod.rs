@@ -7,7 +7,6 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use snafu::ResultExt;
 use tower::Service;
 use vector_lib::{
     configurable::configurable_component,
@@ -16,6 +15,7 @@ use vector_lib::{
 };
 
 use crate::http::HttpClient;
+use crate::sinks::util::HttpEndpoint;
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -366,17 +366,13 @@ pub(in crate::sinks) fn encode_uri(
         }
     }
 
-    let mut url = if endpoint.ends_with('/') {
-        format!("{}{}?{}", endpoint, path, serializer.finish())
+    let query = serializer.finish();
+    let path_and_query = if query.is_empty() {
+        path.to_string()
     } else {
-        format!("{}/{}?{}", endpoint, path, serializer.finish())
+        format!("{path}?{query}")
     };
-
-    if url.ends_with('?') {
-        url.pop();
-    }
-
-    Ok(url.parse::<Uri>().context(super::UriParseSnafu)?)
+    Ok(HttpEndpoint::parse(endpoint)?.append_path(&path_and_query)?.into_uri())
 }
 
 #[cfg(test)]
