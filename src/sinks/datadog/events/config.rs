@@ -128,7 +128,10 @@ impl ValidatedSink for DatadogEventsConfig {
             .site
             .clone()
             .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
-        Self::events_endpoint(self.dd_common.endpoint.as_deref(), &site)?;
+        let uri = Self::events_endpoint(self.dd_common.endpoint.as_deref(), &site)?;
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err("Datadog Events endpoint must be an absolute http(s) URL".into());
+        }
         let request_settings = self.request.into_settings();
         Ok(ValidatedEvents { request_settings })
     }
@@ -186,6 +189,19 @@ mod tests {
     fn validate_rejects_malformed_endpoint() {
         let config = DatadogEventsConfig {
             dd_common: LocalDatadogCommonConfig::new(Some("not a uri".to_string()), None, None),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_scheme() {
+        let config = DatadogEventsConfig {
+            dd_common: LocalDatadogCommonConfig::new(
+                Some("localhost:8080".to_string()),
+                None,
+                None,
+            ),
             ..Default::default()
         };
         assert!(config.validate().is_err());

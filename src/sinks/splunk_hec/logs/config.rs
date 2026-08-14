@@ -202,7 +202,18 @@ impl HecLogsSinkConfig {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
 
-        self.endpoint.parse::<http::Uri>()?;
+        let endpoint = self.endpoint.parse::<http::Uri>()?;
+        if !matches!(endpoint.scheme_str(), Some("http" | "https"))
+            || endpoint.authority().is_none()
+        {
+            return Err(
+                format!(
+                    "endpoint must be an absolute http(s) URL, e.g. `https://hec.splunk.com:8088`; got `{}`",
+                    self.endpoint
+                )
+                .into(),
+            );
+        }
 
         let index = self
             .index
@@ -420,6 +431,34 @@ mod tests {
         let config = HecLogsSinkConfig {
             default_token: "token".to_string().into(),
             endpoint: "not a uri".to_string(),
+            host_key: None,
+            indexed_fields: vec![],
+            index: None,
+            sourcetype: None,
+            source: None,
+            encoding: JsonSerializerConfig::default().into(),
+            compression: Compression::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            timestamp_nanos_key: None,
+            timestamp_key: None,
+            auto_extract_timestamp: None,
+            endpoint_target: EndpointTarget::Event,
+            confinement: Default::default(),
+        };
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        use crate::config::ValidatedSink;
+
+        let config = HecLogsSinkConfig {
+            default_token: "token".to_string().into(),
+            endpoint: "splunk".to_string(),
             host_key: None,
             indexed_fields: vec![],
             index: None,

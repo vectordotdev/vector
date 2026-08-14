@@ -247,7 +247,10 @@ impl ValidatedSink for DatadogTracesConfig {
             .clone()
             .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
         let base = Self::traces_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
-        base.parse::<Uri>()?;
+        let uri = base.parse::<Uri>()?;
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err("Datadog Traces endpoint must be an absolute http(s) URL".into());
+        }
 
         Ok(ValidatedTraces { batcher_settings })
     }
@@ -297,6 +300,19 @@ mod test {
         let config = DatadogTracesConfig {
             local_dd_common: LocalDatadogCommonConfig::new(
                 Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_scheme() {
+        let config = DatadogTracesConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("localhost:8080".to_string()),
                 None,
                 None,
             ),

@@ -225,7 +225,10 @@ impl ValidatedSink for DatadogMetricsConfig {
             .clone()
             .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
         let base = Self::metrics_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
-        base.parse::<Uri>()?;
+        let uri = base.parse::<Uri>()?;
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err("Datadog Metrics endpoint must be an absolute http(s) URL".into());
+        }
 
         Ok(ValidatedMetrics {
             batcher_settings,
@@ -404,6 +407,19 @@ mod tests {
         let config = DatadogMetricsConfig {
             local_dd_common: LocalDatadogCommonConfig::new(
                 Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_scheme() {
+        let config = DatadogMetricsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("localhost:8080".to_string()),
                 None,
                 None,
             ),

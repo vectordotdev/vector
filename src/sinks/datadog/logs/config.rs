@@ -19,7 +19,7 @@ use crate::{
     sinks::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
         prelude::*,
-        util::http::RequestConfig,
+        util::http::{RequestConfig, validate_headers},
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -224,7 +224,19 @@ impl ValidatedSink for DatadogLogsConfig {
             .site
             .clone()
             .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
-        Self::logs_endpoint(self.local_dd_common.endpoint.as_deref(), &site)?;
+        let uri = Self::logs_endpoint(self.local_dd_common.endpoint.as_deref(), &site)?;
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+            return Err("Datadog Logs endpoint must be an absolute http(s) URL".into());
+        }
+
+        let request_headers = {
+            let mut request_headers = self.request.headers.clone();
+            if self.conforms_as_agent {
+                request_headers.insert(String::from("DD-PROTOCOL"), String::from("agent-json"));
+            }
+            request_headers
+        };
+        validate_headers(&request_headers)?;
 
         let batch = self
             .batch
@@ -262,8 +274,9 @@ mod test {
 
     use super::*;
     use crate::{
-        codecs::EncodingConfigWithFraming, components::validation::prelude::*,
-        config::ValidatedSink,
+        assert_downcast_matches, codecs::EncodingConfigWithFraming,
+        components::validation::prelude::*, config::ValidatedSink,
+        sinks::util::http::HeaderValidationError,
     };
 
     #[test]
@@ -290,6 +303,67 @@ mod test {
             ..Default::default()
         };
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_scheme() {
+        let config = DatadogLogsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("localhost:8080".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_valid_headers() {
+        let config = indoc::indoc! {r#"
+            default_api_key: "test_key"
+            request:
+              headers:
+                Auth: "token:thing_and-stuff"
+                X-Custom-Nonsense: "_%_{}_-_&_._`_|_~_!_#_&_$_"
+        "#};
+        let config: DatadogLogsConfig = serde_yaml::from_str(config).unwrap();
+
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_catches_bad_header_names() {
+        let config = indoc::indoc! {r#"
+            default_api_key: "test_key"
+            request:
+              headers:
+                "\x01": "bad"
+        "#};
+        let config: DatadogLogsConfig = serde_yaml::from_str(config).unwrap();
+
+        assert_downcast_matches!(
+            config.validate().unwrap_err(),
+            HeaderValidationError,
+            HeaderValidationError::InvalidHeaderName { .. }
+        );
+    }
+
+    #[test]
+    fn validate_catches_bad_header_values() {
+        let config = indoc::indoc! {r#"
+            default_api_key: "test_key"
+            request:
+              headers:
+                "X-Custom-Nonsense": "a\nb"
+        "#};
+        let config: DatadogLogsConfig = serde_yaml::from_str(config).unwrap();
+
+        assert_downcast_matches!(
+            config.validate().unwrap_err(),
+            HeaderValidationError,
+            HeaderValidationError::InvalidHeaderValue { .. }
+        );
     }
 
     #[test]

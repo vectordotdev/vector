@@ -182,7 +182,18 @@ impl ValidatedSink for HecMetricsSinkConfig {
     type Validated = ValidatedHecMetricsSink;
 
     fn validate(&self) -> crate::Result<ValidatedHecMetricsSink> {
-        self.endpoint.parse::<http::Uri>()?;
+        let endpoint = self.endpoint.parse::<http::Uri>()?;
+        if !matches!(endpoint.scheme_str(), Some("http" | "https"))
+            || endpoint.authority().is_none()
+        {
+            return Err(
+                format!(
+                    "endpoint must be an absolute http(s) URL, e.g. `https://hec.splunk.com:8088`; got `{}`",
+                    self.endpoint
+                )
+                .into(),
+            );
+        }
 
         let templated_field_keys =
             compute_templated_field_keys(&self.index, &self.source, &self.sourcetype);
@@ -337,6 +348,27 @@ mod tests {
             default_namespace: None,
             default_token: "token".to_string().into(),
             endpoint: "not a uri".to_string(),
+            host_key: config_host_key(),
+            index: None,
+            sourcetype: None,
+            source: None,
+            compression: Compression::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            confinement: Default::default(),
+        };
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        let config = HecMetricsSinkConfig {
+            default_namespace: None,
+            default_token: "token".to_string().into(),
+            endpoint: "splunk".to_string(),
             host_key: config_host_key(),
             index: None,
             sourcetype: None,

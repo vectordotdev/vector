@@ -368,13 +368,28 @@ impl ValidatedSink for AzureBlobSinkConfig {
         };
 
         // Parse the resolved connection string and container URL up front.
-        // Credential construction (shared key policy, token credential)
-        // remains in `build`.
+        // Token credential construction remains in `build`; the shared key
+        // policy is constructed here purely to validate the account key base64.
         let parsed_connection_string = ParsedConnectionString::parse(&connection_string)
             .map_err(|e| format!("Invalid connection string: {e}"))?;
         // Reject the deterministic conflict between credentials implied by the
         // connection string (SAS or Shared Key) and an explicit `auth`.
         validate_auth_conflict(&parsed_connection_string.auth(), &self.auth)?;
+        // Force the base64 decode of a Shared Key account key during validation so
+        // malformed keys are rejected up front rather than at build time.
+        if let Auth::SharedKey {
+            account_name,
+            account_key,
+        } = parsed_connection_string.auth()
+        {
+            SharedKeyAuthorizationPolicy::new(
+                account_name,
+                account_key,
+                // Use an Azurite-supported storage service version
+                String::from("2025-11-05"),
+            )
+            .map_err(|e| format!("Failed to create SharedKey policy: {e}"))?;
+        }
         let container_url = parsed_connection_string
             .container_url(&self.container_name)
             .map_err(|e| format!("Failed to build container URL: {e}"))?;
@@ -679,12 +694,29 @@ mod tests {
     fn validate_accepts_connection_string_with_creds_without_auth() {
         let config = test_config(
             Some(
-                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=base64key==;EndpointSuffix=core.windows.net",
+                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=;EndpointSuffix=core.windows.net",
             ),
             None,
         );
 
         config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validate_rejects_invalid_base64_account_key() {
+        let config = test_config(
+            Some(
+                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=base64key==;EndpointSuffix=core.windows.net",
+            ),
+            None,
+        );
+
+        let err = config.validate().expect_err("validation should fail");
+        assert!(
+            err.to_string()
+                .contains("Failed to create SharedKey policy"),
+            "unexpected error: {err}"
+        );
     }
 }
 
