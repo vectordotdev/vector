@@ -258,52 +258,54 @@ generated: components: sinks: aws_s3: configuration: {
 	}
 	batch_encoding: {
 		description: """
-			Batch encoding configuration for columnar formats.
+			Batch encoding configuration for columnar or file-based formats.
 
-			When set, events are encoded together as a batch in a columnar format (Parquet)
-			instead of the standard per-event framing-based encoding. The columnar format handles
-			its own internal compression, so the top-level `compression` setting is bypassed.
+			Supports `avro_ocf` (Avro Object Container File) and `parquet` codecs.
+			When set, each batch of events is written as a single self-contained file in the
+			chosen format. The top-level `compression` setting is bypassed for batch formats.
 			"""
 		required: false
 		type: object: options: {
 			codec: {
-				description: """
-					Encodes events in [Apache Parquet][apache_parquet] columnar format.
-
-					[apache_parquet]: https://parquet.apache.org/
-					"""
-				required: true
-				type: string: enum: parquet: """
-					Encodes events in [Apache Parquet][apache_parquet] columnar format.
-
-					[apache_parquet]: https://parquet.apache.org/
-					"""
+				description: "The codec to use for batch encoding events."
+				required:    true
+				type: string: enum: {
+					avro_ocf: "Encodes events as a complete Avro Object Container File (OCF)."
+					parquet:  "Encodes events in Apache Parquet columnar format."
+				}
 			}
 			compression: {
-				description: "Compression codec applied per column page inside the Parquet file."
+				description: "Compression codec applied to OCF data blocks."
 				required:    false
 				type: object: options: {
 					algorithm: {
-						description: "Compression codec applied per column page inside the Parquet file."
+						description: "The compression algorithm to use for the encoded batch file."
 						required:    false
 						type: string: {
-							default: "snappy"
+							default: "none"
 							enum: {
-								gzip:   "Gzip compression. Level must be between 1 and 9."
-								lz4:    "LZ4 raw compression"
-								none:   "No compression"
-								snappy: "Snappy compression (no level)."
-								zstd:   "Zstd compression. Level must be between 1 and 21."
+								deflate: "Uses Avro OCF Deflate compression."
+								gzip:    "Uses Gzip compression. Level must be between 1 and 9."
+								lz4:     "Uses LZ4 raw compression."
+								none:    "Writes uncompressed batch files."
+								snappy:  "Uses Snappy compression."
+								zstd:    "Uses Zstd compression. Level must be between 1 and 21."
 							}
 						}
 					}
 					level: {
-						description:   "Compression level (1–21). This is the range Vector supports; higher values compress more but are slower."
+						description:   "Compression level (1–21). Higher values compress more but are slower."
 						relevant_when: "algorithm = \"zstd\" or algorithm = \"gzip\""
 						required:      true
 						type: uint: {}
 					}
 				}
+			}
+			schema: {
+				description:   "The Avro schema definition in JSON format."
+				relevant_when: "codec = \"avro_ocf\""
+				required:      true
+				type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 			}
 			schema_file: {
 				description: """
@@ -312,12 +314,14 @@ generated: components: sinks: aws_s3: configuration: {
 					Required unless `schema_mode` is `auto_infer`. The file must contain a valid
 					Parquet message type definition.
 					"""
-				required: false
+				relevant_when: "codec = \"parquet\""
+				required:      false
 				type: string: {}
 			}
 			schema_mode: {
-				description: "Controls how events with fields not present in the schema are handled."
-				required:    false
+				description:   "Controls how events with fields not present in the schema are handled."
+				relevant_when: "codec = \"parquet\""
+				required:      false
 				type: string: {
 					default: "relaxed"
 					enum: {
@@ -385,7 +389,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"gzip",
+			"gzip"
 		]
 	}
 	content_type: {
@@ -429,7 +433,7 @@ generated: components: sinks: aws_s3: configuration: {
 				relevant_when: "codec = \"avro\""
 				required:      true
 				type: object: options: schema: {
-					description: "The Avro schema."
+					description: "The Avro schema definition in JSON format."
 					required:    true
 					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
@@ -884,7 +888,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"json",
+			"json"
 		]
 	}
 	filename_time_format: {
