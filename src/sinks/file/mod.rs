@@ -375,8 +375,7 @@ impl FileSink {
             let input_next = input.next();
 
             let next_timer_deadline = flush_deadlines.peek()
-                .map(|r| (r.0).0)
-                .copied();
+                .map(|&std::cmp::Reverse((d, _, _))| d);
 
             tokio::select! {
                 event = input_next => {
@@ -458,9 +457,6 @@ impl FileSink {
                                 );
                                 *generation += 1;
                             }
-                            // Reset the file-handle idle deadline so the file stays open while
-                            // events accumulate for this path.
-                            self.files.reset_at(&path, self.deadline_at());
                             // Flush immediately when the batch reaches the item or byte limit.
                             let needs_flush = buffers.get(&path).map_or(false, |(events, _)| {
                                 let total_size: usize = events.iter()
@@ -637,18 +633,21 @@ impl FileSink {
             self.files.get_mut(&path).unwrap()
         };
 
-        // Encode the entire batch into one buffer, then issue a single write_all per partition.
-        // This reduces write syscalls from O(events) to O(1) per batch.
-        let mut batch_buffer = BytesMut::new();
-        let mut succeeded: Vec<(EventFinalizers, JsonSize)> = Vec::with_capacity(events.len());
+        // Encode each event individually so we can write them one at a time.
+        // This ensures that if a write fails partway through (e.g. ENOSPC),
+        // events already written are acknowledged Delivered and only the
+        // remaining events are retried, avoiding silent duplicates.
+        let mut encoded: Vec<(BytesMut, EventFinalizers, JsonSize)> =
+            Vec::with_capacity(events.len());
 
         trace!(message = "Encoding batch.", batch_size = events.len(), path = ?path);
         for mut event in events {
             let event_size = event.estimated_json_encoded_size_of();
             let finalizers = event.take_finalizers();
             self.transformer.transform(&mut event);
-            match self.encoder.encode(event, &mut batch_buffer) {
-                Ok(()) => succeeded.push((finalizers, event_size)),
+            let mut buf = BytesMut::new();
+            match self.encoder.encode(event, &mut buf) {
+                Ok(()) => encoded.push((buf, finalizers, event_size)),
                 Err(error) => {
                     finalizers.update_status(EventStatus::Errored);
                     emit!(FileIoError {
@@ -662,37 +661,51 @@ impl FileSink {
             }
         }
 
-        if succeeded.is_empty() {
+        if encoded.is_empty() {
             return;
         }
 
-        let byte_size = batch_buffer.len();
-        match file.write_all(&batch_buffer).await {
-            Ok(()) => {
-                for (finalizers, event_size) in succeeded {
+        // Write each encoded event separately so a mid-batch failure does
+        // not retroactively erase acknowledgements for already-persisted records.
+        let n = encoded.len();
+        let mut total_bytes = 0usize;
+        for i in 0..n {
+            let (buf, finalizers, event_size) = encoded.remove(0);
+            match file.write_all(&buf).await {
+                Ok(()) => {
+                    total_bytes += buf.len();
                     finalizers.update_status(EventStatus::Delivered);
                     self.events_sent.emit(CountByteSize(1, event_size));
                 }
-                emit!(FileBytesSent {
-                    byte_size,
-                    file: String::from_utf8_lossy(&path),
-                    include_file_metric_tag: self.include_file_metric_tag,
-                });
-            }
-            Err(error) => {
-                let dropped_events = succeeded.len();
-                for (finalizers, _) in succeeded {
+                Err(error) => {
+                    // This event failed.  Mark all remaining encoded events as
+                    // Errored so they are retried instead of silently delivered.
                     finalizers.update_status(EventStatus::Errored);
+                    for (_, f, _) in encoded.drain(..) {
+                        f.update_status(EventStatus::Errored);
+                    }
+                    emit!(FileIoError {
+                        code: "failed_writing_file",
+                        message: "Failed to write the file.",
+                        error,
+                        path: &path,
+                        dropped_events: n - i,
+                    });
+                    emit!(FileBytesSent {
+                        byte_size: total_bytes,
+                        file: String::from_utf8_lossy(&path),
+                        include_file_metric_tag: self.include_file_metric_tag,
+                    });
+                    return;
                 }
-                emit!(FileIoError {
-                    code: "failed_writing_file",
-                    message: "Failed to write the file.",
-                    error,
-                    path: &path,
-                    dropped_events,
-                });
             }
         }
+
+        emit!(FileBytesSent {
+            byte_size: total_bytes,
+            file: String::from_utf8_lossy(&path),
+            include_file_metric_tag: self.include_file_metric_tag,
+        });
     }
 
     async fn should_truncate(&mut self, bytes_path: &BytesPath, path: &bytes::Bytes) -> bool {
