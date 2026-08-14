@@ -223,6 +223,9 @@ pub enum HttpEndpointError {
         "endpoint must be an absolute http(s) URL, for example `https://example.com`; got `{endpoint}`"
     ))]
     NotAbsoluteHttp { endpoint: String },
+
+    #[snafu(display("endpoint `{endpoint}` has an invalid port"))]
+    InvalidPort { endpoint: String },
 }
 
 /// A `Uri` proven to be an absolute `http`/`https` URL.
@@ -261,21 +264,27 @@ impl From<HttpEndpoint> for String {
 }
 
 impl HttpEndpoint {
-    /// Requires `uri` to be an absolute `http`/`https` URL with a host.
+    /// Requires `uri` to be an absolute `http`/`https` URL with a host and a
+    /// usable port.
     ///
     /// The authority check alone is not enough: `http://:8080` parses as a
-    /// valid `http::Uri` with an authority but an empty host, so the host is
-    /// checked explicitly.
+    /// valid `http::Uri` with an authority but an empty host, and
+    /// `http://localhost:notaport` parses with a nonempty host but a port that
+    /// cannot be dialed. Both are checked explicitly.
     pub fn new(uri: Uri) -> Result<Self, HttpEndpointError> {
-        if matches!(uri.scheme_str(), Some("http" | "https"))
-            && uri.host().is_some_and(|host| !host.is_empty())
-        {
-            Ok(Self(uri))
-        } else {
-            Err(HttpEndpointError::NotAbsoluteHttp {
+        let has_valid_scheme_and_host = matches!(uri.scheme_str(), Some("http" | "https"))
+            && uri.host().is_some_and(|host| !host.is_empty());
+        if !has_valid_scheme_and_host {
+            return Err(HttpEndpointError::NotAbsoluteHttp {
                 endpoint: uri.to_string(),
-            })
+            });
         }
+        if authority_has_invalid_port(&uri) {
+            return Err(HttpEndpointError::InvalidPort {
+                endpoint: uri.to_string(),
+            });
+        }
+        Ok(Self(uri))
     }
 
     /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
@@ -374,6 +383,35 @@ impl fmt::Display for HttpEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
+}
+
+/// Returns `true` if the URI's authority contains a port that is not a valid
+/// `u16`.
+///
+/// `http::Uri` accepts non-numeric ports (for example
+/// `http://localhost:notaport`), which `HttpClient` cannot dial. `Authority::port`
+/// returns `None` for both a missing port and an invalid one, so the raw
+/// authority is inspected instead.
+fn authority_has_invalid_port(uri: &Uri) -> bool {
+    let Some(authority) = uri.authority() else {
+        return false;
+    };
+    let auth = authority.as_str();
+    // Strip any userinfo (everything up to the last `@`).
+    let host_port = auth
+        .rsplit_once('@')
+        .map(|(_, host_port)| host_port)
+        .unwrap_or(auth);
+    // An IPv6 host is bracketed; the port follows the closing `]`.
+    let host_end = host_port.rfind(']').map_or(0, |i| i + 1);
+    let Some(host_port) = host_port.get(host_end..) else {
+        return false;
+    };
+    host_port.rfind(':').is_some_and(|i| {
+        host_port
+            .get(i + 1..)
+            .is_some_and(|port| port.parse::<u16>().is_err())
+    })
 }
 
 #[cfg(test)]
@@ -517,6 +555,9 @@ mod tests {
             // with `authority() == Some` and `host() == Some("")`.
             "http://:8080",
             "http://:8080/path",
+            // A non-numeric port parses with a nonempty host but cannot be dialed.
+            "http://localhost:notaport",
+            "https://example.com:notaport/path",
         ] {
             assert!(
                 matches!(
@@ -524,6 +565,7 @@ mod tests {
                     Err(HttpEndpointError::NotAbsoluteHttp { .. })
                         | Err(HttpEndpointError::InvalidUri { .. })
                         | Err(HttpEndpointError::InvalidUriParts { .. })
+                        | Err(HttpEndpointError::InvalidPort { .. })
                 ),
                 "expected `{endpoint}` to be rejected"
             );
@@ -534,6 +576,19 @@ mod tests {
     fn http_endpoint_reports_unparseable_endpoints() {
         let error = HttpEndpoint::parse("http://exa mple.com").unwrap_err();
         assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
+    }
+
+    #[test]
+    fn http_endpoint_rejects_malformed_ports() {
+        for endpoint in [
+            "http://localhost:notaport",
+            "https://example.com:notaport/path",
+        ] {
+            assert!(matches!(
+                HttpEndpoint::parse(endpoint),
+                Err(HttpEndpointError::InvalidPort { .. })
+            ));
+        }
     }
 
     #[test]
