@@ -199,8 +199,10 @@ impl PodMetadataAnnotator {
     /// Annotates an event with the information from the [`Pod::metadata`].
     ///
     /// When the pod is not found in the API store (e.g. already deleted), falls back
-    /// to populating basic metadata (namespace, pod name, pod UID, container name)
-    /// from the log file path, which is always available.
+    /// to populating basic metadata (namespace, pod name, pod log directory ID, container name)
+    /// from the log file path, which is always available. The path-derived ID is exposed as
+    /// `pod_log_directory_id` rather than `pod_uid`, since for static pods it may be a config
+    /// hash instead of the API Pod UID.
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
@@ -278,7 +280,10 @@ fn annotate_from_file_info(
 }
 
 /// Fallback annotation from file path when pod is not in the API store.
-/// Sets pod_name, pod_namespace, and pod_uid from the parsed log file path.
+///
+/// Sets `pod_name` and `pod_namespace` from the parsed log file path, and exposes the path
+/// directory ID as `pod_log_directory_id` (not `pod_uid`), since for static pods that segment
+/// may be a config hash rather than the API Pod UID.
 fn annotate_from_file_path(
     log: &mut LogEvent,
     fields_spec: &FieldsSpec,
@@ -292,7 +297,6 @@ fn annotate_from_file_path(
             path!("pod_namespace"),
             file_info.pod_namespace,
         ),
-        (&fields_spec.pod_uid, path!("pod_uid"), file_info.pod_uid),
     ] {
         let legacy_key = field_spec
             .path
@@ -308,6 +312,15 @@ fn annotate_from_file_path(
             value.to_owned(),
         );
     }
+
+    let pod_log_directory_id_path = owned_value_path!("kubernetes", "pod_log_directory_id");
+    log_namespace.insert_source_metadata(
+        Config::NAME,
+        log,
+        Some(LegacyKey::Overwrite(&pod_log_directory_id_path)),
+        path!("pod_log_directory_id"),
+        file_info.pod_uid.to_owned(),
+    );
 }
 
 fn annotate_from_metadata(
@@ -886,7 +899,10 @@ mod tests {
         let mut expected = LogEvent::default();
         expected.insert(event_path!("kubernetes", "pod_name"), "sandbox0-name");
         expected.insert(event_path!("kubernetes", "pod_namespace"), "sandbox0-ns");
-        expected.insert(event_path!("kubernetes", "pod_uid"), "sandbox0-uid");
+        expected.insert(
+            event_path!("kubernetes", "pod_log_directory_id"),
+            "sandbox0-uid",
+        );
 
         assert_eq!(log, expected);
     }
