@@ -71,12 +71,37 @@ generated: components: sources: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: {
-			algorithm: {
-				description: "The decompression algorithm."
-				required:    true
-				type: string: enum: {
-					gzip: """
-						[Gzip][gzip] decompression.
+			avro: {
+				description:   "Apache Avro-specific encoder options."
+				relevant_when: "codec = \"avro\""
+				required:      true
+				type: object: options: {
+					schema: {
+						description: """
+																The Avro schema definition.
+																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
+																* `Decimal`
+																* `Duration`
+																* `Fixed`
+																"""
+						required: true
+						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+					}
+					strip_schema_id_prefix: {
+						description: "For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix, as described in [Confluent Kafka's documentation](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format)."
+						required:    true
+						type: bool: {}
+					}
+				}
+			}
+			codec: {
+				description: "The codec to use for decoding events."
+				required:    false
+				type: string: {
+					default: "bytes"
+					enum: {
+						avro: """
+															Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 						[gzip]: https://www.gzip.org/
 						"""

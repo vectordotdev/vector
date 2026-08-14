@@ -1,6 +1,6 @@
 package metadata
 
-generated: components: sources: http_server: configuration: {
+generated: components: sources: http: configuration: {
 	acknowledgements: {
 		deprecated: true
 		description: """
@@ -16,7 +16,11 @@ generated: components: sources: http_server: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type: object: options: enabled: {
+			description: "Whether or not end-to-end acknowledgements are enabled for this source."
+			required:    false
+			type: bool: {}
+		}
 	}
 	address: {
 		description: """
@@ -39,7 +43,44 @@ generated: components: sources: http_server: configuration: {
 			namespace) or under `http_server.<field>` in event metadata (Vector namespace).
 			"""
 		required: false
-		type:     _schemaDefinitions["core::option::Option<vector::common::http::server_auth::HttpServerAuthConfig>"]
+		type: object: options: {
+			password: {
+				description:   "The basic authentication password."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${PASSWORD}", "password"]
+			}
+			source: {
+				description:   "The VRL boolean expression."
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: {}
+			}
+			strategy: {
+				description: "The authentication strategy to use."
+				required:    true
+				type: string: enum: {
+					basic: """
+						Basic authentication.
+
+						The username and password are concatenated and encoded using [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
+						"""
+					custom: """
+						Custom authentication using VRL code.
+
+						Takes in request and validates it using VRL code. The VRL program must return a boolean.
+						"""
+				}
+			}
+			username: {
+				description:   "The basic authentication username."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${USERNAME}", "username"]
+			}
+		}
 	}
 	decoding: {
 		description: """
@@ -374,7 +415,179 @@ generated: components: sources: http_server: configuration: {
 			ends within the byte stream.
 			"""
 		required: false
-		type:     _schemaDefinitions["codecs::decoding::FramingConfig"]
+		type: object: options: {
+			character_delimited: {
+				description:   "Options for the character delimited decoder."
+				relevant_when: "method = \"character_delimited\""
+				required:      true
+				type: object: options: {
+					delimiter: {
+						description: "The character that delimits byte sequences."
+						required:    true
+						type: ascii_char: {}
+					}
+					max_length: {
+						description: """
+																The maximum length of the byte buffer.
+
+																This length does *not* include the trailing delimiter.
+
+																By default, no maximum length is enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
+
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																prevents processing from being unbounded.
+																"""
+						required: false
+						type: uint: {}
+					}
+				}
+			}
+			chunked_gelf: {
+				description:   "Options for the chunked GELF decoder."
+				relevant_when: "method = \"chunked_gelf\""
+				required:      false
+				type: object: options: {
+					decompression: {
+						description: "Decompression configuration for GELF messages."
+						required:    false
+						type: string: {
+							default: "Auto"
+							enum: {
+								Auto: "Automatically detect the decompression method based on the magic bytes of the message."
+								Gzip: "Use Gzip decompression."
+								None: "Do not decompress the message."
+								Zlib: "Use Zlib decompression."
+							}
+						}
+					}
+					max_length: {
+						description: """
+																The maximum length of a single GELF message, in bytes. Messages longer than this length are
+																dropped. If this option is not set, the decoder does not limit the length of messages and
+																the per-message memory is unbounded.
+
+																**Note**: A message can be composed of multiple chunks, and this limit applies to the whole
+																message, not to individual chunks.
+
+																This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
+																The message payload is the concatenation of all chunk payloads.
+																"""
+						required: false
+						type: uint: {}
+					}
+					pending_messages_limit: {
+						description: """
+																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
+																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
+																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
+																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
+																"""
+						required: false
+						type: uint: {}
+					}
+					timeout_secs: {
+						description: """
+																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
+																decoder drops all received chunks for the timed-out message.
+																"""
+						required: false
+						type: float: default: 5.0
+					}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
+					}
+				}
+			}
+			max_frame_length: {
+				description:   "Maximum frame length"
+				relevant_when: "method = \"varint_length_delimited\""
+				required:      false
+				type: uint: default: 8388608
+			}
+			method: {
+				description: "The framing method."
+				required:    true
+				type: string: enum: {
+					bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
+					character_delimited: "Byte frames which are delimited by a chosen character."
+					chunked_gelf: """
+						Byte frames which are chunked GELF messages.
+
+						[chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+						"""
+					length_delimited:  "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+					newline_delimited: "Byte frames which are delimited by a newline character."
+					octet_counting: """
+						Byte frames according to the [octet counting][octet_counting] format.
+
+						[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+						"""
+					varint_length_delimited: """
+						Byte frames which are prefixed by a varint indicating the length.
+						This is compatible with protobuf's length-delimited encoding.
+						"""
+				}
+			}
+			newline_delimited: {
+				description:   "Options for the newline delimited decoder."
+				relevant_when: "method = \"newline_delimited\""
+				required:      false
+				type: object: options: max_length: {
+					description: """
+						The maximum length of the byte buffer.
+
+						This length does *not* include the trailing delimiter.
+
+						By default, no maximum length is enforced. If events are malformed, this can lead to
+						additional resource usage as events continue to be buffered in memory, and can potentially
+						lead to memory exhaustion in extreme cases.
+
+						If there is a risk of processing malformed data, such as logs with user-controlled input,
+						consider setting the maximum length to a reasonably large value as a safety net. This
+						prevents processing from being unbounded.
+						"""
+					required: false
+					type: uint: {}
+				}
+			}
+			octet_counting: {
+				description:   "Options for the octet counting decoder."
+				relevant_when: "method = \"octet_counting\""
+				required:      false
+				type: object: options: max_length: {
+					description: "The maximum length of the byte buffer."
+					required:    false
+					type: uint: {}
+				}
+			}
+		}
 	}
 	headers: {
 		description: """
@@ -403,7 +616,36 @@ generated: components: sources: http_server: configuration: {
 	keepalive: {
 		description: "Configuration of HTTP server keepalive parameters."
 		required:    false
-		type:        _schemaDefinitions["vector::http::KeepaliveConfig"]
+		type: object: options: {
+			max_connection_age_jitter_factor: {
+				description: """
+					The factor by which to jitter the `max_connection_age_secs` value.
+
+					A value of 0.1 means that the actual duration will be between 90% and 110% of the
+					specified maximum duration.
+					"""
+				required: false
+				type: float: default: 0.1
+			}
+			max_connection_age_secs: {
+				description: """
+					The maximum amount of time a connection may exist before it is closed by sending
+					a `Connection: close` header on the HTTP response. Set this to a large value like
+					`100000000` to "disable" this feature
+
+					Only applies to HTTP/0.9, HTTP/1.0, and HTTP/1.1 requests.
+
+					A random jitter configured by `max_connection_age_jitter_factor` is added
+					to the specified duration to spread out connection storms.
+					"""
+				required: false
+				type: uint: {
+					default: 300
+					examples: [600]
+					unit: "seconds"
+				}
+			}
+		}
 	}
 	method: {
 		description: "Specifies the action of the HTTP request."
@@ -459,7 +701,7 @@ generated: components: sources: http_server: configuration: {
 		type: uint: {
 			default: 200
 			examples: [
-				202
+				202,
 			]
 		}
 	}
@@ -479,6 +721,105 @@ generated: components: sources: http_server: configuration: {
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
-		type:        _schemaDefinitions["core::option::Option<vector_core::tls::settings::TlsEnableableConfig>"]
+		type: object: options: {
+			alpn_protocols: {
+				description: """
+					Sets the list of supported ALPN protocols.
+
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
+					that they are defined.
+					"""
+				required: false
+				type: array: items: type: string: examples: ["h2"]
+			}
+			ca_file: {
+				description: """
+					Absolute path to an additional CA certificate file.
+
+					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/certificate_authority.crt"]
+			}
+			crt_file: {
+				description: """
+					Absolute path to a certificate file used to identify this server.
+
+					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+					an inline string in PEM format.
+
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.crt"]
+			}
+			enabled: {
+				description: """
+					Whether to require TLS for incoming or outgoing connections.
+
+					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+					more information.
+					"""
+				required: false
+				type: bool: {}
+			}
+			key_file: {
+				description: """
+					Absolute path to a private key file used to identify this server.
+
+					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+					"""
+				required: false
+				type: string: examples: ["/path/to/host_certificate.key"]
+			}
+			key_pass: {
+				description: """
+					Passphrase used to unlock the encrypted key file.
+
+					This has no effect unless `key_file` is set.
+					"""
+				required: false
+				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
+
+					If enabled, certificates must not be expired and must be issued by a trusted
+					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+					so on, until the verification process reaches a root certificate.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Enables hostname verification.
+
+					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+					Only relevant for outgoing connections.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+					"""
+				required: false
+				type: bool: {}
+			}
+		}
 	}
 }
