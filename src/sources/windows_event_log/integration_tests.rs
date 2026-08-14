@@ -8,6 +8,8 @@ use std::time::Duration;
 use futures::StreamExt;
 use tokio::fs;
 
+use vrl::event_path;
+
 use super::*;
 use crate::config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext};
 use crate::test_util::components::run_and_assert_source_compliance;
@@ -125,7 +127,7 @@ async fn test_basic_event_ingestion() {
         "level",
     ] {
         assert!(
-            log.contains(field),
+            log.contains(event_path!(field)),
             "Event is missing required field '{field}'. \
              Full event keys: {:?}",
             log.keys().into_iter().flatten().collect::<Vec<_>>()
@@ -168,7 +170,7 @@ async fn test_backlog_drain_no_duplicates() {
     let mut record_ids = HashSet::new();
     let mut duplicate_count = 0;
     for event in &events {
-        if let Some(rid) = event.as_log().get("record_id") {
+        if let Some(rid) = event.as_log().get(event_path!("record_id")) {
             if !record_ids.insert(rid.to_string_lossy()) {
                 duplicate_count += 1;
             }
@@ -212,7 +214,7 @@ async fn test_checkpoint_resume_no_redelivery() {
     // Phase 1 event should NOT be redelivered (checkpoint should have advanced past it)
     let has_phase1 = second_run.iter().any(|e| {
         e.as_log()
-            .get("message")
+            .get(event_path!("message"))
             .map(|m| m.to_string_lossy().contains("checkpoint-test-phase1"))
             .unwrap_or(false)
     });
@@ -226,7 +228,7 @@ async fn test_checkpoint_resume_no_redelivery() {
     // The new phase 2 event should be present
     let has_phase2 = second_run.iter().any(|e| {
         e.as_log()
-            .get("message")
+            .get(event_path!("message"))
             .map(|m| m.to_string_lossy().contains("checkpoint-test-phase2"))
             .unwrap_or(false)
     });
@@ -259,7 +261,7 @@ async fn test_channel_isolation() {
     let events = run_and_assert_source_compliance(config, Duration::from_secs(3), &[]).await;
 
     for event in &events {
-        if let Some(channel) = event.as_log().get("channel") {
+        if let Some(channel) = event.as_log().get(event_path!("channel")) {
             let ch = channel.to_string_lossy();
             assert_eq!(
                 ch, "System",
@@ -294,7 +296,7 @@ async fn test_only_event_ids_filter() {
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     for event in &events {
-        if let Some(eid) = event.as_log().get("event_id") {
+        if let Some(eid) = event.as_log().get(event_path!("event_id")) {
             let id: i64 = match eid {
                 vrl::value::Value::Integer(i) => *i,
                 other => other.to_string_lossy().parse().unwrap_or(-1),
@@ -326,7 +328,7 @@ async fn test_ignore_event_ids_filter() {
     let events = run_and_assert_source_compliance(config, Duration::from_secs(3), &[]).await;
 
     for event in &events {
-        if let Some(eid) = event.as_log().get("event_id") {
+        if let Some(eid) = event.as_log().get(event_path!("event_id")) {
             let id: i64 = match eid {
                 vrl::value::Value::Integer(i) => *i,
                 other => other.to_string_lossy().parse().unwrap_or(-1),
@@ -378,7 +380,7 @@ async fn test_only_event_ids_generates_xpath_filter() {
 
     // Every event must have event_id == 1000.
     for event in &events {
-        if let Some(eid) = event.as_log().get("event_id") {
+        if let Some(eid) = event.as_log().get(event_path!("event_id")) {
             let id: i64 = match eid {
                 vrl::value::Value::Integer(i) => *i,
                 other => other.to_string_lossy().parse().unwrap_or(-1),
@@ -410,7 +412,7 @@ async fn test_multiple_event_levels() {
 
     let mut levels_seen: HashSet<String> = HashSet::new();
     for event in &events {
-        if let Some(level) = event.as_log().get("level") {
+        if let Some(level) = event.as_log().get(event_path!("level")) {
             levels_seen.insert(level.to_string_lossy().to_string());
         }
     }
@@ -443,7 +445,7 @@ async fn test_rendered_message_content() {
 
     let found = events.iter().any(|e| {
         e.as_log()
-            .get("message")
+            .get(event_path!("message"))
             .map(|m| m.to_string_lossy().contains(marker))
             .unwrap_or(false)
     });
@@ -456,7 +458,7 @@ async fn test_rendered_message_content() {
         events.len(),
         events
             .first()
-            .and_then(|e| e.as_log().get("message"))
+            .and_then(|e| e.as_log().get(event_path!("message")))
             .map(|m| m.to_string_lossy())
     );
 }
@@ -476,7 +478,7 @@ async fn test_render_message_disabled_fallback() {
     if !events.is_empty() {
         let log = events[0].as_log();
         assert!(
-            log.contains("message"),
+            log.contains(event_path!("message")),
             "render_message=false should still produce a message field (generic fallback). \
              Event keys: {:?}",
             log.keys().into_iter().flatten().collect::<Vec<_>>()
@@ -503,7 +505,7 @@ async fn test_include_xml_well_formed() {
     );
 
     let log = events[0].as_log();
-    let xml = log.get("xml").expect(
+    let xml = log.get(event_path!("xml")).expect(
         "include_xml=true but 'xml' field missing. \
          Check raw_xml population in parse_event_xml.",
     );
@@ -528,7 +530,7 @@ async fn test_exclude_xml_by_default() {
 
     for event in &events {
         assert!(
-            !event.as_log().contains("xml"),
+            !event.as_log().contains(event_path!("xml")),
             "include_xml=false but 'xml' field is present."
         );
     }
@@ -560,11 +562,11 @@ async fn test_field_filter_exclude_event_data() {
     for event in events.iter().take(10) {
         let log = event.as_log();
         assert!(
-            !log.contains("event_data"),
+            !log.contains(event_path!("event_data")),
             "include_event_data=false but 'event_data' field is present."
         );
         assert!(
-            !log.contains("user_data"),
+            !log.contains(event_path!("user_data")),
             "include_user_data=false but 'user_data' field is present."
         );
     }
@@ -650,7 +652,7 @@ async fn test_event_field_completeness() {
 
     let mut missing = Vec::new();
     for field in &required {
-        if !log.contains(*field) {
+        if !log.contains(event_path!(*field)) {
             missing.push(*field);
         }
     }
@@ -664,7 +666,7 @@ async fn test_event_field_completeness() {
     );
 
     // Verify event_id is a positive integer
-    if let Some(eid) = log.get("event_id") {
+    if let Some(eid) = log.get(event_path!("event_id")) {
         match eid {
             vrl::value::Value::Integer(i) => {
                 assert!(*i > 0, "event_id should be a positive integer, got {i}")
@@ -677,7 +679,7 @@ async fn test_event_field_completeness() {
     }
 
     // Verify record_id is a positive integer
-    if let Some(rid) = log.get("record_id") {
+    if let Some(rid) = log.get(event_path!("record_id")) {
         match rid {
             vrl::value::Value::Integer(i) => {
                 assert!(*i > 0, "record_id should be a positive integer, got {i}")
@@ -687,7 +689,7 @@ async fn test_event_field_completeness() {
     }
 
     // Verify level is a human-readable string
-    if let Some(level) = log.get("level") {
+    if let Some(level) = log.get(event_path!("level")) {
         let level_str = level.to_string_lossy();
         assert!(
             ["Information", "Warning", "Error", "Critical", "Verbose"]
@@ -801,7 +803,7 @@ async fn test_max_event_age_filtering() {
 
     // If we got events, verify none of them are our old test event
     for event in &events {
-        if let Some(msg) = event.as_log().get("message") {
+        if let Some(msg) = event.as_log().get(event_path!("message")) {
             assert!(
                 !msg.to_string_lossy().contains("age-filter-test"),
                 "max_event_age_secs=3 but old event was not filtered out. \
@@ -840,7 +842,7 @@ async fn test_event_data_format_coercion() {
 
     // event_id should be converted to string by the custom formatter
     let log = events[0].as_log();
-    if let Some(eid) = log.get("event_id") {
+    if let Some(eid) = log.get(event_path!("event_id")) {
         assert!(
             matches!(eid, vrl::value::Value::Bytes(_)),
             "event_data_format set event_id to String but got {:?}. \
@@ -874,7 +876,7 @@ async fn test_multi_channel_ingestion() {
 
     let mut channels_seen: HashSet<String> = HashSet::new();
     for event in &events {
-        if let Some(channel) = event.as_log().get("channel") {
+        if let Some(channel) = event.as_log().get(event_path!("channel")) {
             channels_seen.insert(channel.to_string_lossy().to_string());
         }
     }
@@ -1144,7 +1146,7 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
     // Should NOT see phase1 event again (checkpoint advanced)
     let has_phase1 = events.iter().any(|e| {
         e.as_log()
-            .get("message")
+            .get(event_path!("message"))
             .map(|m| m.to_string_lossy().contains("ack-test-phase1"))
             .unwrap_or(false)
     });
@@ -1276,13 +1278,13 @@ async fn test_rejected_ack_does_not_advance_checkpoint() {
         let log = e.as_log();
         // Check message field (rendered message or string_inserts fallback)
         let in_message = log
-            .get("message")
+            .get(event_path!("message"))
             .map(|m| m.to_string_lossy().contains("rejected-ack-test-marker"))
             .unwrap_or(false);
         // Also check string_inserts directly in case EvtFormatMessage is unavailable
         // on this CI runner and the fallback doesn't surface the description.
         let in_inserts = log
-            .get("string_inserts")
+            .get(event_path!("string_inserts"))
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
@@ -1344,7 +1346,7 @@ async fn test_stress_burst_ingestion() {
     let mut record_ids = HashSet::new();
     let mut dups = 0;
     for event in &events {
-        if let Some(rid) = event.as_log().get("record_id") {
+        if let Some(rid) = event.as_log().get(event_path!("record_id")) {
             if !record_ids.insert(rid.to_string_lossy()) {
                 dups += 1;
             }
@@ -1360,7 +1362,7 @@ async fn test_stress_burst_ingestion() {
         let log = event.as_log();
         for field in ["event_id", "record_id", "channel", "provider_name"] {
             assert!(
-                log.contains(field),
+                log.contains(event_path!(field)),
                 "Stress test event missing field '{field}' — possible render corruption."
             );
         }
@@ -1493,7 +1495,7 @@ async fn test_resubscribe_after_log_clear() {
                 tokio::select! {
                     event = rx.next() => {
                         if let Some(event) = event {
-                            if let Some(msg) = event.as_log().get("message") {
+                            if let Some(msg) = event.as_log().get(event_path!("message")) {
                                 if msg.to_string_lossy().contains("post-clear-event") {
                                     found_post_clear = true;
                                     break;
@@ -1620,7 +1622,7 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
         .iter()
         .filter_map(|e| {
             e.as_log()
-                .get("record_id")
+                .get(event_path!("record_id"))
                 .map(|v| v.to_string_lossy().into_owned())
         })
         .collect();
@@ -1649,7 +1651,7 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
         .iter()
         .filter_map(|e| {
             e.as_log()
-                .get("record_id")
+                .get(event_path!("record_id"))
                 .map(|v| v.to_string_lossy().into_owned())
         })
         .collect();

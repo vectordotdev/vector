@@ -876,7 +876,7 @@ mod tests {
                 )
                 .unwrap();
                 // Removing message_id from message, since it is not part of the event
-                base_msg.remove("message_id", true);
+                base_msg.remove(vrl::path!("message_id"), true);
                 let msg_text = serde_json::to_string(&base_msg).unwrap();
                 let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
                 assert_eq!(expected, msg_text);

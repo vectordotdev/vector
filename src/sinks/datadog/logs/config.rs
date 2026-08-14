@@ -82,9 +82,9 @@ const fn default_compression() -> Option<Compression> {
 }
 
 impl GenerateConfig for DatadogLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            default_api_key: ${DATADOG_API_KEY_ENV_VAR}
         "#})
         .unwrap()
     }

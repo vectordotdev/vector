@@ -98,11 +98,11 @@ impl From<udp::UdpConfig> for SocketConfig {
 }
 
 impl GenerateConfig for SocketConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"mode = "tcp"
-            address = "0.0.0.0:9000""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"mode: tcp
+            address: "0.0.0.0:9000""#,
+        })
         .unwrap()
     }
 }
@@ -139,6 +139,7 @@ impl SourceConfig for SocketConfig {
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     config.max_connection_duration_secs(),

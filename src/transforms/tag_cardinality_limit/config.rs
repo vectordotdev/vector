@@ -336,8 +336,8 @@ pub(crate) const fn default_cache_size() -> usize {
 // =============================================================================
 
 impl GenerateConfig for Config {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             global: Inner {
                 mode: Mode::Exact,
                 value_limit: default_value_limit(),
@@ -362,50 +362,10 @@ pub enum BuildError {
     CacheSizeRequiresProbabilistic { tag_key: String },
 }
 
-impl Config {
-    fn validate(&self) -> crate::Result<()> {
-        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
-        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
-            for (tag_key, tag_cfg) in &self.per_tag_limits {
-                if let PerTagMode::LimitOverride {
-                    cache_size_per_key: Some(_),
-                    ..
-                } = tag_cfg.mode
-                {
-                    return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
-                        tag_key: tag_key.clone(),
-                    }));
-                }
-            }
-        }
-
-        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
-        // mode is probabilistic.
-        for per_metric in self.per_metric_limits.values() {
-            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
-                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
-                    if let PerTagMode::LimitOverride {
-                        cache_size_per_key: Some(_),
-                        ..
-                    } = tag_cfg.mode
-                    {
-                        return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
-                            tag_key: tag_key.clone(),
-                        }));
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for Config {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        self.validate()?;
         Ok(Transform::event_task(TagCardinalityLimit::new(
             self.clone(),
         )))
@@ -421,5 +381,54 @@ impl TransformConfig for Config {
         _: &[(OutputId, schema::Definition)],
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
+    }
+
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
+        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
+            for (tag_key, tag_cfg) in &self.per_tag_limits {
+                if let PerTagMode::LimitOverride {
+                    cache_size_per_key: Some(_),
+                    ..
+                } = tag_cfg.mode
+                {
+                    errors.push(
+                        BuildError::CacheSizeRequiresProbabilistic {
+                            tag_key: tag_key.clone(),
+                        }
+                        .to_string(),
+                    );
+                }
+            }
+        }
+
+        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
+        // mode is probabilistic.
+        for per_metric in self.per_metric_limits.values() {
+            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
+                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
+                    if let PerTagMode::LimitOverride {
+                        cache_size_per_key: Some(_),
+                        ..
+                    } = tag_cfg.mode
+                    {
+                        errors.push(
+                            BuildError::CacheSizeRequiresProbabilistic {
+                                tag_key: tag_key.clone(),
+                            }
+                            .to_string(),
+                        );
+                    }
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }

@@ -39,12 +39,9 @@ use crate::{
     sources::{
         http_server::HttpConfigParamKind,
         opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-        util::{
-            add_headers, decompress_body,
-            http::{limited_body, max_decompressed_size_bytes},
-        },
+        util::{add_headers, decompress_body, http::capped_body},
     },
-    tls::MaybeTlsSettings,
+    tls::{MaybeTlsSettings, TlsAcceptorReloader},
 };
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -57,11 +54,12 @@ impl warp::reject::Reject for ApiError {}
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
 ) -> crate::Result<()> {
-    let listener = tls_settings.bind(&address).await?;
+    let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
     let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
@@ -194,7 +192,7 @@ where
         + 'static
         + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
 {
-    let body_filter = limited_body(max_decompressed_size_bytes());
+    let body_filter = capped_body();
 
     warp::post()
         .and(warp::path("v1"))
