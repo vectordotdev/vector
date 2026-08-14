@@ -8,6 +8,7 @@ use std::{
 use async_trait::async_trait;
 use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header};
 use hyper::{Body, body::HttpBody as _, client::conn, server::conn::http1, service::service_fn};
+use rstest::rstest;
 use tokio::{io::copy_bidirectional, net::TcpStream, task::JoinHandle, time::timeout};
 
 use super::{
@@ -85,31 +86,26 @@ trait TestClient: Send + Sync {
     ) -> Result<TestResponse, String>;
 }
 
-trait TestClientFactory: Copy {
-    type Client: TestClient;
-
-    fn build(self, tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self::Client, String>;
+#[derive(Clone, Copy, Debug)]
+enum ClientVersion {
+    Legacy,
+    V1,
 }
 
-#[derive(Clone, Copy)]
-struct LegacyClientFactory;
-
-#[derive(Clone, Copy)]
-struct V1ClientFactory;
-
-impl TestClientFactory for LegacyClientFactory {
-    type Client = HttpClient;
-
-    fn build(self, tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self::Client, String> {
-        HttpClient::new(tls, proxy).map_err(|error| error.to_string())
-    }
-}
-
-impl TestClientFactory for V1ClientFactory {
-    type Client = HttpClientV1;
-
-    fn build(self, tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self::Client, String> {
-        HttpClientV1::new(tls, proxy).map_err(|error| error.to_string())
+impl ClientVersion {
+    fn build(
+        self,
+        tls: MaybeTlsSettings,
+        proxy: &ProxyConfig,
+    ) -> Result<Box<dyn TestClient>, String> {
+        match self {
+            Self::Legacy => Ok(Box::new(
+                HttpClient::new(tls, proxy).map_err(|error| error.to_string())?,
+            )),
+            Self::V1 => Ok(Box::new(
+                HttpClientV1::new(tls, proxy).map_err(|error| error.to_string())?,
+            )),
+        }
     }
 }
 
@@ -410,26 +406,40 @@ fn assert_success(response: TestResponse) {
     assert_eq!(response.body, b"origin response");
 }
 
-async fn direct_http<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn direct_http(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
-    let client = factory.build(no_tls(), &ProxyConfig::default()).unwrap();
+    let client = client_version
+        .build(no_tls(), &ProxyConfig::default())
+        .unwrap();
 
     assert_success(client.get(&origin.http_uri()).await.unwrap());
     assert_eq!(origin.observations().len(), 1);
 }
 
-async fn direct_https_with_trusted_ca<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn direct_https_with_trusted_ca(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
-    let client = factory
+    let client = client_version
         .build(trusted_client_tls(), &ProxyConfig::default())
         .unwrap();
 
     assert_success(client.get(&origin.https_uri()).await.unwrap());
 }
 
-async fn direct_https_rejects_untrusted_ca<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn direct_https_rejects_untrusted_ca(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
-    let client = factory
+    let client = client_version
         .build(
             client_tls(TlsConfig {
                 ca_file: Some(INVALID_CA_PATH.into()),
@@ -445,9 +455,13 @@ async fn direct_https_rejects_untrusted_ca<F: TestClientFactory>(factory: F) {
         .expect_err("an untrusted server certificate must fail");
 }
 
-async fn direct_https_honors_server_name<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn direct_https_honors_server_name(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
-    let without_override = factory
+    let without_override = client_version
         .build(trusted_client_tls(), &ProxyConfig::default())
         .unwrap();
     without_override
@@ -455,7 +469,7 @@ async fn direct_https_honors_server_name<F: TestClientFactory>(factory: F) {
         .await
         .expect_err("the server certificate does not cover its IP address");
 
-    let with_override = factory
+    let with_override = client_version
         .build(
             client_tls(TlsConfig {
                 ca_file: Some(TEST_PEM_CA_PATH.into()),
@@ -468,9 +482,13 @@ async fn direct_https_honors_server_name<F: TestClientFactory>(factory: F) {
     assert_success(with_override.get(&origin.https_ip_uri()).await.unwrap());
 }
 
-async fn direct_https_supports_mtls<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn direct_https_supports_mtls(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(true)).await;
-    let without_identity = factory
+    let without_identity = client_version
         .build(trusted_client_tls(), &ProxyConfig::default())
         .unwrap();
     without_identity
@@ -478,7 +496,7 @@ async fn direct_https_supports_mtls<F: TestClientFactory>(factory: F) {
         .await
         .expect_err("the server requires a client certificate");
 
-    let with_identity = factory
+    let with_identity = client_version
         .build(
             client_tls(TlsConfig {
                 ca_file: Some(TEST_PEM_CA_PATH.into()),
@@ -492,10 +510,14 @@ async fn direct_https_supports_mtls<F: TestClientFactory>(factory: F) {
     assert_success(with_identity.get(&origin.https_uri()).await.unwrap());
 }
 
-async fn http_via_authenticated_proxy<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn http_via_authenticated_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
-    let client = factory
+    let client = client_version
         .build(no_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
@@ -524,10 +546,14 @@ async fn http_via_authenticated_proxy<F: TestClientFactory>(factory: F) {
     );
 }
 
-async fn http_proxy_credentials_do_not_reach_origin<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn http_proxy_credentials_do_not_reach_origin(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
-    let client = factory
+    let client = client_version
         .build(no_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
@@ -547,10 +573,14 @@ async fn http_proxy_credentials_do_not_reach_origin<F: TestClientFactory>(factor
     assert!(!origin_headers.contains_key(header::AUTHORIZATION));
 }
 
-async fn https_via_authenticated_connect_proxy<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn https_via_authenticated_connect_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
     let proxy = spawn_proxy(no_tls(), true).await;
-    let client = factory
+    let client = client_version
         .build(trusted_client_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
@@ -580,32 +610,44 @@ async fn https_via_authenticated_connect_proxy<F: TestClientFactory>(factory: F)
     );
 }
 
-async fn no_proxy_bypasses_proxy<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn no_proxy_bypasses_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
     let mut config = proxy_config(&proxy, false, false);
     config.no_proxy = "127.0.0.1".into();
-    let client = factory.build(no_tls(), &config).unwrap();
+    let client = client_version.build(no_tls(), &config).unwrap();
 
     assert_success(client.get(&origin.http_ip_uri()).await.unwrap());
     assert!(proxy.observations().is_empty());
 }
 
-async fn disabled_proxy_is_bypassed<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn disabled_proxy_is_bypassed(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(no_tls(), true).await;
     let mut config = proxy_config(&proxy, false, false);
     config.enabled = false;
-    let client = factory.build(no_tls(), &config).unwrap();
+    let client = client_version.build(no_tls(), &config).unwrap();
 
     assert_success(client.get(&origin.http_uri()).await.unwrap());
     assert!(proxy.observations().is_empty());
 }
 
-async fn http_via_tls_proxy<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn http_via_tls_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
     let proxy = spawn_proxy(server_tls(false), false).await;
-    let client = factory
+    let client = client_version
         .build(trusted_client_tls(), &proxy_config(&proxy, true, false))
         .unwrap();
 
@@ -613,10 +655,14 @@ async fn http_via_tls_proxy<F: TestClientFactory>(factory: F) {
     assert_eq!(proxy.observations().len(), 1);
 }
 
-async fn https_via_tls_connect_proxy<F: TestClientFactory>(factory: F) {
+#[rstest]
+#[case::legacy(ClientVersion::Legacy)]
+#[case::v1(ClientVersion::V1)]
+#[tokio::test]
+async fn https_via_tls_connect_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
     let proxy = spawn_proxy(server_tls(false), false).await;
-    let client = factory
+    let client = client_version
         .build(trusted_client_tls(), &proxy_config(&proxy, true, false))
         .unwrap();
 
@@ -624,124 +670,4 @@ async fn https_via_tls_connect_proxy<F: TestClientFactory>(factory: F) {
     let observations = proxy.observations();
     assert_eq!(observations.len(), 1);
     assert_eq!(observations[0].method, Method::CONNECT);
-}
-
-#[tokio::test]
-async fn legacy_direct_http() {
-    direct_http(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_direct_https_with_trusted_ca() {
-    direct_https_with_trusted_ca(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_direct_https_rejects_untrusted_ca() {
-    direct_https_rejects_untrusted_ca(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_direct_https_honors_server_name() {
-    direct_https_honors_server_name(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_direct_https_supports_mtls() {
-    direct_https_supports_mtls(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_http_via_authenticated_proxy() {
-    http_via_authenticated_proxy(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_http_proxy_credentials_do_not_reach_origin() {
-    http_proxy_credentials_do_not_reach_origin(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_https_via_authenticated_connect_proxy() {
-    https_via_authenticated_connect_proxy(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_no_proxy_bypasses_proxy() {
-    no_proxy_bypasses_proxy(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_disabled_proxy_is_bypassed() {
-    disabled_proxy_is_bypassed(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_http_via_tls_proxy() {
-    http_via_tls_proxy(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn legacy_https_via_tls_connect_proxy() {
-    https_via_tls_connect_proxy(LegacyClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_direct_http() {
-    direct_http(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_direct_https_with_trusted_ca() {
-    direct_https_with_trusted_ca(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_direct_https_rejects_untrusted_ca() {
-    direct_https_rejects_untrusted_ca(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_direct_https_honors_server_name() {
-    direct_https_honors_server_name(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_direct_https_supports_mtls() {
-    direct_https_supports_mtls(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_http_via_authenticated_proxy() {
-    http_via_authenticated_proxy(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_http_proxy_credentials_do_not_reach_origin() {
-    http_proxy_credentials_do_not_reach_origin(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_https_via_authenticated_connect_proxy() {
-    https_via_authenticated_connect_proxy(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_no_proxy_bypasses_proxy() {
-    no_proxy_bypasses_proxy(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_disabled_proxy_is_bypassed() {
-    disabled_proxy_is_bypassed(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_http_via_tls_proxy() {
-    http_via_tls_proxy(V1ClientFactory).await;
-}
-
-#[tokio::test]
-async fn v1_https_via_tls_connect_proxy() {
-    https_via_tls_connect_proxy(V1ClientFactory).await;
 }
