@@ -565,15 +565,15 @@ mod tests {
         // Validate that all 3 records were deserialized
         assert_eq!(events.len(), 3);
         assert_eq!(
-            events[0].as_log().get("message").unwrap(),
+            events[0].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from("first message")
         );
         assert_eq!(
-            events[1].as_log().get("message").unwrap(),
+            events[1].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from("second message")
         );
         assert_eq!(
-            events[2].as_log().get("message").unwrap(),
+            events[2].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from("third message")
         );
     }

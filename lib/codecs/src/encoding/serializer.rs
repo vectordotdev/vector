@@ -10,7 +10,6 @@ use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
 use super::format::{ParquetSerializer, ParquetSerializerConfig};
-use super::format::{ProtoBatchSerializer, ProtoBatchSerializerConfig};
 #[cfg(feature = "syslog")]
 use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
@@ -179,15 +178,6 @@ pub enum BatchSerializerConfig {
     #[cfg(feature = "parquet")]
     #[serde(rename = "parquet")]
     Parquet(ParquetSerializerConfig),
-
-    /// Encodes each event individually as a [Protocol Buffers][protobuf] message.
-    ///
-    /// Each event in the batch is serialized to protobuf bytes independently,
-    /// producing a list of byte buffers (one per event).
-    ///
-    /// [protobuf]: https://protobuf.dev/
-    #[serde(rename = "proto_batch")]
-    ProtoBatch(ProtoBatchSerializerConfig),
 }
 
 impl BatchSerializerConfig {
@@ -210,10 +200,6 @@ impl BatchSerializerConfig {
                 let serializer = ParquetSerializer::new(parquet_config.clone())?;
                 Ok(super::BatchSerializer::Parquet(Box::new(serializer)))
             }
-            BatchSerializerConfig::ProtoBatch(proto_config) => {
-                let serializer = ProtoBatchSerializer::new(proto_config.clone())?;
-                Ok(super::BatchSerializer::ProtoBatch(serializer))
-            }
         }
     }
 
@@ -225,7 +211,6 @@ impl BatchSerializerConfig {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
-            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.input_type(),
         }
     }
 
@@ -237,7 +222,6 @@ impl BatchSerializerConfig {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
-            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.schema_requirement(),
         }
     }
 }

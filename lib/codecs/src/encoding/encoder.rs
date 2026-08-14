@@ -9,22 +9,16 @@ use crate::encoding::ArrowStreamSerializer;
 use crate::encoding::ParquetSerializer;
 use crate::encoding::format::AvroOcfSerializer;
 use crate::{
-    encoding::{Error, Framer, ProtoBatchSerializer, Serializer},
+    encoding::{Error, Framer, Serializer},
     internal_events::{EncoderFramingError, EncoderSerializeError},
 };
 
 /// The output of a batch encoding operation.
-///
-/// Different batch serializers produce different output types:
-/// - Arrow serializer produces a `RecordBatch`
-/// - Proto serializer produces individual byte buffers per event
 #[derive(Debug)]
 pub enum BatchOutput {
     /// An Arrow RecordBatch containing all events encoded as columnar data.
     #[cfg(feature = "arrow")]
     Arrow(arrow::record_batch::RecordBatch),
-    /// A list of individually-serialized records (one per event).
-    Records(Vec<Vec<u8>>),
 }
 
 /// Serializers that support batch encoding (encoding all events at once).
@@ -41,8 +35,6 @@ pub enum BatchSerializer {
     /// Parquet format serializer.
     #[cfg(feature = "parquet")]
     Parquet(Box<ParquetSerializer>),
-    /// Protobuf batch serializer that encodes each event individually.
-    ProtoBatch(ProtoBatchSerializer),
 }
 
 /// An encoder that encodes batches of events.
@@ -63,10 +55,6 @@ impl BatchEncoder {
     }
 
     /// Get the HTTP content type.
-    ///
-    /// Returns `None` for serializers that do not produce a single HTTP body
-    /// (e.g. `ProtoBatch`, which emits one record per event for an out-of-band
-    /// transport rather than an HTTP payload).
     pub const fn content_type(&self) -> Option<&'static str> {
         match &self.serializer {
             BatchSerializer::AvroOcf(_) => Some("application/octet-stream"),
@@ -74,7 +62,6 @@ impl BatchEncoder {
             BatchSerializer::Arrow(_) => Some("application/vnd.apache.arrow.stream"),
             #[cfg(feature = "parquet")]
             BatchSerializer::Parquet(_) => Some("application/vnd.apache.parquet"),
-            BatchSerializer::ProtoBatch(_) => None,
         }
     }
 
@@ -96,12 +83,6 @@ impl BatchEncoder {
                     }
                 })?;
                 Ok(BatchOutput::Arrow(record_batch))
-            }
-            BatchSerializer::ProtoBatch(serializer) => {
-                let records = serializer
-                    .encode_batch(events)
-                    .map_err(|err| Error::SerializingError(Box::new(err)))?;
-                Ok(BatchOutput::Records(records))
             }
             #[cfg(feature = "parquet")]
             BatchSerializer::Parquet(_) => Err(Error::SerializingError(Box::from(
@@ -136,9 +117,6 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
             BatchSerializer::Parquet(serializer) => serializer
                 .encode(events, buffer)
                 .map_err(Error::SerializingError),
-            BatchSerializer::ProtoBatch(_) => Err(Error::SerializingError(Box::from(
-                "ProtoBatch serializer does not support the tokio Encoder interface; use BatchEncoder::encode_batch() instead",
-            ))),
         }
     }
 }
