@@ -47,18 +47,9 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
-    /// The namespace of the measurement name to use.
-    ///
-    /// When specified, the measurement name is `<namespace>.vector`.
-    ///
-    #[configurable(
-        deprecated = "This field is deprecated, and `measurement` should be used instead."
-    )]
-    #[configurable(metadata(docs::examples = "service"))]
-    pub namespace: Option<String>,
-
     /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
+    #[configurable(metadata(docs::required = true))]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
@@ -213,7 +204,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc! {r#"
             endpoint: http://localhost:8086/
-            namespace: my-namespace
+            measurement: vector-logs
             tags: []
             version: "2"
             org: my-org
@@ -494,22 +485,9 @@ impl InfluxDbLogsConfig {
     }
 
     fn get_measurement(&self) -> Result<String, &'static str> {
-        match (self.measurement.as_ref(), self.namespace.as_ref()) {
-            (Some(measure), Some(_)) => {
-                warn!("Option `namespace` has been superseded by `measurement`.");
-                Ok(measure.clone())
-            }
-            (Some(measure), None) => Ok(measure.clone()),
-            (None, Some(namespace)) => {
-                warn!(
-                    "Option `namespace` has been deprecated. Use `measurement` instead. \
-                       For example, you can use `measurement=<namespace>.vector` for the \
-                       same effect."
-                );
-                Ok(format!("{namespace}.vector"))
-            }
-            (None, None) => Err("The `measurement` option is required."),
-        }
+        self.measurement
+            .clone()
+            .ok_or("The `measurement` option is required.")
     }
 
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
@@ -566,7 +544,7 @@ mod tests {
     #[test]
     fn test_config_without_tags() {
         let config = indoc! {r#"
-            namespace: "vector-logs"
+            measurement: "vector-logs"
             endpoint: "http://localhost:9999"
             version: "2"
             bucket: "my-bucket"
@@ -578,9 +556,8 @@ mod tests {
     }
 
     #[test]
-    fn test_config_measurement_from_namespace() {
+    fn test_config_measurement_required() {
         let config = indoc! {r#"
-            namespace: "ns"
             endpoint: "http://localhost:9999"
             version: "2"
             bucket: "my-bucket"
@@ -589,7 +566,10 @@ mod tests {
         "#};
 
         let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
-        assert_eq!("ns.vector", sink_config.get_measurement().unwrap());
+        assert_eq!(
+            Err("The `measurement` option is required."),
+            sink_config.get_measurement()
+        );
     }
 
     #[test]
@@ -1172,7 +1152,6 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbLogsConfig {
-            namespace: None,
             measurement: Some(measure.clone()),
             endpoint: endpoint.clone(),
             tags: Default::default(),
