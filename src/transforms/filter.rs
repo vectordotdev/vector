@@ -36,7 +36,7 @@ impl From<AnyCondition> for FilterConfig {
 
 impl GenerateConfig for FilterConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(r#"condition = ".message == \"value\"""#).unwrap()
+        serde_yaml::from_str(r#"condition: '.message == "value"'"#).unwrap()
     }
 }
 

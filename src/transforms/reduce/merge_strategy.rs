@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use dyn_clone::DynClone;
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
+use vrl::compiler::value::VrlValueArithmetic;
 use vrl::path::{OwnedSegment, OwnedTargetPath};
 
 use crate::event::{LogEvent, Value};
@@ -412,24 +413,17 @@ impl ReduceValueMerger for AddNumbersMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
-        match v {
-            Value::Integer(i) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Int(i + j),
-                NumberMergerValue::Float(j) => {
-                    self.v = NumberMergerValue::Float(NotNan::new(i as f64).unwrap() + j)
-                }
-            },
-            Value::Float(f) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
-                NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
-            },
-            _ => {
-                return Err(format!(
-                    "expected numeric value, found: '{}'",
-                    v.to_string_lossy()
-                ));
-            }
-        }
+        let current = match &self.v {
+            NumberMergerValue::Int(value) => Value::Integer(*value),
+            NumberMergerValue::Float(value) => Value::Float(*value),
+        };
+        let sum = current.try_add(v).map_err(|error| error.to_string())?;
+        self.v = match sum {
+            Value::Integer(value) => NumberMergerValue::Int(value),
+            Value::Float(value) => NumberMergerValue::Float(value),
+            _ => return Err("summing numeric values produced a non-numeric value".to_owned()),
+        };
+
         Ok(())
     }
 
@@ -828,6 +822,14 @@ mod test {
             Ok(42.into())
         );
         assert_eq!(
+            merge(21.into(), 21.0.into(), &MergeStrategy::Sum),
+            Ok(42.0.into())
+        );
+        assert_eq!(
+            merge(21.0.into(), 21.into(), &MergeStrategy::Sum),
+            Ok(42.0.into())
+        );
+        assert_eq!(
             merge(41.into(), 42.into(), &MergeStrategy::Max),
             Ok(42.into())
         );
@@ -932,6 +934,18 @@ mod test {
         } else {
             panic!("Not array");
         }
+    }
+
+    #[test]
+    fn sum_returns_nan_errors() {
+        assert_eq!(
+            merge(
+                f64::INFINITY.into(),
+                f64::NEG_INFINITY.into(),
+                &MergeStrategy::Sum,
+            ),
+            Err("operation would produce NaN".to_owned())
+        );
     }
 
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {

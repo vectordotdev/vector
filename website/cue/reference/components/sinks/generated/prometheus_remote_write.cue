@@ -334,7 +334,6 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
 	expire_metrics_secs: {
-		common: false
 		description: """
 			The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
 			after having not been updated before they expire and are removed.

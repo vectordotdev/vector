@@ -200,7 +200,6 @@ pub struct ChronicleUnstructuredConfig {
         docs::examples = "production",
         docs::examples = "production-{{ namespace }}",
     ))]
-    #[configurable(metadata(docs::advanced))]
     pub namespace: Option<UnconfinedTemplate>,
 
     /// A set of labels that are attached to each batch of events.
@@ -260,14 +259,15 @@ fn chronicle_labels_examples() -> HashMap<String, String> {
 
 impl GenerateConfig for ChronicleUnstructuredConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(indoc! {r#"
-            credentials_path = "/path/to/credentials.json"
-            customer_id = "customer_id"
-            namespace = "namespace"
-            compression = "gzip"
-            log_type = "log_type"
-            fallback_log_type = "VECTOR_DEV"
-            encoding.codec = "text"
+        serde_yaml::from_str(indoc! {r#"
+            credentials_path: /path/to/credentials.json
+            customer_id: customer_id
+            namespace: namespace
+            compression: gzip
+            log_type: log_type
+            fallback_log_type: VECTOR_DEV
+            encoding:
+              codec: text
         "#})
         .unwrap()
     }
