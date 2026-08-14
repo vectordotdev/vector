@@ -41,6 +41,45 @@ generated: components: sinks: file: configuration: {
 		required: false
 		type: string: examples: ["/var/log/vector"]
 	}
+	batch: {
+		description: """
+			Controls how events are batched per destination file before writing.
+
+			Events sharing the same rendered path are accumulated into a single buffer and written
+			with one syscall per batch, reducing overhead when routing to many partitions
+			(for example, one file per Kafka topic). The default timeout is 1 second; raising it
+			increases throughput at the cost of end-to-end latency.
+			"""
+		required: false
+		type: object: options: {
+			max_bytes: {
+				description: """
+					The maximum size of a batch that is processed by a sink.
+
+					This is based on the uncompressed size of the batched events, before they are
+					serialized or compressed.
+					"""
+				required: false
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
+			}
+			max_events: {
+				description: "The maximum size of a batch before it is flushed."
+				required:    false
+				type: uint: unit: "events"
+			}
+			timeout_secs: {
+				description: "The maximum age of a batch before it is flushed."
+				required:    false
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
+			}
+		}
+	}
 	compression: {
 		description: "Compression configuration."
 		required:    false
@@ -596,7 +635,7 @@ generated: components: sinks: file: configuration: {
 		type: uint: {
 			default: 30
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}

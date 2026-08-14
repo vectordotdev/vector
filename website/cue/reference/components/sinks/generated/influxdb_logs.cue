@@ -153,7 +153,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"text",
+			"text"
 		]
 	}
 	org: {
@@ -384,7 +384,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"source",
+			"source"
 		]
 	}
 	tags: {
