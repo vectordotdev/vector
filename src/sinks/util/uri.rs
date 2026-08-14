@@ -340,7 +340,7 @@ impl HttpEndpoint {
         } else if base_path.ends_with('/') {
             format!("{base_path}{}", path.trim_start_matches('/'))
         } else {
-            format!("{base_path}/{path}")
+            format!("{base_path}/{}", path.trim_start_matches('/'))
         };
         parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
             endpoint: self.0.to_string(),
@@ -626,6 +626,16 @@ mod tests {
             "https://user:pass@example.com:8088/base/sub/path"
         );
         assert!(matches!(appended.as_uri().scheme_str(), Some("https")));
+        // A non-root base path with a leading-slash appended path must not
+        // produce a double slash.
+        assert_eq!(
+            HttpEndpoint::parse("https://proxy/prefix")
+                .unwrap()
+                .append_path("/api/v1/series")
+                .unwrap()
+                .to_string(),
+            "https://proxy/prefix/api/v1/series"
+        );
     }
 
     #[test]
