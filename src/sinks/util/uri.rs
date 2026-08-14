@@ -298,7 +298,7 @@ impl HttpEndpoint {
         // `host:port/path` without a scheme (it reads `host` as a scheme), so
         // the scheme is added up front rather than relying on the parser to
         // accept authority-form input.
-        let uri = if endpoint.contains("://") {
+        let uri = if has_scheme(endpoint) {
             endpoint
                 .parse::<Uri>()
                 .context(InvalidUriSnafu { endpoint })?
@@ -414,6 +414,23 @@ fn authority_has_invalid_port(uri: &Uri) -> bool {
     })
 }
 
+/// Returns `true` if `endpoint` starts with a URI scheme (`[a-zA-Z][a-zA-Z0-9+.-]*://`).
+///
+/// The scheme must be at the very start: a `://` later in the path or query
+/// (for example `localhost:8080/write?target=http://upstream`) is not a scheme
+/// marker, so the endpoint is still defaulted to `https`.
+fn has_scheme(endpoint: &str) -> bool {
+    let Some(scheme_end) = endpoint.find("://") else {
+        return false;
+    };
+    let Some(scheme) = endpoint.get(..scheme_end) else {
+        return false;
+    };
+    let mut chars = scheme.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic())
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -501,6 +518,8 @@ mod tests {
             "example.com:8088/services/collector",
             "localhost:8080",
             "[::1]:8080",
+            // A `://` later in the path or query is not a scheme marker.
+            "localhost:8080/write?target=http://upstream",
         ] {
             let endpoint =
                 HttpEndpoint::parse(endpoint).expect("should accept absolute http(s) URL");
