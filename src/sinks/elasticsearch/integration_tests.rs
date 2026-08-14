@@ -33,10 +33,19 @@ use crate::{
     tls::{self, TlsConfig},
 };
 
-const INITIAL_ADMIN_PASSWORD: &str = "Vector2026!";
-
 fn http_username() -> String {
     std::env::var("ELASTICSEARCH_USERNAME").unwrap_or_else(|_| "elastic".into())
+}
+
+fn http_password() -> String {
+    std::env::var("ELASTICSEARCH_PASSWORD").unwrap_or_else(|_| "vector".into())
+}
+
+fn aws_api_version() -> ElasticsearchApiVersion {
+    match std::env::var("ELASTICSEARCH_AWS_API_VERSION").as_deref() {
+        Ok("v7") => ElasticsearchApiVersion::V7,
+        _ => ElasticsearchApiVersion::V6,
+    }
 }
 
 fn aws_server() -> String {
@@ -116,6 +125,24 @@ async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crat
             "index_patterns": ["my-*-*"],
             "data_stream": {},
         }))
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    Ok(())
+}
+
+async fn delete_template_index(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
+    let response = create_http_client()
+        .delete(format!("{}/_index_template/{name}", common.base_url))
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    Ok(())
+}
+
+async fn delete_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
+    let response = create_http_client()
+        .delete(format!("{}/_data_stream/{name}", common.base_url))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -279,7 +306,7 @@ async fn auto_version_https() {
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
             user: http_username(),
-            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
+            password: http_password().into(),
         }),
         endpoints: vec![https_server()],
         doc_type: "log_lines".to_string(),
@@ -298,7 +325,6 @@ async fn auto_version_https() {
 }
 
 #[cfg(feature = "aws-core")]
-#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn auto_version_aws() {
     trace_init();
@@ -385,7 +411,7 @@ async fn insert_events_over_https() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuthConfig::Basic {
                 user: http_username(),
-                password: INITIAL_ADMIN_PASSWORD.to_string().into(),
+                password: http_password().into(),
             }),
             endpoints: vec![https_server()],
             doc_type: "log_lines".into(),
@@ -404,7 +430,6 @@ async fn insert_events_over_https() {
 }
 
 #[cfg(feature = "aws-core")]
-#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn insert_events_on_aws() {
     trace_init();
@@ -420,7 +445,7 @@ async fn insert_events_on_aws() {
             )),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
-            api_version: ElasticsearchApiVersion::V6,
+            api_version: aws_api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -431,7 +456,6 @@ async fn insert_events_on_aws() {
 }
 
 #[cfg(feature = "aws-core")]
-#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn insert_events_on_aws_with_compression() {
     trace_init();
@@ -448,7 +472,7 @@ async fn insert_events_on_aws_with_compression() {
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
             compression: Compression::gzip_default(),
-            api_version: ElasticsearchApiVersion::V6,
+            api_version: aws_api_version(),
             batch: batch_settings(),
             ..Default::default()
         },
@@ -504,11 +528,9 @@ async fn insert_events_in_data_stream() {
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
         mode: ElasticsearchMode::DataStream,
-        bulk: BulkConfig {
-            index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
-            ..Default::default()
-        },
         data_stream: Some(DataStreamConfig {
+            dtype: Template::try_from("my").unwrap(),
+            dataset: Template::try_from("stream").unwrap(),
             namespace: index,
             ..Default::default()
         }),
@@ -528,6 +550,13 @@ async fn insert_events_in_data_stream() {
         .expect("Data stream creation error");
 
     run_insert_tests_with_config(&cfg, TestType::Normal, BatchStatus::Delivered).await;
+
+    delete_data_stream(&common, &stream_index)
+        .await
+        .expect("Data stream deletion error");
+    delete_template_index(&common, &template_index)
+        .await
+        .expect("Template index deletion error");
 }
 
 #[tokio::test]
@@ -538,7 +567,7 @@ async fn distributed_insert_events() {
     let mut config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
             user: http_username(),
-            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
+            password: http_password().into(),
         }),
         endpoints: vec![https_server(), http_server()],
         doc_type: "log_lines".into(),
@@ -564,7 +593,7 @@ async fn distributed_insert_events_failover() {
     let mut config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
             user: http_username(),
-            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
+            password: http_password().into(),
         }),
         // Valid endpoints and some random non elasticsearch endpoint
         endpoints: vec![
@@ -609,6 +638,9 @@ async fn run_insert_tests(
         index: gen_index(),
         ..Default::default()
     };
+    if test_type == TestType::Error {
+        config.id_key = Some("_id".into());
+    }
     run_insert_tests_with_config(&config, test_type, status).await;
 }
 
@@ -695,7 +727,7 @@ async fn run_insert_tests_with_config(
         ElasticsearchMode::DataStream => config
             .data_stream
             .as_ref()
-            .map(|ds| format!("logs-generic-{}", ds.namespace))
+            .map(|ds| format!("{}-{}-{}", ds.dtype, ds.dataset, ds.namespace))
             .unwrap(),
         ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
@@ -703,7 +735,7 @@ async fn run_insert_tests_with_config(
     let client = create_http_client();
     let mut response = client
         .get(format!("{base_url}/{index}/_search"))
-        .basic_auth(http_username(), Some(INITIAL_ADMIN_PASSWORD))
+        .basic_auth(http_username(), Some(http_password()))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -792,7 +824,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     for base_url in base_urls {
         if let Ok(response) = client
             .get(format!("{base_url}/{index}/_search"))
-            .basic_auth(http_username(), Some(INITIAL_ADMIN_PASSWORD))
+            .basic_auth(http_username(), Some(http_password()))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))

@@ -321,13 +321,10 @@ pub enum ElasticsearchApiVersion {
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
-    /// Use the Elasticsearch 7.x API.
+    /// Use the Elasticsearch 7.x-compatible API, including OpenSearch.
     V7,
     /// Use the Elasticsearch 8.x API.
     V8,
-    #[serde(rename = "os3")]
-    /// Use the Opensearch 3.x API
-    OS3,
 }
 
 #[derive(Debug, Snafu)]
