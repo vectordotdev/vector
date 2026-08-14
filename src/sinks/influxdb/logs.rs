@@ -49,6 +49,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 pub struct InfluxDbLogsConfig {
     /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
+    #[configurable(metadata(docs::required = true))]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
