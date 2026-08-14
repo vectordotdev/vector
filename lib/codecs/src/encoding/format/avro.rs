@@ -104,8 +104,12 @@ fn coerce_logical_types(
 
             let mut last_err = None;
             for (index, variant) in union_schema.variants().iter().enumerate() {
+                let resolved_variant = match variant {
+                    Schema::Ref { name } => names.get(name).unwrap_or(variant),
+                    other => other,
+                };
                 match coerce_logical_types(value.clone(), variant, names) {
-                    Ok(coerced) if coerced.clone().resolve(variant).is_ok() => {
+                    Ok(coerced) if coerced.clone().resolve(resolved_variant).is_ok() => {
                         return Ok(AvroValue::Union(index as u32, Box::new(coerced)));
                     }
                     Ok(_) => {}
@@ -420,6 +424,86 @@ mod tests {
                         &fields[8].1,
                         AvroValue::Union(1, value) if matches!(value.as_ref(), AvroValue::Date(20_009))
                     )
+            }
+        ));
+    }
+
+    #[test]
+    fn coerce_nullable_named_record_with_logical_types() {
+        // Regression: a union branch that is a named schema reference (e.g. ["null", "Inner"])
+        // must resolve coerced values against the dereferenced schema, not the bare Schema::Ref.
+        let schema = apache_avro::Schema::parse_str(indoc! {r#"
+            {
+                "type": "record",
+                "name": "Outer",
+                "fields": [
+                    {
+                        "name": "inner",
+                        "type": {
+                            "type": "record",
+                            "name": "Inner",
+                            "fields": [
+                                {
+                                    "name": "date",
+                                    "type": {"type": "int", "logicalType": "date"}
+                                },
+                                {
+                                    "name": "time_millis",
+                                    "type": {"type": "int", "logicalType": "time-millis"}
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "nullable_inner",
+                        "type": ["null", "Inner"]
+                    }
+                ]
+            }
+        "#})
+        .unwrap();
+
+        let value = AvroValue::Record(vec![
+            (
+                "inner".to_owned(),
+                AvroValue::Record(vec![
+                    ("date".to_owned(), AvroValue::Long(20_000)),
+                    ("time_millis".to_owned(), AvroValue::Long(43_200_000)),
+                ]),
+            ),
+            (
+                "nullable_inner".to_owned(),
+                AvroValue::Record(vec![
+                    ("date".to_owned(), AvroValue::Long(20_001)),
+                    ("time_millis".to_owned(), AvroValue::Long(3_600_000)),
+                ]),
+            ),
+        ]);
+
+        let named_schemas = resolve_named_schemas(&schema).unwrap();
+        let value = coerce_logical_types(value, &schema, &named_schemas).unwrap();
+        let value = value.resolve(&schema).unwrap();
+
+        assert!(matches!(
+            value,
+            AvroValue::Record(ref fields) if {
+                matches!(
+                    &fields[0].1,
+                    AvroValue::Record(inner) if {
+                        matches!(inner[0].1, AvroValue::Date(20_000))
+                            && matches!(inner[1].1, AvroValue::TimeMillis(43_200_000))
+                    }
+                )
+                && matches!(
+                    &fields[1].1,
+                    AvroValue::Union(1, value) if matches!(
+                        value.as_ref(),
+                        AvroValue::Record(inner) if {
+                            matches!(inner[0].1, AvroValue::Date(20_001))
+                                && matches!(inner[1].1, AvroValue::TimeMillis(3_600_000))
+                        }
+                    )
+                )
             }
         ));
     }
