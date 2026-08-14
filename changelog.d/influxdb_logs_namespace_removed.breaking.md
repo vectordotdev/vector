@@ -30,7 +30,7 @@ sinks:
     endpoint: http://localhost:8086
 ```
 
-Note: if your configuration sets both `namespace` and `measurement`, the old sink used `measurement`
-and ignored `namespace`; remove the `namespace` option and leave `measurement` unchanged.
+Note: if your configuration sets both `namespace` and `measurement`, `measurement` was used and
+`namespace` ignored; remove the `namespace` option and leave `measurement` unchanged.
 
 authors: thomasqueirozb
