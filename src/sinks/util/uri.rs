@@ -261,9 +261,15 @@ impl From<HttpEndpoint> for String {
 }
 
 impl HttpEndpoint {
-    /// Requires `uri` to be an absolute `http`/`https` URL.
+    /// Requires `uri` to be an absolute `http`/`https` URL with a host.
+    ///
+    /// The authority check alone is not enough: `http://:8080` parses as a
+    /// valid `http::Uri` with an authority but an empty host, so the host is
+    /// checked explicitly.
     pub fn new(uri: Uri) -> Result<Self, HttpEndpointError> {
-        if matches!(uri.scheme_str(), Some("http" | "https")) && uri.authority().is_some() {
+        if matches!(uri.scheme_str(), Some("http" | "https"))
+            && uri.host().is_some_and(|host| !host.is_empty())
+        {
             Ok(Self(uri))
         } else {
             Err(HttpEndpointError::NotAbsoluteHttp {
@@ -408,6 +414,9 @@ mod tests {
             "https://example.com:8088/services/collector",
             "http://127.0.0.1:9000/endpoint?query=1",
             "https://user:pass@example.com/path",
+            // IPv6 hosts are returned bracketed (`[::1]`) and must be accepted.
+            "http://[::1]:8080",
+            "https://[::1]/path",
         ] {
             let endpoint =
                 HttpEndpoint::parse(endpoint).expect("should accept absolute http(s) URL");
@@ -432,6 +441,10 @@ mod tests {
             "unix:///var/run/vector.sock",
             // Scheme but no authority.
             "http:///path",
+            // Authority with a port but an empty host: `http::Uri` parses this
+            // with `authority() == Some` and `host() == Some("")`.
+            "http://:8080",
+            "http://:8080/path",
         ] {
             assert!(
                 matches!(
