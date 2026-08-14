@@ -357,17 +357,17 @@ impl FileSink {
             path: self.path.clone(),
         };
         let batch_settings = self.batch_settings;
-        // Per-path event buffers with a max-age deadline (absolute Instant).
-        // The deadline is set when the first event for a path arrives and is
-        // never reset, so `batch.timeout` is a true maximum batch age.
-        let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, tokio::time::Instant)> =
+        // Per-path event buffers (unordered). Flush deadlines live in a BinaryHeap
+        // so peeking the earliest deadline is O(1) regardless of partition count.
+        let mut buffers: std::collections::HashMap<Bytes, Vec<Event>> =
             std::collections::HashMap::new();
+        let mut flush_deadlines: std::collections::BinaryHeap<
+            std::cmp::Reverse<(tokio::time::Instant, Bytes)>,
+        > = std::collections::BinaryHeap::new();
 
         tokio::pin!(input);
 
         loop {
-            // Earliest flush deadline across all paths.
-            let flush_deadline = buffers.values().map(|(_, deadline)| *deadline).min();
             let input_next = input.next();
 
             tokio::select! {
@@ -379,8 +379,6 @@ impl FileSink {
                                     if let Some(ref confinement) = self.confinement {
                                         match confinement.confine(&bytes_to_path(&raw_path)) {
                                             Ok(confined) => {
-                                                // Convert the normalised PathBuf back to Bytes
-                                                // for use as the buffer key.
                                                 #[cfg(unix)]
                                                 {
                                                     use std::os::unix::ffi::OsStrExt;
@@ -421,32 +419,70 @@ impl FileSink {
                                 }
                             };
                             let event_size = event.estimated_json_encoded_size_of().get();
-                            if let Some((events, _)) = buffers.get_mut(&path) {
+                            if let Some(events) = buffers.get_mut(&path) {
                                 let current_size: usize = events.iter()
                                     .map(|e| e.estimated_json_encoded_size_of().get())
                                     .sum();
                                 if current_size + event_size > batch_settings.size_limit
                                     || events.len() >= batch_settings.item_limit
                                 {
-                                    // Size limit reached — flush and start a new batch.
-                                    let (old_events, _) = buffers.remove(&path).unwrap();
+                                    // Buffer is full — flush old batch and start fresh.
+                                    let old_events = buffers.remove(&path).unwrap();
                                     self.process_batch(path.clone(), old_events).await;
                                     let deadline = tokio::time::Instant::now()
                                         + batch_settings.timeout;
-                                    buffers.insert(path, (vec![event], deadline));
+                                    buffers.insert(path.clone(), vec![event]);
+                                    flush_deadlines.push(std::cmp::Reverse((deadline, path.clone())));
                                 } else {
                                     events.push(event);
                                 }
                             } else {
                                 let deadline = tokio::time::Instant::now()
                                     + batch_settings.timeout;
-                                buffers.insert(path, (vec![event], deadline));
+                                buffers.insert(path.clone(), vec![event]);
+                                flush_deadlines.push(std::cmp::Reverse((deadline, path.clone())));
+                            }
+                            // Reset the file-handle idle deadline so the file stays open while
+                            // events accumulate for this path.
+                            self.files.reset_at(&path, self.deadline_at());
+                            // Flush immediately when the batch reaches the item or byte limit.
+                            let needs_flush = buffers.get(&path).map_or(false, |events| {
+                                let total_size: usize = events.iter()
+                                    .map(|e| e.estimated_json_encoded_size_of().get())
+                                    .sum();
+                                total_size >= batch_settings.size_limit
+                                    || events.len() >= batch_settings.item_limit
+                            });
+                            if needs_flush {
+                                let batch = buffers.remove(&path).unwrap();
+                                self.process_batch(path, batch).await;
+                            }
+                            // Bound active-buffer memory under high-cardinality templates.
+                            let now = tokio::time::Instant::now();
+                            loop {
+                                let expired = flush_deadlines.peek().map_or(false,
+                                    |std::cmp::Reverse((d, _))| *d <= now,
+                                );
+                                let over_capacity = flush_deadlines.peek().map_or(false, |_|
+                                    buffers.len() > 1000,
+                                );
+                                if !expired && !over_capacity {
+                                    break;
+                                }
+                                let std::cmp::Reverse((_, old_path)) =
+                                    match flush_deadlines.pop() {
+                                        Some(e) => e,
+                                        None => break,
+                                    };
+                                if let Some(events) = buffers.remove(&old_path) {
+                                    self.process_batch(old_path, events).await;
+                                }
                             }
                         }
                         None => {
                             // Stream exhausted — flush all remaining buffers, then close files.
                             debug!(message = "Receiver exhausted, flushing remaining buffers.");
-                            for (path, (events, _)) in buffers.drain() {
+                            for (path, events) in buffers.drain() {
                                 self.process_batch(path, events).await;
                             }
                             debug!(message = "Closing all the open files.");
@@ -468,20 +504,6 @@ impl FileSink {
                         }
                     }
                 }
-                _ = tokio::time::sleep_until(
-                    flush_deadline.unwrap_or(tokio::time::Instant::now() + Duration::from_secs(3600))
-                ), if flush_deadline.is_some() => {
-                    let now = tokio::time::Instant::now();
-                    let expired: Vec<Bytes> = buffers.iter()
-                        .filter(|(_, (_, deadline))| *deadline <= now)
-                        .map(|(path, _)| path.clone())
-                        .collect();
-                    for path in expired {
-                        if let Some((events, _)) = buffers.remove(&path) {
-                            self.process_batch(path, events).await;
-                        }
-                    }
-                }
                 result = self.files.next_expired(), if !self.files.is_empty() => {
                     match result {
                         None => unreachable!(),
@@ -489,6 +511,25 @@ impl FileSink {
                             self.close_file(expired_file, path).await;
                         }
                     }
+                }
+            }
+
+            // Flush any expired buffers after every wake-up.
+            let now = tokio::time::Instant::now();
+            loop {
+                let expired = flush_deadlines.peek().map_or(false,
+                    |std::cmp::Reverse((d, _))| *d <= now,
+                );
+                if !expired {
+                    break;
+                }
+                let std::cmp::Reverse((_, path)) =
+                    match flush_deadlines.pop() {
+                        Some(e) => e,
+                        None => break,
+                    };
+                if let Some(events) = buffers.remove(&path) {
+                    self.process_batch(path, events).await;
                 }
             }
         }
@@ -1328,62 +1369,73 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn confine_drops_dotdot_traversal() {
-    //     // PoC payload: tenant field carries `../..` to escape the base dir.
-    //     let dir = temp_dir();
-    //     let path = format!("{}/apps/{{{{ service }}}}/app.log", dir.display());
-    //     let cfg = base_config(&path);
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn confine_drops_dotdot_traversal() {
+        // PoC payload: tenant field carries `../..` to escape the base dir.
+        let dir = temp_dir();
+        let apps = dir.join("apps");
+        let template = format!("{}/{{{{ service }}}}/app.log", apps.display());
+        let mut cfg = base_config(&template);
+        cfg.base_dir = Some(apps.clone());
 
-    //     let mut event = Event::Log(LogEvent::from("payload"));
-    //     event
-    //         .as_mut_log()
-    //         .insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
+        let mut event = Event::Log(LogEvent::from("payload"));
+        event.as_mut_log().insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
 
-    //     let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-    //     assert!(sink.partition_event(&event).is_none());
-    // }
+        // Run without compliance checks — no events are sent, so the compliance
+        // metric assertions (BytesSent / component_sent_bytes_total) would fail.
+        let sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        VectorSink::from_event_streamsink(sink)
+            .run(Box::pin(stream::iter(vec![event].into_iter().map(Into::into))))
+            .await
+            .expect("Running sink failed");
 
-    // #[tokio::test]
-    // async fn confine_collapses_absolute_injection_into_base() {
-    //     // When a field value begins with `/`, the template render produces
-    //     // `<base>//<value>` which lexically collapses to `<base>/<value>`.
-    //     // The leading slash is harmless (a separator, not an escape) — the
-    //     // event is still confined to the base.
-    //     let dir = temp_dir();
-    //     let path = format!("{}/{{{{ key }}}}.log", dir.display());
-    //     let cfg = base_config(&path);
+        // `confine` rejects the traversal before any filesystem mutation.
+        assert!(!apps.exists(), "base_dir should not have been created: {:?}", apps);
+    }
 
-    //     let mut event = Event::Log(LogEvent::from("payload"));
-    //     event.as_mut_log().insert(event_path!("key"), "/etc/passwd");
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn confine_collapses_absolute_injection_into_base() {
+        // When a field value begins with `/`, the template render produces
+        // `<base>//<value>` which lexically collapses to `<base>/<value>`.
+        // The leading slash is harmless — the event is still confined to the base.
+        let dir = temp_dir();
+        let template = format!("{}/{{{{ key }}}}.log", dir.display());
+        let mut cfg = base_config(&template);
+        cfg.base_dir = Some(dir.clone());
+        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
 
-    //     let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-    //     let confined = sink.partition_event(&event).unwrap();
-    //     let confined_str = String::from_utf8_lossy(&confined);
-    //     assert!(
-    //         confined_str.starts_with(&*dir.to_string_lossy()),
-    //         "expected {confined_str} to remain under {}",
-    //         dir.display()
-    //     );
-    // }
+        let mut event = Event::Log(LogEvent::from("payload"));
+        event.as_mut_log().insert(event_path!("key"), "/etc/passwd");
 
-    // // The path template embeds a literal `/` before the field, which is
-    // // Unix-shaped: on Windows the rendered separator flips to `\`.
-    // #[cfg(unix)]
-    // #[tokio::test]
-    // async fn confine_allows_legit_partition() {
-    //     let dir = temp_dir();
-    //     let path = format!("{}/{{{{ key }}}}.log", dir.display());
-    //     let cfg = base_config(&path);
+        run_assert_sink(&cfg, vec![event].into_iter()).await;
 
-    //     let mut event = Event::Log(LogEvent::from("payload"));
-    //     event.as_mut_log().insert(event_path!("key"), "tenant-a");
+        let expected = dir.join("etc/passwd.log");
+        assert!(
+            expected.exists(),
+            "expected {expected:?} to exist under base {}",
+            dir.display()
+        );
+    }
 
-    //     let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-    //     let rendered = sink.partition_event(&event).unwrap();
-    //     let rendered_str = String::from_utf8_lossy(&rendered);
-    //     assert!(rendered_str.ends_with("/tenant-a.log"), "{rendered_str}");
-    // }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn confine_allows_legit_partition() {
+        let dir = temp_dir();
+        let template = format!("{}/{{{{ key }}}}.log", dir.display());
+        let mut cfg = base_config(&template);
+        cfg.base_dir = Some(dir.clone());
+        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
+
+        let mut event = Event::Log(LogEvent::from("payload"));
+        event.as_mut_log().insert(event_path!("key"), "tenant-a");
+
+        run_assert_sink(&cfg, vec![event].into_iter()).await;
+
+        let expected = dir.join("tenant-a.log");
+        assert!(expected.exists(), "expected file not created: {expected:?}");
+    }
 
     #[test]
     fn escape_hatch_suppresses_build_error() {
@@ -1396,24 +1448,25 @@ mod tests {
         assert!(sink.confinement.is_none());
     }
 
-    // #[tokio::test]
-    // async fn escape_hatch_bypasses_confinement_even_when_base_derivable() {
-    //     // With the flag set, confinement is fully disabled — even when a base
-    //     // would otherwise be derivable. The flag is a complete opt-out.
-    //     let dir = temp_dir();
-    //     let path = format!("{}/{{{{ key }}}}.log", dir.display());
-    //     let mut cfg = base_config(&path);
-    //     cfg.confinement
-    //         .dangerously_allow_unconfined_template_resolution = true;
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn escape_hatch_bypasses_confinement_even_when_base_derivable() {
+        // With the flag set, confinement is fully disabled — even when a base
+        // would otherwise be derivable. The flag is a complete opt-out.
+        let dir = temp_dir();
+        let template = format!("{}/{{{{ key }}}}.log", dir.display());
+        let mut cfg = base_config(&template);
+        cfg.confinement.dangerously_allow_unconfined_template_resolution = true;
+        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
 
-    //     let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-    //     assert!(sink.confinement.is_none());
+        let mut event = Event::Log(LogEvent::from("payload"));
+        event.as_mut_log().insert(event_path!("key"), "safe-value");
 
-    //     let mut event = Event::Log(LogEvent::from("payload"));
-    //     event.as_mut_log().insert(event_path!("key"), "safe-value");
-    //     // Event routes through — no confinement check.
-    //     assert!(sink.partition_event(&event).is_some());
-    // }
+        run_assert_sink(&cfg, vec![event].into_iter()).await;
+
+        let expected = dir.join("safe-value.log");
+        assert!(expected.exists(), "expected file not created: {expected:?}");
+    }
 
     #[tokio::test]
     async fn vector_validate_no_fs_io() {
