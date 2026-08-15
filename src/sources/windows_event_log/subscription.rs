@@ -79,6 +79,12 @@ const ERROR_NO_MORE_ITEMS: u32 = 259;
 const ERROR_INVALID_OPERATION: u32 = 4317; // 0x10DD
 const ERROR_EVT_INVALID_QUERY: u32 = 15001; // 0x3A99
 const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 15007; // 0x3A9F
+// Returned by `EvtSubscribe` for direct (analytic/debug) channels, which cannot be
+// subscribed to. Named explicitly because 15009 used to be held by the misnamed
+// `ERROR_EVT_CHANNEL_NOT_FOUND`, so such a channel was skipped by accident. Correcting
+// that constant without this one would turn a skipped channel into a hard startup
+// failure for every config that lists one alongside valid channels.
+const ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL: u32 = 15009; // 0x3AA1
 const ERROR_EVT_QUERY_RESULT_STALE: u32 = 15011; // 0x3AA3
 const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 15012; // 0x3AA4
 
@@ -368,9 +374,10 @@ impl EventLogSubscription {
                     let error_code = (e.code().0 as u32) & 0xFFFF;
                     if error_code == ERROR_EVT_CHANNEL_NOT_FOUND
                         || error_code == ERROR_EVT_INVALID_QUERY
+                        || error_code == ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL
                     {
                         warn!(
-                            message = "Skipping channel (not found or invalid query).",
+                            message = "Skipping channel (not found, invalid query, or direct channel).",
                             channel = %channel,
                             error_code = error_code
                         );
@@ -819,10 +826,15 @@ impl EventLogSubscription {
         channel_sub: &mut ChannelSubscription,
         config: &WindowsEventLogConfig,
     ) -> Result<(), WindowsEventLogError> {
-        // Close the stale subscription handle
-        unsafe {
-            let _ = EvtClose(channel_sub.subscription_handle);
-        }
+        // The old handle is deliberately kept open until the replacement exists.
+        //
+        // Closing it first would leave a closed handle in `channel_sub` whenever
+        // `EvtSubscribe` fails transiently: the next `EvtNext` would then return
+        // ERROR_INVALID_HANDLE, which matches no recovery branch, so the channel would
+        // stay silent forever despite this function logging that it will retry. Keeping
+        // the stale handle means the next pull reproduces the original error code and
+        // routes back into here — that *is* the retry path.
+        let old_handle = channel_sub.subscription_handle;
 
         let channel_hstring = HSTRING::from(channel_sub.channel.as_str());
         let query = Self::build_xpath_query(config)?;
@@ -893,6 +905,11 @@ impl EventLogSubscription {
             }
         }
         .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?;
+
+        // Replacement is in place — only now is the stale handle safe to release.
+        unsafe {
+            let _ = EvtClose(old_handle);
+        }
 
         channel_sub.subscription_handle = new_handle;
         channel_sub.subscription_active_gauge.set(1.0);
@@ -1366,42 +1383,54 @@ mod tests {
         // only asserted a property of the events it happened to receive, so it passed
         // with zero events — which is exactly the failure mode of #26117, where the
         // source subscribes successfully and then stays silent forever.
-        let seed_output = std::process::Command::new("eventcreate")
-            .args([
-                "/T",
-                "INFORMATION",
-                "/ID",
-                "101",
-                "/L",
-                "APPLICATION",
-                "/SO",
-                "VectorTestFutureEventsSeed",
-                "/D",
-                "seed event for #26117 future-events regression test",
-            ])
-            .output()
-            .expect("failed to spawn eventcreate — required for deterministic seeding");
-        assert!(
-            seed_output.status.success(),
-            "eventcreate failed to seed Application log (exit={:?}): stdout={:?} stderr={:?}. \
-             This test requires a seeded event to be deterministic; a locked-down runner \
-             without the privilege to write to Application cannot run this test reliably.",
-            seed_output.status.code(),
-            String::from_utf8_lossy(&seed_output.stdout),
-            String::from_utf8_lossy(&seed_output.stderr),
-        );
+        fn seed(id: &str, note: &str) {
+            let out = std::process::Command::new("eventcreate")
+                .args([
+                    "/T",
+                    "INFORMATION",
+                    "/ID",
+                    id,
+                    "/L",
+                    "APPLICATION",
+                    "/SO",
+                    "VectorTestFutureEventsSeed",
+                    "/D",
+                    note,
+                ])
+                .output()
+                .expect("failed to spawn eventcreate — required for deterministic seeding");
+            assert!(
+                out.status.success(),
+                "eventcreate failed to seed Application log (exit={:?}): stdout={:?} stderr={:?}. \
+                 This test requires a seeded event to be deterministic; a locked-down runner \
+                 without the privilege to write to Application cannot run this test reliably.",
+                out.status.code(),
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            );
+        }
+
+        /// Pull until at least one event arrives or the deadline passes.
+        async fn pull_until_nonempty(
+            subscription: &mut EventLogSubscription,
+        ) -> Vec<xml_parser::WindowsEvent> {
+            let mut events = Vec::new();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            while std::time::Instant::now() < deadline {
+                events.extend(subscription.pull_events(100).unwrap_or_default());
+                if !events.is_empty() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            events
+        }
+
+        seed("101", "first seed for #26117 future-events regression test");
 
         // Poll rather than sleeping once: the service needs a moment to persist the
         // record, and a single fixed wait makes this flaky on slow runners.
-        let mut events = Vec::new();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-        while std::time::Instant::now() < deadline {
-            events.extend(subscription.pull_events(100).unwrap_or_default());
-            if !events.is_empty() {
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        }
+        let mut events = pull_until_nonempty(&mut subscription).await;
 
         assert!(
             !events.is_empty(),
@@ -1409,6 +1438,22 @@ mod tests {
              Application log after subscribing. With read_existing_events=false the \
              subscription must still deliver newly arriving records (see #26117)."
         );
+
+        // The first batch alone does not prove the fix. `pull_events_inner` keeps events
+        // it has already accumulated when a later `EvtNext` fails, so an unpatched build
+        // can return this first seed, swallow the error that kills the handle, and go
+        // permanently silent — while still satisfying the assertion above. Only a second
+        // event, written after the first pull completed, shows that delivery survives.
+        seed("102", "second seed for #26117 — must arrive after the first pull");
+
+        let later_events = pull_until_nonempty(&mut subscription).await;
+        assert!(
+            !later_events.is_empty(),
+            "The subscription delivered the first seeded event but nothing afterwards. \
+             This is exactly the #26117 failure mode: the handle stops serving results \
+             and is never rebuilt, so the source looks healthy while being silent."
+        );
+        events.extend(later_events);
 
         let tolerance = chrono::Duration::seconds(5);
         let earliest_allowed = subscription_start_time - tolerance;
