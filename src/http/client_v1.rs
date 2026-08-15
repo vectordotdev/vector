@@ -318,9 +318,7 @@ impl HttpProxyConnectorV1 {
         }
         let upgraded = hyper_1::upgrade::on(&mut response).await?;
 
-        let host = destination
-            .host()
-            .ok_or_else(|| invalid_input("HTTPS destination must contain a host"))?;
+        let host = tls_host(&destination)?;
         let mut configuration = destination_tls.configure()?;
         if let Some(settings) = &tls_settings {
             settings.apply_connect_configuration(&mut configuration, false)?;
@@ -414,6 +412,16 @@ fn connect_authority(destination: &Uri) -> Result<String, BoxError> {
     } else {
         format!("{authority}:443")
     })
+}
+
+fn tls_host(destination: &Uri) -> Result<&str, BoxError> {
+    let host = destination
+        .host()
+        .ok_or_else(|| invalid_input("HTTPS destination must contain a host"))?;
+    Ok(host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host))
 }
 
 trait ConnectionIo: rt::Read + rt::Write + Connection + Unpin + Send {}
@@ -587,7 +595,7 @@ fn invalid_input(message: impl Into<String>) -> BoxError {
 
 #[cfg(test)]
 mod tests {
-    use super::connect_authority;
+    use super::{connect_authority, tls_host};
 
     #[test]
     fn connect_authority_includes_a_port() {
@@ -602,6 +610,22 @@ mod tests {
         assert_eq!(
             connect_authority(&"https://[::1]/path".parse().unwrap()).unwrap(),
             "[::1]:443"
+        );
+    }
+
+    #[test]
+    fn tls_host_normalizes_ipv6_literals() {
+        assert_eq!(
+            tls_host(&"https://[::1]/path".parse().unwrap()).unwrap(),
+            "::1"
+        );
+        assert_eq!(
+            tls_host(&"https://127.0.0.1/path".parse().unwrap()).unwrap(),
+            "127.0.0.1"
+        );
+        assert_eq!(
+            tls_host(&"https://example.com/path".parse().unwrap()).unwrap(),
+            "example.com"
         );
     }
 }
