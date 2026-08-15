@@ -94,6 +94,13 @@ struct ChannelSubscription {
     subscription_handle: EVT_HANDLE,
     signal_event: HANDLE,
     bookmark: BookmarkManager,
+    /// Whether `subscription_handle` can currently serve results.
+    ///
+    /// Not derivable from the handle: when re-subscription fails the old handle is
+    /// deliberately retained, so that the next pull reproduces the error and retries.
+    /// A non-null handle therefore no longer implies a working one, and health reporting
+    /// must read this flag rather than infer activity from handle nullness.
+    subscription_active: bool,
     /// Pre-registered counter for events read on this channel.
     events_read_counter: Counter,
     /// Pre-registered counter for render errors on this channel.
@@ -348,6 +355,7 @@ impl EventLogSubscription {
 
                     channel_subscriptions.push(ChannelSubscription {
                         channel: channel.clone(),
+                        subscription_active: true,
                         events_read_counter: counter!(
                             "windows_event_log_events_read_total",
                             "channel" => channel.clone()
@@ -623,6 +631,7 @@ impl EventLogSubscription {
                                     channel = %channel_sub.channel,
                                     error = %e
                                 );
+                                channel_sub.subscription_active = false;
                                 channel_sub.subscription_active_gauge.set(0.0);
                                 channel_drained = true;
                                 // Speculative pull on timeout in mod.rs is a safety net if
@@ -912,6 +921,7 @@ impl EventLogSubscription {
         }
 
         channel_sub.subscription_handle = new_handle;
+        channel_sub.subscription_active = true;
         channel_sub.subscription_active_gauge.set(1.0);
 
         counter!(
@@ -952,12 +962,10 @@ impl EventLogSubscription {
     /// Returns (total_channels, active_channels) for health reporting.
     pub fn channel_health_summary(&self) -> (usize, usize) {
         let total = self.channels.len();
-        // A channel is considered active if its subscription handle is non-null
-        let active = self
-            .channels
-            .iter()
-            .filter(|c| c.subscription_handle.0 != 0)
-            .count();
+        // Read the tracked state, not the handle. A failed re-subscription deliberately
+        // keeps the old, unusable handle so the next pull retries — inferring activity
+        // from handle nullness would report "healthy" during exactly that outage.
+        let active = self.channels.iter().filter(|c| c.subscription_active).count();
         (total, active)
     }
 
@@ -1383,6 +1391,10 @@ mod tests {
         // only asserted a property of the events it happened to receive, so it passed
         // with zero events — which is exactly the failure mode of #26117, where the
         // source subscribes successfully and then stays silent forever.
+        // Named once: the assertions below identify the seeded records by this provider,
+        // so the writer and the reader must not drift apart.
+        const SEED_PROVIDER: &str = "VectorTestFutureEventsSeed";
+
         fn seed(id: &str, note: &str) {
             let out = std::process::Command::new("eventcreate")
                 .args([
@@ -1393,7 +1405,7 @@ mod tests {
                     "/L",
                     "APPLICATION",
                     "/SO",
-                    "VectorTestFutureEventsSeed",
+                    SEED_PROVIDER,
                     "/D",
                     note,
                 ])
@@ -1444,14 +1456,39 @@ mod tests {
         // can return this first seed, swallow the error that kills the handle, and go
         // permanently silent — while still satisfying the assertion above. Only a second
         // event, written after the first pull completed, shows that delivery survives.
+        //
+        // It has to be *this* event, not merely a non-empty second batch: on a busy
+        // Application log the first pull can exhaust its 100-event budget before reaching
+        // the failing `EvtNext`, so the backlog alone would satisfy a non-empty check
+        // while event 102 never arrives.
         seed("102", "second seed for #26117 — must arrive after the first pull");
 
-        let later_events = pull_until_nonempty(&mut subscription).await;
+        let mut later_events = Vec::new();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        while std::time::Instant::now() < deadline {
+            later_events.extend(subscription.pull_events(100).unwrap_or_default());
+            if later_events
+                .iter()
+                .any(|e| e.event_id == 102 && e.provider_name == SEED_PROVIDER)
+            {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+
         assert!(
-            !later_events.is_empty(),
-            "The subscription delivered the first seeded event but nothing afterwards. \
-             This is exactly the #26117 failure mode: the handle stops serving results \
-             and is never rebuilt, so the source looks healthy while being silent."
+            later_events
+                .iter()
+                .any(|e| e.event_id == 102 && e.provider_name == SEED_PROVIDER),
+            "The record seeded *after* the first pull (event ID 102, provider {SEED_PROVIDER}) \
+             was never delivered within 30s. This is the #26117 failure mode: the handle \
+             stops serving results and is never rebuilt, so the source looks healthy while \
+             being silent. Received {} event(s) in the second phase: {:?}",
+            later_events.len(),
+            later_events
+                .iter()
+                .map(|e| (e.event_id, e.provider_name.as_str()))
+                .collect::<Vec<_>>(),
         );
         events.extend(later_events);
 
