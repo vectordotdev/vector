@@ -50,7 +50,7 @@ rm -rf %{buildroot}
 mkdir -p %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
-mkdir -p %{buildroot}%{_sysconfdir}/default
+mkdir -p %{buildroot}%{_sysconfdir}/sysconfig
 mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
 mkdir -p %{buildroot}%{_datadir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
@@ -59,8 +59,9 @@ cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_datadir}/%{_name}/examples
 cp -a %{_builddir}/config/vector.yaml %{buildroot}%{_datadir}/%{_name}/examples/vector.yaml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
-cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
-cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
+sed 's|EnvironmentFile=-/etc/default/vector|EnvironmentFile=-/etc/sysconfig/vector|' \
+  %{_builddir}/systemd/vector.service > %{buildroot}%{_unitdir}/vector.service
+cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/sysconfig/vector
 cp -a %{_builddir}/licenses/. %{buildroot}%{_datadir}/%{_name}/licenses
 cp -a %{_builddir}/NOTICE %{buildroot}%{_datadir}/%{_name}/NOTICE
 cp -a %{_builddir}/LICENSE-3rdparty.csv %{buildroot}%{_datadir}/%{_name}/LICENSE-3rdparty.csv
@@ -80,7 +81,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_unitdir}/vector.service
-%config(noreplace) %{_sysconfdir}/default/vector
+%config(noreplace) %{_sysconfdir}/sysconfig/vector
 # Older versions installed a demo config at this path; mark it as %ghost so
 # rpm preserves any existing on-disk file during upgrade instead of removing
 # it as orphaned.
