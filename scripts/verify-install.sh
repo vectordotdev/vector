@@ -26,6 +26,9 @@ case "$package" in
     ;;
   *.rpm)
     environment_file=/etc/sysconfig/vector
+    # Emulate an upgrade from a package that used the Debian-style path.
+    mkdir -p /etc/default
+    echo "FOO=bar" > /etc/default/vector
     ;;
 esac
 
@@ -39,7 +42,10 @@ test ! -e /etc/vector/vector.yaml || (echo "/etc/vector/vector.yaml should not b
 test -f /usr/share/vector/examples/vector.yaml || (echo "/usr/share/vector/examples/vector.yaml doesn't exist" && exit 1)
 
 mkdir -p /etc/vector
-echo "FOO=bar" > "$environment_file"
+if [[ "$package" == *.deb ]]; then
+  echo "FOO=bar" > "$environment_file"
+fi
+grep -q "FOO=bar" "$environment_file" || (echo "$environment_file did not preserve existing contents" && exit 1)
 echo "foo: bar" > /etc/vector/vector.yaml
 
 install_package "$package"

@@ -66,6 +66,15 @@ cp -a %{_builddir}/licenses/. %{buildroot}%{_datadir}/%{_name}/licenses
 cp -a %{_builddir}/NOTICE %{buildroot}%{_datadir}/%{_name}/NOTICE
 cp -a %{_builddir}/LICENSE-3rdparty.csv %{buildroot}%{_datadir}/%{_name}/LICENSE-3rdparty.csv
 
+%pre
+# Preserve environment customizations when upgrading from an RPM that used
+# the Debian-style path. The packaged file is marked noreplace, so RPM keeps
+# this migrated file and installs the new default alongside it as .rpmnew.
+if [ -f %{_sysconfdir}/default/vector ] && [ ! -e %{_sysconfdir}/sysconfig/vector ]; then
+  mkdir -p %{_sysconfdir}/sysconfig
+  cp -a %{_sysconfdir}/default/vector %{_sysconfdir}/sysconfig/vector
+fi
+
 %post
 getent passwd %{_username} > /dev/null || \
   useradd --shell /sbin/nologin --system --home-dir %{_sharedstatedir}/%{_name} --user-group \
@@ -73,6 +82,10 @@ getent passwd %{_username} > /dev/null || \
 chown %{_username} %{_sharedstatedir}/%{_name}
 usermod -aG systemd-journal %{_username}  || true
 usermod -aG systemd-journal-remote %{_username}  || true
+systemctl daemon-reload >/dev/null 2>&1 || true
+
+%postun
+systemctl daemon-reload >/dev/null 2>&1 || true
 
 %clean
 rm -rf %{buildroot}
