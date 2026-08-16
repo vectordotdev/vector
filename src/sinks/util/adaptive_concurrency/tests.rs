@@ -125,6 +125,15 @@ struct TestParams {
     #[serde(default)]
     jitter: f64,
 
+    /// The number of request attempts that return a retriable error, simulating an outage that
+    /// the backend later recovers from.
+    #[serde(default)]
+    failures: usize,
+
+    /// The number of requests that must complete before the simulated outage starts.
+    #[serde(default)]
+    failures_after: usize,
+
     #[configurable(derived)]
     #[serde(default)]
     concurrency_limit_params: LimitParams,
@@ -269,11 +278,22 @@ impl Service<Vec<Event>> for TestSink {
         let in_flight = stats.in_flight.level();
         let rate = stats.requests.len();
 
-        let action = self
-            .params
-            .concurrency_limit_params
-            .action_at_level(in_flight)
-            .or_else(|| self.params.rate.action_at_level(rate));
+        // Once `failures_after` requests have completed, the next `failures` attempts fail with a
+        // retriable error. The retry layer resends the same request, so a single request as seen by
+        // the concurrency limiter spans every failed attempt plus the backoff between them.
+        let outage = control.failures > 0 && control.stats.completed >= self.params.failures_after;
+        if outage {
+            control.failures -= 1;
+        }
+
+        let action = if outage {
+            Some(Action::Defer)
+        } else {
+            self.params
+                .concurrency_limit_params
+                .action_at_level(in_flight)
+                .or_else(|| self.params.rate.action_at_level(rate))
+        };
         match action {
             None => {
                 let delay = self.delay_at(in_flight, rate);
@@ -331,6 +351,8 @@ impl RetryLogic for TestRetryLogic {
 #[derive(Debug, Default)]
 struct TestController {
     todo: usize,
+    /// Remaining request attempts to fail with a retriable error.
+    failures: usize,
     send_done: Option<oneshot::Sender<()>>,
     stats: Statistics,
 }
@@ -355,9 +377,10 @@ impl fmt::Debug for Statistics {
 }
 
 impl TestController {
-    fn new(todo: usize, send_done: oneshot::Sender<()>) -> Self {
+    fn new(todo: usize, failures: usize, send_done: oneshot::Sender<()>) -> Self {
         Self {
             todo,
+            failures,
             send_done: Some(send_done),
             stats: Default::default(),
         }
@@ -427,7 +450,11 @@ async fn run_test(params: TestParams) -> TestResults {
             ..Default::default()
         },
         params,
-        control: Arc::new(Mutex::new(TestController::new(params.requests, send_done))),
+        control: Arc::new(Mutex::new(TestController::new(
+            params.requests,
+            params.failures,
+            send_done,
+        ))),
         controller_stats: Default::default(),
     };
 
