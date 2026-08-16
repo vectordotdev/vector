@@ -30,8 +30,8 @@ controller:
     mean: [4.0, 29]
   observed_rtt:
     min: [0.100, 0.102]
-    max: [0.100, 19.7]
-    mean: [0.100, 5.7]
+    max: [0.100, 0.102]
+    mean: [0.100, 0.102]
   averaged_rtt:
     min: [0.100, 0.102]
     max: [0.100, 9.0]
