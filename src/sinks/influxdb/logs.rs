@@ -26,7 +26,7 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Buffer, Compression, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },
@@ -56,7 +56,7 @@ pub struct InfluxDbLogsConfig {
     ///
     /// This should be a full HTTP URI, including the scheme, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The list of names of log fields that should be added as tags to each measurement.
     ///
@@ -1013,7 +1013,7 @@ mod tests {
         // Swap out the host so we can force send it
         // to our local server
         let host = format!("http://{addr}");
-        config.endpoint = host;
+        config.endpoint = HttpEndpoint::parse(&host).unwrap();
 
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -1153,7 +1153,7 @@ mod integration_tests {
 
         let config = InfluxDbLogsConfig {
             measurement: Some(measure.clone()),
-            endpoint: endpoint.clone(),
+            endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             tags: Default::default(),
             version: Some(InfluxDbVersion::V2),
             database: None,

@@ -2,6 +2,7 @@ use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
+use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
 
 use crate::http::Auth;
@@ -196,6 +197,240 @@ pub fn protocol_endpoint(uri: Uri) -> (String, String) {
     )
 }
 
+/// Error returned when a configured endpoint cannot be used as an absolute HTTP URL.
+#[derive(Debug, Snafu)]
+pub enum HttpEndpointError {
+    #[snafu(display("endpoint `{endpoint}` is not a valid URI: {source}"))]
+    InvalidUri {
+        endpoint: String,
+        source: http::uri::InvalidUri,
+    },
+
+    #[snafu(display("endpoint `{endpoint}` has an invalid path `{path}`: {source}"))]
+    InvalidPath {
+        endpoint: String,
+        path: String,
+        source: http::uri::InvalidUri,
+    },
+
+    #[snafu(display("endpoint `{endpoint}` cannot be reassembled from its parts: {source}"))]
+    InvalidUriParts {
+        endpoint: String,
+        source: http::uri::InvalidUriParts,
+    },
+
+    #[snafu(display(
+        "endpoint must be an absolute http(s) URL, for example `https://example.com`; got `{endpoint}`"
+    ))]
+    NotAbsoluteHttp { endpoint: String },
+
+    #[snafu(display("endpoint `{endpoint}` has an invalid port"))]
+    InvalidPort { endpoint: String },
+}
+
+/// A `Uri` proven to be an absolute `http`/`https` URL.
+///
+/// Constructing an `HttpEndpoint` is the only way to obtain one: both
+/// [`HttpEndpoint::new`] and [`HttpEndpoint::parse`] reject URIs without an
+/// `http`/`https` scheme or without an authority. Sinks that issue requests
+/// through `HttpClient` need this invariant, since `HttpClient` rejects such
+/// URIs at request time, deferring a pure configuration error to runtime.
+///
+/// As a configuration type it deserializes from a string, so an invalid
+/// endpoint is rejected at config load time with the config path in the error.
+///
+/// Path composition goes through [`HttpEndpoint::append_path`], which
+/// manipates `Uri` parts directly instead of string-concatenating and
+/// re-parsing, so the scheme and authority are preserved and the result is
+/// still an absolute `http(s)` URL.
+#[configurable_component]
+#[configurable(title = "An absolute http(s) URL.", description = "")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[serde(try_from = "String", into = "String")]
+pub struct HttpEndpoint(Uri);
+
+impl TryFrom<String> for HttpEndpoint {
+    type Error = HttpEndpointError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::parse(&value)
+    }
+}
+
+impl From<HttpEndpoint> for String {
+    fn from(value: HttpEndpoint) -> Self {
+        value.to_string()
+    }
+}
+
+impl HttpEndpoint {
+    /// Requires `uri` to be an absolute `http`/`https` URL with a host and a
+    /// usable port.
+    ///
+    /// The authority check alone is not enough: `http://:8080` parses as a
+    /// valid `http::Uri` with an authority but an empty host, and
+    /// `http://localhost:notaport` parses with a nonempty host but a port that
+    /// cannot be dialed. Both are checked explicitly.
+    pub fn new(uri: Uri) -> Result<Self, HttpEndpointError> {
+        let has_valid_scheme_and_host = matches!(uri.scheme_str(), Some("http" | "https"))
+            && uri.host().is_some_and(|host| !host.is_empty());
+        if !has_valid_scheme_and_host {
+            return Err(HttpEndpointError::NotAbsoluteHttp {
+                endpoint: uri.to_string(),
+            });
+        }
+        if authority_has_invalid_port(&uri) {
+            return Err(HttpEndpointError::InvalidPort {
+                endpoint: uri.to_string(),
+            });
+        }
+        Ok(Self(uri))
+    }
+
+    /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
+    ///
+    /// A missing scheme is defaulted to `https`, so `example.com:8080` becomes
+    /// `https://example.com:8080`. An explicit `http`/`https` scheme is
+    /// preserved. Endpoints that still lack a host after defaulting (for
+    /// example `/path`) are rejected.
+    pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
+        // Default a missing scheme to https. `http::Uri` cannot parse
+        // `host:port/path` without a scheme (it reads `host` as a scheme), so
+        // the scheme is added up front rather than relying on the parser to
+        // accept authority-form input.
+        let uri = if has_scheme(endpoint) {
+            endpoint
+                .parse::<Uri>()
+                .context(InvalidUriSnafu { endpoint })?
+        } else {
+            format!("https://{endpoint}")
+                .parse::<Uri>()
+                .context(InvalidUriSnafu { endpoint })?
+        };
+        Self::new(uri)
+    }
+
+    /// Returns the underlying `Uri`.
+    pub const fn as_uri(&self) -> &Uri {
+        &self.0
+    }
+
+    /// Consumes the endpoint, returning the underlying `Uri`.
+    pub fn into_uri(self) -> Uri {
+        self.0
+    }
+
+    /// Appends `path` to this endpoint, preserving the scheme and authority.
+    ///
+    /// `path` may include a leading slash and a query. The existing query, if
+    /// any, is dropped (as with `UriSerde::append_path`), but the scheme and
+    /// authority are preserved and the result is still an absolute `http(s)` URL.
+    pub fn append_path(&self, path: &str) -> Result<Self, HttpEndpointError> {
+        if path.is_empty() {
+            return Ok(self.clone());
+        }
+        let mut parts = self.0.clone().into_parts();
+        let base_path = parts
+            .path_and_query
+            .as_ref()
+            .map(PathAndQuery::path)
+            .unwrap_or_default();
+        let joined = if base_path.is_empty() {
+            path.to_string()
+        } else if base_path.ends_with('/') {
+            format!("{base_path}{}", path.strip_prefix('/').unwrap_or(path))
+        } else {
+            format!("{base_path}/{}", path.strip_prefix('/').unwrap_or(path))
+        };
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
+            endpoint: self.0.to_string(),
+            path: joined,
+        })?);
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
+            endpoint: self.0.to_string(),
+        })?;
+        Self::new(uri)
+    }
+
+    /// Appends `suffix` directly to the path without inserting a separator.
+    ///
+    /// Unlike [`HttpEndpoint::append_path`], this does not add a `/`. It is for
+    /// API method suffixes that attach directly to a resource path, such as
+    /// Google's `:publish` convention.
+    pub fn append_raw_suffix(&self, suffix: &str) -> Result<Self, HttpEndpointError> {
+        if suffix.is_empty() {
+            return Ok(self.clone());
+        }
+        let mut parts = self.0.clone().into_parts();
+        let base_path = parts
+            .path_and_query
+            .as_ref()
+            .map(PathAndQuery::path)
+            .unwrap_or_default();
+        let joined = format!("{base_path}{suffix}");
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
+            endpoint: self.0.to_string(),
+            path: joined,
+        })?);
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
+            endpoint: self.0.to_string(),
+        })?;
+        Self::new(uri)
+    }
+}
+
+impl fmt::Display for HttpEndpoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Returns `true` if the URI's authority contains a port that is not a valid
+/// `u16`.
+///
+/// `http::Uri` accepts non-numeric ports (for example
+/// `http://localhost:notaport`), which `HttpClient` cannot dial. `Authority::port`
+/// returns `None` for both a missing port and an invalid one, so the raw
+/// authority is inspected instead.
+fn authority_has_invalid_port(uri: &Uri) -> bool {
+    let Some(authority) = uri.authority() else {
+        return false;
+    };
+    let auth = authority.as_str();
+    // Strip any userinfo (everything up to the last `@`).
+    let host_port = auth
+        .rsplit_once('@')
+        .map(|(_, host_port)| host_port)
+        .unwrap_or(auth);
+    // An IPv6 host is bracketed; the port follows the closing `]`.
+    let host_end = host_port.rfind(']').map_or(0, |i| i + 1);
+    let Some(host_port) = host_port.get(host_end..) else {
+        return false;
+    };
+    host_port.rfind(':').is_some_and(|i| {
+        host_port
+            .get(i + 1..)
+            .is_some_and(|port| port.parse::<u16>().is_err())
+    })
+}
+
+/// Returns `true` if `endpoint` starts with a URI scheme (`[a-zA-Z][a-zA-Z0-9+.-]*://`).
+///
+/// The scheme must be at the very start: a `://` later in the path or query
+/// (for example `localhost:8080/write?target=http://upstream`) is not a scheme
+/// marker, so the endpoint is still defaulted to `https`.
+fn has_scheme(endpoint: &str) -> bool {
+    let Some(scheme_end) = endpoint.find("://") else {
+        return false;
+    };
+    let Some(scheme) = endpoint.get(..scheme_end) else {
+        return false;
+    };
+    let mut chars = scheme.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic())
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,6 +499,187 @@ mod tests {
         assert_eq!(
             parse("gopher://example.net:123/path?query#frag,emt"),
             ("gopher".into(), "gopher://example.net:123/path".into())
+        );
+    }
+
+    #[test]
+    fn http_endpoint_accepts_absolute_http_urls() {
+        for endpoint in [
+            "http://example.com",
+            "https://example.com",
+            "https://example.com:8088/services/collector",
+            "http://127.0.0.1:9000/endpoint?query=1",
+            "https://user:pass@example.com/path",
+            // IPv6 hosts are returned bracketed (`[::1]`) and must be accepted.
+            "http://[::1]:8080",
+            "https://[::1]/path",
+            // A missing scheme is defaulted to https.
+            "example.com",
+            "example.com:8088/services/collector",
+            "localhost:8080",
+            "[::1]:8080",
+            // A `://` later in the path or query is not a scheme marker.
+            "localhost:8080/write?target=http://upstream",
+        ] {
+            let endpoint =
+                HttpEndpoint::parse(endpoint).expect("should accept absolute http(s) URL");
+            assert!(matches!(
+                endpoint.as_uri().scheme_str(),
+                Some("http" | "https")
+            ));
+            assert!(endpoint.as_uri().authority().is_some());
+        }
+    }
+
+    #[test]
+    fn http_endpoint_defaults_missing_scheme_to_https() {
+        for endpoint in [
+            "example.com",
+            "example.com:8080",
+            "localhost:8080/path",
+            "[::1]:8080",
+        ] {
+            let endpoint =
+                HttpEndpoint::parse(endpoint).expect("should default a missing scheme to https");
+            assert_eq!(endpoint.as_uri().scheme_str(), Some("https"));
+            assert!(
+                endpoint
+                    .as_uri()
+                    .host()
+                    .is_some_and(|host| !host.is_empty())
+            );
+        }
+        // An explicit scheme is preserved.
+        assert_eq!(
+            HttpEndpoint::parse("http://example.com")
+                .unwrap()
+                .as_uri()
+                .scheme_str(),
+            Some("http")
+        );
+    }
+
+    #[test]
+    fn http_endpoint_rejects_non_absolute_http_urls() {
+        for endpoint in [
+            // No scheme and no host: `http::Uri` parses these as a path.
+            "/services/collector",
+            "",
+            // Absolute, but not a scheme `HttpClient` can dial.
+            "gopher://example.com",
+            "unix:///var/run/vector.sock",
+            // Scheme but no authority.
+            "http:///path",
+            // Authority with a port but an empty host: `http::Uri` parses this
+            // with `authority() == Some` and `host() == Some("")`.
+            "http://:8080",
+            "http://:8080/path",
+            // A non-numeric port parses with a nonempty host but cannot be dialed.
+            "http://localhost:notaport",
+            "https://example.com:notaport/path",
+            // Multiple port separators are rejected by the URI parser.
+            "http://localhost:notaport:8080",
+        ] {
+            assert!(
+                matches!(
+                    HttpEndpoint::parse(endpoint),
+                    Err(HttpEndpointError::NotAbsoluteHttp { .. })
+                        | Err(HttpEndpointError::InvalidUri { .. })
+                        | Err(HttpEndpointError::InvalidUriParts { .. })
+                        | Err(HttpEndpointError::InvalidPort { .. })
+                ),
+                "expected `{endpoint}` to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn http_endpoint_reports_unparseable_endpoints() {
+        let error = HttpEndpoint::parse("http://exa mple.com").unwrap_err();
+        assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
+    }
+
+    #[test]
+    fn http_endpoint_rejects_malformed_ports() {
+        for endpoint in [
+            "http://localhost:notaport",
+            "https://example.com:notaport/path",
+        ] {
+            assert!(matches!(
+                HttpEndpoint::parse(endpoint),
+                Err(HttpEndpointError::InvalidPort { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn http_endpoint_append_path_joins_without_string_concatenation() {
+        let base = HttpEndpoint::parse("https://example.com").unwrap();
+
+        assert_eq!(
+            base.append_path("vector/events").unwrap().to_string(),
+            "https://example.com/vector/events"
+        );
+        assert_eq!(
+            base.append_path("/api/v1/series").unwrap().to_string(),
+            "https://example.com/api/v1/series"
+        );
+        assert_eq!(
+            HttpEndpoint::parse("https://example.com/")
+                .unwrap()
+                .append_path("vector/events")
+                .unwrap()
+                .to_string(),
+            "https://example.com/vector/events"
+        );
+        // The query is carried in the appended path.
+        assert_eq!(
+            base.append_path("/write?db=mydb").unwrap().to_string(),
+            "https://example.com/write?db=mydb"
+        );
+        // The scheme and authority survive appending.
+        let appended = HttpEndpoint::parse("https://user:pass@example.com:8088/base")
+            .unwrap()
+            .append_path("sub/path")
+            .unwrap();
+        assert_eq!(
+            appended.to_string(),
+            "https://user:pass@example.com:8088/base/sub/path"
+        );
+        assert!(matches!(appended.as_uri().scheme_str(), Some("https")));
+        // A non-root base path with a leading-slash appended path must not
+        // produce a double slash.
+        assert_eq!(
+            HttpEndpoint::parse("https://proxy/prefix")
+                .unwrap()
+                .append_path("/api/v1/series")
+                .unwrap()
+                .to_string(),
+            "https://proxy/prefix/api/v1/series"
+        );
+        // Only the single boundary slash is removed; significant leading
+        // slashes in the appended path are preserved (GCS object keys).
+        assert_eq!(
+            HttpEndpoint::parse("https://storage.googleapis.com/bucket/")
+                .unwrap()
+                .append_path("//archive/")
+                .unwrap()
+                .to_string(),
+            "https://storage.googleapis.com/bucket//archive/"
+        );
+    }
+
+    #[test]
+    fn http_endpoint_append_raw_suffix_attaches_without_separator() {
+        let base = HttpEndpoint::parse("https://example.com/v1/projects/p/topics/t").unwrap();
+        assert_eq!(
+            base.append_raw_suffix(":publish").unwrap().to_string(),
+            "https://example.com/v1/projects/p/topics/t:publish"
+        );
+        // An empty suffix returns the endpoint unchanged.
+        assert_eq!(
+            base.append_raw_suffix("").unwrap().to_string(),
+            base.to_string()
         );
     }
 }
