@@ -48,8 +48,9 @@ impl<S, L> AdaptiveConcurrencyLimit<S, L> {
     }
 
     /// Create a limiter that shares an existing controller with a `MeasureAttempt` placed on the
-    /// far side of the retry layer, which reports each attempt to that controller.
-    pub(crate) const fn with_measured_attempts(inner: S, controller: Arc<Controller<L>>) -> Self {
+    /// far side of the retry layer, which reports each attempt to that controller. Build both
+    /// halves with [`super::measured_pair`] rather than calling this directly.
+    pub(super) const fn with_measured_attempts(inner: S, controller: Arc<Controller<L>>) -> Self {
         AdaptiveConcurrencyLimit {
             inner,
             controller,

@@ -24,7 +24,7 @@ use crate::{
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
 #[derive(Clone)]
-pub(crate) struct Controller<L> {
+pub(super) struct Controller<L> {
     semaphore: Arc<ShrinkableSemaphore>,
     concurrency: Option<usize>,
     settings: AdaptiveConcurrencySettings,
@@ -60,7 +60,7 @@ pub(super) struct ControllerStatistics {
 }
 
 impl<L> Controller<L> {
-    pub(crate) fn new(
+    pub(super) fn new(
         concurrency: Option<usize>,
         settings: AdaptiveConcurrencySettings,
         logic: L,

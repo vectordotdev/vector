@@ -27,7 +27,7 @@ pub struct MeasureAttempt<S, L> {
 }
 
 impl<S, L> MeasureAttempt<S, L> {
-    pub(crate) const fn new(inner: S, controller: Arc<Controller<L>>) -> Self {
+    pub(super) const fn new(inner: S, controller: Arc<Controller<L>>) -> Self {
         Self { inner, controller }
     }
 }

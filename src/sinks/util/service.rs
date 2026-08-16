@@ -25,7 +25,7 @@ use crate::{
         Batch, BatchSink, Partition, PartitionBatchSink,
         adaptive_concurrency::{
             AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
-            Controller, MeasureAttempt,
+            MeasureAttempt, measured_pair,
         },
         retries::{FibonacciRetryPolicy, JitterMode, RetryLogic},
         service::map::MapLayer,
@@ -389,24 +389,21 @@ where
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
-        // The controller is shared by the concurrency limiter and by `MeasureAttempt` on the far
-        // side of the retry layer. The limiter accounts for permits and back pressure across the
-        // whole retry sequence, while the round-trip time comes from a single attempt.
-        let controller = Arc::new(Controller::new(
+        // The limiter accounts for permits and back pressure across the whole retry sequence,
+        // while the round-trip time comes from a single attempt reported by the reporter.
+        let (limit, measure) = measured_pair(
             self.settings.concurrency,
             self.settings.adaptive_concurrency,
             self.retry_logic.clone(),
-        ));
+        );
         ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
-            .layer_fn(|service| {
-                AdaptiveConcurrencyLimit::with_measured_attempts(service, Arc::clone(&controller))
-            })
+            .layer(limit)
             .retry(policy)
-            .layer_fn(|service| MeasureAttempt::new(service, Arc::clone(&controller)))
+            .layer(measure)
             .timeout(self.settings.timeout)
             .service(inner)
     }
