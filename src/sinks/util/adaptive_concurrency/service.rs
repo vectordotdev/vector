@@ -20,6 +20,9 @@ pub struct AdaptiveConcurrencyLimit<S, L> {
     inner: S,
     pub(super) controller: Arc<Controller<L>>,
     state: State,
+    /// Whether this layer times the call itself. False when a `MeasureAttempt` on the far side of
+    /// the retry layer reports each attempt to the same controller.
+    measure_call: bool,
 }
 
 enum State {
@@ -40,6 +43,18 @@ impl<S, L> AdaptiveConcurrencyLimit<S, L> {
             inner,
             controller: Arc::new(Controller::new(concurrency, options, logic)),
             state: State::Empty,
+            measure_call: true,
+        }
+    }
+
+    /// Create a limiter that shares an existing controller with a `MeasureAttempt` placed on the
+    /// far side of the retry layer, which reports each attempt to that controller.
+    pub(crate) const fn with_measured_attempts(inner: S, controller: Arc<Controller<L>>) -> Self {
+        AdaptiveConcurrencyLimit {
+            inner,
+            controller,
+            state: State::Empty,
+            measure_call: false,
         }
     }
 }
@@ -82,7 +97,12 @@ where
         // Call the inner service
         let future = self.inner.call(request);
 
-        ResponseFuture::new(future, permit, Arc::clone(&self.controller))
+        ResponseFuture::new(
+            future,
+            permit,
+            Arc::clone(&self.controller),
+            self.measure_call,
+        )
     }
 }
 
@@ -104,6 +124,7 @@ where
             inner: self.inner.clone(),
             controller: Arc::clone(&self.controller),
             state: State::Empty,
+            measure_call: self.measure_call,
         }
     }
 }

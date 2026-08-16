@@ -32,7 +32,9 @@ pub struct ResponseFuture<F, L> {
     // Keep this around so that it is dropped when the future completes
     _permit: OwnedSemaphorePermit,
     controller: Arc<Controller<L>>,
-    start: Instant,
+    /// `None` when a `MeasureAttempt` reports each attempt to the controller, which times a
+    /// single attempt rather than the whole retry sequence.
+    start: Option<Instant>,
 }
 
 impl<F, L> ResponseFuture<F, L> {
@@ -40,12 +42,13 @@ impl<F, L> ResponseFuture<F, L> {
         inner: F,
         _permit: OwnedSemaphorePermit,
         controller: Arc<Controller<L>>,
+        measure_call: bool,
     ) -> Self {
         Self {
             inner,
             _permit,
             controller,
-            start: instant_now(),
+            start: measure_call.then(instant_now),
         }
     }
 }
@@ -61,7 +64,10 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let future = self.project();
         let output = ready!(future.inner.poll(cx)).map_err(Into::into);
-        future.controller.adjust_to_response(*future.start, &output);
+        match future.start {
+            Some(start) => future.controller.adjust_to_response(*start, &output),
+            None => future.controller.adjust_to_completion(),
+        }
         Poll::Ready(output)
     }
 }

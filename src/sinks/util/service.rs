@@ -25,6 +25,7 @@ use crate::{
         Batch, BatchSink, Partition, PartitionBatchSink,
         adaptive_concurrency::{
             AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+            Controller, MeasureAttempt,
         },
         retries::{FibonacciRetryPolicy, JitterMode, RetryLogic},
         service::map::MapLayer,
@@ -37,8 +38,9 @@ mod health;
 mod map;
 pub mod net;
 
-pub type Svc<S, L> =
-    RateLimit<AdaptiveConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, Timeout<S>>, L>>;
+pub type Svc<S, L> = RateLimit<
+    AdaptiveConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, MeasureAttempt<Timeout<S>, L>>, L>,
+>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
@@ -387,17 +389,24 @@ where
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
+        // The controller is shared by the concurrency limiter and by `MeasureAttempt` on the far
+        // side of the retry layer. The limiter accounts for permits and back pressure across the
+        // whole retry sequence, while the round-trip time comes from a single attempt.
+        let controller = Arc::new(Controller::new(
+            self.settings.concurrency,
+            self.settings.adaptive_concurrency,
+            self.retry_logic.clone(),
+        ));
         ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
-            .layer(AdaptiveConcurrencyLimitLayer::new(
-                self.settings.concurrency,
-                self.settings.adaptive_concurrency,
-                self.retry_logic.clone(),
-            ))
+            .layer_fn(|service| {
+                AdaptiveConcurrencyLimit::with_measured_attempts(service, Arc::clone(&controller))
+            })
             .retry(policy)
+            .layer_fn(|service| MeasureAttempt::new(service, Arc::clone(&controller)))
             .timeout(self.settings.timeout)
             .service(inner)
     }
