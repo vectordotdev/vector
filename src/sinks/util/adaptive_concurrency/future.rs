@@ -66,7 +66,7 @@ where
         let output = ready!(future.inner.poll(cx)).map_err(Into::into);
         match future.start {
             Some(start) => future.controller.adjust_to_response(*start, &output),
-            None => future.controller.adjust_to_completion(),
+            None => future.controller.adjust_to_completion(&output),
         }
         Poll::Ready(output)
     }

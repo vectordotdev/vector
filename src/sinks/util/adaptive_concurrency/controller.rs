@@ -300,8 +300,12 @@ where
 
     /// Adjust the controller to the final outcome of a request whose attempts were reported
     /// individually by `record_attempt`.
-    pub(super) fn adjust_to_completion(&self) {
-        self.adjust_to_response_inner(None, false)
+    ///
+    /// The round-trip time comes from those attempts, but an outcome that never reached the
+    /// service is only visible here. The retry layer returns a readiness error between attempts
+    /// without calling the service, so classify the outcome again to catch it.
+    pub(super) fn adjust_to_completion(&self, response: &Result<L::Response, crate::Error>) {
+        self.adjust_to_response_inner(None, self.classify(response).is_back_pressure)
     }
 
     /// Adjust the controller to a response, timing the whole call. This is the path taken when no
