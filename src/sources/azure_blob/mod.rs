@@ -387,7 +387,6 @@ pub struct AzureStorageClientSource {
     credential: Option<Arc<dyn TokenCredential>>,
     shared_key: Option<(String, String)>,
     proxy: ProxyConfig,
-    /// The custom root certificate, read once at startup rather than per client build.
     ca_pem: Option<Vec<u8>>,
     /// HTTP clients, cached per host. See `build_transport`.
     http_clients: RwLock<HashMap<String, Arc<dyn HttpClient>>>,
@@ -455,7 +454,6 @@ impl AzureStorageClientSource {
                     .map_err(|e| {
                         format!("Failed to read TLS CA file {}: {e}", ca_file.display())
                     })?;
-                // Parse eagerly so a malformed certificate fails at startup, not on first request.
                 reqwest_13::Certificate::from_pem(&buf)
                     .map_err(|e| format!("Invalid TLS CA file {}: {e}", ca_file.display()))?;
                 info!("Adding TLS root certificate from {}.", ca_file.display());
@@ -474,6 +472,16 @@ impl AzureStorageClientSource {
             ca_pem,
             http_clients: RwLock::new(HashMap::new()),
         })
+    }
+
+    pub fn account_name(&self) -> Option<String> {
+        if let Some(account) = self.parsed.account_name.as_ref() {
+            return Some(account.clone());
+        }
+        if let Some(blob_endpoint) = self.parsed.blob_endpoint.as_deref() {
+            return queue::account_from_url(blob_endpoint);
+        }
+        None
     }
 
     /// Resolution order, mirroring `ParsedConnectionString::blob_account_endpoint`:
@@ -593,7 +601,6 @@ impl AzureStorageClientSource {
         }
 
         if let Some(ca_pem) = &self.ca_pem {
-            // Already validated in `new`, so this cannot fail in practice.
             let cert = reqwest_13::Certificate::from_pem(ca_pem)
                 .map_err(|e| format!("Invalid TLS root certificate: {e}"))?;
             reqwest_builder = reqwest_builder.add_root_certificate(cert);
@@ -685,7 +692,6 @@ impl Policy for ContentLengthPolicy {
     }
 }
 
-/// Extract the value of a connection string key (case-insensitive), if present.
 fn connection_string_value(connection_string: &str, key: &str) -> Option<String> {
     connection_string.split(';').find_map(|seg| {
         let (k, v) = seg.trim().split_once('=')?;

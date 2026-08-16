@@ -121,7 +121,6 @@ impl InternalEvent for AzureQueueMessageProcessingSucceeded<'_> {
 pub struct AzureQueueMessageProcessingError<'a> {
     pub message_id: &'a str,
     pub error: &'a ProcessingError,
-    /// With no dead-letter queue, a growing dequeue count is the signal for a poison message.
     pub dequeue_count: Option<i64>,
 }
 
@@ -152,7 +151,8 @@ impl InternalEvent for AzureQueueMessageProcessingError<'_> {
                 )
                 .increment(1);
             }
-            ProcessingError::ContainerClient { .. } => {
+            ProcessingError::ContainerClient { .. }
+            | ProcessingError::ForeignStorageAccount { .. } => {
                 counter!(
                     CounterName::ComponentErrorsTotal,
                     "error_code" => PROCESSING_ERROR_CODE,
@@ -274,8 +274,6 @@ mod tests {
             cause,
             "failed to execute `reqwest` request",
         );
-
-        // `Display` alone stops at the outer context.
         assert_eq!(error.to_string(), "failed to execute `reqwest` request");
         assert_eq!(
             error_chain(&error),

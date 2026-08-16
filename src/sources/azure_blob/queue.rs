@@ -199,6 +199,13 @@ pub enum ProcessingError {
         subject: Option<String>,
         url: Option<String>,
     },
+    #[snafu(display(
+        "Received notification for storage account '{received}', but source is configured for '{configured}'"
+    ))]
+    ForeignStorageAccount {
+        configured: String,
+        received: String,
+    },
     #[snafu(display("Failed to build client for container {}: {}", container, message))]
     ContainerClient { message: String, container: String },
     #[snafu(display("Failed to fetch blob {}/{}: {}", container, blob, source))]
@@ -233,16 +240,28 @@ impl ProcessingError {
             Self::InvalidQueueMessage { .. } | Self::InvalidBlobPath { .. } => {
                 error_type::PARSER_FAILED
             }
-            Self::ContainerClient { .. } => error_type::CONFIGURATION_FAILED,
+            Self::ForeignStorageAccount { .. } | Self::ContainerClient { .. } => {
+                error_type::CONFIGURATION_FAILED
+            }
             Self::GetBlob { .. } => error_type::REQUEST_FAILED,
             Self::ReadBlob { .. } => error_type::READER_FAILED,
             Self::PipelineSend { .. } => error_type::WRITER_FAILED,
             Self::ErrorAcknowledgement { .. } => error_type::ACKNOWLEDGMENT_FAILED,
         }
     }
+
+    pub const fn is_non_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::InvalidQueueMessage { .. }
+                | Self::InvalidBlobPath { .. }
+                | Self::ForeignStorageAccount { .. }
+        )
+    }
 }
 
 pub struct State {
+    account_name: Option<String>,
     clients: AzureStorageClientSource,
     queue_client: QueueClient,
     container_clients: RwLock<HashMap<String, Arc<BlobContainerClient>>>,
@@ -314,15 +333,15 @@ impl Ingestor {
             }
             .into());
         }
-        // A zero cap makes `ExponentialBackoff` yield `Duration::ZERO` forever, turning the
-        // empty-queue backoff into an unthrottled `GetMessages` loop on every polling task.
         if config.poll_secs == 0 {
             return Err(IngestorNewError::ZeroPollSecs.into());
         }
 
         let queue_client = clients.queue_client(&config.queue_name)?;
+        let account_name = clients.account_name();
 
         let state = Arc::new(State {
+            account_name,
             clients,
             queue_client,
             container_clients: RwLock::new(HashMap::new()),
@@ -497,13 +516,19 @@ impl IngestorProcess {
                 }
             }
             Err(err) => {
-                // Left in the queue to redeliver after the visibility timeout. There is no
-                // dead-letter queue, so a permanently failing message redelivers indefinitely.
                 emit!(AzureQueueMessageProcessingError {
                     message_id: &message_id,
                     error: &err,
                     dequeue_count,
                 });
+                if self.state.delete_failed_message && err.is_non_retryable() {
+                    warn!(
+                        message = "Deleting non-retryable failed queue message.",
+                        message_id = %message_id,
+                        error = %err,
+                    );
+                    self.delete_message(&message_id, &pop_receipt).await;
+                }
             }
         }
     }
@@ -545,6 +570,17 @@ impl IngestorProcess {
                 subject: notification.subject.clone(),
                 url: notification.url.clone(),
             })?;
+
+        if let (Some(configured), Some(received)) = (
+            self.state.account_name.as_deref(),
+            blob_ref.storage_account.as_deref(),
+        ) && !configured.eq_ignore_ascii_case(received)
+        {
+            return Err(ProcessingError::ForeignStorageAccount {
+                configured: configured.to_owned(),
+                received: received.to_owned(),
+            });
+        }
 
         let container_client = self.state.container_client(&blob_ref.container)?;
 
@@ -665,12 +701,8 @@ impl IngestorProcess {
             Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
         };
 
-        // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
-        // so we explicitly drop it so that we can again utilize `read_error` below.
-        drop(stream);
 
-        // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
-        // reference must be dropped before the status of the batch is sent to the channel.
+        drop(stream);
         drop(batch);
 
         // Deliberately not the same as `result.is_ok()`: a rejected batch is removed from the
@@ -729,7 +761,6 @@ impl IngestorProcess {
             }
         };
 
-        // Measured after the acknowledgement, so the outcome is known before a histogram is picked.
         let duration = download_start.elapsed();
         if delivered {
             emit!(AzureBlobProcessingSucceeded {
@@ -881,7 +912,6 @@ fn decode_message_text(raw: &str) -> Cow<'_, str> {
 enum QueueEvent {
     CloudEvent(CloudEventEnvelope),
     EventGrid(EventGridEnvelope),
-    // Defensive: some tooling wraps Event Grid events in a one-element array.
     EventGridBatch(Vec<EventGridEnvelope>),
 }
 
@@ -907,6 +937,7 @@ impl QueueEvent {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EventGridEnvelope {
+    topic: Option<String>,
     event_type: String,
     subject: String,
     event_time: Option<DateTime<Utc>>,
@@ -915,11 +946,18 @@ struct EventGridEnvelope {
 
 impl From<EventGridEnvelope> for BlobNotification {
     fn from(event: EventGridEnvelope) -> Self {
+        let storage_account = event
+            .data
+            .as_ref()
+            .and_then(|data| data.url.as_deref().and_then(account_from_url))
+            .or_else(|| event.topic.as_deref().and_then(account_from_resource_id));
+
         BlobNotification {
             event_type: event.event_type,
             subject: Some(event.subject),
             event_time: event.event_time,
             url: event.data.and_then(|data| data.url),
+            storage_account,
         }
     }
 }
@@ -930,6 +968,7 @@ struct CloudEventEnvelope {
     specversion: String,
     #[serde(rename = "type")]
     event_type: String,
+    source: Option<String>,
     subject: Option<String>,
     time: Option<DateTime<Utc>>,
     data: Option<BlobEventData>,
@@ -937,29 +976,35 @@ struct CloudEventEnvelope {
 
 impl From<CloudEventEnvelope> for BlobNotification {
     fn from(event: CloudEventEnvelope) -> Self {
+        let storage_account = event
+            .data
+            .as_ref()
+            .and_then(|data| data.url.as_deref().and_then(account_from_url))
+            .or_else(|| event.source.as_deref().and_then(account_from_resource_id));
+
         BlobNotification {
             event_type: event.event_type,
             subject: event.subject,
             event_time: event.time,
             url: event.data.and_then(|data| data.url),
+            storage_account,
         }
     }
 }
 
-/// The `data` payload of a blob storage event; identical in both schemas.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BlobEventData {
     url: Option<String>,
 }
 
-/// A single blob notification, normalized from either schema.
 #[derive(Clone, Debug)]
 struct BlobNotification {
     event_type: String,
     subject: Option<String>,
     event_time: Option<DateTime<Utc>>,
     url: Option<String>,
+    storage_account: Option<String>,
 }
 
 /// The identity of a blob resolved from a notification.
@@ -970,14 +1015,15 @@ struct BlobRef {
     blob: String,
 }
 
-/// Prefers `subject`, which is stable and endpoint-agnostic, falling back to `data.url`. The
-/// storage account name is only available from the URL.
 fn resolve_blob_ref(notification: &BlobNotification) -> Option<BlobRef> {
     if let Some(subject) = notification.subject.as_deref()
         && let Some((container, blob)) = parse_subject(subject)
     {
         return Some(BlobRef {
-            storage_account: notification.url.as_deref().and_then(account_from_url),
+            storage_account: notification
+                .storage_account
+                .clone()
+                .or_else(|| notification.url.as_deref().and_then(account_from_url)),
             container,
             blob,
         });
@@ -986,10 +1032,6 @@ fn resolve_blob_ref(notification: &BlobNotification) -> Option<BlobRef> {
     notification.url.as_deref().and_then(parse_blob_url)
 }
 
-/// Parse an Event Grid subject: `/blobServices/default/containers/{container}/blobs/{path}`.
-///
-/// The names are taken verbatim, because only `data.url` is percent-encoded. Decoding here would
-/// corrupt any blob whose name contains a literal `%XX` sequence.
 fn parse_subject(subject: &str) -> Option<(String, String)> {
     let rest = subject.strip_prefix(SUBJECT_CONTAINER_PREFIX)?;
     let (container, blob) = rest.split_once(SUBJECT_BLOB_SEPARATOR)?;
@@ -999,12 +1041,27 @@ fn parse_subject(subject: &str) -> Option<(String, String)> {
     Some((container.to_owned(), blob.to_owned()))
 }
 
-/// Cloud style (`https://{account}.blob.core.windows.net/...`) uses the first host label;
-/// path style (Azurite, `http://127.0.0.1:10000/{account}/...`) uses the first path segment.
-fn account_from_url(url: &str) -> Option<String> {
+fn account_from_resource_id(resource_id: &str) -> Option<String> {
+    let mut segments = resource_id.split('/');
+    while let Some(seg) = segments.next() {
+        if seg.eq_ignore_ascii_case("storageAccounts") {
+            return segments
+                .next()
+                .filter(|account| !account.is_empty())
+                .map(ToOwned::to_owned);
+        }
+    }
+    None
+}
+
+fn is_cloud_storage_host(host: &str) -> bool {
+    host.contains(".blob.") || host.contains(".dfs.")
+}
+
+pub(super) fn account_from_url(url: &str) -> Option<String> {
     let parsed = url::Url::parse(url).ok()?;
     let host = parsed.host_str()?;
-    if host.contains(".blob.") {
+    if is_cloud_storage_host(host) {
         return host.split('.').next().map(ToOwned::to_owned);
     }
     parsed
@@ -1014,19 +1071,16 @@ fn account_from_url(url: &str) -> Option<String> {
         .map(percent_decode)
 }
 
-/// Parse a blob URL into its account/container/blob parts.
 fn parse_blob_url(url: &str) -> Option<BlobRef> {
     let parsed = url::Url::parse(url).ok()?;
     let host = parsed.host_str()?;
     let segments: Vec<&str> = parsed.path_segments()?.collect();
 
-    let (account, container, blob_segments) = if host.contains(".blob.") {
-        // Cloud style: the account is the first host label.
+    let (account, container, blob_segments) = if is_cloud_storage_host(host) {
         let account = host.split('.').next()?;
         let (container, blob_segments) = segments.split_first()?;
         (account.to_owned(), *container, blob_segments)
     } else {
-        // Path style (Azurite): the account is the first path segment.
         let (account, rest) = segments.split_first()?;
         let (container, blob_segments) = rest.split_first()?;
         ((*account).to_owned(), *container, blob_segments)
@@ -1180,7 +1234,6 @@ mod tests {
             parse_subject("/blobServices/default/containers/logs/blobs/app/out.log"),
             Some(("logs".to_owned(), "app/out.log".to_owned()))
         );
-        // The subject carries the raw blob name, so a literal percent sequence is not an escape.
         assert_eq!(
             parse_subject("/blobServices/default/containers/logs/blobs/file name.log"),
             Some(("logs".to_owned(), "file name.log".to_owned()))
@@ -1236,11 +1289,11 @@ mod tests {
             subject: Some("/blobServices/default/containers/from-subject/blobs/a.log".to_owned()),
             event_time: None,
             url: Some("https://myacct.blob.core.windows.net/from-url/b.log".to_owned()),
+            storage_account: None,
         };
         let blob_ref = resolve_blob_ref(&notification).unwrap();
         assert_eq!(blob_ref.container, "from-subject");
         assert_eq!(blob_ref.blob, "a.log");
-        // account still comes from the URL, the only place it is present
         assert_eq!(blob_ref.storage_account.as_deref(), Some("myacct"));
     }
 
@@ -1257,5 +1310,97 @@ mod tests {
         assert_eq!(config.max_number_of_messages, 10);
         assert!(config.delete_message);
         assert!(config.delete_failed_message);
+    }
+
+    #[test]
+    fn url_extraction_dfs_style() {
+        assert_eq!(
+            account_from_url("https://myacct.dfs.core.windows.net/filesystem/app/out.log"),
+            Some("myacct".to_owned())
+        );
+        assert_eq!(
+            parse_blob_url("https://myacct.dfs.core.windows.net/filesystem/app/out.log"),
+            Some(BlobRef {
+                storage_account: Some("myacct".to_owned()),
+                container: "filesystem".to_owned(),
+                blob: "app/out.log".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn arm_resource_id_extraction() {
+        assert_eq!(
+            account_from_resource_id(
+                "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/myacct"
+            ),
+            Some("myacct".to_owned())
+        );
+        assert_eq!(
+            account_from_resource_id(
+                "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/myacct/blobServices/default"
+            ),
+            Some("myacct".to_owned())
+        );
+        assert_eq!(
+            account_from_resource_id("/subscriptions/00000000-0000-0000-0000-000000000000"),
+            None
+        );
+    }
+
+    #[test]
+    fn extracts_account_from_topic_or_source_fallback() {
+        let event_grid_json = r#"{
+            "topic": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/topicacct",
+            "subject": "/blobServices/default/containers/logs/blobs/app.log",
+            "eventType": "Microsoft.Storage.BlobCreated",
+            "id": "1",
+            "data": {}
+        }"#;
+        let notifications = parse(event_grid_json);
+        assert_eq!(notifications.len(), 1);
+        let blob_ref = resolve_blob_ref(&notifications[0]).unwrap();
+        assert_eq!(blob_ref.storage_account.as_deref(), Some("topicacct"));
+
+        let cloud_event_json = r#"{
+            "specversion": "1.0",
+            "type": "Microsoft.Storage.BlobCreated",
+            "source": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/sourceacct",
+            "subject": "/blobServices/default/containers/logs/blobs/app.log",
+            "id": "1",
+            "data": {}
+        }"#;
+        let notifications = parse(cloud_event_json);
+        assert_eq!(notifications.len(), 1);
+        let blob_ref = resolve_blob_ref(&notifications[0]).unwrap();
+        assert_eq!(blob_ref.storage_account.as_deref(), Some("sourceacct"));
+    }
+
+    #[test]
+    fn non_retryable_errors_classification() {
+        let json_err = serde_json::from_str::<QueueEvent>("bad json").unwrap_err();
+        let err1 = ProcessingError::InvalidQueueMessage {
+            source: json_err,
+            message_id: "1".to_owned(),
+        };
+        assert!(err1.is_non_retryable());
+
+        let err2 = ProcessingError::InvalidBlobPath {
+            subject: None,
+            url: None,
+        };
+        assert!(err2.is_non_retryable());
+
+        let err3 = ProcessingError::ForeignStorageAccount {
+            configured: "acct_a".to_owned(),
+            received: "acct_b".to_owned(),
+        };
+        assert!(err3.is_non_retryable());
+
+        let err4 = ProcessingError::ContainerClient {
+            message: "err".to_owned(),
+            container: "c".to_owned(),
+        };
+        assert!(!err4.is_non_retryable());
     }
 }
