@@ -8,7 +8,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use azure_storage_blob::BlobContainerClient;
+use azure_core::http::{Etag, StatusCode};
+use azure_storage_blob::{BlobContainerClient, models::BlobClientDownloadOptions};
 use azure_storage_queue::{
     QueueClient,
     models::{QueueClientReceiveMessagesOptions, ReceivedMessage},
@@ -125,10 +126,7 @@ pub(super) struct Config {
     #[configurable(metadata(docs::type_unit = "tasks"))]
     #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
-
-    /// Whether to delete the message once it is processed.
-    ///
-    /// It can be useful to set this to `false` for debugging or during the initial setup.
+    
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
@@ -250,13 +248,28 @@ impl ProcessingError {
         }
     }
 
-    pub const fn is_non_retryable(&self) -> bool {
-        matches!(
-            self,
+    pub fn is_non_retryable(&self) -> bool {
+        match self {
             Self::InvalidQueueMessage { .. }
-                | Self::InvalidBlobPath { .. }
-                | Self::ForeignStorageAccount { .. }
-        )
+            | Self::InvalidBlobPath { .. }
+            | Self::ForeignStorageAccount { .. } => true,
+            // 404/412 are permanent: the blob is gone, or has changed since the notification.
+            Self::GetBlob { source, .. } => matches!(
+                source.http_status(),
+                Some(StatusCode::NotFound | StatusCode::PreconditionFailed)
+            ),
+            _ => false,
+        }
+    }
+}
+
+/// Prefers a retryable error over a non-retryable one, so one permanent failure in a batch
+/// can't cause the message to be deleted while a sibling failure still needs a retry.
+fn merge_batch_errors(existing: ProcessingError, new: ProcessingError) -> ProcessingError {
+    if existing.is_non_retryable() && !new.is_non_retryable() {
+        new
+    } else {
+        existing
     }
 }
 
@@ -548,10 +561,20 @@ impl IngestorProcess {
                     .unwrap_or_else(|| "<empty>".to_owned()),
             })?;
 
+        let mut error: Option<ProcessingError> = None;
         for notification in event.into_notifications() {
-            self.handle_blob_notification(notification).await?;
+            if let Err(err) = self.handle_blob_notification(notification).await {
+                error = Some(match error {
+                    Some(existing) => merge_batch_errors(existing, err),
+                    None => err,
+                });
+            }
         }
-        Ok(())
+
+        match error {
+            Some(err) => Err(err),
+            None => Ok(()),
+        }
     }
 
     async fn handle_blob_notification(
@@ -586,9 +609,19 @@ impl IngestorProcess {
 
         let download_start = Instant::now();
 
+        // Condition on the notification's etag so an overwritten blob fails instead of silently
+        // serving the wrong content.
+        let download_options = blob_ref
+            .etag
+            .as_deref()
+            .map(|etag| BlobClientDownloadOptions {
+                if_match: Some(Etag::from(etag)),
+                ..Default::default()
+            });
+
         let object = container_client
             .blob_client(&blob_ref.blob)
-            .download(None)
+            .download(download_options)
             .await
             .context(GetBlobSnafu {
                 container: blob_ref.container.clone(),
@@ -700,7 +733,6 @@ impl IngestorProcess {
             }
             Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
         };
-
 
         drop(stream);
         drop(batch);
@@ -951,6 +983,7 @@ impl From<EventGridEnvelope> for BlobNotification {
             .as_ref()
             .and_then(|data| data.url.as_deref().and_then(account_from_url))
             .or_else(|| event.topic.as_deref().and_then(account_from_resource_id));
+        let etag = event.data.as_ref().and_then(|data| data.e_tag.clone());
 
         BlobNotification {
             event_type: event.event_type,
@@ -958,6 +991,7 @@ impl From<EventGridEnvelope> for BlobNotification {
             event_time: event.event_time,
             url: event.data.and_then(|data| data.url),
             storage_account,
+            etag,
         }
     }
 }
@@ -981,6 +1015,7 @@ impl From<CloudEventEnvelope> for BlobNotification {
             .as_ref()
             .and_then(|data| data.url.as_deref().and_then(account_from_url))
             .or_else(|| event.source.as_deref().and_then(account_from_resource_id));
+        let etag = event.data.as_ref().and_then(|data| data.e_tag.clone());
 
         BlobNotification {
             event_type: event.event_type,
@@ -988,6 +1023,7 @@ impl From<CloudEventEnvelope> for BlobNotification {
             event_time: event.time,
             url: event.data.and_then(|data| data.url),
             storage_account,
+            etag,
         }
     }
 }
@@ -996,6 +1032,7 @@ impl From<CloudEventEnvelope> for BlobNotification {
 #[serde(rename_all = "camelCase")]
 struct BlobEventData {
     url: Option<String>,
+    e_tag: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1005,6 +1042,7 @@ struct BlobNotification {
     event_time: Option<DateTime<Utc>>,
     url: Option<String>,
     storage_account: Option<String>,
+    etag: Option<String>,
 }
 
 /// The identity of a blob resolved from a notification.
@@ -1013,6 +1051,7 @@ struct BlobRef {
     storage_account: Option<String>,
     container: String,
     blob: String,
+    etag: Option<String>,
 }
 
 fn resolve_blob_ref(notification: &BlobNotification) -> Option<BlobRef> {
@@ -1026,10 +1065,18 @@ fn resolve_blob_ref(notification: &BlobNotification) -> Option<BlobRef> {
                 .or_else(|| notification.url.as_deref().and_then(account_from_url)),
             container,
             blob,
+            etag: notification.etag.clone(),
         });
     }
 
-    notification.url.as_deref().and_then(parse_blob_url)
+    notification
+        .url
+        .as_deref()
+        .and_then(parse_blob_url)
+        .map(|blob_ref| BlobRef {
+            etag: notification.etag.clone(),
+            ..blob_ref
+        })
 }
 
 fn parse_subject(subject: &str) -> Option<(String, String)> {
@@ -1100,6 +1147,7 @@ fn parse_blob_url(url: &str) -> Option<BlobRef> {
         storage_account: Some(percent_decode(&account)),
         container: percent_decode(container),
         blob,
+        etag: None,
     })
 }
 
@@ -1175,6 +1223,7 @@ mod tests {
                 storage_account: Some("myacct".to_owned()),
                 container: "logs".to_owned(),
                 blob: "app/out.log".to_owned(),
+                etag: Some("0x8DC0000000000000".to_owned()),
             })
         );
     }
@@ -1254,6 +1303,7 @@ mod tests {
                 storage_account: Some("myacct".to_owned()),
                 container: "logs".to_owned(),
                 blob: "app/out.log".to_owned(),
+                etag: None,
             })
         );
     }
@@ -1266,6 +1316,7 @@ mod tests {
                 storage_account: Some("devstoreaccount1".to_owned()),
                 container: "logs".to_owned(),
                 blob: "app/out.log".to_owned(),
+                etag: None,
             })
         );
     }
@@ -1278,6 +1329,7 @@ mod tests {
                 storage_account: Some("myacct".to_owned()),
                 container: "logs".to_owned(),
                 blob: "file name.log".to_owned(),
+                etag: None,
             })
         );
     }
@@ -1290,11 +1342,13 @@ mod tests {
             event_time: None,
             url: Some("https://myacct.blob.core.windows.net/from-url/b.log".to_owned()),
             storage_account: None,
+            etag: Some("\"etag-value\"".to_owned()),
         };
         let blob_ref = resolve_blob_ref(&notification).unwrap();
         assert_eq!(blob_ref.container, "from-subject");
         assert_eq!(blob_ref.blob, "a.log");
         assert_eq!(blob_ref.storage_account.as_deref(), Some("myacct"));
+        assert_eq!(blob_ref.etag.as_deref(), Some("\"etag-value\""));
     }
 
     #[test]
@@ -1324,6 +1378,7 @@ mod tests {
                 storage_account: Some("myacct".to_owned()),
                 container: "filesystem".to_owned(),
                 blob: "app/out.log".to_owned(),
+                etag: None,
             })
         );
     }
@@ -1402,5 +1457,52 @@ mod tests {
             container: "c".to_owned(),
         };
         assert!(!err4.is_non_retryable());
+    }
+
+    fn get_blob_error(status: StatusCode) -> ProcessingError {
+        ProcessingError::GetBlob {
+            source: azure_core::Error::from(azure_core::error::ErrorKind::HttpResponse {
+                status,
+                error_code: None,
+                raw_response: None,
+            }),
+            container: "logs".to_owned(),
+            blob: "app/out.log".to_owned(),
+        }
+    }
+
+    #[test]
+    fn get_blob_non_retryable_classification() {
+        assert!(get_blob_error(StatusCode::NotFound).is_non_retryable());
+        assert!(get_blob_error(StatusCode::PreconditionFailed).is_non_retryable());
+        assert!(!get_blob_error(StatusCode::ServiceUnavailable).is_non_retryable());
+        assert!(!get_blob_error(StatusCode::InternalServerError).is_non_retryable());
+    }
+
+    #[test]
+    fn resolve_blob_ref_carries_etag_from_url_fallback() {
+        let notification = BlobNotification {
+            event_type: BLOB_CREATED_EVENT_TYPE.to_owned(),
+            subject: None,
+            event_time: None,
+            url: Some("https://myacct.blob.core.windows.net/logs/app/out.log".to_owned()),
+            storage_account: None,
+            etag: Some("\"etag-value\"".to_owned()),
+        };
+        let blob_ref = resolve_blob_ref(&notification).unwrap();
+        assert_eq!(blob_ref.etag.as_deref(), Some("\"etag-value\""));
+    }
+
+    #[test]
+    fn batch_error_merging_prefers_retryable() {
+        let non_retryable = || ProcessingError::InvalidBlobPath {
+            subject: None,
+            url: None,
+        };
+        let retryable = || get_blob_error(StatusCode::ServiceUnavailable);
+
+        assert!(!merge_batch_errors(non_retryable(), retryable()).is_non_retryable());
+        assert!(!merge_batch_errors(retryable(), non_retryable()).is_non_retryable());
+        assert!(merge_batch_errors(non_retryable(), non_retryable()).is_non_retryable());
     }
 }
