@@ -321,23 +321,35 @@ impl Aggregate {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
                     if existing.0.kind == data.kind {
-                        if let MetricValue::Gauge {
-                            value: existing_value,
-                        } = existing.0.value()
-                            && let MetricValue::Gauge { value: new_value } = data.value()
-                        {
-                            let should_update = match mode {
-                                AggregationMode::Max => *new_value > *existing_value,
-                                AggregationMode::Min => *new_value < *existing_value,
-                                _ => false,
-                            };
-                            if should_update {
-                                *existing = (data, metadata);
-                            }
+                        // Determine the winner before touching `existing` so the
+                        // comparison borrow of `existing.0.value()` ends here;
+                        // metadata is then merged unconditionally below so a
+                        // losing sample's finalizers are not discarded.
+                        let should_update = match (existing.0.value(), data.value(), mode) {
+                            (
+                                MetricValue::Gauge {
+                                    value: existing_value,
+                                },
+                                MetricValue::Gauge { value: new_value },
+                                AggregationMode::Max,
+                            ) => new_value > existing_value,
+                            (
+                                MetricValue::Gauge {
+                                    value: existing_value,
+                                },
+                                MetricValue::Gauge { value: new_value },
+                                AggregationMode::Min,
+                            ) => new_value < existing_value,
+                            _ => false,
+                        };
+                        existing.1.merge(metadata);
+                        if should_update {
+                            existing.0 = data;
                         }
                     } else {
                         emit!(AggregateUpdateFailed);
-                        *existing = (data, metadata);
+                        existing.1.merge(metadata);
+                        existing.0 = data;
                     }
                 }
                 Entry::Vacant(entry) => {

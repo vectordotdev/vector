@@ -1623,4 +1623,69 @@ fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
         "Diff retention must not keep finalizers alive"
     );
     assert_eq!(diff.event_time_prev_buckets.len(), 1);
+
+    // Max/Min must merge metadata from every sample, including the one that
+    // loses the comparison and is not retained.
+    for mode in [AggregationMode::Max, AggregationMode::Min] {
+        let mut agg = Aggregate::new(&event_time_config(interval_ms, mode)).unwrap();
+        let (winner_batch, mut winner_receiver) = BatchNotifier::new_with_receiver();
+        let (loser_batch, mut loser_receiver) = BatchNotifier::new_with_receiver();
+
+        let winning_value = if mode == AggregationMode::Max {
+            99.0
+        } else {
+            1.0
+        };
+        let losing_value = if mode == AggregationMode::Max {
+            2.0
+        } else {
+            50.0
+        };
+
+        let winner = make_metric_with_timestamp(
+            "extremum",
+            MetricKind::Absolute,
+            MetricValue::Gauge {
+                value: winning_value,
+            },
+            base_time,
+        )
+        .with_batch_notifier(&winner_batch);
+        let loser = make_metric_with_timestamp(
+            "extremum",
+            MetricKind::Absolute,
+            MetricValue::Gauge {
+                value: losing_value,
+            },
+            base_time + chrono::Duration::milliseconds(100),
+        )
+        .with_batch_notifier(&loser_batch);
+        drop((winner_batch, loser_batch));
+
+        agg.record(winner);
+        agg.record(loser);
+        let mut out = vec![];
+        agg.flush_final(&mut out);
+        assert_eq!(out.len(), 1);
+        if let MetricValue::Gauge { value } = out[0].as_metric().value() {
+            assert_eq!(
+                *value, winning_value,
+                "{mode:?} must retain the winning value"
+            );
+        } else {
+            panic!("expected gauge value");
+        }
+        out[0].metadata().update_status(EventStatus::Delivered);
+        drop(out);
+        assert_eq!(
+            winner_receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "{mode:?}: winning sample's finalizers must be delivered"
+        );
+        assert_eq!(
+            loser_receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "{mode:?}: losing sample's finalizers must not be discarded"
+        );
+    }
 }
