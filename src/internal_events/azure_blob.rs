@@ -247,8 +247,6 @@ pub struct AzureBlobEventIgnored<'a> {
 
 impl InternalEvent for AzureBlobEventIgnored<'_> {
     fn emit(self) {
-        // Not a warning: an unfiltered Event Grid subscription delivers these as a matter of
-        // course, and `azure_blob_event_ignored_total` is the signal for operators.
         debug!(
             message = "Ignored queue message for an event that was not BlobCreated.",
             event_type = %self.event_type,
