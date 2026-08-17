@@ -276,9 +276,11 @@ impl Context {
     /// and only then are events sent downstream. That preserves at-most-once tracking
     /// semantics: a missing/unbindable tracking value fails the poll before any pipeline
     /// emit (avoiding infinite replay), while a send failure after a successful checkpoint
-    /// save may skip those rows on the next run. When `last_run_metadata_path` is unset, the
-    /// in-memory overlay is still advanced after a post-checkpoint send failure so
-    /// already-sent rows are not replayed.
+    /// save may skip those rows on the next run. A query or conversion failure after batches
+    /// were received emits `ComponentEventsDropped` for the buffered rows and does not
+    /// commit a checkpoint. When `last_run_metadata_path` is unset, the in-memory overlay
+    /// is still advanced after a post-checkpoint send failure so already-sent rows are not
+    /// replayed.
     ///
     /// Without tracking, batches are streamed to the pipeline as they arrive.
     ///
@@ -445,12 +447,20 @@ impl Context {
         if let Some(error) = stream_error {
             // Prefer the stream conversion/send error over a later join outcome.
             drop(join_result);
+            emit_discarded_tracking_batches(
+                &pending_batches,
+                "ODBC result conversion failed after tracking batches were buffered.",
+            );
             return Err(error);
         }
 
         match join_result {
             Ok(Ok(())) => {}
             Ok(Err(error)) | Err(error) => {
+                emit_discarded_tracking_batches(
+                    &pending_batches,
+                    "ODBC query failed after tracking batches were buffered.",
+                );
                 return Err(error);
             }
         }
@@ -612,6 +622,20 @@ async fn send_enriched_batch(
         }
     }
     Ok(())
+}
+
+/// Counts events in tracking batches that were received but not yet emitted.
+fn discarded_tracking_event_count(pending_batches: &[Vec<Event>]) -> usize {
+    pending_batches.iter().map(Vec::len).sum()
+}
+
+/// Emits `ComponentEventsDropped` for tracking batches that were counted as received
+/// but discarded before pipeline emit (late query failure or conversion error).
+fn emit_discarded_tracking_batches(pending_batches: &[Vec<Event>], reason: &'static str) {
+    let count = discarded_tracking_event_count(pending_batches);
+    if count > 0 {
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count, reason });
+    }
 }
 
 /// Records `BytesReceived` / `EventsReceived` for a converted batch before enrichment.
@@ -1515,6 +1539,20 @@ mod tests {
         let rows = vec![Value::Integer(1)];
         let error = rows_to_events(rows).expect_err("expected error");
         assert!(matches!(error, OdbcError::InvalidResultRow));
+    }
+
+    #[test]
+    fn discarded_tracking_event_count_sums_buffered_rows() {
+        let batches = vec![
+            vec![
+                Event::Log(LogEvent::from("one")),
+                Event::Log(LogEvent::from("two")),
+            ],
+            vec![Event::Log(LogEvent::from("three"))],
+        ];
+
+        assert_eq!(discarded_tracking_event_count(&batches), 3);
+        assert_eq!(discarded_tracking_event_count(&[]), 0);
     }
 
     #[tokio::test]
