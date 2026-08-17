@@ -7,6 +7,7 @@ use vector_lib::{
 use super::config::AppsignalConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
+    sinks::util::HttpEndpoint,
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -19,7 +20,7 @@ async fn component_spec_compliance() {
 
     let mut config: AppsignalConfig =
         serde_json::from_value(AppsignalConfig::generate_config()).expect("config should be valid");
-    config.endpoint = mock_endpoint.to_string();
+    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
