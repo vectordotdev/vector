@@ -320,6 +320,14 @@ impl HttpEndpoint {
         self.0
     }
 
+    /// Returns the URL scheme (`http` or `https`) of this endpoint.
+    ///
+    /// [`HttpEndpoint::new`] guarantees the scheme is an absolute `http`/`https`
+    /// scheme, so this is infallible.
+    pub fn protocol(&self) -> &str {
+        self.0.scheme_str().unwrap_or("https")
+    }
+
     /// Appends `path` to this endpoint, preserving the scheme and authority.
     ///
     /// `path` may include a leading slash and a query. The existing query, if

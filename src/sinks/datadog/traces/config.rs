@@ -170,7 +170,7 @@ impl DatadogTracesConfig {
             request_builder,
             batcher_settings,
             shutdown,
-            self.get_protocol(dd_common)?,
+            endpoints.traces_endpoint.protocol().to_string(),
         );
 
         // Send the APM stats payloads independently of the sink framework.
@@ -201,15 +201,6 @@ impl DatadogTracesConfig {
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)
-    }
-
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
-        let endpoint = HttpEndpoint::parse(&self.get_base_uri(dd_common))?;
-        Ok(endpoint
-            .as_uri()
-            .scheme_str()
-            .unwrap_or("https")
-            .to_string())
     }
 }
 
