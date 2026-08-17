@@ -132,7 +132,11 @@ pub trait WsMessageBufferConfig {
     fn should_buffer(&self) -> bool;
     /// Generates key for a client based on connection request headers and address.
     /// This key should be used for storing client checkpoints (last ACKed message).
-    fn client_key<B>(&self, request: &http_1::Request<B>, client_address: &SocketAddr) -> Option<String>;
+    fn client_key<B>(
+        &self,
+        request: &http_1::Request<B>,
+        client_address: &SocketAddr,
+    ) -> Option<String>;
     /// Returns configured size of the buffer.
     fn buffer_capacity(&self) -> usize;
     /// Extracts buffer replay request from the given connection request, based on configuration.
@@ -153,7 +157,11 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
         self.is_some()
     }
 
-    fn client_key<B>(&self, request: &http_1::Request<B>, client_address: &SocketAddr) -> Option<String> {
+    fn client_key<B>(
+        &self,
+        request: &http_1::Request<B>,
+        client_address: &SocketAddr,
+    ) -> Option<String> {
         self.as_ref()
             .and_then(|mb| mb.client_ack_config.as_ref())
             .and_then(|ack| match &ack.client_key {

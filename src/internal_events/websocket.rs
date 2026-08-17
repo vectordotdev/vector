@@ -5,7 +5,6 @@ use std::{
     fmt::{Debug, Display, Formatter, Result},
 };
 
-use metrics::{counter, histogram};
 use vector_common::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,

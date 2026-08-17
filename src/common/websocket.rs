@@ -100,9 +100,7 @@ impl WebSocketConnector {
         options
     }
 
-    async fn connect(
-        &self,
-    ) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, WebSocketError> {
+    async fn connect(&self) -> Result<WebSocket<MaybeTlsStream<TcpStream>>, WebSocketError> {
         let maybe_tls = self.tls_connect().await?;
 
         let mut builder = HttpRequest::builder();

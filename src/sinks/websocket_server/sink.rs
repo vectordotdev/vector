@@ -387,13 +387,12 @@ impl WebSocketListenerSink {
             .forward(outgoing);
 
         pin_mut!(forward_data_to_client, incoming_data_handler);
-        match future::select(forward_data_to_client, incoming_data_handler).await {
-            future::Either::Left((Err(error), _)) => {
-                emit!(WebSocketListenerSendError {
-                    error: Box::new(error)
-                })
-            }
-            _ => {}
+        if let future::Either::Left((Err(error), _)) =
+            future::select(forward_data_to_client, incoming_data_handler).await
+        {
+            emit!(WebSocketListenerSendError {
+                error: Box::new(error)
+            })
         }
 
         {

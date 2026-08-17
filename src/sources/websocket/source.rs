@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
 use tokio::time;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::DecoderFramedRead,
@@ -64,11 +63,12 @@ pub enum WebSocketSourceError {
     ))]
     ConnectionClosedPrematurely,
 
-    #[snafu(display("Connection closed by server with code '{:?}' and reason: '{}'", code, reason))]
-    RemoteClosed {
-        code: CloseCode,
-        reason: String,
-    },
+    #[snafu(display(
+        "Connection closed by server with code '{:?}' and reason: '{}'",
+        code,
+        reason
+    ))]
+    RemoteClosed { code: CloseCode, reason: String },
 
     #[snafu(display("Connection closed by server without a close frame"))]
     RemoteClosedEmpty,
@@ -117,7 +117,10 @@ impl WebSocketSource {
 
             if let Err(error) = result {
                 match error {
-                    WebSocketSourceError::RemoteClosed { ref code, ref reason } => {
+                    WebSocketSourceError::RemoteClosed {
+                        ref code,
+                        ref reason,
+                    } => {
                         warn!(
                             message = "Connection closed by server.",
                             code = ?code,
@@ -294,9 +297,7 @@ impl WebSocketSource {
         Ok((ws_sink, ws_source))
     }
 
-    async fn try_create_sink_and_stream(
-        &self,
-    ) -> Result<(WsSink, WsStream), WebSocketSourceError> {
+    async fn try_create_sink_and_stream(&self) -> Result<(WsSink, WsStream), WebSocketSourceError> {
         let ws_stream = self
             .params
             .connector
@@ -348,10 +349,7 @@ impl WebSocketSource {
         }
     }
 
-    fn handle_close_frame(
-        &self,
-        frame: &Frame,
-    ) -> Result<(), WebSocketSourceError> {
+    fn handle_close_frame(&self, frame: &Frame) -> Result<(), WebSocketSourceError> {
         let close_code = frame.close_code();
         let close_reason = frame.close_reason().ok().flatten().unwrap_or("");
 
@@ -426,8 +424,8 @@ mod tests {
 
     use bytes::Bytes;
     use futures::{StreamExt, sink::SinkExt};
-    use hyper1::{body::Incoming, service::service_fn};
     use hyper_util::rt::TokioIo;
+    use hyper1::{body::Incoming, service::service_fn};
     use tokio::{net::TcpListener, time::Duration};
     use url::Url;
     use vector_lib::codecs::decoding::DeserializerConfig;
@@ -556,10 +554,7 @@ mod tests {
         tokio::spawn(async move {
             // First connection
             let mut websocket = accept_ws(&listener).await;
-            websocket
-                .send(Frame::text("first message"))
-                .await
-                .unwrap();
+            websocket.send(Frame::text("first message")).await.unwrap();
             // Close the connection to force a reconnect from the client
             websocket
                 .send(Frame::close(CloseCode::Normal, b""))
@@ -568,10 +563,7 @@ mod tests {
 
             // Second connection
             let mut websocket = accept_ws(&listener).await;
-            websocket
-                .send(Frame::text("second message"))
-                .await
-                .unwrap();
+            websocket.send(Frame::text("second message")).await.unwrap();
         });
 
         server_addr
@@ -659,7 +651,10 @@ mod tests {
 
             if websocket.next().await.is_some() {
                 let _ = websocket
-                    .send(Frame::close(CloseCode::Error, b"Simulated Internal Server Error"))
+                    .send(Frame::close(
+                        CloseCode::Error,
+                        b"Simulated Internal Server Error",
+                    ))
                     .await;
             }
         });

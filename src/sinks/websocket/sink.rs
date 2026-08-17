@@ -213,8 +213,8 @@ mod tests {
     use bytes::Bytes;
     use futures::{FutureExt, StreamExt};
     use http_body_util::Empty;
-    use hyper1::{body::Incoming, service::service_fn};
     use hyper_util::rt::TokioIo;
+    use hyper1::{body::Incoming, service::service_fn};
     use serde_json::Value as JsonValue;
     use tokio::{time, time::timeout};
     use vector_lib::codecs::JsonSerializerConfig;
@@ -445,17 +445,14 @@ mod tests {
 
                                 tokio::spawn(async move {
                                     if let Ok(ws) = upgrade_fut.await {
-                                        let mut ws_stream =
-                                            futures::StreamExt::fuse(ws);
+                                        let mut ws_stream = futures::StreamExt::fuse(ws);
                                         while let Some(frame) =
                                             futures::StreamExt::next(&mut ws_stream).await
                                         {
                                             if frame.opcode() == OpCode::Text {
-                                                let text = std::str::from_utf8(
-                                                    frame.payload(),
-                                                )
-                                                .unwrap()
-                                                .to_string();
+                                                let text = std::str::from_utf8(frame.payload())
+                                                    .unwrap()
+                                                    .to_string();
                                                 if tx.send(text).is_err() {
                                                     break;
                                                 }
