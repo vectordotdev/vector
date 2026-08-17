@@ -21,7 +21,7 @@ use crate::{
             },
         },
         prelude::*,
-        util::http::HttpService,
+        util::{HttpEndpoint, http::HttpService},
     },
     template::ConfinementConfig,
 };
@@ -30,15 +30,22 @@ fn extra_params_examples() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])
 }
 
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("http://localhost:4000")
+        .expect("static default endpoint should be a valid http(s) URL")
+}
+
 /// Configuration for the `greptimedb_logs` sink.
 #[configurable_component(sink("greptimedb_logs", "Ingest logs data into GreptimeDB."))]
-#[derive(Clone, Debug, Default, Derivative)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBLogsConfig {
     /// The endpoint of the GreptimeDB server.
     #[serde(alias = "host")]
+    #[derivative(Default(value = "default_endpoint()"))]
     #[configurable(metadata(docs::examples = "http://localhost:4000"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
@@ -163,8 +170,6 @@ impl ValidatedSink for GreptimeDBLogsConfig {
     type Validated = ValidatedGreptimeDBLogs;
 
     fn validate(&self) -> crate::Result<ValidatedGreptimeDBLogs> {
-        url::Url::parse(&self.endpoint)?;
-
         let confined_table = self
             .table
             .clone()
@@ -221,7 +226,7 @@ impl ValidatedSink for GreptimeDBLogsConfig {
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
-            endpoint: self.endpoint.clone(),
+            endpoint: self.endpoint.to_string(),
             auth: auth.clone(),
             encoder: (
                 self.encoding.clone(),
@@ -260,7 +265,7 @@ impl ValidatedSink for GreptimeDBLogsConfig {
 
         let healthcheck = Box::pin(http_healthcheck(
             client,
-            self.endpoint.clone(),
+            self.endpoint.to_string(),
             auth.clone(),
         ));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -269,6 +274,8 @@ impl ValidatedSink for GreptimeDBLogsConfig {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
     use crate::{
         config::ValidatedSink,
@@ -278,7 +285,7 @@ mod tests {
     #[test]
     fn prepares_valid_config() {
         let config = GreptimeDBLogsConfig {
-            endpoint: "http://localhost:4000".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:4000").unwrap(),
             table: "mytable".try_into().unwrap(),
             dbname: "public".try_into().unwrap(),
             pipeline_name: "greptime_identity".try_into().unwrap(),
@@ -297,15 +304,30 @@ mod tests {
 
     #[test]
     fn validate_rejects_malformed_endpoint() {
-        let config = GreptimeDBLogsConfig {
-            endpoint: "not a uri".to_string(),
-            table: "mytable".try_into().unwrap(),
-            dbname: "public".try_into().unwrap(),
-            pipeline_name: "greptime_identity".try_into().unwrap(),
-            ..Default::default()
-        };
+        // `HttpEndpoint` rejects a malformed endpoint at load time, so
+        // deserialization fails.
+        let result: Result<GreptimeDBLogsConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "not a uri"
+            table: "mytable"
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a malformed endpoint"
+        );
+    }
 
-        assert!(config.validate().is_err());
+    #[test]
+    fn validate_rejects_non_http_endpoint() {
+        // `HttpEndpoint` only accepts absolute http(s) URLs, so an `ftp://`
+        // endpoint is rejected at load time.
+        let result: Result<GreptimeDBLogsConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "ftp://example.com"
+            table: "mytable"
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a non-http endpoint"
+        );
     }
 
     #[test]
