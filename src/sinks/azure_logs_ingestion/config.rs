@@ -21,7 +21,7 @@ use crate::{
 };
 
 use super::{
-    service::{request_path, AzureLogsIngestionResponse, AzureLogsIngestionService},
+    service::{AzureLogsIngestionResponse, AzureLogsIngestionService, request_path},
     sink::AzureLogsIngestionSink,
 };
 

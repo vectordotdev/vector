@@ -85,9 +85,11 @@ pub(super) fn request_path(
     dcr_immutable_id: &str,
     stream_name: &str,
 ) -> crate::Result<http::uri::PathAndQuery> {
-    format!("/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}")
-        .parse()
-        .map_err(Into::into)
+    format!(
+        "/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}"
+    )
+    .parse()
+    .map_err(Into::into)
 }
 
 impl AzureLogsIngestionService {

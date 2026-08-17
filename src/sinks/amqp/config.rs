@@ -1,5 +1,5 @@
 //! Configuration functionality for the `AMQP` sink.
-use lapin::{uri::AMQPUri, BasicProperties, types::ShortString};
+use lapin::{BasicProperties, types::ShortString, uri::AMQPUri};
 use vector_lib::{
     codecs::TextSerializerConfig,
     internal_event::{error_stage, error_type},

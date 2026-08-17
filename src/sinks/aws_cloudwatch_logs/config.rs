@@ -378,10 +378,10 @@ mod tests {
         let mut config = super::default_config(JsonSerializerConfig::default().into());
         config.group_name = "group".try_into().unwrap();
         config.stream_name = "stream".try_into().unwrap();
-        config
-            .request
-            .headers
-            .insert("valid-header".to_string(), "value\nwith newline".to_string());
+        config.request.headers.insert(
+            "valid-header".to_string(),
+            "value\nwith newline".to_string(),
+        );
 
         assert!(config.validate().is_err());
     }
