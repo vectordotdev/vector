@@ -192,10 +192,11 @@ components: transforms: aggregate: {
 		event_time_aggregation: {
 			title: "Event-Time Aggregation"
 			body: """
-				When `time_source` is set to `event_time`, metrics are bucketed by the timestamp on each
-				event rather than by the moment Vector processes it. Bucket boundaries are aligned to
-				multiples of `interval_ms` from the Unix epoch, so the same source timestamp always maps
-				to the same bucket regardless of when Vector receives it.
+				When an `event_time` configuration block is present, metrics are bucketed by the
+				timestamp on each event rather than by the moment Vector processes it. Bucket
+				boundaries are aligned to multiples of `interval_ms` from the Unix epoch, so the
+				same source timestamp always maps to the same bucket regardless of when Vector
+				receives it. Omit the `event_time` block to keep the default system-time behavior.
 
 				This is useful when downstream sinks key on the metric timestamp. For example, the
 				Datadog Metrics sink overwrites earlier values for an identical timestamp; bucketing on
@@ -207,11 +208,12 @@ components: transforms: aggregate: {
 					body: """
 						Vector tracks a *watermark* — the exclusive end of the most recently emitted bucket.
 						Events whose bucket has already been emitted are dropped and counted via
-						`component_discarded_events_total`. Use `allowed_lateness_ms` to extend how long
-						each bucket accepts events after its window ends (`bucket_end + allowed_lateness_ms`,
-						compared to the system clock). That cutoff applies when *recording* an event, not
-						only when the periodic flush runs, so `allowed_lateness_ms = 0` enforces strict
-						lateness even if the flush interval is long or misaligned.
+						`component_discarded_events_total`. Use `event_time.allowed_lateness_ms` to extend
+						how long each bucket accepts events after its window ends
+						(`bucket_end + allowed_lateness_ms`, compared to the system clock). That cutoff
+						applies when *recording* an event, not only when the periodic flush runs, so
+						`allowed_lateness_ms = 0` enforces strict lateness even if the flush interval is
+						long or misaligned.
 
 						Metrics the configured `mode` does not aggregate (for example an `incremental`
 						event in `mean` mode, or an `absolute` event in `sum` mode) pass through
@@ -225,10 +227,11 @@ components: transforms: aggregate: {
 					body: """
 						By default, metrics that will be bucketed and have no timestamp are dropped. Metrics
 						that pass through unchanged (see above) do not require a timestamp. Set
-						`use_system_time_for_missing_timestamps` to `true` to fall back to the current system
-						time for bucketed metrics instead. Bucketed events whose timestamp is more than
-						`max_future_ms` ahead of the system clock are dropped as a clock-skew guard. All such
-						drops surface in `component_discarded_events_total` with a reason tag.
+						`event_time.missing_timestamp` to `use_system_time` to fall back to the current
+						system time for bucketed metrics instead. Bucketed events whose timestamp is more
+						than `event_time.max_future_ms` ahead of the system clock are dropped as a
+						clock-skew guard. All such drops surface in `component_discarded_events_total`
+						with a reason tag.
 						"""
 				},
 				{

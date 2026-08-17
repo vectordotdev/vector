@@ -1,4 +1,4 @@
-use super::{AggregateConfig, AggregationMode, TimeSource};
+use super::{AggregateConfig, AggregationMode};
 
 use std::{
     collections::{BTreeMap, HashMap, hash_map::Entry},
@@ -87,7 +87,6 @@ pub struct Aggregate {
     interval: Duration,
     map: HashMap<MetricSeries, MetricEntry>,
     mode: InnerMode,
-    time_source: TimeSource,
     pub(crate) event_time_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricEntry>>,
     pub(crate) event_time_prev_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricEntry>>,
     pub(crate) event_time_multi_buckets:
@@ -114,26 +113,27 @@ impl Aggregate {
             )
             .into());
         }
-        if config.max_future_ms > MAX_DURATION_MS {
-            return Err(format!(
-                "`max_future_ms` ({}) exceeds the maximum supported value of {} ms",
-                config.max_future_ms, MAX_DURATION_MS
-            )
-            .into());
-        }
-        if config.allowed_lateness_ms > MAX_DURATION_MS {
-            return Err(format!(
-                "`allowed_lateness_ms` ({}) exceeds the maximum supported value of {} ms",
-                config.allowed_lateness_ms, MAX_DURATION_MS
-            )
-            .into());
+        if let Some(event_time) = &config.event_time {
+            if event_time.max_future_ms > MAX_DURATION_MS {
+                return Err(format!(
+                    "`event_time.max_future_ms` ({}) exceeds the maximum supported value of {} ms",
+                    event_time.max_future_ms, MAX_DURATION_MS
+                )
+                .into());
+            }
+            if event_time.allowed_lateness_ms > MAX_DURATION_MS {
+                return Err(format!(
+                    "`event_time.allowed_lateness_ms` ({}) exceeds the maximum supported value of {} ms",
+                    event_time.allowed_lateness_ms, MAX_DURATION_MS
+                )
+                .into());
+            }
         }
 
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
             mode: config.mode.into(),
-            time_source: config.time_source,
             event_time_buckets: Default::default(),
             event_time_prev_buckets: Default::default(),
             event_time_multi_buckets: Default::default(),
@@ -147,7 +147,7 @@ impl Aggregate {
         let timestamp = metric.timestamp();
         let (series, data, metadata) = metric.into_parts();
 
-        if self.time_source == TimeSource::EventTime {
+        if self.config.is_event_time() {
             return self.record_event_time(series, data, metadata, timestamp);
         }
 
@@ -322,7 +322,7 @@ impl Aggregate {
         }
     }
     pub fn flush_into(&mut self, output: &mut Vec<Event>) {
-        if self.time_source == TimeSource::EventTime {
+        if self.config.is_event_time() {
             self.flush_event_time_buckets(output, false);
         } else {
             self.flush_system_time(output);
@@ -335,7 +335,7 @@ impl Aggregate {
     /// shutdown or topology reload, matching system-time semantics where
     /// `flush_system_time` always empties `self.map`.
     pub(crate) fn flush_final(&mut self, output: &mut Vec<Event>) {
-        if self.time_source == TimeSource::EventTime {
+        if self.config.is_event_time() {
             self.flush_event_time_buckets(output, true);
         } else {
             self.flush_system_time(output);

@@ -6,8 +6,9 @@ use vector_lib::event::{
     metric::{Metric, MetricData, MetricKind, MetricSeries},
 };
 
-use super::AggregationMode;
+use super::config::{EventTimeConfig, MissingTimestamp};
 use super::transform::{Aggregate, BucketKey, MetricEntry};
+use super::AggregationMode;
 use crate::{
     event::{Event, EventMetadata},
     internal_events::{
@@ -16,6 +17,14 @@ use crate::{
 };
 
 impl Aggregate {
+    /// Event-time settings; only called from the event-time path.
+    fn event_time(&self) -> &EventTimeConfig {
+        self.config
+            .event_time
+            .as_ref()
+            .expect("event-time path requires AggregateConfig.event_time")
+    }
+
     pub(crate) fn record_event_time(
         &mut self,
         series: MetricSeries,
@@ -34,6 +43,8 @@ impl Aggregate {
             return None;
         }
 
+        let event_time = *self.event_time();
+
         // Capture one wall-clock instant for fallback synthesis and all subsequent
         // skew/cutoff checks so a missing timestamp cannot be assigned to bucket B
         // via `now` and then rejected because a later `Utc::now()` crosses B's end.
@@ -43,24 +54,23 @@ impl Aggregate {
         // Handle missing timestamp — only required for metrics that are bucketed.
         let ts = match timestamp {
             Some(ts) => ts,
-            None => {
-                if self.config.use_system_time_for_missing_timestamps {
-                    now
-                } else {
+            None => match event_time.missing_timestamp {
+                MissingTimestamp::UseSystemTime => now,
+                MissingTimestamp::Drop => {
                     emit!(AggregateEventDropped {
                         reason: "Event missing timestamp required for event-time aggregation."
                     });
                     return None;
                 }
-            }
+            },
         };
         // Preserve (or synthesize) the timestamp in the stored metric so that
         // event-time "latest" selection can compare timestamps reliably.
         data.time.timestamp = Some(ts);
 
         // Check for future timestamps (bucketed metrics only; passthrough is above).
-        if self.config.max_future_ms > 0 {
-            let max_future_ms = i64::try_from(self.config.max_future_ms)
+        if event_time.max_future_ms > 0 {
+            let max_future_ms = i64::try_from(event_time.max_future_ms)
                 .expect("max_future_ms validated to fit in i64 in Aggregate::new");
             let drift_ms = ts.timestamp_millis().saturating_sub(now_ms);
             if drift_ms > max_future_ms {
@@ -137,7 +147,7 @@ impl Aggregate {
     pub(crate) fn is_past_bucket_cutoff(&self, bucket_key: BucketKey, now_ms: i64) -> bool {
         let interval_ms = i64::try_from(self.config.interval_ms)
             .expect("interval_ms validated to fit in i64 in Aggregate::new");
-        let grace_ms = i64::try_from(self.config.allowed_lateness_ms)
+        let grace_ms = i64::try_from(self.event_time().allowed_lateness_ms)
             .expect("allowed_lateness_ms validated to fit in i64 in Aggregate::new");
         now_ms
             >= bucket_key
@@ -334,7 +344,7 @@ impl Aggregate {
         // Range-validated in `Aggregate::new` to fit in i64.
         let interval_ms = i64::try_from(self.config.interval_ms)
             .expect("interval_ms validated to fit in i64 in Aggregate::new");
-        let grace_ms = i64::try_from(self.config.allowed_lateness_ms)
+        let grace_ms = i64::try_from(self.event_time().allowed_lateness_ms)
             .expect("allowed_lateness_ms validated to fit in i64 in Aggregate::new");
 
         // A bucket [bucket_key, bucket_key + interval) is eligible to flush

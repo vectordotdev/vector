@@ -4,8 +4,5 @@ transforms:
     inputs:
       - my-source-or-transform-id
     interval_ms: 10000
-    max_future_ms: 10000
     measure_cpu_usage: false
     mode: Auto
-    time_source: system_time
-    use_system_time_for_missing_timestamps: false

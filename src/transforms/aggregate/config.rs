@@ -27,16 +27,22 @@ pub struct AggregateConfig {
     #[serde(default = "default_mode")]
     #[configurable(derived)]
     pub mode: AggregationMode,
-    /// Time source to use for aggregation windows.
-    ///
-    /// When set to `event_time`, events are grouped into buckets based on their timestamps rather than
-    /// when they are processed. Events are rejected when their window has ended (per
-    /// `allowed_lateness_ms`) or when their bucket was already emitted (watermark).
-    #[serde(default = "default_time_source")]
-    #[configurable(derived)]
-    pub time_source: TimeSource,
 
-    /// Grace period for late-arriving events when using event-time aggregation.
+    /// Event-time aggregation settings.
+    ///
+    /// When present, metrics are grouped into buckets based on their timestamps rather than when
+    /// they are processed. Omit this block to keep the default system-time behavior.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(derived)]
+    pub event_time: Option<EventTimeConfig>,
+}
+
+/// Settings for event-time aggregation windows.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct EventTimeConfig {
+    /// Grace period for late-arriving events, in milliseconds.
     ///
     /// Each bucket accepts events until the system clock reaches
     /// `bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
@@ -45,54 +51,55 @@ pub struct AggregateConfig {
     /// events whose timestamp falls inside it are dropped and counted via
     /// `component_discarded_events_total`.
     ///
-    /// Set to 0 for strict ordering (no late events allowed). Only applies when `time_source`
-    /// is set to `event_time`.
+    /// Set to 0 for strict ordering (no late events allowed).
     #[serde(default)]
     #[configurable(metadata(docs::examples = 0, docs::examples = 5000, docs::examples = 30000))]
     pub allowed_lateness_ms: u64,
 
-    /// How to handle events with missing timestamps in event-time mode.
+    /// How to handle events with missing timestamps.
     ///
-    /// When `true`, events without a timestamp use the current system time as a fallback.
-    /// When `false`, such events are dropped and counted via `component_discarded_events_total`.
-    ///
-    /// Only applies when `time_source` is set to `event_time`.
+    /// Metrics that pass through unchanged for the configured mode do not require a timestamp.
+    /// For metrics that would be bucketed:
+    /// - `drop` (default) discards the event and increments `component_discarded_events_total`
+    /// - `use_system_time` synthesizes a timestamp from the current system clock
     #[serde(default)]
-    pub use_system_time_for_missing_timestamps: bool,
+    #[configurable(derived)]
+    pub missing_timestamp: MissingTimestamp,
 
-    /// Maximum allowed time drift for future events in event-time mode.
+    /// Maximum allowed time drift for future events, in milliseconds.
     ///
     /// Acts as a clock-skew guard: events whose timestamp is further in the future than this
     /// many milliseconds (relative to the current system time) are dropped and counted via
     /// `component_discarded_events_total`. Defaults to 10 seconds.
     ///
-    /// Set to 0 to allow events at any future time. Only applies when `time_source` is set
-    /// to `event_time`.
+    /// Set to 0 to allow events at any future time.
     #[serde(default = "default_max_future_ms")]
     #[configurable(metadata(docs::examples = 0, docs::examples = 60000, docs::examples = 300000))]
     pub max_future_ms: u64,
 }
 
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[configurable(description = "The time source to use for aggregation windows.")]
-#[serde(rename_all = "snake_case")]
-pub enum TimeSource {
-    /// Use system clock time for aggregation windows (default).
-    ///
-    /// Events are aggregated based on when they are processed, not their timestamps.
-    #[default]
-    SystemTime,
-
-    /// Use event timestamps for aggregation windows.
-    ///
-    /// Events are grouped into buckets based on their timestamps. Events are rejected when
-    /// their window has ended or their bucket was already emitted.
-    EventTime,
+impl Default for EventTimeConfig {
+    fn default() -> Self {
+        Self {
+            allowed_lateness_ms: 0,
+            missing_timestamp: MissingTimestamp::Drop,
+            max_future_ms: default_max_future_ms(),
+        }
+    }
 }
 
-const fn default_time_source() -> TimeSource {
-    TimeSource::SystemTime
+/// Behavior for metrics that are missing a timestamp in event-time mode.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[configurable(description = "How to handle metrics that are missing a timestamp.")]
+#[serde(rename_all = "snake_case")]
+pub enum MissingTimestamp {
+    /// Drop the event and count it via `component_discarded_events_total`.
+    #[default]
+    Drop,
+
+    /// Use the current system time as the event timestamp.
+    UseSystemTime,
 }
 
 pub(crate) const fn default_max_future_ms() -> u64 {
@@ -145,11 +152,15 @@ impl Default for AggregateConfig {
         Self {
             interval_ms: default_interval_ms(),
             mode: default_mode(),
-            time_source: default_time_source(),
-            allowed_lateness_ms: 0,
-            use_system_time_for_missing_timestamps: false,
-            max_future_ms: default_max_future_ms(),
+            event_time: None,
         }
+    }
+}
+
+impl AggregateConfig {
+    /// Returns `true` when event-time aggregation is enabled.
+    pub const fn is_event_time(&self) -> bool {
+        self.event_time.is_some()
     }
 }
 

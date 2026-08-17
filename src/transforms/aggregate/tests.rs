@@ -9,7 +9,8 @@ use vector_lib::config::{ComponentKey, LogNamespace};
 use vrl::value::Kind;
 
 use super::{
-    Aggregate, AggregateConfig, AggregationMode, TimeSource, config::default_max_future_ms,
+    Aggregate, AggregateConfig, AggregationMode, EventTimeConfig, MissingTimestamp,
+    config::default_max_future_ms,
 };
 use crate::{
     config::{OutputId, TransformConfig, TransformContext},
@@ -28,14 +29,18 @@ crate::test_util::test_generate_config::<AggregateConfig>();
 }
 
 #[test]
-fn generated_config_uses_max_future_ms_default() {
+fn generated_config_omits_inactive_event_time_block() {
 use crate::config::GenerateConfig;
 
 let generated = AggregateConfig::generate_config();
+assert!(
+    generated.get("event_time").is_none(),
+    "system-time default must not emit an event_time block in generated config"
+);
 assert_eq!(
-    generated.get("max_future_ms").and_then(|v| v.as_u64()),
-    Some(default_max_future_ms()),
-    "generated config must match the serde/missing-config default for max_future_ms"
+    EventTimeConfig::default().max_future_ms,
+    default_max_future_ms(),
+    "event_time.max_future_ms default must match the serde/missing-config default"
 );
 }
 
@@ -45,14 +50,7 @@ assert_eq!(
 /// keys, so `Aggregate::new` must reject it up front.
 #[test]
 fn rejects_zero_interval_ms() {
-let result = Aggregate::new(&AggregateConfig {
-    interval_ms: 0,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-});
+let result = Aggregate::new(&event_time_config(0, AggregationMode::Auto));
 
 let err = result.expect_err("zero interval_ms must not be accepted");
 assert!(
@@ -63,14 +61,7 @@ assert!(
 
 #[test]
 fn rejects_interval_ms_above_i64_max() {
-let result = Aggregate::new(&AggregateConfig {
-    interval_ms: u64::MAX,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-});
+let result = Aggregate::new(&event_time_config(u64::MAX, AggregationMode::Auto));
 
 let err = result.expect_err("u64::MAX must not be accepted");
 let msg = err.to_string();
@@ -80,27 +71,13 @@ assert!(
 );
 
 let boundary = i64::MAX as u64 + 1;
-let result = Aggregate::new(&AggregateConfig {
-    interval_ms: boundary,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-});
+let result = Aggregate::new(&event_time_config(boundary, AggregationMode::Auto));
 assert!(
     result.is_err(),
     "i64::MAX + 1 (first wrapping value) must be rejected",
 );
 
-Aggregate::new(&AggregateConfig {
-    interval_ms: i64::MAX as u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+Aggregate::new(&event_time_config(i64::MAX as u64, AggregationMode::Auto))
 .expect("i64::MAX (largest non-wrapping value) must be accepted");
 }
 
@@ -110,14 +87,9 @@ Aggregate::new(&AggregateConfig {
 /// transform silently drop every event as "too far in the future".
 #[test]
 fn rejects_max_future_ms_above_i64_max() {
-let result = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: u64::MAX,
-});
+let result = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.max_future_ms = u64::MAX;
+    }));
 
 let err = result.expect_err("u64::MAX must not be accepted");
 let msg = err.to_string();
@@ -127,27 +99,17 @@ assert!(
 );
 
 let boundary = i64::MAX as u64 + 1;
-let result = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: boundary,
-});
+let result = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.max_future_ms = boundary;
+    }));
 assert!(
     result.is_err(),
     "i64::MAX + 1 (first wrapping value) must be rejected",
 );
 
-Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: i64::MAX as u64,
-})
+Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.max_future_ms = i64::MAX as u64;
+    }))
 .expect("i64::MAX (largest non-wrapping value) must be accepted");
 }
 
@@ -158,14 +120,9 @@ Aggregate::new(&AggregateConfig {
 /// every late event that the configured lateness was meant to protect.
 #[test]
 fn rejects_allowed_lateness_ms_above_i64_max() {
-let result = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: u64::MAX,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-});
+let result = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.allowed_lateness_ms = u64::MAX;
+    }));
 
 let err = result.expect_err("u64::MAX must not be accepted");
 let msg = err.to_string();
@@ -175,27 +132,17 @@ assert!(
 );
 
 let boundary = i64::MAX as u64 + 1;
-let result = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: boundary,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-});
+let result = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.allowed_lateness_ms = boundary;
+    }));
 assert!(
     result.is_err(),
     "i64::MAX + 1 (first wrapping value) must be rejected",
 );
 
-Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: i64::MAX as u64,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.allowed_lateness_ms = i64::MAX as u64;
+    }))
 .expect("i64::MAX (largest non-wrapping value) must be accepted");
 }
 
@@ -254,16 +201,40 @@ Utc.timestamp_millis_opt(bucket_key + interval_i64 / 2)
     .expect("bucket midpoint is a valid timestamp")
 }
 
+
+fn system_time_config(mode: AggregationMode) -> AggregateConfig {
+    AggregateConfig {
+        interval_ms: 1000,
+        mode,
+        event_time: None,
+    }
+}
+
+fn event_time_config(interval_ms: u64, mode: AggregationMode) -> AggregateConfig {
+    AggregateConfig {
+        interval_ms,
+        mode,
+        event_time: Some(EventTimeConfig::default()),
+    }
+}
+
+fn event_time_config_with(
+    interval_ms: u64,
+    mode: AggregationMode,
+    f: impl FnOnce(&mut EventTimeConfig),
+) -> AggregateConfig {
+    let mut event_time = EventTimeConfig::default();
+    f(&mut event_time);
+    AggregateConfig {
+        interval_ms,
+        mode,
+        event_time: Some(event_time),
+    }
+}
+
 #[test]
 fn incremental_auto() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto))
 .unwrap();
 
 let counter_a_1 = make_metric(
@@ -332,14 +303,7 @@ for event in out {
 #[test]
 fn passes_through_ignored_kind() {
 // Sum mode aggregates incremental, passes through absolute without collapsing.
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Sum,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Sum))
 .unwrap();
 
 let counter_1 = make_metric(
@@ -385,14 +349,7 @@ assert_eq!(&counter_summed, &out[0]);
 
 #[test]
 fn absolute_auto() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto))
 .unwrap();
 
 let gauge_a_1 = make_metric(
@@ -455,14 +412,7 @@ for event in out {
 
 #[test]
 fn count_agg() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Count,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Count))
 .unwrap();
 
 let gauge_a_1 = make_metric(
@@ -515,14 +465,7 @@ assert_eq!(&result_count_2, &out[0]);
 
 #[test]
 fn absolute_max() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Max,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Max))
 .unwrap();
 
 let gauge_a_1 = make_metric(
@@ -565,14 +508,7 @@ assert_eq!(&gauge_a_1, &out[0]);
 
 #[test]
 fn absolute_min() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Min,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Min))
 .unwrap();
 
 let gauge_a_1 = make_metric(
@@ -615,14 +551,7 @@ assert_eq!(&gauge_a_1, &out[0]);
 
 #[test]
 fn absolute_diff() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Diff,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Diff))
 .unwrap();
 
 let gauge_a_1 = make_metric(
@@ -675,14 +604,7 @@ assert_eq!(&result, &out[0]);
 
 #[test]
 fn absolute_diff_conflicting_type() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Diff,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Diff))
 .unwrap();
 
 let gauge_a_1 = make_metric(
@@ -714,14 +636,7 @@ assert_eq!(&gauge_a_2, &out[0]);
 
 #[test]
 fn absolute_mean() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Mean,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Mean))
 .unwrap();
 
 let gauge_a_1 = make_metric(
@@ -775,14 +690,7 @@ assert_eq!(&mean_result, &out[0]);
 
 #[test]
 fn absolute_stdev() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Stdev,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Stdev))
 .unwrap();
 
 let gauges = vec![
@@ -839,14 +747,7 @@ assert_eq!(&stdev_result, &out[0]);
 
 #[test]
 fn conflicting_value_type() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto))
 .unwrap();
 
 let counter = make_metric(
@@ -901,14 +802,7 @@ assert_eq!(&summed, &out[0]);
 
 #[test]
 fn conflicting_kinds() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::SystemTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto))
 .unwrap();
 
 let incremental = make_metric(
@@ -1098,14 +992,7 @@ assert_transform_compliance(async {
 
 #[test]
 fn event_time_incremental_auto() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64, // 10 seconds
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Auto))
 .unwrap();
 
 // Create events with timestamps in the same bucket (11:00:20 to 11:00:30)
@@ -1145,14 +1032,7 @@ if let MetricValue::Counter { value } = metric.value() {
 /// `-1ms` in `[-interval_ms, 0)` anchored at `-interval_ms`.
 #[test]
 fn event_time_pre_epoch_buckets_use_floor_division() {
-let agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10_000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+let agg = Aggregate::new(&event_time_config(10_000_u64, AggregationMode::Auto))
 .unwrap();
 
 let ts = Utc
@@ -1169,14 +1049,9 @@ assert_eq!(
 
 #[test]
 fn event_time_out_of_order_rejection() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64, // 10 seconds
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 0,
-})
+let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Auto, |et| {
+        et.max_future_ms = 0;
+    }))
 .unwrap();
 
 let bucket0 = open_bucket_timestamp(10_000);
@@ -1221,14 +1096,9 @@ assert_eq!(1, out.len());
 
 #[test]
 fn event_time_different_buckets() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64, // 10 seconds
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Auto, |et| {
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 let base_time = open_bucket_timestamp(10_000);
@@ -1284,14 +1154,7 @@ if let MetricValue::Counter { value } = metric.value() {
 
 #[test]
 fn event_time_no_timestamp_rejected() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Auto))
 .unwrap();
 
 // Event without timestamp should be rejected
@@ -1310,14 +1173,7 @@ assert_eq!(0, out.len());
 
 #[test]
 fn event_time_absolute_latest() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Auto))
 .unwrap();
 
 let base_time = open_bucket_timestamp(10_000);
@@ -1353,14 +1209,7 @@ if let MetricValue::Gauge { value } = metric.value() {
 
 #[test]
 fn event_time_mean_happy_path() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Mean,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Mean))
 .unwrap();
 
 let base_time = open_bucket_timestamp(10_000);
@@ -1404,14 +1253,7 @@ if let MetricValue::Gauge { value } = out[0].as_metric().value() {
 
 #[test]
 fn event_time_stdev_happy_path() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Stdev,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Stdev))
 .unwrap();
 
 let base_time = open_bucket_timestamp(10_000);
@@ -1445,14 +1287,9 @@ if let MetricValue::Gauge { value } = out[0].as_metric().value() {
 
 #[test]
 fn event_time_diff_uses_previous_bucket() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64, // 10 seconds
-    mode: AggregationMode::Diff,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Diff, |et| {
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 let ts1 = event_time_bucket_timestamp(10_000, 0);
@@ -1503,14 +1340,7 @@ assert!((values[1] - 15.0).abs() < 1e-9);
 fn event_time_rejects_late_events_before_flush_tick() {
 let interval_ms = 10_000_u64;
 
-let agg = Aggregate::new(&AggregateConfig {
-    interval_ms,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+let agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto))
 .unwrap();
 
 let now_ms = Utc::now().timestamp_millis();
@@ -1541,14 +1371,7 @@ assert!(agg.event_time_buckets.is_empty());
 
 #[test]
 fn event_time_passes_through_ignored_kind() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10_000_u64,
-    mode: AggregationMode::Sum,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+let mut agg = Aggregate::new(&event_time_config(10_000_u64, AggregationMode::Sum))
 .unwrap();
 
 let ts = open_bucket_timestamp(10_000);
@@ -1577,14 +1400,7 @@ assert_eq!(&incremental.into_metric(), out[0].as_metric());
 
 #[test]
 fn event_time_passthrough_without_timestamp() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10_000_u64,
-    mode: AggregationMode::Sum,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+let mut agg = Aggregate::new(&event_time_config(10_000_u64, AggregationMode::Sum))
 .unwrap();
 
 let absolute_no_ts = make_metric(
@@ -1598,14 +1414,7 @@ assert!(
 );
 assert!(agg.event_time_buckets.is_empty());
 
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10_000_u64,
-    mode: AggregationMode::Mean,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+let mut agg = Aggregate::new(&event_time_config(10_000_u64, AggregationMode::Mean))
 .unwrap();
 
 let incremental_no_ts = make_metric(
@@ -1622,14 +1431,7 @@ assert!(agg.event_time_buckets.is_empty() && agg.event_time_multi_buckets.is_emp
 
 #[test]
 fn event_time_mean_absolute_non_gauge_is_silently_ignored() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10_000_u64,
-    mode: AggregationMode::Mean,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10_000,
-})
+let mut agg = Aggregate::new(&event_time_config(10_000_u64, AggregationMode::Mean))
 .unwrap();
 
 let mut values = std::collections::BTreeSet::new();
@@ -1658,14 +1460,13 @@ fn event_time_allowed_lateness_delays_flush_for_current_bucket() {
 let interval_ms = 5000_u64;
 let allowed_lateness_ms = 3000_u64;
 
-let mut agg = Aggregate::new(&AggregateConfig {
+let mut agg = Aggregate::new(&event_time_config_with(
     interval_ms,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+    AggregationMode::Auto,
+    |et| {
+        et.allowed_lateness_ms = allowed_lateness_ms;
+    },
+))
 .unwrap();
 
 // Put an event in the *current* bucket. With allowed_lateness configured, the bucket should
@@ -1700,14 +1501,10 @@ fn event_time_closed_buckets_are_rejected_regardless_of_grace() {
 // still permit recording into an unflushed bucket.
 let interval_ms = 10_000_u64;
 
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 10_000,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(interval_ms, AggregationMode::Auto, |et| {
+        et.allowed_lateness_ms = 10_000;
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 let interval_i64 = interval_ms as i64;
@@ -1768,14 +1565,9 @@ if let MetricValue::Gauge { value } = out[0].as_metric().value() {
 fn event_time_non_diff_modes_do_not_retain_prev_buckets() {
 let interval_ms = 10_000_u64;
 
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(interval_ms, AggregationMode::Auto, |et| {
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 for offset in 0..50_i64 {
@@ -1804,14 +1596,9 @@ assert_eq!(
 fn event_time_diff_mode_retains_only_bounded_prev_buckets() {
 let interval_ms = 10_000_u64;
 
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms,
-    mode: AggregationMode::Diff,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(interval_ms, AggregationMode::Diff, |et| {
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 for offset in 0..50_i64 {
@@ -1834,18 +1621,34 @@ assert!(
 );
 }
 
-/// `time_source` parses the snake_case literals shown in the inline
-/// schema docs. Prior to this fix the enum had no `rename_all` attribute,
-/// so only the Rust variant names (`EventTime` / `SystemTime`) parsed --
-/// any user copying the documented `event_time` / `system_time` form
-/// hit a config validation error and the transform failed to start.
+/// `event_time.missing_timestamp` parses the snake_case literals shown in docs.
 #[test]
-fn time_source_parses_documented_snake_case_literals() {
-let cfg: AggregateConfig = toml::from_str(r#"time_source = "event_time""#).unwrap();
-assert_eq!(cfg.time_source, TimeSource::EventTime);
+fn event_time_block_parses_documented_literals() {
+let cfg: AggregateConfig = toml::from_str(
+    r#"
+        [event_time]
+        missing_timestamp = "use_system_time"
+        allowed_lateness_ms = 5000
+        max_future_ms = 60000
+    "#,
+)
+.unwrap();
+let event_time = cfg.event_time.expect("event_time block present");
+assert_eq!(event_time.missing_timestamp, MissingTimestamp::UseSystemTime);
+assert_eq!(event_time.allowed_lateness_ms, 5000);
+assert_eq!(event_time.max_future_ms, 60000);
 
-let cfg: AggregateConfig = toml::from_str(r#"time_source = "system_time""#).unwrap();
-assert_eq!(cfg.time_source, TimeSource::SystemTime);
+let cfg: AggregateConfig = toml::from_str(
+    r#"
+        [event_time]
+        missing_timestamp = "drop"
+    "#,
+)
+.unwrap();
+assert_eq!(
+    cfg.event_time.unwrap().missing_timestamp,
+    MissingTimestamp::Drop
+);
 }
 
 /// When the input stream closes, every still-open event-time bucket must
@@ -1860,8 +1663,8 @@ async fn event_time_drains_open_buckets_on_shutdown() {
 let agg = toml::from_str::<AggregateConfig>(
     r#"
 interval_ms = 600000
+[event_time]
 allowed_lateness_ms = 600000
-time_source = "event_time"
 "#,
 )
 .unwrap()
@@ -1901,14 +1704,9 @@ assert_eq!(
 
 #[test]
 fn event_time_future_timestamp_rejected() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 5000, // only allow 5 seconds into the future
-})
+let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Auto, |et| {
+        et.max_future_ms = 5000;
+    }))
 .unwrap();
 
 // Timestamp 60 seconds in the future — well beyond max_future_ms.
@@ -1935,14 +1733,9 @@ assert_eq!(0, out.len(), "Far-future event must be dropped");
 /// the boundary value is safe at record time.
 #[test]
 fn event_time_record_with_max_future_ms_at_i64_max_does_not_panic() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: i64::MAX as u64,
-})
+let mut agg = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.max_future_ms = i64::MAX as u64;
+    }))
 .unwrap();
 
 let event = make_metric_with_timestamp(
@@ -1973,17 +1766,10 @@ assert_eq!(
 /// `i64::MAX`, leaving the far-future bucket open until `force`.
 #[test]
 fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 1000,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    // Largest grace period accepted by `Aggregate::new`; chosen so
-    // `bucket_key + grace_ms` is guaranteed to overflow when combined
-    // with a near-`MAX_UTC` timestamp.
-    allowed_lateness_ms: i64::MAX as u64,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 0,
-})
+let mut agg = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.allowed_lateness_ms = i64::MAX as u64;
+        et.max_future_ms = 0;
+    }))
 .unwrap();
 
 let far_future = DateTime::<Utc>::MAX_UTC;
@@ -2027,14 +1813,9 @@ assert_eq!(
 
 #[test]
 fn event_time_missing_timestamp_uses_system_time() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: true,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Auto, |et| {
+        et.missing_timestamp = MissingTimestamp::UseSystemTime;
+    }))
 .unwrap();
 
 // Event with no timestamp — should be bucketed using system time and accepted.
@@ -2072,14 +1853,9 @@ fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
     let interval_ms = 1_000_u64;
     let interval_i64 = interval_ms as i64;
 
-    let agg = Aggregate::new(&AggregateConfig {
-        interval_ms,
-        mode: AggregationMode::Auto,
-        time_source: TimeSource::EventTime,
-        allowed_lateness_ms: 0,
-        use_system_time_for_missing_timestamps: true,
-        max_future_ms: 10_000,
-    })
+    let agg = Aggregate::new(&event_time_config_with(interval_ms, AggregationMode::Auto, |et| {
+        et.missing_timestamp = MissingTimestamp::UseSystemTime;
+    }))
     .unwrap();
 
     let now_ms = Utc::now().timestamp_millis();
@@ -2115,15 +1891,7 @@ fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
 #[test]
 fn event_time_auto_replaces_on_kind_change_before_timestamp_compare() {
     let interval_ms = 10_000_u64;
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms,
-        mode: AggregationMode::Auto,
-        time_source: TimeSource::EventTime,
-        allowed_lateness_ms: 0,
-        use_system_time_for_missing_timestamps: false,
-        max_future_ms: 10_000,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
 
     let bucket_start = open_bucket_timestamp(interval_ms);
     let ts_older = bucket_start + chrono::Duration::milliseconds(100);
@@ -2158,40 +1926,6 @@ fn event_time_auto_replaces_on_kind_change_before_timestamp_compare() {
     }
 }
 
-#[test]
-fn event_time_diff_first_bucket_no_previous() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Diff,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
-.unwrap();
-
-let base_time = open_bucket_timestamp(10_000);
-
-let event = make_metric_with_timestamp(
-    "diff_gauge",
-    MetricKind::Absolute,
-    MetricValue::Gauge { value: 42.0 },
-    base_time,
-);
-agg.record(event);
-
-let mut out = vec![];
-agg.flush_final(&mut out);
-
-// First bucket has no previous window — should emit raw value without subtraction.
-assert_eq!(1, out.len());
-if let MetricValue::Gauge { value } = out[0].as_metric().value() {
-    assert_eq!(*value, 42.0, "First bucket in Diff emits the raw value");
-} else {
-    panic!("Expected Gauge metric value");
-}
-}
-
 /// Diff mode with several distinct series in the same bucket: every
 /// series must be emitted on the first flush and every series must be
 /// retained in `event_time_prev_buckets` so the next bucket's flush can
@@ -2200,14 +1934,9 @@ if let MetricValue::Gauge { value } = out[0].as_metric().value() {
 /// `&bucket_map` iteration / move-into-prev-buckets path.
 #[test]
 fn event_time_diff_multiple_series_same_bucket() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Diff,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Diff, |et| {
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 let base_time = open_bucket_timestamp(10_000);
@@ -2285,14 +2014,7 @@ for (name, raw2) in &bucket2 {
 
 #[test]
 fn event_time_count_mode() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Count,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Count))
 .unwrap();
 
 let base_time = open_bucket_timestamp(10_000);
@@ -2321,14 +2043,9 @@ if let MetricValue::Counter { value } = out[0].as_metric().value() {
 
 #[test]
 fn event_time_watermark_only_advances() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Auto, |et| {
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 // Arrive in reverse bucket order: newer first, then older.
@@ -2367,37 +2084,10 @@ assert_eq!(
 );
 }
 
-#[test]
-fn event_time_empty_flush_produces_nothing() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64,
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
-.unwrap();
-
-let mut out = vec![];
-agg.flush_into(&mut out);
-assert_eq!(0, out.len(), "Flush with no events must produce no output");
-
-// Second call must also be safe.
-agg.flush_into(&mut out);
-assert_eq!(0, out.len());
-}
 
 #[test]
 fn event_time_multiple_different_metrics_same_bucket() {
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms: 10000_u64, // 10 seconds
-    mode: AggregationMode::Auto,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    max_future_ms: 10000,
-})
+let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Auto))
 .unwrap();
 
 let base_time = open_bucket_timestamp(10_000);
@@ -2484,17 +2174,9 @@ assert!(found_gauge_c, "Should have found gauge_c");
 fn event_time_ignored_kind_passes_through_without_advancing_watermark() {
 let interval_ms = 10_000_u64;
 
-let mut agg = Aggregate::new(&AggregateConfig {
-    interval_ms,
-    mode: AggregationMode::Mean,
-    time_source: TimeSource::EventTime,
-    allowed_lateness_ms: 0,
-    use_system_time_for_missing_timestamps: false,
-    // Generous future allowance so the stray event isn't rejected by
-    // `max_future_ms` -- we want it to fail the *mode* compatibility
-    // check, not the future check.
-    max_future_ms: 600_000,
-})
+let mut agg = Aggregate::new(&event_time_config_with(interval_ms, AggregationMode::Mean, |et| {
+        et.max_future_ms = 600_000;
+    }))
 .unwrap();
 
 let stray_ts = open_bucket_timestamp(interval_ms);

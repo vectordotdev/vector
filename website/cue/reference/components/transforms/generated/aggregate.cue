@@ -1,24 +1,68 @@
 package metadata
 
 generated: components: transforms: aggregate: configuration: {
-	allowed_lateness_ms: {
+	event_time: {
 		description: """
-			Grace period for late-arriving events when using event-time aggregation.
+			Event-time aggregation settings.
 
-			Each bucket accepts events until the system clock reaches
-			`bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
-			event-time window. That cutoff is enforced when events are recorded, not only when a
-			periodic flush runs. Once a bucket is emitted it is closed permanently; any later
-			events whose timestamp falls inside it are dropped and counted via
-			`component_discarded_events_total`.
-
-			Set to 0 for strict ordering (no late events allowed). Only applies when `time_source`
-			is set to `event_time`.
+			When present, metrics are grouped into buckets based on their timestamps rather than when
+			they are processed. Omit this block to keep the default system-time behavior.
 			"""
 		required: false
-		type: uint: {
-			default: 0
-			examples: [0, 5000, 30000]
+		type: object: options: {
+			allowed_lateness_ms: {
+				description: """
+					Grace period for late-arriving events, in milliseconds.
+
+					Each bucket accepts events until the system clock reaches
+					`bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
+					event-time window. That cutoff is enforced when events are recorded, not only when a
+					periodic flush runs. Once a bucket is emitted it is closed permanently; any later
+					events whose timestamp falls inside it are dropped and counted via
+					`component_discarded_events_total`.
+
+					Set to 0 for strict ordering (no late events allowed).
+					"""
+				required: false
+				type: uint: {
+					default: 0
+					examples: [0, 5000, 30000]
+				}
+			}
+			max_future_ms: {
+				description: """
+					Maximum allowed time drift for future events, in milliseconds.
+
+					Acts as a clock-skew guard: events whose timestamp is further in the future than this
+					many milliseconds (relative to the current system time) are dropped and counted via
+					`component_discarded_events_total`. Defaults to 10 seconds.
+
+					Set to 0 to allow events at any future time.
+					"""
+				required: false
+				type: uint: {
+					default: 10000
+					examples: [0, 60000, 300000]
+				}
+			}
+			missing_timestamp: {
+				description: """
+					How to handle events with missing timestamps.
+
+					Metrics that pass through unchanged for the configured mode do not require a timestamp.
+					For metrics that would be bucketed:
+					- `drop` (default) discards the event and increments `component_discarded_events_total`
+					- `use_system_time` synthesizes a timestamp from the current system clock
+					"""
+				required: false
+				type: string: {
+					default: "drop"
+					enum: {
+						drop:            "Drop the event and count it via `component_discarded_events_total`."
+						use_system_time: "Use the current system time as the event timestamp."
+					}
+				}
+			}
 		}
 	}
 	interval_ms: {
@@ -30,23 +74,6 @@ generated: components: transforms: aggregate: configuration: {
 			"""
 		required: false
 		type: uint: default: 10000
-	}
-	max_future_ms: {
-		description: """
-			Maximum allowed time drift for future events in event-time mode.
-
-			Acts as a clock-skew guard: events whose timestamp is further in the future than this
-			many milliseconds (relative to the current system time) are dropped and counted via
-			`component_discarded_events_total`. Defaults to 10 seconds.
-
-			Set to 0 to allow events at any future time. Only applies when `time_source` is set
-			to `event_time`.
-			"""
-		required: false
-		type: uint: {
-			default: 10000
-			examples: [0, 60000, 300000]
-		}
 	}
 	mode: {
 		description: """
@@ -69,43 +96,5 @@ generated: components: transforms: aggregate: configuration: {
 				Sum:    "Sums incremental metrics; absolute metrics pass through unchanged."
 			}
 		}
-	}
-	time_source: {
-		description: """
-			Time source to use for aggregation windows.
-
-			When set to `event_time`, events are grouped into buckets based on their timestamps rather than
-			when they are processed. Events are rejected when their window has ended (per
-			`allowed_lateness_ms`) or when their bucket was already emitted (watermark).
-			"""
-		required: false
-		type: string: {
-			default: "system_time"
-			enum: {
-				event_time: """
-					Use event timestamps for aggregation windows.
-
-					Events are grouped into buckets based on their timestamps. Events are rejected when
-					their window has ended or their bucket was already emitted.
-					"""
-				system_time: """
-					Use system clock time for aggregation windows (default).
-
-					Events are aggregated based on when they are processed, not their timestamps.
-					"""
-			}
-		}
-	}
-	use_system_time_for_missing_timestamps: {
-		description: """
-			How to handle events with missing timestamps in event-time mode.
-
-			When `true`, events without a timestamp use the current system time as a fallback.
-			When `false`, such events are dropped and counted via `component_discarded_events_total`.
-
-			Only applies when `time_source` is set to `event_time`.
-			"""
-		required: false
-		type: bool: default: false
 	}
 }
