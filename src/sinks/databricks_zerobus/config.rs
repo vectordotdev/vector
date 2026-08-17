@@ -8,7 +8,9 @@ use crate::config::{
 };
 use crate::sinks::{
     prelude::*,
-    util::{BatchConfig, RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings},
+    util::{
+        BatchConfig, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings,
+    },
 };
 
 use super::{error::ZerobusSinkError, service::ZerobusService, sink::ZerobusSink};
@@ -128,7 +130,7 @@ pub struct ZerobusSinkConfig {
     #[configurable(metadata(
         docs::examples = "https://6543210987654321.zerobus.us-east-1.cloud.databricks.com"
     ))]
-    pub ingestion_endpoint: String,
+    pub ingestion_endpoint: HttpEndpoint,
 
     /// The Unity Catalog table name to write to.
     ///
@@ -195,8 +197,10 @@ pub struct ZerobusSinkConfig {
 impl GenerateConfig for ZerobusSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            ingestion_endpoint: "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com"
-                .to_string(),
+            ingestion_endpoint: HttpEndpoint::parse(
+                "https://1234567890123456.zerobus.us-west-2.cloud.databricks.com",
+            )
+            .expect("valid example ingestion endpoint"),
             table_name: "main.default.logs".to_string(),
             unity_catalog_endpoint: "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com".to_string(),
             auth: DatabricksAuthentication::OAuth {
@@ -279,11 +283,9 @@ impl ValidatedSink for ZerobusSinkConfig {
 
 impl ZerobusSinkConfig {
     pub fn validate(&self) -> Result<(), ZerobusSinkError> {
-        if self.ingestion_endpoint.is_empty() {
-            return Err(ZerobusSinkError::ConfigError {
-                message: "ingestion_endpoint cannot be empty".to_string(),
-            });
-        }
+        // `ingestion_endpoint` is an `HttpEndpoint`: deserialization already
+        // guarantees it is an absolute http(s) URL with a host and valid port,
+        // so no further validation is needed here.
 
         if self.table_name.is_empty() {
             return Err(ZerobusSinkError::ConfigError {
@@ -388,7 +390,7 @@ mod tests {
 
     fn create_test_config() -> ZerobusSinkConfig {
         ZerobusSinkConfig {
-            ingestion_endpoint: "https://test.databricks.com".to_string(),
+            ingestion_endpoint: HttpEndpoint::parse("https://test.databricks.com").unwrap(),
             table_name: "test.default.logs".to_string(),
             unity_catalog_endpoint: "https://test-workspace.databricks.com".to_string(),
             auth: DatabricksAuthentication::OAuth {
@@ -446,21 +448,39 @@ mod tests {
     }
 
     #[test]
-    fn test_config_validation_empty_endpoint() {
-        let mut config = create_test_config();
-        config.ingestion_endpoint = "".to_string();
+    fn test_config_validation_rejects_non_http_ingestion_endpoint() {
+        // `ingestion_endpoint` is an `HttpEndpoint`, so a non-http scheme is
+        // rejected at deserialization time rather than at validate time.
+        let config = r#"
+ingestion_endpoint: "ftp://test.databricks.com"
+table_name: "test.default.logs"
+unity_catalog_endpoint: "https://test-workspace.databricks.com"
+auth:
+  strategy: oauth
+  client_id: "test-client-id"
+  client_secret: "test-client-secret"
+"#;
+        let result: Result<ZerobusSinkConfig, _> = serde_yaml::from_str(config);
+        assert!(
+            result.is_err(),
+            "non-http ingestion_endpoint should fail deserialization"
+        );
 
-        let result = config.validate();
-        assert!(result.is_err());
-
-        if let Err(crate::sinks::databricks_zerobus::error::ZerobusSinkError::ConfigError {
-            message,
-        }) = result
-        {
-            assert!(message.contains("ingestion_endpoint cannot be empty"));
-        } else {
-            panic!("Expected ConfigError for empty ingestion_endpoint");
-        }
+        // The same holds for a relative endpoint with no host.
+        let config = r#"
+ingestion_endpoint: "/some/path"
+table_name: "test.default.logs"
+unity_catalog_endpoint: "https://test-workspace.databricks.com"
+auth:
+  strategy: oauth
+  client_id: "test-client-id"
+  client_secret: "test-client-secret"
+"#;
+        let result: Result<ZerobusSinkConfig, _> = serde_yaml::from_str(config);
+        assert!(
+            result.is_err(),
+            "host-less ingestion_endpoint should fail deserialization"
+        );
     }
 
     #[test]
