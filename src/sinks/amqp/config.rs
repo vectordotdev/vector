@@ -1,5 +1,5 @@
 //! Configuration functionality for the `AMQP` sink.
-use lapin::{BasicProperties, types::ShortString};
+use lapin::{uri::AMQPUri, BasicProperties, types::ShortString};
 use vector_lib::{
     codecs::TextSerializerConfig,
     internal_event::{error_stage, error_type},
@@ -166,6 +166,12 @@ impl ValidatedSink for AmqpSinkConfig {
                 error: "max_channels must be positive".into(),
             }));
         }
+        // Parse the connection string up front so malformed or unsupported-scheme
+        // AMQP URIs are rejected by `vector validate` rather than at build time.
+        self.connection
+            .connection_string
+            .parse::<AMQPUri>()
+            .map_err(|e| format!("Invalid connection string: {e}"))?;
         let exchange = self
             .exchange
             .clone()
@@ -233,6 +239,38 @@ mod tests {
         };
         let result = config.validate();
         assert!(result.is_err(), "validation should reject max_channels = 0");
+    }
+
+    #[test]
+    fn validate_rejects_malformed_connection_string() {
+        let config = AmqpSinkConfig {
+            connection: AmqpConfig {
+                connection_string: "not a uri".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "validation should reject a malformed connection string"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_unsupported_scheme() {
+        let config = AmqpSinkConfig {
+            connection: AmqpConfig {
+                connection_string: "http://localhost:5672".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "validation should reject an unsupported AMQP URI scheme"
+        );
     }
 
     #[test]
