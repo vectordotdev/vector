@@ -187,6 +187,13 @@ impl ValidatedSink for DorisConfig {
         // certificate files from disk, so it is deferred to `build` to keep
         // `vector validate --no-environment` filesystem-free.
         for endpoint in &self.endpoints {
+            if !matches!(endpoint.uri.scheme_str(), Some("http" | "https")) {
+                return Err(format!(
+                    "Invalid scheme: {}, endpoint must use http or https",
+                    endpoint.uri
+                )
+                .into());
+            }
             if endpoint.uri.host().is_none() {
                 return Err(
                     format!("Invalid host: {}, host must include hostname", endpoint.uri).into(),
@@ -374,6 +381,27 @@ mod tests {
         assert!(
             config.validate().is_err(),
             "top-level auth combined with endpoint-embedded credentials must be rejected"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_non_http_scheme() {
+        use crate::config::ValidatedSink;
+        let config = DorisConfig {
+            endpoints: vec![
+                "ftp://doris.example.com:8030"
+                    .parse::<http::Uri>()
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+            ],
+            database: Template::try_from("mydatabase").unwrap(),
+            table: Template::try_from("mytable").unwrap(),
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_err(),
+            "a non-http endpoint scheme must be rejected during validation"
         );
     }
 
