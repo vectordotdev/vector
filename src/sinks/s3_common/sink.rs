@@ -10,20 +10,25 @@ pub struct S3Sink<Svc, RB, P> {
     request_builder: RB,
     partitioner: P,
     batcher_settings: BatcherSettings,
+    /// The AWS region string for metric labels.
+    region: String,
 }
 
 impl<Svc, RB, P> S3Sink<Svc, RB, P> {
+    /// Create a new S3 sink.
     pub const fn new(
         service: Svc,
         request_builder: RB,
         partitioner: P,
         batcher_settings: BatcherSettings,
+        region: String,
     ) -> Self {
         Self {
             partitioner,
             service,
             request_builder,
             batcher_settings,
+            region,
         }
     }
 }
@@ -62,6 +67,8 @@ where
                 }
             })
             .into_driver(self.service)
+            .protocol("https")
+            .label("region", self.region)
             .run()
             .await
     }

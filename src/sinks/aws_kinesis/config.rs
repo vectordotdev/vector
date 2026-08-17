@@ -87,6 +87,7 @@ pub fn build_sink<C, R, RR, E, RT>(
     batch_settings: BatcherSettings,
     client: C,
     retry_logic: RT,
+    region: String,
 ) -> crate::Result<VectorSink>
 where
     C: SendRecord + Clone + Send + Sync + 'static,
@@ -100,13 +101,13 @@ where
 {
     let request_limits = config.request.into_settings();
 
-    let region = config.region.region();
+    let sdk_region = config.region.region();
     let service = ServiceBuilder::new()
         .settings::<RT, BatchKinesisRequest<RR>>(request_limits, retry_logic)
         .service(KinesisService::<C, R, E> {
             client,
             stream_name: config.stream_name.clone(),
-            region,
+            region: sdk_region,
             _phantom_t: PhantomData,
             _phantom_e: PhantomData,
         });
@@ -126,6 +127,7 @@ where
         service,
         request_builder,
         partition_key_field,
+        region,
         _phantom: PhantomData,
     };
     Ok(VectorSink::from_event_streamsink(sink))

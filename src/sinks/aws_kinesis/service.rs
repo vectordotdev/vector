@@ -38,6 +38,7 @@ where
 pub struct KinesisResponse {
     pub(crate) failure_count: usize,
     pub(crate) events_byte_size: GroupedCountByteSize,
+    pub(crate) byte_size: usize,
     #[cfg(feature = "sinks-aws_kinesis_streams")]
     /// Track individual failed records for retry logic (Streams only)
     pub(crate) failed_records: Vec<RecordResult>,
@@ -59,6 +60,10 @@ impl DriverResponse for KinesisResponse {
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
     }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
+    }
 }
 
 impl<R, C, T, E> Service<BatchKinesisRequest<R>> for KinesisService<C, T, E>
@@ -79,6 +84,11 @@ where
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut requests: BatchKinesisRequest<R>) -> Self::Future {
+        let byte_size: usize = requests
+            .events
+            .iter()
+            .map(|req| req.record.encoded_length())
+            .sum();
         let metadata = std::mem::take(requests.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
 
@@ -95,6 +105,7 @@ where
             client.send(records, stream_name).await.map(|mut r| {
                 // augment the response
                 r.events_byte_size = events_byte_size;
+                r.byte_size = byte_size;
                 r
             })
         })
