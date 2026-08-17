@@ -428,7 +428,7 @@ k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31
 kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 libc.workspace = true
-lru = { version = "0.16.3", default-features = false }
+lru = { version = "0.18.2", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.7.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
@@ -549,7 +549,6 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
 default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
-antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-api-client", "sources-dnstap"]

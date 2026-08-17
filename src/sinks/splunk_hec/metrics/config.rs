@@ -21,7 +21,8 @@ use crate::{
             service::{HecService, HttpRequestBuilder},
         },
         util::{
-            BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig, http::HttpRetryLogic,
+            BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, TowerRequestConfig,
+            http::HttpRetryLogic,
         },
     },
     template::{ConfinedTemplate, Template},
@@ -65,7 +66,7 @@ pub struct HecMetricsSinkConfig {
         docs::examples = "http://example.com"
     ))]
     #[configurable(validation(format = "uri"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
@@ -128,7 +129,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
         serde_json::to_value(Self {
             default_namespace: None,
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
-            endpoint: "http://localhost:8088".to_owned(),
+            endpoint: HttpEndpoint::parse("http://localhost:8088").unwrap(),
             host_key: config_host_key(),
             index: None,
             sourcetype: None,
@@ -169,7 +170,7 @@ impl SinkConfig for HecMetricsSinkConfig {
 
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.default_token.inner().to_owned(),
             client.clone(),
         )
@@ -232,7 +233,7 @@ impl HecMetricsSinkConfig {
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             EndpointTarget::default(),
             self.default_token.inner().to_owned(),
             self.compression,
