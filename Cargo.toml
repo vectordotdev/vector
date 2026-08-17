@@ -564,7 +564,6 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # Note `default` still includes it, so macOS dev/source builds require a Homebrew
 # libodbc at build + run time.
 default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "sources-odbc"]
-antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-api-client", "sources-dnstap", "sources-odbc"]

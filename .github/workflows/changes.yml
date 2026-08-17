@@ -130,6 +130,8 @@ on:
         value: ${{ jobs.int_tests.outputs.odbc-mariadb }}
       odbc-postgresql:
         value: ${{ jobs.int_tests.outputs.odbc-postgresql }}
+      opensearch:
+        value: ${{ jobs.int_tests.outputs.opensearch }}
       opentelemetry:
         value: ${{ jobs.int_tests.outputs.opentelemetry }}
       postgres:
@@ -370,6 +372,7 @@ jobs:
       nginx: ${{ steps.filter.outputs.nginx }}
       odbc-mariadb: ${{ steps.filter.outputs.odbc-mariadb }}
       odbc-postgresql: ${{ steps.filter.outputs.odbc-postgresql }}
+      opensearch: ${{ steps.filter.outputs.opensearch }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
       postgres: ${{ steps.filter.outputs.postgres }}
       prometheus: ${{ steps.filter.outputs.prometheus }}
@@ -437,6 +440,7 @@ jobs:
             "nginx": ${{ steps.filter.outputs.nginx }},
             "odbc-mariadb": ${{ steps.filter.outputs.odbc-mariadb }},
             "odbc-postgresql": ${{ steps.filter.outputs.odbc-postgresql }},
+            "opensearch": ${{ steps.filter.outputs.opensearch }},
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
             "postgres": ${{ steps.filter.outputs.postgres }},
             "prometheus": ${{ steps.filter.outputs.prometheus }},

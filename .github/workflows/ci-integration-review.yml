@@ -136,6 +136,7 @@ jobs:
             "nginx",
             "odbc-mariadb",
             "odbc-postgresql",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",

@@ -278,9 +278,9 @@ dependencies = [
  "axum 0.6.20",
  "clap",
  "reqwest 0.11.26",
+ "serde",
  "serde_json",
  "tokio",
- "vector-buffers",
 ]
 
 [[package]]

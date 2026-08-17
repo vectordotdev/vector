@@ -27,7 +27,7 @@ use crate::{
             influxdb_settings,
         },
         util::{
-            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, EncodedEvent, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
@@ -70,7 +70,7 @@ pub struct InfluxDbConfig {
     ///
     /// This should be a full HTTP URI, including the scheme, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The InfluxDB API version to use.
     ///
@@ -1190,6 +1190,7 @@ mod integration_tests {
                 onboarding_v1, onboarding_v2, query_v1,
             },
         },
+        sinks::util::HttpEndpoint,
         test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         tls::{self, TlsConfig},
     };
@@ -1218,7 +1219,7 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
-            endpoint: url.to_string(),
+            endpoint: HttpEndpoint::parse(url).unwrap(),
             version: Some(InfluxDbVersion::V1),
             database: Some(database.clone()),
             consistency: None,
@@ -1313,7 +1314,7 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
-            endpoint,
+            endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             version: Some(InfluxDbVersion::V2),
             database: None,
             consistency: None,
