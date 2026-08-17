@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 use indoc::indoc;
 use tower::ServiceBuilder;
@@ -17,7 +17,7 @@ use crate::{
     sinks::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
         prelude::*,
-        util::http::RequestConfig,
+        util::{HttpEndpoint, http::RequestConfig},
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -93,20 +93,22 @@ impl GenerateConfig for DatadogLogsConfig {
 impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
-    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
+    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> crate::Result<http::Uri> {
         let base_url = dd_common
             .endpoint
             .clone()
             .unwrap_or_else(|| format!("https://http-intake.logs.{}", dd_common.site));
 
-        http::Uri::try_from(format!("{base_url}/api/v2/logs")).expect("URI not valid")
+        let endpoint = HttpEndpoint::parse(&base_url)?.append_path("/api/v2/logs")?;
+        Ok(endpoint.into_uri())
     }
 
-    pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        self.get_uri(dd_common)
+    pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
+        Ok(self
+            .get_uri(dd_common)?
             .scheme_str()
-            .unwrap_or("http")
-            .to_string()
+            .unwrap_or("https")
+            .to_string())
     }
 
     pub fn build_processor<C>(
@@ -150,13 +152,13 @@ impl DatadogLogsConfig {
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(
                 client,
-                self.get_uri(dd_common),
+                self.get_uri(dd_common)?,
                 headers,
                 dd_evp_origin,
             )?);
 
         let encoding = self.encoding.clone();
-        let protocol = self.get_protocol(dd_common);
+        let protocol = self.get_protocol(dd_common)?;
 
         let sink = LogSinkBuilder::new(
             encoding,
@@ -227,6 +229,7 @@ mod test {
     use vector_lib::{
         codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
+        sensitive_string::SensitiveString,
     };
 
     use super::*;
@@ -235,6 +238,32 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
+
+    #[test]
+    fn get_uri_defaults_missing_scheme_to_https() {
+        let config = DatadogLogsConfig::default();
+        let custom = DatadogCommonConfig {
+            endpoint: Some("localhost:8080".to_string()),
+            site: "datadoghq.com".to_string(),
+            default_api_key: SensitiveString::from("key".to_string()),
+            acknowledgements: Default::default(),
+        };
+        assert_eq!(
+            config.get_uri(&custom).unwrap().to_string(),
+            "https://localhost:8080/api/v2/logs"
+        );
+        // The default site-based endpoint keeps its scheme.
+        let default = DatadogCommonConfig {
+            endpoint: None,
+            site: "datadoghq.com".to_string(),
+            default_api_key: SensitiveString::from("key".to_string()),
+            acknowledgements: Default::default(),
+        };
+        assert_eq!(
+            config.get_uri(&default).unwrap().to_string(),
+            "https://http-intake.logs.datadoghq.com/api/v2/logs"
+        );
     }
 
     #[test]

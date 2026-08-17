@@ -205,7 +205,11 @@ impl DatadogTracesConfig {
 
     fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
         let endpoint = HttpEndpoint::parse(&self.get_base_uri(dd_common))?;
-        Ok(endpoint.as_uri().scheme_str().unwrap_or("http").to_string())
+        Ok(endpoint
+            .as_uri()
+            .scheme_str()
+            .unwrap_or("https")
+            .to_string())
     }
 }
 
