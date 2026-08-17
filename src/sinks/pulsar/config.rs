@@ -443,6 +443,20 @@ impl ValidatedSink for PulsarSinkConfig {
         if let Some(auth) = &self.auth {
             validate_auth_shape(auth)?;
         }
+        let url = url::Url::parse(&self.endpoint)
+            .map_err(|e| format!("Invalid Pulsar endpoint `{}`: {}", self.endpoint, e))?;
+        if !matches!(url.scheme(), "pulsar" | "pulsar+ssl") {
+            return Err(format!(
+                "Invalid Pulsar endpoint `{}`: scheme must be pulsar or pulsar+ssl",
+                self.endpoint
+            )
+            .into());
+        }
+        if url.host().is_none() {
+            return Err(
+                format!("Invalid Pulsar endpoint `{}`: missing host", self.endpoint).into(),
+            );
+        }
         let topic = self
             .topic
             .clone()
@@ -554,6 +568,42 @@ mod tests {
                     scope: None,
                 }),
             }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = PulsarSinkConfig {
+            endpoint: "not a valid endpoint".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_unsupported_endpoint_scheme() {
+        let config = PulsarSinkConfig {
+            endpoint: "ftp://127.0.0.1:6650".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_host() {
+        let config = PulsarSinkConfig {
+            endpoint: "pulsar:topic".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_valid_endpoint() {
+        let config = PulsarSinkConfig {
+            endpoint: "pulsar://127.0.0.1:6650".to_string(),
             ..Default::default()
         };
         assert!(config.validate().is_ok());
