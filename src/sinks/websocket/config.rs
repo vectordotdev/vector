@@ -32,8 +32,8 @@ pub struct WebSocketSinkConfig {
 }
 
 impl GenerateConfig for WebSocketSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             common: WebSocketCommonConfig {
                 ..Default::default()
             },

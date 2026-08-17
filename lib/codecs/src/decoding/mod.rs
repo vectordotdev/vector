@@ -31,7 +31,8 @@ pub use framing::{
     ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
     NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
-    OctetCountingDecoderOptions, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
+    OctetCountingDecoderOptions, OversizedAction, VarintLengthDelimitedDecoder,
+    VarintLengthDelimitedDecoderConfig,
 };
 use smallvec::SmallVec;
 use vector_config::configurable_component;
@@ -311,7 +312,7 @@ pub enum DeserializerConfig {
     /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
     Influxdb(InfluxdbDeserializerConfig),
 
-    /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+    /// Decodes the raw bytes as an [Apache Avro][apache_avro] message.
     ///
     /// [apache_avro]: https://avro.apache.org/
     Avro {
@@ -492,6 +493,7 @@ impl DeserializerConfig {
                         CharacterDelimitedDecoderOptions {
                             delimiter: b',',
                             max_length: Some(usize::MAX),
+                            ..
                         },
                 }),
             ) => "application/json",
@@ -598,6 +600,7 @@ mod tests {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: 0,
                     max_length: None,
+                    ..
                 }
             })
         ));

@@ -3,13 +3,13 @@ use indoc::indoc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vrl::owned_value_path;
+use vrl::{event_path, owned_value_path};
 
 use crate::{
     conditions::{Condition, ConditionalConfig, VrlConfig},
     config::log_schema,
     event::{Event, LogEvent, TraceEvent},
-    template::Template,
+    template::UnconfinedTemplate,
     test_util::{components::assert_transform_compliance, random_lines},
     transforms::{
         FunctionTransform, OutputBuffer,
@@ -163,10 +163,13 @@ fn always_passes_events_matching_pass_list() {
 
 #[test]
 fn handles_group_by() {
-    for group_by in &[None, Some(Template::try_from("{{ other_field }}").unwrap())] {
+    for group_by in &[
+        None,
+        Some(UnconfinedTemplate::try_from("{{ other_field }}").unwrap()),
+    ] {
         let mut event = Event::Log(LogEvent::from("nananana"));
         let log = event.as_mut_log();
-        log.insert("other_field", "foo");
+        log.insert(event_path!("other_field"), "foo");
         let mut sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_rate(0),
@@ -193,7 +196,7 @@ fn handles_key_field() {
     for key_field in &[None, Some("other_field".into())] {
         let mut event = Event::Log(LogEvent::from("nananana"));
         let log = event.as_mut_log();
-        log.insert("other_field", "foo");
+        log.insert(event_path!("other_field"), "foo");
         let mut sampler = Sample::new(
             "sample".to_string(),
             SampleMode::new_ratio(0.0),
@@ -247,7 +250,7 @@ fn sampler_adds_sampling_rate_to_event() {
             .find_map(|event| transform_one(&mut sampler, event))
             .unwrap();
         assert_eq!(passing.as_log()["custom_sample_rate"], "25".into());
-        assert!(passing.as_log().get("sample_rate").is_none());
+        assert!(passing.as_log().get(event_path!("sample_rate")).is_none());
 
         let events = random_events(10000);
         let mut sampler = Sample::new(
@@ -263,7 +266,7 @@ fn sampler_adds_sampling_rate_to_event() {
             .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
             .find_map(|event| transform_one(&mut sampler, event))
             .unwrap();
-        assert!(passing.as_log().get("sample_rate").is_none());
+        assert!(passing.as_log().get(event_path!("sample_rate")).is_none());
 
         // If the event passed the regex check, don't include the sampling rate
         let mut sampler = Sample::new(
@@ -276,7 +279,7 @@ fn sampler_adds_sampling_rate_to_event() {
         );
         let event = Event::Log(LogEvent::from("nananana"));
         let passing = transform_one(&mut sampler, event).unwrap();
-        assert!(passing.as_log().get("sample_rate").is_none());
+        assert!(passing.as_log().get(event_path!("sample_rate")).is_none());
     }
 }
 
@@ -299,6 +302,26 @@ fn handles_trace_event() {
         .filter_map(|_| transform_one(&mut sampler, trace.clone()))
         .count();
     assert_eq!(total_passed, 1);
+}
+
+#[test]
+fn group_by_uses_independent_ratio_samplers() {
+    let mut sampler = Sample::new(
+        "sample".to_string(),
+        SampleMode::new_ratio(0.5),
+        None,
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        None,
+        default_sample_rate_key(),
+    );
+
+    let sampled = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
+        let mut event = LogEvent::from("event");
+        event.insert(event_path!("service"), service);
+        transform_one(&mut sampler, event.into()).is_some()
+    });
+
+    assert_eq!(sampled, [true, true, false, false]);
 }
 
 #[test]
@@ -343,7 +366,7 @@ fn dynamic_ratio_field_overrides_static_ratio() {
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
-    log.insert("dynamic_ratio", 1.0);
+    log.insert(event_path!("dynamic_ratio"), 1.0);
 
     let output = transform_one(&mut sampler, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
@@ -384,7 +407,7 @@ fn dynamic_rate_field_overrides_static_ratio() {
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
-    log.insert("dynamic_rate", 1);
+    log.insert(event_path!("dynamic_rate"), 1);
 
     let output = transform_one(&mut sampler, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
@@ -425,7 +448,7 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
 
     let mut event = Event::Log(LogEvent::from("hello"));
     let log = event.as_mut_log();
-    log.insert("dynamic_rate", 2.0);
+    log.insert(event_path!("dynamic_rate"), 2.0);
 
     let output = transform_one(&mut sampler, event).expect("event should be sampled");
     assert_eq!(output.as_log()["sample_rate"], "1".into());
@@ -442,7 +465,7 @@ fn dynamic_ratio_honors_group_by_key() {
             ratio_field: Some("dynamic_ratio".to_string()),
             rate_field: None,
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
@@ -453,8 +476,8 @@ fn dynamic_ratio_honors_group_by_key() {
         for service in ["service-a", "service-b"] {
             let mut event = Event::Log(LogEvent::from("hello"));
             let log = event.as_mut_log();
-            log.insert("service", service);
-            log.insert("dynamic_ratio", ratio);
+            log.insert(event_path!("service"), service);
+            log.insert(event_path!("dynamic_ratio"), ratio);
             if let Some(output) = transform_one(&mut sampler, event) {
                 assert_eq!(output.as_log()["sample_rate"], "0.5".into());
                 if service == "service-a" {
@@ -489,7 +512,7 @@ fn dynamic_rate_honors_group_by_key() {
             ratio_field: None,
             rate_field: Some("dynamic_rate".to_string()),
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
@@ -500,8 +523,8 @@ fn dynamic_rate_honors_group_by_key() {
         for service in ["service-a", "service-b"] {
             let mut event = Event::Log(LogEvent::from("hello"));
             let log = event.as_mut_log();
-            log.insert("service", service);
-            log.insert("dynamic_rate", rate);
+            log.insert(event_path!("service"), service);
+            log.insert(event_path!("dynamic_rate"), rate);
             if let Some(output) = transform_one(&mut sampler, event) {
                 assert_eq!(output.as_log()["sample_rate"], "2".into());
                 if service == "service-a" {
@@ -535,7 +558,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
             ratio_field: Some("dynamic_ratio".to_string()),
             rate_field: None,
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
@@ -546,8 +569,8 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
         for (ratio, is_low_ratio) in [(0.25_f64, true), (0.75_f64, false)] {
             let mut event = Event::Log(LogEvent::from("hello"));
             let log = event.as_mut_log();
-            log.insert("service", "service-a");
-            log.insert("dynamic_ratio", ratio);
+            log.insert(event_path!("service"), "service-a");
+            log.insert(event_path!("dynamic_ratio"), ratio);
             if let Some(output) = transform_one(&mut sampler, event) {
                 assert_eq!(output.as_log()["sample_rate"], ratio.to_string().into());
                 if is_low_ratio {
@@ -585,7 +608,7 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
             ratio_field: None,
             rate_field: Some("dynamic_rate".to_string()),
         },
-        Some(Template::try_from("{{ service }}").unwrap()),
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
     );
@@ -596,8 +619,8 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
         for rate in [2_i64, 3_i64] {
             let mut event = Event::Log(LogEvent::from("hello"));
             let log = event.as_mut_log();
-            log.insert("service", "service-a");
-            log.insert("dynamic_rate", rate);
+            log.insert(event_path!("service"), "service-a");
+            log.insert(event_path!("dynamic_rate"), rate);
             if let Some(output) = transform_one(&mut sampler, event) {
                 assert_eq!(output.as_log()["sample_rate"], rate.to_string().into());
                 if rate == 2 {
@@ -638,7 +661,7 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
         let mut log = LogEvent::from("hello");
-        log.insert("dynamic_ratio", 1.0);
+        log.insert(event_path!("dynamic_ratio"), 1.0);
         tx.send(log.into()).await.unwrap();
 
         let event = out.recv().await.expect("event should be sampled");

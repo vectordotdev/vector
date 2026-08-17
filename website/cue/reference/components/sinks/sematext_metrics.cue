@@ -4,9 +4,8 @@ components: sinks: sematext_metrics: {
 	title: "Sematext Metrics"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
-		development:   "stable"
+		delivery:    "at_least_once"
+		development: "stable"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
 		stateful:      true
@@ -19,7 +18,6 @@ components: sinks: sematext_metrics: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   20
 				timeout_secs: 1.0
 			}

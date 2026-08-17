@@ -250,7 +250,6 @@ pub struct WebSocketCommonConfig {
     ///
     /// [ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = 30))]
     pub ping_interval: Option<NonZeroU64>,
 
@@ -261,7 +260,6 @@ pub struct WebSocketCommonConfig {
     /// [pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
     // NOTE: this option is not relevant if the `ping_interval` is not configured.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = 5))]
     pub ping_timeout: Option<NonZeroU64>,
 

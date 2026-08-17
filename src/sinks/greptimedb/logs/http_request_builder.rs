@@ -32,18 +32,18 @@ pub(super) struct PartitionKey {
 
 /// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
 pub(super) struct KeyPartitioner {
-    dbname: Template,
-    table: Template,
-    pipeline_name: Template,
-    pipeline_version: Option<Template>,
+    dbname: ConfinedTemplate,
+    table: ConfinedTemplate,
+    pipeline_name: ConfinedTemplate,
+    pipeline_version: Option<ConfinedTemplate>,
 }
 
 impl KeyPartitioner {
     pub const fn new(
-        db: Template,
-        table: Template,
-        pipeline_name: Template,
-        pipeline_version: Option<Template>,
+        db: ConfinedTemplate,
+        table: ConfinedTemplate,
+        pipeline_name: ConfinedTemplate,
+        pipeline_version: Option<ConfinedTemplate>,
     ) -> Self {
         Self {
             dbname: db,
@@ -53,7 +53,7 @@ impl KeyPartitioner {
         }
     }
 
-    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
         template
             .render_string(item)
             .map_err(|error| {
@@ -75,10 +75,32 @@ impl Partitioner for KeyPartitioner {
         let dbname = Self::render(&self.dbname, item, "dbname_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
         let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")?;
-        let pipeline_version = self
-            .pipeline_version
-            .as_ref()
-            .and_then(|template| Self::render(template, item, "pipeline_version"));
+
+        // pipeline_version is optional: a Confined render error drops the event;
+        // any other render error omits the field and continues.
+        let pipeline_version = match &self.pipeline_version {
+            None => None,
+            Some(template) => match template.render_string(item) {
+                Ok(s) => Some(s),
+                Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("pipeline_version"),
+                        drop_event: true,
+                    });
+                    return None;
+                }
+                Err(error) => {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("pipeline_version"),
+                        drop_event: false,
+                    });
+                    None
+                }
+            },
+        };
+
         Some(PartitionKey {
             dbname,
             table,

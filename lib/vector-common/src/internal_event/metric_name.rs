@@ -90,6 +90,7 @@ pub enum CounterName {
     K8sEventNodeAnnotationFailuresTotal,
     K8sFormatPickerEdgeCasesTotal,
     K8sDockerFormatParseFailuresTotal,
+    K8sMergedLineTruncatedTotal,
     SqsS3EventRecordIgnoredTotal,
     ComponentAllocatedBytesTotal,
     ComponentDeallocatedBytesTotal,
@@ -98,7 +99,10 @@ pub enum CounterName {
     MemoryEnrichmentTableFlushesTotal,
     MemoryEnrichmentTableInsertionsTotal,
     MemoryEnrichmentTableReadsTotal,
+    MemoryEnrichmentTableRemovedTotal,
     MemoryEnrichmentTableTtlExpirations,
+    ComponentCpuUsageNsTotal,
+    DatadogLogsReservedAttributeConflictsTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -208,6 +212,7 @@ pub enum GaugeName {
     MemoryEnrichmentTableObjectsCount,
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
+    SecurityConfinementDisabled,
 }
 
 impl GaugeName {
@@ -251,6 +256,7 @@ impl GaugeName {
             Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
+            Self::SecurityConfinementDisabled => "security_confinement_disabled",
         }
     }
 }
@@ -351,6 +357,7 @@ impl CounterName {
             Self::K8sEventNodeAnnotationFailuresTotal => "k8s_event_node_annotation_failures_total",
             Self::K8sFormatPickerEdgeCasesTotal => "k8s_format_picker_edge_cases_total",
             Self::K8sDockerFormatParseFailuresTotal => "k8s_docker_format_parse_failures_total",
+            Self::K8sMergedLineTruncatedTotal => "k8s_merged_line_truncated_total",
             Self::SqsS3EventRecordIgnoredTotal => "sqs_s3_event_record_ignored_total",
             Self::ComponentAllocatedBytesTotal => "component_allocated_bytes_total",
             Self::ComponentDeallocatedBytesTotal => "component_deallocated_bytes_total",
@@ -363,7 +370,12 @@ impl CounterName {
                 "memory_enrichment_table_insertions_total"
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
+            Self::MemoryEnrichmentTableRemovedTotal => "memory_enrichment_table_removed_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
+            Self::DatadogLogsReservedAttributeConflictsTotal => {
+                "datadog_logs_reserved_attribute_conflicts_total"
+            }
         }
     }
 }

@@ -420,20 +420,23 @@ mod tests {
                                     let hdr = req.headers().get("Authorization");
                                     if let Some(h) = hdr {
                                         match a {
-                                            Auth::Bearer { token } => {
+                                            Auth::Bearer { token }
                                                 if format!("Bearer {}", token.inner())
-                                                    != h.to_str().unwrap()
-                                                {
-                                                    return Ok::<_, hyper1::Error>(
-                                                        hyper1::Response::builder()
-                                                            .status(401)
-                                                            .body(Empty::<Bytes>::new())
-                                                            .unwrap(),
-                                                    );
-                                                }
+                                                    != h.to_str().unwrap() =>
+                                            {
+                                                return Ok::<_, hyper1::Error>(
+                                                    hyper1::Response::builder()
+                                                        .status(401)
+                                                        .body(Empty::<Bytes>::new())
+                                                        .unwrap(),
+                                                );
                                             }
-                                            Auth::Basic { .. } => {}
-                                            Auth::Custom { .. } => {}
+                                            Auth::Bearer { .. } => {}
+                                            Auth::Basic {
+                                                user: _user,
+                                                password: _password,
+                                            } => { /* Not needed for tests at the moment */ }
+                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
                                             #[cfg(feature = "aws-core")]
                                             _ => {}
                                         }
@@ -468,10 +471,11 @@ mod tests {
                         });
 
                         tokio::spawn(async move {
-                            let _ = hyper1::server::conn::http1::Builder::new()
+                            hyper1::server::conn::http1::Builder::new()
                                 .serve_connection(io, service)
                                 .with_upgrades()
-                                .await;
+                                .await
+                                .ok(); // connection may already be gone
                         });
 
                         Some(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))

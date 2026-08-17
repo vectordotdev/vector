@@ -467,7 +467,7 @@ mod tests {
                     YawcWebSocket::upgrade(&mut req).expect("upgrade failed");
 
                 if let Some(tx) = tx {
-                    let _ = tx.send(upgrade_fut);
+                    tx.send(upgrade_fut).ok(); // receiver may already be gone
                 }
 
                 Ok::<_, hyper1::Error>(response)
@@ -475,10 +475,11 @@ mod tests {
         });
 
         tokio::spawn(async move {
-            let _ = hyper1::server::conn::http1::Builder::new()
+            hyper1::server::conn::http1::Builder::new()
                 .serve_connection(io, service)
                 .with_upgrades()
-                .await;
+                .await
+                .ok(); // connection may already be gone
         });
 
         rx.await.unwrap().await.unwrap()
@@ -650,12 +651,13 @@ mod tests {
             let mut websocket = accept_ws(&listener).await;
 
             if websocket.next().await.is_some() {
-                let _ = websocket
+                websocket
                     .send(Frame::close(
                         CloseCode::Error,
                         b"Simulated Internal Server Error",
                     ))
-                    .await;
+                    .await
+                    .ok(); // connection may already be gone
             }
         });
 
@@ -663,7 +665,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn websocket_source_exits_on_rejected_intial_messsage() {
+    async fn websocket_source_exits_on_rejected_initial_message() {
         let server_addr = start_reject_initial_message_server().await;
 
         let mut config = make_config(&server_addr);

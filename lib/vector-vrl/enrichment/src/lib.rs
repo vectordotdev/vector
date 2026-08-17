@@ -141,6 +141,11 @@ pub trait Table: DynClone {
 
     /// Returns true if the underlying data has changed and the table needs reloading.
     fn needs_reload(&self) -> bool;
+
+    /// Extracts state from this table
+    fn extract_state(&self) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        None
+    }
 }
 
 dyn_clone::clone_trait_object!(Table);

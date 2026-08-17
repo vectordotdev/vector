@@ -146,7 +146,7 @@ impl InternalEvent for WebSocketMessageReceived<'_> {
             count = %self.count,
             byte_size = %self.byte_size,
             url =  %self.url,
-            protcol = %self.protocol,
+            protocol = %self.protocol,
             kind = %self.kind
         );
 

@@ -119,7 +119,7 @@ generated: components: sources: http_server: configuration: {
 				required:    true
 				type: string: enum: {
 					avro: """
-						Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+						Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 						[apache_avro]: https://avro.apache.org/
 						"""
@@ -393,21 +393,6 @@ generated: components: sources: http_server: configuration: {
 			}
 		}
 	}
-	encoding: {
-		deprecated: true
-		description: """
-			The expected encoding of received data.
-
-			For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
-			"""
-		required: false
-		type: string: enum: {
-			binary: "Binary."
-			json:   "JSON."
-			ndjson: "Newline-delimited JSON."
-			text:   "Plaintext."
-		}
-	}
 	framing: {
 		description: """
 			Framing configuration.
@@ -444,6 +429,29 @@ generated: components: sources: http_server: configuration: {
 																"""
 						required: false
 						type: uint: {}
+					}
+					oversized_action: {
+						description: """
+																The behavior when a frame exceeds `max_length`.
+
+																When set to `drop` (the default), the entire oversized frame is discarded.
+																When set to `truncate`, the frame is truncated to `max_length` bytes and the
+																remainder is discarded up to the next delimiter.
+
+																This option has no effect if `max_length` is not set.
+																"""
+						required: false
+						type: string: {
+							default: "drop"
+							enum: {
+								drop: "Drop the entire oversized frame."
+								truncate: """
+																			Truncate the frame to the maximum allowed size and emit the partial content.
+
+																			The remainder of the oversized frame is discarded up to the next delimiter.
+																			"""
+							}
+						}
 					}
 				}
 			}
@@ -561,22 +569,47 @@ generated: components: sources: http_server: configuration: {
 				description:   "Options for the newline delimited decoder."
 				relevant_when: "method = \"newline_delimited\""
 				required:      false
-				type: object: options: max_length: {
-					description: """
-						The maximum length of the byte buffer.
+				type: object: options: {
+					max_length: {
+						description: """
+																The maximum length of the byte buffer.
 
-						This length does *not* include the trailing delimiter.
+																This length does *not* include the trailing delimiter.
 
-						By default, no maximum length is enforced. If events are malformed, this can lead to
-						additional resource usage as events continue to be buffered in memory, and can potentially
-						lead to memory exhaustion in extreme cases.
+																By default, no maximum length is enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
 
-						If there is a risk of processing malformed data, such as logs with user-controlled input,
-						consider setting the maximum length to a reasonably large value as a safety net. This
-						prevents processing from being unbounded.
-						"""
-					required: false
-					type: uint: {}
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																prevents processing from being unbounded.
+																"""
+						required: false
+						type: uint: {}
+					}
+					oversized_action: {
+						description: """
+																The behavior when a line exceeds `max_length`.
+
+																When set to `drop` (the default), the entire oversized line is discarded.
+																When set to `truncate`, the line is truncated to `max_length` bytes and the
+																remainder is discarded up to the next newline.
+
+																This option has no effect if `max_length` is not set.
+																"""
+						required: false
+						type: string: {
+							default: "drop"
+							enum: {
+								drop: "Drop the entire oversized frame."
+								truncate: """
+																			Truncate the frame to the maximum allowed size and emit the partial content.
+
+																			The remainder of the oversized frame is discarded up to the next delimiter.
+																			"""
+							}
+						}
+					}
 				}
 			}
 			octet_counting: {

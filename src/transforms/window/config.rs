@@ -42,8 +42,8 @@ pub struct WindowConfig {
 }
 
 impl GenerateConfig for WindowConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(r#"flush_when = ".message == \"value\"""#).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(r#"flush_when: '.message == "value"'"#).unwrap()
     }
 }
 
@@ -90,5 +90,27 @@ impl TransformConfig for WindowConfig {
             DataType::Log,
             clone_input_definitions(input_definitions),
         )]
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if let Some(Err(e)) = self
+            .forward_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("forward_when: {e}"));
+        }
+        if let Err(e) = self
+            .flush_when
+            .validate(&context.enrichment_tables, &context.metrics_storage)
+        {
+            errors.push(format!("flush_when: {e}"));
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }

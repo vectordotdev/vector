@@ -8,7 +8,6 @@ components: transforms: delay: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      true
@@ -30,7 +29,9 @@ components: transforms: delay: {
 		notices: []
 	}
 
-	configuration: generated.components.transforms.delay.configuration
+	configuration: generated.components.transforms.delay.configuration & {
+		delay_ms: type: uint: examples: [5000]
+	}
 
 	input: {
 		logs: true

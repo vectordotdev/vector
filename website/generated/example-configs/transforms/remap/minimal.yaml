@@ -1,0 +1,11 @@
+transforms:
+  my_transform_id:
+    type: remap
+    inputs:
+      - my-source-or-transform-id
+    source: |-
+      . = parse_json!(.message)
+      .new_field = "new value"
+      .status = to_int!(.status)
+      .duration = parse_duration!(.duration, "s")
+      .new_name = del(.old_name)

@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use http::{HeaderValue, Uri, header::AUTHORIZATION};
-use snafu::prelude::*;
 
 #[cfg(feature = "aws-core")]
 use super::Errors;
@@ -12,15 +11,16 @@ use super::{
 use crate::{
     http::HttpClient,
     sinks::{
-        UriParseSnafu,
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
+            HttpEndpoint,
             auth::Auth,
             http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
         },
     },
+    template::ConfinementConfig,
 };
 
 /// The batch config for remote write.
@@ -51,7 +51,8 @@ pub struct RemoteWriteConfig {
     ///
     /// The endpoint should include the scheme and the path to write to.
     #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
-    pub endpoint: String,
+    #[derivative(Default(value = "default_endpoint()"))]
+    pub endpoint: HttpEndpoint,
 
     /// The default namespace for any metrics sent.
     ///
@@ -62,21 +63,18 @@ pub struct RemoteWriteConfig {
     ///
     /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[configurable(metadata(docs::examples = "service"))]
-    #[configurable(metadata(docs::advanced))]
     pub default_namespace: Option<String>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_histogram_buckets")]
-    #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
     /// [dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_summary_quantiles")]
-    #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,
 
     #[configurable(derived)]
@@ -94,7 +92,6 @@ pub struct RemoteWriteConfig {
     /// This may be used by Cortex or other remote services to identify the tenant making the request.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "my-domain"))]
-    #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
     /// The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
@@ -102,7 +99,7 @@ pub struct RemoteWriteConfig {
     ///
     /// If unset, sending unique incremental metrics to this sink will cause indefinite memory growth.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     #[configurable(derived)]
@@ -113,7 +110,6 @@ pub struct RemoteWriteConfig {
 
     #[cfg(feature = "aws-config")]
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[configurable(derived)]
@@ -125,7 +121,6 @@ pub struct RemoteWriteConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_compression")]
     #[derivative(Default(value = "default_compression()"))]
     pub compression: Compression,
@@ -133,10 +128,18 @@ pub struct RemoteWriteConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_compression() -> Compression {
     Compression::Snappy
+}
+
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://localhost:8087/api/v1/write").unwrap()
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);
@@ -190,7 +193,15 @@ impl SinkConfig for RemoteWriteConfig {
     }
 
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
+        let tenant_id = self
+            .tenant_id
+            .clone()
+            .map(|template| {
+                template.confine(&self.confinement, RemoteWriteConfig::NAME, "tenant_id")
+            })
+            .transpose()?;
+
+        let endpoint = self.endpoint.clone();
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let request_settings = self.request.tower.into_settings();
         let validated_headers = Arc::new(validate_headers(
@@ -235,7 +246,7 @@ impl SinkConfig for RemoteWriteConfig {
 
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
-            None => endpoint.clone(),
+            None => endpoint.as_uri().clone(),
         };
 
         let healthcheck = healthcheck(
@@ -262,7 +273,7 @@ impl SinkConfig for RemoteWriteConfig {
             .service(service);
 
         let sink = RemoteWriteSink {
-            tenant_id: self.tenant_id.clone(),
+            tenant_id,
             compression: self.compression,
             aggregate: self.batch.aggregate,
             batch_settings: self
@@ -276,8 +287,11 @@ impl SinkConfig for RemoteWriteConfig {
             expire_metrics_secs: self.expire_metrics_secs,
             service,
         };
-
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -308,5 +322,55 @@ async fn healthcheck(
     match response.status() {
         http::StatusCode::OK => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoteWriteConfig>();
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "prometheus_remote_write", "tenant_id");
+        assert!(
+            result.is_err(),
+            "bare tenant_id template with no literal prefix must be rejected"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_tenant_id() {
+        let template = Template::try_from("{{ tenant }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "prometheus_remote_write", "tenant_id");
+        assert!(result.is_ok(), "opt-out must allow bare tenant_id template");
+    }
+
+    #[test]
+    fn confinement_prefixed_tenant_id_locks_org_prefix() {
+        use crate::event::{Event, LogEvent};
+        use vrl::event_path;
+        let template = Template::try_from("team-{{ org }}").unwrap();
+        let config = ConfinementConfig::default();
+        let confined = template
+            .confine(&config, "prometheus_remote_write", "tenant_id")
+            .unwrap();
+        let mut event = LogEvent::default();
+        event.insert(event_path!("org"), "other-tenant-entirely");
+        let rendered = confined.render_string(&Event::Log(event)).unwrap();
+        assert!(
+            rendered.starts_with("team-"),
+            "operator-controlled prefix must be preserved in rendered tenant_id"
+        );
     }
 }

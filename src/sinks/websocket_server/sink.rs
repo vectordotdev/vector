@@ -34,7 +34,6 @@ use http_body_util::Empty;
 use hyper1::body::Incoming;
 use tokio::net::TcpStream;
 use tokio_util::codec::Encoder as _;
-use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
@@ -127,20 +126,17 @@ impl WebSocketListenerSink {
         let open_gauge = OpenGauge::new();
 
         while let Ok(stream) = listener.accept().await {
-            tokio::spawn(
-                Self::handle_connection(
-                    auth.clone(),
-                    message_buffering.clone(),
-                    subprotocol.clone(),
-                    Arc::clone(&peers),
-                    Arc::clone(&client_checkpoints),
-                    Arc::clone(&buffer),
-                    stream,
-                    extra_tags_config.clone(),
-                    open_gauge.clone(),
-                )
-                .in_current_span(),
-            );
+            crate::spawn_in_current_span(Self::handle_connection(
+                auth.clone(),
+                message_buffering.clone(),
+                subprotocol.clone(),
+                Arc::clone(&peers),
+                Arc::clone(&client_checkpoints),
+                Arc::clone(&buffer),
+                stream,
+                extra_tags_config.clone(),
+                open_gauge.clone(),
+            ));
         }
     }
 
@@ -290,12 +286,13 @@ impl WebSocketListenerSink {
 
                 // Send upgrade context
                 if let Some(tx) = ctx_tx {
-                    let _ = tx.send((
+                    tx.send((
                         upgrade_fut,
                         req_extra_tags,
                         client_checkpoint_key,
                         buffer_replay,
-                    ));
+                    ))
+                    .ok(); // receiver may already be gone
                 }
 
                 Ok(response)
@@ -304,10 +301,11 @@ impl WebSocketListenerSink {
 
         // Spawn the HTTP1 connection handler
         tokio::spawn(async move {
-            let _ = hyper1::server::conn::http1::Builder::new()
+            hyper1::server::conn::http1::Builder::new()
                 .serve_connection(io, service)
                 .with_upgrades()
-                .await;
+                .await
+                .ok(); // connection may already be gone
         });
 
         // Wait for the upgrade context from the HTTP handler
@@ -441,19 +439,16 @@ impl StreamSink<Event> for WebSocketListenerSink {
         )));
         let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
 
-        tokio::spawn(
-            Self::handle_connections(
-                self.auth,
-                self.message_buffering.clone(),
-                self.subprotocol.clone(),
-                Arc::clone(&peers),
-                self.extra_tags_config,
-                Arc::clone(&client_checkpoints),
-                Arc::clone(&message_buffer),
-                listener,
-            )
-            .in_current_span(),
-        );
+        crate::spawn_in_current_span(Self::handle_connections(
+            self.auth,
+            self.message_buffering.clone(),
+            self.subprotocol.clone(),
+            Arc::clone(&peers),
+            self.extra_tags_config,
+            Arc::clone(&client_checkpoints),
+            Arc::clone(&message_buffer),
+            listener,
+        ));
 
         while input.as_mut().peek().await.is_some() {
             let mut event = input.next().await.unwrap();
@@ -962,7 +957,7 @@ mod tests {
                 let text = std::str::from_utf8(frame.payload()).unwrap();
                 let mut base_msg = serde_json::from_str::<Value>(text).unwrap();
                 // Removing message_id from message, since it is not part of the event
-                base_msg.remove("message_id", true);
+                base_msg.remove(vrl::path!("message_id"), true);
                 let msg_text = serde_json::to_string(&base_msg).unwrap();
                 let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
                 assert_eq!(expected, msg_text);
@@ -974,7 +969,8 @@ mod tests {
                 }
             }
 
-            let _ = tx.close().await;
+            // Error is ignored since it only fails if the channel is already closed.
+            tx.close().await.ok();
         })
     }
 
