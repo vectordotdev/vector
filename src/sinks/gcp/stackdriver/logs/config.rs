@@ -9,8 +9,12 @@ use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
 use super::{
-    encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
-    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
+    encoder::{
+        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+    },
+    request_builder::StackdriverLogsRequestBuilder,
+    service::StackdriverLogsServiceRequestBuilder,
+    sink::StackdriverLogsSink,
 };
 use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
@@ -20,11 +24,12 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
+            BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
+    template::ConfinementConfig,
 };
 
 #[derive(Debug, Snafu)]
@@ -45,11 +50,13 @@ impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
     "gcp_stackdriver_logs",
     "Deliver logs to GCP's Cloud Operations suite."
 ))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct StackdriverConfig {
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     #[serde(flatten)]
     pub(super) log_name: StackdriverLogName,
@@ -110,10 +117,15 @@ pub(super) struct StackdriverConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
-pub(super) fn default_endpoint() -> String {
-    "https://logging.googleapis.com/v2/entries:write".to_string()
+pub(super) fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://logging.googleapis.com/v2/entries:write")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
@@ -239,15 +251,53 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let log_id = self
+            .log_id
+            .clone()
+            .confine(&self.confinement, Self::NAME, "log_id")?;
+
+        // Confine every label value template. Stackdriver identifies
+        // destinations by `resource.type + resource.labels`, so an event-
+        // controlled label like `resource.labels.zone: "{{ zone }}"` is as
+        // steerable as `log_id` unless we confine it too. Same for arbitrary
+        // log-entry labels in `label_config.labels`.
+        let resource = ConfinedStackdriverResource {
+            type_: self.resource.type_.clone(),
+            labels: self
+                .resource
+                .labels
+                .clone()
+                .into_iter()
+                .map(|(k, v)| {
+                    v.confine(&self.confinement, Self::NAME, "resource.labels")
+                        .map(|v| (k, v))
+                })
+                .collect::<crate::Result<_>>()?,
+        };
+
+        let label_config = ConfinedStackdriverLabelConfig {
+            labels_key: self.label_config.labels_key.clone(),
+            labels: self
+                .label_config
+                .labels
+                .clone()
+                .into_iter()
+                .map(|(k, v)| {
+                    v.confine(&self.confinement, Self::NAME, "label_config.labels")
+                        .map(|v| (k, v))
+                })
+                .collect::<crate::Result<_>>()?,
+        };
+
         let auth = self.auth.build(Scope::LoggingWrite).await?;
 
         let request_builder = StackdriverLogsRequestBuilder {
             encoder: StackdriverLogsEncoder::new(
                 self.encoding.clone(),
-                self.log_id.clone(),
+                log_id,
                 self.log_name.clone(),
-                self.label_config.clone(),
-                self.resource.clone(),
+                label_config,
+                resource,
                 self.severity_key.clone(),
             ),
         };
@@ -263,7 +313,7 @@ impl SinkConfig for StackdriverConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let uri: Uri = self.endpoint.parse()?;
+        let uri = self.endpoint.clone().into_uri();
 
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
             uri: uri.clone(),
@@ -284,8 +334,11 @@ impl SinkConfig for StackdriverConfig {
         let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
 
         auth.spawn_regenerate_token();
-
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -318,4 +371,35 @@ async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> cr
     let response = client.send(request).await?;
 
     healthcheck_response(response, HealthcheckError::NotFound.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn confinement_rejects_unconfined_log_id() {
+        let template = Template::try_from("{{ log_id }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_log_id() {
+        let template = Template::try_from("{{ log_id }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_log_id() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_ok());
+    }
 }

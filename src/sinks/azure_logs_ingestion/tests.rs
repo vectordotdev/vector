@@ -14,7 +14,7 @@ use super::config::AzureLogsIngestionConfig;
 
 use crate::{
     event::LogEvent,
-    sinks::prelude::*,
+    sinks::{prelude::*, util::HttpEndpoint},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::spawn_blackhole_http_server,
@@ -64,8 +64,8 @@ fn basic_config_with_client_credentials() {
         .expect("Config parsing failed");
 
     assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        config.endpoint.to_string(),
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
@@ -103,8 +103,8 @@ fn basic_config_with_managed_identity() {
         .expect("Config parsing failed");
 
     assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        config.endpoint.to_string(),
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
@@ -176,7 +176,7 @@ async fn correct_request() {
     let (sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -288,7 +288,7 @@ async fn mock_healthcheck_with_400_response() {
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -355,7 +355,7 @@ async fn mock_healthcheck_with_403_response() {
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,

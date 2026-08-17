@@ -50,7 +50,7 @@ use vector_lib::{
         resource::v1::{Resource, Resource as OtelResource},
     },
 };
-use vrl::value;
+use vrl::{event_path, value};
 
 fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
     Request::new(ExportLogsServiceRequest {
@@ -206,6 +206,30 @@ fn generate_config() {
     test_util::test_generate_config::<OpentelemetryConfig>();
 }
 
+#[test]
+fn config_grpc_keepalive() {
+    let config: OpentelemetryConfig = toml::from_str(
+        r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [grpc.keepalive]
+            max_connection_age_secs = 300
+            max_connection_age_grace_secs = 30
+
+            [http]
+            address = "0.0.0.0:4318"
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(config.grpc.keepalive.max_connection_age_secs, Some(300));
+    assert_eq!(
+        config.grpc.keepalive.max_connection_age_grace_secs,
+        Some(30)
+    );
+}
+
 #[tokio::test]
 async fn receive_grpc_logs_vector_namespace() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -228,7 +252,10 @@ async fn receive_grpc_logs_vector_namespace() {
         let event = output.pop().unwrap();
         schema_definitions.unwrap().assert_valid_for_event(&event);
 
-        assert_eq!(event.as_log().get(".").unwrap(), &value!("log body"));
+        assert_eq!(
+            event.as_log().get(event_path!()).unwrap(),
+            &value!("log body")
+        );
 
         let meta = event.as_log().metadata().value();
         assert_eq!(
@@ -1256,6 +1283,7 @@ fn get_source_config_with_headers(
         grpc: GrpcConfig {
             address: grpc_addr,
             tls: Default::default(),
+            keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
@@ -1469,7 +1497,7 @@ async fn http_headers_metrics_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("AbsentHeader")
+                .get(path!("AbsentHeader"))
                 .unwrap(),
             &Value::Null
         );
@@ -1479,7 +1507,7 @@ async fn http_headers_metrics_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("User-Agent")
+                .get(path!("User-Agent"))
                 .unwrap(),
             &value!("Test")
         );
@@ -1521,7 +1549,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("AbsentHeader")
+                .get(path!("AbsentHeader"))
                 .unwrap(),
             &Value::Null
         );
@@ -1531,7 +1559,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("User-Agent")
+                .get(path!("User-Agent"))
                 .unwrap(),
             &value!("Test")
         );
@@ -1556,7 +1584,7 @@ async fn http_headers_traces_use_otlp_decoding_true() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("AbsentHeader")
+                .get(path!("AbsentHeader"))
                 .unwrap(),
             &Value::Null
         );
@@ -1566,7 +1594,7 @@ async fn http_headers_traces_use_otlp_decoding_true() {
                 .value()
                 .get(path!("opentelemetry", "headers"))
                 .unwrap()
-                .get("User-Agent")
+                .get(path!("User-Agent"))
                 .unwrap(),
             &value!("Test")
         );
@@ -1591,6 +1619,7 @@ pub async fn build_otlp_test_env(
         grpc: GrpcConfig {
             address: grpc_addr,
             tls: Default::default(),
+            keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
@@ -1670,6 +1699,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         grpc: GrpcConfig {
             address: grpc_addr,
             tls: Default::default(),
+            keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
@@ -1897,6 +1927,7 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
@@ -1937,6 +1968,7 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
@@ -1980,6 +2012,7 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),

@@ -18,10 +18,9 @@ use std::{
 };
 
 use chrono::{DateTime, SubsecRound, Utc};
-use flate2::read::MultiGzDecoder;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, stream, task::noop_waker_ref};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
@@ -35,6 +34,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     buffers::topology::channel::LimitedReceiver,
     event::{
@@ -42,8 +42,6 @@ use vector_lib::{
         MetricTags, MetricValue,
     },
 };
-#[cfg(test)]
-use zstd::Decoder as ZstdDecoder;
 
 use crate::{
     config::{Config, GenerateConfig},
@@ -88,7 +86,7 @@ macro_rules! log_event {
             let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
             let log = event.as_mut_log();
             $(
-                log.insert($key, $value);
+                log.insert(::vrl::event_path!($key), $value);
             )*
             event
         }
@@ -99,10 +97,23 @@ pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
-    let cfg = toml::to_string(&T::generate_config()).unwrap();
+    let generated = T::generate_config();
 
-    toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{e}\n'{cfg}'"));
+    // TOML cannot represent JSON null; strip None-valued fields before serializing.
+    let toml_cfg = toml::to_string(&crate::generate::strip_nulls(generated.clone())).unwrap();
+    toml::from_str::<T>(&toml_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from TOML string:\n\n{e}\n'{toml_cfg}'")
+    });
+
+    let yaml_cfg = serde_yaml::to_string(&generated).unwrap();
+    serde_yaml::from_str::<T>(&yaml_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from YAML string:\n\n{e}\n'{yaml_cfg}'")
+    });
+
+    let json_cfg = serde_json::to_string(&generated).unwrap();
+    serde_json::from_str::<T>(&json_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from JSON string:\n\n{e}\n'{json_cfg}'")
+    });
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
@@ -471,23 +482,24 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     let mut file = File::open(path).unwrap();
     let mut gzip_bytes = Vec::new();
     file.read_to_end(&mut gzip_bytes).unwrap();
-    let mut output = String::new();
-    MultiGzDecoder::new(&gzip_bytes[..])
-        .read_to_string(&mut output)
-        .unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
+    let output = CappedDecoder::gzip(&gzip_bytes[..]).decompress().unwrap();
+    String::from_utf8(output)
+        .unwrap()
+        .lines()
+        .map(|s| s.to_owned())
+        .collect()
 }
 
 #[cfg(test)]
 pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading zstd file.", path = %path.as_ref().display());
     let file = File::open(path).unwrap();
-    let mut output = String::new();
-    ZstdDecoder::new(file)
+    let output = CappedDecoder::zstd(file).unwrap().decompress().unwrap();
+    String::from_utf8(output)
         .unwrap()
-        .read_to_string(&mut output)
-        .unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
+        .lines()
+        .map(|s| s.to_owned())
+        .collect()
 }
 
 pub fn runtime() -> runtime::Runtime {

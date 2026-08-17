@@ -10,7 +10,7 @@ use http::{
     HeaderValue, Request, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
-use hyper::Body;
+use hyper::{Body, client::connect::Connect};
 use tower::Service;
 use tracing::Instrument;
 use vector_lib::{
@@ -20,7 +20,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::HttpClient,
+    http::{HttpClient, HttpProxyConnector},
     sinks::{
         datadog::DatadogApiError,
         util::{
@@ -97,16 +97,19 @@ impl DriverResponse for LogApiResponse {
 /// composed within a Tower "stack", such that we can easily and transparently
 /// provide retries, concurrency limits, rate limits, and more.
 #[derive(Debug, Clone)]
-pub struct LogApiService {
-    client: HttpClient,
+pub struct LogApiService<C = HttpProxyConnector> {
+    client: HttpClient<Body, C>,
     uri: Uri,
     user_provided_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     dd_evp_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
 }
 
-impl LogApiService {
+impl<C> LogApiService<C>
+where
+    C: Connect + Clone + Send + Sync + 'static,
+{
     pub fn new(
-        client: HttpClient,
+        client: HttpClient<Body, C>,
         uri: Uri,
         headers: BTreeMap<String, String>,
         dd_evp_origin: String,
@@ -130,7 +133,10 @@ impl LogApiService {
     }
 }
 
-impl Service<LogApiRequest> for LogApiService {
+impl<C> Service<LogApiRequest> for LogApiService<C>
+where
+    C: Connect + Clone + Send + Sync + 'static,
+{
     type Response = LogApiResponse;
     type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;

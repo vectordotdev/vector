@@ -57,17 +57,19 @@ impl Default for Protocol {
             tls: Default::default(),
             acknowledgements: Default::default(),
             retry_strategy: Default::default(),
+            confinement: Default::default(),
         })
     }
 }
 
 impl GenerateConfig for OpenTelemetryConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            [protocol]
-            type = "http"
-            uri = "http://localhost:5318/v1/logs"
-            encoding.codec = "json"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            protocol:
+              type: http
+              uri: http://localhost:5318/v1/logs
+              encoding:
+                codec: json
         "#})
         .unwrap()
     }
@@ -80,8 +82,17 @@ impl SinkConfig for OpenTelemetryConfig {
         match &self.protocol {
             Protocol::Http(config) => {
                 warn_on_invalid_otlp_batching(config);
-                config.build(cx).await
+                // Delegate to the HTTP sink, but thread through `opentelemetry`
+                // as the component type so security warnings carry the outer
+                // sink type rather than `http`.
+                config.build_with_component_type(cx, Self::NAME).await
             }
+        }
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        match &self.protocol {
+            Protocol::Http(config) => Some(&config.confinement),
         }
     }
 

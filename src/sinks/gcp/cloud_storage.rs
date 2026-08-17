@@ -2,10 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::{
-    Uri,
-    header::{HeaderName, HeaderValue},
-};
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -36,13 +33,13 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
-            partitioner::KeyPartitioner, request_builder::EncodeResult,
-            service::TowerRequestConfigDefaults, timezone_to_offset,
+            BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint, RequestBuilder,
+            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
-    template::{Template, TemplateParseError},
+    template::{ConfinementConfig, Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -92,7 +89,6 @@ pub struct GcsSinkConfig {
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
     #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
-    #[configurable(metadata(docs::advanced))]
     metadata: Option<HashMap<String, String>>,
 
     /// A prefix to apply to all object keys.
@@ -107,7 +103,6 @@ pub struct GcsSinkConfig {
         docs::examples = "year=%Y/month=%m/day=%d/",
         docs::examples = "application_id={{ application_id }}/date=%F/"
     ))]
-    #[configurable(metadata(docs::advanced))]
     key_prefix: Option<String>,
 
     /// The timestamp format for the time component of the object key.
@@ -127,7 +122,6 @@ pub struct GcsSinkConfig {
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_time_format")]
-    #[configurable(metadata(docs::advanced))]
     filename_time_format: String,
 
     /// Whether or not to append a UUID v4 token to the end of the object key.
@@ -139,13 +133,11 @@ pub struct GcsSinkConfig {
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
     #[serde(default = "crate::serde::default_true")]
-    #[configurable(metadata(docs::advanced))]
     filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.
     ///
     /// If not specified, the extension is determined by the compression scheme used.
-    #[configurable(metadata(docs::advanced))]
     filename_extension: Option<String>,
 
     #[serde(flatten)]
@@ -194,7 +186,7 @@ pub struct GcsSinkConfig {
     #[configurable(metadata(docs::examples = "http://localhost:9000"))]
     #[configurable(validation(format = "uri"))]
     #[serde(default = "default_endpoint")]
-    endpoint: String,
+    endpoint: HttpEndpoint,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -217,6 +209,9 @@ pub struct GcsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 fn default_time_format() -> String {
@@ -240,22 +235,25 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
-        endpoint: Default::default(),
+        endpoint: default_endpoint(),
         request: Default::default(),
         auth: Default::default(),
         tls: Default::default(),
         acknowledgements: Default::default(),
         timezone: Default::default(),
+        confinement: ConfinementConfig::default(),
     }
 }
 
 impl GenerateConfig for GcsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            bucket = "my-bucket"
-            credentials_path = "/path/to/credentials.json"
-            framing.method = "newline_delimited"
-            encoding.codec = "json"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            bucket: my-bucket
+            credentials_path: /path/to/credentials.json
+            framing:
+              method: newline_delimited
+            encoding:
+              codec: json
         "#})
         .unwrap()
     }
@@ -266,7 +264,7 @@ impl GenerateConfig for GcsSinkConfig {
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
-        let base_url = format!("{}/{}/", self.endpoint, self.bucket);
+        let base_url = self.endpoint.append_path(&format!("{}/", self.bucket))?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
@@ -277,8 +275,11 @@ impl SinkConfig for GcsSinkConfig {
         )?;
         auth.spawn_regenerate_token();
         let sink = self.build_sink(client, base_url, auth, cx)?;
-
         Ok((sink, healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -294,7 +295,7 @@ impl GcsSinkConfig {
     fn build_sink(
         &self,
         client: HttpClient,
-        base_url: String,
+        base_url: HttpEndpoint,
         auth: GcpAuthenticator,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
@@ -304,7 +305,7 @@ impl GcsSinkConfig {
 
         let partitioner = self.key_partitioner()?;
 
-        let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
+        let protocol = get_http_scheme_from_uri(base_url.as_uri());
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
@@ -318,11 +319,10 @@ impl GcsSinkConfig {
     }
 
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        Ok(KeyPartitioner::new(
-            Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
-                .context(KeyPrefixTemplateSnafu)?,
-            None,
-        ))
+        let tpl = Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
+            .context(KeyPrefixTemplateSnafu)?;
+        let tpl = tpl.confine(&self.confinement, Self::NAME, "key_prefix")?;
+        Ok(KeyPartitioner::new(tpl, None))
     }
 }
 
@@ -501,10 +501,12 @@ mod tests {
         partition::Partitioner,
         request_metadata::GroupedCountByteSize,
     };
+    use vrl::event_path;
 
     use super::*;
     use crate::{
         event::LogEvent,
+        template::{ConfinementConfig, Template},
         test_util::{
             components::{SINK_TAGS, run_and_assert_sink_compliance},
             http::{always_200_response, spawn_blackhole_http_server},
@@ -531,7 +533,7 @@ mod tests {
         let sink = config
             .build_sink(
                 client,
-                mock_endpoint.to_string(),
+                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 context,
             )
@@ -547,7 +549,7 @@ mod tests {
 
         let message = "hello world".to_string();
         let mut event = LogEvent::from(message);
-        event.insert("key", "value");
+        event.insert(event_path!("key"), "value");
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
@@ -782,5 +784,51 @@ mod tests {
         let result = RequestSettings::new(&sink_config, context);
         // Should return an error, not panic
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_key_prefix() {
+        let config = GcsSinkConfig {
+            key_prefix: Some("{{ tenant }}".into()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        match config.key_partitioner() {
+            Err(err) => assert!(
+                err.to_string().contains("no literal string prefix"),
+                "unexpected error: {err}"
+            ),
+            Ok(_) => panic!("expected confinement error"),
+        }
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_key_prefix() {
+        let config = GcsSinkConfig {
+            key_prefix: Some("{{ tenant }}".into()),
+            confinement: ConfinementConfig {
+                dangerously_allow_unconfined_template_resolution: true,
+            },
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        assert!(config.key_partitioner().is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::Event;
+
+        let template: Template = "safe/{{ tenant }}/".try_into().unwrap();
+        let template = template
+            .confine(
+                &ConfinementConfig::default(),
+                "gcp_cloud_storage",
+                "key_prefix",
+            )
+            .unwrap();
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../escape");
+        assert!(template.render_string(&event).is_err());
     }
 }

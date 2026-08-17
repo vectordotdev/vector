@@ -16,10 +16,6 @@ enum V1 {
     /// Lua transform API version 1.
     ///
     /// This version is deprecated and will be removed in a future version.
-    // TODO: The `deprecated` attribute flag is not used/can't be used for enum values like this
-    // because we don't emit the full schema for the enum value, we just gather its description. We
-    // might need to consider actually using the flag as a marker to say "append our boilerplate
-    // deprecation warning to the description of the field/enum value/etc".
     #[configurable(metadata(deprecated))]
     #[serde(rename = "1")]
     V1,
@@ -76,11 +72,12 @@ pub enum LuaConfig {
 }
 
 impl GenerateConfig for LuaConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"version = "2"
-            hooks.process = """#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"version: "2"
+            hooks:
+              process: """#,
+        })
         .unwrap()
     }
 }
@@ -123,5 +120,22 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::LuaConfig>();
+    }
+
+    #[test]
+    fn rejects_auto_metric_tag_values() {
+        assert!(
+            serde_yaml::from_str::<super::LuaConfig>(indoc::indoc! {r#"
+                version: "2"
+                metric_tag_values: auto
+                hooks:
+                  process: |
+                    function (event, emit)
+                      emit(event)
+                    end
+            "#})
+            .is_err(),
+            "metric_tag_values = auto must be rejected at parse time"
+        );
     }
 }

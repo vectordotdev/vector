@@ -27,6 +27,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> WebHdfsConfig {
         compression: Compression::gzip_default(),
         batch: Default::default(),
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     }
 }
 

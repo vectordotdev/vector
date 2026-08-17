@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.57.0"
+version = "0.58.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -154,7 +154,7 @@ async-compression = { version = "0.4.42", default-features = false, features = [
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 axum = { version = "0.6.20", default-features = false }
-base64 = { version = "0.22.1", default-features = false }
+base64 = { version = "0.23.0", default-features = false, features = ["std"] }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
 chrono = { version = "0.4.44", default-features = false, features = ["clock", "serde"] }
@@ -163,10 +163,11 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.6.5"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
-convert_case = { version = "0.8", default-features = false }
+convert_case = { version = "0.10", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
-darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
+cuckoo-clock = { version = "0.2.7" , default-features = false }
+darling = { version = "0.23.0", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
@@ -179,25 +180,25 @@ humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
-itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
-ordered-float = { version = "4.6.0", default-features = false }
+ordered-float = { version = "5.3.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.11" }
-proptest-derive = { version = "0.6.0" }
+proptest-derive = { version = "0.8.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
 quickcheck = { version = "1.1.0" }
-rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
-rand_distr = { version = "0.5.1", default-features = false }
+rand = { version = "0.10.1", default-features = false, features = ["thread_rng"] }
+rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
@@ -205,10 +206,11 @@ rust_decimal = { version = "1.40.0", default-features = false, features = ["std"
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_path_to_error = "0.1.14"
 serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
-socket2 = { version = "0.5.10", default-features = false }
+socket2 = { version = "0.6.3", default-features = false }
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
@@ -216,7 +218,7 @@ tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
-syn = { version = "2", default-features = false }
+syn = { version = "3", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -231,12 +233,13 @@ vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-common-macros = { path = "lib/vector-common-macros" }
-vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-lib = { path = "lib/vector-lib", default-features = false }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
+zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
-serial_test = { version = "3.4" }
+serial_test = { version = "4.0" }
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
@@ -256,8 +259,6 @@ uuid.workspace = true
 vrl.workspace = true
 
 # Internal libs
-dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
-dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-common = { path = "lib/vector-common", default-features = false }
@@ -336,9 +337,9 @@ tower = { version = "0.5.2", default-features = false, features = ["buffer", "li
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
 # Serde
 serde.workspace = true
-serde-toml-merge = { version = "0.3.11", default-features = false }
 serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
+serde_path_to_error.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["macros", "std"] }
 serde_yaml.workspace = true
 
@@ -352,7 +353,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { version = "2.0.1", optional = true, features = ["arrow-flight"] }
+databricks-zerobus-ingest-sdk = { version = "2.6.0", optional = true, features = ["arrow-flight"] }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
@@ -373,9 +374,9 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
-arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
-arrow-schema = { version = "58.2.0", default-features = false, optional = true }
-parquet = { version = "58.2.0", default-features = false, features = [
+arrow = { version = "59.1.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "59.1.0", default-features = false, optional = true }
+parquet = { version = "59.1.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
@@ -392,6 +393,7 @@ chrono.workspace = true
 chrono-tz.workspace = true
 colored.workspace = true
 csv = { version = "1.3", default-features = false }
+cuckoo-clock = { workspace = true, optional = true }
 databend-client = { version = "0.28.0", default-features = false, features = ["rustls"], optional = true }
 derivative.workspace = true
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
@@ -426,7 +428,7 @@ k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31
 kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 libc.workspace = true
-lru = { version = "0.16.3", default-features = false }
+lru = { version = "0.18.2", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.7.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
@@ -457,10 +459,10 @@ sqlx = { version = "0.8.6", default-features = false, features = ["derive", "pos
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
+tempfile = { workspace = true, optional = true }
 tokio-postgres = { version = "0.7.18", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
-hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
 tonic-health = { workspace = true, optional = true }
 tonic-reflection = { workspace = true, optional = true }
@@ -468,7 +470,7 @@ thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
 warp = { version = "0.3.7", default-features = false }
-zstd = { version = "0.13.0", default-features = false }
+zstd.workspace = true
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
@@ -491,6 +493,9 @@ rdkafka = { workspace = true, features = ["cmake_build"], optional = true }
 libc.workspace = true
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs", "resource"] }
 tikv-jemallocator = { version = "0.7.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
+dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
+dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
+hickory-proto = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs = { version = "0.18.0", default-features = false }
@@ -508,7 +513,7 @@ approx = "0.5.1"
 strum.workspace = true
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
-base64 = "0.22.1"
+base64.workspace = true
 criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc.workspace = true
@@ -528,7 +533,7 @@ vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
-zstd = { version = "0.13.0", default-features = false }
+zstd.workspace = true
 
 [patch.crates-io]
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
@@ -543,13 +548,12 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # macOS releases pick it up through the `target-aarch64-apple-darwin` feature (see target
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
-default = ["enable-unix"]
-antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
+default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
-docs = ["enable-unix"]
+docs = ["enable-api-client", "sources-dnstap"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
+default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 
 # Enables Kerberos / GSSAPI SASL support for kafka via dynamic linkage to a
 # system-provided libsasl2 (and the host's GSS implementation). Requires
@@ -572,11 +576,8 @@ vendored = ["gssapi-vendored"]
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
-enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
-
-default-msvc = ["enable-api-client", "rdkafka?/cmake_build"]
-default-musl = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
-default-no-api-client = ["base", "sources-dnstap", "unix", "vendored"]
+default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
+default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -596,23 +597,19 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
 target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
-target-unix = ["target-base", "unix"]
-target-aarch64-unknown-linux-gnu =      ["target-unix"]
-target-aarch64-unknown-linux-musl =     ["target-unix"]
-target-armv7-unknown-linux-gnueabihf =  ["target-unix"]
+target-aarch64-unknown-linux-gnu =      ["target-base", "tikv-jemallocator"]
+target-aarch64-unknown-linux-musl =     ["target-base", "tikv-jemallocator"]
+target-armv7-unknown-linux-gnueabihf =  ["target-base", "tikv-jemallocator"]
 target-armv7-unknown-linux-musleabihf = ["target-base"]
-target-arm-unknown-linux-gnueabi =      ["target-unix"]
+target-arm-unknown-linux-gnueabi =      ["target-base", "tikv-jemallocator"]
 target-arm-unknown-linux-musleabi =     ["target-base"]
-target-x86_64-unknown-linux-gnu =       ["target-unix", "vendored"]
-target-x86_64-unknown-linux-musl =      ["target-unix"]
+target-x86_64-unknown-linux-gnu =       ["target-base", "tikv-jemallocator", "vendored"]
+target-x86_64-unknown-linux-musl =      ["target-base", "tikv-jemallocator"]
 # Apple targets opt into `gssapi` (dynamic linkage to system libsasl2 + Apple's
 # GSS framework). The `gssapi-vendored` path does not currently link on
 # macOS arm64 (unresolved gss_* symbols).
-target-aarch64-apple-darwin =           ["enable-unix", "gssapi"]
+target-aarch64-apple-darwin =           ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "gssapi"]
 
-# Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator", "allocation-tracing"]
-allocation-tracing = ["vector-lib/allocation-tracing"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -668,7 +665,7 @@ gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 enrichment-tables-mmdb = ["dep:maxminddb"]
-enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
+enrichment-tables-memory = ["dep:bloomy", "dep:cuckoo-clock", "dep:evmap", "dep:evmap-derive", "dep:thread_local", "dep:tempfile"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
@@ -738,7 +735,7 @@ sources-metrics = [
 sources-amqp = ["lapin", "async-rs"]
 sources-apache_metrics = ["sources-utils-http-client"]
 sources-aws_ecs_metrics = ["sources-utils-http-client"]
-sources-aws_kinesis_firehose = ["dep:base64"]
+sources-aws_kinesis_firehose = ["dep:base64", "sources-http_server", "sources-utils-http-encoding"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
@@ -786,7 +783,7 @@ sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vec
 sources-pulsar = ["dep:pulsar"]
 sources-redis = ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
-sources-splunk_hec = ["dep:roaring"]
+sources-splunk_hec = ["dep:roaring", "sources-utils-http-encoding"]
 sources-statsd = ["sources-utils-net", "tokio-util/net"]
 sources-stdin = ["tokio-util/io"]
 sources-syslog = ["codecs-syslog", "sources-utils-net", "tokio-util/net"]
@@ -1079,7 +1076,7 @@ datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics", "dep:prost"]
 datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
-docker-logs-integration-tests = ["sources-docker_logs", "unix"]
+docker-logs-integration-tests = ["sources-docker_logs"]
 doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
@@ -1109,8 +1106,8 @@ dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 windows-event-log-integration-tests = ["sources-windows_event_log-integration-tests"]
 disable-resolv-conf = []
-shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
-cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap"]
+shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap"]
+cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap", "transforms-filter", "transforms-aws_ec2_metadata"]
 test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features
@@ -1189,7 +1186,6 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transfo
 statistic-benches = []
 remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
-codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
@@ -1236,9 +1232,3 @@ path = "benches/transform/main.rs"
 harness = false
 test = false
 required-features = ["transform-benches"]
-
-[[bench]]
-name = "codecs"
-path = "benches/codecs/main.rs"
-harness = false
-required-features = ["codecs-benches"]

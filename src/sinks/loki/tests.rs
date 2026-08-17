@@ -1,4 +1,5 @@
 use vector_lib::config::{log_schema, proxy::ProxyConfig};
+use vrl::event_path;
 
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
@@ -20,7 +21,7 @@ async fn interpolate_labels() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
         endpoint = "http://localhost:3100"
-        labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
+        labels = {label1 = "l1-{{ foo }}", label2 = "some-static-label", label3 = "l3-{{ foo }}", "k-{{ foo }}" = "v-{{ foo }}"}
         encoding.codec = "json"
         remove_label_fields = true
     "#,
@@ -31,7 +32,7 @@ async fn interpolate_labels() {
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
-    e1.as_mut_log().insert("foo", "bar");
+    e1.as_mut_log().insert(event_path!("foo"), "bar");
 
     let mut record = sink.encoder.encode_event(e1).unwrap();
 
@@ -46,14 +47,20 @@ async fn interpolate_labels() {
 
     assert_eq!(record.event.event, expected_line);
 
-    assert_eq!(record.labels[0], ("bar".to_string(), "bar".to_string()));
-    assert_eq!(record.labels[1], ("label1".to_string(), "bar".to_string()));
+    assert_eq!(record.labels[0], ("k-bar".to_string(), "v-bar".to_string()));
+    assert_eq!(
+        record.labels[1],
+        ("label1".to_string(), "l1-bar".to_string())
+    );
     assert_eq!(
         record.labels[2],
         ("label2".to_string(), "some-static-label".to_string())
     );
     // make sure we can reuse fields across labels.
-    assert_eq!(record.labels[3], ("label3".to_string(), "bar".to_string()));
+    assert_eq!(
+        record.labels[3],
+        ("label3".to_string(), "l3-bar".to_string())
+    );
 }
 
 #[tokio::test]
@@ -61,7 +68,7 @@ async fn use_label_from_dropped_fields() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
             endpoint = "http://localhost:3100"
-            labels.bar = "{{ foo }}"
+            labels.bar = "bar-{{ foo }}"
             encoding.codec = "json"
             encoding.except_fields = ["foo"]
         "#,
@@ -72,7 +79,7 @@ async fn use_label_from_dropped_fields() {
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
-    e1.as_mut_log().insert("foo", "bar");
+    e1.as_mut_log().insert(event_path!("foo"), "bar");
 
     let record = sink.encoder.encode_event(e1).unwrap();
 
@@ -83,7 +90,7 @@ async fn use_label_from_dropped_fields() {
 
     assert_eq!(record.event.event, expected_line);
 
-    assert_eq!(record.labels[0], ("bar".to_string(), "bar".to_string()));
+    assert_eq!(record.labels[0], ("bar".to_string(), "bar-bar".to_string()));
 }
 
 #[tokio::test]
@@ -106,7 +113,8 @@ async fn healthcheck_includes_auth() {
         .clone()
         .parse::<http::Uri>()
         .expect("could not create URI")
-        .into();
+        .try_into()
+        .unwrap();
 
     let (rx, _trigger, server) = build_test_server(addr);
     tokio::spawn(server);
@@ -156,7 +164,7 @@ async fn timestamp_out_of_range() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
         endpoint = "http://localhost:3100"
-        labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
+        labels = {label1 = "l1-{{ foo }}", label2 = "some-static-label", label3 = "l3-{{ foo }}", "k-{{ foo }}" = "v-{{ foo }}"}
         encoding.codec = "json"
     "#,
     )
@@ -185,7 +193,7 @@ async fn structured_metadata_as_json() {
         r#"
         endpoint = "http://localhost:3100"
         labels = {test = "structured_metadata"}
-        structured_metadata.bar = "{{ foo }}"
+        structured_metadata.bar = "bar-{{ foo }}"
         encoding.codec = "json"
         encoding.except_fields = ["foo"]
         "#,
@@ -195,11 +203,11 @@ async fn structured_metadata_as_json() {
     let mut sink = LokiSink::new(config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
-    e1.as_mut_log().insert("foo", "bar");
+    e1.as_mut_log().insert(event_path!("foo"), "bar");
 
     let event = sink.encoder.encode_event(e1).unwrap();
     let body = serde_json::json!(event.event);
-    let expected_metadata = serde_json::json!({"bar": "bar"});
+    let expected_metadata = serde_json::json!({"bar": "bar-bar"});
 
     assert_eq!(body[2], expected_metadata);
 }

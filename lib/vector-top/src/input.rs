@@ -123,7 +123,7 @@ async fn handle_top_input<B: Backend>(
                 '7' => SortColumn::EventsOutTotal,
                 '8' => SortColumn::BytesOutTotal,
                 '9' => SortColumn::Errors,
-                #[cfg(feature = "allocation-tracing")]
+                #[cfg(unix)]
                 '0' => SortColumn::MemoryUsed,
                 _ => return false,
             };

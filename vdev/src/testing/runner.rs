@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::{collections::HashSet, process::Command};
+use std::{collections::HashSet, path::PathBuf, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
@@ -29,6 +29,7 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
+const LOCAL_TEST_COMMAND: &[&str] = &["cargo", "nextest", "run", "--no-fail-fast"];
 const COVERAGE_COMMAND: &[&str] = &[
     "cargo",
     "llvm-cov",
@@ -41,6 +42,10 @@ const COVERAGE_COMMAND: &[&str] = &[
 const COVERAGE_OUTPUT_DIR: &str = "/coverage";
 /// Coverage output path on the host (relative to project root).
 pub(crate) const LOCAL_COVERAGE_OUTPUT_DIR: &str = "target/coverage";
+
+pub(crate) fn local_coverage_output_dir() -> PathBuf {
+    std::path::Path::new(app::path()).join(LOCAL_COVERAGE_OUTPUT_DIR)
+}
 
 pub enum RunnerState {
     Running,
@@ -315,7 +320,7 @@ impl IntegrationTestRunner {
 
         // Always mount the coverage directory so the container can be reused
         // for coverage runs without needing to be recreated.
-        let coverage_dir = std::path::Path::new(app::path()).join(LOCAL_COVERAGE_OUTPUT_DIR);
+        let coverage_dir = local_coverage_output_dir();
         std::fs::create_dir_all(&coverage_dir)?;
         volumes.push(format!("{}:{COVERAGE_OUTPUT_DIR}", coverage_dir.display()));
 
@@ -417,19 +422,17 @@ impl TestRunner for LocalTestRunner {
         let test_cmd = if coverage {
             COVERAGE_COMMAND
         } else {
-            TEST_COMMAND
+            LOCAL_TEST_COMMAND
         };
         let mut command = Command::new(test_cmd[0]);
         command.args(&test_cmd[1..]);
         command.args(args);
         if coverage {
-            std::fs::create_dir_all(LOCAL_COVERAGE_OUTPUT_DIR)?;
-            let filename = coverage_filename(coverage_env);
-            command.args([
-                "--lcov",
-                "--output-path",
-                &format!("{LOCAL_COVERAGE_OUTPUT_DIR}/{filename}"),
-            ]);
+            let coverage_dir = local_coverage_output_dir();
+            std::fs::create_dir_all(&coverage_dir)?;
+            command.arg("--lcov");
+            command.arg("--output-path");
+            command.arg(coverage_dir.join(coverage_filename(coverage_env)));
         }
 
         for (key, value) in outer_env {
