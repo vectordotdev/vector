@@ -2,7 +2,10 @@
 
 use vector_lib::{
     NamedInternalEvent, counter, gauge,
-    internal_event::{CounterName, GaugeName, InternalEvent, error_stage, error_type},
+    internal_event::{
+        ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
+        error_type,
+    },
     json_size::JsonSize,
 };
 use vrl::path::OwnedTargetPath;
@@ -171,5 +174,32 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             "stage" => error_stage::RECEIVING,
         )
         .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct KafkaSeekError {
+    pub error: rdkafka::error::KafkaError,
+}
+
+impl InternalEvent for KafkaSeekError {
+    fn emit(self) {
+        let reason = "Failed to seek consumer to retry rejected message.";
+        error!(
+            message = reason,
+            error = %self.error,
+            error_code = "kafka_seek",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "kafka_seek",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
