@@ -780,6 +780,15 @@ impl ValidatedSink for ElasticsearchConfig {
                 }
                 .into());
             }
+            // Requests are sent through Vector's HTTP(S) Hyper connector, so a
+            // non-http scheme (e.g. `ftp://`) is a deterministic failure.
+            if !matches!(uri.uri.scheme_str(), Some("http" | "https")) {
+                return Err(format!(
+                    "Invalid scheme: {}, endpoint must use http or https",
+                    uri.uri
+                )
+                .into());
+            }
         }
 
         // Mirror the pure Serverless checks from `ElasticsearchCommon::parse_config`
@@ -970,6 +979,24 @@ mod tests {
             .expect_err("an endpoint without a host should fail validation");
         assert!(
             err.to_string().contains("must include hostname"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_non_http_endpoint() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["ftp://elasticsearch.example.com"]
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("a non-http endpoint should fail validation");
+        assert!(
+            err.to_string().contains("must use http or https"),
             "unexpected error: {err}"
         );
     }
