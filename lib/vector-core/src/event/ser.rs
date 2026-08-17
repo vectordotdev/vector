@@ -27,33 +27,23 @@ pub(crate) const ARRAY_FRAME_COST: usize = 2;
 ///
 /// Unlike other scalar variants, `Value::Timestamp` is encoded as a nested
 /// `google.protobuf.Timestamp` message, so decoding it consumes one additional frame
-/// beyond the enclosing `Value`. Without this cost a timestamp leaf at the deepest
-/// allowed branch (event-data object depth 33 or metadata object depth 32) sneaks past
-/// the gate and trips prost's recursion limit on decode.
+/// beyond the enclosing `Value`. Without this cost, a timestamp leaf under 32 object
+/// levels would sneak past the gate at cost 96 and trip prost's recursion limit on
+/// decode at cost 97.
 pub(crate) const TIMESTAMP_FRAME_COST: usize = 1;
 
-/// Maximum prost recursion frame cost for event data values (`Log.fields`, `Trace.fields`).
+/// Maximum prost recursion frame cost accepted for any arbitrary [`Value`].
 ///
 /// Prost enforces a decode recursion limit of 100 (no limit on encode). Each nesting level
 /// consumes 3 frames for [`Value::Object`], 2 for [`Value::Array`], or 1 for a
 /// [`Value::Timestamp`] leaf, plus a fixed overhead for the proto wrappers outside the
-/// Value tree. The event data path (`EventArray` → `*Array` → Event → fields) has fewer
-/// wrappers than the metadata path, allowing a higher frame budget.
+/// Value tree.
 ///
-/// Object-only depth 33 (cost 99) roundtrips; depth 34 (cost 102) fails decode. Array-only
-/// nesting is correspondingly looser: depth 49 (cost 98) is the highest that fits. A
-/// `Value::Timestamp` leaf added at depth 33 raises the cost to 100 and fails decode.
-pub const MAX_VALUE_NESTING_FRAMES: usize = 99;
-
-/// Maximum prost recursion frame cost for event metadata values (via `metadata_full`).
-///
-/// The metadata path (`EventArray` → `*Array` → Event → `Metadata` → Value) has one more
-/// proto wrapper message than the event data path due to the `Metadata` message, reducing
-/// the safe budget by 3 frames.
-///
-/// Object-only depth 32 (cost 96) roundtrips; depth 33 (cost 99) fails decode. A
-/// `Value::Timestamp` leaf added at depth 32 raises the cost to 97 and fails decode.
-pub const MAX_METADATA_VALUE_NESTING_FRAMES: usize = 96;
+/// Some protobuf paths (`Log.fields` and `Trace.fields`) can carry 99 frames, but the
+/// `Log.value` and metadata paths are only safe through 96. We use that highest common
+/// safe limit for every value so validation does not depend on its event type, root type,
+/// or destination protobuf field.
+pub const MAX_VALUE_NESTING_FRAMES: usize = 96;
 
 /// Walks a [`Value`] tree accumulating prost recursion frame cost, returning
 /// `Err(over_budget_cost)` as soon as any branch exceeds `budget`.
@@ -103,72 +93,54 @@ pub(crate) fn check_value_nesting_cost(
 /// Returns `Some((cost, budget))` identifying the path that violated its budget, or `None`
 /// if the event is within bounds.
 ///
-/// Event data values (Log.fields, Trace.fields) are checked against
-/// [`MAX_VALUE_NESTING_FRAMES`], while metadata values are checked against the stricter
-/// [`MAX_METADATA_VALUE_NESTING_FRAMES`] because the `Metadata` proto message adds an
-/// extra wrapper layer.
+/// Every arbitrary value is checked against [`MAX_VALUE_NESTING_FRAMES`].
 ///
 /// For metrics, only metadata is checked since metric values have a fixed structure.
 pub fn event_exceeds_max_nesting_cost(event: &Event) -> Option<(usize, usize)> {
+    let check = |value: &Value| {
+        check_value_nesting_cost(value, 0, MAX_VALUE_NESTING_FRAMES)
+            .map_err(|cost| (cost, MAX_VALUE_NESTING_FRAMES))
+    };
     match event {
-        Event::Log(log) => check_value_nesting_cost(log.value(), 0, MAX_VALUE_NESTING_FRAMES)
-            .map_err(|cost| (cost, MAX_VALUE_NESTING_FRAMES))
-            .and_then(|()| {
-                check_value_nesting_cost(
-                    log.metadata().value(),
-                    0,
-                    MAX_METADATA_VALUE_NESTING_FRAMES,
-                )
-                .map_err(|cost| (cost, MAX_METADATA_VALUE_NESTING_FRAMES))
-            })
+        Event::Log(log) => check(log.value())
+            .and_then(|()| check(log.metadata().value()))
             .err(),
-        Event::Trace(trace) => check_value_nesting_cost(trace.value(), 0, MAX_VALUE_NESTING_FRAMES)
-            .map_err(|cost| (cost, MAX_VALUE_NESTING_FRAMES))
-            .and_then(|()| {
-                check_value_nesting_cost(
-                    trace.metadata().value(),
-                    0,
-                    MAX_METADATA_VALUE_NESTING_FRAMES,
-                )
-                .map_err(|cost| (cost, MAX_METADATA_VALUE_NESTING_FRAMES))
-            })
+        Event::Trace(trace) => check(trace.value())
+            .and_then(|()| check(trace.metadata().value()))
             .err(),
-        Event::Metric(metric) => check_value_nesting_cost(
-            metric.metadata().value(),
-            0,
-            MAX_METADATA_VALUE_NESTING_FRAMES,
-        )
-        .map_err(|cost| (cost, MAX_METADATA_VALUE_NESTING_FRAMES))
-        .err(),
+        Event::Metric(metric) => check(metric.metadata().value()).err(),
     }
 }
 
 /// Checks all events in an `EventArray` for nesting cost violations.
 ///
-/// Event data is checked against [`MAX_VALUE_NESTING_FRAMES`] and metadata against
-/// [`MAX_METADATA_VALUE_NESTING_FRAMES`]. For metrics, only metadata is checked since
-/// metric values have a fixed structure.
+/// Every arbitrary value is checked against [`MAX_VALUE_NESTING_FRAMES`]. For metrics,
+/// only metadata is checked since metric values have a fixed structure.
 fn check_event_array_nesting_cost(events: &EventArray) -> Result<(), EncodeError> {
-    let check = |value: &Value, budget: usize| {
-        check_value_nesting_cost(value, 0, budget)
-            .map_err(|cost| EncodeError::NestingTooDeep { cost, budget })
+    let check = |value: &Value| {
+        check_value_nesting_cost(value, 0, MAX_VALUE_NESTING_FRAMES).map_err(|cost| {
+            EncodeError::NestingTooDeep {
+                cost,
+                budget: MAX_VALUE_NESTING_FRAMES,
+            }
+        })
     };
     match events {
         EventArray::Logs(logs) => {
             for log in logs {
-                check(log.value(), MAX_VALUE_NESTING_FRAMES)?;
-                check(log.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES)?;
+                check(log.value())?;
+                check(log.metadata().value())?;
             }
         }
         EventArray::Traces(traces) => {
             for trace in traces {
-                check(trace.value(), MAX_VALUE_NESTING_FRAMES)?;
-                check(trace.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES)?;
+                check(trace.value())?;
+                check(trace.metadata().value())?;
             }
         }
         EventArray::Metrics(metrics) => {
             for metric in metrics {
-                check(metric.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES)?;
+                check(metric.metadata().value())?;
             }
         }
     }
@@ -265,8 +237,7 @@ impl Encodable for EventArray {
     /// # Errors
     ///
     /// Returns `EncodeError::NestingTooDeep` if any contained event's value or metadata
-    /// exceeds the per-path frame budget ([`MAX_VALUE_NESTING_FRAMES`] /
-    /// [`MAX_METADATA_VALUE_NESTING_FRAMES`]). This is **all-or-nothing**: a single
+    /// exceeds [`MAX_VALUE_NESTING_FRAMES`]. This is **all-or-nothing**: a single
     /// over-budget event fails the entire batch, because a partially-encoded
     /// `EventArray` reaching disk would trip prost's recursion limit on decode and
     /// corrupt the buffer.
@@ -317,13 +288,12 @@ impl Bufferable for EventArray {
 
     fn filter_unencodable(self) -> Option<Self> {
         let exceeds =
-            |value: &Value, budget: usize| check_value_nesting_cost(value, 0, budget).is_err();
+            |value: &Value| check_value_nesting_cost(value, 0, MAX_VALUE_NESTING_FRAMES).is_err();
         let mut dropped = 0;
         let filtered = match self {
             EventArray::Logs(mut logs) => {
                 logs.retain(|log| {
-                    let too_deep = exceeds(log.value(), MAX_VALUE_NESTING_FRAMES)
-                        || exceeds(log.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
+                    let too_deep = exceeds(log.value()) || exceeds(log.metadata().value());
                     if too_deep {
                         log.metadata().update_status(EventStatus::Rejected);
                         dropped += 1;
@@ -334,8 +304,7 @@ impl Bufferable for EventArray {
             }
             EventArray::Traces(mut traces) => {
                 traces.retain(|trace| {
-                    let too_deep = exceeds(trace.value(), MAX_VALUE_NESTING_FRAMES)
-                        || exceeds(trace.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
+                    let too_deep = exceeds(trace.value()) || exceeds(trace.metadata().value());
                     if too_deep {
                         trace.metadata().update_status(EventStatus::Rejected);
                         dropped += 1;
@@ -346,8 +315,7 @@ impl Bufferable for EventArray {
             }
             EventArray::Metrics(mut metrics) => {
                 metrics.retain(|metric| {
-                    let too_deep =
-                        exceeds(metric.metadata().value(), MAX_METADATA_VALUE_NESTING_FRAMES);
+                    let too_deep = exceeds(metric.metadata().value());
                     if too_deep {
                         metric.metadata().update_status(EventStatus::Rejected);
                         dropped += 1;
