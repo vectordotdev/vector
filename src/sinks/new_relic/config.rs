@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt, fmt::Debug, sync::Arc};
 
 use http::Uri;
 use tower::ServiceBuilder;
@@ -139,11 +139,22 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ValidatedNewRelic {
     batcher_settings: BatcherSettings,
     request_limits: TowerRequestSettings,
     credentials: Arc<NewRelicCredentials>,
+}
+
+impl fmt::Debug for ValidatedNewRelic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // The credentials contain the license key and account ID, so they are
+        // intentionally omitted from diagnostics.
+        f.debug_struct("ValidatedNewRelic")
+            .field("batcher_settings", &self.batcher_settings)
+            .field("request_limits", &self.request_limits)
+            .finish_non_exhaustive()
+    }
 }
 
 #[async_trait::async_trait]
@@ -292,5 +303,19 @@ mod tests {
         config.account_id = SensitiveString::from("bad id".to_string());
 
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn debug_omits_credentials() {
+        let mut config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+        config.license_key = SensitiveString::from("super-secret-license-key".to_string());
+        config.account_id = SensitiveString::from("super-secret-account-id".to_string());
+
+        let validated = config.validate().expect("validation should succeed");
+        let debug = format!("{:?}", validated);
+
+        assert!(!debug.contains("super-secret-license-key"));
+        assert!(!debug.contains("super-secret-account-id"));
     }
 }
