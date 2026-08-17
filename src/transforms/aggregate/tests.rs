@@ -1526,40 +1526,129 @@ fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
 }
 
 #[test]
-fn event_time_auto_replaces_on_kind_change_before_timestamp_compare() {
+fn event_time_auto_handles_kind_switch_in_both_directions() {
     let interval_ms = 10_000_u64;
-    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+    let base_time = open_bucket_timestamp(interval_ms);
 
-    let bucket_start = open_bucket_timestamp(interval_ms);
-    let ts_older = bucket_start + chrono::Duration::milliseconds(100);
-    let ts_newer = bucket_start + chrono::Duration::milliseconds(200);
+    // Direction 1: Incremental stored first, then Absolute with an *older* event
+    // timestamp arrives. Absolute must win (matching system-time Auto) rather than
+    // being silently dropped by timestamp-only comparison — this is the Absolute
+    // arm's kind-mismatch branch, which already merges metadata unconditionally.
+    {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        let ts_older = base_time + chrono::Duration::milliseconds(100);
+        let ts_newer = base_time + chrono::Duration::milliseconds(200);
+        let (incremental_batch, mut incremental_receiver) = BatchNotifier::new_with_receiver();
+        let (absolute_batch, mut absolute_receiver) = BatchNotifier::new_with_receiver();
 
-    // Incremental stored first with a newer event timestamp.
-    agg.record(make_metric_with_timestamp(
-        "the-thing",
-        MetricKind::Incremental,
-        MetricValue::Counter { value: 10.0 },
-        ts_newer,
-    ));
+        agg.record(
+            make_metric_with_timestamp(
+                "the-thing",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 10.0 },
+                ts_newer,
+            )
+            .with_batch_notifier(&incremental_batch),
+        );
+        agg.record(
+            make_metric_with_timestamp(
+                "the-thing",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 99.0 },
+                ts_older,
+            )
+            .with_batch_notifier(&absolute_batch),
+        );
+        drop((incremental_batch, absolute_batch));
 
-    // Absolute with an older timestamp must replace the incremental entry (matching
-    // system-time Auto), not be silently dropped by timestamp-only comparison.
-    agg.record(make_metric_with_timestamp(
-        "the-thing",
-        MetricKind::Absolute,
-        MetricValue::Counter { value: 99.0 },
-        ts_older,
-    ));
+        let mut out = vec![];
+        agg.flush_final(&mut out);
+        assert_eq!(out.len(), 1);
+        let metric = out[0].as_metric();
+        assert_eq!(metric.kind(), MetricKind::Absolute);
+        if let MetricValue::Counter { value } = metric.value() {
+            assert_eq!(*value, 99.0);
+        } else {
+            panic!("expected absolute counter");
+        }
+        assert!(incremental_receiver.try_recv().is_err());
+        assert!(absolute_receiver.try_recv().is_err());
+        out[0].metadata().update_status(EventStatus::Delivered);
+        drop(out);
+        assert_eq!(
+            incremental_receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "superseded incremental sample's finalizers must not be discarded"
+        );
+        assert_eq!(
+            absolute_receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "retained absolute sample's finalizers must be delivered"
+        );
+    }
 
-    let mut out = vec![];
-    agg.flush_final(&mut out);
-    assert_eq!(out.len(), 1);
-    let metric = out[0].as_metric();
-    assert_eq!(metric.kind(), MetricKind::Absolute);
-    if let MetricValue::Counter { value } = metric.value() {
-        assert_eq!(*value, 99.0);
-    } else {
-        panic!("expected absolute counter");
+    // Direction 2 (mirror image): Absolute stored first, then Incremental arrives
+    // for the same series/bucket. This is `record_sum_in_map`'s kind-mismatch
+    // branch, which must also merge the superseded Absolute sample's metadata
+    // instead of discarding it when it replaces the tuple.
+    {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        let (absolute_batch, mut absolute_receiver) = BatchNotifier::new_with_receiver();
+        let (incremental_batch, mut incremental_receiver) = BatchNotifier::new_with_receiver();
+
+        agg.record(
+            make_metric_with_timestamp(
+                "the-thing",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 42.0 },
+                base_time,
+            )
+            .with_batch_notifier(&absolute_batch),
+        );
+        agg.record(
+            make_metric_with_timestamp(
+                "the-thing",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+                base_time + chrono::Duration::milliseconds(100),
+            )
+            .with_batch_notifier(&incremental_batch),
+        );
+        drop((absolute_batch, incremental_batch));
+
+        let mut out = vec![];
+        agg.flush_final(&mut out);
+        assert_eq!(out.len(), 1);
+        let metric = out[0].as_metric();
+        assert_eq!(metric.kind(), MetricKind::Incremental);
+        if let MetricValue::Counter { value } = metric.value() {
+            assert_eq!(*value, 1.0);
+        } else {
+            panic!("expected incremental counter");
+        }
+        // Neither finalizer may have resolved yet — if the superseded absolute
+        // sample's metadata was dropped instead of merged, its `EventFinalizer`
+        // would already have completed here (defaulting to `Delivered`) instead
+        // of waiting on the emitted metric's own status update below.
+        assert!(incremental_receiver.try_recv().is_err());
+        assert!(
+            absolute_receiver.try_recv().is_err(),
+            "absolute sample's finalizer resolved prematurely (metadata was dropped, not merged)"
+        );
+        out[0].metadata().update_status(EventStatus::Delivered);
+        drop(out);
+        assert_eq!(
+            incremental_receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "retained incremental sample's finalizers must be delivered"
+        );
+        assert_eq!(
+            absolute_receiver.try_recv(),
+            Ok(BatchStatus::Delivered),
+            "superseded absolute sample's finalizers must not be discarded"
+        );
     }
 }
 

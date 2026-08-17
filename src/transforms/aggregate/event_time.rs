@@ -51,7 +51,6 @@ impl Aggregate {
         let now = Utc::now();
         let now_ms = now.timestamp_millis();
 
-        // Handle missing timestamp — only required for metrics that are bucketed.
         let ts = match timestamp {
             Some(ts) => ts,
             None => match event_time.missing_timestamp {
@@ -68,7 +67,6 @@ impl Aggregate {
         // event-time "latest" selection can compare timestamps reliably.
         data.time.timestamp = Some(ts);
 
-        // Check for future timestamps (bucketed metrics only; passthrough is above).
         if event_time.max_future_ms > 0 {
             let max_future_ms = i64::try_from(event_time.max_future_ms)
                 .expect("max_future_ms validated to fit in i64 in Aggregate::new");
@@ -272,12 +270,14 @@ impl Aggregate {
             MetricKind::Incremental => match map.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
-                    // In order to update (add) the new and old kind's must match
-                    if existing.0.kind == data.kind && existing.0.update(&data) {
-                        existing.1.merge(metadata);
-                    } else {
+                    // In order to update (add) the new and old kind's must match.
+                    // Metadata is always merged, even on a kind mismatch, so an
+                    // existing sample's finalizers are never discarded.
+                    let updated = existing.0.kind == data.kind && existing.0.update(&data);
+                    existing.1.merge(metadata);
+                    if !updated {
                         emit!(AggregateUpdateFailed);
-                        *existing = (data, metadata);
+                        existing.0 = data;
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -367,17 +367,6 @@ impl Aggregate {
         let grace_ms = i64::try_from(self.event_time().allowed_lateness_ms)
             .expect("allowed_lateness_ms validated to fit in i64 in Aggregate::new");
 
-        // A bucket [bucket_key, bucket_key + interval) is eligible to flush
-        // when either:
-        //   1. `now >= bucket_key + interval + allowed_lateness` -- the
-        //      bucket has ended and its grace period has elapsed; or
-        //   2. `force` is true -- final flush on shutdown / topology reload,
-        //      which drains every remaining bucket so in-flight events are
-        //      not silently dropped.
-        //
-        // The watermark advanced below gates late-event rejection via
-        // `is_too_late()`.
-        //
         // `bucket_key + interval_ms + grace_ms` is i64 arithmetic. With
         // `max_future_ms = 0` (documented as accepting arbitrary future
         // timestamps), a metric near `DateTime::<Utc>::MAX_UTC` can produce
