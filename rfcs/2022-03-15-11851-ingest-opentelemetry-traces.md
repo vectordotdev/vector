@@ -23,7 +23,7 @@ for a single trace, a group of traces or per spans. From a config perspective th
 the following configuration:
 
 ```yaml
-[...]
+# ...
 sources:
   otlp:
     type: opentelemetry
@@ -33,14 +33,14 @@ sources:
 transforms:
   set_key:
     type: remap
-      source: |
-        if exists!(.tags.user_id) {
-          return
-        }
-        key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
-        set_metadata_field("datadog_api_key", key)
-      inputs:
-       - otlp.traces # Would exclusively emit traces
+    source: |
+      if exists!(.tags.user_id) {
+        return
+      }
+      key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
+      set_metadata_field("datadog_api_key", key)
+    inputs:
+      - otlp.traces # Would exclusively emit traces
 
 sinks:
   dd_trace:
