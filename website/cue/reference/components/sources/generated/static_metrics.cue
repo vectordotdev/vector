@@ -80,7 +80,7 @@ generated: components: sources: static_metrics: configuration: {
 																							The sum of all observations contained within this histogram.
 
 																							Optional, because not every source reports one: OTLP makes the histogram sum optional,
-																							and `OpenMetrics` only recommends the `_sum` series, forbidding it outright for
+																							and `OpenMetrics` only recommends the `_sum` series -- forbidding it outright for
 																							histograms with negative bucket thresholds. A histogram without a sum is a legitimate
 																							input rather than an error, and consumers must not substitute zero for it.
 																							"""
