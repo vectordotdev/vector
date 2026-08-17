@@ -276,11 +276,11 @@ impl Context {
     /// and only then are events sent downstream. That preserves at-most-once tracking
     /// semantics: a missing/unbindable tracking value fails the poll before any pipeline
     /// emit (avoiding infinite replay), while a send failure after a successful checkpoint
-    /// save may skip those rows on the next run. A query or conversion failure after batches
-    /// were received emits `ComponentEventsDropped` for the buffered rows and does not
-    /// commit a checkpoint. When `last_run_metadata_path` is unset, the in-memory overlay
-    /// is still advanced after a post-checkpoint send failure so already-sent rows are not
-    /// replayed.
+    /// save may skip those rows on the next run. A query, conversion, or tracking-checkpoint
+    /// failure after batches were received emits `ComponentEventsDropped` for the buffered
+    /// rows and does not commit a checkpoint. When `last_run_metadata_path` is unset, the
+    /// in-memory overlay is still advanced after a post-checkpoint send failure so
+    /// already-sent rows are not replayed.
     ///
     /// Without tracking, batches are streamed to the pipeline as they arrive.
     ///
@@ -469,13 +469,24 @@ impl Context {
         // pipeline emit so a missing/null tracking value cannot replay forever, and an
         // overlay failure cannot leave a persisted checkpoint that would skip unsent rows.
         let next_params = match (final_row, cfg.tracking_columns.as_ref()) {
-            (Some(last), Some(tracking_columns)) => Some(prepare_tracking_checkpoint(
-                cfg.last_run_metadata_path.as_deref(),
-                last,
-                template,
-                tracking_columns,
-                tz,
-            )?),
+            (Some(last), Some(tracking_columns)) => {
+                match prepare_tracking_checkpoint(
+                    cfg.last_run_metadata_path.as_deref(),
+                    last,
+                    template,
+                    tracking_columns,
+                    tz,
+                ) {
+                    Ok(next_params) => Some(next_params),
+                    Err(error) => {
+                        emit_discarded_tracking_batches(
+                            &pending_batches,
+                            "ODBC tracking checkpoint failed after tracking batches were buffered.",
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             _ => None,
         };
 
@@ -630,7 +641,7 @@ fn discarded_tracking_event_count(pending_batches: &[Vec<Event>]) -> usize {
 }
 
 /// Emits `ComponentEventsDropped` for tracking batches that were counted as received
-/// but discarded before pipeline emit (late query failure or conversion error).
+/// but discarded before pipeline emit (late query, conversion, or checkpoint failure).
 fn emit_discarded_tracking_batches(pending_batches: &[Vec<Event>], reason: &'static str) {
     let count = discarded_tracking_event_count(pending_batches);
     if count > 0 {
