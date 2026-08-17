@@ -89,10 +89,21 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ValidatedSematextLogs {
     endpoint: String,
     index: Template,
+}
+
+impl std::fmt::Debug for ValidatedSematextLogs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // `index` is built from the write token, and `Template`'s derived Debug
+        // prints its underlying source — so it must be omitted to avoid leaking
+        // the token into logs.
+        f.debug_struct("ValidatedSematextLogs")
+            .field("endpoint", &self.endpoint)
+            .finish_non_exhaustive()
+    }
 }
 
 #[async_trait::async_trait]
@@ -230,6 +241,29 @@ mod tests {
         let validated = config.validate().expect("preparation should succeed");
         assert_eq!(validated.endpoint, US_ENDPOINT);
         assert_eq!(validated.index.get_ref(), "mylogtoken");
+    }
+
+    #[test]
+    fn debug_impl_does_not_leak_token() {
+        // `ValidatedSematextLogs`'s `index` field is built from the write token,
+        // so its Debug output must not expose the token value.
+        let token = "mylogtoken";
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: token.to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        let debug = format!("{validated:?}");
+        assert!(
+            !debug.contains(token),
+            "Debug output must not contain the write token, got: {debug}"
+        );
     }
 
     #[test]
