@@ -22,7 +22,7 @@
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/postcss": "^4.2.4",
     "@tailwindcss/typography": "^0.5.16",
-    "@types/dotenv-defaults": "^2.0.1",
+    "@types/dotenv-defaults": "^5.0.0",
     "@types/lodash.chunk": "^4.2.6",
     "@types/node": "^26.1.2",
     "@types/topojson-specification": "^1.0.1",
@@ -48,7 +48,7 @@
     "tailwindcss": "^4.2.4",
     "tocbot": "^4.36.8",
     "topojson-client": "^3.1.0",
-    "tsx": "^4.23.4",
+    "tsx": "^4.23.5",
     "typescript": "^7.0.2",
     "typesense": "^3.0.6",
     "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v2.0.0.tgz"

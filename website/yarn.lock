@@ -1369,13 +1369,13 @@
   dependencies:
     tslib "^2.4.0"
 
-"@types/dotenv-defaults@^2.0.1":
-  version "2.0.4"
-  resolved "https://registry.npmjs.org/@types/dotenv-defaults/-/dotenv-defaults-2.0.4.tgz"
-  integrity sha512-+KwZaAMQkt0uk5IH3F2zqjUsZqEi8ro0qEpi4dnYwpNfG3Mejf3PlCQooqMrICWkSg3gq9jgFCeAwFrbhDQmbQ==
+"@types/dotenv-defaults@^5.0.0":
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/@types/dotenv-defaults/-/dotenv-defaults-5.0.0.tgz#b5a142aa3c8cbdff5bc99f26976dba913a82859d"
+  integrity sha512-dsSXKxF67flwQ5drC+oaeCisRkQjQmbvxMaTU2WQ1lYjtKtSiHQmepfzbx0vTCHvTyAVzNZukHcLcUJKdG4kFA==
   dependencies:
     "@types/node" "*"
-    dotenv "^8.2.0"
+    dotenv "^14.0.0"
 
 "@types/gensync@^1.0.5":
   version "1.0.5"
@@ -1955,15 +1955,15 @@ dotenv-defaults@^6.0.0:
   dependencies:
     dotenv "^16.4.7"
 
+dotenv@^14.0.0:
+  version "14.3.2"
+  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-14.3.2.tgz#7c30b3a5f777c79a3429cb2db358eef6751e8369"
+  integrity sha512-vwEppIphpFdvaMCaHfCEv9IgwcxMljMw2TnAQBB4VWPvzXQLTb82jwmdOKzlEVUL3gNFT4l4TPKO+Bn+sqcrVQ==
+
 dotenv@^16.4.5, dotenv@^16.4.7:
   version "16.6.1"
   resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-16.6.1.tgz#773f0e69527a8315c7285d5ee73c4459d20a8020"
   integrity sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==
-
-dotenv@^8.2.0:
-  version "8.6.0"
-  resolved "https://registry.npmjs.org/dotenv/-/dotenv-8.6.0.tgz"
-  integrity sha512-IrPdXQsk2BbzvCBGBOTmmSH5SodmqZNt4ERAZDmW4CT+tL8VtvinqywuANaFu4bOMWki16nqf0e4oC0QIaDr/g==
 
 downshift@^9.4.0:
   version "9.4.0"
@@ -3134,10 +3134,10 @@ tslib@^2.1.0, tslib@^2.4.0, tslib@^2.8.1:
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.8.1.tgz#612efe4ed235d567e8aba5f2a5fab70280ade83f"
   integrity sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==
 
-tsx@^4.23.4:
-  version "4.23.4"
-  resolved "https://registry.yarnpkg.com/tsx/-/tsx-4.23.4.tgz#7e0b074f7f8105c19d389a54bac47eb1db02cf03"
-  integrity sha512-ZiUQ8oT/KzN51mJUWPqARYqwFLFJZtGZipRkw1ynHMr9vy3eU77m5yfF3Gzm6meEg/beW+lUu3fHYgskTN2oVQ==
+tsx@^4.23.5:
+  version "4.23.5"
+  resolved "https://registry.yarnpkg.com/tsx/-/tsx-4.23.5.tgz#fbf78241ff3e616c5dc96e6113200b0e6899e7dc"
+  integrity sha512-rw55FUaqOoI7RvlQwLbhO4nSDApnQ4/CykPuiQ/EPvtrX3WA9Ig55jIt9VvbBJbzJuj12ueRu4PMZ2SxPVbihg==
   dependencies:
     esbuild "~0.28.0"
   optionalDependencies:
