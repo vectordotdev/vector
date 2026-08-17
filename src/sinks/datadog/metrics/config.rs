@@ -1,5 +1,3 @@
-use http::Uri;
-use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_lib::{
     config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings,
@@ -15,9 +13,12 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
-        Healthcheck, UriParseSnafu, VectorSink,
+        Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig, batch::BatchConfig},
+        util::{
+            HttpEndpoint, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            batch::BatchConfig,
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -137,13 +138,13 @@ impl DatadogMetricsCompression {
 
 /// Maps Datadog metric endpoints to their actual URI.
 pub struct DatadogMetricsEndpointConfiguration {
-    series_endpoint: Uri,
-    sketches_endpoint: Uri,
+    series_endpoint: HttpEndpoint,
+    sketches_endpoint: HttpEndpoint,
 }
 
 impl DatadogMetricsEndpointConfiguration {
     /// Creates a new `DatadogMEtricsEndpointConfiguration`.
-    pub const fn new(series_endpoint: Uri, sketches_endpoint: Uri) -> Self {
+    pub const fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
         Self {
             series_endpoint,
             sketches_endpoint,
@@ -151,7 +152,7 @@ impl DatadogMetricsEndpointConfiguration {
     }
 
     /// Gets the URI for the given Datadog metrics endpoint.
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> HttpEndpoint {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => self.series_endpoint.clone(),
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
@@ -225,10 +226,7 @@ impl ValidatedSink for DatadogMetricsConfig {
             .clone()
             .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
         let base = Self::metrics_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
-        let uri = base.parse::<Uri>()?;
-        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
-            return Err("Datadog Metrics endpoint must be an absolute http(s) URL".into());
-        }
+        HttpEndpoint::parse(&base)?;
 
         Ok(ValidatedMetrics {
             batcher_settings,
@@ -332,7 +330,7 @@ impl DatadogMetricsConfig {
             self.series_api_version,
         );
 
-        let protocol = self.get_protocol(dd_common);
+        let protocol = self.get_protocol(dd_common)?;
         let sink = DatadogMetricsSink::new(
             service,
             request_builder,
@@ -345,13 +343,12 @@ impl DatadogMetricsConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        Self::metrics_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)
-            .parse::<Uri>()
-            .unwrap()
-            .scheme_str()
-            .unwrap_or("http")
-            .to_string()
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
+        let endpoint = HttpEndpoint::parse(&Self::metrics_base_endpoint(
+            dd_common.endpoint.as_deref(),
+            &dd_common.site,
+        ))?;
+        Ok(endpoint.as_uri().scheme_str().unwrap_or("http").to_string())
     }
 }
 
@@ -377,11 +374,8 @@ fn resolve_endpoint_batch_settings(
     Ok((series, sketches))
 }
 
-fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{host}{endpoint}")
-        .parse::<Uri>()
-        .context(UriParseSnafu)?;
-    Ok(result)
+fn build_uri(host: &str, endpoint: &str) -> crate::Result<HttpEndpoint> {
+    Ok(HttpEndpoint::parse(host)?.append_path(endpoint)?)
 }
 
 #[cfg(test)]
@@ -416,10 +410,10 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_endpoint_without_scheme() {
+    fn validate_rejects_non_http_scheme() {
         let config = DatadogMetricsConfig {
             local_dd_common: LocalDatadogCommonConfig::new(
-                Some("localhost:8080".to_string()),
+                Some("ftp://localhost:8080".to_string()),
                 None,
                 None,
             ),

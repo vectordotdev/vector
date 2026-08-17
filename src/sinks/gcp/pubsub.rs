@@ -5,7 +5,7 @@ use http::{Request, Uri};
 use hyper::Body;
 use indoc::indoc;
 use serde_json::{Value, json};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use vector_lib::configurable::configurable_component;
 
@@ -18,10 +18,11 @@ use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     http::HttpClient,
     sinks::{
-        Healthcheck, UriParseSnafu, VectorSink,
+        Healthcheck, VectorSink,
         gcs_common::config::healthcheck_response,
         util::{
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings,
+            BatchConfig, BatchSettings, BoxedRawValue, HttpEndpoint, JsonArrayBuffer,
+            SinkBatchSettings,
             TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
@@ -72,7 +73,7 @@ pub struct PubsubConfig {
     /// [pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "https://us-central1-pubsub.googleapis.com"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
@@ -101,8 +102,8 @@ pub struct PubsubConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_endpoint() -> String {
-    PUBSUB_URL.to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse(PUBSUB_URL).expect("static default endpoint should be a valid http(s) URL")
 }
 
 impl GenerateConfig for PubsubConfig {
@@ -134,26 +135,10 @@ impl ValidatedSink for PubsubConfig {
     type Validated = ValidatedPubsub;
 
     fn validate(&self) -> crate::Result<ValidatedPubsub> {
-        // Parse the assembled publish URI up front so `vector validate
-        // --no-environment` rejects a malformed endpoint/project/topic
-        // combination instead of failing (or panicking) at build time.
-        let uri_base = format!(
-            "{}/v1/projects/{}/topics/{}",
-            self.endpoint, self.project, self.topic,
-        )
-        .parse::<Uri>()?;
-
-        // Reject a relative or authority-less endpoint up front so `vector validate
-        // --no-environment` fails instead of deferring the error to HttpClient.
-        if !matches!(uri_base.scheme_str(), Some("http" | "https"))
-            || uri_base.authority().is_none()
-        {
-            return Err(format!(
-                "endpoint must be an absolute `http(s)` URL, e.g. `https://pubsub.googleapis.com`; got `{}`",
-                self.endpoint
-            )
-            .into());
-        }
+        let uri_base = self.endpoint.append_path(&format!(
+            "/v1/projects/{}/topics/{}",
+            self.project, self.topic,
+        ))?;
 
         let batch_settings = self
             .batch
@@ -217,22 +202,24 @@ impl ValidatedSink for PubsubConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedPubsub {
-    uri_base: Uri,
+    uri_base: HttpEndpoint,
     batch_settings: BatchSettings<JsonArrayBuffer>,
     transformer: Transformer,
 }
 
 struct PubsubSink {
     auth: GcpAuthenticator,
-    uri_base: Uri,
+    uri_base: HttpEndpoint,
     transformer: Transformer,
     encoder: Encoder<()>,
 }
 
 impl PubsubSink {
+
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
-        let uri = format!("{}{}", self.uri_base, suffix);
-        let mut uri = uri.parse::<Uri>().context(UriParseSnafu)?;
+        // The suffix is a Google API method (for example `:publish`) that
+        // attaches directly to the topic path without a separator.
+        let mut uri = self.uri_base.append_raw_suffix(suffix)?.into_uri();
         self.auth.apply_uri(&mut uri);
         Ok(uri)
     }
@@ -319,48 +306,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn validate_rejects_relative_endpoint() {
-        use crate::config::ValidatedSink;
-
-        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
-                project: project
-                topic: topic
-                endpoint: pubsub.googleapis.com
-                encoding:
-                  codec: json
-            "#})
-        .unwrap();
-
-        let err = config
-            .validate()
-            .expect_err("a relative endpoint must be rejected");
-        assert!(
-            err.to_string().contains("absolute `http(s)` URL")
-                || err.to_string().contains("invalid format"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn validate_rejects_endpoint_without_authority() {
-        use crate::config::ValidatedSink;
-
-        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
-                project: project
-                topic: topic
-                endpoint: https:///v1/projects/project/topics/topic
-                encoding:
-                  codec: json
-            "#})
-        .unwrap();
-
-        assert!(
-            config.validate().is_err(),
-            "an endpoint without a host must be rejected"
-        );
-    }
-
     #[tokio::test]
     async fn fails_missing_creds() {
         let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
@@ -407,7 +352,7 @@ mod integration_tests {
         PubsubConfig {
             project: PROJECT.into(),
             topic: topic.into(),
-            endpoint: gcp::PUBSUB_ADDRESS.clone(),
+            endpoint: HttpEndpoint::parse(&gcp::PUBSUB_ADDRESS).unwrap(),
             auth: GcpAuthConfig {
                 skip_authentication: true,
                 ..Default::default()

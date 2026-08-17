@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use http::{HeaderValue, Uri, header::AUTHORIZATION};
-use snafu::prelude::*;
 
 #[cfg(feature = "aws-core")]
 use super::Errors;
@@ -13,10 +12,10 @@ use crate::{
     config::ValidatedSink,
     http::HttpClient,
     sinks::{
-        UriParseSnafu,
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
+            HttpEndpoint,
             auth::Auth,
             http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
@@ -53,7 +52,8 @@ pub struct RemoteWriteConfig {
     ///
     /// The endpoint should include the scheme and the path to write to.
     #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
-    pub endpoint: String,
+    #[derivative(Default(value = "default_endpoint()"))]
+    pub endpoint: HttpEndpoint,
 
     /// The default namespace for any metrics sent.
     ///
@@ -139,6 +139,10 @@ const fn default_compression() -> Compression {
     Compression::Snappy
 }
 
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://localhost:8087/api/v1/write").unwrap()
+}
+
 impl_generate_config_from_default!(RemoteWriteConfig);
 
 /// Outbound HTTP request settings for the Prometheus remote write sink.
@@ -217,7 +221,7 @@ impl SinkConfig for RemoteWriteConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedRemoteWrite {
     tenant_id: Option<ConfinedTemplate>,
-    endpoint: Uri,
+    endpoint: HttpEndpoint,
     validated_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
     batch_settings: BatcherSettings,
 }
@@ -235,18 +239,7 @@ impl ValidatedSink for RemoteWriteConfig {
             })
             .transpose()?;
 
-        let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
-
-        // Reject endpoints that parse but lack a scheme or authority (e.g.
-        // `/api/v1/write`). `http::Uri` accepts them, but the request path hands
-        // them to the HTTP client as a non-absolute target that deterministically
-        // fails at build/healthcheck time.
-        if endpoint.scheme().is_none() || endpoint.authority().is_none() {
-            return Err(format!(
-                "endpoint must include a scheme and host, e.g. `https://localhost:8087/api/v1/write`; got `{endpoint}`"
-            )
-            .into());
-        }
+        let endpoint = self.endpoint.clone();
         let validated_headers = Arc::new(validate_headers(
             &self.request.headers,
             self.auth.is_some(),
@@ -320,7 +313,7 @@ impl ValidatedSink for RemoteWriteConfig {
 
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
-            None => endpoint.clone(),
+            None => endpoint.as_uri().clone(),
         };
 
         let healthcheck = healthcheck(
@@ -439,7 +432,7 @@ mod tests {
     #[test]
     fn validate_produces_usable_state() {
         let config = RemoteWriteConfig {
-            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
             tenant_id: Some("team-{{ org }}".try_into().unwrap()),
             ..Default::default()
         };
@@ -455,29 +448,19 @@ mod tests {
 
     #[test]
     fn validate_rejects_relative_endpoint() {
-        let config = RemoteWriteConfig {
-            endpoint: "/api/v1/write".to_string(),
-            ..Default::default()
-        };
-
-        let err = config
-            .validate()
-            .expect_err("a relative endpoint must be rejected");
+        // The config field is `HttpEndpoint`, whose type-level validation rejects
+        // relative endpoints at load time, so `validate()` never sees them.
         assert!(
-            err.to_string().contains("scheme and host"),
-            "unexpected error: {err}"
+            HttpEndpoint::parse("/api/v1/write").is_err(),
+            "a relative endpoint must be rejected"
         );
     }
 
     #[test]
     fn validate_rejects_endpoint_without_authority() {
-        let config = RemoteWriteConfig {
-            endpoint: "https:///api/v1/write".to_string(),
-            ..Default::default()
-        };
-
+        // HttpEndpoint rejects endpoints without a host at load time.
         assert!(
-            config.validate().is_err(),
+            HttpEndpoint::parse("https:///api/v1/write").is_err(),
             "an endpoint without a host must be rejected"
         );
     }
@@ -488,7 +471,7 @@ mod tests {
         use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 
         let config = RemoteWriteConfig {
-            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
             auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
             aws: Some(RegionOrEndpoint::default()),
             ..Default::default()
@@ -506,7 +489,7 @@ mod tests {
         use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 
         let config = RemoteWriteConfig {
-            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
             auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
             aws: Some(RegionOrEndpoint::with_region("us-east-1".to_string())),
             ..Default::default()
@@ -522,7 +505,7 @@ mod tests {
     #[test]
     fn validate_accepts_non_aws_auth_without_region() {
         let config = RemoteWriteConfig {
-            endpoint: "http://localhost:8087/api/v1/write".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
             auth: Some(PrometheusRemoteWriteAuth::Basic {
                 user: "user".to_string(),
                 password: "password".to_string(),

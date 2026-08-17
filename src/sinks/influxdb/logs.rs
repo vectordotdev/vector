@@ -28,7 +28,7 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, BatchSettings, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },
@@ -58,7 +58,7 @@ pub struct InfluxDbLogsConfig {
     ///
     /// This should be a full HTTP URI, including the scheme, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The list of names of log fields that should be added as tags to each measurement.
     ///
@@ -259,14 +259,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
 
         let settings = influxdb_settings(self.settings()?);
 
-        let endpoint = self.endpoint.clone();
-        let uri = settings.write_uri(endpoint)?;
-
-        // The write URI must be an absolute `http`/`https` URL; a relative or
-        // non-HTTP URI would be rejected by `HttpClient` at build/first send.
-        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
-            return Err("InfluxDB endpoint must be an absolute http(s) URL".into());
-        }
+        let uri = settings.write_uri(self.endpoint.clone())?;
 
         let token = settings.token();
         let protocol_version = settings.protocol_version();
@@ -636,7 +629,7 @@ mod tests {
     fn prepares_valid_config() {
         let config = InfluxDbLogsConfig {
             measurement: Some("vector".to_string()),
-            endpoint: "http://localhost:9999".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
             org: Some("my-org".to_string()),
             bucket: Some("my-bucket".to_string()),
             token: Some("my-token".to_string().into()),
@@ -667,41 +660,10 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_relative_endpoint() {
-        let config = InfluxDbLogsConfig {
-            measurement: Some("vector".to_string()),
-            endpoint: "influxdb".to_string(),
-            org: Some("my-org".to_string()),
-            bucket: Some("my-bucket".to_string()),
-            token: Some("my-token".to_string().into()),
-            tags: vec![],
-            version: Some(InfluxDbVersion::V2),
-            database: None,
-            consistency: None,
-            retention_policy_name: None,
-            username: None,
-            password: None,
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            tls: None,
-            acknowledgements: Default::default(),
-            host_key: None,
-            message_key: None,
-            source_type_key: None,
-        };
-
-        assert!(
-            config.validate().is_err(),
-            "a scheme-less endpoint must be rejected during validation"
-        );
-    }
-
-    #[test]
     fn validate_retains_config_keys_without_log_schema_fallback() {
         let config = InfluxDbLogsConfig {
             measurement: Some("vector".to_string()),
-            endpoint: "http://localhost:9999".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
             org: Some("my-org".to_string()),
             bucket: Some("my-bucket".to_string()),
             token: Some("my-token".to_string().into()),
@@ -1076,7 +1038,7 @@ mod tests {
         // Swap out the host so we can force send it
         // to our local server
         let host = format!("http://{addr}");
-        config.endpoint = host;
+        config.endpoint = HttpEndpoint::parse(&host).unwrap();
 
         let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
@@ -1216,7 +1178,7 @@ mod integration_tests {
 
         let config = InfluxDbLogsConfig {
             measurement: Some(measure.clone()),
-            endpoint: endpoint.clone(),
+            endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             tags: Default::default(),
             version: Some(InfluxDbVersion::V2),
             database: None,

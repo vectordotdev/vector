@@ -23,7 +23,8 @@ use crate::{
             service::{HecService, HttpRequestBuilder},
         },
         util::{
-            BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig, http::HttpRetryLogic,
+            BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, TowerRequestConfig,
+            http::HttpRetryLogic,
         },
     },
     template::{ConfinedTemplate, Template},
@@ -67,7 +68,7 @@ pub struct HecMetricsSinkConfig {
         docs::examples = "http://example.com"
     ))]
     #[configurable(validation(format = "uri"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
@@ -136,7 +137,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
         serde_json::to_value(Self {
             default_namespace: None,
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
-            endpoint: "http://localhost:8088".to_owned(),
+            endpoint: HttpEndpoint::parse("http://localhost:8088").unwrap(),
             host_key: config_host_key(),
             index: None,
             sourcetype: None,
@@ -182,18 +183,7 @@ impl ValidatedSink for HecMetricsSinkConfig {
     type Validated = ValidatedHecMetricsSink;
 
     fn validate(&self) -> crate::Result<ValidatedHecMetricsSink> {
-        let endpoint = self.endpoint.parse::<http::Uri>()?;
-        if !matches!(endpoint.scheme_str(), Some("http" | "https"))
-            || endpoint.authority().is_none()
-        {
-            return Err(
-                format!(
-                    "endpoint must be an absolute http(s) URL, e.g. `https://hec.splunk.com:8088`; got `{}`",
-                    self.endpoint
-                )
-                .into(),
-            );
-        }
+        // The endpoint is validated at config load as an absolute http(s) URL.
 
         let templated_field_keys =
             compute_templated_field_keys(&self.index, &self.source, &self.sourcetype);
@@ -232,7 +222,7 @@ impl ValidatedSink for HecMetricsSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.default_token.inner().to_owned(),
             client.clone(),
         )
@@ -274,7 +264,7 @@ impl HecMetricsSinkConfig {
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             EndpointTarget::default(),
             self.default_token.inner().to_owned(),
             self.compression,
@@ -320,7 +310,7 @@ mod tests {
         let config = HecMetricsSinkConfig {
             default_namespace: None,
             default_token: "token".to_string().into(),
-            endpoint: "http://localhost:8088".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:8088").unwrap(),
             host_key: config_host_key(),
             index: Some("custom_index".try_into().unwrap()),
             sourcetype: None,
@@ -340,47 +330,5 @@ mod tests {
         );
         assert!(validated.source.is_none());
         assert!(validated.sourcetype.is_none());
-    }
-
-    #[test]
-    fn validate_rejects_malformed_endpoint() {
-        let config = HecMetricsSinkConfig {
-            default_namespace: None,
-            default_token: "token".to_string().into(),
-            endpoint: "not a uri".to_string(),
-            host_key: config_host_key(),
-            index: None,
-            sourcetype: None,
-            source: None,
-            compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            tls: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
-        };
-
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn validate_rejects_relative_endpoint() {
-        let config = HecMetricsSinkConfig {
-            default_namespace: None,
-            default_token: "token".to_string().into(),
-            endpoint: "splunk".to_string(),
-            host_key: config_host_key(),
-            index: None,
-            sourcetype: None,
-            source: None,
-            compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            tls: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
-        };
-
-        assert!(config.validate().is_err());
     }
 }

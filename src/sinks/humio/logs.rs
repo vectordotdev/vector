@@ -22,7 +22,7 @@ use crate::{
             },
             logs::config::{HecLogsSinkConfig, ValidatedHecLogsSink},
         },
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
     template::Template,
     tls::TlsConfig,
@@ -54,7 +54,7 @@ pub struct HumioLogsConfig {
         docs::examples = "http://127.0.0.1",
         docs::examples = "https://example.com",
     ))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The source of events sent to this sink.
     ///
@@ -150,8 +150,8 @@ pub struct HumioLogsConfig {
     pub confinement: crate::template::ConfinementConfig,
 }
 
-fn default_endpoint() -> String {
-    HOST.to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse(HOST).expect("static default endpoint should be a valid http(s) URL")
 }
 
 pub fn timestamp_nanos_key() -> Option<String> {
@@ -473,7 +473,7 @@ mod integration_tests {
 
         HumioLogsConfig {
             token: token.to_string().into(),
-            endpoint: humio_address(),
+            endpoint: HttpEndpoint::parse(&humio_address()).unwrap(),
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             event_type: None,

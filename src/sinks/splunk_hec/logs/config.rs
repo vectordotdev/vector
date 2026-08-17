@@ -18,7 +18,7 @@ use crate::{
             build_healthcheck, build_http_batch_service, create_client,
             service::{HecService, HttpRequestBuilder},
         },
-        util::http::HttpRetryLogic,
+        util::{HttpEndpoint, http::HttpRetryLogic},
     },
     template::ConfinementConfig,
 };
@@ -49,7 +49,7 @@ pub struct HecLogsSinkConfig {
         docs::examples = "http://example.com"
     ))]
     #[configurable(validation(format = "uri"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
@@ -167,7 +167,7 @@ impl GenerateConfig for HecLogsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
-            endpoint: "endpoint".to_owned(),
+            endpoint: HttpEndpoint::parse("http://example.com").unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: None,
@@ -202,18 +202,7 @@ impl HecLogsSinkConfig {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
 
-        let endpoint = self.endpoint.parse::<http::Uri>()?;
-        if !matches!(endpoint.scheme_str(), Some("http" | "https"))
-            || endpoint.authority().is_none()
-        {
-            return Err(
-                format!(
-                    "endpoint must be an absolute http(s) URL, e.g. `https://hec.splunk.com:8088`; got `{}`",
-                    self.endpoint
-                )
-                .into(),
-            );
-        }
+        // The endpoint is validated at config load as an absolute http(s) URL.
 
         let index = self
             .index
@@ -251,7 +240,7 @@ impl HecLogsSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.default_token.inner().to_owned(),
             client.clone(),
         )
@@ -330,7 +319,7 @@ impl HecLogsSinkConfig {
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.endpoint_target,
             self.default_token.inner().to_owned(),
             self.compression,
@@ -396,7 +385,7 @@ mod tests {
 
         let config = HecLogsSinkConfig {
             default_token: "token".to_string().into(),
-            endpoint: "http://localhost:8088".to_string(),
+            endpoint: HttpEndpoint::parse("http://localhost:8088").unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: Some("custom_index".try_into().unwrap()),
@@ -422,62 +411,6 @@ mod tests {
         );
         assert!(validated.source.is_none());
         assert!(validated.sourcetype.is_none());
-    }
-
-    #[test]
-    fn validate_rejects_malformed_endpoint() {
-        use crate::config::ValidatedSink;
-
-        let config = HecLogsSinkConfig {
-            default_token: "token".to_string().into(),
-            endpoint: "not a uri".to_string(),
-            host_key: None,
-            indexed_fields: vec![],
-            index: None,
-            sourcetype: None,
-            source: None,
-            encoding: JsonSerializerConfig::default().into(),
-            compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            tls: None,
-            acknowledgements: Default::default(),
-            timestamp_nanos_key: None,
-            timestamp_key: None,
-            auto_extract_timestamp: None,
-            endpoint_target: EndpointTarget::Event,
-            confinement: Default::default(),
-        };
-
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn validate_rejects_relative_endpoint() {
-        use crate::config::ValidatedSink;
-
-        let config = HecLogsSinkConfig {
-            default_token: "token".to_string().into(),
-            endpoint: "splunk".to_string(),
-            host_key: None,
-            indexed_fields: vec![],
-            index: None,
-            sourcetype: None,
-            source: None,
-            encoding: JsonSerializerConfig::default().into(),
-            compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            tls: None,
-            acknowledgements: Default::default(),
-            timestamp_nanos_key: None,
-            timestamp_key: None,
-            auto_extract_timestamp: None,
-            endpoint_target: EndpointTarget::Event,
-            confinement: Default::default(),
-        };
-
-        assert!(config.validate().is_err());
     }
 
     #[test]
@@ -508,7 +441,7 @@ mod tests {
 
     impl ValidatableComponent for HecLogsSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
-            let endpoint = "http://127.0.0.1:9001".to_string();
+            let endpoint = HttpEndpoint::parse("http://127.0.0.1:9001").unwrap();
 
             let mut batch = BatchConfig::default();
             batch.max_events = Some(1);
@@ -548,14 +481,14 @@ mod tests {
                 confinement: ConfinementConfig::default(),
             };
 
-            let endpoint = format!("{endpoint}/services/collector/raw");
+            let endpoint = endpoint
+                .append_path("services/collector/raw")
+                .unwrap()
+                .into_uri();
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(
-                    http::Uri::try_from(&endpoint).expect("should not fail to parse URI"),
-                    None,
-                ),
+                HttpResourceConfig::from_parts(endpoint, None),
                 config.encoding.clone(),
             );
 

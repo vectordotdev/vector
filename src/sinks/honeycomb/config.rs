@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http::{Request, StatusCode, Uri};
+use http::{Request, StatusCode};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            BatchConfig, BoxedRawValue, TowerRequestSettings,
+            BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
@@ -35,7 +35,7 @@ pub struct HoneycombConfig {
         docs::examples = "https://api.eu1.honeycomb.io",
     ))]
     #[configurable(validation(format = "uri"))]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The API key that is used to authenticate against Honeycomb.
     #[configurable(metadata(docs::examples = "${HONEYCOMB_API_KEY}"))]
@@ -78,8 +78,9 @@ pub struct HoneycombConfig {
     pub retry_strategy: RetryStrategy,
 }
 
-fn default_endpoint() -> String {
-    "https://api.honeycomb.io".to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://api.honeycomb.io")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -118,7 +119,7 @@ impl SinkConfig for HoneycombConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedHoneycomb {
     batch_settings: BatcherSettings,
-    uri: Uri,
+    uri: HttpEndpoint,
     request_limits: TowerRequestSettings,
 }
 
@@ -182,32 +183,19 @@ impl ValidatedSink for HoneycombConfig {
 }
 
 impl HoneycombConfig {
-    fn build_uri(&self) -> crate::Result<Uri> {
-        let uri = format!(
-            "{}/1/batch/{}",
-            self.endpoint.trim_end_matches('/'),
-            self.dataset
-        );
-        let uri = uri
-            .parse::<Uri>()
-            .map_err(|e| -> crate::Error { e.into() })?;
-        // Reject endpoints that parse but lack a scheme or authority (e.g.
-        // `api.honeycomb.io`). `http::Uri` accepts them, but the request path
-        // hands them to the HTTP client as a non-absolute target that
-        // deterministically fails at build time.
-        if uri.scheme().is_none() || uri.authority().is_none() {
-            return Err(format!(
-                "endpoint must include a scheme and host, e.g. `https://api.honeycomb.io`; got `{}`",
-                self.endpoint
-            )
-            .into());
-        }
-        Ok(uri)
+    fn build_uri(&self) -> crate::Result<HttpEndpoint> {
+        Ok(self
+            .endpoint
+            .append_path(&format!("1/batch/{}", self.dataset))?)
     }
 }
 
-async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> crate::Result<()> {
-    let request = Request::post(uri).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
+async fn healthcheck(
+    uri: HttpEndpoint,
+    api_key: SensitiveString,
+    client: HttpClient,
+) -> crate::Result<()> {
+    let request = Request::post(uri.as_uri()).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();
@@ -245,22 +233,6 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn validate_rejects_relative_endpoint() {
-        let mut config: HoneycombConfig =
-            serde_json::from_value(HoneycombConfig::generate_config())
-                .expect("config should be valid");
-        config.endpoint = "/foo".to_string();
-
-        let err = config
-            .validate()
-            .expect_err("a relative endpoint must be rejected");
-        assert!(
-            err.to_string().contains("scheme and host"),
-            "unexpected error: {err}"
-        );
-    }
 
     #[test]
     fn validate_returns_usable_values() {

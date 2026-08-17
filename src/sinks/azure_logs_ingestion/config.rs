@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
-use http::Uri;
 
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
@@ -13,7 +12,7 @@ use crate::{
         azure_common::config::AzureAuthentication,
         prelude::*,
         util::{
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
@@ -49,7 +48,7 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(
         docs::examples = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
     ))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
     ///
@@ -116,7 +115,7 @@ pub struct AzureLogsIngestionConfig {
 impl Default for AzureLogsIngestionConfig {
     fn default() -> Self {
         Self {
-            endpoint: Default::default(),
+            endpoint: HttpEndpoint::parse("http://localhost:8080").unwrap(),
             dcr_immutable_id: Default::default(),
             stream_name: Default::default(),
             auth: Default::default(),
@@ -138,13 +137,14 @@ impl AzureLogsIngestionConfig {
         &self,
         cx: SinkContext,
         validated: &ValidatedAzureLogsIngestion,
-        endpoint: Uri,
+        endpoint: HttpEndpoint,
         dcr_immutable_id: String,
         stream_name: String,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
         timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let endpoint = endpoint.into_uri();
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
@@ -185,13 +185,14 @@ impl_generate_config_from_default!(AzureLogsIngestionConfig);
 
 #[derive(Clone, Debug)]
 pub struct ValidatedAzureLogsIngestion {
-    endpoint: Uri,
+    endpoint: HttpEndpoint,
     batch_settings: BatcherSettings,
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
+
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
@@ -209,14 +210,7 @@ impl ValidatedSink for AzureLogsIngestionConfig {
     type Validated = ValidatedAzureLogsIngestion;
 
     fn validate(&self) -> crate::Result<ValidatedAzureLogsIngestion> {
-        let endpoint: UriSerde = self.endpoint.parse()?;
-        let endpoint = endpoint.with_default_parts().uri;
-
-        if !matches!(endpoint.scheme_str(), Some("http" | "https"))
-            || endpoint.authority().is_none()
-        {
-            return Err("Azure Logs Ingestion endpoint must be an absolute http(s) URL".into());
-        }
+        let endpoint = self.endpoint.clone();
 
         let batch_settings = self
             .batch

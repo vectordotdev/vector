@@ -15,7 +15,7 @@ use super::config::AzureLogsIngestionConfig;
 use crate::{
     config::ValidatedSink,
     event::LogEvent,
-    sinks::prelude::*,
+    sinks::{prelude::*, util::HttpEndpoint},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::spawn_blackhole_http_server,
@@ -46,7 +46,10 @@ fn validate_accepts_valid_config() {
 
 #[test]
 fn validate_rejects_non_http_endpoint() {
-    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+    // The `HttpEndpoint` config field rejects a non-http(s) endpoint at load
+    // time, so deserialization fails.
+    let result: Result<AzureLogsIngestionConfig, _> =
+        serde_yaml::from_str(indoc::indoc! {r#"
             endpoint: "ftp://example.com"
             dcr_immutable_id: dcr-00000000000000000000000000000000
             stream_name: Custom-UnitTest
@@ -55,12 +58,8 @@ fn validate_rejects_non_http_endpoint() {
               azure_tenant_id: "00000000-0000-0000-0000-000000000000"
               azure_client_id: mock-client-id
               azure_client_secret: mock-client-secret
-        "#})
-    .unwrap();
-
-    config
-        .validate()
-        .expect_err("validation should fail for non-http endpoint");
+        "#});
+    assert!(result.is_err(), "config load should reject a non-http endpoint");
 }
 
 #[tokio::test]
@@ -101,8 +100,8 @@ fn basic_config_with_client_credentials() {
         .expect("Config parsing failed");
 
     assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        config.endpoint.to_string(),
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
@@ -140,8 +139,8 @@ fn basic_config_with_managed_identity() {
         .expect("Config parsing failed");
 
     assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        config.endpoint.to_string(),
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
@@ -215,7 +214,7 @@ async fn correct_request() {
         .build_inner(
             context,
             &validated,
-            mock_endpoint,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -329,7 +328,7 @@ async fn mock_healthcheck_with_400_response() {
         .build_inner(
             context,
             &validated,
-            mock_endpoint,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,
@@ -398,7 +397,7 @@ async fn mock_healthcheck_with_403_response() {
         .build_inner(
             context,
             &validated,
-            mock_endpoint,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             config.dcr_immutable_id.clone(),
             config.stream_name.clone(),
             credential,

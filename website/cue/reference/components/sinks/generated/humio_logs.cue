@@ -561,7 +561,7 @@ generated: components: sinks: humio_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "https://cloud.humio.com"
+			default: "https://cloud.humio.com/"
 			examples: ["http://127.0.0.1", "https://example.com"]
 		}
 	}

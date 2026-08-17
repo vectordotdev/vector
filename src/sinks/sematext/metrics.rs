@@ -27,7 +27,7 @@ use crate::{
         Healthcheck, HealthcheckError, VectorSink,
         influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
-            BatchConfig, BatchSettings, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
         },
@@ -105,7 +105,9 @@ impl GenerateConfig for SematextMetricsConfig {
 }
 
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
-    let uri = format!("{endpoint}/health");
+    let uri = HttpEndpoint::parse(&endpoint)?
+        .append_path("health")?
+        .into_uri();
 
     let request = Request::get(uri)
         .body(Body::empty())
@@ -127,6 +129,7 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
+
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -163,10 +166,7 @@ impl ValidatedSink for SematextMetricsConfig {
             (None, Region::Eu) => EU_ENDPOINT.to_owned(),
         };
 
-        let uri = write_uri(&endpoint)?;
-        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
-            return Err("Sematext Metrics endpoint must be an absolute http(s) URL".into());
-        }
+        let uri = write_uri(&HttpEndpoint::parse(&endpoint)?)?;
         let batch = self.batch.into_batch_settings()?;
 
         Ok(ValidatedSematextMetrics {
@@ -192,7 +192,7 @@ impl ValidatedSink for SematextMetricsConfig {
     }
 }
 
-fn write_uri(endpoint: &str) -> Result<Uri> {
+fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
     encode_uri(
         endpoint,
         "write",
@@ -405,14 +405,14 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        // Schemeless endpoints produce a relative write URI with no authority.
-        assert!(config("spm-receiver.sematext.com").validate().is_err());
-        // Non-http(s) schemes are rejected as well.
+        // Non-http(s) schemes are rejected by the HttpEndpoint type-level validation.
         assert!(
             config("ftp://spm-receiver.sematext.com")
                 .validate()
                 .is_err()
         );
+        // Relative paths cannot be resolved to an absolute http(s) URL.
+        assert!(config("/write").validate().is_err());
     }
 
     #[test]

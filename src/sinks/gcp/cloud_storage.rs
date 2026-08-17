@@ -2,10 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::{
-    Uri,
-    header::{HeaderName, HeaderValue},
-};
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -40,10 +37,10 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
-            partitioner::KeyPartitioner, request_builder::EncodeResult,
-            service::TowerRequestConfigDefaults, timezone_to_offset,
+            BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint, RequestBuilder,
+            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template, TemplateParseError},
@@ -193,7 +190,7 @@ pub struct GcsSinkConfig {
     #[configurable(metadata(docs::examples = "http://localhost:9000"))]
     #[configurable(validation(format = "uri"))]
     #[serde(default = "default_endpoint")]
-    endpoint: String,
+    endpoint: HttpEndpoint,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -242,7 +239,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
-        endpoint: Default::default(),
+        endpoint: default_endpoint(),
         request: Default::default(),
         auth: Default::default(),
         tls: Default::default(),
@@ -269,6 +266,7 @@ impl GenerateConfig for GcsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
+
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -287,14 +285,7 @@ impl ValidatedSink for GcsSinkConfig {
     type Validated = ValidatedGcsSink;
 
     fn validate(&self) -> crate::Result<ValidatedGcsSink> {
-        // Parse the base URL up front so `vector validate --no-environment`
-        // rejects a malformed endpoint instead of panicking at build time.
-        let base_url = format!("{}/{}/", self.endpoint, self.bucket).parse::<Uri>()?;
-        if !matches!(base_url.scheme_str(), Some("http" | "https"))
-            || base_url.authority().is_none()
-        {
-            return Err("GCS endpoint must be an absolute http(s) URL".into());
-        }
+        let base_url = self.endpoint.append_path(&format!("{}/", self.bucket))?;
         let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix_template = self.key_prefix_template()?;
 
@@ -318,7 +309,7 @@ impl ValidatedSink for GcsSinkConfig {
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
             client.clone(),
-            base_url.to_string(),
+            base_url.clone(),
             auth.clone(),
         )?;
         auth.spawn_regenerate_token();
@@ -329,7 +320,7 @@ impl ValidatedSink for GcsSinkConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedGcsSink {
-    base_url: Uri,
+    base_url: HttpEndpoint,
     batch_settings: BatcherSettings,
     key_prefix_template: ConfinedTemplate,
 }
@@ -338,7 +329,7 @@ impl GcsSinkConfig {
     fn build_sink(
         &self,
         client: HttpClient,
-        base_url: Uri,
+        base_url: HttpEndpoint,
         auth: GcpAuthenticator,
         cx: SinkContext,
         validated: &ValidatedGcsSink,
@@ -347,11 +338,11 @@ impl GcsSinkConfig {
 
         let partitioner = KeyPartitioner::new(validated.key_prefix_template.clone(), None);
 
-        let protocol = get_http_scheme_from_uri(&base_url);
+        let protocol = get_http_scheme_from_uri(base_url.as_uri());
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
-            .service(GcsService::new(client, base_url.to_string(), auth));
+            .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self, cx)?;
 
@@ -578,12 +569,13 @@ mod tests {
         let config = GcsSinkConfig {
             bucket: "my-bucket".into(),
             key_prefix: Some("date=%F/".into()),
-            endpoint: "https://storage.googleapis.com".into(),
+            endpoint: HttpEndpoint::parse("https://storage.googleapis.com")
+                .expect("valid endpoint"),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(
-            validated.base_url,
+            validated.base_url.to_string(),
             "https://storage.googleapis.com/my-bucket/"
         );
         assert_eq!(validated.key_prefix_template.to_string(), "date=%F/");
@@ -600,14 +592,15 @@ mod tests {
             HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
-            endpoint: mock_endpoint.to_string(),
+            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string())
+                .expect("valid mock endpoint"),
             ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
-                mock_endpoint,
+                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 context,
                 &validated,

@@ -1,8 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use http::Uri;
 use indoc::indoc;
-use snafu::ResultExt;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -20,7 +18,7 @@ use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
-        Healthcheck, UriParseSnafu, VectorSink,
+        Healthcheck, VectorSink,
         datadog::{
             DatadogCommonConfig, LocalDatadogCommonConfig,
             traces::{
@@ -29,7 +27,7 @@ use crate::{
             },
         },
         util::{
-            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             service::ServiceBuilderExt,
         },
     },
@@ -95,12 +93,12 @@ pub enum DatadogTracesEndpoint {
 /// Store traces & APM stats endpoints actual URIs.
 #[derive(Clone)]
 pub struct DatadogTracesEndpointConfiguration {
-    traces_endpoint: Uri,
-    stats_endpoint: Uri,
+    traces_endpoint: HttpEndpoint,
+    stats_endpoint: HttpEndpoint,
 }
 
 impl DatadogTracesEndpointConfiguration {
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> Uri {
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> HttpEndpoint {
         match endpoint {
             DatadogTracesEndpoint::Traces => self.traces_endpoint.clone(),
             DatadogTracesEndpoint::APMStats => self.stats_endpoint.clone(),
@@ -167,7 +165,7 @@ impl DatadogTracesConfig {
             request_builder,
             batcher_settings,
             shutdown,
-            self.get_protocol(dd_common),
+            self.get_protocol(dd_common)?,
         );
 
         // Send the APM stats payloads independently of the sink framework.
@@ -200,15 +198,12 @@ impl DatadogTracesConfig {
         Ok(HttpClient::new(tls_settings, proxy)?)
     }
 
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        build_uri(
-            &Self::traces_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site),
-            "",
-        )
-        .unwrap()
-        .scheme_str()
-        .unwrap_or("http")
-        .to_string()
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
+        let endpoint = HttpEndpoint::parse(&Self::traces_base_endpoint(
+            dd_common.endpoint.as_deref(),
+            &dd_common.site,
+        ))?;
+        Ok(endpoint.as_uri().scheme_str().unwrap_or("http").to_string())
     }
 }
 
@@ -247,10 +242,7 @@ impl ValidatedSink for DatadogTracesConfig {
             .clone()
             .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
         let base = Self::traces_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
-        let uri = base.parse::<Uri>()?;
-        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
-            return Err("Datadog Traces endpoint must be an absolute http(s) URL".into());
-        }
+        HttpEndpoint::parse(&base)?;
 
         Ok(ValidatedTraces { batcher_settings })
     }
@@ -270,11 +262,8 @@ impl ValidatedSink for DatadogTracesConfig {
     }
 }
 
-fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{host}{endpoint}")
-        .parse::<Uri>()
-        .context(UriParseSnafu)?;
-    Ok(result)
+fn build_uri(host: &str, endpoint: &str) -> crate::Result<HttpEndpoint> {
+    Ok(HttpEndpoint::parse(host)?.append_path(endpoint)?)
 }
 
 #[cfg(test)]
@@ -309,10 +298,10 @@ mod test {
     }
 
     #[test]
-    fn validate_rejects_endpoint_without_scheme() {
+    fn validate_rejects_non_http_scheme() {
         let config = DatadogTracesConfig {
             local_dd_common: LocalDatadogCommonConfig::new(
-                Some("localhost:8080".to_string()),
+                Some("ftp://localhost:8080".to_string()),
                 None,
                 None,
             ),

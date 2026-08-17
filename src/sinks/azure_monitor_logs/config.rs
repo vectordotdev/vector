@@ -1,4 +1,3 @@
-use http::Uri;
 use openssl::{base64, pkey};
 use vector_lib::{
     config::log_schema,
@@ -19,7 +18,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
@@ -157,8 +156,9 @@ impl AzureMonitorLogsConfig {
         &self,
         cx: SinkContext,
         validated: &ValidatedAzureMonitorLogs,
-        endpoint: Uri,
+        endpoint: HttpEndpoint,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let endpoint = endpoint.into_uri();
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
@@ -207,7 +207,7 @@ impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 #[derive(Clone, Debug)]
 pub struct ValidatedAzureMonitorLogs {
-    endpoint: Uri,
+    endpoint: HttpEndpoint,
     batch_settings: BatcherSettings,
     shared_key: pkey::PKey<pkey::Private>,
     time_generated_key: Option<OwnedValuePath>,
@@ -216,6 +216,7 @@ pub struct ValidatedAzureMonitorLogs {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
+
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
@@ -233,8 +234,7 @@ impl ValidatedSink for AzureMonitorLogsConfig {
     type Validated = ValidatedAzureMonitorLogs;
 
     fn validate(&self) -> crate::Result<ValidatedAzureMonitorLogs> {
-        let endpoint: UriSerde = format!("https://{}.{}", self.customer_id, self.host).parse()?;
-        let endpoint = endpoint.with_default_parts().uri;
+        let endpoint = HttpEndpoint::parse(&format!("https://{}.{}", self.customer_id, self.host))?;
 
         let batch_settings = self
             .batch

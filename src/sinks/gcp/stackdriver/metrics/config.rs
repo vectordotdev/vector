@@ -15,6 +15,7 @@ use crate::{
         HTTPRequestBuilderSnafu, gcp,
         prelude::*,
         util::{
+            HttpEndpoint,
             http::{
                 HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
                 http_response_retry_logic,
@@ -36,10 +37,12 @@ impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults
     "gcp_stackdriver_metrics",
     "Deliver metrics to GCP's Cloud Monitoring system."
 ))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 pub struct StackdriverConfig {
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The project ID to which to publish metrics.
     ///
@@ -89,8 +92,9 @@ fn default_metric_namespace_value() -> String {
     "namespace".to_string()
 }
 
-fn default_endpoint() -> String {
-    "https://monitoring.googleapis.com".to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://monitoring.googleapis.com")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 impl_generate_config_from_default!(StackdriverConfig);
@@ -114,11 +118,9 @@ impl ValidatedSink for StackdriverConfig {
     fn validate(&self) -> crate::Result<ValidatedStackdriverMetrics> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
-        let uri: Uri = format!(
-            "{}/v3/projects/{}/timeSeries",
-            self.endpoint, self.project_id
-        )
-        .parse()?;
+        let uri = self
+            .endpoint
+            .append_path(&format!("/v3/projects/{}/timeSeries", self.project_id))?;
 
         Ok(ValidatedStackdriverMetrics {
             batch_settings,
@@ -153,10 +155,14 @@ impl ValidatedSink for StackdriverConfig {
 
         let request_limits = self.request.into_settings();
 
+
         auth.spawn_regenerate_token();
 
         let stackdriver_metrics_service_request_builder =
-            StackdriverMetricsServiceRequestBuilder { uri, auth };
+            StackdriverMetricsServiceRequestBuilder {
+                uri: uri.into_uri(),
+                auth,
+            };
 
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
@@ -176,7 +182,7 @@ impl ValidatedSink for StackdriverConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedStackdriverMetrics {
     batch_settings: BatcherSettings,
-    uri: Uri,
+    uri: HttpEndpoint,
 }
 
 #[cfg(test)]

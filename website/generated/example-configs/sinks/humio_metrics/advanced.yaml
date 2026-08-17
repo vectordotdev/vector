@@ -5,7 +5,7 @@ sinks:
       - my-source-or-transform-id
     compression: none
     dangerously_allow_unconfined_template_resolution: false
-    endpoint: https://cloud.humio.com
+    endpoint: https://cloud.humio.com/
     event_type: json
     host_key: host
     host_tag: host
