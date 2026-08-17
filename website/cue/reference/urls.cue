@@ -129,6 +129,8 @@ urls: {
 	databend:                                   "https://databend.rs"
 	databend_rest:                              "https://databend.rs/doc/integrations/api/rest"
 	databend_cloud:                             "https://www.databend.com"
+	duckdb:                                     "https://duckdb.org/"
+	duckdb_data_types:                          "https://duckdb.org/docs/stable/sql/data_types/overview"
 	doris:                                      "https://doris.apache.org"
 	doris_stream_load:                          "https://doris.apache.org/docs/data-operate/import/import-way/stream-load-manual"
 	datadog:                                    "https://www.datadoghq.com"

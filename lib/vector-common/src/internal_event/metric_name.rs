@@ -133,6 +133,7 @@ pub enum HistogramName {
     HttpClientErrorRttSeconds,
     SourceBufferUtilization,
     TransformBufferUtilization,
+    DuckdbRequestStageDurationSeconds,
 }
 
 impl HistogramName {
@@ -168,6 +169,7 @@ impl HistogramName {
             Self::HttpClientErrorRttSeconds => "http_client_error_rtt_seconds",
             Self::SourceBufferUtilization => "source_buffer_utilization",
             Self::TransformBufferUtilization => "transform_buffer_utilization",
+            Self::DuckdbRequestStageDurationSeconds => "duckdb_request_stage_duration_seconds",
         }
     }
 }
