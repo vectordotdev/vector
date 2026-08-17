@@ -387,6 +387,23 @@ fn count_agg() {
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
     assert_eq!(&result_count_2, &out[0]);
+
+    // Count is documented to count both Absolute and Incremental metrics, so
+    // a mismatched kind for the same series must not be dropped — it must
+    // still count toward the total, not just emit `AggregateUpdateFailed`.
+    agg.record(gauge_a_1);
+    agg.record(make_metric(
+        "gauge_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    ));
+    out.clear();
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+    assert_eq!(
+        &result_count_2, &out[0],
+        "mixed-kind series must count both samples"
+    );
 }
 
 #[test]
@@ -1776,5 +1793,37 @@ fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
             Ok(BatchStatus::Delivered),
             "{mode:?}: losing sample's finalizers must not be discarded"
         );
+    }
+}
+
+#[test]
+fn event_time_count_counts_mixed_kinds_in_same_bucket() {
+    // Count is documented to count both Absolute and Incremental metrics, so
+    // a kind change within one series/bucket must not be dropped by the
+    // kind-equality guard — it must still count toward the total.
+    let interval_ms = 10_000;
+    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Count)).unwrap();
+    let base_time = open_bucket_timestamp(interval_ms);
+
+    agg.record(make_metric_with_timestamp(
+        "the-thing",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 42.0 },
+        base_time,
+    ));
+    agg.record(make_metric_with_timestamp(
+        "the-thing",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+        base_time + chrono::Duration::milliseconds(100),
+    ));
+
+    let mut out = vec![];
+    agg.flush_final(&mut out);
+    assert_eq!(out.len(), 1);
+    if let MetricValue::Counter { value } = out[0].as_metric().value() {
+        assert_eq!(*value, 2.0, "both samples must count toward the total");
+    } else {
+        panic!("expected counter value");
     }
 }

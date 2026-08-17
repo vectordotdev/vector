@@ -281,9 +281,11 @@ impl Aggregate {
             (data.clone(), metadata.clone())
         });
         *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
-        if existing.0.kind == data.kind && existing.0.update(&count_data) {
-            existing.1.merge(metadata);
-        } else {
+        // Count mode counts every sample regardless of kind (a series may mix
+        // Absolute and Incremental metrics), so — unlike Sum/Latest/Max/Min —
+        // kind must not gate the update or mixed-kind series get undercounted.
+        existing.1.merge(metadata);
+        if !existing.0.update(&count_data) {
             emit!(AggregateUpdateFailed);
         }
     }
