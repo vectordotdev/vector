@@ -164,6 +164,9 @@ impl ValidatedSink for WebSocketListenerSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketListenerSink> {
         let transformer = self.encoding.transformer();
+        if let Some(auth) = &self.auth {
+            auth.validate()?;
+        }
         Ok(ValidatedWebSocketListenerSink { transformer })
     }
 
@@ -189,6 +192,7 @@ impl_generate_config_from_default!(WebSocketListenerSinkConfig);
 #[cfg(test)]
 mod test {
     use super::*;
+    use indoc::indoc;
     use vector_lib::codecs::encoding::SerializerConfig;
 
     use crate::config::ValidatedSink;
@@ -211,5 +215,38 @@ mod test {
             config.encoding.config(),
             SerializerConfig::Json(_)
         ));
+    }
+
+    #[test]
+    fn validate_fails_on_invalid_custom_auth_source() {
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            auth: Some(HttpServerAuthConfig::Custom {
+                source: "invalid VRL source".to_string(),
+            }),
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_err(),
+            "an invalid custom auth VRL source must fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_succeeds_on_valid_custom_auth_source() {
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            auth: Some(HttpServerAuthConfig::Custom {
+                source: indoc! {r#"
+                    .headers.authorization == "Basic test"
+                    "#}
+                .to_string(),
+            }),
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_ok(),
+            "a valid custom auth VRL source must pass validation"
+        );
     }
 }
