@@ -328,8 +328,16 @@ impl AzureBlobConfig {
             (Some(_), _, Some(_)) => {
                 return Err("Cannot provide both `connection_string` and `blob_endpoint`".into());
             }
-            (_, Some(_), Some(_)) => {
-                return Err("Cannot provide both `account_name` and `blob_endpoint`".into());
+            (None, Some(account_name), Some(blob_endpoint)) => {
+                if self.auth.is_none() {
+                    return Err("`auth` configuration must be provided when using `account_name` and `blob_endpoint`".into());
+                }
+                let blob_endpoint = if blob_endpoint.ends_with('/') {
+                    blob_endpoint.clone()
+                } else {
+                    format!("{blob_endpoint}/")
+                };
+                format!("AccountName={account_name};BlobEndpoint={blob_endpoint}")
             }
         };
 

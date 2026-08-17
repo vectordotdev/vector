@@ -844,9 +844,10 @@ generated: components: sources: azure_blob: configuration: {
 			}
 			delete_message: {
 				description: """
-					Whether to delete the message once it is processed.
+					Whether to delete a queue message once its blob has been successfully processed.
 
-					It can be useful to set this to `false` for debugging or during the initial setup.
+					When set to `false`, messages remain in the queue and are redelivered after each
+					visibility timeout, which is useful for debugging but otherwise duplicates data.
 					"""
 				required: false
 				type: bool: default: true

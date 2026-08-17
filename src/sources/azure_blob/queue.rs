@@ -114,19 +114,14 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 1))]
     pub(super) max_number_of_messages: u32,
 
-    /// Number of concurrent tasks to create for polling the queue for messages.
-    ///
-    /// Defaults to the number of available CPUs on the system.
-    ///
-    /// Should not typically need to be changed, but it can sometimes be beneficial to raise this
-    /// value when there is a high rate of messages being pushed into the queue and the blobs
-    /// being fetched are small. In these cases, system resources may not be fully utilized
-    /// without fetching more messages per second, as the queue message consumption rate affects
-    /// the blob retrieval rate.
     #[configurable(metadata(docs::type_unit = "tasks"))]
     #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
-    
+
+    /// Whether to delete a queue message once its blob has been successfully processed.
+    ///
+    /// When set to `false`, messages remain in the queue and are redelivered after each
+    /// visibility timeout, which is useful for debugging but otherwise duplicates data.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
@@ -174,6 +169,11 @@ pub(super) enum IngestorNewError {
     InvalidVisibilityTimeout { seconds: u32 },
     #[snafu(display("Invalid value for poll_secs 0, must be at least 1 second"))]
     ZeroPollSecs,
+    #[snafu(display(
+        "Could not determine the storage account name. Set `account_name` (it may be combined with \
+         a custom `blob_endpoint`) so notifications can be validated against the configured account."
+    ))]
+    MissingAccountName,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -230,6 +230,8 @@ pub enum ProcessingError {
         blob
     ))]
     ErrorAcknowledgement { container: String, blob: String },
+    #[snafu(display("Sink rejected events for blob {}/{}", container, blob))]
+    RejectedBySink { container: String, blob: String },
 }
 
 impl ProcessingError {
@@ -244,7 +246,9 @@ impl ProcessingError {
             Self::GetBlob { .. } => error_type::REQUEST_FAILED,
             Self::ReadBlob { .. } => error_type::READER_FAILED,
             Self::PipelineSend { .. } => error_type::WRITER_FAILED,
-            Self::ErrorAcknowledgement { .. } => error_type::ACKNOWLEDGMENT_FAILED,
+            Self::ErrorAcknowledgement { .. } | Self::RejectedBySink { .. } => {
+                error_type::ACKNOWLEDGMENT_FAILED
+            }
         }
     }
 
@@ -252,7 +256,8 @@ impl ProcessingError {
         match self {
             Self::InvalidQueueMessage { .. }
             | Self::InvalidBlobPath { .. }
-            | Self::ForeignStorageAccount { .. } => true,
+            | Self::ForeignStorageAccount { .. }
+            | Self::RejectedBySink { .. } => true,
             // 404/412 are permanent: the blob is gone, or has changed since the notification.
             Self::GetBlob { source, .. } => matches!(
                 source.http_status(),
@@ -274,7 +279,7 @@ fn merge_batch_errors(existing: ProcessingError, new: ProcessingError) -> Proces
 }
 
 pub struct State {
-    account_name: Option<String>,
+    account_name: String,
     clients: AzureStorageClientSource,
     queue_client: QueueClient,
     container_clients: RwLock<HashMap<String, Arc<BlobContainerClient>>>,
@@ -351,7 +356,9 @@ impl Ingestor {
         }
 
         let queue_client = clients.queue_client(&config.queue_name)?;
-        let account_name = clients.account_name();
+        let account_name = clients
+            .account_name()
+            .ok_or(IngestorNewError::MissingAccountName)?;
 
         let state = Arc::new(State {
             account_name,
@@ -594,10 +601,9 @@ impl IngestorProcess {
                 url: notification.url.clone(),
             })?;
 
-        if let (Some(configured), Some(received)) = (
-            self.state.account_name.as_deref(),
-            blob_ref.storage_account.as_deref(),
-        ) && !configured.eq_ignore_ascii_case(received)
+        let configured = self.state.account_name.as_str();
+        if let Some(received) = blob_ref.storage_account.as_deref()
+            && !configured.eq_ignore_ascii_case(received)
         {
             return Err(ProcessingError::ForeignStorageAccount {
                 configured: configured.to_owned(),
@@ -610,12 +616,12 @@ impl IngestorProcess {
         let download_start = Instant::now();
 
         // Condition on the notification's etag so an overwritten blob fails instead of silently
-        // serving the wrong content.
+        // serving stale content.
         let download_options = blob_ref
             .etag
             .as_deref()
             .map(|etag| BlobClientDownloadOptions {
-                if_match: Some(Etag::from(etag)),
+                if_match: Some(Etag::from(quoted_etag(etag).as_str())),
                 ..Default::default()
             });
 
@@ -774,21 +780,10 @@ impl IngestorProcess {
                         container: blob_ref.container,
                         blob: blob_ref.blob,
                     }),
-                    BatchStatus::Rejected => {
-                        if self.state.delete_failed_message {
-                            warn!(
-                                message = "Blob from queue notification was rejected. Deleting failed message.",
-                                container = blob_ref.container,
-                                blob = blob_ref.blob,
-                            );
-                            Ok(())
-                        } else {
-                            Err(ProcessingError::ErrorAcknowledgement {
-                                container: blob_ref.container,
-                                blob: blob_ref.blob,
-                            })
-                        }
-                    }
+                    BatchStatus::Rejected => Err(ProcessingError::RejectedBySink {
+                        container: blob_ref.container,
+                        blob: blob_ref.blob,
+                    }),
                 },
             }
         };
@@ -1157,6 +1152,18 @@ fn percent_decode(s: &str) -> String {
         .into_owned()
 }
 
+/// Wraps an ETag in the quotes an HTTP `If-Match` entity-tag requires.
+///
+/// Event Grid delivers `data.eTag` unquoted (e.g. `0x8D…`), while the Blob service expects a
+/// quoted entity-tag (`"0x8D…"`). Values that already carry surrounding quotes are left as-is.
+fn quoted_etag(etag: &str) -> String {
+    if etag.len() >= 2 && etag.starts_with('"') && etag.ends_with('"') {
+        etag.to_owned()
+    } else {
+        format!("\"{etag}\"")
+    }
+}
+
 fn to_chrono_timestamp(ts: azure_core::time::OffsetDateTime) -> Option<DateTime<Utc>> {
     Utc.timestamp_opt(ts.unix_timestamp(), ts.nanosecond())
         .single()
@@ -1457,6 +1464,12 @@ mod tests {
             container: "c".to_owned(),
         };
         assert!(!err4.is_non_retryable());
+
+        let err5 = ProcessingError::RejectedBySink {
+            container: "c".to_owned(),
+            blob: "b".to_owned(),
+        };
+        assert!(err5.is_non_retryable());
     }
 
     fn get_blob_error(status: StatusCode) -> ProcessingError {
@@ -1477,6 +1490,16 @@ mod tests {
         assert!(get_blob_error(StatusCode::PreconditionFailed).is_non_retryable());
         assert!(!get_blob_error(StatusCode::ServiceUnavailable).is_non_retryable());
         assert!(!get_blob_error(StatusCode::InternalServerError).is_non_retryable());
+    }
+
+    #[test]
+    fn quoted_etag_wraps_unquoted_and_preserves_quoted() {
+        assert_eq!(quoted_etag("0x8DC0000000000000"), "\"0x8DC0000000000000\"");
+        assert_eq!(
+            quoted_etag("\"0x8DC0000000000000\""),
+            "\"0x8DC0000000000000\""
+        );
+        assert_eq!(quoted_etag("\""), "\"\"\"");
     }
 
     #[test]

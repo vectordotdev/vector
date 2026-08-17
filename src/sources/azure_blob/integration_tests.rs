@@ -123,7 +123,7 @@ async fn upload_blob(
     payload: Vec<u8>,
     content_type: Option<&str>,
     content_encoding: Option<&str>,
-) {
+) -> String {
     let options = BlockBlobClientUploadOptions {
         blob_content_type: content_type.map(ToOwned::to_owned),
         blob_content_encoding: content_encoding.map(ToOwned::to_owned),
@@ -132,17 +132,26 @@ async fn upload_blob(
         partition_size: Some(NonZeroU64::new(64 * 1024 * 1024).expect("nonzero")),
         ..Default::default()
     };
-    container_client
+    let result = container_client
         .blob_client(blob_name)
         .upload(RequestContent::from(payload), Some(options))
         .await
         .expect("Failed to upload blob");
+    String::from(result.etag.expect("upload response is missing an ETag"))
 }
 
-fn notification_body(container: &str, blob: &str, format: NotificationFormat) -> String {
+fn notification_body(
+    container: &str,
+    blob: &str,
+    etag: &str,
+    format: NotificationFormat,
+) -> String {
     let address = azurite_address();
     let url = format!("http://{address}:10000/devstoreaccount1/{container}/{blob}");
     let subject = format!("/blobServices/default/containers/{container}/blobs/{blob}");
+    // Real Event Grid delivers `data.eTag` unquoted; strip the quotes Azurite returns so the test
+    // mirrors that format (the source re-quotes it for `if_match`).
+    let etag = serde_json::to_string(etag.trim_matches('"')).expect("ETag serializes to JSON");
 
     let json = match format {
         NotificationFormat::EventGridBase64 | NotificationFormat::EventGridRaw => format!(
@@ -156,7 +165,7 @@ fn notification_body(container: &str, blob: &str, format: NotificationFormat) ->
                     "api": "PutBlob",
                     "blobType": "BlockBlob",
                     "url": "{url}",
-                    "eTag": "0x8DC0000000000000"
+                    "eTag": {etag}
                 }},
                 "dataVersion": "",
                 "metadataVersion": "1"
@@ -174,7 +183,7 @@ fn notification_body(container: &str, blob: &str, format: NotificationFormat) ->
                     "api": "PutBlob",
                     "blobType": "BlockBlob",
                     "url": "{url}",
-                    "eTag": "0x8DC0000000000000"
+                    "eTag": {etag}
                 }}
             }}"#
         ),
@@ -238,7 +247,7 @@ async fn test_event(
         let (container_client, queue_client, container_name) =
             test_clients(&config, &queue_name).await;
 
-        upload_blob(
+        let etag = upload_blob(
             &container_client,
             &blob_name,
             payload,
@@ -249,7 +258,7 @@ async fn test_event(
 
         enqueue_notification(
             &queue_client,
-            notification_body(&container_name, &blob_name, format),
+            notification_body(&container_name, &blob_name, &etag, format),
         )
         .await;
 
@@ -677,6 +686,7 @@ async fn azure_blob_ignores_other_event_types() {
     let body = notification_body(
         &container_name,
         "some.log",
+        "0x0",
         NotificationFormat::EventGridRaw,
     )
     .replace(

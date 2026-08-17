@@ -188,7 +188,8 @@ impl InternalEvent for AzureQueueMessageProcessingError<'_> {
                 )
                 .increment(1);
             }
-            ProcessingError::ErrorAcknowledgement { .. } => {
+            ProcessingError::ErrorAcknowledgement { .. }
+            | ProcessingError::RejectedBySink { .. } => {
                 counter!(
                     CounterName::ComponentErrorsTotal,
                     "error_code" => PROCESSING_ERROR_CODE,
