@@ -235,6 +235,14 @@ impl OutFile {
         }
     }
 
+    async fn write(&mut self, src: &[u8]) -> Result<usize, std::io::Error> {
+        match &mut self.inner {
+            OutFileInner::Regular(file) => file.write(src).await,
+            OutFileInner::Gzip(gzip) => gzip.write(src).await,
+            OutFileInner::Zstd(zstd) => zstd.write(src).await,
+        }
+    }
+
     async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
         match &mut self.inner {
             OutFileInner::Regular(file) => file.write_all(src).await,
@@ -582,17 +590,63 @@ impl FileSink {
 
         let bytes_path = BytesPath::new(path.clone());
         let truncate = self.should_truncate(&bytes_path, &path).await;
-        let file = if !truncate && let Some(file) = self.files.reset_at(&path, next_deadline) {
-            trace!(message = "Working with an already opened file.", path = ?path);
-            file
+
+        let file = if !truncate {
+            if let Some(file) = self.files.reset_at(&path, next_deadline) {
+                trace!(message = "Working with an already opened file.", path = ?path);
+                file
+            } else {
+                trace!(message = "Opening new file.", ?path);
+                let file = match open_file(bytes_path, truncate, self.confinement.as_mut()).await {
+                    Ok(file) => file,
+                    Err(OpenError::Io(error)) => {
+                        // We couldn't open the file for this event.
+                        // Maybe other events will work though! Just log
+                        // the error and skip this event.
+                        let dropped_events = events.len();
+                        emit!(FileIoError {
+                            code: "failed_opening_file",
+                            message: "Unable to open the file.",
+                            error,
+                            path: &path,
+                            dropped_events,
+                        });
+                        events.iter_mut().for_each(|event| {
+                            event.metadata().update_status(EventStatus::Errored);
+                        });
+                        return;
+                    }
+                    Err(OpenError::Confine(error)) => {
+                        let rendered = bytes_to_path(&path);
+                        let base = self
+                            .confinement
+                            .as_ref()
+                            .map(|c| c.base_dir().to_path_buf())
+                            .unwrap_or_default();
+                        emit!(FilePathOutsideBaseDirError {
+                            path: &rendered,
+                            base_dir: &base,
+                            error,
+                        });
+                        events.iter_mut().for_each(|event| {
+                            event.metadata().update_status(EventStatus::Errored);
+                        });
+                        return;
+                    }
+                };
+
+                let outfile = OutFile::new(file, self.compression);
+                self.files.insert_at(path.clone(), outfile, next_deadline);
+                emit!(FileOpen {
+                    count: self.files.len()
+                });
+                self.files.get_mut(&path).unwrap()
+            }
         } else {
-            trace!(message = "Opening new file.", ?path);
+            trace!(message = "Opening new file (truncating).", ?path);
             let file = match open_file(bytes_path, truncate, self.confinement.as_mut()).await {
                 Ok(file) => file,
                 Err(OpenError::Io(error)) => {
-                    // We couldn't open the file for this event.
-                    // Maybe other events will work though! Just log
-                    // the error and skip this event.
                     let dropped_events = events.len();
                     emit!(FileIoError {
                         code: "failed_opening_file",
@@ -665,47 +719,81 @@ impl FileSink {
             return;
         }
 
-        // Write each encoded event separately so a mid-batch failure does
-        // not retroactively erase acknowledgements for already-persisted records.
-        let n = encoded.len();
-        let mut total_bytes = 0usize;
-        for i in 0..n {
-            let (buf, finalizers, event_size) = encoded.remove(0);
-            match file.write_all(&buf).await {
-                Ok(()) => {
-                    total_bytes += buf.len();
+        // Combine all encoded records into a single buffer so we issue one
+        // write syscall per batch for the common uncompressed case.  Track
+        // each event's byte boundary so a partial write (ENOSPC, quota) can
+        // still acknowledge the events that were fully persisted.
+        let n_events = encoded.len();
+        let mut batch_buffer = BytesMut::new();
+        let mut boundaries: Vec<usize> = Vec::with_capacity(n_events);
+        for (buf, _, _) in &encoded {
+            boundaries.push(batch_buffer.len() + buf.len());
+            batch_buffer.extend_from_slice(buf);
+        }
+
+        let len = batch_buffer.len();
+        let mut written = 0usize;
+        let write_result: Result<(), std::io::Error> = loop {
+            match file.write(&batch_buffer[written..]).await {
+                Ok(0) => break Err(std::io::Error::new(
+                    std::io::ErrorKind::WriteZero,
+                    "write returned 0",
+                )),
+                Ok(n) => {
+                    written += n;
+                    if written >= len {
+                        break Ok(());
+                    }
+                }
+                Err(e) => break Err(e),
+            }
+        };
+
+        match write_result {
+            Ok(()) => {
+                for (buf, finalizers, event_size) in encoded {
                     finalizers.update_status(EventStatus::Delivered);
                     self.events_sent.emit(CountByteSize(1, event_size));
                 }
+                emit!(FileBytesSent {
+                    byte_size: len,
+                    file: String::from_utf8_lossy(&path),
+                    include_file_metric_tag: self.include_file_metric_tag,
+                });
+            }
                 Err(error) => {
-                    // This event failed.  Mark all remaining encoded events as
-                    // Errored so they are retried instead of silently delivered.
-                    finalizers.update_status(EventStatus::Errored);
-                    for (_, f, _) in encoded.drain(..) {
-                        f.update_status(EventStatus::Errored);
+                    // `written` bytes made it to the file / compression stream.
+                    // Events whose end offset lies at or before `written` were
+                    // fully persisted; everything beyond that must be retried.
+                    let mut dropped_events = n_events;
+                    for (i, (buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
+                        if boundaries[i] <= written {
+                            finalizers.update_status(EventStatus::Delivered);
+                            self.events_sent.emit(CountByteSize(1, event_size));
+                            dropped_events -= 1;
+                        } else {
+                            finalizers.update_status(EventStatus::Errored);
+                            if dropped_events == n_events {
+                                dropped_events = n_events - i;
+                            }
+                        }
                     }
                     emit!(FileIoError {
                         code: "failed_writing_file",
                         message: "Failed to write the file.",
                         error,
                         path: &path,
-                        dropped_events: n - i,
+                        dropped_events,
                     });
-                    emit!(FileBytesSent {
-                        byte_size: total_bytes,
-                        file: String::from_utf8_lossy(&path),
-                        include_file_metric_tag: self.include_file_metric_tag,
-                    });
-                    return;
+                    if written > 0 {
+                        emit!(FileBytesSent {
+                            byte_size: written,
+                            file: String::from_utf8_lossy(&path),
+                            include_file_metric_tag: self.include_file_metric_tag,
+                        });
+                    }
                 }
-            }
         }
-
-        emit!(FileBytesSent {
-            byte_size: total_bytes,
-            file: String::from_utf8_lossy(&path),
-            include_file_metric_tag: self.include_file_metric_tag,
-        });
     }
 
     async fn should_truncate(&mut self, bytes_path: &BytesPath, path: &bytes::Bytes) -> bool {
