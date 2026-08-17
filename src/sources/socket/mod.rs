@@ -143,6 +143,7 @@ impl SourceConfig for SocketConfig {
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     config.max_connection_duration_secs(),
+                    config.tls_handshake_timeout_secs(),
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -923,6 +924,61 @@ mod test {
                  match read_result {
                     // read resulting with 0 bytes -> the connection was closed
                     Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
+                    Ok(_) => panic!("unexpectedly read data from stream"),
+                    Err(e) => panic!("{e:}")
+                 }
+             }
+        }
+    }
+
+    #[tokio::test]
+    async fn tcp_tls_handshake_timeout() {
+        let (tx, _) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_tls(Some(TlsSourceConfig {
+            tls_config: TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    verify_certificate: Some(true),
+                    crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
+                    ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                    ..Default::default()
+                },
+            },
+            client_metadata_key: None,
+        }));
+        config.set_tls_handshake_timeout_secs(Some(1));
+
+        let source_task = SocketConfig::from(config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        drop(tokio::spawn(source_task));
+        wait_for_tcp_and_release(guard, addr).await;
+
+        // Open a plain TCP connection but deliberately never send a TLS
+        // ClientHello, so the server's handshake never completes on its own.
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let timeout = tokio::time::sleep(Duration::from_millis(2000));
+        let mut buffer = [0u8; 10];
+
+        tokio::select! {
+             _ = timeout => {
+                 panic!("timed out waiting for stream to close")
+             },
+             read_result = stream.read(&mut buffer) => {
+                 match read_result {
+                    // read resulting with 0 bytes -> the connection was closed
+                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.5),
                     Ok(_) => panic!("unexpectedly read data from stream"),
                     Err(e) => panic!("{e:}")
                  }

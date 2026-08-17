@@ -139,6 +139,14 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<u64>,
+
     ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"
     /// - All whitespace is replaced with "_"
@@ -163,6 +171,7 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
             connection_limit: None,
+            tls_handshake_timeout_secs: None,
             sanitize: default_sanitize(),
             convert_to: default_convert_to(),
         }
@@ -223,6 +232,7 @@ impl SourceConfig for StatsdConfig {
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     None,
+                    config.tls_handshake_timeout_secs,
                     cx,
                     false.into(),
                     config.connection_limit,

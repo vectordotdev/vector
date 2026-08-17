@@ -184,6 +184,14 @@ pub struct FluentTcpConfig {
     #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<u64>,
+
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
@@ -216,6 +224,7 @@ impl FluentTcpConfig {
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
+            self.tls_handshake_timeout_secs,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -277,6 +286,7 @@ impl GenerateConfig for FluentConfig {
                 permit_origin: None,
                 tls: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: Default::default(),
                 connection_limit: Some(2),
             }),
@@ -1167,6 +1177,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: true.into(),
                 connection_limit: None,
             }),
@@ -1240,6 +1251,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
             }),
@@ -1298,6 +1310,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
             }),
@@ -1527,6 +1540,7 @@ mod integration_tests {
                     keepalive: None,
                     permit_origin: None,
                     receive_buffer_bytes: None,
+                    tls_handshake_timeout_secs: None,
                     acknowledgements: false.into(),
                     connection_limit: None,
                 }),
