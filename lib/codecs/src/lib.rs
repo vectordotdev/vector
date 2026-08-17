@@ -17,11 +17,12 @@ pub use decoder_framed_read::DecoderFramedRead;
 pub use decoding::{
     BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, DecodingConfig,
-    GelfDeserializer, GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
-    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NativeDeserializer,
-    NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,
-    NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, OctetCountingDecoder,
-    OctetCountingDecoderConfig, OversizedAction, StreamDecodingError, VarintLengthDelimitedDecoder,
+    DecompressionAlgorithm, DecompressionConfig, Decompressor, GelfDeserializer,
+    GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, LengthDelimitedDecoder,
+    LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
+    NativeJsonDeserializer, NativeJsonDeserializerConfig, NewlineDelimitedDecoder,
+    NewlineDelimitedDecoderConfig, OctetCountingDecoder, OctetCountingDecoderConfig,
+    OversizedAction, StreamDecodingError, VarintLengthDelimitedDecoder,
     VarintLengthDelimitedDecoderConfig,
 };
 #[cfg(feature = "syslog")]
