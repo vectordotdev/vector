@@ -52,9 +52,31 @@ const SUBNET_ID_KEY: &str = "subnet-id";
 const VPC_ID_KEY: &str = "vpc-id";
 const ROLE_NAME_KEY: &str = "role-name";
 const TAGS_KEY: &str = "tags";
+const PARTITION_KEY: &str = "partition";
+const DOMAIN_KEY: &str = "domain";
+const AVAILABILITY_ZONE_ID_KEY: &str = "availability-zone-id";
+const PLACEMENT_GROUP_NAME_KEY: &str = "placement-group-name";
+const PLACEMENT_PARTITION_NUMBER_KEY: &str = "placement-partition-number";
+const HOST_ID_KEY: &str = "host-id";
+const AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY: &str = "autoscaling-target-lifecycle-state";
 
 static AVAILABILITY_ZONE: LazyLock<PathAndQuery> =
     LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
+static AVAILABILITY_ZONE_ID: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone-id"));
+static PARTITION: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/services/partition"));
+static DOMAIN: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/services/domain"));
+static PLACEMENT_GROUP_NAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/group-name"));
+static PLACEMENT_PARTITION_NUMBER: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/partition-number"));
+static HOST_ID: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/host-id"));
+static AUTOSCALING_TARGET_LIFECYCLE_STATE: LazyLock<PathAndQuery> = LazyLock::new(|| {
+    PathAndQuery::from_static("/latest/meta-data/autoscaling/target-lifecycle-state")
+});
 static LOCAL_HOSTNAME: LazyLock<PathAndQuery> =
     LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
 static LOCAL_IPV4: LazyLock<PathAndQuery> =
@@ -186,6 +208,7 @@ struct Keys {
     account_id_key: MetadataKey,
     ami_id_key: MetadataKey,
     availability_zone_key: MetadataKey,
+    availability_zone_id_key: MetadataKey,
     instance_id_key: MetadataKey,
     instance_type_key: MetadataKey,
     local_hostname_key: MetadataKey,
@@ -193,6 +216,12 @@ struct Keys {
     public_hostname_key: MetadataKey,
     public_ipv4_key: MetadataKey,
     region_key: MetadataKey,
+    partition_key: MetadataKey,
+    domain_key: MetadataKey,
+    placement_group_name_key: MetadataKey,
+    placement_partition_number_key: MetadataKey,
+    host_id_key: MetadataKey,
+    autoscaling_target_lifecycle_state_key: MetadataKey,
     subnet_id_key: MetadataKey,
     vpc_id_key: MetadataKey,
     role_name_key: MetadataKey,
@@ -269,6 +298,7 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.account_id_key.log_path,
             &added_keys.ami_id_key.log_path,
             &added_keys.availability_zone_key.log_path,
+            &added_keys.availability_zone_id_key.log_path,
             &added_keys.instance_id_key.log_path,
             &added_keys.instance_type_key.log_path,
             &added_keys.local_hostname_key.log_path,
@@ -276,6 +306,12 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.public_hostname_key.log_path,
             &added_keys.public_ipv4_key.log_path,
             &added_keys.region_key.log_path,
+            &added_keys.partition_key.log_path,
+            &added_keys.domain_key.log_path,
+            &added_keys.placement_group_name_key.log_path,
+            &added_keys.placement_partition_number_key.log_path,
+            &added_keys.host_id_key.log_path,
+            &added_keys.autoscaling_target_lifecycle_state_key.log_path,
             &added_keys.subnet_id_key.log_path,
             &added_keys.vpc_id_key.log_path,
             &added_keys.role_name_key.log_path,
@@ -493,6 +529,63 @@ impl MetadataClient {
                 new_state.push((self.keys.availability_zone_key.clone(), availability_zone));
             }
 
+            if self.fields.contains(AVAILABILITY_ZONE_ID_KEY)
+                && let Some(availability_zone_id) = self.get_metadata(&AVAILABILITY_ZONE_ID).await?
+            {
+                new_state.push((
+                    self.keys.availability_zone_id_key.clone(),
+                    availability_zone_id,
+                ));
+            }
+
+            if self.fields.contains(PARTITION_KEY)
+                && let Some(partition) = self.get_metadata(&PARTITION).await?
+            {
+                new_state.push((self.keys.partition_key.clone(), partition));
+            }
+
+            if self.fields.contains(DOMAIN_KEY)
+                && let Some(domain) = self.get_metadata(&DOMAIN).await?
+            {
+                new_state.push((self.keys.domain_key.clone(), domain));
+            }
+
+            if self.fields.contains(PLACEMENT_GROUP_NAME_KEY)
+                && let Some(placement_group_name) = self.get_metadata(&PLACEMENT_GROUP_NAME).await?
+            {
+                new_state.push((
+                    self.keys.placement_group_name_key.clone(),
+                    placement_group_name,
+                ));
+            }
+
+            if self.fields.contains(PLACEMENT_PARTITION_NUMBER_KEY)
+                && let Some(placement_partition_number) =
+                    self.get_metadata(&PLACEMENT_PARTITION_NUMBER).await?
+            {
+                new_state.push((
+                    self.keys.placement_partition_number_key.clone(),
+                    placement_partition_number,
+                ));
+            }
+
+            if self.fields.contains(HOST_ID_KEY)
+                && let Some(host_id) = self.get_metadata(&HOST_ID).await?
+            {
+                new_state.push((self.keys.host_id_key.clone(), host_id));
+            }
+
+            if self.fields.contains(AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY)
+                && let Some(autoscaling_target_lifecycle_state) = self
+                    .get_metadata(&AUTOSCALING_TARGET_LIFECYCLE_STATE)
+                    .await?
+            {
+                new_state.push((
+                    self.keys.autoscaling_target_lifecycle_state_key.clone(),
+                    autoscaling_target_lifecycle_state,
+                ));
+            }
+
             if self.fields.contains(LOCAL_HOSTNAME_KEY)
                 && let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await?
             {
@@ -675,6 +768,7 @@ impl Keys {
             account_id_key: create_key(&namespace, ACCOUNT_ID_KEY),
             ami_id_key: create_key(&namespace, AMI_ID_KEY),
             availability_zone_key: create_key(&namespace, AVAILABILITY_ZONE_KEY),
+            availability_zone_id_key: create_key(&namespace, AVAILABILITY_ZONE_ID_KEY),
             instance_id_key: create_key(&namespace, INSTANCE_ID_KEY),
             instance_type_key: create_key(&namespace, INSTANCE_TYPE_KEY),
             local_hostname_key: create_key(&namespace, LOCAL_HOSTNAME_KEY),
@@ -682,6 +776,15 @@ impl Keys {
             public_hostname_key: create_key(&namespace, PUBLIC_HOSTNAME_KEY),
             public_ipv4_key: create_key(&namespace, PUBLIC_IPV4_KEY),
             region_key: create_key(&namespace, REGION_KEY),
+            partition_key: create_key(&namespace, PARTITION_KEY),
+            domain_key: create_key(&namespace, DOMAIN_KEY),
+            placement_group_name_key: create_key(&namespace, PLACEMENT_GROUP_NAME_KEY),
+            placement_partition_number_key: create_key(&namespace, PLACEMENT_PARTITION_NUMBER_KEY),
+            host_id_key: create_key(&namespace, HOST_ID_KEY),
+            autoscaling_target_lifecycle_state_key: create_key(
+                &namespace,
+                AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY,
+            ),
             subnet_id_key: create_key(&namespace, SUBNET_ID_KEY),
             vpc_id_key: create_key(&namespace, VPC_ID_KEY),
             role_name_key: create_key(&namespace, ROLE_NAME_KEY),
