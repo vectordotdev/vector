@@ -14,6 +14,7 @@ use crate::{
         HTTPRequestBuilderSnafu, gcp,
         prelude::*,
         util::{
+            HttpEndpoint,
             http::{
                 HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
                 http_response_retry_logic,
@@ -35,10 +36,12 @@ impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults
     "gcp_stackdriver_metrics",
     "Deliver metrics to GCP's Cloud Monitoring system."
 ))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 pub struct StackdriverConfig {
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The project ID to which to publish metrics.
     ///
@@ -88,8 +91,9 @@ fn default_metric_namespace_value() -> String {
     "namespace".to_string()
 }
 
-fn default_endpoint() -> String {
-    "https://monitoring.googleapis.com".to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://monitoring.googleapis.com")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 impl_generate_config_from_default!(StackdriverConfig);
@@ -117,11 +121,10 @@ impl SinkConfig for StackdriverConfig {
 
         let request_limits = self.request.into_settings();
 
-        let uri: Uri = format!(
-            "{}/v3/projects/{}/timeSeries",
-            self.endpoint, self.project_id
-        )
-        .parse()?;
+        let uri = self
+            .endpoint
+            .append_path(&format!("/v3/projects/{}/timeSeries", self.project_id))?
+            .into_uri();
 
         auth.spawn_regenerate_token();
 

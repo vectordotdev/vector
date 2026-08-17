@@ -17,7 +17,7 @@ use crate::{
             build_healthcheck, build_http_batch_service, create_client,
             service::{HecService, HttpRequestBuilder},
         },
-        util::http::HttpRetryLogic,
+        util::{HttpEndpoint, http::HttpRetryLogic},
     },
     template::ConfinementConfig,
 };
@@ -48,7 +48,7 @@ pub struct HecLogsSinkConfig {
         docs::examples = "http://example.com"
     ))]
     #[configurable(validation(format = "uri"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
@@ -160,7 +160,7 @@ impl GenerateConfig for HecLogsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
-            endpoint: "endpoint".to_owned(),
+            endpoint: HttpEndpoint::parse("http://example.com").unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: None,
@@ -214,7 +214,7 @@ impl HecLogsSinkConfig {
 
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.default_token.inner().to_owned(),
             client.clone(),
         )
@@ -275,7 +275,7 @@ impl HecLogsSinkConfig {
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.endpoint_target,
             self.default_token.inner().to_owned(),
             self.compression,
@@ -365,7 +365,7 @@ mod tests {
 
     impl ValidatableComponent for HecLogsSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
-            let endpoint = "http://127.0.0.1:9001".to_string();
+            let endpoint = HttpEndpoint::parse("http://127.0.0.1:9001").unwrap();
 
             let mut batch = BatchConfig::default();
             batch.max_events = Some(1);
@@ -405,14 +405,14 @@ mod tests {
                 confinement: ConfinementConfig::default(),
             };
 
-            let endpoint = format!("{endpoint}/services/collector/raw");
+            let endpoint = endpoint
+                .append_path("services/collector/raw")
+                .unwrap()
+                .into_uri();
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(
-                    http::Uri::try_from(&endpoint).expect("should not fail to parse URI"),
-                    None,
-                ),
+                HttpResourceConfig::from_parts(endpoint, None),
                 config.encoding.clone(),
             );
 
