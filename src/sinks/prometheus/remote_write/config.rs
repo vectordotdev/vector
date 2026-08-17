@@ -221,7 +221,6 @@ impl SinkConfig for RemoteWriteConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedRemoteWrite {
     tenant_id: Option<ConfinedTemplate>,
-    endpoint: HttpEndpoint,
     validated_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
     batch_settings: BatcherSettings,
 }
@@ -239,7 +238,6 @@ impl ValidatedSink for RemoteWriteConfig {
             })
             .transpose()?;
 
-        let endpoint = self.endpoint.clone();
         let validated_headers = Arc::new(validate_headers(
             &self.request.headers,
             self.auth.is_some(),
@@ -255,7 +253,6 @@ impl ValidatedSink for RemoteWriteConfig {
 
         Ok(ValidatedRemoteWrite {
             tenant_id,
-            endpoint,
             validated_headers,
             batch_settings,
         })
@@ -268,7 +265,6 @@ impl ValidatedSink for RemoteWriteConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedRemoteWrite {
             tenant_id,
-            endpoint,
             validated_headers,
             batch_settings,
         } = validated;
@@ -313,7 +309,7 @@ impl ValidatedSink for RemoteWriteConfig {
 
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
-            None => endpoint.as_uri().clone(),
+            None => self.endpoint.as_uri().clone(),
         };
 
         let healthcheck = healthcheck(
@@ -326,7 +322,7 @@ impl ValidatedSink for RemoteWriteConfig {
         .boxed();
 
         let service = RemoteWriteService {
-            endpoint: endpoint.clone(),
+            endpoint: self.endpoint.clone(),
             client,
             auth,
             compression: self.compression,
@@ -439,7 +435,7 @@ mod tests {
 
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(
-            validated.endpoint.to_string(),
+            config.endpoint.to_string(),
             "http://localhost:8087/api/v1/write"
         );
         assert!(validated.tenant_id.is_some());

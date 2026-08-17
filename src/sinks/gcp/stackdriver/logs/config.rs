@@ -328,12 +328,9 @@ impl ValidatedSink for StackdriverConfig {
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batcher_settings()?;
 
-        let uri = self.endpoint.clone();
-
         Ok(ValidatedStackdriverLogs {
             encoder,
             batch_settings,
-            uri,
         })
     }
 
@@ -345,7 +342,6 @@ impl ValidatedSink for StackdriverConfig {
         let ValidatedStackdriverLogs {
             encoder,
             batch_settings,
-            uri,
         } = validated;
 
         let auth = self.auth.build(Scope::LoggingWrite).await?;
@@ -361,7 +357,7 @@ impl ValidatedSink for StackdriverConfig {
 
 
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
-            uri: uri.as_uri().clone(),
+            uri: self.endpoint.as_uri().clone(),
             auth: auth.clone(),
         };
 
@@ -376,7 +372,7 @@ impl ValidatedSink for StackdriverConfig {
 
         let sink = StackdriverLogsSink::new(service, *batch_settings, request_builder);
 
-        let healthcheck = healthcheck(client, auth.clone(), uri.as_uri().clone()).boxed();
+        let healthcheck = healthcheck(client, auth.clone(), self.endpoint.as_uri().clone()).boxed();
 
         auth.spawn_regenerate_token();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -387,7 +383,6 @@ impl ValidatedSink for StackdriverConfig {
 pub struct ValidatedStackdriverLogs {
     encoder: StackdriverLogsEncoder,
     batch_settings: BatcherSettings,
-    uri: HttpEndpoint,
 }
 
 async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> crate::Result<()> {
@@ -450,9 +445,9 @@ mod tests {
             endpoint: default_endpoint(),
             ..Default::default()
         };
-        let validated = config.validate().expect("validation should succeed");
+        config.validate().expect("validation should succeed");
         assert_eq!(
-            validated.uri.to_string(),
+            config.endpoint.to_string(),
             "https://logging.googleapis.com/v2/entries:write"
         );
     }
