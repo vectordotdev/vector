@@ -134,7 +134,6 @@ impl SinkConfig for StatsdSinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedStatsd {
     batcher_settings: BatcherSettings,
-    socket_mode: SocketMode,
 }
 
 #[async_trait]
@@ -143,12 +142,8 @@ impl ValidatedSink for StatsdSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedStatsd> {
         let batcher_settings = self.batch.into_batcher_settings()?;
-        let socket_mode = self.mode.as_socket_mode();
 
-        Ok(ValidatedStatsd {
-            batcher_settings,
-            socket_mode,
-        })
+        Ok(ValidatedStatsd { batcher_settings })
     }
 
     async fn build(
@@ -156,11 +151,7 @@ impl ValidatedSink for StatsdSinkConfig {
         validated: &ValidatedStatsd,
         _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ValidatedStatsd {
-            batcher_settings,
-            socket_mode,
-        } = validated.clone();
-
+        let socket_mode = self.mode.as_socket_mode();
         let request_builder =
             StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode);
         let protocol = Protocol::from(socket_mode.as_str());
@@ -171,7 +162,7 @@ impl ValidatedSink for StatsdSinkConfig {
 
         let sink = StatsdSink::new(
             StatsdService::from_transport(service),
-            batcher_settings,
+            validated.batcher_settings,
             request_builder,
             protocol,
         );
@@ -201,7 +192,7 @@ mod test {
             acknowledgements: Default::default(),
         };
 
-        let validated = config.validate().expect("validation should succeed");
-        assert!(matches!(validated.socket_mode, SocketMode::Udp));
+        config.validate().expect("validation should succeed");
+        assert!(matches!(config.mode.as_socket_mode(), SocketMode::Udp));
     }
 }
