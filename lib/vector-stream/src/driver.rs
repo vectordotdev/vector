@@ -25,6 +25,13 @@ pub trait DriverResponse {
     fn bytes_sent(&self) -> Option<usize> {
         None
     }
+
+    /// Return the number of events that were rejected/failed in this response.
+    /// This allows reporting partial failures where some events succeeded and some failed.
+    /// Default implementation returns None, meaning the response doesn't support partial failures.
+    fn events_rejected(&self) -> Option<usize> {
+        None
+    }
 }
 
 /// Drives the interaction between a stream of items and a service which processes them
@@ -220,6 +227,13 @@ where
                     }
 
                     response.events_sent().emit_event(events_sent);
+
+                    // Check if there are also rejected events (partial failure after retries exhausted)
+                    if let Some(rejected_count) = response.events_rejected()
+                        && rejected_count > 0
+                    {
+                        Self::emit_call_error(None, request_id, rejected_count);
+                    }
 
                 // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
                 } else if response.event_status() == EventStatus::Rejected {
