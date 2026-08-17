@@ -39,6 +39,18 @@ const SHARED_KEY: &str = "SharedKey";
 /// API version
 const API_VERSION: &str = "2016-04-01";
 
+/// Validates that a `log_type` contains only letters, numbers, and underscores,
+/// and does not exceed 100 characters.
+pub(super) fn validate_log_type(log_type: &str) -> crate::Result<()> {
+    if log_type.len() > 100 || !LOG_TYPE_REGEX.is_match(log_type) {
+        return Err(format!(
+            "invalid log_type \"{log_type}\": log type can only contain letters, numbers, and underscore (_), and may not exceed 100 characters"
+        )
+        .into());
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct AzureMonitorLogsRequest {
     pub body: Bytes,
@@ -117,11 +129,7 @@ impl AzureMonitorLogsService {
         let default_headers = {
             let mut headers = HeaderMap::new();
 
-            if log_type.len() > 100 || !LOG_TYPE_REGEX.is_match(log_type) {
-                return Err(format!(
-                "invalid log_type \"{log_type}\": log type can only contain letters, numbers, and underscore (_), and may not exceed 100 characters"
-            ).into());
-            }
+            validate_log_type(log_type)?;
             let log_type = HeaderValue::from_str(log_type)?;
             headers.insert(LOG_TYPE_HEADER.clone(), log_type);
 

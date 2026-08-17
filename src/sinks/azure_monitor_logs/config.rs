@@ -233,6 +233,8 @@ impl ValidatedSink for AzureMonitorLogsConfig {
     type Validated = ValidatedAzureMonitorLogs;
 
     fn validate(&self) -> crate::Result<ValidatedAzureMonitorLogs> {
+        super::service::validate_log_type(&self.log_type)?;
+
         let endpoint = HttpEndpoint::parse(&format!("https://{}.{}", self.customer_id, self.host))?;
 
         let batch_settings = self
@@ -285,5 +287,55 @@ mod tests {
         // global `log_schema.timestamp_key` fallback (which isn't initialized
         // yet at validation time in the startup path); it is resolved in `build`.
         assert_eq!(validated.time_generated_key, None);
+    }
+
+    #[test]
+    fn validate_rejects_log_type_with_disallowed_characters() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "My Log Type".to_string(),
+            ..Default::default()
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("log type can only contain letters, numbers, and underscore (_)")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_log_type_exceeding_100_chars() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "a".repeat(101),
+            ..Default::default()
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("log type can only contain letters, numbers, and underscore (_)")
+        );
+    }
+
+    #[test]
+    fn validate_accepts_valid_log_type() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "My_Log_Type_123".to_string(),
+            ..Default::default()
+        };
+
+        config.validate().expect("validation should succeed");
     }
 }
