@@ -155,14 +155,12 @@ impl ValidatedSink for StackdriverConfig {
 
         let request_limits = self.request.into_settings();
 
-
         auth.spawn_regenerate_token();
 
-        let stackdriver_metrics_service_request_builder =
-            StackdriverMetricsServiceRequestBuilder {
-                uri: uri.into_uri(),
-                auth,
-            };
+        let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
+            uri: uri.into_uri(),
+            auth,
+        };
 
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 

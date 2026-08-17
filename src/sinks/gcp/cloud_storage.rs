@@ -266,7 +266,6 @@ impl GenerateConfig for GcsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -592,8 +591,7 @@ mod tests {
             HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
-            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string())
-                .expect("valid mock endpoint"),
+            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
             ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");

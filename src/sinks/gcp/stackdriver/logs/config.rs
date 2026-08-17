@@ -355,7 +355,6 @@ impl ValidatedSink for StackdriverConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
             uri: self.endpoint.as_uri().clone(),
             auth: auth.clone(),

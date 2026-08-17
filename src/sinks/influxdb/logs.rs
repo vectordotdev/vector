@@ -28,7 +28,8 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, BatchSettings, Buffer, Compression, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, HttpEndpoint, SinkBatchSettings,
+            TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },

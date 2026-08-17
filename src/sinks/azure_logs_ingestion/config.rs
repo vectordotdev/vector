@@ -191,7 +191,6 @@ pub struct ValidatedAzureLogsIngestion {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
-
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());

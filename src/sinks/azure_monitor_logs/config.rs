@@ -216,7 +216,6 @@ pub struct ValidatedAzureMonitorLogs {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
-
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());

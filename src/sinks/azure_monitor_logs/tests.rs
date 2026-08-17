@@ -54,7 +54,11 @@ async fn component_spec_compliance() {
     let context = SinkContext::default();
     let validated = config.validate().unwrap();
     let (sink, _healthcheck) = config
-        .build_inner(context, &validated, HttpEndpoint::new(mock_endpoint).unwrap())
+        .build_inner(
+            context,
+            &validated,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
+        )
         .await
         .unwrap();
 
@@ -208,7 +212,11 @@ async fn correct_request() {
     let context = SinkContext::default();
     let validated = config.validate().unwrap();
     let (sink, _healthcheck) = config
-        .build_inner(context, &validated, HttpEndpoint::new(mock_endpoint).unwrap())
+        .build_inner(
+            context,
+            &validated,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
+        )
         .await
         .unwrap();
 

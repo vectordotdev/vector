@@ -29,7 +29,8 @@ use crate::{
             influxdb_settings,
         },
         util::{
-            BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
+            TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},

@@ -48,8 +48,7 @@ fn validate_accepts_valid_config() {
 fn validate_rejects_non_http_endpoint() {
     // The `HttpEndpoint` config field rejects a non-http(s) endpoint at load
     // time, so deserialization fails.
-    let result: Result<AzureLogsIngestionConfig, _> =
-        serde_yaml::from_str(indoc::indoc! {r#"
+    let result: Result<AzureLogsIngestionConfig, _> = serde_yaml::from_str(indoc::indoc! {r#"
             endpoint: "ftp://example.com"
             dcr_immutable_id: dcr-00000000000000000000000000000000
             stream_name: Custom-UnitTest
@@ -59,7 +58,10 @@ fn validate_rejects_non_http_endpoint() {
               azure_client_id: mock-client-id
               azure_client_secret: mock-client-secret
         "#});
-    assert!(result.is_err(), "config load should reject a non-http endpoint");
+    assert!(
+        result.is_err(),
+        "config load should reject a non-http endpoint"
+    );
 }
 
 #[tokio::test]

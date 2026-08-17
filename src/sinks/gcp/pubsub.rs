@@ -22,8 +22,7 @@ use crate::{
         gcs_common::config::healthcheck_response,
         util::{
             BatchConfig, BatchSettings, BoxedRawValue, HttpEndpoint, JsonArrayBuffer,
-            SinkBatchSettings,
-            TowerRequestConfig,
+            SinkBatchSettings, TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },
@@ -215,7 +214,6 @@ struct PubsubSink {
 }
 
 impl PubsubSink {
-
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
         // The suffix is a Google API method (for example `:publish`) that
         // attaches directly to the topic path without a separator.

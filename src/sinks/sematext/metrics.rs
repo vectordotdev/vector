@@ -27,7 +27,8 @@ use crate::{
         Healthcheck, HealthcheckError, VectorSink,
         influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
-            BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
+            TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
         },
@@ -129,7 +130,6 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
-
     fn input(&self) -> Input {
         Input::metric()
     }
