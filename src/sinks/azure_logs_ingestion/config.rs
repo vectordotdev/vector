@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
 
+use http::uri::PathAndQuery;
+
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
@@ -19,7 +21,7 @@ use crate::{
 };
 
 use super::{
-    service::{AzureLogsIngestionResponse, AzureLogsIngestionService},
+    service::{request_path, AzureLogsIngestionResponse, AzureLogsIngestionService},
     sink::AzureLogsIngestionSink,
 };
 
@@ -138,8 +140,6 @@ impl AzureLogsIngestionConfig {
         cx: SinkContext,
         validated: &ValidatedAzureLogsIngestion,
         endpoint: HttpEndpoint,
-        dcr_immutable_id: String,
-        stream_name: String,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
         timestamp_field: String,
@@ -153,8 +153,7 @@ impl AzureLogsIngestionConfig {
         let service = AzureLogsIngestionService::new(
             client,
             endpoint,
-            dcr_immutable_id,
-            stream_name,
+            validated.path_and_query.clone(),
             credential,
             token_scope,
         )?;
@@ -186,6 +185,7 @@ impl_generate_config_from_default!(AzureLogsIngestionConfig);
 #[derive(Clone, Debug)]
 pub struct ValidatedAzureLogsIngestion {
     batch_settings: BatcherSettings,
+    path_and_query: PathAndQuery,
 }
 
 #[async_trait::async_trait]
@@ -214,7 +214,12 @@ impl ValidatedSink for AzureLogsIngestionConfig {
             .limit_max_bytes(MAX_BATCH_SIZE)?
             .into_batcher_settings()?;
 
-        Ok(ValidatedAzureLogsIngestion { batch_settings })
+        let path_and_query = request_path(&self.dcr_immutable_id, &self.stream_name)?;
+
+        Ok(ValidatedAzureLogsIngestion {
+            batch_settings,
+            path_and_query,
+        })
     }
 
     async fn build(
@@ -228,8 +233,6 @@ impl ValidatedSink for AzureLogsIngestionConfig {
             cx,
             validated,
             self.endpoint.clone(),
-            self.dcr_immutable_id.clone(),
-            self.stream_name.clone(),
             credential,
             self.token_scope.clone(),
             self.timestamp_field.clone(),

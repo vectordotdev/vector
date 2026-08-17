@@ -45,6 +45,43 @@ fn validate_accepts_valid_config() {
 }
 
 #[test]
+fn validate_rejects_invalid_path_segments() {
+    // A space in either path segment makes the request path unparseable, so
+    // validation must fail rather than panicking at build time.
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: "dcr-00000000000000000000000000000000 with space"
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+    .unwrap();
+
+    config
+        .validate()
+        .expect_err("validation should reject a dcr_immutable_id containing a space");
+
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: "Custom-Unit Test"
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+    .unwrap();
+
+    config
+        .validate()
+        .expect_err("validation should reject a stream_name containing a space");
+}
+
+#[test]
 fn validate_rejects_non_http_endpoint() {
     // The `HttpEndpoint` config field rejects a non-http(s) endpoint at load
     // time, so deserialization fails.
@@ -217,8 +254,6 @@ async fn correct_request() {
             context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
-            config.dcr_immutable_id.clone(),
-            config.stream_name.clone(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
@@ -331,8 +366,6 @@ async fn mock_healthcheck_with_400_response() {
             context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
-            config.dcr_immutable_id.clone(),
-            config.stream_name.clone(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
@@ -400,8 +433,6 @@ async fn mock_healthcheck_with_403_response() {
             context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
-            config.dcr_immutable_id.clone(),
-            config.stream_name.clone(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
