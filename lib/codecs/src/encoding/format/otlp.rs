@@ -218,7 +218,37 @@ mod tests {
                         },
                     ],
                     count: 6,
-                    sum: 10.0,
+                    sum: Some(10.0),
+                },
+            )
+            .with_timestamp(Some(Utc.timestamp_nanos(1_000_000_000))),
+        );
+
+        assert_eq!(metric.clone(), round_trip_metric(metric));
+    }
+
+    /// OTLP's `sum` is optional, so a histogram reporting none encodes with the field unset and
+    /// decodes back to the same thing. Substituting a zero on the way out would manufacture a
+    /// measurement that the producer never made.
+    #[test]
+    fn round_trip_aggregated_histogram_without_sum() {
+        let metric = with_empty_tags(
+            Metric::new(
+                "latency",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![
+                        Bucket {
+                            upper_limit: 1.0,
+                            count: 1,
+                        },
+                        Bucket {
+                            upper_limit: f64::INFINITY,
+                            count: 2,
+                        },
+                    ],
+                    count: 3,
+                    sum: None,
                 },
             )
             .with_timestamp(Some(Utc.timestamp_nanos(1_000_000_000))),

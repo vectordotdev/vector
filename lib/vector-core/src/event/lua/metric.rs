@@ -585,7 +585,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.aggregated_histogram) == 'table'",
                 "metric.aggregated_histogram.count == 30",
