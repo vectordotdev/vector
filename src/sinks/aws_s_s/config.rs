@@ -14,9 +14,9 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 pub(super) enum BuildError {
-    #[snafu(display("`message_group_id` should be defined for FIFO queue."))]
+    #[snafu(display("`message_group_id` should be defined for FIFO queue or topic."))]
     MessageGroupIdMissing,
-    #[snafu(display("`message_group_id` is not allowed with non-FIFO queue."))]
+    #[snafu(display("`message_group_id` is not allowed with non-FIFO queue or topic."))]
     MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateParseError },
@@ -32,17 +32,19 @@ pub(super) struct BaseSSSinkConfig {
 
     /// The tag that specifies that a message belongs to a specific message group.
     ///
-    /// Can be applied only to FIFO queues.
+    /// Can be applied only to FIFO queues or FIFO topics.
     #[configurable(metadata(docs::examples = "vector"))]
     #[configurable(metadata(docs::examples = "vector-%Y-%m-%d"))]
     pub(super) message_group_id: Option<String>,
 
     /// The message deduplication ID value to allow AWS to identify duplicate messages.
     ///
-    /// This value is a template which should result in a unique string for each event. See the [AWS
-    /// documentation][deduplication_id_docs] for more about how AWS does message deduplication.
+    /// This value is a template which should result in a unique string for each event. See the [SQS
+    /// documentation][sqs_deduplication_id_docs] or [SNS documentation][sns_deduplication_id_docs]
+    /// for more about how AWS does message deduplication.
     ///
-    /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
+    /// [sqs_deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
+    /// [sns_deduplication_id_docs]: https://docs.aws.amazon.com/sns/latest/dg/fifo-message-dedup.html
     #[configurable(metadata(docs::examples = "{{ transaction_id }}"))]
     pub(super) message_deduplication_id: Option<String>,
 
