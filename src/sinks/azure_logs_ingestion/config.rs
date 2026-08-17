@@ -185,7 +185,6 @@ impl_generate_config_from_default!(AzureLogsIngestionConfig);
 
 #[derive(Clone, Debug)]
 pub struct ValidatedAzureLogsIngestion {
-    endpoint: HttpEndpoint,
     batch_settings: BatcherSettings,
 }
 
@@ -210,18 +209,13 @@ impl ValidatedSink for AzureLogsIngestionConfig {
     type Validated = ValidatedAzureLogsIngestion;
 
     fn validate(&self) -> crate::Result<ValidatedAzureLogsIngestion> {
-        let endpoint = self.endpoint.clone();
-
         let batch_settings = self
             .batch
             .validate()?
             .limit_max_bytes(MAX_BATCH_SIZE)?
             .into_batcher_settings()?;
 
-        Ok(ValidatedAzureLogsIngestion {
-            endpoint,
-            batch_settings,
-        })
+        Ok(ValidatedAzureLogsIngestion { batch_settings })
     }
 
     async fn build(
@@ -234,7 +228,7 @@ impl ValidatedSink for AzureLogsIngestionConfig {
         self.build_inner(
             cx,
             validated,
-            validated.endpoint.clone(),
+            self.endpoint.clone(),
             self.dcr_immutable_id.clone(),
             self.stream_name.clone(),
             credential,
