@@ -14,6 +14,8 @@ mod aws_secrets_manager;
 mod directory;
 mod exec;
 mod file;
+#[cfg(feature = "secrets-gcp-secret-manager")]
+mod gcp_secret_manager;
 mod test;
 
 ///	Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
@@ -70,6 +72,10 @@ pub enum SecretBackends {
     #[cfg(feature = "secrets-aws-secrets-manager")]
     AwsSecretsManager(aws_secrets_manager::AwsSecretsManagerBackend),
 
+    /// GCP Secret Manager.
+    #[cfg(feature = "secrets-gcp-secret-manager")]
+    GcpSecretManager(gcp_secret_manager::GcpSecretManagerBackend),
+
     /// Test.
     #[configurable(metadata(docs::hidden))]
     Test(test::TestBackend),
@@ -84,6 +90,8 @@ impl vector_lib::configurable::NamedComponent for SecretBackends {
             Self::Exec(config) => config.get_component_name(),
             #[cfg(feature = "secrets-aws-secrets-manager")]
             Self::AwsSecretsManager(config) => config.get_component_name(),
+            #[cfg(feature = "secrets-gcp-secret-manager")]
+            Self::GcpSecretManager(config) => config.get_component_name(),
             Self::Test(config) => config.get_component_name(),
         }
     }
