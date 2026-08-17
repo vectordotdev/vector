@@ -418,7 +418,7 @@ where
                         error
                     });
                     if let Some((mut sink, _open_token)) = connection.take() {
-                        let _ = sink.close().await;
+                        _ = sink.close().await;
                     }
 
                     if let Some(delay) = send_failure_backoff.next() {

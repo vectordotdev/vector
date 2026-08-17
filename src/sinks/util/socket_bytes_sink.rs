@@ -114,7 +114,7 @@ struct State {
 pub(crate) struct PendingBatch(Vec<EncodedEvent<Bytes>>);
 
 impl PendingBatch {
-    pub(crate) fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self(Vec::new())
     }
 }
