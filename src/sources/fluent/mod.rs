@@ -18,7 +18,7 @@ use vector_lib::{
 use vrl::value::{Kind, Value, kind::Collection};
 
 use super::util::decompression::{CappedDecoder, max_decompressed_size_bytes};
-use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{DisconnectMode, SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -190,6 +190,10 @@ pub struct FluentTcpConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    disconnect_mode: DisconnectMode,
 }
 
 impl FluentTcpConfig {
@@ -216,6 +220,7 @@ impl FluentTcpConfig {
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
+            self.disconnect_mode,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -279,6 +284,7 @@ impl GenerateConfig for FluentConfig {
                 receive_buffer_bytes: None,
                 acknowledgements: Default::default(),
                 connection_limit: Some(2),
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: None,
         })
@@ -1169,6 +1175,7 @@ mod tests {
                 receive_buffer_bytes: None,
                 acknowledgements: true.into(),
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: None,
         }
@@ -1242,6 +1249,7 @@ mod tests {
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: Some(true),
         };
@@ -1300,6 +1308,7 @@ mod tests {
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: None,
         };
@@ -1529,6 +1538,7 @@ mod integration_tests {
                     receive_buffer_bytes: None,
                     acknowledgements: false.into(),
                     connection_limit: None,
+                    disconnect_mode: DisconnectMode::Drain,
                 }),
                 log_namespace: None,
             }
