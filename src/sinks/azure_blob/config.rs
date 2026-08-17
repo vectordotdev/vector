@@ -295,7 +295,6 @@ impl SinkConfig for AzureBlobSinkConfig {
 
 #[derive(Clone)]
 pub struct ValidatedAzureBlob {
-    connection_string: String,
     parsed_connection_string: ParsedConnectionString,
     container_url: Url,
     batcher_settings: BatcherSettings,
@@ -306,8 +305,9 @@ pub struct ValidatedAzureBlob {
 
 impl fmt::Debug for ValidatedAzureBlob {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // The connection string contains credentials (AccountKey / SAS token),
+        // so it is intentionally omitted from diagnostics.
         f.debug_struct("ValidatedAzureBlob")
-            .field("connection_string", &self.connection_string)
             .field("container_url", &self.container_url)
             .field("batcher_settings", &self.batcher_settings)
             .field("blob_time_format", &self.blob_time_format)
@@ -410,7 +410,6 @@ impl ValidatedSink for AzureBlobSinkConfig {
         let confined_blob_prefix = self.confined_blob_prefix()?;
 
         Ok(ValidatedAzureBlob {
-            connection_string,
             parsed_connection_string,
             container_url,
             batcher_settings,
@@ -596,10 +595,23 @@ mod tests {
         };
 
         let validated = config.validate().expect("validation should succeed");
-        assert_eq!(validated.connection_string, "AccountName=mylogstorage");
         assert_eq!(validated.blob_time_format, "%s");
         assert!(validated.blob_append_uuid);
         assert_eq!(validated.confined_blob_prefix.to_string(), "blob");
+    }
+
+    #[test]
+    fn validated_debug_redacts_connection_string() {
+        let config = test_config(
+            Some("AccountName=mylogstorage;AccountKey=supersecret"),
+            None,
+        );
+        let validated = config.validate().expect("validation should succeed");
+        let debug = format!("{validated:?}");
+        assert!(
+            !debug.contains("supersecret"),
+            "Debug output must not leak the connection string: {debug}"
+        );
     }
 
     #[test]
