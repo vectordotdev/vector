@@ -46,7 +46,8 @@ use crate::{
             service::GcsResponse,
         },
         util::{
-            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Compression, HttpEndpoint, RequestBuilder, SinkBatchSettings,
+            TowerRequestConfig,
             encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
@@ -185,7 +186,7 @@ pub struct ChronicleUnstructuredConfig {
         docs::examples = "http://example.com:12345"
     ))]
     #[configurable(required_one_of = "region_or_endpoint")]
-    pub endpoint: Option<String>,
+    pub endpoint: Option<HttpEndpoint>,
 
     /// The GCP region to use.
     #[configurable(derived)]
@@ -412,8 +413,8 @@ impl ChronicleUnstructuredConfig {
         Ok(format!(
             "{}/{}",
             match (&self.endpoint, self.region) {
-                (Some(endpoint), None) => endpoint.trim_end_matches('/'),
-                (None, Some(region)) => region.endpoint(),
+                (Some(endpoint), None) => endpoint.to_string().trim_end_matches('/').to_string(),
+                (None, Some(region)) => region.endpoint().to_string(),
                 (Some(_), Some(_)) => return Err(ChronicleError::BothRegionAndEndpoint),
                 (None, None) => return Err(ChronicleError::RegionOrEndpoint),
             },
@@ -769,11 +770,46 @@ mod unit_tests {
     }
 
     #[test]
-    fn validate_rejects_malformed_endpoint() {
+    fn deserialization_rejects_malformed_endpoint() {
+        // The `HttpEndpoint` config field rejects a malformed endpoint at
+        // config load time, so deserialization fails.
+        let result: Result<ChronicleUnstructuredConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "not a uri"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a malformed endpoint"
+        );
+    }
+
+    #[test]
+    fn deserialization_rejects_non_http_endpoint() {
+        // The `HttpEndpoint` config field rejects a non-http(s) endpoint at
+        // config load time, so deserialization fails.
+        let result: Result<ChronicleUnstructuredConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "ftp://example.com"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a non-http endpoint"
+        );
+    }
+
+    #[test]
+    fn relative_endpoint_becomes_absolute_https() {
         use crate::config::ValidatedSink;
 
+        // A missing scheme is defaulted to https by `HttpEndpoint`.
         let config: ChronicleUnstructuredConfig = serde_yaml::from_str(indoc! {r#"
-            endpoint: "not a uri"
+            endpoint: "chronicle.example.com:8080"
             customer_id: test-customer
             log_type: "WINDOWS_DNS"
             encoding:
@@ -781,7 +817,15 @@ mod unit_tests {
         "#})
         .unwrap();
 
-        assert!(config.validate().is_err());
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint,
+            "https://chronicle.example.com:8080/v2/unstructuredlogentries:batchCreate"
+        );
+        assert_eq!(
+            validated.healthcheck_endpoint,
+            "https://chronicle.example.com:8080/v2/logtypes"
+        );
     }
 
     #[test]

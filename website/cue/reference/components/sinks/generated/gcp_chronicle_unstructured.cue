@@ -558,6 +558,8 @@ generated: components: sinks: gcp_chronicle_unstructured: configuration: {
 	}
 	endpoint: {
 		description: """
+			An absolute http(s) URL.
+
 			The endpoint to send data to.
 
 			Exactly one of `endpoint` or `region` must be set.
