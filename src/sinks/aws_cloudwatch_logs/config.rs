@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
+use http::HeaderValue;
 use serde::{Deserialize, Deserializer, de};
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -24,7 +25,8 @@ use crate::{
             retry::CloudwatchRetryLogic, service::CloudwatchLogsPartitionSvc, sink::CloudwatchSink,
         },
         util::{
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, http::RequestConfig,
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            http::{OrderedHeaderName, RequestConfig, validate_headers},
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
@@ -231,6 +233,7 @@ pub struct ValidatedCloudwatchLogs {
     group_template: ConfinedTemplate,
     stream_template: ConfinedTemplate,
     batcher_settings: BatcherSettings,
+    headers: BTreeMap<OrderedHeaderName, HeaderValue>,
 }
 
 #[async_trait::async_trait]
@@ -247,11 +250,13 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
                 .clone()
                 .confine(&self.confinement, Self::NAME, "stream_name")?;
         let batcher_settings = self.batch.into_batcher_settings()?;
+        let headers = validate_headers(&self.request.headers)?;
 
         Ok(ValidatedCloudwatchLogs {
             group_template,
             stream_template,
             batcher_settings,
+            headers,
         })
     }
 
@@ -264,6 +269,7 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
             group_template,
             stream_template,
             batcher_settings,
+            headers,
         } = validated.clone();
         let request_settings = self.request.tower.into_settings();
         let client = self.create_client(cx.proxy()).await?;
@@ -272,7 +278,8 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
-            )?);
+                headers.clone(),
+            ));
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -351,6 +358,49 @@ mod tests {
     #[test]
     fn test_generate_config() {
         crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_invalid_header_name() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+        config
+            .request
+            .headers
+            .insert("invalid header name".to_string(), "value".to_string());
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_header_value() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+        config
+            .request
+            .headers
+            .insert("valid-header".to_string(), "value\nwith newline".to_string());
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_retains_valid_headers() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+        config
+            .request
+            .headers
+            .insert("x-custom-header".to_string(), "custom-value".to_string());
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.headers.len(), 1);
+        let (name, value) = validated.headers.iter().next().unwrap();
+        assert_eq!(name.inner(), "x-custom-header");
+        assert_eq!(value, "custom-value");
     }
 
     #[test]
