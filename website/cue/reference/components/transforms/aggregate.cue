@@ -230,8 +230,9 @@ components: transforms: aggregate: {
 						`event_time.missing_timestamp` to `use_system_time` to fall back to the current
 						system time for bucketed metrics instead. Bucketed events whose timestamp is more
 						than `event_time.max_future_ms` ahead of the system clock are dropped as a
-						clock-skew guard. All such drops surface in `component_discarded_events_total`
-						with a reason tag.
+						clock-skew guard. All such drops increment
+						`component_discarded_events_total` (the drop reason is logged, not tagged on
+						the metric).
 						"""
 				},
 				{

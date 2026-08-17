@@ -6,9 +6,9 @@ use vector_lib::event::{
     metric::{Metric, MetricData, MetricKind, MetricSeries},
 };
 
+use super::AggregationMode;
 use super::config::{EventTimeConfig, MissingTimestamp};
 use super::transform::{Aggregate, BucketKey, MetricEntry};
-use super::AggregationMode;
 use crate::{
     event::{Event, EventMetadata},
     internal_events::{
@@ -181,20 +181,17 @@ impl Aggregate {
                         Entry::Occupied(mut entry) => {
                             if entry.get().0.kind != data.kind {
                                 emit!(AggregateUpdateFailed);
-                                *entry.get_mut() = (data, metadata);
+                                let existing = entry.get_mut();
+                                existing.1.merge(metadata);
+                                existing.0 = data;
                             } else {
                                 // In event-time mode, "latest" means latest *event timestamp*
                                 // within the time bucket, not latest arrival order.
-                                let new_ts = data.timestamp().cloned();
-                                let existing_ts = entry.get().0.timestamp().cloned();
-                                let should_replace = match (new_ts, existing_ts) {
-                                    (Some(n), Some(e)) => n >= e,
-                                    (Some(_), None) => true,
-                                    _ => false,
-                                };
-                                if should_replace {
-                                    *entry.get_mut() = (data, metadata);
-                                }
+                                Self::select_latest_by_event_timestamp(
+                                    entry.get_mut(),
+                                    data,
+                                    metadata,
+                                );
                             }
                         }
                     },
@@ -212,16 +209,7 @@ impl Aggregate {
                         entry.insert((data, metadata));
                     }
                     Entry::Occupied(mut entry) => {
-                        let new_ts = data.timestamp().cloned();
-                        let existing_ts = entry.get().0.timestamp().cloned();
-                        let should_replace = match (new_ts, existing_ts) {
-                            (Some(n), Some(e)) => n >= e,
-                            (Some(_), None) => true,
-                            _ => false,
-                        };
-                        if should_replace {
-                            *entry.get_mut() = (data, metadata);
-                        }
+                        Self::select_latest_by_event_timestamp(entry.get_mut(), data, metadata);
                     }
                 }
             }
@@ -251,6 +239,26 @@ impl Aggregate {
                     }
                 }
             }
+        }
+    }
+
+    /// Selects the metric data with the latest event timestamp while merging
+    /// `EventMetadata` from every consumed sample (acknowledgements / secrets).
+    fn select_latest_by_event_timestamp(
+        existing: &mut MetricEntry,
+        data: MetricData,
+        metadata: EventMetadata,
+    ) {
+        let new_ts = data.timestamp().cloned();
+        let existing_ts = existing.0.timestamp().cloned();
+        let should_replace = match (new_ts, existing_ts) {
+            (Some(n), Some(e)) => n >= e,
+            (Some(_), None) => true,
+            _ => false,
+        };
+        existing.1.merge(metadata);
+        if should_replace {
+            existing.0 = data;
         }
     }
 
@@ -392,21 +400,24 @@ impl Aggregate {
                 // workloads).
                 if matches!(self.config.mode, AggregationMode::Diff) {
                     let prev_bucket_key = bucket_key.saturating_sub(interval_ms);
-                    for (series, entry) in &bucket_map {
-                        let mut metric =
-                            Metric::from_parts(series.clone(), entry.0.clone(), entry.1.clone());
+                    let mut prev_data = HashMap::with_capacity(bucket_map.len());
+                    for (series, (data, metadata)) in bucket_map {
+                        let mut metric = Metric::from_parts(series.clone(), data.clone(), metadata);
                         if let Some(prev_bucket) =
                             self.event_time_prev_buckets.get(&prev_bucket_key)
                             && let Some(prev_entry) = prev_bucket.get(metric.series())
-                            && metric.data().kind == prev_entry.0.kind
-                            && !metric.subtract(&prev_entry.0)
+                            && metric.data().kind == prev_entry.kind
+                            && !metric.subtract(prev_entry)
                         {
                             emit!(AggregateUpdateFailed);
                         }
                         output.push(Event::Metric(metric));
+                        // Retain data only — drop metadata/finalizers so
+                        // acknowledgements are not held after emission.
+                        prev_data.insert(series, data);
                     }
 
-                    self.event_time_prev_buckets.insert(bucket_key, bucket_map);
+                    self.event_time_prev_buckets.insert(bucket_key, prev_data);
                     // Keep only a small rolling window for diffing against the
                     // immediately preceding bucket.
                     let min_keep = bucket_key.saturating_sub(interval_ms);

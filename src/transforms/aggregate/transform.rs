@@ -88,7 +88,9 @@ pub struct Aggregate {
     map: HashMap<MetricSeries, MetricEntry>,
     mode: InnerMode,
     pub(crate) event_time_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricEntry>>,
-    pub(crate) event_time_prev_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricEntry>>,
+    /// Previous bucket *data* only (no `EventMetadata`) so Diff can subtract
+    /// without retaining acknowledgement finalizers after emission.
+    pub(crate) event_time_prev_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricData>>,
     pub(crate) event_time_multi_buckets:
         BTreeMap<BucketKey, HashMap<MetricSeries, Vec<MetricEntry>>>,
     pub(crate) watermark: Option<BucketKey>,
