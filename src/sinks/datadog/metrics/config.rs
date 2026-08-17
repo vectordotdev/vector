@@ -1,5 +1,3 @@
-use http::Uri;
-use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_lib::{
     config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings,
@@ -15,9 +13,12 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        Healthcheck, UriParseSnafu, VectorSink,
+        Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig, batch::BatchConfig},
+        util::{
+            HttpEndpoint, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            batch::BatchConfig,
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -137,13 +138,13 @@ impl DatadogMetricsCompression {
 
 /// Maps Datadog metric endpoints to their actual URI.
 pub struct DatadogMetricsEndpointConfiguration {
-    series_endpoint: Uri,
-    sketches_endpoint: Uri,
+    series_endpoint: HttpEndpoint,
+    sketches_endpoint: HttpEndpoint,
 }
 
 impl DatadogMetricsEndpointConfiguration {
     /// Creates a new `DatadogMEtricsEndpointConfiguration`.
-    pub const fn new(series_endpoint: Uri, sketches_endpoint: Uri) -> Self {
+    pub const fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
         Self {
             series_endpoint,
             sketches_endpoint,
@@ -151,7 +152,7 @@ impl DatadogMetricsEndpointConfiguration {
     }
 
     /// Gets the URI for the given Datadog metrics endpoint.
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> HttpEndpoint {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => self.series_endpoint.clone(),
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
@@ -293,7 +294,7 @@ impl DatadogMetricsConfig {
             self.series_api_version,
         );
 
-        let protocol = self.get_protocol(dd_common);
+        let protocol = self.get_protocol(dd_common)?;
         let sink = DatadogMetricsSink::new(
             service,
             request_builder,
@@ -306,13 +307,9 @@ impl DatadogMetricsConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        self.get_base_agent_endpoint(dd_common)
-            .parse::<Uri>()
-            .unwrap()
-            .scheme_str()
-            .unwrap_or("http")
-            .to_string()
+    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
+        let endpoint = HttpEndpoint::parse(&self.get_base_agent_endpoint(dd_common))?;
+        Ok(endpoint.as_uri().scheme_str().unwrap_or("http").to_string())
     }
 }
 
@@ -338,11 +335,8 @@ fn resolve_endpoint_batch_settings(
     Ok((series, sketches))
 }
 
-fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{host}{endpoint}")
-        .parse::<Uri>()
-        .context(UriParseSnafu)?;
-    Ok(result)
+fn build_uri(host: &str, endpoint: &str) -> crate::Result<HttpEndpoint> {
+    Ok(HttpEndpoint::parse(host)?.append_path(endpoint)?)
 }
 
 #[cfg(test)]

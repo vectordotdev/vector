@@ -458,6 +458,29 @@ async fn http_via_authenticated_proxy<F: TestClientFactory>(factory: F) {
     );
 }
 
+async fn http_proxy_credentials_do_not_reach_origin<F: TestClientFactory>(factory: F) {
+    let origin = spawn_origin(no_tls()).await;
+    let proxy = spawn_proxy(no_tls(), true).await;
+    let client = factory
+        .build(no_tls(), &proxy_config(&proxy, false, true))
+        .unwrap();
+
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
+
+    let proxy_observations = proxy.observations();
+    assert_eq!(proxy_observations.len(), 1);
+    assert!(has_proxy_authorization(&proxy_observations[0].headers));
+    assert!(
+        !proxy_observations[0]
+            .headers
+            .contains_key(header::AUTHORIZATION)
+    );
+
+    let origin_headers = &origin.observations()[0].headers;
+    assert!(!origin_headers.contains_key(header::PROXY_AUTHORIZATION));
+    assert!(!origin_headers.contains_key(header::AUTHORIZATION));
+}
+
 async fn https_via_authenticated_connect_proxy<F: TestClientFactory>(factory: F) {
     let origin = spawn_origin(server_tls(false)).await;
     let proxy = spawn_proxy(no_tls(), true).await;
@@ -465,14 +488,32 @@ async fn https_via_authenticated_connect_proxy<F: TestClientFactory>(factory: F)
         .build(trusted_client_tls(), &proxy_config(&proxy, false, true))
         .unwrap();
 
-    assert_success(client.get(&origin.https_uri()).await.unwrap());
+    let mut destination_headers = HeaderMap::new();
+    destination_headers.insert(
+        header::AUTHORIZATION,
+        "Bearer destination-token".parse().unwrap(),
+    );
+    assert_success(
+        client
+            .get_with_headers(&origin.https_uri(), destination_headers)
+            .await
+            .unwrap(),
+    );
     let proxy_observations = proxy.observations();
     assert_eq!(proxy_observations.len(), 1);
     assert_eq!(proxy_observations[0].method, Method::CONNECT);
     assert!(has_proxy_authorization(&proxy_observations[0].headers));
+    assert!(
+        !proxy_observations[0]
+            .headers
+            .contains_key(header::AUTHORIZATION)
+    );
     let origin_headers = &origin.observations()[0].headers;
     assert!(!origin_headers.contains_key(header::PROXY_AUTHORIZATION));
-    assert!(!origin_headers.contains_key(header::AUTHORIZATION));
+    assert_eq!(
+        origin_headers.get(header::AUTHORIZATION).unwrap(),
+        "Bearer destination-token"
+    );
 }
 
 async fn no_proxy_bypasses_proxy<F: TestClientFactory>(factory: F) {
@@ -549,6 +590,11 @@ async fn legacy_direct_https_supports_mtls() {
 #[tokio::test]
 async fn legacy_http_via_authenticated_proxy() {
     http_via_authenticated_proxy(LegacyClientFactory).await;
+}
+
+#[tokio::test]
+async fn legacy_http_proxy_credentials_do_not_reach_origin() {
+    http_proxy_credentials_do_not_reach_origin(LegacyClientFactory).await;
 }
 
 #[tokio::test]

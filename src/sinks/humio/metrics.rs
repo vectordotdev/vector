@@ -23,7 +23,7 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         splunk_hec::common::SplunkHecDefaultBatchSettings,
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
     template::Template,
     tls::TlsConfig,
@@ -67,7 +67,7 @@ pub struct HumioMetricsConfig {
         docs::examples = "http://127.0.0.1",
         docs::examples = "https://example.com",
     ))]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The source of events sent to this sink.
     ///
@@ -143,8 +143,8 @@ pub struct HumioMetricsConfig {
     pub confinement: crate::template::ConfinementConfig,
 }
 
-fn default_endpoint() -> String {
-    HOST.to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse(HOST).expect("static default endpoint should be a valid http(s) URL")
 }
 
 impl GenerateConfig for HumioMetricsConfig {
@@ -274,7 +274,10 @@ mod tests {
         "#})
         .unwrap();
 
-        assert_eq!("https://localhost:9200/".to_string(), config.endpoint);
+        assert_eq!(
+            HttpEndpoint::parse("https://localhost:9200/").unwrap(),
+            config.endpoint
+        );
         let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
@@ -282,7 +285,10 @@ mod tests {
         "#})
         .unwrap();
 
-        assert_eq!("https://localhost:9200/".to_string(), config.endpoint);
+        assert_eq!(
+            HttpEndpoint::parse("https://localhost:9200/").unwrap(),
+            config.endpoint
+        );
     }
 
     #[tokio::test]
@@ -296,7 +302,7 @@ mod tests {
         let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{addr}");
+        config.endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
 
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -362,7 +368,7 @@ mod tests {
         let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{addr}");
+        config.endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
 
         let (sink, _) = config.build(cx).await.unwrap();
 
