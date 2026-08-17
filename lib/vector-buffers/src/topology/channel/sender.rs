@@ -1,11 +1,11 @@
 // Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
 #![allow(clippy::let_underscore_must_use)]
 
-use std::{sync::Arc, time::Instant};
+use std::{fmt, io, sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
 use derivative::Derivative;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, oneshot, watch};
 use tracing::Span;
 use vector_common::internal_event::{InternalEventHandle, Registered, register};
 
@@ -17,6 +17,129 @@ use crate::{
     variants::disk_v2::{self, ProductionFilesystem, TryWriteOutcome},
 };
 
+const DISK_V2_WRITER_QUEUE_CAPACITY: usize = 1;
+
+enum DiskV2WriterCommand<T: Bufferable> {
+    Write {
+        item: T,
+        blocking: bool,
+        response: oneshot::Sender<Result<TryWriteOutcome<T>, disk_v2::WriterError<T>>>,
+    },
+    Flush {
+        response: oneshot::Sender<io::Result<()>>,
+    },
+}
+
+#[derive(Clone)]
+pub struct DiskV2Sender<T: Bufferable> {
+    commands: mpsc::Sender<DiskV2WriterCommand<T>>,
+    _shutdown: watch::Sender<()>,
+}
+
+impl<T: Bufferable> DiskV2Sender<T> {
+    fn new(mut writer: disk_v2::BufferWriter<T, ProductionFilesystem>) -> Self {
+        let (commands, mut command_rx) = mpsc::channel(DISK_V2_WRITER_QUEUE_CAPACITY);
+        let (shutdown, shutdown_rx) = watch::channel(());
+        writer.set_shutdown(shutdown_rx);
+        // The task is the cancellation boundary for disk I/O. While the topology is active, once
+        // the queue accepts a command, this owner finishes the write and its visibility flush even
+        // if the requesting future is dropped. When the last sender is dropped, only waits for
+        // reader progress are interrupted; any file I/O already in progress still finishes.
+        vector_common::spawn_in_current_span(async move {
+            while let Some(command) = command_rx.recv().await {
+                let (failed, shutting_down) = match command {
+                    DiskV2WriterCommand::Write {
+                        item,
+                        blocking,
+                        response,
+                    } => {
+                        let result = if blocking {
+                            writer.write_record_outcome(item).await
+                        } else {
+                            writer.try_write_record(item).await
+                        };
+                        let result = match result {
+                            Ok(outcome) => writer
+                                .flush()
+                                .await
+                                .map(|()| outcome)
+                                .map_err(|source| disk_v2::WriterError::Io { source }),
+                            other => other,
+                        };
+                        let shutting_down = matches!(&result, Err(disk_v2::WriterError::Shutdown));
+                        let failed = result.is_err() && !shutting_down;
+                        if failed {
+                            writer.fail();
+                        }
+                        let _ = response.send(result);
+                        (failed, shutting_down)
+                    }
+                    DiskV2WriterCommand::Flush { response } => {
+                        let result = writer.flush().await;
+                        let failed = result.is_err();
+                        if failed {
+                            writer.fail();
+                        }
+                        let _ = response.send(result);
+                        (failed, false)
+                    }
+                };
+
+                if failed || shutting_down {
+                    break;
+                }
+            }
+        });
+
+        Self {
+            commands,
+            _shutdown: shutdown,
+        }
+    }
+
+    async fn write(&self, item: T, blocking: bool) -> crate::Result<TryWriteOutcome<T>> {
+        let (response, response_rx) = oneshot::channel();
+        self.commands
+            .send(DiskV2WriterCommand::Write {
+                item,
+                blocking,
+                response,
+            })
+            .await
+            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?;
+
+        response_rx
+            .await
+            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?
+            .map_err(|error| {
+                error!(%error, "Disk buffer writer encountered an unrecoverable error.");
+                error.into()
+            })
+    }
+
+    async fn flush(&self) -> crate::Result<()> {
+        let (response, response_rx) = oneshot::channel();
+        self.commands
+            .send(DiskV2WriterCommand::Flush { response })
+            .await
+            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?;
+
+        response_rx
+            .await
+            .map_err(|_| io::Error::other("disk buffer writer task stopped"))?
+            .map_err(|error| {
+                error!(%error, "Disk buffer writer encountered an unrecoverable error.");
+                error.into()
+            })
+    }
+}
+
+impl<T: Bufferable> fmt::Debug for DiskV2Sender<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("DiskV2Sender").finish()
+    }
+}
+
 /// Adapter for papering over various sender backends.
 #[derive(Clone, Debug)]
 pub enum SenderAdapter<T: Bufferable> {
@@ -24,7 +147,7 @@ pub enum SenderAdapter<T: Bufferable> {
     InMemory(LimitedSender<T>),
 
     /// The disk v2 buffer.
-    DiskV2(Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>),
+    DiskV2(DiskV2Sender<T>),
 }
 
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
@@ -35,7 +158,7 @@ impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
 
 impl<T: Bufferable> From<disk_v2::BufferWriter<T, ProductionFilesystem>> for SenderAdapter<T> {
     fn from(v: disk_v2::BufferWriter<T, ProductionFilesystem>) -> Self {
-        Self::DiskV2(Arc::new(Mutex::new(v)))
+        Self::DiskV2(DiskV2Sender::new(v))
     }
 }
 
@@ -50,20 +173,7 @@ where
                 .await
                 .map(|()| TryWriteOutcome::Written)
                 .map_err(Into::into),
-            Self::DiskV2(writer) => {
-                let mut writer = writer.lock().await;
-
-                writer.write_record_outcome(item).await.map_err(|e| {
-                    // Record-level failures that can never succeed (a record too large to encode
-                    // within the max record size) are handled inside the writer and surfaced as a
-                    // dropped outcome. Anything that reaches this point -- I/O errors,
-                    // serialization failures, an inconsistent writer state -- is genuinely
-                    // unrecoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
-            }
+            Self::DiskV2(writer) => writer.write(item, true).await,
         }
     }
 
@@ -73,35 +183,14 @@ where
                 .try_send(item)
                 .map(|()| TryWriteOutcome::Written)
                 .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
-            Self::DiskV2(writer) => {
-                let mut writer = writer.lock().await;
-
-                writer.try_write_record(item).await.map_err(|e| {
-                    // Record-level failures that can never succeed (a record too large to encode
-                    // within the max record size) are handled inside the writer and surfaced as a
-                    // dropped outcome. Anything that reaches this point -- I/O errors,
-                    // serialization failures, an inconsistent writer state -- is genuinely
-                    // unrecoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
-            }
+            Self::DiskV2(writer) => writer.write(item, false).await,
         }
     }
 
     pub(crate) async fn flush(&mut self) -> crate::Result<()> {
         match self {
             Self::InMemory(_) => Ok(()),
-            Self::DiskV2(writer) => {
-                let mut writer = writer.lock().await;
-                writer.flush().await.map_err(|e| {
-                    // Errors on the I/O path, which is all that flushing touches, are never recoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
-            }
+            Self::DiskV2(writer) => writer.flush().await,
         }
     }
 
@@ -299,5 +388,141 @@ impl<T: Bufferable> BufferSender<T> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{DiskV2Sender, DiskV2WriterCommand, TryWriteOutcome, oneshot};
+    use crate::{
+        buffer_usage_data::BufferUsageHandle,
+        test::{SizedRecord, with_temp_dir},
+        variants::disk_v2::{Buffer, DiskBufferConfigBuilder},
+    };
+
+    #[tokio::test]
+    async fn disk_writer_finishes_accepted_write_after_request_is_cancelled() {
+        with_temp_dir(|data_dir| {
+            let data_dir = data_dir.to_path_buf();
+
+            async move {
+                let config = DiskBufferConfigBuilder::from_path(data_dir)
+                    .build()
+                    .expect("disk buffer config should be valid");
+                let (writer, mut reader) =
+                    Buffer::<SizedRecord>::from_config(config, BufferUsageHandle::noop())
+                        .await
+                        .expect("disk buffer should initialize");
+                let sender = DiskV2Sender::new(writer);
+                let first = SizedRecord::new(64);
+                let second = SizedRecord::new(96);
+
+                // Enqueue the first write and then discard its response, exactly matching a caller
+                // future being cancelled after the writer task accepted the command.
+                let (response, response_rx) = oneshot::channel();
+                sender
+                    .commands
+                    .send(DiskV2WriterCommand::Write {
+                        item: first.clone(),
+                        blocking: true,
+                        response,
+                    })
+                    .await
+                    .expect("writer task should accept the command");
+                drop(response_rx);
+
+                // No later writer command is needed to complete or publish the cancelled request.
+                let first_read = tokio::time::timeout(Duration::from_secs(2), reader.next())
+                    .await
+                    .expect("first read should not stall")
+                    .expect("first read should succeed");
+                assert_eq!(first_read, Some(first));
+
+                // Reusing the same writer after cancellation must assign a new ID rather than
+                // resubmitting the first record under its old ID.
+                assert_eq!(
+                    sender
+                        .write(second.clone(), true)
+                        .await
+                        .expect("second write should succeed"),
+                    TryWriteOutcome::Written
+                );
+                sender.flush().await.expect("writer flush should succeed");
+
+                let second_read = tokio::time::timeout(Duration::from_secs(2), reader.next())
+                    .await
+                    .expect("second read should not stall")
+                    .expect("second read should succeed");
+
+                assert_eq!(second_read, Some(second));
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn disk_writer_stops_waiting_for_reader_when_last_sender_is_dropped() {
+        with_temp_dir(|data_dir| {
+            let data_dir = data_dir.to_path_buf();
+
+            async move {
+                let config = DiskBufferConfigBuilder::from_path(data_dir)
+                    .max_buffer_size(4096)
+                    .max_data_file_size(1024)
+                    .max_record_size(1024)
+                    .build()
+                    .expect("disk buffer config should be valid");
+                let (writer, _reader) =
+                    Buffer::<SizedRecord>::from_config(config, BufferUsageHandle::noop())
+                        .await
+                        .expect("disk buffer should initialize");
+                let sender = DiskV2Sender::new(writer);
+
+                let mut blocked_item = None;
+                for _ in 0..100 {
+                    let item = SizedRecord::new(128);
+                    match sender
+                        .write(item, false)
+                        .await
+                        .expect("nonblocking write should succeed")
+                    {
+                        TryWriteOutcome::Written => {}
+                        TryWriteOutcome::Full(item) => {
+                            blocked_item = Some(item);
+                            break;
+                        }
+                        TryWriteOutcome::Dropped => panic!("record should fit in the buffer"),
+                    }
+                }
+                let blocked_item = blocked_item.expect("writes should fill the buffer");
+
+                let (response, response_rx) = oneshot::channel();
+                sender
+                    .commands
+                    .send(DiskV2WriterCommand::Write {
+                        item: blocked_item,
+                        blocking: true,
+                        response,
+                    })
+                    .await
+                    .expect("writer task should accept the blocking command");
+
+                // Closing the final sender is the topology shutdown signal. It must interrupt the
+                // reader-progress wait without cancelling any file I/O already in progress.
+                drop(sender);
+
+                let result = tokio::time::timeout(Duration::from_secs(2), response_rx)
+                    .await
+                    .expect("writer task should observe shutdown")
+                    .expect("writer task should return the command response");
+                assert!(matches!(
+                    result,
+                    Err(crate::variants::disk_v2::WriterError::Shutdown)
+                ));
+            }
+        })
+        .await;
     }
 }

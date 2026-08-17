@@ -259,6 +259,10 @@ where
             .validate_last_write()
             .await
             .context(WriterSeekFailedSnafu)?;
+        // Validation may advance the runtime writer checkpoint beyond the value loaded from the
+        // ledger. Publish that reconciled state before constructing the reader so its persistent
+        // progress receiver cannot start from a stale record-ID boundary.
+        writer.publish_current_position();
 
         let finalizer = Arc::clone(&ledger).spawn_finalizer();
 
@@ -281,6 +285,7 @@ where
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailedSnafu)?;
+        writer.publish_current_position();
 
         // Install the authoritative buffer size now that the reader is positioned at the first
         // unread record. Startup recovery treats the durable ledger checkpoint as the logical
