@@ -19,9 +19,9 @@ use crate::{
     http::{Auth, HttpClient},
     schema,
     sinks::util::{
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
+        BatchConfig, BatchSettings, BoxedRawValue, HttpEndpoint, JsonArrayBuffer, PartitionBuffer,
         PartitionInnerBuffer, RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
-        TowerRequestSettings, UriSerde,
+        TowerRequestSettings,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
     },
     template::{TemplateRenderingError, UnconfinedTemplate},
@@ -45,7 +45,7 @@ pub struct MezmoConfig {
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
     #[configurable(metadata(docs::examples = "http://example.com"))]
-    endpoint: UriSerde,
+    endpoint: HttpEndpoint,
 
     /// The hostname that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "${HOSTNAME}"))]
@@ -98,11 +98,8 @@ pub struct MezmoConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_endpoint() -> UriSerde {
-    UriSerde {
-        uri: Uri::from_static("https://logs.mezmo.com"),
-        auth: None,
-    }
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://logs.mezmo.com").unwrap()
 }
 
 fn default_app() -> String {
@@ -359,7 +356,7 @@ impl HttpSink for MezmoConfig {
 
 impl MezmoConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host = &self.endpoint.uri;
+        let host = self.endpoint.as_uri();
 
         let uri = format!("{host}{PATH}?{query}");
 
@@ -471,6 +468,18 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rejects_non_http_endpoint() {
+        let config = serde_yaml::from_str::<MezmoConfig>(
+            r#"
+            api_key: "mylogtoken"
+            hostname: "vector"
+            endpoint: "ftp://logs.example.com"
+        "#,
+        );
+        assert!(config.is_err());
+    }
+
     async fn smoke_start(
         status_code: StatusCode,
         batch_status: BatchStatus,
@@ -496,11 +505,7 @@ mod tests {
         let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let endpoint = UriSerde {
-            uri: format!("http://{addr}").parse::<http::Uri>().unwrap(),
-            auth: None,
-        };
-        config.endpoint = endpoint;
+        config.endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
 
         let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
