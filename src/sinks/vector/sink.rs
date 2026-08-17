@@ -155,8 +155,7 @@ mod tests {
     use bytes::BytesMut;
     use prost::Message;
     use vector_lib::event::{
-        Event, LogEvent, MAX_METADATA_VALUE_NESTING_FRAMES, MAX_VALUE_NESTING_FRAMES, ObjectMap,
-        Value, event_exceeds_max_nesting_cost,
+        Event, LogEvent, MAX_VALUE_NESTING_FRAMES, ObjectMap, Value, event_exceeds_max_nesting_cost,
     };
     use vrl::event_path;
 
@@ -181,11 +180,10 @@ mod tests {
     /// wrapper.
     #[test]
     fn push_events_request_decode_at_value_budget() {
-        // 32 nested objects under "data" key → 33 effective object levels in
-        // `log.value()` (one outer Object from the inserted key), cost = 99 =
-        // MAX_VALUE_NESTING_FRAMES.
+        // 31 nested objects under "data" key → 32 effective object levels in
+        // `log.value()` (one outer Object from the inserted key), cost = 96.
         let mut log = LogEvent::default();
-        log.insert(event_path!("data"), build_nested_value(32));
+        log.insert(event_path!("data"), build_nested_value(31));
         let event = Event::Log(log);
         assert!(
             event_exceeds_max_nesting_cost(&event).is_none(),
@@ -204,16 +202,18 @@ mod tests {
             .expect("PushEventsRequest decode should succeed at the accepted value budget");
     }
 
-    /// Boundary check: one step past the value budget must fail decode through
-    /// the gRPC wire shape. Together with the at-budget test above this pins
-    /// `MAX_VALUE_NESTING_FRAMES` as the tight boundary for the vector-sink
-    /// path, identical to the disk-buffer / native-codec `EventArray` path.
+    /// An object-root log one step past the common budget still fits the wider
+    /// `Log.fields` wire path, but the sink gate applies the same limit to every Value.
     #[test]
-    fn push_events_request_decode_one_past_value_budget_fails() {
-        // 33 nested objects under "data" → 34 effective object levels, cost 102.
+    fn push_events_request_rejects_one_past_common_value_budget() {
+        // 32 nested objects under "data" → 33 effective object levels, cost 99.
         let mut log = LogEvent::default();
-        log.insert(event_path!("data"), build_nested_value(33));
+        log.insert(event_path!("data"), build_nested_value(32));
         let event = Event::Log(log);
+        assert_eq!(
+            event_exceeds_max_nesting_cost(&event),
+            Some((MAX_VALUE_NESTING_FRAMES + 3, MAX_VALUE_NESTING_FRAMES)),
+        );
 
         let request = proto_vector::PushEventsRequest {
             events: vec![EventWrapper::from(event)],
@@ -222,22 +222,21 @@ mod tests {
         let mut buf = BytesMut::with_capacity(65536);
         request.encode(&mut buf).expect("encode should succeed");
 
-        assert!(
-            proto_vector::PushEventsRequest::decode(buf.freeze()).is_err(),
-            "PushEventsRequest decode must fail one step past the value budget; \
-             if this changes, the gate is no longer tight",
+        proto_vector::PushEventsRequest::decode(buf.freeze()).expect(
+            "the object-root wire path can decode 99 frames even though the common \
+             Value gate rejects it",
         );
     }
 
     #[test]
-    fn push_events_request_decode_at_metadata_budget() {
+    fn push_events_request_decode_with_metadata_at_value_budget() {
         let mut log = LogEvent::from("flat");
         *log.metadata_mut().value_mut() = build_nested_value(32);
         let event = Event::Log(log);
         assert!(
             event_exceeds_max_nesting_cost(&event).is_none(),
-            "test setup invariant: metadata must sit exactly at the metadata \
-             budget (cost {MAX_METADATA_VALUE_NESTING_FRAMES})",
+            "test setup invariant: metadata must sit exactly at the Value budget \
+             (cost {MAX_VALUE_NESTING_FRAMES})",
         );
 
         let request = proto_vector::PushEventsRequest {
