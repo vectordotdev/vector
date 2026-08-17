@@ -15,8 +15,8 @@ use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
     chunking::Chunker,
     format::{
-        AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
-        CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
+        AvroOcfSerializerConfig, AvroSerializer, AvroSerializerConfig, AvroSerializerOptions,
+        CefSerializer, CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
         GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
         LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
         NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
@@ -145,11 +145,38 @@ impl Default for SerializerConfig {
     }
 }
 
+/// Compression algorithm used by file-oriented batch serializers.
+#[configurable_component]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[configurable(metadata(
+    docs::enum_tag_description = "The compression algorithm to use for the encoded batch file."
+))]
+#[serde(tag = "algorithm", rename_all = "snake_case")]
+pub enum BatchSerializerCompression {
+    /// Writes uncompressed batch files.
+    #[default]
+    None,
+    /// Uses Snappy compression.
+    Snappy,
+    /// Uses Avro OCF Deflate compression.
+    Deflate,
+    /// Uses Zstd compression. Level must be between 1 and 21.
+    Zstd {
+        /// Compression level (1–21). Higher values compress more but are slower.
+        #[configurable(validation(range(min = 1, max = 21)))]
+        level: u8,
+    },
+    /// Uses Gzip compression. Level must be between 1 and 9.
+    Gzip {
+        /// Compression level (1–9). Higher values compress more but are slower.
+        #[configurable(validation(range(min = 1, max = 9)))]
+        level: u8,
+    },
+    /// Uses LZ4 raw compression.
+    Lz4,
+}
+
 /// Batch serializer configuration.
-///
-/// Only available when the `arrow` feature is enabled (the `parquet` feature
-/// implies `arrow`); all batch serializers produce columnar Arrow/Parquet output.
-#[cfg(feature = "arrow")]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
@@ -157,12 +184,23 @@ impl Default for SerializerConfig {
     docs::enum_tag_description = "The codec to use for batch encoding events."
 ))]
 pub enum BatchSerializerConfig {
+    /// Encodes events as a complete [Apache Avro][apache_avro] Object Container File (OCF).
+    ///
+    /// Each batch of events is written as a single self-contained OCF file, with an embedded
+    /// schema and a randomly-generated sync marker. This format is suitable for file-based sinks
+    /// (e.g. S3, local file) where downstream tools such as Spark, Flink, or avro-tools expect
+    /// standard Avro files. For streaming Avro datum encoding, use the per-event `avro` codec.
+    ///
+    /// [apache_avro]: https://avro.apache.org/
+    #[serde(rename = "avro_ocf")]
+    AvroOcf(AvroOcfSerializerConfig),
     /// Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
     ///
     /// This is the streaming variant of the Arrow IPC format, which writes
     /// a continuous stream of record batches.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
+    #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
     /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
@@ -173,13 +211,17 @@ pub enum BatchSerializerConfig {
     Parquet(ParquetSerializerConfig),
 }
 
-#[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
     /// Build the batch serializer from this configuration.
     pub fn build_batch_serializer(
         &self,
     ) -> Result<super::BatchSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
+            BatchSerializerConfig::AvroOcf(avro_config) => {
+                let serializer = avro_config.build()?;
+                Ok(super::BatchSerializer::AvroOcf(serializer))
+            }
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => {
                 let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
                 Ok(super::BatchSerializer::Arrow(serializer))
@@ -195,6 +237,8 @@ impl BatchSerializerConfig {
     /// The data type of events that are accepted by this batch serializer.
     pub fn input_type(&self) -> DataType {
         match self {
+            BatchSerializerConfig::AvroOcf(avro_config) => avro_config.input_type(),
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
@@ -204,6 +248,8 @@ impl BatchSerializerConfig {
     /// The schema required by the batch serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
+            BatchSerializerConfig::AvroOcf(avro_config) => avro_config.schema_requirement(),
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
@@ -289,7 +335,7 @@ impl SerializerConfig {
     pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
-                AvroSerializerConfig::new(avro.schema.clone()).build()?,
+                AvroSerializerConfig::new(avro.clone()).build()?,
             )),
             SerializerConfig::Cef(config) => Ok(Serializer::Cef(config.build()?)),
             SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
@@ -354,9 +400,7 @@ impl SerializerConfig {
     /// The data type of events that are accepted by this `Serializer`.
     pub fn input_type(&self) -> DataType {
         match self {
-            SerializerConfig::Avro { avro } => {
-                AvroSerializerConfig::new(avro.schema.clone()).input_type()
-            }
+            SerializerConfig::Avro { avro } => AvroSerializerConfig::new(avro.clone()).input_type(),
             SerializerConfig::Cef(config) => config.input_type(),
             SerializerConfig::Csv(config) => config.input_type(),
             SerializerConfig::Gelf(config) => config.input_type(),
@@ -378,7 +422,7 @@ impl SerializerConfig {
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             SerializerConfig::Avro { avro } => {
-                AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
+                AvroSerializerConfig::new(avro.clone()).schema_requirement()
             }
             SerializerConfig::Cef(config) => config.schema_requirement(),
             SerializerConfig::Csv(config) => config.schema_requirement(),

@@ -297,6 +297,7 @@ checksum = "36fa98bc79671c7981272d91a8753a928ff6a1cd8e4f20a44c45bd5d313840bf"
 dependencies = [
  "bigdecimal",
  "bon",
+ "crc32fast",
  "digest 0.10.7",
  "log",
  "miniz_oxide",
@@ -307,6 +308,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "snap",
  "strum 0.27.2",
  "strum_macros 0.27.2",
  "thiserror 2.0.18",
@@ -2838,6 +2840,7 @@ dependencies = [
  "snafu 0.9.0",
  "strum 0.28.0",
  "syslog_loose 0.23.0",
+ "tempfile",
  "tokio",
  "tokio-util",
  "toml",
@@ -13184,6 +13187,7 @@ name = "vector"
 version = "0.58.0"
 dependencies = [
  "antithesis-instrumentation",
+ "apache-avro",
  "approx",
  "arc-swap",
  "arr_macro",

@@ -5,6 +5,7 @@
 #![deny(warnings)]
 #![deny(clippy::unwrap_used)]
 
+pub mod avro;
 mod common;
 mod decoder_framed_read;
 pub mod decoding;
@@ -26,7 +27,6 @@ pub use decoding::{
 };
 #[cfg(feature = "syslog")]
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
-#[cfg(feature = "arrow")]
 pub use encoding::{BatchEncoder, BatchSerializer};
 pub use encoding::{
     BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
