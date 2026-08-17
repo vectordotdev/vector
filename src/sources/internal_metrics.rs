@@ -275,7 +275,7 @@ mod tests {
                 // users to set their own bucket widths.
                 assert_eq!(buckets[15].count, 2);
                 assert_eq!(*count, 2);
-                assert_eq!(*sum, 11.0);
+                assert_eq!(*sum, Some(11.0));
             }
             _ => panic!("wrong type"),
         }
@@ -293,7 +293,7 @@ mod tests {
                 assert_eq!(buckets[15].count, 1);
                 assert_eq!(buckets[16].count, 1);
                 assert_eq!(*count, 2);
-                assert_eq!(*sum, 16.1);
+                assert_eq!(*sum, Some(16.1));
             }
             _ => panic!("wrong type"),
         }

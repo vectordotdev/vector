@@ -186,6 +186,8 @@ impl IntoLua for LuaMetric {
                 aggregated_histogram.raw_set("buckets", buckets)?;
                 aggregated_histogram.raw_set("counts", counts)?;
                 aggregated_histogram.raw_set("count", count)?;
+                // An unreported sum leaves the key unset, so a script sees `nil` rather than a
+                // zero it cannot distinguish from a real measurement.
                 aggregated_histogram.raw_set("sum", sum)?;
                 tbl.raw_set("aggregated_histogram", aggregated_histogram)?;
             }
@@ -552,7 +554,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_metric(
@@ -570,6 +572,53 @@ mod test {
                 "metric.aggregated_histogram.sum == 975.2",
             ],
         );
+    }
+
+    /// A histogram that reports no sum leaves the key unset, so a script sees `nil` and can tell
+    /// "not reported" apart from a measured zero. Note that a script doing arithmetic on `sum`
+    /// without checking will now fail for these histograms.
+    #[test]
+    fn into_lua_aggregated_histogram_without_sum() {
+        let metric = Metric::new(
+            "example histogram",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10],
+                count: 30,
+                sum: None,
+            },
+        );
+        assert_metric(
+            metric,
+            false,
+            vec![
+                "type(metric.aggregated_histogram) == 'table'",
+                "metric.aggregated_histogram.count == 30",
+                "metric.aggregated_histogram.sum == nil",
+            ],
+        );
+    }
+
+    #[test]
+    fn from_lua_aggregated_histogram_without_sum() {
+        let value = r#"{
+            name = "example histogram",
+            kind = "absolute",
+            aggregated_histogram = {
+                buckets = {1.0, 2.0},
+                counts = {20, 10}
+            }
+        }"#;
+        let expected = Metric::new(
+            "example histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10],
+                count: 30,
+                sum: None,
+            },
+        );
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -770,7 +819,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);

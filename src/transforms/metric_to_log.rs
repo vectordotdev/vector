@@ -189,7 +189,10 @@ fn schema_definition(log_namespace: LogNamespace) -> Definition {
                         ),
                     )
                     .with_known("count", Kind::integer())
-                    .with_known("sum", Kind::float()),
+                    // A histogram that reports no sum omits the field, so the schema must allow it
+                    // to be absent. The `aggregated_summary` equivalent below stays a plain float,
+                    // because a summary's sum is always reported.
+                    .with_known("sum", Kind::float().or_undefined()),
             )
             .or_undefined(),
             None,
@@ -566,7 +569,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets: vector_lib::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
-                sum: 50.0,
+                sum: Some(50.0),
             },
             event_metadata(),
         )

@@ -218,7 +218,9 @@ impl Arbitrary for MetricValue {
             4 => MetricValue::AggregatedHistogram {
                 buckets: Vec::arbitrary(g),
                 count: u64::arbitrary(g),
-                sum: f64_for_arbitrary(g),
+                // Generate both the reported and unreported cases so round-trip tests cover the
+                // encodings of each.
+                sum: bool::arbitrary(g).then(|| f64_for_arbitrary(g)),
             },
             5 => MetricValue::AggregatedSummary {
                 quantiles: Vec::arbitrary(g),
@@ -242,8 +244,12 @@ impl Arbitrary for MetricValue {
 
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_many(&samples);
+                // An empty sketch reports no sum or average at all, and serializes them as zero, so
+                // randomizing them here would build a value that no round-trip can preserve.
                 #[cfg(feature = "generate-fixtures")]
-                sketch.set_sum_avg(f64_for_arbitrary(g), f64_for_arbitrary(g));
+                if !sketch.is_empty() {
+                    sketch.set_sum_avg(f64_for_arbitrary(g), f64_for_arbitrary(g));
+                }
 
                 MetricValue::Sketch {
                     sketch: MetricSketch::AgentDDSketch(sketch),

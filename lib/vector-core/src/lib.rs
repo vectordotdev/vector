@@ -70,6 +70,16 @@ pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {
     (l_value.is_nan() && r_value.is_nan()) || l_value.eq_ulps(&r_value, &1)
 }
 
+/// Compares two optional floats, treating a reported value and an unreported one as different even
+/// when the reported value is zero.
+pub(crate) fn opt_float_eq(l_value: Option<f64>, r_value: Option<f64>) -> bool {
+    match (l_value, r_value) {
+        (Some(l_value), Some(r_value)) => float_eq(l_value, r_value),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
 // These macros aren't actually usable in lib crates without some `vector_lib` shenanigans.
 #[macro_export]
 macro_rules! emit {

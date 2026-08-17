@@ -119,6 +119,7 @@ message Metric {
     Sketch sketch = 15;
     AggregatedHistogram3 aggregated_histogram3 = 16;
     AggregatedSummary3 aggregated_summary3 = 17;
+    AggregatedHistogram4 aggregated_histogram4 = 22;
   }
   string namespace = 11;
   uint32 interval_ms = 18;
@@ -184,6 +185,17 @@ message AggregatedHistogram3 {
   repeated HistogramBucket3 buckets = 1;
   uint64 count = 2;
   double sum = 3;
+}
+
+// Identical to AggregatedHistogram3 except that `sum` carries explicit presence, so a histogram
+// from a source that reports no sum (OTLP, where the field is optional, and OpenMetrics, where the
+// `_sum` series is only recommended) can be distinguished from one whose sum is genuinely zero.
+// AggregatedHistogram3 cannot express that: proto3 implicit presence never writes a zero, so an
+// absent field and a zero are the same bytes.
+message AggregatedHistogram4 {
+  repeated HistogramBucket3 buckets = 1;
+  uint64 count = 2;
+  optional double sum = 3;
 }
 
 message HistogramBucket {

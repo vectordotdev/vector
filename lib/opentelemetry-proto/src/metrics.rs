@@ -332,7 +332,7 @@ impl HistogramMetric {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: self.point.count,
-                sum: self.point.sum.unwrap_or(0.0),
+                sum: self.point.sum,
             },
         )
         .with_timestamp(timestamp)
@@ -388,7 +388,7 @@ impl ExpHistogramMetric {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: self.point.count,
-                sum: self.point.sum.unwrap_or(0.0),
+                sum: self.point.sum,
             },
         )
         .with_timestamp(timestamp)
