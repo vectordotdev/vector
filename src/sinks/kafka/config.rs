@@ -345,6 +345,9 @@ impl ValidatedSink for KafkaSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedKafkaSink> {
         self.validate_batch_librdkafka_conflicts()?;
+        // Validate the full librdkafka configuration (unknown keys and invalid
+        // values) without connecting to any broker.
+        let _ = self.to_rdkafka()?.create_native_config()?;
         let topic = self
             .topic
             .clone()
@@ -499,6 +502,44 @@ mod tests {
         assert!(
             config.validate().is_ok(),
             "batch options without conflicting librdkafka options should pass validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_unknown_librdkafka_option() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            librdkafka_options:
+                definitely.not.an.option: "x"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "an unknown librdkafka option should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_librdkafka_option_value() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            librdkafka_options:
+                queue.buffering.max.ms: "not-a-number"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "an invalid value for a known librdkafka option should fail validation"
         );
     }
 }
