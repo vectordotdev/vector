@@ -129,6 +129,21 @@ impl ValidatedSink for WebHdfsConfig {
     type Validated = ValidatedWebHdfs;
 
     fn validate(&self) -> crate::Result<ValidatedWebHdfs> {
+        // OpenDAL's WebHDFS builder parses and requires an absolute http(s)
+        // endpoint, so reject empty/malformed/non-http endpoints here instead
+        // of deferring to `build_operator`.
+        let uri = self
+            .endpoint
+            .parse::<http::Uri>()
+            .map_err(|e| format!("Invalid WebHDFS endpoint `{}`: {}", self.endpoint, e))?;
+        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.host().is_none() {
+            return Err(format!(
+                "Invalid WebHDFS endpoint `{}`: must be an absolute http(s) URL",
+                self.endpoint
+            )
+            .into());
+        }
+
         let batcher_settings = self.batch.into_batcher_settings()?;
         let confined_prefix = self.confined_prefix()?;
 
@@ -279,6 +294,25 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("tenant"), "../../escape");
         assert!(partitioner.partition(&event).is_none());
+    }
+
+    #[test]
+    fn validate_rejects_non_http_endpoint() {
+        use crate::config::ValidatedSink;
+
+        for endpoint in ["", "ftp://hdfs.example.com", "not a uri"] {
+            let config = WebHdfsConfig {
+                endpoint: endpoint.into(),
+                ..base_config()
+            };
+            let err = config
+                .validate()
+                .expect_err("a non-http or malformed endpoint should fail validation");
+            assert!(
+                err.to_string().contains("endpoint"),
+                "unexpected error: {err}"
+            );
+        }
     }
 
     #[test]
