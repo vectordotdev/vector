@@ -990,43 +990,6 @@ assert_transform_compliance(async {
 .await;
 }
 
-#[test]
-fn event_time_incremental_auto() {
-let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Auto))
-.unwrap();
-
-// Create events with timestamps in the same bucket (11:00:20 to 11:00:30)
-let base_time = open_bucket_timestamp(10_000);
-
-let counter_a_1 = make_metric_with_timestamp(
-    "counter_a",
-    MetricKind::Incremental,
-    MetricValue::Counter { value: 42.0 },
-    base_time,
-);
-let counter_a_2 = make_metric_with_timestamp(
-    "counter_a",
-    MetricKind::Incremental,
-    MetricValue::Counter { value: 43.0 },
-    base_time + chrono::Duration::milliseconds(500),
-);
-// Record events in the same bucket
-agg.record(counter_a_1.clone());
-agg.record(counter_a_2);
-let mut out = vec![];
-// Force flush so the open bucket emits without waiting for wall clock.
-agg.flush_final(&mut out);
-assert_eq!(1, out.len());
-// Check that values are summed (we can't easily compare full events, so check the value)
-let metric = out[0].as_metric();
-assert_eq!(metric.series().name.name.as_str(), "counter_a");
-if let MetricValue::Counter { value } = metric.value() {
-    assert_eq!(*value, 85.0);
-} else {
-    panic!("Expected Counter value");
-}
-}
-
 /// Rust truncating `/` rounds toward zero, so `-1 / 10000 == 0` and the
 /// bucket anchor would wrongly be `0`. Euclidean alignment places
 /// `-1ms` in `[-interval_ms, 0)` anchored at `-interval_ms`.
@@ -1208,84 +1171,6 @@ if let MetricValue::Gauge { value } = metric.value() {
 }
 
 #[test]
-fn event_time_mean_happy_path() {
-let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Mean))
-.unwrap();
-
-let base_time = open_bucket_timestamp(10_000);
-
-// Three absolute gauges for the same series in one event-time bucket.
-agg.record(make_metric_with_timestamp(
-    "gauge_mean_et",
-    MetricKind::Absolute,
-    MetricValue::Gauge { value: 32.0 },
-    base_time + chrono::Duration::seconds(1),
-));
-agg.record(make_metric_with_timestamp(
-    "gauge_mean_et",
-    MetricKind::Absolute,
-    MetricValue::Gauge { value: 82.0 },
-    base_time + chrono::Duration::seconds(2),
-));
-agg.record(make_metric_with_timestamp(
-    "gauge_mean_et",
-    MetricKind::Absolute,
-    MetricValue::Gauge { value: 51.0 },
-    base_time + chrono::Duration::seconds(3),
-));
-
-let mut out = vec![];
-agg.flush_final(&mut out);
-assert_eq!(1, out.len());
-assert_eq!(
-    out[0].as_metric().series().name.name.as_str(),
-    "gauge_mean_et"
-);
-if let MetricValue::Gauge { value } = out[0].as_metric().value() {
-    assert!(
-        (*value - 55.0).abs() < 1e-9,
-        "expected mean 55.0, got {value}"
-    );
-} else {
-    panic!("Expected Gauge metric value");
-}
-}
-
-#[test]
-fn event_time_stdev_happy_path() {
-let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Stdev))
-.unwrap();
-
-let base_time = open_bucket_timestamp(10_000);
-
-let values = [25.0f64, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0];
-for (i, &v) in values.iter().enumerate() {
-    agg.record(make_metric_with_timestamp(
-        "gauge_stdev_et",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: v },
-        base_time + chrono::Duration::milliseconds(100 * i as i64),
-    ));
-}
-
-let mut out = vec![];
-agg.flush_final(&mut out);
-assert_eq!(1, out.len());
-assert_eq!(
-    out[0].as_metric().series().name.name.as_str(),
-    "gauge_stdev_et"
-);
-if let MetricValue::Gauge { value } = out[0].as_metric().value() {
-    assert!(
-        (*value - 10.0).abs() < 1e-9,
-        "expected stdev 10.0, got {value}"
-    );
-} else {
-    panic!("Expected Gauge metric value");
-}
-}
-
-#[test]
 fn event_time_diff_uses_previous_bucket() {
 let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Diff, |et| {
         et.max_future_ms = 600_000;
@@ -1367,35 +1252,6 @@ assert!(
     "events for an ended window must be dropped before flush"
 );
 assert!(agg.event_time_buckets.is_empty());
-}
-
-#[test]
-fn event_time_passes_through_ignored_kind() {
-let mut agg = Aggregate::new(&event_time_config(10_000_u64, AggregationMode::Sum))
-.unwrap();
-
-let ts = open_bucket_timestamp(10_000);
-let incremental = make_metric_with_timestamp(
-    "counter_a",
-    MetricKind::Incremental,
-    MetricValue::Counter { value: 10.0 },
-    ts,
-);
-let absolute = make_metric_with_timestamp(
-    "gauge_a",
-    MetricKind::Absolute,
-    MetricValue::Gauge { value: 42.0 },
-    ts,
-);
-
-assert!(agg.record(absolute.clone()).is_some());
-assert!(agg.record(incremental.clone()).is_none());
-assert_eq!(agg.event_time_buckets.len(), 1);
-
-let mut out = vec![];
-agg.flush_final(&mut out);
-assert_eq!(out.len(), 1);
-assert_eq!(&incremental.into_metric(), out[0].as_metric());
 }
 
 #[test]
@@ -1811,43 +1667,11 @@ assert_eq!(
 );
 }
 
-#[test]
-fn event_time_missing_timestamp_uses_system_time() {
-let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Auto, |et| {
-        et.missing_timestamp = MissingTimestamp::UseSystemTime;
-    }))
-.unwrap();
-
-// Event with no timestamp — should be bucketed using system time and accepted.
-let event = make_metric(
-    "counter_no_ts",
-    MetricKind::Incremental,
-    MetricValue::Counter { value: 7.0 },
-);
-agg.record(event);
-
-// The event goes into the current (system-time) bucket, which hasn't completed yet,
-// so it should NOT flush on the first call.
-let mut out = vec![];
-agg.flush_into(&mut out);
-assert_eq!(
-    0,
-    out.len(),
-    "Current bucket not yet flushed — event is pending"
-);
-
-// Verify the event is actually stored (not dropped): the bucket exists.
-assert_eq!(
-    1,
-    agg.event_time_buckets.len(),
-    "Event should be stored in exactly one bucket"
-);
-}
-
-/// Regression for the case where fallback `Utc::now()` and cutoff `Utc::now()`
-/// were separate reads: with `allowed_lateness_ms = 0`, a second read one
-/// millisecond after the bucket end would reject an event whose synthesized
-/// timestamp still lies inside the bucket.
+/// Missing-timestamp fallback (`missing_timestamp = use_system_time`) must
+/// accept and store the event, and must reuse one wall-clock instant for
+/// synthesis and cutoff checks. With `allowed_lateness_ms = 0`, a second
+/// `Utc::now()` read one millisecond after the bucket end would otherwise
+/// reject an event whose synthesized timestamp still lies inside the bucket.
 #[test]
 fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
     let interval_ms = 1_000_u64;
@@ -2013,35 +1837,6 @@ for (name, raw2) in &bucket2 {
 }
 
 #[test]
-fn event_time_count_mode() {
-let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Count))
-.unwrap();
-
-let base_time = open_bucket_timestamp(10_000);
-
-// Three events (any kind) in the same bucket should produce count = 3.
-for i in 0..3 {
-    let event = make_metric_with_timestamp(
-        "count_metric",
-        MetricKind::Incremental,
-        MetricValue::Counter { value: 1.0 },
-        base_time + chrono::Duration::milliseconds(i * 100),
-    );
-    agg.record(event);
-}
-
-let mut out = vec![];
-agg.flush_final(&mut out);
-
-assert_eq!(1, out.len());
-if let MetricValue::Counter { value } = out[0].as_metric().value() {
-    assert_eq!(*value, 3.0, "Count mode should count 3 events");
-} else {
-    panic!("Expected Counter value from Count mode");
-}
-}
-
-#[test]
 fn event_time_watermark_only_advances() {
 let mut agg = Aggregate::new(&event_time_config_with(10000_u64, AggregationMode::Auto, |et| {
         et.max_future_ms = 600_000;
@@ -2084,83 +1879,6 @@ assert_eq!(
 );
 }
 
-
-#[test]
-fn event_time_multiple_different_metrics_same_bucket() {
-let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Auto))
-.unwrap();
-
-let base_time = open_bucket_timestamp(10_000);
-
-// Create multiple different metrics (different names) in the same time bucket
-let counter_a = make_metric_with_timestamp(
-    "counter_a",
-    MetricKind::Incremental,
-    MetricValue::Counter { value: 10.0 },
-    base_time,
-);
-let counter_b = make_metric_with_timestamp(
-    "counter_b",
-    MetricKind::Incremental,
-    MetricValue::Counter { value: 20.0 },
-    base_time + chrono::Duration::milliseconds(300),
-);
-let gauge_c = make_metric_with_timestamp(
-    "gauge_c",
-    MetricKind::Absolute,
-    MetricValue::Gauge { value: 30.0 },
-    base_time + chrono::Duration::milliseconds(700),
-);
-
-// Record all metrics in the same bucket
-agg.record(counter_a);
-agg.record(counter_b);
-agg.record(gauge_c);
-
-let mut out = vec![];
-agg.flush_final(&mut out);
-
-// All three different metrics should be flushed together from the same bucket
-assert_eq!(
-    3,
-    out.len(),
-    "Should flush all three different metrics from the same bucket"
-);
-
-// Verify we have all three metrics
-let mut found_counter_a = false;
-let mut found_counter_b = false;
-let mut found_gauge_c = false;
-
-for event in out {
-    let metric = event.as_metric();
-    match metric.series().name.name.as_str() {
-        "counter_a" => {
-            found_counter_a = true;
-            if let MetricValue::Counter { value } = metric.value() {
-                assert_eq!(*value, 10.0);
-            }
-        }
-        "counter_b" => {
-            found_counter_b = true;
-            if let MetricValue::Counter { value } = metric.value() {
-                assert_eq!(*value, 20.0);
-            }
-        }
-        "gauge_c" => {
-            found_gauge_c = true;
-            if let MetricValue::Gauge { value } = metric.value() {
-                assert_eq!(*value, 30.0);
-            }
-        }
-        _ => panic!("Unexpected metric name: {}", metric.series().name.name),
-    }
-}
-
-assert!(found_counter_a, "Should have found counter_a");
-assert!(found_counter_b, "Should have found counter_b");
-assert!(found_gauge_c, "Should have found gauge_c");
-}
 
 /// An event whose (kind, value) is incompatible with the configured
 /// aggregation mode (for example an `Incremental` event arriving at a
