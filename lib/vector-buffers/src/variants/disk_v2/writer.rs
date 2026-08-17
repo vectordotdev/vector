@@ -913,6 +913,10 @@ where
         }
     }
 
+    pub(crate) fn usage_handle(&self) -> super::DiskBufferUsageHandle {
+        self.ledger.disk_usage_handle()
+    }
+
     fn get_next_record_id(&mut self) -> u64 {
         self.next_record_id + self.unflushed_events
     }

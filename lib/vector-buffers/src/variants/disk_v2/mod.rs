@@ -174,12 +174,15 @@ use std::{
     marker::PhantomData,
     num::NonZeroU64,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
-use tracing::debug;
+use tracing::{debug, info};
 use vector_common::finalization::Finalizable;
 
 mod backed_archive;
@@ -211,6 +214,62 @@ use crate::{
         channel::{ReceiverAdapter, SenderAdapter},
     },
 };
+
+/// An approximate view of unread records in a disk buffer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DiskBufferUsageSnapshot {
+    /// Number of unread events in the buffer.
+    pub event_count: u64,
+    /// Encoded size of unread records in the buffer.
+    pub byte_size: u64,
+}
+
+/// Read-only access to the current unread usage of a disk buffer.
+#[derive(Clone, Debug)]
+pub struct DiskBufferUsageHandle {
+    event_count: Arc<AtomicU64>,
+    byte_size: Arc<AtomicU64>,
+}
+
+impl DiskBufferUsageHandle {
+    fn new() -> Self {
+        Self {
+            event_count: Arc::new(AtomicU64::new(0)),
+            byte_size: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    /// Gets the approximate current number and encoded size of unread records.
+    pub fn snapshot(&self) -> DiskBufferUsageSnapshot {
+        DiskBufferUsageSnapshot {
+            event_count: self.event_count.load(Ordering::Relaxed),
+            byte_size: self.byte_size.load(Ordering::Relaxed),
+        }
+    }
+
+    fn set(&self, event_count: u64, byte_size: u64) {
+        self.event_count.store(event_count, Ordering::Relaxed);
+        self.byte_size.store(byte_size, Ordering::Relaxed);
+    }
+
+    fn increment(&self, event_count: u64, byte_size: u64) {
+        self.event_count.fetch_add(event_count, Ordering::Relaxed);
+        self.byte_size.fetch_add(byte_size, Ordering::Relaxed);
+    }
+
+    fn decrement(&self, event_count: u64, byte_size: u64) {
+        _ = self
+            .event_count
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                Some(current.saturating_sub(event_count))
+            });
+        _ = self
+            .byte_size
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                Some(current.saturating_sub(byte_size))
+            });
+    }
+}
 
 /// Error that occurred when creating/loading a disk buffer.
 #[derive(Debug, Snafu)]
@@ -396,7 +455,8 @@ where
     usage_handle.set_buffer_limits(Some(max_size.get()), None);
 
     let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
-    let builder = DiskBufferConfigBuilder::from_path(buffer_path).max_buffer_size(max_size.get());
+    let builder =
+        DiskBufferConfigBuilder::from_path(buffer_path.clone()).max_buffer_size(max_size.get());
     // Shrink the data-file size (and the matching record size) so files fill and
     // rotate constantly. That is what reaches the rare recovery paths the bug hides
     // in: reopening a file whose last write was cut short, and reusing a file number
@@ -412,9 +472,27 @@ where
         None => builder,
     };
     let config = builder.build()?;
-    Buffer::from_config(config, usage_handle)
+    let (writer, reader) = Buffer::from_config(config, usage_handle)
         .await
-        .map_err(Into::into)
+        .map_err(Box::<dyn Error + Send + Sync>::from)?;
+    let existing_usage = writer.usage_handle().snapshot();
+    if existing_usage.event_count > 0 || existing_usage.byte_size > 0 {
+        info!(
+            buffer_id = id,
+            buffer_dir = buffer_path.to_string_lossy().as_ref(),
+            unread_events = existing_usage.event_count,
+            unread_bytes = existing_usage.byte_size,
+            message = "Opened disk buffer with unread data.",
+        );
+    } else {
+        debug!(
+            buffer_id = id,
+            buffer_dir = buffer_path.to_string_lossy().as_ref(),
+            message = "Opened empty disk buffer.",
+        );
+    }
+
+    Ok((writer, reader))
 }
 
 pub(crate) fn get_disk_v2_data_dir_path(base_dir: &Path, buffer_id: &str) -> PathBuf {
