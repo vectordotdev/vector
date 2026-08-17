@@ -718,11 +718,13 @@ impl VectorConfig {
                 // time. The `tls` flag only selects the default scheme and
                 // cannot change whether the parse succeeds, so the `Uri` is
                 // discarded.
-                with_default_scheme(address, false).map(|_| ())
+                let uri = with_default_scheme(address, false)?;
+                validate_endpoint_scheme(&uri)
             }
             (None, Some(routing)) => {
                 for endpoint in &routing.endpoints {
-                    with_default_scheme(endpoint, false)?;
+                    let uri = with_default_scheme(endpoint, false)?;
+                    validate_endpoint_scheme(&uri)?;
                 }
                 Ok(())
             }
@@ -868,6 +870,13 @@ pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
     } else {
         Ok(uri)
     }
+}
+
+fn validate_endpoint_scheme(uri: &Uri) -> crate::Result<()> {
+    if !matches!(uri.scheme_str(), Some("http" | "https")) {
+        return Err(format!("Invalid endpoint `{uri}`: scheme must be http or https").into());
+    }
+    Ok(())
 }
 
 fn new_client(
@@ -1543,6 +1552,51 @@ mod tests {
             err.downcast_ref::<http::uri::InvalidUri>().is_some(),
             "expected a URI parse error, got: {err}"
         );
+    }
+
+    #[test]
+    fn validate_rejects_non_http_address() {
+        let config = VectorConfig {
+            address: Some("ftp://vector.example.com:6000".to_owned()),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let err = config.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("scheme must be http or https"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_non_http_routing_endpoint() {
+        let config = VectorConfig {
+            address: None,
+            routing: Some(RoutingConfig {
+                endpoints: vec![
+                    "http://127.0.0.1:6000".to_owned(),
+                    "ftp://vector.example.com:6001".to_owned(),
+                ],
+                ..Default::default()
+            }),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let err = config.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("scheme must be http or https"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_address_without_scheme() {
+        let config = VectorConfig {
+            address: Some("127.0.0.1:6000".to_owned()),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        config.validate().expect("validation should succeed");
     }
 
     #[test]
