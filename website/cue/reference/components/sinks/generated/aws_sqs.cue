@@ -149,6 +149,60 @@ generated: components: sinks: aws_sqs: configuration: {
 			}
 		}
 	}
+	batch: {
+		description: """
+			Event batching behavior.
+
+			When configured, multiple events will be sent in a single request using the
+			`send_message_batch` API, reducing the number of API calls by up to 10x.
+
+			## Retry Behavior
+
+			Uses **all-or-nothing** semantics: if any message in a batch fails to send, the **entire batch is retried**
+			by Vector's retry framework. This approach simplifies error handling and leverages Vector's built-in
+			deduplication and acknowledgements to prevent message loss.
+
+			Per-message retry is not used because:
+			- SQS batch limit is only 10 messages—low cost to retry all
+			- Simpler than maintaining per-message state
+			- Aligns with Vector's request-level deduplication semantics
+
+			SQS limits batches to a maximum of 10 messages or 256KB (standard queues), upgradable to 1MB.
+			The default batch size is set to 256KB to ensure compatibility with standard queues, but can be increased for extended queues.
+
+			Note: Batching introduces latency based on the `timeout_secs` setting.
+			If omitted, messages are sent individually (legacy behavior).
+			"""
+		required: false
+		type: object: options: {
+			max_bytes: {
+				description: """
+					The maximum size of a batch that is processed by a sink.
+
+					This is based on the uncompressed size of the batched events, before they are
+					serialized or compressed.
+					"""
+				required: false
+				type: uint: {
+					default: 262144
+					unit:    "bytes"
+				}
+			}
+			max_events: {
+				description: "The maximum size of a batch before it is flushed."
+				required:    false
+				type: uint: unit: "events"
+			}
+			timeout_secs: {
+				description: "The maximum age of a batch before it is flushed."
+				required:    false
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
+			}
+		}
+	}
 	encoding: {
 		description: """
 			Encoding configuration.
