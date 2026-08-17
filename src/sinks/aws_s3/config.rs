@@ -278,7 +278,8 @@ impl S3SinkConfig {
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
+        let key_prefix: Template =
+            Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
         let key_prefix = key_prefix.confine(&self.confinement, Self::NAME, "key_prefix")?;
 
         let ssekms_key_id = self

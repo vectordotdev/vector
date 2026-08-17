@@ -1,5 +1,6 @@
 use chrono::{Offset, TimeZone, Utc};
 use chrono_tz::Tz;
+use vector_config::schema::generate_root_schema;
 use vector_lib::{
     config::LogNamespace,
     lookup::{PathPrefix, metadata_path},
@@ -9,6 +10,163 @@ use vrl::event_path;
 
 use super::*;
 use crate::event::{Event, LogEvent, MetricKind, MetricValue};
+
+// =============================================================================
+// UriTemplate serde and schema tests
+// =============================================================================
+
+#[test]
+fn template_marker_is_ignored_by_configurable() {
+    // `Template` and `UriTemplate` are concrete newtypes over `UnconfinedTemplate` that
+    // must report the same referenceable name (so the generator emits a single shared
+    // schema definition) and generate an identical schema.
+    assert_eq!(
+        <Template as Configurable>::referenceable_name(),
+        <UriTemplate as Configurable>::referenceable_name(),
+    );
+    assert_eq!(
+        <Template as Configurable>::referenceable_name(),
+        Some("vector::template::Template"),
+    );
+
+    let prefix_schema = serde_json::to_value(generate_root_schema::<Template>().unwrap()).unwrap();
+    let uri_schema = serde_json::to_value(generate_root_schema::<UriTemplate>().unwrap()).unwrap();
+    assert_eq!(prefix_schema, uri_schema);
+}
+
+#[test]
+fn template_schema_is_templateable() {
+    // Documentation generation keys off the `docs::templateable` metadata flag, so it must
+    // survive the hand-written `Configurable` impl for both markers.
+    for schema in [
+        generate_root_schema::<Template>().unwrap(),
+        generate_root_schema::<UriTemplate>().unwrap(),
+    ] {
+        let metadata = serde_json::to_value(&schema.schema).unwrap();
+        assert_eq!(
+            metadata.pointer("/_metadata/docs::templateable"),
+            Some(&serde_json::json!(true)),
+            "schema must carry the docs::templateable flag: {metadata}"
+        );
+    }
+}
+
+#[test]
+fn uri_template_schema_is_string() {
+    // UriTemplate must generate a plain string schema (same as Template).
+    let root_schema = generate_root_schema::<UriTemplate>().unwrap();
+    let schema_value = serde_json::to_value(&root_schema.schema).unwrap();
+
+    // The schema must have type: "string" and no object/array/oneOf/anyOf
+    let schema_obj = schema_value.as_object().expect("schema must be an object");
+    assert_eq!(
+        schema_obj.get("type"),
+        Some(&serde_json::json!("string")),
+        "UriTemplate schema must have type: string"
+    );
+    assert!(
+        !schema_obj.contains_key("properties"),
+        "UriTemplate must not have properties (not an object)"
+    );
+    assert!(
+        !schema_obj.contains_key("additionalProperties"),
+        "UriTemplate must not have additionalProperties"
+    );
+    assert!(
+        !schema_obj.contains_key("items"),
+        "UriTemplate must not have items (not an array)"
+    );
+    assert!(
+        !schema_obj.contains_key("oneOf"),
+        "UriTemplate must not be a oneOf"
+    );
+    assert!(
+        !schema_obj.contains_key("anyOf"),
+        "UriTemplate must not be an anyOf"
+    );
+    assert!(
+        !schema_obj.contains_key("allOf"),
+        "UriTemplate must not be an allOf"
+    );
+}
+
+#[test]
+fn uri_template_serde_roundtrip_string() {
+    // UriTemplate must serialize/deserialize as a plain string, not an object.
+    let uri = UriTemplate::try_from("https://example.com/{{ tenant }}/path").unwrap();
+
+    // Serialize to JSON string (exact scalar, not object)
+    let json = serde_json::to_string(&uri).unwrap();
+    assert_eq!(json, "\"https://example.com/{{ tenant }}/path\"");
+
+    // Deserialize back from JSON string
+    let uri2: UriTemplate = serde_json::from_str(&json).unwrap();
+    assert_eq!(uri, uri2);
+}
+
+#[test]
+fn uri_template_toml_roundtrip_string() {
+    // UriTemplate must work with TOML (plain string representation)
+    #[derive(serde::Deserialize, serde::Serialize)]
+    struct Config {
+        uri: UriTemplate,
+    }
+
+    let config = Config {
+        uri: UriTemplate::try_from("https://logs.example.com/{{ key }}").unwrap(),
+    };
+
+    let toml_str = toml::to_string(&config).unwrap();
+    assert!(toml_str.contains("uri = \"https://logs.example.com"));
+    assert!(!toml_str.contains("inner")); // Should NOT expose inner field
+
+    // Parse serialized TOML and assert the uri node is a scalar string, not a table/object
+    let value = toml::from_str::<toml::Value>(&toml_str).unwrap();
+    let uri_value = value.get("uri").expect("toml must contain 'uri' key");
+    assert!(
+        uri_value.is_str(),
+        "UriTemplate must serialize as a TOML string, not a table; got {uri_value:?}"
+    );
+    assert_eq!(
+        uri_value.as_str().unwrap(),
+        "https://logs.example.com/{{ key }}"
+    );
+
+    let config2: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(config.uri, config2.uri);
+}
+
+#[test]
+fn uri_template_yaml_roundtrip_string() {
+    // UriTemplate must work with YAML (plain string representation)
+    let uri = UriTemplate::try_from("https://api.example.com/ingest/{{ id }}").unwrap();
+
+    let yaml_str = serde_yaml::to_string(&uri).unwrap();
+    assert!(yaml_str.contains("https://api.example.com"));
+    assert!(!yaml_str.contains("inner"));
+
+    // Parse serialized YAML and assert the value is exactly the expected scalar string
+    let value = serde_yaml::from_str::<serde_yaml::Value>(&yaml_str).unwrap();
+    assert!(
+        value.is_string(),
+        "UriTemplate must serialize as a YAML string, not a mapping; got {value:?}"
+    );
+    assert_eq!(
+        value.as_str().unwrap(),
+        "https://api.example.com/ingest/{{ id }}"
+    );
+
+    let uri2: UriTemplate = serde_yaml::from_str(&yaml_str).unwrap();
+    assert_eq!(uri, uri2);
+}
+
+#[test]
+fn uri_template_display_preserves_source() {
+    // Display must return the original source string
+    let src = "https://example.com/{{ path }}";
+    let uri = UriTemplate::try_from(src).unwrap();
+    assert_eq!(uri.to_string(), src);
+}
 
 #[test]
 fn get_fields() {
@@ -471,7 +629,9 @@ fn dotdot_bypass_rejected() {
     // be rejected — on filesystem-like protocols (WebHDFS) the server resolves
     // `..` and the value escapes the intended namespace.
     let tpl = Template::try_from("safe/{{ tenant }}/").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let c = ConfinementChecker::for_prefix_template(&tpl)
+        .unwrap()
+        .unwrap();
 
     assert!(c.confine("safe/legit/").is_ok());
     assert!(matches!(
@@ -491,8 +651,8 @@ fn uri_path_traversal_rejected() {
     // `https://api.internal/ingest/{{ tenant }}` with `../../admin` passes the
     // authority check (same host) but must be caught by the path-prefix +
     // `..` checks.
-    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     assert!(c.confine("https://api.internal/ingest/acme").is_ok());
     assert!(matches!(
@@ -512,8 +672,8 @@ fn uri_percent_encoded_dotdot_rejected() {
     // Servers that decode percent-encoding before path resolution can be
     // tricked by `%2e%2e` instead of `..`.  All encoded variants must be
     // rejected alongside the literal `..`.
-    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     assert!(c.confine("https://api.internal/ingest/legit").is_ok());
     assert!(matches!(
@@ -546,8 +706,8 @@ fn uri_encoded_slash_traversal_rejected() {
     // alone would miss it. Many HTTP servers decode `%2f` before resolving the
     // path, turning the single segment into `../admin` and escaping the prefix.
     // We must also reject `%5c` (encoded backslash) for Windows-backed services.
-    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     assert!(matches!(
         c.confine("https://api.internal/ingest/%2e%2e%2fadmin")
@@ -573,8 +733,8 @@ fn uri_encoded_slash_traversal_rejected() {
 
 #[test]
 fn uri_authority_mismatch_rejected() {
-    let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let tpl = UriTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     // Normal path extension is fine.
     assert!(c.confine("https://trusted.example.com/api/v1").is_ok());
@@ -614,8 +774,8 @@ fn uri_path_field_cannot_smuggle_backslash() {
     // Raw `\` is accepted by `http::Uri` but Windows/IIS servers treat it
     // as a path separator — `/ingest/..\admin` escapes the prefix on those
     // hosts. Reject at render time.
-    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
     assert!(matches!(
         c.confine("https://api.internal/ingest/..\\admin")
             .unwrap_err(),
@@ -633,8 +793,8 @@ fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
     // `%25` is the encoded form of `%`. A proxy that decodes once turns
     // `%252e%252e%252fadmin` into `%2e%2e%2fadmin`; a second decoder
     // resolves it to `../admin`. Reject at render time.
-    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
     assert!(matches!(
         c.confine("https://api.internal/ingest/%252e%252e%252fadmin")
             .unwrap_err(),
@@ -647,16 +807,69 @@ fn uri_path_field_cannot_smuggle_query() {
     // Templates with no `?` build successfully. A field value that smuggles
     // `?...` into the path (e.g. tenant=`ok?tenant=evil`) is caught at
     // render time via the query-rejection check.
-    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
-    let c = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
     assert!(matches!(
         c.confine("https://api.internal/ingest/ok?tenant=evil")
             .unwrap_err(),
         ConfineError::OutsideBase { .. }
     ));
-    // Fragments are stripped by `http::Uri` before reaching the server,
-    // so a rendered `#frag` doesn't count as a query and is accepted.
-    assert!(c.confine("https://api.internal/ingest/ok#frag").is_ok());
+}
+
+#[test]
+fn uri_fragment_prevents_suffix_hiding() {
+    // Fragment must be rejected before parsing to prevent truncation from
+    // hiding an operator-authored suffix. Template:
+    //   https://api.internal/base/{{ tenant }}/ingest
+    // with tenant = "ok#evil" renders:
+    //   https://api.internal/base/ok#evil
+    // Without raw fragment checking, http::Uri would truncate to:
+    //   https://api.internal/base/ok
+    // and the /ingest suffix is never checked or used.
+    use crate::event::Event;
+    use vector_lib::event::LogEvent;
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://api.internal/base/{{ tenant }}/ingest").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    let mut event = Event::Log(LogEvent::from("x"));
+    event.as_mut_log().insert(event_path!("tenant"), "ok#evil");
+
+    // Fragment in field value must be rejected
+    assert!(
+        matches!(
+            confined.render_string(&event).unwrap_err(),
+            TemplateRenderingError::Confined { .. }
+        ),
+        "Expected fragment to be rejected before parsing hides /ingest"
+    );
+}
+
+#[test]
+fn uri_path_field_cannot_smuggle_fragment() {
+    // Dynamic URI templates cannot have field-injected fragments.
+    // Although `http::Uri` strips fragments server-side, the raw `#` can
+    // affect client-side routing/logging and must be rejected.
+    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
+
+    // Check that we detect fragments before parsing strips them
+    let test_uri = "https://api.internal/ingest/ok#evil";
+    assert!(test_uri.contains('#'), "Test URI should contain #");
+
+    // Fragment in path value should be rejected
+    let result = c.confine(test_uri);
+    assert!(
+        result.is_err(),
+        "Expected fragment to be rejected, got {:?} for {}",
+        result,
+        test_uri
+    );
+    assert!(matches!(
+        result.unwrap_err(),
+        ConfineError::OutsideBase { .. }
+    ));
 }
 
 #[test]
@@ -676,10 +889,10 @@ fn uri_template_with_query_or_fragment_rejected_at_build() {
         "https://api.internal/base/{{ tenant }}/ingest#frag",
         "https://api.internal/base/{{ tenant }}#frag",
     ] {
-        let tpl = Template::try_from(*template_str).unwrap();
+        let tpl = UriTemplate::try_from(*template_str).unwrap();
         assert!(
             matches!(
-                ConfinementChecker::for_template(&tpl).unwrap_err(),
+                ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
                 BuildError::DynamicUriQueryOrFragment { .. }
             ),
             "expected DynamicUriQueryOrFragment for {template_str}"
@@ -692,8 +905,25 @@ fn static_uri_with_query_allowed() {
     // A fully static URI (no `{{ }}`) with a query string is safe: the
     // rendered value is fixed and cannot be influenced by event data.
     // No checker is installed; `Ok(None)` is the expected result.
-    let tpl = Template::try_from("https://api.internal/ingest?source=vector").unwrap();
-    assert!(ConfinementChecker::for_template(&tpl).unwrap().is_none());
+    let tpl = UriTemplate::try_from("https://api.internal/ingest?source=vector").unwrap();
+    assert!(
+        ConfinementChecker::for_uri_template(&tpl)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn static_uri_with_fragment_allowed() {
+    // A fully static URI (no `{{ }}`) with a fragment is safe: the
+    // rendered value is fixed and cannot be influenced by event data.
+    // No checker is installed; `Ok(None)` is the expected result.
+    let tpl = UriTemplate::try_from("https://api.internal/ingest#section").unwrap();
+    assert!(
+        ConfinementChecker::for_uri_template(&tpl)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -701,18 +931,22 @@ fn no_static_uri_authority_rejected() {
     // `https://{{ host }}/ingest` has prefix `https://` — any host can be
     // rendered, so the confinement is meaningless. Must be rejected at build.
     for template_str in &["https://{{ host }}/ingest", "http://{{ host }}/path"] {
-        let tpl = Template::try_from(*template_str).unwrap();
+        let tpl = UriTemplate::try_from(*template_str).unwrap();
         assert!(
             matches!(
-                ConfinementChecker::for_template(&tpl).unwrap_err(),
+                ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
                 BuildError::NoStaticUriAuthority { .. }
             ),
             "expected NoStaticUriAuthority for {template_str}"
         );
     }
     // A template with a static host followed by a `/` is accepted.
-    let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
-    assert!(ConfinementChecker::for_template(&tpl).unwrap().is_some());
+    let tpl = UriTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
+    assert!(
+        ConfinementChecker::for_uri_template(&tpl)
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[test]
@@ -722,10 +956,10 @@ fn partial_uri_authority_rejected() {
         "https://tenant.{{ env }}.example.com/",
         "https://api.internal{{ path }}",
     ] {
-        let tpl = Template::try_from(*template_str).unwrap();
+        let tpl = UriTemplate::try_from(*template_str).unwrap();
         assert!(
             matches!(
-                ConfinementChecker::for_template(&tpl).unwrap_err(),
+                ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
                 BuildError::PartialUriAuthority { .. }
             ),
             "expected PartialUriAuthority for {template_str}"
@@ -739,7 +973,7 @@ fn root_only_prefix_rejected() {
     // trivially starts with it, so it provides no useful confinement.
     let tpl = Template::try_from("/{{ tenant }}/").unwrap();
     assert!(matches!(
-        ConfinementChecker::for_template(&tpl).unwrap_err(),
+        ConfinementChecker::for_prefix_template(&tpl).unwrap_err(),
         BuildError::DerivedBaseIsRoot { .. }
     ));
 }
@@ -748,7 +982,9 @@ fn root_only_prefix_rejected() {
 fn non_root_slash_prefix_accepted() {
     // `/data/{{ tenant }}/` has a literal prefix of `/data/` — non-root, valid.
     let tpl = Template::try_from("/data/{{ tenant }}/").unwrap();
-    let checker = ConfinementChecker::for_template(&tpl).unwrap().unwrap();
+    let checker = ConfinementChecker::for_prefix_template(&tpl)
+        .unwrap()
+        .unwrap();
     assert!(checker.confine("/data/tenant-a/").is_ok());
     assert!(checker.confine("/other/tenant-a/").is_err());
 }
@@ -782,4 +1018,261 @@ fn confined_template_rejects_escape() {
         confined.render(&event).unwrap_err(),
         TemplateRenderingError::Confined { .. }
     ));
+}
+
+// Regression tests for F1c: type-safe ConfinedUriTemplate
+
+#[test]
+fn http_prefix_treated_as_non_uri_for_confine() {
+    // `confine` does not interpret content as URI, so `http://` prefixes
+    // are treated as ordinary string prefixes (useful for object-store keys).
+    use crate::event::Event;
+    use vector_lib::event::LogEvent;
+
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(event_path!("region"), "us-east-1");
+
+    let config = ConfinementConfig::default();
+    let tpl = Template::try_from("http://logs-{{ region }}/").unwrap();
+
+    // Should succeed - this is prefix confinement, not URI confinement
+    let confined = tpl.confine(&config, "test_sink", "key_prefix").unwrap();
+
+    // Should render successfully
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "http://logs-us-east-1/"
+    );
+}
+
+#[test]
+fn uri_template_confine_enforces_uri_semantics() {
+    // UriTemplate::confine enforces URI-specific checks
+    use crate::event::Event;
+    use vector_lib::event::LogEvent;
+
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(event_path!("tenant"), "acme/../../../evil");
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://api.example.com/ingest/{{ tenant }}").unwrap();
+
+    // Should succeed to build with URI confinement
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    // But should reject path traversal at render time (URI-specific check)
+    assert!(matches!(
+        confined.render_string(&event).unwrap_err(),
+        TemplateRenderingError::Confined { .. }
+    ));
+}
+
+#[test]
+fn uri_template_confine_rejects_partial_authority() {
+    // URI templates must have a fully static authority (host) component.
+    // Field references inside the host are rejected at build time.
+
+    let config = ConfinementConfig::default();
+
+    // Field reference inside the authority (host) component
+    let tpl = UriTemplate::try_from("https://trusted.example{{ ext }}/path").unwrap();
+    let err = tpl.confine(&config, "http", "uri").unwrap_err();
+    // The error chain should contain PartialUriAuthority
+    let err_str = err.to_string();
+    assert!(
+        err_str.contains("host") && err_str.contains("authority"),
+        "Expected PartialUriAuthority error, got {:?}",
+        err_str
+    );
+}
+
+#[test]
+fn uri_template_confine_opt_out_returns_correct_type() {
+    // Even when opting out, UriTemplate::confine must return ConfinedUriTemplate
+    let config = ConfinementConfig {
+        dangerously_allow_unconfined_template_resolution: true,
+    };
+    let tpl = UriTemplate::try_from("{{ endpoint }}").unwrap();
+    // Type annotation ensures we get ConfinedUriTemplate, not ConfinedTemplate
+    let _confined_confined_uri: ConfinedUriTemplate = tpl.confine(&config, "http", "uri").unwrap();
+}
+
+// Tests for URI scheme validation (blocker #1)
+
+#[test]
+fn uri_template_confine_rejects_relative_uri() {
+    // Relative URIs like `/path/{{ field }}` lack scheme and authority
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("/api/{{ tenant }}").unwrap();
+    let err = tpl.confine(&config, "http", "uri").unwrap_err();
+    let err_str = err.to_string();
+    assert!(
+        err_str.contains("authority"),
+        "Expected NoStaticUriAuthority for relative URI, got {:?}",
+        err_str
+    );
+}
+
+#[test]
+fn uri_template_confine_rejects_schemeless_uri() {
+    // Schemeless URIs like `//host/path` are not HTTP/HTTPS
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("//api.example.com/{{ tenant }}").unwrap();
+    let err = tpl.confine(&config, "http", "uri").unwrap_err();
+    let err_str = err.to_string();
+    assert!(
+        err_str.contains("authority"),
+        "Expected NoStaticUriAuthority for schemeless URI, got {:?}",
+        err_str
+    );
+}
+
+#[test]
+fn uri_template_confine_rejects_unsupported_scheme() {
+    // Non-HTTP(S) schemes like ftp:// must be rejected
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("ftp://files.example.com/{{ path }}").unwrap();
+    let err = tpl.confine(&config, "http", "uri").unwrap_err();
+    let err_str = err.to_string();
+    assert!(
+        err_str.contains("ftp"),
+        "Expected UnsupportedUriScheme for ftp://, got {:?}",
+        err_str
+    );
+}
+
+#[test]
+fn uri_template_confine_accepts_http_and_https_schemes() {
+    // Both http:// and https:// must be accepted for UriTemplate, including mixed case
+    use crate::event::Event;
+    use vector_lib::event::LogEvent;
+
+    let config = ConfinementConfig::default();
+
+    // HTTP scheme (lowercase)
+    let mut event = Event::Log(LogEvent::from("x"));
+    event.as_mut_log().insert(event_path!("tenant"), "acme");
+    let tpl = UriTemplate::try_from("http://api.example.com/{{ tenant }}").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "http://api.example.com/acme"
+    );
+
+    // HTTPS scheme (lowercase)
+    let tpl = UriTemplate::try_from("https://api.example.com/{{ tenant }}").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://api.example.com/acme"
+    );
+
+    // HTTPS scheme (mixed case - HtTpS)
+    let tpl = UriTemplate::try_from("HtTpS://api.example.com/{{ tenant }}").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "HtTpS://api.example.com/acme"
+    );
+}
+
+// Tests for static URI validation
+
+#[test]
+fn static_uri_template_rejects_ftp_scheme() {
+    // Static FTP URIs must be rejected even though there are no dynamic fields
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("ftp://files.example.com/path").unwrap();
+    let err = tpl.confine(&config, "http", "uri").unwrap_err();
+    let err_str = err.to_string();
+    assert!(
+        err_str.contains("ftp"),
+        "Expected UnsupportedUriScheme error for ftp, got: {:?}",
+        err_str
+    );
+}
+
+#[test]
+fn static_uri_template_rejects_relative_path() {
+    // Static relative URIs (no scheme) must be rejected
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("/api/endpoint").unwrap();
+    let err = tpl.confine(&config, "http", "uri").unwrap_err();
+    let err_str = err.to_string();
+    assert!(
+        err_str.contains("authority") || err_str.contains("scheme"),
+        "Expected authority/scheme error for relative URI, got: {:?}",
+        err_str
+    );
+}
+
+#[test]
+fn static_uri_template_rejects_schemeless() {
+    // Static schemeless URIs (//host/path) must be rejected
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("//api.example.com/path").unwrap();
+    let err = tpl.confine(&config, "http", "uri").unwrap_err();
+    let err_str = err.to_string();
+    assert!(
+        err_str.contains("authority") || err_str.contains("scheme"),
+        "Expected authority/scheme error for schemeless URI, got: {:?}",
+        err_str
+    );
+}
+
+#[test]
+fn static_uri_template_accepts_valid_http() {
+    // Valid static HTTP URIs must be accepted (no checker needed)
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("http://api.example.com/path").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+    // Can still render the static value
+    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "http://api.example.com/path"
+    );
+}
+
+#[test]
+fn static_uri_template_accepts_valid_https() {
+    // Valid static HTTPS URIs must be accepted (no checker needed)
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://secure.example.com/api").unwrap();
+    let confined = tpl.confine(&config, "https", "uri").unwrap();
+    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://secure.example.com/api"
+    );
+}
+
+#[test]
+fn static_uri_template_retains_query_acceptance() {
+    // Static URIs with query strings must still be accepted
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://api.example.com/ingest?source=vector").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://api.example.com/ingest?source=vector"
+    );
+}
+
+#[test]
+fn static_uri_template_retains_fragment_acceptance() {
+    // Static URIs with fragments must still be accepted
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://api.example.com/ingest#section").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://api.example.com/ingest#section"
+    );
 }
