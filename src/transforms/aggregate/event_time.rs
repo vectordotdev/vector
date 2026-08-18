@@ -18,7 +18,7 @@ use crate::{
 
 impl Aggregate {
     /// Event-time settings; only called from the event-time path.
-    fn event_time(&self) -> &EventTimeConfig {
+    const fn event_time(&self) -> &EventTimeConfig {
         self.config
             .event_time
             .as_ref()
