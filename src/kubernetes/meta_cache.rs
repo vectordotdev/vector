@@ -31,14 +31,20 @@ impl MetaCache {
 pub struct MetaDescribe {
     name: String,
     namespace: String,
+    uid: String,
 }
 
 impl MetaDescribe {
     pub fn from_meta(meta: &ObjectMeta) -> Self {
         let name = meta.name.clone().unwrap_or_default();
         let namespace = meta.namespace.clone().unwrap_or_default();
+        let uid = meta.uid.clone().unwrap_or_default();
 
-        Self { name, namespace }
+        Self {
+            name,
+            namespace,
+            uid,
+        }
     }
 }
 
