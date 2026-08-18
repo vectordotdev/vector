@@ -19,7 +19,7 @@ use crate::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{
-            ServiceBuilderExt, TowerRequestConfig, TowerRequestSettings,
+            HttpEndpoint, ServiceBuilderExt, TowerRequestConfig, TowerRequestSettings,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
@@ -59,10 +59,9 @@ impl DatadogEventsConfig {
     /// Resolve the events API endpoint URI from the given endpoint/site.
     fn events_endpoint(endpoint: Option<&str>, site: &str) -> crate::Result<Uri> {
         let base = datadog::get_api_base_endpoint(endpoint, site);
-        [&base, "/api/v1/events"]
-            .join("")
-            .parse()
-            .map_err(Into::into)
+        Ok(HttpEndpoint::parse(&base)?
+            .append_path("/api/v1/events")?
+            .into_uri())
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
@@ -200,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_endpoint_without_scheme() {
+    fn validate_accepts_endpoint_without_scheme() {
         let config = DatadogEventsConfig {
             dd_common: LocalDatadogCommonConfig::new(
                 Some("localhost:8080".to_string()),
@@ -209,6 +208,14 @@ mod tests {
             ),
             ..Default::default()
         };
-        assert!(config.validate().is_err());
+        config.validate().expect("validation should succeed");
+        // A missing scheme is defaulted to https, matching the shared Datadog
+        // endpoint contract used by the healthcheck and other Datadog sinks.
+        assert_eq!(
+            DatadogEventsConfig::events_endpoint(Some("localhost:8080"), datadog::DD_US_SITE)
+                .expect("endpoint should parse")
+                .to_string(),
+            "https://localhost:8080/api/v1/events"
+        );
     }
 }
