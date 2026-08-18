@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZeroU64, time::Duration};
 
 use chrono::Utc;
 use serde_with::serde_as;
@@ -81,7 +81,7 @@ pub struct TcpConfig {
     /// before the TLS handshake finishes, protecting against clients that open a
     /// connection but never complete (or never start) a handshake.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    tls_handshake_timeout_secs: Option<u64>,
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
 
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
@@ -173,11 +173,11 @@ impl TcpConfig {
         self
     }
 
-    pub const fn tls_handshake_timeout_secs(&self) -> Option<u64> {
+    pub const fn tls_handshake_timeout_secs(&self) -> Option<NonZeroU64> {
         self.tls_handshake_timeout_secs
     }
 
-    pub const fn set_tls_handshake_timeout_secs(&mut self, val: Option<u64>) -> &mut Self {
+    pub const fn set_tls_handshake_timeout_secs(&mut self, val: Option<NonZeroU64>) -> &mut Self {
         self.tls_handshake_timeout_secs = val;
         self
     }

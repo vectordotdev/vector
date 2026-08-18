@@ -1,5 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
     time::Duration,
 };
 
@@ -145,7 +146,7 @@ pub struct TcpConfig {
     /// before the TLS handshake finishes, protecting against clients that open a
     /// connection but never complete (or never start) a handshake.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    tls_handshake_timeout_secs: Option<u64>,
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
 
     ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"

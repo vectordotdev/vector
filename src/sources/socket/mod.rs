@@ -323,6 +323,7 @@ mod test {
     use std::{
         collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+        num::NonZeroU64,
         sync::{
             Arc,
             atomic::{AtomicBool, Ordering},
@@ -939,18 +940,9 @@ mod test {
         let mut config = TcpConfig::from_address(addr.into());
         config.set_tls(Some(TlsSourceConfig {
             tls_config: TlsEnableableConfig::test_config(),
-                enabled: Some(true),
-                options: TlsConfig {
-                    verify_certificate: Some(true),
-                    crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
-                    key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
-                    ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                    ..Default::default()
-                },
-            },
             client_metadata_key: None,
         }));
-        config.set_tls_handshake_timeout_secs(Some(1));
+        config.set_tls_handshake_timeout_secs(Some(NonZeroU64::new(1).unwrap()));
 
         let source_task = SocketConfig::from(config)
             .build(SourceContext::new_test(tx, None))
@@ -968,14 +960,11 @@ mod test {
             .expect("stream should be able to connect");
         let start = Instant::now();
 
-        let timeout = tokio::time::sleep(Duration::from_millis(2000));
-        let mut buffer = [0u8; 10];
+        let bytes_read = timeout(Duration::from_secs(2), stream.read(&mut [0]))
+            .await
+            .expect("timed out waiting for stream to close")
+            .expect("failed to read from stream");
 
-    let bytes_read = timeout(Duration::from_secs(2), stream.read(&mut [0]))
-        .await
-        .expect("timed out waiting for stream to close")
-        .expect("failed to read from stream");
-        
         assert_eq!(bytes_read, 0, "unexpectedly read data from stream");
         assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.5);
     }

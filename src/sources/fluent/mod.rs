@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, io, net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Buf, Bytes, BytesMut};
@@ -190,7 +190,7 @@ pub struct FluentTcpConfig {
     /// before the TLS handshake finishes, protecting against clients that open a
     /// connection but never complete (or never start) a handshake.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    tls_handshake_timeout_secs: Option<u64>,
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,

@@ -1,6 +1,6 @@
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -107,7 +107,7 @@ pub enum Mode {
         /// before the TLS handshake finishes, protecting against clients that open a
         /// connection but never complete (or never start) a handshake.
         #[configurable(metadata(docs::type_unit = "seconds"))]
-        tls_handshake_timeout_secs: Option<u64>,
+        tls_handshake_timeout_secs: Option<NonZeroU64>,
     },
 
     /// Listen on UDP.

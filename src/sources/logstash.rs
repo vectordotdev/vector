@@ -3,7 +3,7 @@ use std::{
     convert::TryFrom,
     io,
     net::SocketAddr,
-    num::NonZeroUsize,
+    num::{NonZeroU64, NonZeroUsize},
     time::Duration,
 };
 
@@ -68,7 +68,7 @@ pub struct LogstashConfig {
     /// before the TLS handshake finishes, protecting against clients that open a
     /// connection but never complete (or never start) a handshake.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    tls_handshake_timeout_secs: Option<u64>,
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
