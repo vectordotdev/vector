@@ -136,6 +136,43 @@ impl UncompressedReader for UncompressedReaderImpl {
     }
 }
 
+/// Carries the number of bytes actually read from the (decompressed) stream
+/// before hitting EOF, so callers can distinguish a genuinely empty stream
+/// from one that simply had too little data to fingerprint.
+#[derive(Debug)]
+struct TooSmallToFingerprint {
+    bytes_read: usize,
+}
+
+impl std::fmt::Display for TooSmallToFingerprint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EOF reached after {} bytes", self.bytes_read)
+    }
+}
+
+impl std::error::Error for TooSmallToFingerprint {}
+
+/// Per-path state for files that were too small to fingerprint on their last
+/// attempt.
+#[derive(Debug, Clone, Copy)]
+pub struct SmallFileState {
+    /// When this path was first observed as too small to fingerprint.
+    /// Used by callers for retry/cleanup bookkeeping.
+    pub first_seen: time::Instant,
+    /// Whether `emit_file_checksum_failed` has already been emitted for
+    /// this path, so it isn't repeated on every subsequent attempt.
+    warned: bool,
+}
+
+impl SmallFileState {
+    fn new() -> Self {
+        Self {
+            first_seen: time::Instant::now(),
+            warned: false,
+        }
+    }
+}
+
 async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
     reader: &mut R,
     n: usize,
@@ -199,12 +236,15 @@ impl Fingerprinter {
     pub async fn fingerprint_or_emit(
         &mut self,
         path: &Path,
-        known_small_files: &mut HashMap<PathBuf, time::Instant>,
+        known_small_files: &mut HashMap<PathBuf, SmallFileState>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
+        let mut file_size = None;
+
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if !metadata.is_dir() {
+                    file_size = Some(metadata.len());
                     self.fingerprint(path).await.map(Some)
                 } else {
                     Ok(None)
@@ -221,9 +261,30 @@ impl Fingerprinter {
             .map_err(|error| {
                 match error.kind() {
                     ErrorKind::UnexpectedEof => {
-                        if !known_small_files.contains_key(path) {
+                        // An empty (decompressed) stream should never warn; a
+                        // stream with content that's still too small to
+                        // fingerprint should warn exactly once per path.
+                        //
+                        // The stream reader tracks bytes actually consumed
+                        // once decoding is under way, which is what makes an
+                        // empty-decompressed-gzip-stream distinguishable from
+                        // a gzip file with nonzero on-disk size. If decoding
+                        // never got that far (e.g. the raw file is too short
+                        // to even hold a compression magic header), fall back
+                        // to the on-disk size, which is accurate for
+                        // uncompressed files.
+                        let is_empty = error
+                            .get_ref()
+                            .and_then(|inner| inner.downcast_ref::<TooSmallToFingerprint>())
+                            .map_or(file_size == Some(0), |inner| inner.bytes_read == 0);
+
+                        let state = known_small_files
+                            .entry(path.to_path_buf())
+                            .or_insert_with(SmallFileState::new);
+
+                        if !is_empty && !state.warned {
                             emitter.emit_file_checksum_failed(path);
-                            known_small_files.insert(path.to_path_buf(), time::Instant::now());
+                            state.warned = true;
                         }
                         return;
                     }
@@ -253,7 +314,14 @@ async fn fingerprinter_read_until(
     let mut total_read = 0;
     'main: while !buf.is_empty() {
         let read = match r.read(buf).await {
-            Ok(0) => return Err(std::io::Error::new(ErrorKind::UnexpectedEof, "EOF reached")),
+            Ok(0) => {
+                return Err(std::io::Error::new(
+                    ErrorKind::UnexpectedEof,
+                    TooSmallToFingerprint {
+                        bytes_read: total_read,
+                    },
+                ));
+            }
             Ok(n) => n,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
@@ -277,7 +345,17 @@ async fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, fs, io::Error, path::Path, time::Duration};
+    use std::{
+        collections::HashMap,
+        fs,
+        io::Error,
+        path::Path,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
 
     use async_compression::tokio::bufread::GzipEncoder;
     use bytes::BytesMut;
@@ -638,6 +716,138 @@ mod test {
         );
     }
 
+    #[tokio::test]
+    async fn fingerprint_or_emit_only_warns_on_non_empty_small_files() {
+        let target_dir = tempdir().unwrap();
+        let empty_path = target_dir.path().join("empty.log");
+        let too_small_path = target_dir.path().join("too_small.log");
+
+        fs::write(&empty_path, []).unwrap();
+        fs::write(&too_small_path, b"missing newline").unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+
+        let emitter = RecordingEmitter::default();
+        let mut small_files = HashMap::new();
+
+        // Raw empty file: no warning, but still tracked.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&empty_path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 0);
+        assert!(small_files.contains_key(&empty_path));
+
+        // Non-empty file that's too small to fingerprint: warns once.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&too_small_path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 1);
+        assert!(small_files.contains_key(&too_small_path));
+
+        // Calling again on the same too-small file must not warn a second time.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&too_small_path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn fingerprint_or_emit_warns_once_when_empty_file_becomes_partial() {
+        let target_dir = tempdir().unwrap();
+        let path = target_dir.path().join("growing.log");
+
+        fs::write(&path, []).unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+
+        let emitter = RecordingEmitter::default();
+        let mut small_files = HashMap::new();
+
+        // First seen while empty: no warning, but tracked.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 0);
+        assert!(small_files.contains_key(&path));
+
+        // File gains some content but is still too small to fingerprint: warns once.
+        fs::write(&path, b"missing newline").unwrap();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 1);
+        assert!(small_files.contains_key(&path));
+
+        // Further attempts while still too small must not warn again.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn fingerprint_or_emit_does_not_warn_on_empty_gzip_stream() {
+        let target_dir = tempdir().unwrap();
+        let path = target_dir.path().join("empty_decompressed.log.gz");
+
+        // A valid gzip container whose decompressed content is empty: on-disk
+        // size is nonzero, but the decompressed stream has zero bytes.
+        fs::write(&path, gzip(b"").await).unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+
+        let emitter = RecordingEmitter::default();
+        let mut small_files = HashMap::new();
+
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(emitter.checksum_failed_count(), 0);
+        assert!(small_files.contains_key(&path));
+    }
+
     #[test]
     fn test_monotonic_compression_algorithms() {
         // This test is necessary to handle an edge case where when assessing the magic header
@@ -656,6 +866,47 @@ mod test {
     }
     #[derive(Clone)]
     struct NoErrors;
+
+    #[derive(Clone, Default)]
+    struct RecordingEmitter {
+        checksum_failed: Arc<AtomicUsize>,
+    }
+
+    impl RecordingEmitter {
+        fn checksum_failed_count(&self) -> usize {
+            self.checksum_failed.load(Ordering::SeqCst)
+        }
+    }
+
+    impl FileSourceInternalEvents for RecordingEmitter {
+        fn emit_file_added(&self, _: &Path) {}
+
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+
+        fn emit_file_deleted(&self, _: &Path) {}
+
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+
+        fn emit_file_checksum_failed(&self, _: &Path) {
+            self.checksum_failed.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn emit_file_checkpoint_write_error(&self, _: Error) {}
+
+        fn emit_files_open(&self, _: usize) {}
+
+        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
+    }
 
     impl FileSourceInternalEvents for NoErrors {
         fn emit_file_added(&self, _: &Path) {}
