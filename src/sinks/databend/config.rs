@@ -4,8 +4,12 @@ use databend_client::APIClient as DatabendAPIClient;
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::{
-    codecs::encoding::{Framer, FramingConfig},
+    codecs::{
+        Transformer,
+        encoding::{Framer, FramingConfig},
+    },
     configurable::{component::GenerateConfig, configurable_component},
+    stream::BatcherSettings,
 };
 
 use super::{
@@ -17,13 +21,13 @@ use super::{
 };
 use crate::{
     codecs::{Encoder, EncodingConfig},
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::{Auth, MaybeAuth},
     sinks::{
         Healthcheck, VectorSink,
         util::{
             BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, UriSerde,
+            TowerRequestConfig, TowerRequestSettings, UriSerde,
         },
     },
     tls::TlsConfig,
@@ -102,8 +106,30 @@ impl GenerateConfig for DatabendConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "databend")]
 impl SinkConfig for DatabendConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ua = format!("vector/{}", vector_version());
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedDatabend {
+    endpoint: String,
+    request_settings: TowerRequestSettings,
+    batch_settings: BatcherSettings,
+    file_format_options: BTreeMap<&'static str, &'static str>,
+    compression: Compression,
+    transformer: Transformer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatabendConfig {
+    type Validated = ValidatedDatabend;
+
+    fn validate(&self) -> crate::Result<ValidatedDatabend> {
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
         let authority = self
             .endpoint
@@ -143,8 +169,6 @@ impl SinkConfig for DatabendConfig {
             endpoint.set_path(&format!("/{database}"));
         }
         let endpoint = endpoint.to_string();
-        let health_client = DatabendAPIClient::new(&endpoint, Some(ua.clone())).await?;
-        let healthcheck = select_one(health_client).boxed();
 
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -161,51 +185,72 @@ impl SinkConfig for DatabendConfig {
             }
         };
         let encoding: EncodingConfig = self.encoding.clone().into();
-        let serializer = match self.encoding.config() {
+        match self.encoding.config() {
             DatabendSerializerConfig::Json(_) => {
                 file_format_options.insert("type", "NDJSON");
                 file_format_options.insert("missing_field_as", self.missing_field_as.as_str());
-                encoding.build()?
             }
             DatabendSerializerConfig::Csv(_) => {
                 file_format_options.insert("type", "CSV");
                 file_format_options.insert("field_delimiter", ",");
                 file_format_options.insert("record_delimiter", "\n");
                 file_format_options.insert("skip_header", "0");
-                encoding.build()?
             }
-        };
-        let framer = FramingConfig::NewlineDelimited.build();
+        }
         let transformer = encoding.transformer();
+
+        Ok(ValidatedDatabend {
+            endpoint,
+            request_settings,
+            batch_settings,
+            file_format_options,
+            compression,
+            transformer,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedDatabend,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedDatabend {
+            endpoint,
+            request_settings,
+            batch_settings,
+            file_format_options,
+            compression,
+            transformer,
+        } = validated;
+
+        let ua = format!("vector/{}", vector_version());
+        let health_client = DatabendAPIClient::new(endpoint, Some(ua.clone())).await?;
+        let healthcheck = select_one(health_client).boxed();
 
         let mut copy_options = BTreeMap::new();
         copy_options.insert("purge", "true");
 
-        let client = DatabendAPIClient::new(&endpoint, Some(ua)).await?;
+        let client = DatabendAPIClient::new(endpoint, Some(ua)).await?;
         let service = DatabendService::new(
             client,
             self.table.clone(),
-            file_format_options,
+            file_format_options.clone(),
             copy_options,
         )?;
         let service = ServiceBuilder::new()
-            .settings(request_settings, DatabendRetryLogic)
+            .settings(request_settings.clone(), DatabendRetryLogic)
             .service(service);
 
+        let encoding: EncodingConfig = self.encoding.clone().into();
+        let serializer = encoding.build()?;
+        let framer = FramingConfig::NewlineDelimited.build();
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let request_builder = DatabendRequestBuilder::new(compression, (transformer, encoder));
+        let request_builder =
+            DatabendRequestBuilder::new(*compression, (transformer.clone(), encoder));
 
-        let sink = DatabendSink::new(batch_settings, request_builder, service);
+        let sink = DatabendSink::new(*batch_settings, request_builder, service);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -221,6 +266,19 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatabendConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+        let config = serde_yaml::from_str::<DatabendConfig>(indoc::indoc! {r#"
+            endpoint: "databend://localhost:8000/mydatabase?sslmode=disable"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert!(validated.endpoint.starts_with("databend://localhost:8000"));
+        assert!(matches!(validated.compression, Compression::None));
     }
 
     #[test]

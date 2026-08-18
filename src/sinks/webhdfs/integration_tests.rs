@@ -13,7 +13,7 @@ use vector_lib::{
 
 use super::WebHdfsConfig;
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::util::{BatchConfig, Compression},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
@@ -25,8 +25,7 @@ use crate::{
 async fn hdfs_healthchecks_invalid_node_node() {
     // Point to an invalid endpoint
     let config = config("http://127.0.0.1:1", 10);
-    let (_, health_check) = config
-        .build(SinkContext::default())
+    let (_, health_check) = SinkConfig::build(&config, SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;
@@ -37,8 +36,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
 #[tokio::test]
 async fn hdfs_healthchecks_valid_node_node() {
     let config = config(&webhdfs_endpoint(), 10);
-    let (_, health_check) = config
-        .build(SinkContext::default())
+    let (_, health_check) = SinkConfig::build(&config, SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;
@@ -54,7 +52,8 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     config.prefix = "logs/%F-{{ .i }}-".to_string();
 
     let op = config.build_operator().unwrap();
-    let sink = config.build_processor(op.clone()).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(op.clone(), &validated).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 30, None);
 

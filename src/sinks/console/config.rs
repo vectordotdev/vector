@@ -9,8 +9,10 @@ use vector_lib::{
 };
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     sinks::{Healthcheck, VectorSink, console::sink::WriterSink},
 };
 
@@ -75,27 +77,6 @@ impl GenerateConfig for ConsoleSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
-
-        let sink: VectorSink = match self.target {
-            Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
-                output: io::stdout(),
-                transformer,
-                encoder,
-            }),
-            Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
-                output: io::stderr(),
-                transformer,
-                encoder,
-            }),
-        };
-
-        Ok((sink, future::ok(()).boxed()))
-    }
-
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type())
     }
@@ -105,12 +86,101 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedConsoleSink {
+    transformer: Transformer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for ConsoleSinkConfig {
+    type Validated = ValidatedConsoleSink;
+
+    fn validate(&self) -> crate::Result<ValidatedConsoleSink> {
+        let transformer = self.encoding.transformer();
+        Ok(ValidatedConsoleSink { transformer })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedConsoleSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedConsoleSink { transformer } = validated;
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
+        let sink: VectorSink = match self.target {
+            Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
+                output: io::stdout(),
+                transformer: transformer.clone(),
+                encoder,
+            }),
+            Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
+                output: io::stderr(),
+                transformer: transformer.clone(),
+                encoder,
+            }),
+        };
+
+        Ok((sink, future::ok(()).boxed()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vector_lib::codecs::encoding::{
+        ProtobufSerializerConfig, ProtobufSerializerOptions, SerializerConfig,
+    };
+
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ConsoleSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = ConsoleSinkConfig {
+            target: Target::Stdout,
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            acknowledgements: Default::default(),
+        };
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the encoder.
+        assert!(matches!(
+            config.encoding.config().1,
+            SerializerConfig::Json(_)
+        ));
+    }
+
+    #[test]
+    fn validate_does_not_build_file_reading_serializers() {
+        // A protobuf codec pointing at a nonexistent descriptor file must still
+        // validate without error: serializer construction (which reads the file)
+        // is deferred to `build`, so `vector validate --no-environment` never
+        // touches the descriptor file.
+        let config = ConsoleSinkConfig {
+            target: Target::Stdout,
+            encoding: (
+                None::<FramingConfig>,
+                ProtobufSerializerConfig {
+                    protobuf: ProtobufSerializerOptions {
+                        desc_file: "/nonexistent/descriptor.desc".into(),
+                        message_type: "package.Message".into(),
+                        use_json_names: false,
+                    },
+                },
+            )
+                .into(),
+            acknowledgements: Default::default(),
+        };
+        let _validated = config.validate().expect("validation should succeed");
+        assert!(matches!(
+            config.encoding.config().1,
+            SerializerConfig::Protobuf(_)
+        ));
     }
 }

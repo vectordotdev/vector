@@ -41,9 +41,13 @@ generated: components: sinks: vector: configuration: {
 			`address` or `routing`.
 
 			This option has been deprecated, use `routing.endpoints` instead.
+
+			Exactly one of `address` or `routing` must be set.
 			"""
 		required: false
-		type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
+		required_one_of: ["address", "routing"]
+		required_one_of_group: "address_or_routing"
+		type: string: examples: ["127.0.0.1:6000", "https://somehost:6000"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -329,8 +333,12 @@ generated: components: sinks: vector: configuration: {
 
 			This option is mutually exclusive with `address`. Set exactly one of
 			`address` or `routing`.
+
+			Exactly one of `address` or `routing` must be set.
 			"""
 		required: false
+		required_one_of: ["address", "routing"]
+		required_one_of_group: "address_or_routing"
 		type: object: options: {
 			endpoints: {
 				description: """
@@ -343,7 +351,7 @@ generated: components: sinks: vector: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
+					items: type: string: examples: ["127.0.0.1:6000", "https://somehost:6000"]
 				}
 			}
 			health: {

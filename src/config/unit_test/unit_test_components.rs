@@ -18,6 +18,7 @@ use crate::{
     conditions::Condition,
     config::{
         AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+        ValidatedSink,
     },
     sinks::Healthcheck,
     sources,
@@ -165,7 +166,28 @@ impl_generate_config_from_default!(UnitTestSinkConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for UnitTestSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
         let sink = UnitTestSink {
             test_name: self.test_name.clone(),
@@ -176,14 +198,6 @@ impl SinkConfig for UnitTestSinkConfig {
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
     }
 }
 
@@ -317,20 +331,33 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = self.sink.lock().await.take().unwrap();
-        let healthcheck = future::ok(()).boxed();
-
-        #[allow(deprecated)]
-        Ok((VectorSink::from_event_sink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for UnitTestStreamSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = self.sink.lock().await.take().unwrap();
+        let healthcheck = future::ok(()).boxed();
+
+        #[allow(deprecated)]
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 }
 

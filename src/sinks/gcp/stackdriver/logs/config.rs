@@ -17,6 +17,7 @@ use super::{
     sink::StackdriverLogsSink,
 };
 use crate::{
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
@@ -198,7 +199,10 @@ pub(super) struct StackdriverLabelConfig {
 fn labels_examples() -> HashMap<String, String> {
     let mut example = HashMap::new();
     example.insert("label_1".to_string(), "value_1".to_string());
-    example.insert("label_2".to_string(), "{{ template_value_2 }}".to_string());
+    example.insert(
+        "label_2".to_string(),
+        "label-{{ template_value_2 }}".to_string(),
+    );
     example
 }
 
@@ -241,7 +245,7 @@ pub(super) struct StackdriverResource {
 fn label_examples() -> HashMap<String, String> {
     let mut example = HashMap::new();
     example.insert("instanceId".to_string(), "Twilight".to_string());
-    example.insert("zone".to_string(), "{{ zone }}".to_string());
+    example.insert("zone".to_string(), "zone-{{ zone }}".to_string());
     example
 }
 
@@ -250,7 +254,27 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        let requirement =
+            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for StackdriverConfig {
+    type Validated = ValidatedStackdriverLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedStackdriverLogs> {
         let log_id = self
             .log_id
             .clone()
@@ -289,18 +313,14 @@ impl SinkConfig for StackdriverConfig {
                 .collect::<crate::Result<_>>()?,
         };
 
-        let auth = self.auth.build(Scope::LoggingWrite).await?;
-
-        let request_builder = StackdriverLogsRequestBuilder {
-            encoder: StackdriverLogsEncoder::new(
-                self.encoding.clone(),
-                log_id,
-                self.log_name.clone(),
-                label_config,
-                resource,
-                self.severity_key.clone(),
-            ),
-        };
+        let encoder = StackdriverLogsEncoder::new(
+            self.encoding.clone(),
+            log_id,
+            self.log_name.clone(),
+            label_config,
+            resource,
+            self.severity_key.clone(),
+        );
 
         let batch_settings = self
             .batch
@@ -308,15 +328,35 @@ impl SinkConfig for StackdriverConfig {
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batcher_settings()?;
 
+        Ok(ValidatedStackdriverLogs {
+            encoder,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedStackdriverLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedStackdriverLogs {
+            encoder,
+            batch_settings,
+        } = validated;
+
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
+
+        let request_builder = StackdriverLogsRequestBuilder {
+            encoder: encoder.clone(),
+        };
+
         let request_limits = self.request.into_settings();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let uri = self.endpoint.clone().into_uri();
-
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
-            uri: uri.clone(),
+            uri: self.endpoint.as_uri().clone(),
             auth: auth.clone(),
         };
 
@@ -329,28 +369,19 @@ impl SinkConfig for StackdriverConfig {
             )
             .service(service);
 
-        let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);
+        let sink = StackdriverLogsSink::new(service, *batch_settings, request_builder);
 
-        let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
+        let healthcheck = healthcheck(client, auth.clone(), self.endpoint.as_uri().clone()).boxed();
 
         auth.spawn_regenerate_token();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
+}
 
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        let requirement =
-            schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
-
-        Input::log().with_schema_requirement(requirement)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
+#[derive(Clone, Debug)]
+pub struct ValidatedStackdriverLogs {
+    encoder: StackdriverLogsEncoder,
+    batch_settings: BatcherSettings,
 }
 
 async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> crate::Result<()> {
@@ -375,7 +406,10 @@ async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> cr
 
 #[cfg(test)]
 mod tests {
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
+
+    use super::*;
 
     #[test]
     fn confinement_rejects_unconfined_log_id() {
@@ -401,5 +435,19 @@ mod tests {
         let config = ConfinementConfig::default();
         let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        let config = StackdriverConfig {
+            log_id: "events-{{ env }}".try_into().unwrap(),
+            endpoint: default_endpoint(),
+            ..Default::default()
+        };
+        config.validate().expect("validation should succeed");
+        assert_eq!(
+            config.endpoint.to_string(),
+            "https://logging.googleapis.com/v2/entries:write"
+        );
     }
 }

@@ -11,6 +11,7 @@ use super::{
     sink::JsonEncoding,
 };
 use crate::{
+    config::ValidatedSink,
     event::LogEvent,
     sinks::{
         prelude::*,
@@ -27,6 +28,18 @@ fn generate_config() {
     crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
 }
 
+#[test]
+fn validate_accepts_valid_config() {
+    let config: AzureMonitorLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            customer_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type: Vector
+        "#})
+    .unwrap();
+
+    config.validate().expect("validation should succeed");
+}
+
 #[tokio::test]
 async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
@@ -39,8 +52,13 @@ async fn component_spec_compliance() {
     };
 
     let context = SinkContext::default();
+    let validated = config.validate().unwrap();
     let (sink, _healthcheck) = config
-        .build_inner(context, HttpEndpoint::new(mock_endpoint).unwrap())
+        .build_inner(
+            context,
+            &validated,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
+        )
         .await
         .unwrap();
 
@@ -57,7 +75,10 @@ async fn fails_missing_creds() {
             azure_resource_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
         "#})
     .unwrap();
-    if config.build(SinkContext::default()).await.is_ok() {
+    if SinkConfig::build(&config, SinkContext::default())
+        .await
+        .is_ok()
+    {
         panic!("config.build failed to error");
     }
 }
@@ -95,7 +116,10 @@ async fn fails_invalid_base64() {
             azure_resource_id: 97ce69d9-b4be-4241-8dbd-d265edcf06c4
         "#})
     .unwrap();
-    if config.build(SinkContext::default()).await.is_ok() {
+    if SinkConfig::build(&config, SinkContext::default())
+        .await
+        .is_ok()
+    {
         panic!("config.build failed to error");
     }
 }
@@ -186,8 +210,13 @@ async fn correct_request() {
     .await;
 
     let context = SinkContext::default();
+    let validated = config.validate().unwrap();
     let (sink, _healthcheck) = config
-        .build_inner(context, HttpEndpoint::new(mock_endpoint).unwrap())
+        .build_inner(
+            context,
+            &validated,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
+        )
         .await
         .unwrap();
 

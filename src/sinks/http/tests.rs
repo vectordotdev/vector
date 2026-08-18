@@ -14,7 +14,7 @@ use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
         JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-        encoding::{Framer, FramingConfig},
+        encoding::FramingConfig,
     },
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
     finalization::AddBatchNotifier,
@@ -28,7 +28,7 @@ use super::{
 };
 use crate::{
     assert_downcast_matches,
-    codecs::{EncodingConfigWithFraming, SinkType},
+    codecs::EncodingConfigWithFraming,
     log_event,
     sinks::{
         prelude::*,
@@ -168,10 +168,21 @@ fn http_validates_payload_prefix_and_suffix() {
         payload_suffix: "}"
         "#};
     let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
-    let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
-    let encoder = Encoder::<Framer>::new(framer, serializer);
+    let serializer = config.encoding.config().1;
+    let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
+        // Message-based default for JSON is comma-delimited framing.
+        FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
+            b',',
+        ))
+    });
     assert!(
-        validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix, &encoder).is_ok()
+        validate_payload_wrapper(
+            &config.payload_prefix,
+            &config.payload_suffix,
+            serializer,
+            &framer,
+        )
+        .is_ok()
     );
 }
 
@@ -185,10 +196,21 @@ fn http_validates_payload_prefix_and_suffix_fails_on_invalid_json() {
         payload_suffix: ""
         "#};
     let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
-    let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
-    let encoder = Encoder::<Framer>::new(framer, serializer);
+    let serializer = config.encoding.config().1;
+    let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
+        // Message-based default for JSON is comma-delimited framing.
+        FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
+            b',',
+        ))
+    });
     assert!(
-        validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix, &encoder).is_err()
+        validate_payload_wrapper(
+            &config.payload_prefix,
+            &config.payload_suffix,
+            serializer,
+            &framer,
+        )
+        .is_err()
     );
 }
 

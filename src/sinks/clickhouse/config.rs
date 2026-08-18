@@ -19,7 +19,7 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    config::{DynValidatedSink, SinkContext, ValidatedSink},
+    config::{SinkContext, ValidatedSink},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -221,10 +221,6 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -456,22 +452,12 @@ impl ClickhouseConfig {
     }
 }
 
-/// Purely validated ClickHouse sink configuration.
-///
-/// This type captures all validation results that can be computed purely from
-/// configuration without network/filesystem/credentials/async operations.
-/// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedClickhouse {
-    /// The database template, validated.
     database: Template,
-    /// Resolved auth (pure validation without network).
     auth: Option<Auth>,
-    /// Batch settings computed during preparation.
     batch_settings: BatcherSettings,
-    /// Confined table template.
     confined_table: ConfinedTemplate,
-    /// Confined database template.
     confined_database: ConfinedTemplate,
 }
 
