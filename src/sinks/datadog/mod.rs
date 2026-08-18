@@ -38,8 +38,8 @@ pub mod traces;
 pub struct LocalDatadogCommonConfig {
     /// The endpoint to send observability data to.
     ///
-    /// The endpoint must contain an HTTP scheme, and may specify a hostname or IP
-    /// address and port. The API path should NOT be specified as this is handled by
+    /// The endpoint must be an absolute HTTP(S) URL. A missing scheme defaults
+    /// to `https`. The API path should NOT be specified as this is handled by
     /// the sink.
     ///
     /// If set, overrides the `site` option.
