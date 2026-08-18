@@ -15,7 +15,7 @@ use super::{
 use crate::{
     config::{OutputId, TransformConfig, TransformContext},
     event::{
-        BatchNotifier, BatchStatus, Event, EventStatus, Metric,
+        BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventStatus, Metric,
         metric::{MetricKind, MetricValue},
     },
     schema::Definition,
@@ -78,19 +78,7 @@ fn validates_millisecond_fields_fit_i64() {
 }
 
 fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Event {
-    let mut event = Event::Metric(Metric::new(name, kind, value))
-        .with_source_id(Arc::new(ComponentKey::from("in")))
-        .with_upstream_id(Arc::new(OutputId::from("transform")));
-    event
-        .metadata_mut()
-        .set_schema_definition(&Arc::new(Definition::new_with_default_metadata(
-            Kind::any_object(),
-            [LogNamespace::Legacy],
-        )));
-
-    event.metadata_mut().set_source_type("unit_test_stream");
-
-    event
+    make_metric_inner(name, kind, value, None)
 }
 
 fn make_metric_with_timestamp(
@@ -99,7 +87,20 @@ fn make_metric_with_timestamp(
     value: MetricValue,
     timestamp: DateTime<Utc>,
 ) -> Event {
-    let mut event = Event::Metric(Metric::new(name, kind, value).with_timestamp(Some(timestamp)))
+    make_metric_inner(name, kind, value, Some(timestamp))
+}
+
+fn make_metric_inner(
+    name: &'static str,
+    kind: MetricKind,
+    value: MetricValue,
+    timestamp: Option<DateTime<Utc>>,
+) -> Event {
+    let metric = match timestamp {
+        Some(ts) => Metric::new(name, kind, value).with_timestamp(Some(ts)),
+        None => Metric::new(name, kind, value),
+    };
+    let mut event = Event::Metric(metric)
         .with_source_id(Arc::new(ComponentKey::from("in")))
         .with_upstream_id(Arc::new(OutputId::from("transform")));
     event
@@ -108,9 +109,62 @@ fn make_metric_with_timestamp(
             Kind::any_object(),
             [LogNamespace::Legacy],
         )));
-
     event.metadata_mut().set_source_type("unit_test_stream");
+    event
+}
 
+fn flush_final(agg: &mut Aggregate) -> Vec<Event> {
+    let mut out = vec![];
+    agg.flush_final(&mut out);
+    out
+}
+
+fn assert_counter(event: &Event, expected: f64) {
+    match event.as_metric().value() {
+        MetricValue::Counter { value } => assert_eq!(*value, expected),
+        other => panic!("expected Counter {expected}, got {other:?}"),
+    }
+}
+
+fn assert_gauge(event: &Event, expected: f64) {
+    match event.as_metric().value() {
+        MetricValue::Gauge { value } => assert_eq!(*value, expected),
+        other => panic!("expected Gauge {expected}, got {other:?}"),
+    }
+}
+
+/// Deliver output events and assert every batch receiver resolves to Delivered.
+fn deliver_and_assert_batches(out: Vec<Event>, receivers: &mut [&mut BatchStatusReceiver]) {
+    for receiver in receivers.iter_mut() {
+        assert!(
+            receiver.try_recv().is_err(),
+            "finalizer resolved before delivery"
+        );
+    }
+    for event in &out {
+        event.metadata().update_status(EventStatus::Delivered);
+    }
+    drop(out);
+    for receiver in receivers {
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+}
+
+/// Event-time fixture with a distinct `source_type` (and optional batch notifier)
+/// so attribution/finalizer assertions can tell winner vs loser samples apart.
+fn metric_with_source(
+    name: &'static str,
+    kind: MetricKind,
+    value: MetricValue,
+    timestamp: DateTime<Utc>,
+    source_type: &'static str,
+    batch: Option<&BatchNotifier>,
+) -> Event {
+    let mut event = make_metric_with_timestamp(name, kind, value, timestamp);
+    if let Some(batch) = batch {
+        event = event.with_batch_notifier(batch);
+    }
+    event.metadata_mut().set_source_type(source_type);
     event
 }
 
@@ -944,6 +998,8 @@ fn event_time_pre_epoch_buckets_use_floor_division() {
     );
 }
 
+/// Adjacent event-time windows must aggregate independently (10+20 in bucket 0,
+/// 30 in bucket 1), not collapse across bucket keys.
 #[test]
 fn event_time_different_buckets() {
     let mut agg = Aggregate::new(&event_time_config_with(
@@ -981,66 +1037,18 @@ fn event_time_different_buckets() {
     // Record events from first bucket
     agg.record(event1_bucket1);
     agg.record(event2_bucket1);
-    let mut out = vec![];
-    agg.flush_final(&mut out);
-    // Should flush first bucket (summed: 10 + 20 = 30)
+    let out = flush_final(&mut agg);
     assert_eq!(1, out.len());
-    let metric = out[0].as_metric();
-    if let MetricValue::Counter { value } = metric.value() {
-        assert_eq!(*value, 30.0);
-    } else {
-        panic!("Expected Counter value");
-    }
+    assert_counter(&out[0], 30.0);
 
     // Record event from second bucket
     agg.record(event1_bucket2);
-    out.clear();
-    agg.flush_final(&mut out);
-    // Should flush second bucket (30.0)
+    let out = flush_final(&mut agg);
     assert_eq!(1, out.len());
-    let metric = out[0].as_metric();
-    if let MetricValue::Counter { value } = metric.value() {
-        assert_eq!(*value, 30.0);
-    } else {
-        panic!("Expected Counter value");
-    }
+    assert_counter(&out[0], 30.0);
 }
 
-#[test]
-fn event_time_absolute_latest() {
-    let mut agg = Aggregate::new(&event_time_config(10000_u64, AggregationMode::Auto)).unwrap();
-
-    let base_time = open_bucket_timestamp(10_000);
-
-    // Multiple absolute metrics in same bucket
-    let gauge1 = make_metric_with_timestamp(
-        "gauge_a",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 42.0 },
-        base_time,
-    );
-    let gauge2 = make_metric_with_timestamp(
-        "gauge_a",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 43.0 },
-        base_time + chrono::Duration::milliseconds(500),
-    );
-
-    // Record out of timestamp order: latest means latest event timestamp, not arrival order.
-    agg.record(gauge2);
-    agg.record(gauge1);
-    let mut out = vec![];
-    agg.flush_final(&mut out);
-    // Should get the latest value (43.0)
-    assert_eq!(1, out.len());
-    let metric = out[0].as_metric();
-    if let MetricValue::Gauge { value } = metric.value() {
-        assert_eq!(*value, 43.0);
-    } else {
-        panic!("Expected Gauge value");
-    }
-}
-
+/// Diff: first closed bucket emits the raw value (10); the next emits the delta (15).
 #[test]
 fn event_time_diff_uses_previous_bucket() {
     let mut agg = Aggregate::new(&event_time_config_with(
@@ -1071,20 +1079,14 @@ fn event_time_diff_uses_previous_bucket() {
     agg.record(g1);
     agg.record(g2);
 
-    let mut out = vec![];
-    agg.flush_final(&mut out);
-
+    let out = flush_final(&mut agg);
     assert_eq!(2, out.len());
 
     let mut values: Vec<f64> = out
         .iter()
-        .map(|event| {
-            let metric = event.as_metric();
-            if let MetricValue::Gauge { value } = metric.value() {
-                *value
-            } else {
-                panic!("Expected Gauge metric value");
-            }
+        .map(|event| match event.as_metric().value() {
+            MetricValue::Gauge { value } => *value,
+            other => panic!("Expected Gauge metric value, got {other:?}"),
         })
         .collect();
 
@@ -1093,24 +1095,19 @@ fn event_time_diff_uses_previous_bucket() {
     assert!((values[1] - 15.0).abs() < 1e-9);
 }
 
-/// With `allowed_lateness_ms = 0`, events must be rejected once the
-/// bucket window has ended on the wall clock, even if the periodic flush
-/// tick has not yet closed the bucket.
+/// Late events are rejected both by wall-clock cutoff (before any flush) and
+/// by watermark after a bucket has already been emitted — even when
+/// `allowed_lateness_ms` would still allow recording into an unflushed bucket.
 #[test]
-fn event_time_rejects_late_events_before_flush_tick() {
+fn event_time_late_events_are_rejected_by_cutoff_and_watermark() {
     let interval_ms = 10_000_u64;
-
-    let agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
-
-    let now_ms = Utc::now().timestamp_millis();
     let interval_i64 = interval_ms as i64;
-    let ended_bucket_key = (now_ms / interval_i64) * interval_i64 - interval_i64 * 2;
-    assert!(
-        agg.is_past_bucket_cutoff(ended_bucket_key, now_ms),
-        "wall clock must be past a bucket two intervals old"
-    );
 
-    let mut agg = agg;
+    // Wall-clock cutoff rejects ended windows before the periodic flush tick.
+    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+    let now_ms = Utc::now().timestamp_millis();
+    let ended_bucket_key = (now_ms / interval_i64) * interval_i64 - interval_i64 * 2;
+    assert!(agg.is_past_bucket_cutoff(ended_bucket_key, now_ms));
     let ts = Utc
         .timestamp_millis_opt(ended_bucket_key + interval_i64 / 2)
         .latest()
@@ -1122,19 +1119,11 @@ fn event_time_rejects_late_events_before_flush_tick() {
             MetricValue::Gauge { value: 1.0 },
             ts,
         ))
-        .is_none(),
-        "events for an ended window must be dropped before flush"
+        .is_none()
     );
     assert!(agg.event_time_buckets.is_empty());
-}
 
-#[test]
-fn event_time_closed_buckets_are_rejected_regardless_of_grace() {
-    // Once a bucket has been emitted, a late event for that bucket (or any
-    // earlier one) must be rejected even if `allowed_lateness_ms` would
-    // still permit recording into an unflushed bucket.
-    let interval_ms = 10_000_u64;
-
+    // After emit, watermark rejects the closed bucket (and earlier ones).
     let mut agg = Aggregate::new(&event_time_config_with(
         interval_ms,
         AggregationMode::Auto,
@@ -1145,7 +1134,6 @@ fn event_time_closed_buckets_are_rejected_regardless_of_grace() {
     ))
     .unwrap();
 
-    let interval_i64 = interval_ms as i64;
     let bucket0 = open_bucket_timestamp(interval_ms);
     let bucket0_key = bucket0.timestamp_millis().div_euclid(interval_i64) * interval_i64;
     let bucket_end = bucket0_key + interval_i64;
@@ -1156,11 +1144,9 @@ fn event_time_closed_buckets_are_rejected_regardless_of_grace() {
         MetricValue::Gauge { value: 1.0 },
         bucket0,
     ));
-    let mut out = vec![];
-    agg.flush_final(&mut out);
+    let out = flush_final(&mut agg);
     assert_eq!(1, out.len());
     assert_eq!(agg.watermark, Some(bucket_end));
-    out.clear();
 
     agg.record(make_metric_with_timestamp(
         "gauge_closed_bucket_rejection",
@@ -1174,9 +1160,8 @@ fn event_time_closed_buckets_are_rejected_regardless_of_grace() {
         MetricValue::Gauge { value: 99.0 },
         event_time_bucket_timestamp(interval_ms, -1),
     ));
-    agg.flush_final(&mut out);
     assert!(
-        out.is_empty(),
+        flush_final(&mut agg).is_empty(),
         "events for already-closed buckets must not produce a duplicate aggregate"
     );
 
@@ -1186,15 +1171,12 @@ fn event_time_closed_buckets_are_rejected_regardless_of_grace() {
         MetricValue::Gauge { value: 7.0 },
         event_time_bucket_timestamp(interval_ms, 1),
     ));
-    agg.flush_final(&mut out);
+    let out = flush_final(&mut agg);
     assert_eq!(1, out.len(), "next open bucket must still flush");
-    if let MetricValue::Gauge { value } = out[0].as_metric().value() {
-        assert_eq!(*value, 7.0);
-    } else {
-        panic!("Expected Gauge metric value");
-    }
+    assert_gauge(&out[0], 7.0);
 }
 
+/// Diff keeps a bounded previous-bucket map for deltas; Auto must not retain any.
 #[test]
 fn event_time_previous_bucket_retention_is_mode_specific_and_bounded() {
     let interval_ms = 10_000_u64;
@@ -1282,15 +1264,9 @@ fn event_time_block_parses_documented_literals() {
     );
 }
 
-/// When the input stream closes, every still-open event-time bucket must
-/// be drained so in-flight metrics are not silently dropped on shutdown
-/// or topology reload (matching system-time semantics, where
-/// `flush_system_time` always empties the entire map).
 #[tokio::test]
 async fn event_time_drains_open_buckets_on_shutdown() {
-    // Long interval and large grace so the bucket is *not* eligible for the
-    // wall-clock flush during the test -- the only way it gets emitted is
-    // via the final-flush shutdown path.
+    // Long interval/grace so only the final-flush path can emit.
     let agg = toml::from_str::<AggregateConfig>(
         r#"
 interval_ms = 600000
@@ -1321,84 +1297,51 @@ allowed_lateness_ms = 600000
             ev.as_metric().series().name.name.as_str(),
             "shutdown_drain_probe"
         );
-        if let MetricValue::Counter { value } = ev.as_metric().value() {
-            assert_eq!(*value, 41.0);
-        } else {
-            panic!("Expected Counter metric value from drained bucket");
-        }
+        assert_counter(&ev, 41.0);
     }
-    assert_eq!(
-        count, 1,
-        "open event-time bucket must be drained when the input stream closes"
-    );
+    assert_eq!(count, 1, "open event-time bucket must drain on input close");
 }
 
+/// Future skew uses saturating millis math: events beyond `max_future_ms` drop,
+/// and `max_future_ms = i64::MAX` must not panic at record time.
 #[test]
-fn event_time_future_timestamp_rejected() {
-    let mut agg = Aggregate::new(&event_time_config_with(
-        10000_u64,
+fn event_time_future_skew_gating_and_boundary() {
+    let mut strict = Aggregate::new(&event_time_config_with(
+        10_000,
         AggregationMode::Auto,
-        |et| {
-            et.max_future_ms = 5000;
-        },
+        |et| et.max_future_ms = 5_000,
     ))
     .unwrap();
-
-    // Timestamp 60 seconds in the future — well beyond max_future_ms.
-    let far_future = Utc::now() + chrono::Duration::seconds(60);
-    let event = make_metric_with_timestamp(
+    // 60s ahead is well past max_future_ms = 5s.
+    strict.record(make_metric_with_timestamp(
         "counter_future",
         MetricKind::Incremental,
         MetricValue::Counter { value: 99.0 },
-        far_future,
-    );
-
-    agg.record(event);
+        Utc::now() + chrono::Duration::seconds(60),
+    ));
     let mut out = vec![];
-    agg.flush_into(&mut out);
-    assert_eq!(0, out.len(), "Far-future event must be dropped");
-}
+    strict.flush_into(&mut out);
+    assert!(out.is_empty(), "far-future event must be dropped");
 
-/// `Aggregate::new` accepts `max_future_ms: i64::MAX as u64` -- the
-/// largest non-wrapping i64 cast -- but a naive future-skew check that
-/// computes `Utc::now() + Duration::milliseconds(i64::MAX)` overflows
-/// `NaiveDateTime`'s representable range and panics in `<DateTime as
-/// Add<Duration>>::add` as soon as the first event is recorded. The
-/// check must instead compare drift in millis with saturating math so
-/// the boundary value is safe at record time.
-#[test]
-fn event_time_record_with_max_future_ms_at_i64_max_does_not_panic() {
-    let mut agg = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
-        et.max_future_ms = i64::MAX as u64;
-    }))
-    .unwrap();
-
-    let event = make_metric_with_timestamp(
+    // Boundary config must not panic in `now + max_future_ms` (saturating millis).
+    let mut boundary =
+        Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+            et.max_future_ms = i64::MAX as u64;
+        }))
+        .unwrap();
+    boundary.record(make_metric_with_timestamp(
         "counter_now",
         MetricKind::Incremental,
         MetricValue::Counter { value: 1.0 },
         Utc::now(),
-    );
-    agg.record(event);
-
-    let mut out = vec![];
-    agg.flush_event_time_buckets(&mut out, true);
-    assert_eq!(
-        out.len(),
-        1,
-        "realistic timestamp must record under boundary max_future_ms",
-    );
+    ));
+    out.clear();
+    boundary.flush_event_time_buckets(&mut out, true);
+    assert_eq!(out.len(), 1);
 }
 
-/// With `max_future_ms = 0` arbitrary future timestamps are accepted, so a
-/// metric near `DateTime::<Utc>::MAX_UTC` can produce a `bucket_key` close
-/// to `i64::MAX`. The flush eligibility predicate adds `bucket_key +
-/// interval_ms + grace_ms` in i64; plain `+` would either panic
-/// (overflow-checked builds) or wrap negative -- which makes the cutoff
-/// `<= now_ms` so the bucket flushes immediately and the watermark
-/// advances to ~`i64::MAX`, after which every normal event is rejected
-/// as late. Saturating arithmetic must instead park the cutoff at
-/// `i64::MAX`, leaving the far-future bucket open until `force`.
+/// Far-future buckets must use saturating cutoff math so non-forced flush
+/// does not wrap, emit early, or advance the watermark to ~i64::MAX.
 #[test]
 fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
     let mut agg = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
@@ -1416,46 +1359,26 @@ fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
     );
     agg.record(event);
 
-    // Non-force flush: the bucket must stay parked because its saturated
-    // cutoff is `i64::MAX`, which `now_ms` never reaches.
     let mut out = vec![];
     agg.flush_event_time_buckets(&mut out, false);
-    assert!(
-        out.is_empty(),
-        "a far-future bucket must not be eligible for non-forced flush",
-    );
-    assert_eq!(
-        agg.event_time_buckets.len(),
-        1,
-        "the bucket must remain open after a non-forced flush",
-    );
+    assert!(out.is_empty(), "saturated cutoff must stay ineligible until force");
+    assert_eq!(agg.event_time_buckets.len(), 1);
     assert!(
         agg.watermark.is_none(),
-        "the watermark must not advance for a non-forced flush of an \
-         ineligible bucket (advancing it to i64::MAX would drop every \
-         subsequent normal event as late)",
+        "must not advance watermark to i64::MAX (would drop every later event)"
     );
 
-    // Force flush still drains it (shutdown / topology reload path).
     agg.flush_event_time_buckets(&mut out, true);
-    assert_eq!(
-        out.len(),
-        1,
-        "force flush must drain the far-future bucket so in-flight \
-         events are not silently dropped on shutdown",
-    );
+    assert_eq!(out.len(), 1, "shutdown/force flush must still drain the bucket");
 }
 
-/// Missing-timestamp fallback (`missing_timestamp = use_system_time`) must
-/// accept and store the event, and must reuse one wall-clock instant for
-/// synthesis and cutoff checks. With `allowed_lateness_ms = 0`, a second
-/// `Utc::now()` read one millisecond after the bucket end would otherwise
-/// reject an event whose synthesized timestamp still lies inside the bucket.
+/// Missing-timestamp drop vs use_system_time, plus same-instant cutoff reuse.
 #[test]
 fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
     let interval_ms = 1_000_u64;
     let interval_i64 = interval_ms as i64;
 
+    // Default missing_timestamp = drop.
     let mut drop_agg =
         Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
     assert!(
@@ -1482,32 +1405,24 @@ fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
     let bucket_key = now_ms.div_euclid(interval_i64).saturating_mul(interval_i64);
     let last_ms_in_bucket = bucket_key + interval_i64 - 1;
 
-    assert!(
-        !agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket),
-        "same-instant cutoff must accept timestamps still inside the bucket"
-    );
-    assert!(
-        agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket + 1),
-        "a later clock read crosses the bucket boundary — the race this fix avoids"
-    );
+    // Same-instant cutoff is still inside the bucket; a 1ms-later clock is not.
+    // Record must reuse one `now` for synthesis + cutoff, or this race drops the event.
+    assert!(!agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket));
+    assert!(agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket + 1));
 
     let mut agg = agg;
-    let event = make_metric(
-        "counter_no_ts",
-        MetricKind::Incremental,
-        MetricValue::Counter { value: 1.0 },
-    );
     assert!(
-        agg.record(event).is_none(),
-        "missing-timestamp fallback must be bucketed, not dropped by a later cutoff read"
+        agg.record(make_metric(
+            "counter_no_ts",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        ))
+        .is_none()
     );
-    assert_eq!(
-        agg.event_time_buckets.len(),
-        1,
-        "fallback event must land in the current bucket"
-    );
+    assert_eq!(agg.event_time_buckets.len(), 1);
 }
 
+/// Mean ignores Incremental: passthrough must skip watermark/gating and not bucket.
 #[test]
 fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
     let interval_ms = 10_000;
@@ -1542,314 +1457,221 @@ fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
     assert_eq!(out.len(), 1);
 }
 
+/// EventMetadata::merge keeps finalizers/secrets but not attribution (`source_type`).
+/// Every replacement path must use the winner as the metadata base, then merge losers.
 #[test]
 fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
     let interval_ms = 10_000;
     let base_time = open_bucket_timestamp(interval_ms);
+    let later = base_time + chrono::Duration::milliseconds(100);
+    let latest_ts = base_time + chrono::Duration::milliseconds(200);
 
-    // Latest/Auto must preserve finalizers from both retained and discarded samples,
-    // and keep attribution fields (e.g. source_type) from the timestamp-selected sample.
-    let mut latest =
-        Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
-    let (newer_batch, mut newer_receiver) = BatchNotifier::new_with_receiver();
-    let (older_batch, mut older_receiver) = BatchNotifier::new_with_receiver();
-    let mut newer = make_metric_with_timestamp(
-        "latest",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 2.0 },
-        base_time + chrono::Duration::milliseconds(200),
-    )
-    .with_batch_notifier(&newer_batch);
-    newer.metadata_mut().set_source_type("winner_source");
-    let mut older = make_metric_with_timestamp(
-        "latest",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 1.0 },
-        base_time + chrono::Duration::milliseconds(100),
-    )
-    .with_batch_notifier(&older_batch);
-    older.metadata_mut().set_source_type("loser_source");
-    drop((newer_batch, older_batch));
-
-    // Older lands first so its metadata is the initial base; newer must still win
-    // both the value and attribution fields that merge does not overwrite.
-    latest.record(older);
-    latest.record(newer);
-    let mut out = vec![];
-    latest.flush_final(&mut out);
-    assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
-    assert!(newer_receiver.try_recv().is_err());
-    assert!(older_receiver.try_recv().is_err());
-    out[0].metadata().update_status(EventStatus::Delivered);
-    drop(out);
-    assert_eq!(newer_receiver.try_recv(), Ok(BatchStatus::Delivered));
-    assert_eq!(older_receiver.try_recv(), Ok(BatchStatus::Delivered));
-
-    // Auto kind / value-type replacements must also keep the retained sample's
-    // attribution metadata as the base while preserving superseded finalizers.
+    // Latest: event timestamp wins value + source_type; both samples' finalizers merge.
     {
         let mut agg =
             Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
-        let ts_older = base_time + chrono::Duration::milliseconds(100);
-        let ts_newer = base_time + chrono::Duration::milliseconds(200);
-        let (incremental_batch, mut incremental_receiver) = BatchNotifier::new_with_receiver();
-        let (absolute_batch, mut absolute_receiver) = BatchNotifier::new_with_receiver();
+        let (newer_batch, mut newer_rx) = BatchNotifier::new_with_receiver();
+        let (older_batch, mut older_rx) = BatchNotifier::new_with_receiver();
+        let newer = metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+            latest_ts,
+            "winner_source",
+            Some(&newer_batch),
+        );
+        let older = metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            later,
+            "loser_source",
+            Some(&older_batch),
+        );
+        drop((newer_batch, older_batch));
+        agg.record(older); // stored loser, then incoming winner replaces
+        agg.record(newer);
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
+        assert_gauge(&out[0], 2.0);
+        deliver_and_assert_batches(out, &mut [&mut newer_rx, &mut older_rx]);
+    }
 
-        let mut incremental = make_metric_with_timestamp(
-            "the-thing",
+    {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        // Reverse arrival: newer already stored; older must not overwrite.
+        agg.record(metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+            latest_ts,
+            "winner_source",
+            None,
+        ));
+        agg.record(metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            later,
+            "loser_source",
+            None,
+        ));
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
+        assert_gauge(&out[0], 2.0);
+    }
+
+    // Auto kind switch: retained sample's data and source_type must stay paired.
+    // Inc→Abs: Absolute wins even if older. Abs→Inc: newer Incremental replaces.
+    for (first_kind, first_value, first_src, second_kind, second_value, second_src, expect_kind) in [
+        (
             MetricKind::Incremental,
             MetricValue::Counter { value: 10.0 },
-            ts_newer,
-        )
-        .with_batch_notifier(&incremental_batch);
-        incremental
-            .metadata_mut()
-            .set_source_type("superseded_incremental");
-        let mut absolute = make_metric_with_timestamp(
-            "the-thing",
+            "superseded_incremental",
             MetricKind::Absolute,
             MetricValue::Counter { value: 99.0 },
-            ts_older,
-        )
-        .with_batch_notifier(&absolute_batch);
-        absolute.metadata_mut().set_source_type("retained_absolute");
-        agg.record(incremental);
-        agg.record(absolute);
-        drop((incremental_batch, absolute_batch));
-
-        let mut out = vec![];
-        agg.flush_final(&mut out);
-        assert_eq!(out.len(), 1);
-        let metric = out[0].as_metric();
-        assert_eq!(metric.kind(), MetricKind::Absolute);
-        assert_eq!(
-            metric.metadata().source_type(),
-            Some("retained_absolute"),
-            "replacement data and attribution metadata must come from the same sample"
-        );
-        if let MetricValue::Counter { value } = metric.value() {
-            assert_eq!(*value, 99.0);
-        } else {
-            panic!("expected absolute counter");
-        }
-        assert!(incremental_receiver.try_recv().is_err());
-        assert!(absolute_receiver.try_recv().is_err());
-        out[0].metadata().update_status(EventStatus::Delivered);
-        drop(out);
-        assert_eq!(
-            incremental_receiver.try_recv(),
-            Ok(BatchStatus::Delivered),
-            "superseded incremental sample's finalizers must not be discarded"
-        );
-        assert_eq!(
-            absolute_receiver.try_recv(),
-            Ok(BatchStatus::Delivered),
-            "retained absolute sample's finalizers must be delivered"
-        );
-    }
-
-    {
-        let mut agg =
-            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
-        let (absolute_batch, mut absolute_receiver) = BatchNotifier::new_with_receiver();
-        let (incremental_batch, mut incremental_receiver) = BatchNotifier::new_with_receiver();
-
-        let mut absolute = make_metric_with_timestamp(
-            "the-thing",
+            "retained_absolute",
+            MetricKind::Absolute,
+        ),
+        (
             MetricKind::Absolute,
             MetricValue::Counter { value: 42.0 },
-            base_time,
-        )
-        .with_batch_notifier(&absolute_batch);
-        absolute
-            .metadata_mut()
-            .set_source_type("superseded_absolute");
-        let mut incremental = make_metric_with_timestamp(
-            "the-thing",
+            "superseded_absolute",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
-            base_time + chrono::Duration::milliseconds(100),
-        )
-        .with_batch_notifier(&incremental_batch);
-        incremental
-            .metadata_mut()
-            .set_source_type("retained_incremental");
-        agg.record(absolute);
-        agg.record(incremental);
-        drop((absolute_batch, incremental_batch));
-
-        let mut out = vec![];
-        agg.flush_final(&mut out);
-        assert_eq!(out.len(), 1);
-        let metric = out[0].as_metric();
-        assert_eq!(metric.kind(), MetricKind::Incremental);
-        assert_eq!(
-            metric.metadata().source_type(),
-            Some("retained_incremental"),
-            "replacement data and attribution metadata must come from the same sample"
-        );
-        if let MetricValue::Counter { value } = metric.value() {
-            assert_eq!(*value, 1.0);
+            "retained_incremental",
+            MetricKind::Incremental,
+        ),
+    ] {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        let (first_batch, mut first_rx) = BatchNotifier::new_with_receiver();
+        let (second_batch, mut second_rx) = BatchNotifier::new_with_receiver();
+        let (first_ts, second_ts) = if expect_kind == MetricKind::Absolute {
+            (latest_ts, later)
         } else {
-            panic!("expected incremental counter");
+            (base_time, later)
+        };
+        let first = metric_with_source(
+            "the-thing",
+            first_kind,
+            first_value,
+            first_ts,
+            first_src,
+            Some(&first_batch),
+        );
+        let second = metric_with_source(
+            "the-thing",
+            second_kind,
+            second_value.clone(),
+            second_ts,
+            second_src,
+            Some(&second_batch),
+        );
+        drop((first_batch, second_batch));
+        agg.record(first);
+        agg.record(second);
+        let out = flush_final(&mut agg);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].as_metric().kind(), expect_kind);
+        assert_eq!(out[0].metadata().source_type(), Some(second_src));
+        match &second_value {
+            MetricValue::Counter { value } => assert_counter(&out[0], *value),
+            MetricValue::Gauge { value } => assert_gauge(&out[0], *value),
+            other => panic!("unexpected fixture value {other:?}"),
         }
-        assert!(incremental_receiver.try_recv().is_err());
-        assert!(
-            absolute_receiver.try_recv().is_err(),
-            "absolute sample's finalizer resolved prematurely (metadata was dropped, not merged)"
-        );
-        out[0].metadata().update_status(EventStatus::Delivered);
-        drop(out);
-        assert_eq!(
-            incremental_receiver.try_recv(),
-            Ok(BatchStatus::Delivered),
-            "retained incremental sample's finalizers must be delivered"
-        );
-        assert_eq!(
-            absolute_receiver.try_recv(),
-            Ok(BatchStatus::Delivered),
-            "superseded absolute sample's finalizers must not be discarded"
-        );
+        deliver_and_assert_batches(out, &mut [&mut first_rx, &mut second_rx]);
     }
 
+    // Failed same-kind value-type update replaces data + attribution.
     {
         let mut agg =
             Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
-        let mut counter = make_metric_with_timestamp(
+        agg.record(metric_with_source(
             "the-thing",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
             base_time,
-        );
-        counter.metadata_mut().set_source_type("superseded_counter");
-        let mut gauge = make_metric_with_timestamp(
+            "superseded_counter",
+            None,
+        ));
+        agg.record(metric_with_source(
             "the-thing",
             MetricKind::Incremental,
             MetricValue::Gauge { value: 2.0 },
-            base_time + chrono::Duration::milliseconds(100),
-        );
-        gauge.metadata_mut().set_source_type("retained_gauge");
-
-        agg.record(counter);
-        agg.record(gauge);
-        let mut out = vec![];
-        agg.flush_final(&mut out);
-
-        assert_eq!(
-            out[0].metadata().source_type(),
-            Some("retained_gauge"),
-            "failed updates must replace both data and attribution metadata"
-        );
-        assert!(matches!(
-            out[0].as_metric().value(),
-            MetricValue::Gauge { value } if *value == 2.0
+            later,
+            "retained_gauge",
+            None,
         ));
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("retained_gauge"));
+        assert_gauge(&out[0], 2.0);
     }
 
-    // Diff retains prior metric data, but must not retain metadata/finalizers.
-    let mut diff = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Diff)).unwrap();
-    let (diff_batch, mut diff_receiver) = BatchNotifier::new_with_receiver();
-    let event = make_metric_with_timestamp(
-        "diff",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 1.0 },
-        base_time,
-    )
-    .with_batch_notifier(&diff_batch);
-    drop(diff_batch);
+    // Diff retains prior data only — finalizers must release on flush.
+    {
+        let mut diff =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Diff)).unwrap();
+        let (diff_batch, mut diff_rx) = BatchNotifier::new_with_receiver();
+        diff.record(
+            make_metric_with_timestamp(
+                "diff",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+                base_time,
+            )
+            .with_batch_notifier(&diff_batch),
+        );
+        drop(diff_batch);
+        let out = flush_final(&mut diff);
+        deliver_and_assert_batches(out, &mut [&mut diff_rx]);
+        assert_eq!(diff.event_time_prev_buckets.len(), 1);
+    }
 
-    diff.record(event);
-    let mut out = vec![];
-    diff.flush_final(&mut out);
-    out[0].metadata().update_status(EventStatus::Delivered);
-    drop(out);
-    assert_eq!(
-        diff_receiver.try_recv(),
-        Ok(BatchStatus::Delivered),
-        "Diff retention must not keep finalizers alive"
-    );
-    assert_eq!(diff.event_time_prev_buckets.len(), 1);
-
-    // Max/Min must use the winning sample's metadata as the base while merging
-    // metadata from every sample, including one that loses the comparison.
+    // Max/Min: winner metadata is the base; loser finalizers still merge.
     for mode in [AggregationMode::Max, AggregationMode::Min] {
         let mut agg = Aggregate::new(&event_time_config(interval_ms, mode)).unwrap();
-        let (winner_batch, mut winner_receiver) = BatchNotifier::new_with_receiver();
-        let (loser_batch, mut loser_receiver) = BatchNotifier::new_with_receiver();
-
-        let winning_value = if mode == AggregationMode::Max {
-            99.0
+        let (winner_batch, mut winner_rx) = BatchNotifier::new_with_receiver();
+        let (loser_batch, mut loser_rx) = BatchNotifier::new_with_receiver();
+        let (winning_value, losing_value) = if mode == AggregationMode::Max {
+            (99.0, 2.0)
         } else {
-            1.0
+            (1.0, 50.0)
         };
-        let losing_value = if mode == AggregationMode::Max {
-            2.0
-        } else {
-            50.0
-        };
-
-        let mut winner = make_metric_with_timestamp(
+        let winner = metric_with_source(
             "extremum",
             MetricKind::Absolute,
             MetricValue::Gauge {
                 value: winning_value,
             },
             base_time,
-        )
-        .with_batch_notifier(&winner_batch);
-        winner.metadata_mut().set_source_type("winner_source");
-        let mut loser = make_metric_with_timestamp(
+            "winner_source",
+            Some(&winner_batch),
+        );
+        let loser = metric_with_source(
             "extremum",
             MetricKind::Absolute,
             MetricValue::Gauge {
                 value: losing_value,
             },
-            base_time + chrono::Duration::milliseconds(100),
-        )
-        .with_batch_notifier(&loser_batch);
-        loser.metadata_mut().set_source_type("loser_source");
+            later,
+            "loser_source",
+            Some(&loser_batch),
+        );
         drop((winner_batch, loser_batch));
-
-        // Record the loser first so selecting the incoming winner exercises
-        // both data replacement and metadata-base replacement.
-        agg.record(loser);
+        agg.record(loser); // incoming winner must replace data and metadata base
         agg.record(winner);
-        let mut out = vec![];
-        agg.flush_final(&mut out);
-        assert_eq!(out.len(), 1);
-        assert_eq!(
-            out[0].metadata().source_type(),
-            Some("winner_source"),
-            "{mode:?}: winner metadata must be the emitted metadata base"
-        );
-        if let MetricValue::Gauge { value } = out[0].as_metric().value() {
-            assert_eq!(
-                *value, winning_value,
-                "{mode:?} must retain the winning value"
-            );
-        } else {
-            panic!("expected gauge value");
-        }
-        out[0].metadata().update_status(EventStatus::Delivered);
-        drop(out);
-        assert_eq!(
-            winner_receiver.try_recv(),
-            Ok(BatchStatus::Delivered),
-            "{mode:?}: winning sample's finalizers must be delivered"
-        );
-        assert_eq!(
-            loser_receiver.try_recv(),
-            Ok(BatchStatus::Delivered),
-            "{mode:?}: losing sample's finalizers must not be discarded"
-        );
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
+        assert_gauge(&out[0], winning_value);
+        deliver_and_assert_batches(out, &mut [&mut winner_rx, &mut loser_rx]);
     }
 }
 
+/// Count is documented to include both Absolute and Incremental in the same series.
 #[test]
 fn event_time_count_counts_mixed_kinds_in_same_bucket() {
-    // Count is documented to count both Absolute and Incremental metrics, so
-    // a kind change within one series/bucket must not be dropped by the
-    // kind-equality guard — it must still count toward the total.
     let interval_ms = 10_000;
     let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Count)).unwrap();
     let base_time = open_bucket_timestamp(interval_ms);
@@ -1867,12 +1689,7 @@ fn event_time_count_counts_mixed_kinds_in_same_bucket() {
         base_time + chrono::Duration::milliseconds(100),
     ));
 
-    let mut out = vec![];
-    agg.flush_final(&mut out);
+    let out = flush_final(&mut agg);
     assert_eq!(out.len(), 1);
-    if let MetricValue::Counter { value } = out[0].as_metric().value() {
-        assert_eq!(*value, 2.0, "both samples must count toward the total");
-    } else {
-        panic!("expected counter value");
-    }
+    assert_counter(&out[0], 2.0);
 }
