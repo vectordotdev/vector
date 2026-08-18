@@ -6,6 +6,7 @@ use tower::ServiceBuilder;
 use vector_lib::{
     config::{AcknowledgementsConfig, proxy::ProxyConfig},
     configurable::configurable_component,
+    stream::BatcherSettings,
 };
 
 use super::{
@@ -14,7 +15,7 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
@@ -106,18 +107,18 @@ impl DatadogTracesEndpointConfiguration {
 }
 
 impl DatadogTracesConfig {
-    fn get_base_uri(&self, dd_common: &DatadogCommonConfig) -> String {
-        dd_common
-            .endpoint
-            .clone()
-            .unwrap_or_else(|| format!("https://trace.agent.{}", dd_common.site))
+    fn traces_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
+        endpoint.map_or_else(
+            || format!("https://trace.agent.{site}"),
+            |endpoint| endpoint.to_string(),
+        )
     }
 
     fn generate_traces_endpoint_configuration(
         &self,
         dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogTracesEndpointConfiguration> {
-        let base_uri = self.get_base_uri(dd_common);
+        let base_uri = Self::traces_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site);
         let traces_endpoint = build_uri(&base_uri, "/api/v0.2/traces")?;
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
@@ -131,17 +132,11 @@ impl DatadogTracesConfig {
         &self,
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
+        batcher_settings: BatcherSettings,
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.into_settings();
         let endpoints = self.generate_traces_endpoint_configuration(dd_common)?;
-
-        let batcher_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(BATCH_GOAL_BYTES)?
-            .limit_max_events(BATCH_MAX_EVENTS)?
-            .into_batcher_settings()?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, TraceApiRetry)
@@ -207,22 +202,59 @@ impl DatadogTracesConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_traces")]
 impl SinkConfig for DatadogTracesConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
-        let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(&dd_common, client)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::trace()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedTraces {
+    batcher_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatadogTracesConfig {
+    type Validated = ValidatedTraces;
+
+    fn validate(&self) -> crate::Result<ValidatedTraces> {
+        let batcher_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(BATCH_GOAL_BYTES)?
+            .limit_max_events(BATCH_MAX_EVENTS)?
+            .into_batcher_settings()?;
+
+        let site = self
+            .local_dd_common
+            .site
+            .clone()
+            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
+        let base = Self::traces_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
+        HttpEndpoint::parse(&base)?;
+
+        Ok(ValidatedTraces { batcher_settings })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedTraces,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.build_client(&cx.proxy)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.local_dd_common.with_globals(global)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(&dd_common, client, validated.batcher_settings)?;
+
+        Ok((sink, healthcheck))
     }
 }
 
@@ -232,10 +264,45 @@ fn build_uri(host: &str, endpoint: &str) -> crate::Result<HttpEndpoint> {
 
 #[cfg(test)]
 mod test {
-    use super::DatadogTracesConfig;
+    use super::{BATCH_GOAL_BYTES, BATCH_MAX_EVENTS, DatadogTracesConfig};
+    use crate::{config::ValidatedSink, sinks::datadog::LocalDatadogCommonConfig};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogTracesConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_batch_settings() {
+        let config = DatadogTracesConfig::default();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batcher_settings.size_limit, BATCH_GOAL_BYTES);
+        assert_eq!(validated.batcher_settings.item_limit, BATCH_MAX_EVENTS);
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = DatadogTracesConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_non_http_scheme() {
+        let config = DatadogTracesConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("ftp://localhost:8080".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 }
