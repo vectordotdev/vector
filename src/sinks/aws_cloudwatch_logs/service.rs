@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt,
-    task::{Context, Poll, ready},
+    task::{Context, Poll},
 };
 
 use aws_sdk_cloudwatchlogs::{
@@ -23,7 +23,6 @@ use http::{
 };
 use indexmap::IndexMap;
 use snafu::{ResultExt, Snafu};
-use tokio::sync::oneshot;
 use tower::{
     Service, ServiceBuilder, ServiceExt,
     buffer::Buffer,
@@ -199,7 +198,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
-            // Concurrency limit is 1 because we need token from previous request.
+            // Concurrency limit is 1 to keep writes to a single stream ordered.
             let svc = ServiceBuilder::new()
                 .buffer(1)
                 .concurrency_limit(1)
@@ -259,8 +258,6 @@ impl CloudwatchLogsSvc {
             retention,
             kms_key,
             tags,
-            token: None,
-            token_rx: None,
         }
     }
 
@@ -310,38 +307,25 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     type Error = CloudwatchError;
     type Future = request::CloudwatchFuture;
 
-    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        if let Some(rx) = &mut self.token_rx {
-            self.token = ready!(rx.poll_unpin(cx)).ok().flatten();
-            self.token_rx = None;
-        }
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Vec<InputLogEvent>) -> Self::Future {
-        if self.token_rx.is_none() {
-            let event_batches = self.process_events(req);
+        let event_batches = self.process_events(req);
 
-            let (tx, rx) = oneshot::channel();
-            self.token_rx = Some(rx);
-
-            request::CloudwatchFuture::new(
-                self.client.clone(),
-                self.headers.clone(),
-                self.stream_name.clone(),
-                self.group_name.clone(),
-                self.create_missing_group,
-                self.create_missing_stream,
-                self.retention.clone(),
-                self.kms_key.clone(),
-                self.tags.clone(),
-                event_batches,
-                self.token.take(),
-                tx,
-            )
-        } else {
-            panic!("poll_ready was not called; this is a bug!");
-        }
+        request::CloudwatchFuture::new(
+            self.client.clone(),
+            self.headers.clone(),
+            self.stream_name.clone(),
+            self.group_name.clone(),
+            self.create_missing_group,
+            self.create_missing_stream,
+            self.retention.clone(),
+            self.kms_key.clone(),
+            self.tags.clone(),
+            event_batches,
+        )
     }
 }
 
@@ -355,8 +339,6 @@ pub struct CloudwatchLogsSvc {
     retention: Retention,
     kms_key: Option<String>,
     tags: Option<HashMap<String, String>>,
-    token: Option<String>,
-    token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
 
 impl EncodedLength for InputLogEvent {

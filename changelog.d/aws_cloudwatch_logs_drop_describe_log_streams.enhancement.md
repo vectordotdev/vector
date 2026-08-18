@@ -1,0 +1,3 @@
+The `aws_cloudwatch_logs` sink no longer calls `DescribeLogStreams` before every batch to fetch a sequence token. Since January 2023 CloudWatch Logs accepts `PutLogEvents` without a sequence token and never returns `InvalidSequenceToken`, so the sink now writes directly and only falls back to `DescribeLogStreams` (to locate a missing group/stream) when `PutLogEvents` returns `ResourceNotFoundException`. This removes the per-batch (and per-retry) `DescribeLogStreams` request, which is throttled account-and-region-wide at a low default quota (25 TPS) and could stall the sink under load on large fleets writing to many streams.
+
+authors: vvo

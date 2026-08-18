@@ -20,7 +20,6 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::{FutureExt, future::BoxFuture};
 use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
-use tokio::sync::oneshot;
 
 use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
 
@@ -30,8 +29,15 @@ pub struct CloudwatchFuture {
     create_missing_group: bool,
     create_missing_stream: bool,
     retention_enabled: bool,
+    // Batches still waiting to be sent after `current`.
     events: Vec<Vec<InputLogEvent>>,
-    token_tx: Option<oneshot::Sender<Option<String>>>,
+    // The batch currently in flight. Retained so it can be resent after a
+    // missing log group/stream is created.
+    current: Vec<InputLogEvent>,
+    // Set once we've dropped into the describe/create path from a
+    // `ResourceNotFoundException`, so a second one is a hard error rather than
+    // an infinite resolve loop.
+    resolving: bool,
 }
 
 struct Client {
@@ -68,8 +74,6 @@ impl CloudwatchFuture {
         kms_key: Option<String>,
         tags: Option<HashMap<String, String>>,
         mut events: Vec<Vec<InputLogEvent>>,
-        token: Option<String>,
-        token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
         let retention_days = retention.days;
         let client = Client {
@@ -82,19 +86,26 @@ impl CloudwatchFuture {
             tags,
         };
 
-        let state = if let Some(token) = token {
-            State::Put(client.put_logs(Some(token), events.pop().expect("No Events to send")))
-        } else {
-            State::DescribeStream(client.describe_stream())
-        };
+        // Since January 2023, CloudWatch Logs no longer requires a sequence
+        // token on `PutLogEvents` and never returns `InvalidSequenceToken`, so
+        // we write directly. The old sink called `DescribeLogStreams` before
+        // every batch (and again on every retry) just to fetch that token,
+        // which is throttled account+region-wide at a low default quota
+        // (25 TPS) and starved the sink under load. We now only fall back to
+        // `DescribeLogStreams` when `PutLogEvents` reports the group/stream is
+        // missing, i.e. once per new stream, not once per batch.
+        // https://aws.amazon.com/about-aws/whats-new/2023/01/amazon-cloudwatch-logs-log-stream-transaction-quota-sequencetoken-requirement/
+        let current = events.pop().expect("No Events to send");
+        let state = State::Put(client.put_logs(current.clone()));
 
         let retention_enabled = retention.enabled;
 
         Self {
             client,
             events,
+            current,
+            resolving: false,
             state,
-            token_tx: Some(token_tx),
             create_missing_group,
             create_missing_stream,
             retention_enabled,
@@ -108,6 +119,33 @@ impl Future for CloudwatchFuture {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         loop {
             match &mut self.state {
+                State::Put(fut) => {
+                    match ready!(fut.poll_unpin(cx)) {
+                        Ok(_response) => {
+                            if let Some(events) = self.events.pop() {
+                                self.current = events;
+                                debug!(message = "Putting logs.");
+                                self.state =
+                                    State::Put(self.client.put_logs(self.current.clone()));
+                            } else {
+                                info!(message = "Putting logs was successful.");
+                                return Poll::Ready(Ok(()));
+                            }
+                        }
+                        Err(err) => {
+                            // The group or stream is missing. Resolve it once
+                            // with a describe (which distinguishes a missing
+                            // group from a missing stream), then replay.
+                            if !self.resolving && is_resource_not_found(&err) {
+                                self.resolving = true;
+                                self.state = State::DescribeStream(self.client.describe_stream());
+                                continue;
+                            }
+                            return Poll::Ready(Err(CloudwatchError::Put(err)));
+                        }
+                    }
+                }
+
                 State::DescribeStream(fut) => {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
@@ -130,23 +168,14 @@ impl Future for CloudwatchFuture {
 
                     let stream_name = &self.client.stream_name;
 
-                    if let Some(stream) = response
+                    if response
                         .log_streams
                         .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
-                        .find(|log_stream| log_stream.log_stream_name == Some(stream_name.clone()))
+                        .any(|log_stream| log_stream.log_stream_name == Some(stream_name.clone()))
                     {
-                        debug!(message = "Stream found.", stream = ?stream.log_stream_name);
-
-                        let events = self
-                            .events
-                            .pop()
-                            .expect("Token got called multiple times, self is a bug!");
-
-                        let token = stream.upload_sequence_token;
-
-                        info!(message = "Putting logs.", token = ?token);
-                        self.state = State::Put(self.client.put_logs(token, events));
+                        debug!(message = "Stream found.", stream = ?stream_name);
+                        self.state = State::Put(self.client.put_logs(self.current.clone()));
                     } else if self.create_missing_stream {
                         info!("Provided stream does not exist; creating a new one.");
                         self.state = State::CreateStream(self.client.create_log_stream());
@@ -175,7 +204,8 @@ impl Future for CloudwatchFuture {
                     info!(message = "Group created.", name = %self.client.group_name);
 
                     if self.retention_enabled {
-                        self.state = State::PutRetentionPolicy(self.client.put_retention_policy());
+                        self.state =
+                            State::PutRetentionPolicy(self.client.put_retention_policy());
                         continue;
                     }
 
@@ -204,29 +234,8 @@ impl Future for CloudwatchFuture {
 
                     info!(message = "Stream created.", name = %self.client.stream_name);
 
-                    self.state = State::DescribeStream(self.client.describe_stream());
-                }
-
-                State::Put(fut) => {
-                    let next_token = match ready!(fut.poll_unpin(cx)) {
-                        Ok(resp) => resp.next_sequence_token,
-                        Err(err) => return Poll::Ready(Err(CloudwatchError::Put(err))),
-                    };
-
-                    if let Some(events) = self.events.pop() {
-                        debug!(message = "Putting logs.", next_token = ?next_token);
-                        self.state = State::Put(self.client.put_logs(next_token, events));
-                    } else {
-                        info!(message = "Putting logs was successful.", next_token = ?next_token);
-
-                        self.token_tx
-                            .take()
-                            .expect("Put was polled after finishing.")
-                            .send(next_token)
-                            .expect("CloudwatchLogsSvc was dropped unexpectedly");
-
-                        return Poll::Ready(Ok(()));
-                    }
+                    // No sequence token needed, so replay the batch straight away.
+                    self.state = State::Put(self.client.put_logs(self.current.clone()));
                 }
 
                 State::PutRetentionPolicy(fut) => {
@@ -246,10 +255,17 @@ impl Future for CloudwatchFuture {
     }
 }
 
+fn is_resource_not_found(err: &SdkError<PutLogEventsError, HttpResponse>) -> bool {
+    matches!(
+        err,
+        SdkError::ServiceError(inner)
+            if matches!(inner.err(), PutLogEventsError::ResourceNotFoundException(_))
+    )
+}
+
 impl Client {
     pub fn put_logs(
         &self,
-        sequence_token: Option<String>,
         log_events: Vec<InputLogEvent>,
     ) -> ClientResult<PutLogEventsOutput, PutLogEventsError> {
         let client = self.client.clone();
@@ -261,7 +277,6 @@ impl Client {
             client
                 .put_log_events()
                 .set_log_events(Some(log_events))
-                .set_sequence_token(sequence_token)
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
                 .customize()
