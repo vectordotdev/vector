@@ -7,7 +7,8 @@ env:
   CLICKHOUSE_ADDRESS: http://clickhouse:8123
 
 matrix:
-  version: ["23"]
+  # 23 covers the uncompressed paths; 25 exercises compressed Arrow IPC.
+  version: ["23", "25"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

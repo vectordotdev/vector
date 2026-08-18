@@ -3,4 +3,4 @@
 pub mod parser;
 pub mod schema;
 
-pub use schema::ClickHouseSchemaProvider;
+pub use schema::{ClickHouseSchemaProvider, ensure_arrow_compression_supported};

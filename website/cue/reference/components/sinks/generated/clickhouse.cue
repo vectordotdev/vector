@@ -273,6 +273,11 @@ generated: components: sinks: clickhouse: configuration: {
 					This is the streaming variant of the Arrow IPC format, which writes
 					a continuous stream of record batches.
 
+					Note: enabling the `compression` option (any value other than `none`) requires ClickHouse
+					23.11 or newer. Older servers accept the insert but cannot read compressed Arrow IPC, so the
+					sink rejects that combination at startup. When it is enabled, the sink also disables the
+					top-level HTTP `compression` to avoid double-compressing the payload.
+
 					[apache_arrow]: https://arrow.apache.org/
 					"""
 				required: true
@@ -282,8 +287,29 @@ generated: components: sinks: clickhouse: configuration: {
 					This is the streaming variant of the Arrow IPC format, which writes
 					a continuous stream of record batches.
 
+					Note: enabling the `compression` option (any value other than `none`) requires ClickHouse
+					23.11 or newer. Older servers accept the insert but cannot read compressed Arrow IPC, so the
+					sink rejects that combination at startup. When it is enabled, the sink also disables the
+					top-level HTTP `compression` to avoid double-compressing the payload.
+
 					[apache_arrow]: https://arrow.apache.org/
 					"""
+			}
+			compression: {
+				description: """
+					Block-level compression applied to the Arrow IPC record batch buffers.
+
+					Compresses each buffer inside the IPC stream.
+					"""
+				required: false
+				type: string: {
+					default: "none"
+					enum: {
+						lz4_frame: "LZ4 frame compression."
+						none:      "No compression."
+						zstd:      "Zstandard compression."
+					}
+				}
 			}
 		}
 	}
