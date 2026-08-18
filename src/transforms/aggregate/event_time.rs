@@ -179,9 +179,7 @@ impl Aggregate {
                         Entry::Occupied(mut entry) => {
                             if entry.get().0.kind != data.kind {
                                 emit!(AggregateUpdateFailed);
-                                let existing = entry.get_mut();
-                                existing.1.merge(metadata);
-                                existing.0 = data;
+                                Self::replace_entry(entry.get_mut(), data, metadata);
                             } else {
                                 // In event-time mode, "latest" means latest *event timestamp*
                                 // within the time bucket, not latest arrival order.
@@ -261,12 +259,19 @@ impl Aggregate {
             _ => false,
         };
         if should_replace {
-            existing.0 = data;
-            let previous = std::mem::replace(&mut existing.1, metadata);
-            existing.1.merge(previous);
+            Self::replace_entry(existing, data, metadata);
         } else {
             existing.1.merge(metadata);
         }
+    }
+
+    /// Replaces the retained metric with the incoming sample while preserving
+    /// metadata from every consumed sample. The incoming metadata is the base
+    /// so attribution and routing fields match the data that will be emitted.
+    fn replace_entry(existing: &mut MetricEntry, data: MetricData, metadata: EventMetadata) {
+        existing.0 = data;
+        let previous = std::mem::replace(&mut existing.1, metadata);
+        existing.1.merge(previous);
     }
 
     fn record_sum_in_map(
@@ -283,10 +288,11 @@ impl Aggregate {
                     // Metadata is always merged, even on a kind mismatch, so an
                     // existing sample's finalizers are never discarded.
                     let updated = existing.0.kind == data.kind && existing.0.update(&data);
-                    existing.1.merge(metadata);
-                    if !updated {
+                    if updated {
+                        existing.1.merge(metadata);
+                    } else {
                         emit!(AggregateUpdateFailed);
-                        existing.0 = data;
+                        Self::replace_entry(existing, data, metadata);
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -353,14 +359,14 @@ impl Aggregate {
                             ) => new_value < existing_value,
                             _ => false,
                         };
-                        existing.1.merge(metadata);
                         if should_update {
-                            existing.0 = data;
+                            Self::replace_entry(existing, data, metadata);
+                        } else {
+                            existing.1.merge(metadata);
                         }
                     } else {
                         emit!(AggregateUpdateFailed);
-                        existing.1.merge(metadata);
-                        existing.0 = data;
+                        Self::replace_entry(existing, data, metadata);
                     }
                 }
                 Entry::Vacant(entry) => {
