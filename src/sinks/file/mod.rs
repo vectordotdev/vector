@@ -18,6 +18,8 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::{codec::Encoder as _, time::delay_queue::Expired};
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::{BatchSerializerConfig, format::ParquetSerializerConfig};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{
@@ -38,7 +40,7 @@ use crate::{
         FilePathOutsideBaseDirError, TemplateRenderingError,
     },
     sinks::util::{
-        StreamSink,
+        BatchConfig, BulkSizeBasedDefaultBatchSettings, StreamSink,
         path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
@@ -46,8 +48,25 @@ use crate::{
 };
 
 mod bytes_path;
+#[cfg(feature = "codecs-parquet")]
+mod parquet;
 
 use bytes_path::BytesPath;
+
+/// Batch encoding configuration for the `file` sink.
+#[cfg(feature = "codecs-parquet")]
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The codec to use for batch encoding events."
+))]
+pub enum FileBatchEncoding {
+    /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
+    ///
+    /// [apache_parquet]: https://parquet.apache.org/
+    Parquet(ParquetSerializerConfig),
+}
 
 /// Configuration for the `file` sink.
 #[serde_as]
@@ -96,6 +115,30 @@ pub struct FileSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
+    /// Batch encoding configuration for columnar formats.
+    ///
+    /// When set, events are batched together and encoded as a columnar format
+    /// (Parquet) instead of the standard per-event, framing-based encoding. The
+    /// columnar format handles its own internal compression, so the top-level
+    /// `compression` setting is ignored.
+    ///
+    /// Because columnar files cannot be appended to, each batch is written to a
+    /// distinct file: a time-ordered UUID (v7) is inserted into the rendered `path`
+    /// before the file extension so that successive batches do not overwrite one
+    /// another.
+    #[cfg(feature = "codecs-parquet")]
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch_encoding: Option<FileBatchEncoding>,
+
+    /// Event batching behavior.
+    ///
+    /// This is only applied when `batch_encoding` is set. The default per-event
+    /// streaming path writes events to files as they arrive and does not batch.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub compression: Compression,
@@ -143,6 +186,9 @@ impl GenerateConfig for FileSinkConfig {
             path: UnconfinedTemplate::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
             compression: Default::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
@@ -247,6 +293,15 @@ impl SinkConfig for FileSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        #[cfg(feature = "codecs-parquet")]
+        if self.batch_encoding.is_some() {
+            let sink = parquet::ParquetFileSink::new(self, cx)?;
+            return Ok((
+                super::VectorSink::from_event_streamsink(sink),
+                future::ok(()).boxed(),
+            ));
+        }
+
         let sink = FileSink::new(self, cx)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
@@ -259,12 +314,49 @@ impl SinkConfig for FileSinkConfig {
     }
 
     fn input(&self) -> Input {
+        #[cfg(feature = "codecs-parquet")]
+        if let Some(FileBatchEncoding::Parquet(parquet_config)) = &self.batch_encoding {
+            let resolved = BatchSerializerConfig::Parquet(parquet_config.clone());
+            return Input::new(resolved.input_type());
+        }
         Input::new(self.encoding.config().1.input_type())
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+}
+
+/// Derive the path confinement for `config`.
+///
+/// Shared by the streaming [`FileSink`] and the batch (Parquet) sink so that
+/// both enforce the same boundary: a config that is rejected — or confined —
+/// on one path behaves identically on the other.
+fn build_confinement(config: &FileSinkConfig) -> crate::Result<Option<PathConfinement>> {
+    // Config validation runs regardless of the opt-out: a relative
+    // `base_dir` is a syntactic error, not a confinement decision.
+    if let Some(base) = config.base_dir.as_ref()
+        && base.is_relative()
+    {
+        return Err(Box::new(
+            crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
+                path: base.clone(),
+            },
+        ));
+    }
+
+    if config
+        .confinement
+        .dangerously_allow_unconfined_template_resolution
+    {
+        ConfinementConfig::warn_unconfined_template("sink", "file", "path");
+        return Ok(None);
+    }
+
+    Ok(
+        PathConfinement::for_template(&config.path, config.base_dir.as_deref())
+            .map_err(Box::new)?,
+    )
 }
 
 pub struct FileSink {
@@ -291,28 +383,7 @@ impl FileSink {
             .or(cx.globals.timezone)
             .and_then(timezone_to_offset);
 
-        // Config validation runs regardless of the opt-out: a relative
-        // `base_dir` is a syntactic error, not a confinement decision.
-        if let Some(base) = config.base_dir.as_ref()
-            && base.is_relative()
-        {
-            return Err(Box::new(
-                crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
-                    path: base.clone(),
-                },
-            ));
-        }
-
-        let confinement = if config
-            .confinement
-            .dangerously_allow_unconfined_template_resolution
-        {
-            ConfinementConfig::warn_unconfined_template("sink", "file", "path");
-            None
-        } else {
-            PathConfinement::for_template(&config.path, config.base_dir.as_deref())
-                .map_err(Box::new)?
-        };
+        let confinement = build_confinement(config)?;
 
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
@@ -352,6 +423,7 @@ impl FileSink {
                         path: &rendered_path,
                         base_dir: confinement.base_dir(),
                         error,
+                        dropped_events: 1,
                     });
                     None
                 }
@@ -469,6 +541,7 @@ impl FileSink {
                         path: &rendered,
                         base_dir: &base,
                         error,
+                        dropped_events: 1,
                     });
                     event.metadata().update_status(EventStatus::Errored);
                     return;
@@ -784,6 +857,9 @@ mod tests {
             },
             truncate: Default::default(),
             base_dir: None,
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
             confinement: ConfinementConfig::default(),
         };
 
@@ -814,6 +890,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -843,6 +922,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -877,6 +959,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -988,6 +1073,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -1047,6 +1135,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         };
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
@@ -1081,6 +1172,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         };
 
         let metric_count = 3;
@@ -1135,6 +1229,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -1159,6 +1256,9 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
+            batch: Default::default(),
         }
     }
 
@@ -1318,6 +1418,103 @@ mod tests {
         cfg.base_dir = Some(dir.join("does-not-yet-exist"));
         // No filesystem precondition is established.
         let _ = FileSink::new(&cfg, SinkContext::default()).unwrap();
+    }
+
+    #[cfg(feature = "codecs-parquet")]
+    #[tokio::test]
+    async fn parquet_batch_writes_valid_file() {
+        use vector_lib::codecs::encoding::format::{ParquetSchemaMode, ParquetSerializerConfig};
+
+        let directory = temp_dir();
+        let mut template = directory.to_string_lossy().to_string();
+        template.push_str("/events-%Y.parquet");
+
+        let config = FileSinkConfig {
+            path: template.try_into().unwrap(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            batch_encoding: Some(FileBatchEncoding::Parquet(ParquetSerializerConfig {
+                schema_mode: ParquetSchemaMode::AutoInfer,
+                ..Default::default()
+            })),
+            batch: Default::default(),
+            compression: Compression::None,
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
+            truncate: Default::default(),
+            base_dir: None,
+            confinement: ConfinementConfig::default(),
+        };
+
+        let (input, _events) = random_events_with_stream(64, 8, None);
+
+        assert_sink_compliance(&FILE_SINK_TAGS, async {
+            let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+            sink.run(Box::pin(stream::iter(input.into_iter().map(Into::into))))
+                .await
+                .expect("Running sink failed");
+        })
+        .await;
+
+        // Exactly one `.parquet` file should have been written for the single
+        // partition, with a UUID inserted before the extension.
+        let parquet_files: Vec<_> = std::fs::read_dir(&directory)
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "parquet"))
+            .collect();
+
+        assert_eq!(parquet_files.len(), 1, "expected a single parquet file");
+
+        let file_name = parquet_files[0].file_name().unwrap().to_string_lossy();
+        assert!(file_name.starts_with("events-"));
+
+        // Valid Parquet files begin and end with the `PAR1` magic bytes.
+        let bytes = std::fs::read(&parquet_files[0]).unwrap();
+        assert!(bytes.len() > 8, "parquet file should not be empty");
+        assert_eq!(&bytes[..4], b"PAR1", "missing leading parquet magic");
+        assert_eq!(
+            &bytes[bytes.len() - 4..],
+            b"PAR1",
+            "missing trailing parquet magic"
+        );
+    }
+
+    #[cfg(feature = "codecs-parquet")]
+    #[tokio::test]
+    async fn parquet_batch_confines_to_base_dir() {
+        use vector_lib::codecs::encoding::format::{ParquetSchemaMode, ParquetSerializerConfig};
+
+        // PoC payload: a tenant-controlled field escapes the derived base dir
+        // (`<dir>/apps/`) into `<dir>/escaped/`. The batch path must be
+        // rejected before anything is written.
+        let directory = temp_dir();
+        let path = format!("{}/apps/{{{{ service }}}}/app.parquet", directory.display());
+
+        let mut config = base_config(&path);
+        config.batch_encoding = Some(FileBatchEncoding::Parquet(ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            ..Default::default()
+        }));
+
+        let mut event = Event::Log(LogEvent::from("payload"));
+        event
+            .as_mut_log()
+            .insert(event_path!("service"), "../escaped/poc");
+
+        let (sink, _healthcheck) = config.build(SinkContext::default()).await.unwrap();
+        sink.run(Box::pin(stream::iter(vec![event.into()])))
+            .await
+            .expect("Running sink failed");
+
+        assert!(
+            !directory.join("escaped").exists(),
+            "batch was written outside the base directory"
+        );
     }
 
     async fn run_assert_log_sink(config: &FileSinkConfig, events: Vec<String>) {
