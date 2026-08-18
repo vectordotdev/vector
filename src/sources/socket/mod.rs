@@ -938,7 +938,7 @@ mod test {
 
         let mut config = TcpConfig::from_address(addr.into());
         config.set_tls(Some(TlsSourceConfig {
-            tls_config: TlsEnableableConfig {
+            tls_config: TlsEnableableConfig::test_config(),
                 enabled: Some(true),
                 options: TlsConfig {
                     verify_certificate: Some(true),
