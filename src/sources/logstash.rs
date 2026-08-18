@@ -3,7 +3,7 @@ use std::{
     convert::TryFrom,
     io,
     net::SocketAddr,
-    num::NonZeroUsize,
+    num::{NonZeroU64, NonZeroUsize},
     time::Duration,
 };
 
@@ -61,6 +61,14 @@ pub struct LogstashConfig {
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
+
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -125,6 +133,7 @@ impl Default for LogstashConfig {
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
             connection_limit: None,
+            tls_handshake_timeout_secs: None,
             log_namespace: None,
         }
     }
@@ -164,6 +173,7 @@ impl SourceConfig for LogstashConfig {
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
+            self.tls_handshake_timeout_secs,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -902,6 +912,7 @@ mod test {
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
             connection_limit: None,
+            tls_handshake_timeout_secs: None,
             log_namespace: None,
         }
         .build(SourceContext::new_test(sender, None))
@@ -1667,6 +1678,7 @@ mod integration_tests {
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
                 log_namespace: None,
             }
             .build(SourceContext::new_test(sender, None))
