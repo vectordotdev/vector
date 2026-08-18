@@ -154,6 +154,10 @@ pub struct Config {
     sources: IndexMap<ComponentKey, SourceOuter>,
     sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
     transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
+    #[serde(skip)]
+    acknowledgement_required: HashSet<ComponentKey>,
+    #[serde(skip)]
+    acknowledgement_best_effort: HashSet<ComponentKey>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
@@ -211,8 +215,16 @@ impl Config {
             .or_else(|| self.enrichment_tables.get(id).map(|s| &s.inputs[..]))
     }
 
+    pub fn acknowledgement_required(&self, id: &ComponentKey) -> bool {
+        self.acknowledgement_required.contains(id)
+    }
+
+    pub fn acknowledgement_best_effort(&self, id: &ComponentKey) -> bool {
+        self.acknowledgement_best_effort.contains(id) && !self.acknowledgement_required.contains(id)
+    }
+
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
-        let inputs: Vec<_> = self
+        let enabled_sinks: Vec<_> = self
             .sinks
             .iter()
             .filter(|(_, sink)| {
@@ -221,19 +233,22 @@ impl Config {
                     .merge_default(&self.global.acknowledgements)
                     .enabled()
             })
-            .flat_map(|(name, sink)| {
-                sink.inputs
-                    .iter()
-                    .map(|input| (name.clone(), input.clone()))
-            })
+            .map(|(name, sink)| (name.clone(), sink.inputs.clone()))
             .collect();
-        self.propagate_acks_rec(inputs);
-        Ok(())
-    }
 
-    fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
-        for (sink, input) in sink_inputs {
+        self.acknowledgement_required.clear();
+        let mut pending = Vec::new();
+        for (sink, inputs) in enabled_sinks {
+            self.acknowledgement_required.insert(sink.clone());
+            pending.extend(inputs.into_iter().map(|input| (sink.clone(), input)));
+        }
+
+        while let Some((sink, input)) = pending.pop() {
             let component = &input.component;
+            if !self.acknowledgement_required.insert(component.clone()) {
+                continue;
+            }
+
             if let Some(source) = self.sources.get_mut(component) {
                 if source.inner.can_acknowledge() {
                     source.sink_acknowledgements = true;
@@ -245,14 +260,36 @@ impl Config {
                     );
                 }
             } else if let Some(transform) = self.transforms.get(component) {
-                let inputs = transform
-                    .inputs
-                    .iter()
-                    .map(|input| (sink.clone(), input.clone()))
-                    .collect();
-                self.propagate_acks_rec(inputs);
+                pending.extend(
+                    transform
+                        .inputs
+                        .iter()
+                        .map(|input| (sink.clone(), input.clone())),
+                );
             }
         }
+
+        self.acknowledgement_best_effort.clear();
+        let mut pending: Vec<_> = self
+            .sinks
+            .iter()
+            .filter(|(_, sink)| sink.inner.acknowledgements().explicitly_disabled())
+            .flat_map(|(sink, config)| {
+                self.acknowledgement_best_effort.insert(sink.clone());
+                config.inputs.iter().cloned()
+            })
+            .collect();
+        while let Some(input) = pending.pop() {
+            let component = &input.component;
+            if !self.acknowledgement_best_effort.insert(component.clone()) {
+                continue;
+            }
+            if let Some(transform) = self.transforms.get(component) {
+                pending.extend(transform.inputs.iter().cloned());
+            }
+        }
+
+        Ok(())
     }
 
     pub fn transform_keys_with_external_files(&self) -> HashSet<ComponentKey> {
@@ -1206,6 +1243,12 @@ mod acknowledgements_tests {
                     encoding.codec = "text"
                     path = "/path/to/out2"
                     acknowledgements = true
+                [sinks.out2_optional]
+                    type = "file"
+                    inputs = ["in2"]
+                    encoding.codec = "text"
+                    path = "/path/to/out2_optional"
+                    acknowledgements = false
                 [sinks.out3]
                     type = "file"
                     inputs = ["parse3"]
@@ -1230,6 +1273,12 @@ mod acknowledgements_tests {
         assert!(!get("in1").sink_acknowledgements);
         assert!(get("in2").sink_acknowledgements);
         assert!(get("in3").sink_acknowledgements);
+
+        assert!(config.acknowledgement_required(&ComponentKey::from("out2")));
+        assert!(config.acknowledgement_required(&ComponentKey::from("in2")));
+        assert!(!config.acknowledgement_required(&ComponentKey::from("out2_optional")));
+        assert!(config.acknowledgement_best_effort(&ComponentKey::from("out2_optional")));
+        assert!(!config.acknowledgement_required(&ComponentKey::from("out1")));
     }
 }
 

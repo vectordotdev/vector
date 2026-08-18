@@ -24,7 +24,7 @@ use vector_lib::{
 use super::{
     BuiltBuffer, TaskHandle, TaskResult,
     builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
-    fanout::{ControlChannel, ControlMessage},
+    fanout::{AcknowledgementRequirement, ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::{Task, TaskOutput},
 };
@@ -881,7 +881,7 @@ impl RunningTopology {
         // Instead of propagating connections forward -- B reconnecting A forcefully -- we only
         // connect components backwards i.e. transforms to sources/transforms, and sinks to
         // sources/transforms, to ensure we're connecting components in order.
-        self.reattach_severed_inputs(diff);
+        self.reattach_severed_inputs(diff, &new_pieces.acknowledgement_requirements);
 
         // Broadcast any topology changes to subscribers.
         if !self.watch.0.is_closed() {
@@ -965,6 +965,11 @@ impl RunningTopology {
         diff: &ConfigDiff,
         new_pieces: &mut builder::TopologyPieces,
     ) {
+        let acknowledgement_requirement = new_pieces
+            .acknowledgement_requirements
+            .get(key)
+            .copied()
+            .unwrap_or(AcknowledgementRequirement::Required);
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
         let old_inputs = self
@@ -987,7 +992,11 @@ impl RunningTopology {
                 // output for the first time, since there's nothing to actually replace at this point.
                 debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
 
-                _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Add(
+                    key.clone(),
+                    tx.clone(),
+                    acknowledgement_requirement,
+                ));
             } else {
                 // We know that if this component is connected to a given input, and neither
                 // components were changed, then the output must still exist, which means we paused
@@ -995,7 +1004,11 @@ impl RunningTopology {
                 // now:
                 debug!(component_id = %key, fanout_id = %input, "Replacing component input in fanout.");
 
-                _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
+                _ = output.send(ControlMessage::Replace(
+                    key.clone(),
+                    tx.clone(),
+                    acknowledgement_requirement,
+                ));
             }
         }
 
@@ -1052,7 +1065,11 @@ impl RunningTopology {
         }
     }
 
-    fn reattach_severed_inputs(&mut self, diff: &ConfigDiff) {
+    fn reattach_severed_inputs(
+        &mut self,
+        diff: &ConfigDiff,
+        acknowledgement_requirements: &HashMap<ComponentKey, AcknowledgementRequirement>,
+    ) {
         let unchanged_transforms = self
             .config
             .transforms()
@@ -1064,7 +1081,15 @@ impl RunningTopology {
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(transform_key.clone(), input));
+                let requirement = acknowledgement_requirements
+                    .get(transform_key)
+                    .copied()
+                    .unwrap_or(AcknowledgementRequirement::Required);
+                _ = output.send(ControlMessage::Add(
+                    transform_key.clone(),
+                    input,
+                    requirement,
+                ));
             }
         }
 
@@ -1087,7 +1112,11 @@ impl RunningTopology {
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
-                _ = output.send(ControlMessage::Add(sink_key.clone(), input));
+                let requirement = acknowledgement_requirements
+                    .get(sink_key)
+                    .copied()
+                    .unwrap_or(AcknowledgementRequirement::Required);
+                _ = output.send(ControlMessage::Add(sink_key.clone(), input, requirement));
             }
         }
     }
