@@ -25,7 +25,11 @@ use vector_lib::{
         encoding::{Framer, FramingConfig},
     },
     configurable::configurable_component,
+    finalization::EventFinalizers,
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
+    json_size::JsonSize,
+    partition::Partitioner,
+    stream::BatcherSettings,
 };
 
 use crate::{
@@ -38,7 +42,7 @@ use crate::{
         FilePathOutsideBaseDirError, TemplateRenderingError,
     },
     sinks::util::{
-        StreamSink,
+        BatchConfig, RealtimeSizeBasedDefaultBatchSettings, StreamSink,
         path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
@@ -119,6 +123,16 @@ pub struct FileSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub truncate: FileTruncateConfig,
+
+    /// Controls how events are batched per destination file before writing.
+    ///
+    /// Events sharing the same rendered path are accumulated into a single buffer and written
+    /// with one syscall per batch, reducing overhead when routing to many partitions
+    /// (for example, one file per Kafka topic). The default timeout is 1 second; raising it
+    /// increases throughput at the cost of end-to-end latency.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 }
 
 /// Configuration for truncating files.
@@ -150,6 +164,7 @@ impl GenerateConfig for FileSinkConfig {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         })
         .unwrap()
     }
@@ -220,6 +235,14 @@ impl OutFile {
         }
     }
 
+    async fn write(&mut self, src: &[u8]) -> Result<usize, std::io::Error> {
+        match &mut self.inner {
+            OutFileInner::Regular(file) => file.write(src).await,
+            OutFileInner::Gzip(gzip) => gzip.write(src).await,
+            OutFileInner::Zstd(zstd) => zstd.write(src).await,
+        }
+    }
+
     async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
         match &mut self.inner {
             OutFileInner::Regular(file) => file.write_all(src).await,
@@ -272,6 +295,7 @@ pub struct FileSink {
     transformer: Transformer,
     encoder: Encoder<Framer>,
     idle_timeout: Duration,
+    batch_settings: BatcherSettings,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
     events_sent: Registered<EventsSent>,
@@ -285,6 +309,7 @@ impl FileSink {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
+        let batch_settings = config.batch.validate()?.into_batcher_settings()?;
 
         let offset = config
             .timezone
@@ -319,6 +344,7 @@ impl FileSink {
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
+            batch_settings,
             files: ExpiringHashMap::default(),
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
@@ -328,56 +354,171 @@ impl FileSink {
         })
     }
 
-    /// Uses pass the `event` to `self.path` template to obtain the file path
-    /// to store the event as.
-    fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
-        let bytes = match self.path.render(event) {
-            Ok(b) => b,
-            Err(error) => {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some("path"),
-                    drop_event: true,
-                });
-                return None;
-            }
-        };
-
-        if let Some(confinement) = self.confinement.as_ref() {
-            let rendered_path = bytes_to_path(&bytes);
-            match confinement.confine(&rendered_path) {
-                Ok(normalized) => Some(path_to_bytes(&normalized)),
-                Err(error) => {
-                    emit!(FilePathOutsideBaseDirError {
-                        path: &rendered_path,
-                        base_dir: confinement.base_dir(),
-                        error,
-                    });
-                    None
-                }
-            }
-        } else {
-            Some(bytes)
-        }
-    }
-
     fn deadline_at(&self) -> Instant {
         Instant::now()
             .checked_add(self.idle_timeout)
             .expect("unable to compute next deadline")
     }
 
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> crate::Result<()> {
-        loop {
-            tokio::select! {
-                event = input.next() => {
-                    match event {
-                        Some(event) => self.process_event(event).await,
-                        None => {
-                            // If we got `None` - terminate the processing.
-                            debug!(message = "Receiver exhausted, terminating the processing loop.");
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> crate::Result<()> {
+        let partitioner = FilePathPartitioner {
+            path: self.path.clone(),
+        };
+        let batch_settings = self.batch_settings;
+        // Per-path event buffers with a generation counter that increments each
+        // time the buffer is flushed and recreated.  The generation lets us detect stale
+        // deadline entries in the BinaryHeap so that a completed batch's deadline
+        // is never applied to a later batch for the same path.
+        let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64)> =
+            std::collections::HashMap::new();
+        let mut per_path_gen: std::collections::HashMap<Bytes, u64> =
+            std::collections::HashMap::new();
+        let mut flush_deadlines: std::collections::BinaryHeap<
+            std::cmp::Reverse<(tokio::time::Instant, Bytes, u64)>,
+        > = std::collections::BinaryHeap::new();
 
-                            // Close all the open files.
+        tokio::pin!(input);
+
+        loop {
+            let input_next = input.next();
+
+            let next_timer_deadline = flush_deadlines.peek()
+                .map(|&std::cmp::Reverse((d, _, _))| d);
+
+            tokio::select! {
+                event = input_next => {
+                    match event {
+                        Some(event) => {
+                            let path = match partitioner.partition(&event) {
+                                Some(raw_path) => {
+                                    if let Some(ref confinement) = self.confinement {
+                                        match confinement.confine(&bytes_to_path(&raw_path)) {
+                                            Ok(confined) => {
+                                                #[cfg(unix)]
+                                                {
+                                                    use std::os::unix::ffi::OsStrExt;
+                                                    Bytes::copy_from_slice(
+                                                        confined.as_os_str().as_bytes(),
+                                                    )
+                                                }
+                                                #[cfg(not(unix))]
+                                                {
+                                                    Bytes::from(
+                                                        confined
+                                                            .to_string_lossy()
+                                                            .as_bytes()
+                                                            .to_vec(),
+                                                    )
+                                                }
+                                            }
+                                            Err(error) => {
+                                                let rendered = bytes_to_path(&raw_path);
+                                                let base = confinement.base_dir().to_path_buf();
+                                                emit!(FilePathOutsideBaseDirError {
+                                                    path: &rendered,
+                                                    base_dir: &base,
+                                                    error,
+                                                });
+                                                event.metadata()
+                                                    .update_status(EventStatus::Errored);
+                                                continue;
+                                            }
+                                        }
+                                    } else {
+                                        raw_path
+                                    }
+                                }
+                                None => {
+                                    event.metadata().update_status(EventStatus::Errored);
+                                    continue;
+                                }
+                            };
+                            let event_size = event.estimated_json_encoded_size_of().get();
+                            if let Some((events, _)) = buffers.get_mut(&path) {
+                                let current_size: usize = events.iter()
+                                    .map(|e| e.estimated_json_encoded_size_of().get())
+                                    .sum();
+                                if current_size + event_size > batch_settings.size_limit
+                                    || events.len() >= batch_settings.item_limit
+                                {
+                                    // Buffer is full — flush old batch and start fresh.
+                                    let (old_events, _old_generation) = buffers.remove(&path).unwrap();
+                                    self.process_batch(path.clone(), old_events).await;
+                                    let generation = per_path_gen.entry(path.clone()).or_insert(0);
+                                    let deadline = tokio::time::Instant::now()
+                                        + batch_settings.timeout;
+                                    buffers.insert(path.clone(), (vec![event], *generation));
+                                    flush_deadlines.push(
+                                        std::cmp::Reverse((deadline, path.clone(), *generation)),
+                                    );
+                                    *generation += 1;
+                                } else {
+                                    events.push(event);
+                                }
+                            } else {
+                                let generation = per_path_gen.entry(path.clone()).or_insert(0);
+                                let deadline = tokio::time::Instant::now()
+                                    + batch_settings.timeout;
+                                buffers.insert(path.clone(), (vec![event], *generation));
+                                flush_deadlines.push(
+                                    std::cmp::Reverse((deadline, path.clone(), *generation)),
+                                );
+                                *generation += 1;
+                            }
+                            // Flush immediately when the batch reaches the item or byte limit.
+                            let needs_flush = buffers.get(&path).map_or(false, |(events, _)| {
+                                let total_size: usize = events.iter()
+                                    .map(|e| e.estimated_json_encoded_size_of().get())
+                                    .sum();
+                                total_size >= batch_settings.size_limit
+                                    || events.len() >= batch_settings.item_limit
+                            });
+                            if needs_flush {
+                                let (events, _generation) = buffers.remove(&path).unwrap();
+                                self.process_batch(path.clone(), events).await;
+                                // The stale deadline entry (generation) remains in the heap but won't
+                                // match the new generation if this path receives more events.
+                            }
+                            // Bound active-buffer memory under high-cardinality templates.
+                            // Also flush expired buffers inline.
+                            {
+                                let now = tokio::time::Instant::now();
+                                loop {
+                                    let expire_or_cap =
+                                        flush_deadlines.peek().map_or(false,
+                                            |std::cmp::Reverse((d, _, _))| {
+                                                *d <= now || buffers.len() > 1000
+                                            },
+                                        );
+                                    if !expire_or_cap {
+                                        break;
+                                    }
+                                    let std::cmp::Reverse((_, path, generation)) =
+                                        match flush_deadlines.pop() {
+                                            Some(e) => e,
+                                            None => break,
+                                        };
+                                    if let Some((events, current_generation)) =
+                                        buffers.remove(&path)
+                                    {
+                                        if current_generation == generation {
+                                            self.process_batch(path, events).await;
+                                        } else {
+                                            buffers.insert(path, (events, current_generation));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        None => {
+                            // Stream exhausted — flush all remaining buffers, then close files.
+                            debug!(message = "Receiver exhausted, flushing remaining buffers.");
+                            let paths: Vec<Bytes> = buffers.keys().cloned().collect();
+                            for p in paths {
+                                if let Some((events, _generation)) = buffers.remove(&p) {
+                                    self.process_batch(p, events).await;
+                                }
+                            }
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
                                 if let Err(error) = file.close().await {
@@ -388,29 +529,53 @@ impl FileSink {
                                         path,
                                         dropped_events: 0,
                                     });
-                                } else{
+                                } else {
                                     trace!(message = "Successfully closed file.", path = ?path);
                                 }
                             }
-
-                            emit!(FileOpen {
-                                count: 0
-                            });
-
+                            emit!(FileOpen { count: 0 });
                             break;
                         }
                     }
                 }
                 result = self.files.next_expired(), if !self.files.is_empty() => {
                     match result {
-                        // We do not poll map when it's empty, so we should
-                        // never reach this branch.
                         None => unreachable!(),
                         Some((expired_file, path)) => {
-                            // We got an expired file. All we really want is to
-                            // flush and close it.
                             self.close_file(expired_file, path).await;
                         }
+                    }
+                }
+                _ = async {
+                    tokio::time::sleep_until(
+                        next_timer_deadline
+                            .unwrap_or_else(|| {
+                                tokio::time::Instant::now()
+                                    + std::time::Duration::from_secs(3600)
+                            }),
+                    ).await;
+                }, if next_timer_deadline.is_some() => {}
+            }
+
+            // Flush any expired buffers after every wake-up.
+            let now = tokio::time::Instant::now();
+            loop {
+                let expired = flush_deadlines.peek().map_or(false,
+                    |std::cmp::Reverse((d, _, _))| *d <= now,
+                );
+                if !expired {
+                    break;
+                }
+                let std::cmp::Reverse((_, path, generation)) =
+                    match flush_deadlines.pop() {
+                        Some(e) => e,
+                        None => break,
+                    };
+                if let Some((events, current_generation)) = buffers.remove(&path) {
+                    if current_generation == generation {
+                        self.process_batch(path, events).await;
+                    } else {
+                        buffers.insert(path, (events, current_generation));
                     }
                 }
             }
@@ -419,43 +584,80 @@ impl FileSink {
         Ok(())
     }
 
-    async fn process_event(&mut self, mut event: Event) {
-        let path = match self.partition_event(&event) {
-            Some(path) => path,
-            None => {
-                // We weren't able to find the path to use for the
-                // file.
-                // The error is already handled at `partition_event`, so
-                // here we just skip the event.
-                event.metadata().update_status(EventStatus::Errored);
-                return;
-            }
-        };
-
+    async fn process_batch(&mut self, path: Bytes, mut events: Vec<Event>) {
         let next_deadline = self.deadline_at();
         trace!(message = "Computed next deadline.", next_deadline = ?next_deadline, path = ?path);
 
         let bytes_path = BytesPath::new(path.clone());
         let truncate = self.should_truncate(&bytes_path, &path).await;
-        let file = if !truncate && let Some(file) = self.files.reset_at(&path, next_deadline) {
-            trace!(message = "Working with an already opened file.", path = ?path);
-            file
+
+        let file = if !truncate {
+            if let Some(file) = self.files.reset_at(&path, next_deadline) {
+                trace!(message = "Working with an already opened file.", path = ?path);
+                file
+            } else {
+                trace!(message = "Opening new file.", ?path);
+                let file = match open_file(bytes_path, truncate, self.confinement.as_mut()).await {
+                    Ok(file) => file,
+                    Err(OpenError::Io(error)) => {
+                        // We couldn't open the file for this event.
+                        // Maybe other events will work though! Just log
+                        // the error and skip this event.
+                        let dropped_events = events.len();
+                        emit!(FileIoError {
+                            code: "failed_opening_file",
+                            message: "Unable to open the file.",
+                            error,
+                            path: &path,
+                            dropped_events,
+                        });
+                        events.iter_mut().for_each(|event| {
+                            event.metadata().update_status(EventStatus::Errored);
+                        });
+                        return;
+                    }
+                    Err(OpenError::Confine(error)) => {
+                        let rendered = bytes_to_path(&path);
+                        let base = self
+                            .confinement
+                            .as_ref()
+                            .map(|c| c.base_dir().to_path_buf())
+                            .unwrap_or_default();
+                        emit!(FilePathOutsideBaseDirError {
+                            path: &rendered,
+                            base_dir: &base,
+                            error,
+                        });
+                        events.iter_mut().for_each(|event| {
+                            event.metadata().update_status(EventStatus::Errored);
+                        });
+                        return;
+                    }
+                };
+
+                let outfile = OutFile::new(file, self.compression);
+                self.files.insert_at(path.clone(), outfile, next_deadline);
+                emit!(FileOpen {
+                    count: self.files.len()
+                });
+                self.files.get_mut(&path).unwrap()
+            }
         } else {
-            trace!(message = "Opening new file.", ?path);
+            trace!(message = "Opening new file (truncating).", ?path);
             let file = match open_file(bytes_path, truncate, self.confinement.as_mut()).await {
                 Ok(file) => file,
                 Err(OpenError::Io(error)) => {
-                    // We couldn't open the file for this event.
-                    // Maybe other events will work though! Just log
-                    // the error and skip this event.
+                    let dropped_events = events.len();
                     emit!(FileIoError {
                         code: "failed_opening_file",
                         message: "Unable to open the file.",
                         error,
                         path: &path,
-                        dropped_events: 1,
+                        dropped_events,
                     });
-                    event.metadata().update_status(EventStatus::Errored);
+                    events.iter_mut().for_each(|event| {
+                        event.metadata().update_status(EventStatus::Errored);
+                    });
                     return;
                 }
                 Err(OpenError::Confine(error)) => {
@@ -470,13 +672,14 @@ impl FileSink {
                         base_dir: &base,
                         error,
                     });
-                    event.metadata().update_status(EventStatus::Errored);
+                    events.iter_mut().for_each(|event| {
+                        event.metadata().update_status(EventStatus::Errored);
+                    });
                     return;
                 }
             };
 
             let outfile = OutFile::new(file, self.compression);
-
             self.files.insert_at(path.clone(), outfile, next_deadline);
             emit!(FileOpen {
                 count: self.files.len()
@@ -484,29 +687,112 @@ impl FileSink {
             self.files.get_mut(&path).unwrap()
         };
 
-        trace!(message = "Writing an event to file.", path = ?path);
-        let event_size = event.estimated_json_encoded_size_of();
-        let finalizers = event.take_finalizers();
-        match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
-            Ok(byte_size) => {
-                finalizers.update_status(EventStatus::Delivered);
-                self.events_sent.emit(CountByteSize(1, event_size));
+        // Encode each event individually so we can write them one at a time.
+        // This ensures that if a write fails partway through (e.g. ENOSPC),
+        // events already written are acknowledged Delivered and only the
+        // remaining events are retried, avoiding silent duplicates.
+        let mut encoded: Vec<(BytesMut, EventFinalizers, JsonSize)> =
+            Vec::with_capacity(events.len());
+
+        trace!(message = "Encoding batch.", batch_size = events.len(), path = ?path);
+        for mut event in events {
+            let event_size = event.estimated_json_encoded_size_of();
+            let finalizers = event.take_finalizers();
+            self.transformer.transform(&mut event);
+            let mut buf = BytesMut::new();
+            match self.encoder.encode(event, &mut buf) {
+                Ok(()) => encoded.push((buf, finalizers, event_size)),
+                Err(error) => {
+                    finalizers.update_status(EventStatus::Errored);
+                    emit!(FileIoError {
+                        code: "failed_encoding_event",
+                        message: "Failed to encode event.",
+                        error: std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+                        path: &path,
+                        dropped_events: 1,
+                    });
+                }
+            }
+        }
+
+        if encoded.is_empty() {
+            return;
+        }
+
+        // Combine all encoded records into a single buffer so we issue one
+        // write syscall per batch for the common uncompressed case.  Track
+        // each event's byte boundary so a partial write (ENOSPC, quota) can
+        // still acknowledge the events that were fully persisted.
+        let n_events = encoded.len();
+        let mut batch_buffer = BytesMut::new();
+        let mut boundaries: Vec<usize> = Vec::with_capacity(n_events);
+        for (buf, _, _) in &encoded {
+            boundaries.push(batch_buffer.len() + buf.len());
+            batch_buffer.extend_from_slice(buf);
+        }
+
+        let len = batch_buffer.len();
+        let mut written = 0usize;
+        let write_result: Result<(), std::io::Error> = loop {
+            match file.write(&batch_buffer[written..]).await {
+                Ok(0) => break Err(std::io::Error::new(
+                    std::io::ErrorKind::WriteZero,
+                    "write returned 0",
+                )),
+                Ok(n) => {
+                    written += n;
+                    if written >= len {
+                        break Ok(());
+                    }
+                }
+                Err(e) => break Err(e),
+            }
+        };
+
+        match write_result {
+            Ok(()) => {
+                for (buf, finalizers, event_size) in encoded {
+                    finalizers.update_status(EventStatus::Delivered);
+                    self.events_sent.emit(CountByteSize(1, event_size));
+                }
                 emit!(FileBytesSent {
-                    byte_size,
+                    byte_size: len,
                     file: String::from_utf8_lossy(&path),
                     include_file_metric_tag: self.include_file_metric_tag,
                 });
             }
-            Err(error) => {
-                finalizers.update_status(EventStatus::Errored);
-                emit!(FileIoError {
-                    code: "failed_writing_file",
-                    message: "Failed to write the file.",
-                    error,
-                    path: &path,
-                    dropped_events: 1,
-                });
-            }
+                Err(error) => {
+                    // `written` bytes made it to the file / compression stream.
+                    // Events whose end offset lies at or before `written` were
+                    // fully persisted; everything beyond that must be retried.
+                    let mut dropped_events = n_events;
+                    for (i, (buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
+                        if boundaries[i] <= written {
+                            finalizers.update_status(EventStatus::Delivered);
+                            self.events_sent.emit(CountByteSize(1, event_size));
+                            dropped_events -= 1;
+                        } else {
+                            finalizers.update_status(EventStatus::Errored);
+                            if dropped_events == n_events {
+                                dropped_events = n_events - i;
+                            }
+                        }
+                    }
+                    emit!(FileIoError {
+                        code: "failed_writing_file",
+                        message: "Failed to write the file.",
+                        error,
+                        path: &path,
+                        dropped_events,
+                    });
+                    if written > 0 {
+                        emit!(FileBytesSent {
+                            byte_size: written,
+                            file: String::from_utf8_lossy(&path),
+                            include_file_metric_tag: self.include_file_metric_tag,
+                        });
+                    }
+                }
         }
     }
 
@@ -575,17 +861,6 @@ fn bytes_to_path(b: &Bytes) -> PathBuf {
 #[cfg(not(unix))]
 fn bytes_to_path(b: &Bytes) -> PathBuf {
     PathBuf::from(String::from_utf8_lossy(b).as_ref())
-}
-
-#[cfg(unix)]
-fn path_to_bytes(p: &Path) -> Bytes {
-    use std::os::unix::ffi::OsStrExt;
-    Bytes::copy_from_slice(p.as_os_str().as_bytes())
-}
-
-#[cfg(not(unix))]
-fn path_to_bytes(p: &Path) -> Bytes {
-    Bytes::from(p.to_string_lossy().into_owned().into_bytes())
 }
 
 /// Errors produced by `open_file`. Routed at the call site so that
@@ -714,18 +989,27 @@ async fn open_file(
     opts.open(open_path).await.map_err(OpenError::Io)
 }
 
-async fn write_event_to_file(
-    file: &mut OutFile,
-    mut event: Event,
-    transformer: &Transformer,
-    encoder: &mut Encoder<Framer>,
-) -> Result<usize, std::io::Error> {
-    transformer.transform(&mut event);
-    let mut buffer = BytesMut::new();
-    encoder
-        .encode(event, &mut buffer)
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
-    file.write_all(&buffer).await.map(|()| buffer.len())
+struct FilePathPartitioner {
+    path: UnconfinedTemplate,
+}
+
+impl Partitioner for FilePathPartitioner {
+    type Item = Event;
+    type Key = Option<Bytes>;
+
+    fn partition(&self, event: &Self::Item) -> Self::Key {
+        match self.path.render(event) {
+            Ok(bytes) => Some(bytes),
+            Err(error) => {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("path"),
+                    drop_event: true,
+                });
+                None
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -785,6 +1069,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -814,6 +1099,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -843,6 +1129,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -877,6 +1164,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -988,6 +1276,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -1018,8 +1307,8 @@ mod tests {
         tx.send(LogEvent::from(last_line).into()).await.unwrap();
         input.push(String::from(last_line));
 
-        // wait for another flush
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // wait for batch timeout (1s default) plus margin to flush
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
         // make sure we appended instead of overwriting
         let output = lines_from_file(template);
@@ -1047,6 +1336,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
@@ -1081,6 +1371,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let metric_count = 3;
@@ -1135,6 +1426,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -1159,6 +1451,7 @@ mod tests {
             truncate: Default::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
+            batch: BatchConfig::default(),
         }
     }
 
@@ -1220,61 +1513,72 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn confine_drops_dotdot_traversal() {
         // PoC payload: tenant field carries `../..` to escape the base dir.
         let dir = temp_dir();
-        let path = format!("{}/apps/{{{{ service }}}}/app.log", dir.display());
-        let cfg = base_config(&path);
+        let apps = dir.join("apps");
+        let template = format!("{}/{{{{ service }}}}/app.log", apps.display());
+        let mut cfg = base_config(&template);
+        cfg.base_dir = Some(apps.clone());
 
         let mut event = Event::Log(LogEvent::from("payload"));
-        event
-            .as_mut_log()
-            .insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
+        event.as_mut_log().insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-        assert!(sink.partition_event(&event).is_none());
+        // Run without compliance checks — no events are sent, so the compliance
+        // metric assertions (BytesSent / component_sent_bytes_total) would fail.
+        let sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        VectorSink::from_event_streamsink(sink)
+            .run(Box::pin(stream::iter(vec![event].into_iter().map(Into::into))))
+            .await
+            .expect("Running sink failed");
+
+        // `confine` rejects the traversal before any filesystem mutation.
+        assert!(!apps.exists(), "base_dir should not have been created: {:?}", apps);
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn confine_collapses_absolute_injection_into_base() {
         // When a field value begins with `/`, the template render produces
         // `<base>//<value>` which lexically collapses to `<base>/<value>`.
-        // The leading slash is harmless (a separator, not an escape) — the
-        // event is still confined to the base.
+        // The leading slash is harmless — the event is still confined to the base.
         let dir = temp_dir();
-        let path = format!("{}/{{{{ key }}}}.log", dir.display());
-        let cfg = base_config(&path);
+        let template = format!("{}/{{{{ key }}}}.log", dir.display());
+        let mut cfg = base_config(&template);
+        cfg.base_dir = Some(dir.clone());
+        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
 
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "/etc/passwd");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-        let confined = sink.partition_event(&event).unwrap();
-        let confined_str = String::from_utf8_lossy(&confined);
+        run_assert_sink(&cfg, vec![event].into_iter()).await;
+
+        let expected = dir.join("etc/passwd.log");
         assert!(
-            confined_str.starts_with(&*dir.to_string_lossy()),
-            "expected {confined_str} to remain under {}",
+            expected.exists(),
+            "expected {expected:?} to exist under base {}",
             dir.display()
         );
     }
 
-    // The path template embeds a literal `/` before the field, which is
-    // Unix-shaped: on Windows the rendered separator flips to `\`.
     #[cfg(unix)]
     #[tokio::test]
     async fn confine_allows_legit_partition() {
         let dir = temp_dir();
-        let path = format!("{}/{{{{ key }}}}.log", dir.display());
-        let cfg = base_config(&path);
+        let template = format!("{}/{{{{ key }}}}.log", dir.display());
+        let mut cfg = base_config(&template);
+        cfg.base_dir = Some(dir.clone());
+        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
 
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "tenant-a");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-        let rendered = sink.partition_event(&event).unwrap();
-        let rendered_str = String::from_utf8_lossy(&rendered);
-        assert!(rendered_str.ends_with("/tenant-a.log"), "{rendered_str}");
+        run_assert_sink(&cfg, vec![event].into_iter()).await;
+
+        let expected = dir.join("tenant-a.log");
+        assert!(expected.exists(), "expected file not created: {expected:?}");
     }
 
     #[test]
@@ -1288,23 +1592,24 @@ mod tests {
         assert!(sink.confinement.is_none());
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn escape_hatch_bypasses_confinement_even_when_base_derivable() {
         // With the flag set, confinement is fully disabled — even when a base
         // would otherwise be derivable. The flag is a complete opt-out.
         let dir = temp_dir();
-        let path = format!("{}/{{{{ key }}}}.log", dir.display());
-        let mut cfg = base_config(&path);
-        cfg.confinement
-            .dangerously_allow_unconfined_template_resolution = true;
-
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
-        assert!(sink.confinement.is_none());
+        let template = format!("{}/{{{{ key }}}}.log", dir.display());
+        let mut cfg = base_config(&template);
+        cfg.confinement.dangerously_allow_unconfined_template_resolution = true;
+        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
 
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "safe-value");
-        // Event routes through — no confinement check.
-        assert!(sink.partition_event(&event).is_some());
+
+        run_assert_sink(&cfg, vec![event].into_iter()).await;
+
+        let expected = dir.join("safe-value.log");
+        assert!(expected.exists(), "expected file not created: {expected:?}");
     }
 
     #[tokio::test]
