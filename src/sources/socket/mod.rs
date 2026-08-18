@@ -971,19 +971,13 @@ mod test {
         let timeout = tokio::time::sleep(Duration::from_millis(2000));
         let mut buffer = [0u8; 10];
 
-        tokio::select! {
-             _ = timeout => {
-                 panic!("timed out waiting for stream to close")
-             },
-             read_result = stream.read(&mut buffer) => {
-                 match read_result {
-                    // read resulting with 0 bytes -> the connection was closed
-                    Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.5),
-                    Ok(_) => panic!("unexpectedly read data from stream"),
-                    Err(e) => panic!("{e:}")
-                 }
-             }
-        }
+    let bytes_read = timeout(Duration::from_secs(2), stream.read(&mut [0]))
+        .await
+        .expect("timed out waiting for stream to close")
+        .expect("failed to read from stream");
+        
+        assert_eq!(bytes_read, 0, "unexpectedly read data from stream");
+        assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.5);
     }
 
     //////// UDP TESTS ////////
