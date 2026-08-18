@@ -917,6 +917,63 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		azure_blob_event_ignored_total: {
+			description:       "The total number of times a blob notification in an Azure queue message was ignored (for an event that was not `Microsoft.Storage.BlobCreated`)."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				event_type: {
+					description: "The event type of the ignored notification."
+					required:    true
+				}
+			}
+		}
+		azure_blob_processing_failed_duration_seconds: {
+			description:       "The time taken to process an Azure blob that failed, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				container: {
+					description: "The name of the Azure Blob Storage container."
+					required:    true
+				}
+			}
+		}
+		azure_blob_processing_succeeded_duration_seconds: {
+			description:       "The time taken to process an Azure blob that succeeded, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				container: {
+					description: "The name of the Azure Blob Storage container."
+					required:    true
+				}
+			}
+		}
+		azure_queue_message_delete_succeeded_total: {
+			description:       "The total number of successful deletions of Azure queue messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		azure_queue_message_processing_succeeded_total: {
+			description:       "The total number of Azure queue messages successfully processed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		azure_queue_message_receive_succeeded_total: {
+			description:       "The total number of times successfully receiving Azure queue messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		azure_queue_message_received_messages_total: {
+			description:       "The total number of received Azure queue messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		s3_object_processing_failed_duration_seconds: {
 			description:       "The time taken to process an S3 object that failed, in seconds."
 			type:              "histogram"

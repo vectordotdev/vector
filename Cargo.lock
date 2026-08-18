@@ -2002,6 +2002,7 @@ dependencies = [
  "rustc_version",
  "serde",
  "serde_json",
+ "tokio",
  "tracing 0.1.44",
  "typespec",
  "typespec_client_core",
@@ -2053,6 +2054,18 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_json",
+ "time",
+]
+
+[[package]]
+name = "azure_storage_queue"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e3836053722dfa5aa3461e47aebb96e230a87d8d22eb1f866ca704f691b93ae"
+dependencies = [
+ "async-trait",
+ "azure_core",
+ "serde",
  "time",
 ]
 
@@ -12868,6 +12881,7 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "tokio",
  "tracing 0.1.44",
  "typespec",
  "typespec_macros",
@@ -13222,6 +13236,7 @@ dependencies = [
  "azure_core",
  "azure_identity",
  "azure_storage_blob",
+ "azure_storage_queue",
  "base64 0.23.0",
  "bloomy",
  "bollard",

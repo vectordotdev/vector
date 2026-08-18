@@ -16,5 +16,6 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
   - "src/sinks/azure_**"
+  - "src/sources/azure_blob/**"
   - "src/sinks/util/**"
   - "tests/integration/azure/**"
