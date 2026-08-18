@@ -1,4 +1,4 @@
-# Histograms that report no sum no longer report a sum of zero {#histogram-absent-sum}
+# Absent histogram sums are no longer reported as zero {#histogram-absent-sum}
 
 ## Summary
 
@@ -12,7 +12,8 @@ the `sum` column, and a `lua` transform sees `aggregated_histogram.sum` as `nil`
 ## Migration
 
 A `lua` transform that reads `aggregated_histogram.sum` must tolerate `nil`. Unguarded arithmetic
-raises `attempt to perform arithmetic on a nil value`, and Vector drops the event.
+raises `attempt to perform arithmetic on a nil value`, and Vector drops the event. To preserve the
+old behavior, default an absent sum to zero before using it in the calculation.
 
 #### Old
 
@@ -44,10 +45,9 @@ transforms:
       process: |
         function (event, emit)
           local h = event.metric.aggregated_histogram
-          if h.sum ~= nil and h.count > 0 then
-            event.metric.gauge = { value = h.sum / h.count }
-            event.metric.aggregated_histogram = nil
-          end
+          local sum = h.sum or 0
+          event.metric.gauge = { value = sum / h.count }
+          event.metric.aggregated_histogram = nil
           emit(event)
         end
 ```
