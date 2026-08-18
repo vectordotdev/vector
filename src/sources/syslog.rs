@@ -1,6 +1,6 @@
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -100,6 +100,14 @@ pub enum Mode {
 
         /// The maximum number of TCP connections that are allowed at any given time.
         connection_limit: Option<u32>,
+
+        /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+        ///
+        /// This bounds how long a connection can hold its slot against `connection_limit`
+        /// before the TLS handshake finishes, protecting against clients that open a
+        /// connection but never complete (or never start) a handshake.
+        #[configurable(metadata(docs::type_unit = "seconds"))]
+        tls_handshake_timeout_secs: Option<NonZeroU64>,
     },
 
     /// Listen on UDP.
@@ -155,6 +163,7 @@ impl Default for SyslogConfig {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             },
             host_key: None,
             max_length: crate::serde::default_max_length(),
@@ -188,6 +197,7 @@ impl SourceConfig for SyslogConfig {
                 tls,
                 receive_buffer_bytes,
                 connection_limit,
+                tls_handshake_timeout_secs,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -210,6 +220,7 @@ impl SourceConfig for SyslogConfig {
                     tls_client_metadata_key,
                     receive_buffer_bytes,
                     None,
+                    tls_handshake_timeout_secs,
                     cx,
                     false.into(),
                     connection_limit,
@@ -1149,6 +1160,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             });
 
             let key = ComponentKey::from("in");
@@ -1360,6 +1372,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             });
 
             let key = ComponentKey::from("in");
