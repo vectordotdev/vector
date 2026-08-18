@@ -294,7 +294,9 @@ impl DatadogMetricsConfig {
             self.series_api_version,
         );
 
-        let protocol = self.get_protocol(dd_common)?;
+        let protocol = HttpEndpoint::parse(&self.get_base_agent_endpoint(dd_common))?
+            .protocol()
+            .to_string();
         let sink = DatadogMetricsSink::new(
             service,
             request_builder,
@@ -305,11 +307,6 @@ impl DatadogMetricsConfig {
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
-    }
-
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> crate::Result<String> {
-        let endpoint = HttpEndpoint::parse(&self.get_base_agent_endpoint(dd_common))?;
-        Ok(endpoint.as_uri().scheme_str().unwrap_or("http").to_string())
     }
 }
 
