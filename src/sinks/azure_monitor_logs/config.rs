@@ -17,7 +17,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
@@ -161,9 +161,9 @@ impl AzureMonitorLogsConfig {
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
-        endpoint: UriSerde,
+        endpoint: HttpEndpoint,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = endpoint.with_default_parts().uri;
+        let endpoint = endpoint.into_uri();
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
 
         let batch_settings = self
@@ -216,7 +216,7 @@ impl_generate_config_from_default!(AzureMonitorLogsConfig);
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = format!("https://{}.{}", self.customer_id, self.host).parse()?;
+        let endpoint = HttpEndpoint::parse(&format!("https://{}.{}", self.customer_id, self.host))?;
         self.build_inner(cx, endpoint).await
     }
 

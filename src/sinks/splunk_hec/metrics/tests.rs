@@ -18,7 +18,7 @@ use crate::{
             common::config_host_key,
             metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
         },
-        util::{Compression, test::build_test_server},
+        util::{Compression, HttpEndpoint, test::build_test_server},
     },
     template::{ConfinementConfig, Template},
     test_util::addr::next_addr,
@@ -352,7 +352,7 @@ async fn splunk_passthrough_token() {
     let (_guard, addr) = next_addr();
     let config = HecMetricsSinkConfig {
         default_token: "token".to_owned().into(),
-        endpoint: format!("http://{addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{addr}")).unwrap(),
         host_key: config_host_key(),
         index: None,
         sourcetype: None,

@@ -253,9 +253,9 @@ dependencies = [
  "axum 0.6.20",
  "clap",
  "reqwest 0.11.26",
+ "serde",
  "serde_json",
  "tokio",
- "vector-buffers",
 ]
 
 [[package]]
@@ -1707,7 +1707,7 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "h2 0.3.26",
- "h2 0.4.13",
+ "h2 0.4.16",
  "http 0.2.12",
  "http-body 0.4.6",
  "hyper 0.14.32",
@@ -2838,6 +2838,7 @@ dependencies = [
  "snafu 0.9.0",
  "strum 0.28.0",
  "syslog_loose 0.23.0",
+ "tempfile",
  "tokio",
  "tokio-util",
  "toml",
@@ -2852,6 +2853,7 @@ dependencies = [
  "vector-lookup",
  "vector-vrl-functions",
  "vrl",
+ "zstd 0.13.2",
 ]
 
 [[package]]
@@ -4994,9 +4996,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.13"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f44da3a8150a6703ed5d34e164b875fd14c2cdab9af1252a9a1020bde2bdc54"
+checksum = "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -5572,7 +5574,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-core",
- "h2 0.4.13",
+ "h2 0.4.16",
  "http 1.3.1",
  "http-body 1.0.1",
  "httparse",
@@ -9866,7 +9868,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
- "h2 0.4.13",
+ "h2 0.4.16",
  "http 1.3.1",
  "http-body 1.0.1",
  "http-body-util",
@@ -12342,7 +12344,7 @@ dependencies = [
  "axum 0.7.9",
  "base64 0.22.1",
  "bytes",
- "h2 0.4.13",
+ "h2 0.4.16",
  "http 1.3.1",
  "http-body 1.0.1",
  "http-body-util",
@@ -12372,7 +12374,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "flate2",
- "h2 0.4.13",
+ "h2 0.4.16",
  "http 1.3.1",
  "http-body 1.0.1",
  "http-body-util",
@@ -13257,7 +13259,7 @@ dependencies = [
  "goauth",
  "governor",
  "greptimedb-ingester",
- "h2 0.4.13",
+ "h2 0.4.16",
  "hash_hasher",
  "hashbrown 0.14.5",
  "headers 0.3.9",

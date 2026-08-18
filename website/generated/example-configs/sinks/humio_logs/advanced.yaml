@@ -7,7 +7,7 @@ sinks:
     dangerously_allow_unconfined_template_resolution: false
     encoding:
       codec: json
-    endpoint: https://cloud.humio.com
+    endpoint: https://cloud.humio.com/
     event_type: json
     host_key: .host
     index: "{{ host }}"
