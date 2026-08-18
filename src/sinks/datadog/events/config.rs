@@ -1,7 +1,7 @@
 use http::Uri;
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, schema};
+use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use super::{
@@ -23,7 +23,6 @@ use crate::{
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
-    tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `datadog_events` sink.
@@ -64,12 +63,6 @@ impl DatadogEventsConfig {
             .into_uri())
     }
 
-    fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(self.dd_common.tls.as_ref(), false)?;
-        let client = HttpClient::new(tls, proxy)?;
-        Ok(client)
-    }
-
     fn build_sink(
         &self,
         dd_common: &DatadogCommonConfig,
@@ -80,14 +73,13 @@ impl DatadogEventsConfig {
         let service =
             DatadogEventsService::new(endpoint, dd_common.default_api_key.clone(), client);
 
-        let request_settings = validated.request_settings.clone();
         let retry_logic = HttpStatusRetryLogic::new(
             |req: &DatadogEventsResponse| req.http_status,
             self.retry_strategy.clone(),
         );
 
         let service = ServiceBuilder::new()
-            .settings(request_settings, retry_logic)
+            .settings(validated.request_settings.clone(), retry_logic)
             .service(service);
 
         let sink = DatadogEventsSink { service };
@@ -145,9 +137,9 @@ impl ValidatedSink for DatadogEventsConfig {
         validated: &ValidatedEvents,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(cx.proxy())?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.dd_common.with_globals(global)?;
+        let dd_common = self.dd_common.with_globals_from(&cx)?;
+        // Events defaults to HTTP; explicit TLS configuration overrides it.
+        let client = self.dd_common.build_client(cx.proxy(), false)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let endpoint = Self::events_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)?;
         let sink = self.build_sink(&dd_common, client, validated, endpoint)?;

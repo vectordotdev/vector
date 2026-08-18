@@ -111,11 +111,9 @@ where
     pub fn new(
         client: HttpClient<Body, C>,
         uri: Uri,
-        headers: BTreeMap<String, String>,
+        user_provided_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
         dd_evp_origin: String,
     ) -> crate::Result<Self> {
-        let user_provided_headers = validate_headers(&headers)?;
-
         let dd_evp_headers: BTreeMap<String, String> = [
             ("DD-EVP-ORIGIN".to_string(), dd_evp_origin),
             ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),

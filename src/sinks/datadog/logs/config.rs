@@ -1,29 +1,26 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
+use http::HeaderValue;
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_lib::{
-    config::proxy::ProxyConfig, configurable::configurable_component, schema::meaning,
-};
+use vector_lib::{configurable::configurable_component, schema::meaning, stream::BatcherSettings};
 use vrl::value::Kind;
 
 use hyper::{Body, client::connect::Connect};
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
-use crate::config::{DynValidatedSink, ValidatedSink};
 use crate::{
-    common::datadog,
+    config::{DynValidatedSink, ValidatedSink},
     http::HttpClient,
     schema,
     sinks::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
         prelude::*,
         util::{
-            HttpEndpoint,
-            http::{RequestConfig, validate_headers},
+            HttpEndpoint, TowerRequestSettings,
+            http::{OrderedHeaderName, RequestConfig, validate_headers},
         },
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -81,6 +78,15 @@ pub struct DatadogLogsConfig {
     pub conforms_as_agent: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedDatadogLogs {
+    batch: BatcherSettings,
+    compression: Compression,
+    headers: BTreeMap<OrderedHeaderName, HeaderValue>,
+    conforms_as_agent: bool,
+    request_settings: TowerRequestSettings,
+}
+
 const fn default_compression() -> Option<Compression> {
     Some(Compression::zstd_default())
 }
@@ -116,39 +122,21 @@ impl DatadogLogsConfig {
         dd_common: &DatadogCommonConfig,
         client: HttpClient<Body, C>,
         dd_evp_origin: String,
-        batch: BatcherSettings,
+        validated: &ValidatedDatadogLogs,
     ) -> crate::Result<VectorSink>
     where
         C: Connect + Clone + Send + Sync + 'static,
     {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
-        let request_limits = self.request.tower.into_settings();
-
-        let headers = {
-            let mut request_headers = self.request.headers.clone();
-            if self.conforms_as_agent {
-                request_headers.insert(String::from("DD-PROTOCOL"), String::from("agent-json"));
-            }
-            request_headers
-        };
-
-        // conforms_as_agent is true if either the user supplied configuration parameter is enabled
-        // or the DD-PROTOCOL: agent-json header had already been manually set
-        let conforms_as_agent = if let Some(value) = headers.get("DD-PROTOCOL") {
-            value == "agent-json"
-        } else {
-            false
-        };
-
         let endpoint = self.get_uri(dd_common)?;
         let protocol = endpoint.protocol().to_string();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, LogApiRetry)
+            .settings(validated.request_settings.clone(), LogApiRetry)
             .service(LogApiService::new(
                 client,
                 endpoint.into_uri(),
-                headers,
+                validated.headers.clone(),
                 dd_evp_origin,
             )?);
 
@@ -158,30 +146,14 @@ impl DatadogLogsConfig {
             encoding,
             service,
             default_api_key,
-            batch,
+            validated.batch,
             protocol,
-            conforms_as_agent,
+            validated.conforms_as_agent,
         )
-        .compression(self.compression.or_else(default_compression).unwrap())
+        .compression(validated.compression)
         .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
-    }
-
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let default_tls_config;
-
-        let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
-            }),
-            false,
-        )?;
-        Ok(HttpClient::new(tls_settings, proxy)?)
     }
 }
 
@@ -210,32 +182,13 @@ impl SinkConfig for DatadogLogsConfig {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ValidatedLogs {
-    batch: BatcherSettings,
-}
-
 #[async_trait::async_trait]
 impl ValidatedSink for DatadogLogsConfig {
-    type Validated = ValidatedLogs;
+    type Validated = ValidatedDatadogLogs;
 
-    fn validate(&self) -> crate::Result<ValidatedLogs> {
-        let site = self
-            .local_dd_common
-            .site
-            .clone()
-            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
-        Self::logs_endpoint(self.local_dd_common.endpoint.as_deref(), &site)?;
-
-        let request_headers = {
-            let mut request_headers = self.request.headers.clone();
-            if self.conforms_as_agent {
-                request_headers.insert(String::from("DD-PROTOCOL"), String::from("agent-json"));
-            }
-            request_headers
-        };
-        validate_headers(&request_headers)?;
-
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        // We forcefully cap the provided batch configuration to the size/log line limits imposed by
+        // the Datadog Logs API, but we still allow them to be lowered if need be.
         let batch = self
             .batch
             .validate()?
@@ -243,21 +196,45 @@ impl ValidatedSink for DatadogLogsConfig {
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
-        Ok(ValidatedLogs { batch })
+        let mut configured_headers = self.request.headers.clone();
+        if self.conforms_as_agent {
+            configured_headers.insert(String::from("DD-PROTOCOL"), String::from("agent-json"));
+        }
+
+        // conforms_as_agent is true if either the user supplied configuration parameter is enabled
+        // or the DD-PROTOCOL: agent-json header had already been manually set
+        let conforms_as_agent = configured_headers
+            .get("DD-PROTOCOL")
+            .is_some_and(|value| value == "agent-json");
+        let headers = validate_headers(&configured_headers)?;
+
+        if self.local_dd_common.endpoint.is_some() {
+            self.local_dd_common
+                .validate_endpoint_with_path("/api/v2/logs")?;
+        } else if let Some(site) = self.local_dd_common.site.as_deref() {
+            Self::logs_endpoint(None, site)?;
+        }
+
+        let compression = self.compression.or_else(default_compression).unwrap();
+
+        Ok(ValidatedDatadogLogs {
+            batch,
+            compression,
+            headers,
+            conforms_as_agent,
+            request_settings: self.request.tower.into_settings(),
+        })
     }
 
     async fn build(
         &self,
-        validated: &ValidatedLogs,
+        validated: &Self::Validated,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
-
+        let dd_common = self.local_dd_common.with_globals_from(&cx)?;
+        let client = self.local_dd_common.build_client(&cx.proxy, true)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
-
-        let sink = self.build_processor(&dd_common, client, cx.app_name_slug, validated.batch)?;
+        let sink = self.build_processor(&dd_common, client, cx.app_name_slug, validated)?;
 
         Ok((sink, healthcheck))
     }
@@ -297,6 +274,19 @@ mod test {
             local_dd_common: LocalDatadogCommonConfig::new(
                 Some("not a uri".to_string()),
                 None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_local_site_without_endpoint() {
+        let config = DatadogLogsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                None,
+                Some("bad site".to_string()),
                 None,
             ),
             ..Default::default()
@@ -439,6 +429,24 @@ mod test {
             config_gzip.compression,
             Some(Compression::Gzip(_))
         ));
+    }
+
+    #[test]
+    fn invalid_request_headers_are_rejected_during_structure_validation() {
+        let mut config = DatadogLogsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                None,
+                None,
+                Some("test_key".to_string().into()),
+            ),
+            ..Default::default()
+        };
+        config
+            .request
+            .headers
+            .insert("invalid\nname".to_string(), "value".to_string());
+
+        assert!(crate::config::ValidatedSink::validate(&config).is_err());
     }
 
     impl ValidatableComponent for DatadogLogsConfig {

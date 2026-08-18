@@ -10,15 +10,29 @@ use vrl::event_path;
 
 use super::*;
 use crate::{
-    config::SinkConfig,
+    config::{SinkConfig, SinkContext},
     event::EventArray,
-    sinks::util::test::{build_test_server_status, load_sink},
+    sinks::util::test::{build_test_server_status, load_sink, load_sink_with_context},
     test_util::{
         addr::next_addr,
         components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
         random_lines_with_stream,
     },
 };
+
+#[tokio::test]
+async fn pure_validation_does_not_load_tls_files_but_full_build_does() {
+    let config = indoc! {r#"
+        default_api_key = "local-key"
+        tls.enabled = true
+        tls.ca_file = "/definitely/missing/vector-datadog-ca.pem"
+    "#};
+    let (config, cx) =
+        load_sink_with_context::<DatadogEventsConfig>(config, SinkContext::default()).unwrap();
+
+    assert!(crate::config::ValidatedSink::validate(&config).is_ok());
+    assert!(config.build(cx).await.is_err());
+}
 
 fn random_events_with_stream(
     len: usize,

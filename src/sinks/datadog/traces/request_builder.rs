@@ -115,7 +115,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             .collect::<Vec<TraceEvent>>();
 
         // Compute APM stats from the incoming events. The stats payloads are sent out
-        // separately from the sink framework, by the thread `flush_apm_stats_thread()`
+        // separately from the sink framework, by the flusher future `flush_apm_stats()`
         compute_apm_stats(&key, Arc::clone(&self.stats_aggregator), &trace_events);
 
         encode_traces(&key, trace_events, self.max_size)

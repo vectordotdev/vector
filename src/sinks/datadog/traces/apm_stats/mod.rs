@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 use vector_lib::event::TraceEvent;
 
-pub use self::{aggregation::Aggregator, flusher::flush_apm_stats_thread};
+pub use self::{aggregation::Aggregator, flusher::flush_apm_stats};
 pub(crate) use super::{
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     request_builder::{DDTracesMetadata, RequestBuilderError, build_request},
