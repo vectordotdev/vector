@@ -1674,31 +1674,37 @@ fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
     let interval_ms = 10_000;
     let base_time = open_bucket_timestamp(interval_ms);
 
-    // Latest/Auto must preserve finalizers from both retained and discarded samples.
+    // Latest/Auto must preserve finalizers from both retained and discarded samples,
+    // and keep attribution fields (e.g. source_type) from the timestamp-selected sample.
     let mut latest =
         Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
     let (newer_batch, mut newer_receiver) = BatchNotifier::new_with_receiver();
     let (older_batch, mut older_receiver) = BatchNotifier::new_with_receiver();
-    let newer = make_metric_with_timestamp(
+    let mut newer = make_metric_with_timestamp(
         "latest",
         MetricKind::Absolute,
         MetricValue::Gauge { value: 2.0 },
         base_time + chrono::Duration::milliseconds(200),
     )
     .with_batch_notifier(&newer_batch);
-    let older = make_metric_with_timestamp(
+    newer.metadata_mut().set_source_type("winner_source");
+    let mut older = make_metric_with_timestamp(
         "latest",
         MetricKind::Absolute,
         MetricValue::Gauge { value: 1.0 },
         base_time + chrono::Duration::milliseconds(100),
     )
     .with_batch_notifier(&older_batch);
+    older.metadata_mut().set_source_type("loser_source");
     drop((newer_batch, older_batch));
 
-    latest.record(newer);
+    // Older lands first so its metadata is the initial base; newer must still win
+    // both the value and attribution fields that merge does not overwrite.
     latest.record(older);
+    latest.record(newer);
     let mut out = vec![];
     latest.flush_final(&mut out);
+    assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
     assert!(newer_receiver.try_recv().is_err());
     assert!(older_receiver.try_recv().is_err());
     out[0].metadata().update_status(EventStatus::Delivered);

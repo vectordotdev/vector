@@ -242,6 +242,12 @@ impl Aggregate {
 
     /// Selects the metric data with the latest event timestamp while merging
     /// `EventMetadata` from every consumed sample (acknowledgements / secrets).
+    ///
+    /// When the incoming sample wins, its metadata becomes the base and the
+    /// previous sample is merged into it. `EventMetadata::merge` does not
+    /// replace attribution fields such as `source_type` /
+    /// `datadog_origin_metadata`, so the emitted value must keep the winner's
+    /// metadata as the base rather than the first-arriving sample's.
     fn select_latest_by_event_timestamp(
         existing: &mut MetricEntry,
         data: MetricData,
@@ -254,9 +260,12 @@ impl Aggregate {
             (Some(_), None) => true,
             _ => false,
         };
-        existing.1.merge(metadata);
         if should_replace {
             existing.0 = data;
+            let previous = std::mem::replace(&mut existing.1, metadata);
+            existing.1.merge(previous);
+        } else {
+            existing.1.merge(metadata);
         }
     }
 
