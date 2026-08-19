@@ -312,8 +312,24 @@ pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
     } else {
         data.deprecations_enacted.push(entry);
     }
+    sort_enacted(&mut data.deprecations_enacted);
     data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     write_json(repo_root, &data)
+}
+
+/// Sort enacted deprecations so generated output has a stable order.
+///
+/// Entries are grouped by the release that removed them, then by the release
+/// that announced them. `what` makes the order deterministic for entries
+/// announced and removed in the same releases.
+fn sort_enacted(entries: &mut [EnactedEntry]) {
+    entries.sort_by_cached_key(|entry| {
+        (
+            parse_strict_release(&entry.removed_in).ok(),
+            parse_strict_release(&entry.deprecated_since).ok(),
+            entry.what.clone(),
+        )
+    });
 }
 
 /// Filter pending fragments so they exclude any `what` already in `enacted`.
@@ -402,6 +418,7 @@ pub fn rendered_json(repo_root: &Path) -> Result<String> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
     let mut data = read_json(repo_root)?;
+    sort_enacted(&mut data.deprecations_enacted);
     data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     Ok(serde_json::to_string_pretty(&data)? + "\n")
 }
@@ -412,6 +429,7 @@ pub fn sync_deprecations_cue(repo_root: &Path) -> Result<()> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
     let mut data = read_json(repo_root)?;
+    sort_enacted(&mut data.deprecations_enacted);
     data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     write_json(repo_root, &data)
 }
@@ -575,6 +593,35 @@ mod tests {
         append_enacted(tmp.path(), entry).unwrap();
         let enacted = read_enacted(tmp.path()).unwrap();
         assert_eq!(enacted.len(), 1);
+    }
+
+    #[test]
+    fn append_enacted_sorts_entries_canonically() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
+        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
+
+        for (what, deprecated_since, removed_in) in [
+            ("later", "0.57.0", "0.60.0"),
+            ("zeta", "0.55.0", "0.59.0"),
+            ("beta", "0.54.0", "0.59.0"),
+            ("alpha", "0.54.0", "0.59.0"),
+        ] {
+            append_enacted(
+                tmp.path(),
+                EnactedEntry {
+                    what: what.into(),
+                    deprecated_since: deprecated_since.into(),
+                    removed_in: removed_in.into(),
+                    description: String::new(),
+                },
+            )
+            .unwrap();
+        }
+
+        let enacted = read_enacted(tmp.path()).unwrap();
+        let names: Vec<&str> = enacted.iter().map(|entry| entry.what.as_str()).collect();
+        assert_eq!(names, ["alpha", "beta", "zeta", "later"]);
     }
 
     #[test]
