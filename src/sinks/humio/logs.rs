@@ -8,7 +8,10 @@ use vector_lib::{
 use super::config_host_key_target_path;
 use crate::{
     codecs::EncodingConfig,
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
+        SinkContext, ValidatedSink,
+    },
     sinks::{
         Healthcheck, VectorSink,
         splunk_hec::{
@@ -17,7 +20,7 @@ use crate::{
                 acknowledgements::HecClientAcknowledgementsConfig,
                 config_timestamp_key_target_path,
             },
-            logs::config::HecLogsSinkConfig,
+            logs::config::{HecLogsSinkConfig, ValidatedHecLogsSink},
         },
         util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
@@ -67,7 +70,7 @@ pub struct HumioLogsConfig {
     #[configurable(metadata(
         docs::examples = "json",
         docs::examples = "none",
-        docs::examples = "{{ event_type }}"
+        docs::examples = "event_type-{{ event_type }}"
     ))]
     pub event_type: Option<Template>,
 
@@ -100,7 +103,10 @@ pub struct HumioLogsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
+    #[configurable(metadata(
+        docs::examples = "index-{{ host }}",
+        docs::examples = "custom_index"
+    ))]
     pub index: Option<Template>,
 
     #[configurable(derived)]
@@ -179,10 +185,6 @@ impl GenerateConfig for HumioLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.build_with_component_type(cx, Self::NAME)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -194,20 +196,58 @@ impl SinkConfig for HumioLogsConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedHumioLogs {
+    pub(super) hec: ValidatedHecLogsSink,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HumioLogsConfig {
+    type Validated = ValidatedHumioLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedHumioLogs> {
+        self.validate_with_component_name(Self::NAME)
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHumioLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_from_validated(cx, &validated.hec)
+    }
 }
 
 impl HumioLogsConfig {
-    /// Confinement + sink construction. `component_name` is threaded through so
+    /// Pure structural validation. `component_name` is threaded through so
     /// per-template security warnings carry the outer sink type — `humio_logs`
     /// when this is the top-level sink, `humio_metrics` when
-    /// [`HumioMetricsConfig::build`] delegates here.
-    pub(super) fn build_with_component_type(
+    /// [`HumioMetricsConfig`] delegates here.
+    pub(super) fn validate_with_component_name(
+        &self,
+        component_name: &'static str,
+    ) -> crate::Result<ValidatedHumioLogs> {
+        Ok(ValidatedHumioLogs {
+            hec: self
+                .build_hec_config()
+                .validate_with_component_name(component_name)?,
+        })
+    }
+
+    /// Build the sink from validated state, delegating to the underlying
+    /// Splunk HEC logs sink without redoing any pure validation.
+    pub(super) fn build_from_validated(
         &self,
         cx: SinkContext,
-        component_name: &'static str,
+        validated: &ValidatedHecLogsSink,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.build_hec_config()
-            .build_with_component_type(cx, component_name)
+        self.build_hec_config().build_from_validated(cx, validated)
     }
 
     fn build_hec_config(&self) -> HecLogsSinkConfig {
@@ -244,6 +284,33 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HumioLogsConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_unconfined_template() {
+        use crate::config::ValidatedSink;
+
+        let config = HumioLogsConfig {
+            token: "token".to_string().into(),
+            endpoint: default_endpoint(),
+            source: None,
+            encoding: JsonSerializerConfig::default().into(),
+            event_type: None,
+            host_key: config_host_key_target_path(),
+            indexed_fields: vec![],
+            index: Some("{{ index }}".try_into().unwrap()),
+            compression: Compression::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            tls: None,
+            timestamp_nanos_key: None,
+            acknowledgements: Default::default(),
+            timestamp_key: config_timestamp_key_target_path(),
+            confinement: Default::default(),
+        };
+
+        let result = config.validate();
+        assert!(result.is_err());
     }
 }
 
@@ -286,7 +353,7 @@ mod integration_tests {
 
         let config = config(&repo.default_ingest_token);
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
@@ -331,7 +398,7 @@ mod integration_tests {
         let mut config = config(&repo.default_ingest_token);
         config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let message = random_string(100);
         let event = LogEvent::from(message.clone());
@@ -360,7 +427,9 @@ mod integration_tests {
             let mut config = config(&repo.default_ingest_token);
             config.event_type = Template::try_from("json".to_string()).ok();
 
-            let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+            let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+                .await
+                .unwrap();
 
             let message = random_string(100);
             let mut event = LogEvent::from(message.clone());
@@ -386,7 +455,9 @@ mod integration_tests {
         {
             let config = config(&repo.default_ingest_token);
 
-            let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+            let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+                .await
+                .unwrap();
 
             let message = random_string(100);
             let event = LogEvent::from(message.clone());
