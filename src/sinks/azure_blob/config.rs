@@ -310,9 +310,13 @@ pub struct ValidatedAzureBlob {
 impl fmt::Debug for ValidatedAzureBlob {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // The connection string contains credentials (AccountKey / SAS token),
-        // so it is intentionally omitted from diagnostics.
+        // so it is intentionally omitted from diagnostics. The container URL
+        // may embed a SAS token as its query string, so it is rendered without
+        // the query.
+        let mut container_url = self.container_url.clone();
+        container_url.set_query(None);
         f.debug_struct("ValidatedAzureBlob")
-            .field("container_url", &self.container_url)
+            .field("container_url", &container_url)
             .field("batcher_settings", &self.batcher_settings)
             .field("blob_time_format", &self.blob_time_format)
             .field("blob_append_uuid", &self.blob_append_uuid)
@@ -618,6 +622,23 @@ mod tests {
         assert!(
             !debug.contains(account_key),
             "Debug output must not leak the connection string: {debug}"
+        );
+    }
+
+    #[test]
+    fn validated_debug_redacts_sas_token() {
+        let sas_sig = "supersecretsignature";
+        let config = test_config(
+            Some(&format!(
+                "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=b&srt=sco&sp=rcw&se=2099-01-01T00:00:00Z&sig={sas_sig}"
+            )),
+            None,
+        );
+        let validated = config.validate().expect("validation should succeed");
+        let debug = format!("{validated:?}");
+        assert!(
+            !debug.contains(sas_sig),
+            "Debug output must not leak the SAS token: {debug}"
         );
     }
 

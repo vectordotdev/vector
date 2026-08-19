@@ -175,7 +175,7 @@ impl AzureMonitorLogsConfig {
             client,
             endpoint,
             self.customer_id.clone(),
-            self.azure_resource_id.as_deref(),
+            validated.azure_resource_id.as_deref(),
             &self.log_type,
             time_generated_key.clone(),
             validated.shared_key.clone(),
@@ -211,6 +211,7 @@ pub struct ValidatedAzureMonitorLogs {
     batch_settings: BatcherSettings,
     shared_key: pkey::PKey<pkey::Private>,
     time_generated_key: Option<OwnedValuePath>,
+    azure_resource_id: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -238,6 +239,9 @@ impl ValidatedSink for AzureMonitorLogsConfig {
 
     fn validate(&self) -> crate::Result<ValidatedAzureMonitorLogs> {
         super::service::validate_log_type(&self.log_type)?;
+        if let Some(resource_id) = self.azure_resource_id.as_deref() {
+            super::service::validate_azure_resource_id(resource_id)?;
+        }
 
         let endpoint = HttpEndpoint::parse(&format!("https://{}.{}", self.customer_id, self.host))?;
 
@@ -258,6 +262,7 @@ impl ValidatedSink for AzureMonitorLogsConfig {
             batch_settings,
             shared_key,
             time_generated_key,
+            azure_resource_id: self.azure_resource_id.clone(),
         })
     }
 
@@ -341,5 +346,87 @@ mod tests {
         };
 
         config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validate_rejects_non_ascii_log_type() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "é".to_string(),
+            ..Default::default()
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("log type can only contain letters, numbers, and underscore (_)")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_empty_azure_resource_id() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "Vector".to_string(),
+            azure_resource_id: Some(String::new()),
+            ..Default::default()
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("azure_resource_id can't be an empty string"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_azure_resource_id() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "Vector".to_string(),
+            azure_resource_id: Some("not a valid header \u{1f}".to_string()),
+            ..Default::default()
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("azure_resource_id must be a valid HTTP header value"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_and_retains_azure_resource_id() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "Vector".to_string(),
+            azure_resource_id: Some(
+                "/subscriptions/1234/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/ws"
+                    .to_string(),
+            ),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.azure_resource_id.as_deref(),
+            Some(
+                "/subscriptions/1234/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/ws"
+            )
+        );
     }
 }

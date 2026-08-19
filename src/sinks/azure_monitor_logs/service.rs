@@ -16,7 +16,7 @@ use vector_lib::lookup::lookup_v2::OwnedValuePath;
 
 use crate::{http::HttpClient, sinks::prelude::*};
 
-static LOG_TYPE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\w+$").unwrap());
+static LOG_TYPE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Za-z0-9_]+$").unwrap());
 static LOG_TYPE_HEADER: LazyLock<HeaderName> =
     LazyLock::new(|| HeaderName::from_static("log-type"));
 static X_MS_DATE_HEADER: LazyLock<HeaderName> =
@@ -48,6 +48,18 @@ pub(super) fn validate_log_type(log_type: &str) -> crate::Result<()> {
         )
         .into());
     }
+    Ok(())
+}
+
+/// Validates that an `azure_resource_id` is non-empty and can form an HTTP
+/// header value, mirroring the check in `AzureMonitorLogsService::new`.
+pub(super) fn validate_azure_resource_id(azure_resource_id: &str) -> crate::Result<()> {
+    if azure_resource_id.is_empty() {
+        return Err("azure_resource_id can't be an empty string".into());
+    }
+    HeaderValue::from_str(azure_resource_id).map_err(|_| {
+        format!("azure_resource_id must be a valid HTTP header value: {azure_resource_id}")
+    })?;
     Ok(())
 }
 
