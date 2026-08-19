@@ -472,7 +472,8 @@ fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> 
     let schema = Schema::parse_str(schema)?;
 
     let value = value.resolve(&schema)?;
-    let bytes = apache_avro::to_avro_datum(&schema, value)?;
+    let writer = apache_avro::writer::datum::GenericDatumWriter::builder(&schema).build()?;
+    let bytes = writer.write_value_to_vec(value)?;
 
     let mut schema_file = File::create(format!("{FIXTURES_PATH}/{filename}.avsc"))?;
     let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro"))?;
