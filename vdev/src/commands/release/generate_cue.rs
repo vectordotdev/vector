@@ -11,6 +11,7 @@ use chrono::Utc;
 use semver::Version;
 use serde_json::json;
 
+use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
 
 const RELEASES_DIR: &str = "website/cue/reference/releases";
@@ -334,19 +335,20 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
         );
     }
     let fragment_type = parts[1];
-    let breaking = fragment_type == "breaking";
-    let cue_type = match fragment_type {
-        "breaking" => "chore",
-        "security" => "security",
-        "fix" => "fix",
-        "feature" => "feat",
-        "enhancement" => "enhancement",
-        other => bail!(
-            "Changelog fragment {} has unrecognized type '{}'",
+    let Some(entry) = FRAGMENT_TYPES.iter().find(|t| t.name == fragment_type) else {
+        bail!(
+            "Changelog fragment {} has unrecognized type '{}' (valid types: {})",
             path.display(),
-            other
-        ),
+            fragment_type,
+            FRAGMENT_TYPES
+                .iter()
+                .map(|t| t.name)
+                .collect::<Vec<_>>()
+                .join("|")
+        );
     };
+    let breaking = entry.breaking;
+    let cue_type = entry.cue_type;
 
     let raw =
         fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
