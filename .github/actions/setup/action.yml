@@ -219,6 +219,10 @@ runs:
 
         DEBS_DIR=/tmp/libsasl2-debs
 
+        apt_get_with_timeout() {
+          timeout 30m sudo apt-get "$@"
+        }
+
         # Install the cached .deb files, skipping any package that is already
         # satisfied at an equal or newer version.
         install_from_cache() {
@@ -242,15 +246,15 @@ runs:
           if ! install_from_cache; then
             echo "Cached packages could not be installed, falling back to apt"
             echo "::warning::Cached libsasl2 packages could not be installed. Refresh the cache by running the 'Refresh libsasl2 cache' workflow manually, or wait for the weekly scheduled refresh."
-            timeout 30m sudo apt-get update
-            timeout 30m sudo apt-get install -f -y libsasl2-dev
+            apt_get_with_timeout update
+            apt_get_with_timeout install -f -y libsasl2-dev
           fi
         else
           echo "Installing libsasl2 from apt"
-          timeout 30m sudo apt-get update
+          apt_get_with_timeout update
           TMP_DEBS=$(mktemp -d)
           cd "$TMP_DEBS"
-          timeout 30m apt-get download libsasl2-dev libsasl2-2 libsasl2-modules-db libdb5.3t64
+          apt_get_with_timeout download libsasl2-dev libsasl2-2 libsasl2-modules-db libdb5.3t64
           mkdir -p "$DEBS_DIR"
           cp "$TMP_DEBS"/*.deb "$DEBS_DIR"/
           rm -rf "$TMP_DEBS"
