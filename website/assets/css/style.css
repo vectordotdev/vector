@@ -55,6 +55,15 @@
   --grid-template-columns-16: repeat(16, minmax(0, 1fr));
 }
 
+/* Tailwind v4 removed the preflight rule that gave buttons a pointer cursor
+   (buttons now default to `cursor: default`). Restore the v3 behavior. */
+@layer base {
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Custom typography overrides migrated from the v3 configuration.
 
