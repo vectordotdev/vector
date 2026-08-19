@@ -241,6 +241,7 @@ runs:
           echo "Installing libsasl2 from cached packages"
           if ! install_from_cache; then
             echo "Cached packages could not be installed, falling back to apt"
+            echo "::warning::Cached libsasl2 packages could not be installed. Refresh the cache by running the 'Refresh libsasl2 cache' workflow manually, or wait for the weekly scheduled refresh."
             timeout 30m sudo apt-get update
             timeout 30m sudo apt-get install -f -y libsasl2-dev
           fi
