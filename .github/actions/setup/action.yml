@@ -201,10 +201,60 @@ runs:
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
 
+    - name: Cache libsasl2 packages
+      if: ${{ inputs.libsasl2 == 'true' }}
+      id: cache-libsasl2
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: /tmp/libsasl2-debs
+        key: ${{ runner.os }}-libsasl2-${{ hashFiles('.github/actions/setup/action.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-libsasl2-
+
     - name: Install libsasl2
       if: ${{ inputs.libsasl2 == 'true' }}
       shell: bash
-      run: timeout 30m sudo apt-get update && timeout 30m sudo apt-get install -y libsasl2-dev
+      run: |
+        set -euo pipefail
+
+        DEBS_DIR=/tmp/libsasl2-debs
+
+        # Install the cached .deb files, skipping any package that is already
+        # satisfied at an equal or newer version.
+        install_from_cache() {
+          local debs=()
+          local pkg ver installed
+          for deb in "$DEBS_DIR"/*.deb; do
+            pkg=$(dpkg-deb -f "$deb" Package)
+            ver=$(dpkg-deb -f "$deb" Version)
+            installed=$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)
+            if [[ -z "$installed" ]] || ! dpkg --compare-versions "$installed" ge "$ver"; then
+              debs+=("$deb")
+            fi
+          done
+          if [[ ${#debs[@]} -gt 0 ]]; then
+            sudo dpkg -i "${debs[@]}"
+          fi
+        }
+
+        if compgen -G "$DEBS_DIR"/*.deb > /dev/null; then
+          echo "Installing libsasl2 from cached packages"
+          if ! install_from_cache; then
+            echo "Cached packages could not be installed, falling back to apt"
+            timeout 30m sudo apt-get update
+            timeout 30m sudo apt-get install -f -y libsasl2-dev
+          fi
+        else
+          echo "Installing libsasl2 from apt"
+          timeout 30m sudo apt-get update
+          TMP_DEBS=$(mktemp -d)
+          cd "$TMP_DEBS"
+          timeout 30m apt-get download libsasl2-dev libsasl2-2 libsasl2-modules-db libdb5.3t64
+          mkdir -p "$DEBS_DIR"
+          cp "$TMP_DEBS"/*.deb "$DEBS_DIR"/
+          rm -rf "$TMP_DEBS"
+          install_from_cache
+        fi
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries
