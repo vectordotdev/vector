@@ -230,7 +230,7 @@ impl ValidatedSink for GreptimeDBLogsConfig {
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
-            endpoint: self.endpoint.to_string(),
+            endpoint: self.endpoint.clone(),
             auth: auth.clone(),
             encoder: (
                 self.encoding.clone(),
@@ -269,7 +269,7 @@ impl ValidatedSink for GreptimeDBLogsConfig {
 
         let healthcheck = Box::pin(http_healthcheck(
             client,
-            self.endpoint.to_string(),
+            self.endpoint.clone(),
             auth.clone(),
         ));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
