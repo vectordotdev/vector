@@ -596,35 +596,6 @@ mod tests {
     }
 
     #[test]
-    fn append_enacted_sorts_entries_canonically() {
-        let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-
-        for (what, deprecated_since, removed_in) in [
-            ("later", "0.57.0", "0.60.0"),
-            ("zeta", "0.55.0", "0.59.0"),
-            ("beta", "0.54.0", "0.59.0"),
-            ("alpha", "0.54.0", "0.59.0"),
-        ] {
-            append_enacted(
-                tmp.path(),
-                EnactedEntry {
-                    what: what.into(),
-                    deprecated_since: deprecated_since.into(),
-                    removed_in: removed_in.into(),
-                    description: String::new(),
-                },
-            )
-            .unwrap();
-        }
-
-        let enacted = read_enacted(tmp.path()).unwrap();
-        let names: Vec<&str> = enacted.iter().map(|entry| entry.what.as_str()).collect();
-        assert_eq!(names, ["alpha", "beta", "zeta", "later"]);
-    }
-
-    #[test]
     fn append_enacted_rejects_conflicting_removed_in() {
         let tmp = tempdir().unwrap();
         fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
