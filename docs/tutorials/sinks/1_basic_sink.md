@@ -178,7 +178,7 @@ build with just the components required. We need to add this feature to the
 
 ```diff
   sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
-  sinks-azure_logs_ingestion = []
+  sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 + sinks-basic = []
   sinks-blackhole = []
   sinks-chronicle = []
