@@ -4,8 +4,6 @@ use http::{
     HeaderMap, Request, Response, Version,
     header::{self, HeaderName, HeaderValue},
 };
-use http_1::{Request as RequestV1, Response as ResponseV1};
-use http_body_1::Body as HttpBodyV1;
 use hyper::body::HttpBody;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
@@ -190,94 +188,6 @@ impl InternalEvent for GotHttpWarning<'_> {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Adapts Hyper 1 request metadata to the shared HTTP telemetry contract.
-pub(crate) struct HttpRequestV1Telemetry<'a, T: HttpBodyV1> {
-    request: &'a RequestV1<T>,
-}
-
-impl<'a, T: HttpBodyV1> HttpRequestV1Telemetry<'a, T> {
-    pub(crate) const fn new(request: &'a RequestV1<T>) -> Self {
-        Self { request }
-    }
-}
-
-impl<T: HttpBodyV1> HttpRequestTelemetry for HttpRequestV1Telemetry<'_, T> {
-    fn method(&self) -> &str {
-        self.request.method().as_str()
-    }
-
-    fn uri(&self) -> String {
-        self.request.uri().to_string()
-    }
-
-    fn headers(&self) -> HeaderMap<HeaderValue> {
-        convert_headers(self.request.headers())
-    }
-
-    fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.request.body().size_hint();
-        (hint.lower(), hint.upper())
-    }
-
-    fn version(&self) -> Option<Version> {
-        convert_version(self.request.version())
-    }
-}
-
-/// Adapts Hyper 1 response metadata to the shared HTTP telemetry contract.
-pub(crate) struct HttpResponseV1Telemetry<'a, T: HttpBodyV1> {
-    response: &'a ResponseV1<T>,
-}
-
-impl<'a, T: HttpBodyV1> HttpResponseV1Telemetry<'a, T> {
-    pub(crate) const fn new(response: &'a ResponseV1<T>) -> Self {
-        Self { response }
-    }
-}
-
-impl<T: HttpBodyV1> HttpResponseTelemetry for HttpResponseV1Telemetry<'_, T> {
-    fn status_u16(&self) -> u16 {
-        self.response.status().as_u16()
-    }
-
-    fn headers(&self) -> HeaderMap<HeaderValue> {
-        convert_headers(self.response.headers())
-    }
-
-    fn body_size_hint(&self) -> (u64, Option<u64>) {
-        let hint = self.response.body().size_hint();
-        (hint.lower(), hint.upper())
-    }
-
-    fn version(&self) -> Option<Version> {
-        convert_version(self.response.version())
-    }
-}
-
-fn convert_headers(headers: &http_1::HeaderMap) -> HeaderMap<HeaderValue> {
-    headers
-        .iter()
-        .fold(HeaderMap::new(), |mut converted, (name, value)| {
-            let name = HeaderName::from_bytes(name.as_str().as_bytes())
-                .expect("HTTP/1 header names are valid HTTP header names");
-            let value = HeaderValue::from_bytes(value.as_bytes())
-                .expect("HTTP/1 header values are valid HTTP header values");
-            converted.append(name, value);
-            converted
-        })
-}
-
-const fn convert_version(version: http_1::Version) -> Option<Version> {
-    match version {
-        http_1::Version::HTTP_09 => Some(Version::HTTP_09),
-        http_1::Version::HTTP_10 => Some(Version::HTTP_10),
-        http_1::Version::HTTP_11 => Some(Version::HTTP_11),
-        http_1::Version::HTTP_2 => Some(Version::HTTP_2),
-        http_1::Version::HTTP_3 => Some(Version::HTTP_3),
-        _ => None,
-    }
-}
 
 fn remove_sensitive(
     mut headers: HeaderMap<HeaderValue>,

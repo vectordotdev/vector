@@ -2,8 +2,7 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http_1::{Request, StatusCode};
-use http_body_util::BodyExt;
+use http::{Request, StatusCode};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
@@ -12,13 +11,12 @@ use super::{
     service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 use crate::{
-    http::{client_v1::HttpClientV1, client_v1::full_body},
+    http::HttpClient,
     sinks::{
         prelude::*,
         util::{
             BatchConfig, BoxedRawValue, HttpEndpoint,
-            http::RetryStrategy,
-            http_v1::{HttpServiceV1, http_response_retry_logic_v1},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
 };
@@ -124,16 +122,16 @@ impl SinkConfig for HoneycombConfig {
             compression: self.compression,
         };
 
-        let client = HttpClientV1::new(None.into(), cx.proxy())?;
+        let client = HttpClient::new(None, cx.proxy())?;
 
-        let service = HttpServiceV1::new(client.clone(), honeycomb_service_request_builder);
+        let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
 
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(
                 request_limits,
-                http_response_retry_logic_v1(self.retry_strategy.clone()),
+                http_response_retry_logic(self.retry_strategy.clone()),
             )
             .service(service);
 
@@ -166,19 +164,19 @@ impl HoneycombConfig {
 async fn healthcheck(
     uri: HttpEndpoint,
     api_key: SensitiveString,
-    client: HttpClientV1,
+    client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::post(uri.to_string()).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
+    let request = Request::post(uri.as_uri()).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();
     let req: Request<Bytes> = request.body(body)?;
-    let req = req.map(full_body);
+    let req = req.map(hyper::Body::from);
 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = res.into_body().collect().await?.to_bytes();
+    let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
     if status == StatusCode::BAD_REQUEST {
         Ok(())

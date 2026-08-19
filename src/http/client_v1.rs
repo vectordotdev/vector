@@ -1,4 +1,4 @@
-#![allow(dead_code)] // The remaining unused pieces will be exercised as more sinks migrate.
+#![allow(dead_code)] // This client is private and currently exercised only by its transport contract.
 
 use std::{
     convert::Infallible,
@@ -15,7 +15,7 @@ use http_1::{
     HeaderValue, Method, Request, Response, Uri,
     header::{ACCEPT_ENCODING, HOST, PROXY_AUTHORIZATION, USER_AGENT},
 };
-use http_body_util::{BodyExt, Empty, Full, combinators::UnsyncBoxBody};
+use http_body_util::{BodyExt, Empty, combinators::UnsyncBoxBody};
 use hyper_1::{body::Incoming, rt};
 use hyper_openssl_1::{SslStream, client::legacy::HttpsConnector};
 use hyper_util::{
@@ -28,15 +28,10 @@ use hyper_util::{
 use openssl::ssl::SslConnector;
 use percent_encoding::percent_decode_str;
 use tower::Service;
-use tracing::Instrument;
 use url::{Host, Url};
 
 use crate::{
     config::ProxyConfig,
-    internal_events::http_client::{
-        AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning, HttpRequestV1Telemetry,
-        HttpResponseV1Telemetry,
-    },
     tls::{MaybeTlsSettings, TlsSettings, tls_connector_builder},
 };
 
@@ -44,61 +39,12 @@ type BoxError = Box<dyn Error + Send + Sync>;
 pub(crate) type RequestBody = UnsyncBoxBody<Bytes, BoxError>;
 const HTTP1_ALPN: &[u8] = b"\x08http/1.1";
 
-#[derive(Debug)]
-pub(crate) struct HttpErrorV1 {
-    source: BoxError,
-    retriable: bool,
-}
-
-impl HttpErrorV1 {
-    pub(crate) fn new(source: impl Error + Send + Sync + 'static) -> Self {
-        Self {
-            source: Box::new(source),
-            retriable: true,
-        }
-    }
-}
-
-impl std::fmt::Display for HttpErrorV1 {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "HTTP request failed: {}", self.source)
-    }
-}
-
-impl Error for HttpErrorV1 {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(self.source.as_ref())
-    }
-}
-
-impl From<BoxError> for HttpErrorV1 {
-    fn from(source: BoxError) -> Self {
-        Self {
-            source,
-            retriable: false,
-        }
-    }
-}
-
-impl crate::sinks::util::http::HttpErrorClassify for HttpErrorV1 {
-    fn is_retriable(&self) -> bool {
-        self.retriable
-    }
-}
-
 pub(crate) fn empty_body() -> RequestBody {
     Empty::<Bytes>::new()
         .map_err(|never: Infallible| match never {})
         .boxed_unsync()
 }
 
-pub(crate) fn full_body(bytes: Bytes) -> RequestBody {
-    Full::new(bytes)
-        .map_err(|never: Infallible| match never {})
-        .boxed_unsync()
-}
-
-#[derive(Clone)]
 pub(crate) struct HttpClientV1 {
     client: Client<HttpProxyConnectorV1, RequestBody>,
     routes: Arc<RoutePlanner>,
@@ -121,57 +67,24 @@ impl HttpClientV1 {
     pub(crate) async fn send(
         &self,
         mut request: Request<RequestBody>,
-    ) -> Result<Response<Incoming>, HttpErrorV1> {
-        let span = tracing::info_span!("http");
-        async move {
-            default_request_headers(&mut request, &self.user_agent);
+    ) -> Result<Response<Incoming>, BoxError> {
+        default_request_headers(&mut request, &self.user_agent);
 
-            if let Route::ForwardProxy {
-                authorization: Some(authorization),
-                ..
-            } = self
-                .routes
-                .route(request.uri())
-                .map_err(HttpErrorV1::from)?
-                && !request.headers().contains_key(PROXY_AUTHORIZATION)
-            {
-                request
-                    .headers_mut()
-                    .insert(PROXY_AUTHORIZATION, authorization);
-            }
-
-            {
-                let telemetry = HttpRequestV1Telemetry::new(&request);
-                emit!(AboutToSendHttpRequest {
-                    request: &telemetry
-                });
-            }
-
-            let before = std::time::Instant::now();
-            let response = self.client.request(request).await;
-            let roundtrip = before.elapsed();
-
-            match response {
-                Ok(response) => {
-                    let telemetry = HttpResponseV1Telemetry::new(&response);
-                    emit!(GotHttpResponse {
-                        response: &telemetry,
-                        roundtrip
-                    });
-                    Ok(response)
-                }
-                Err(error) => {
-                    let error = HttpErrorV1::new(error);
-                    emit!(GotHttpWarning {
-                        error: &error,
-                        roundtrip
-                    });
-                    Err(error)
-                }
-            }
+        if let Route::ForwardProxy {
+            authorization: Some(authorization),
+            ..
+        } = self.routes.route(request.uri())?
+            && !request.headers().contains_key(PROXY_AUTHORIZATION)
+        {
+            request
+                .headers_mut()
+                .insert(PROXY_AUTHORIZATION, authorization);
         }
-        .instrument(span)
-        .await
+
+        self.client
+            .request(request)
+            .await
+            .map_err(|error| Box::new(error) as BoxError)
     }
 }
 

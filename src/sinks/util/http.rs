@@ -721,67 +721,36 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
 /// A more generic version of `HttpRetryLogic` that accepts anything that can be converted
 /// to a status code
 #[derive(Debug)]
-pub struct HttpStatusRetryLogic<F, Req, Res, E = HttpError> {
+pub struct HttpStatusRetryLogic<F, Req, Res> {
     func: F,
     request: PhantomData<Req>,
     response: PhantomData<Res>,
-    error: PhantomData<E>,
     retry_strategy: RetryStrategy,
 }
 
-pub trait HttpErrorClassify {
-    fn is_retriable(&self) -> bool;
-}
-
-impl HttpErrorClassify for HttpError {
-    fn is_retriable(&self) -> bool {
-        HttpError::is_retriable(self)
-    }
-}
-
-impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
+impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res>
 where
     F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
-    pub const fn new(func: F, retry_strategy: RetryStrategy) -> Self {
+    pub const fn new(func: F, retry_strategy: RetryStrategy) -> HttpStatusRetryLogic<F, Req, Res> {
         HttpStatusRetryLogic {
             func,
             request: PhantomData,
             response: PhantomData,
-            error: PhantomData,
             retry_strategy,
         }
     }
 }
 
-impl<F, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
+impl<F, Req, Res> RetryLogic for HttpStatusRetryLogic<F, Req, Res>
 where
     F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
-    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
 {
-    pub const fn new_with_error(func: F, retry_strategy: RetryStrategy) -> Self {
-        HttpStatusRetryLogic {
-            func,
-            request: PhantomData,
-            response: PhantomData,
-            error: PhantomData,
-            retry_strategy,
-        }
-    }
-}
-
-impl<F, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
-where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
-    Req: Send + Sync + 'static,
-    Res: Send + Sync + 'static,
-    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
-{
-    type Error = E;
+    type Error = HttpError;
     type Request = Req;
     type Response = Res;
 
@@ -803,7 +772,7 @@ where
     }
 }
 
-impl<F, Req, Res, E> Clone for HttpStatusRetryLogic<F, Req, Res, E>
+impl<F, Req, Res> Clone for HttpStatusRetryLogic<F, Req, Res>
 where
     F: Clone,
 {
@@ -812,7 +781,6 @@ where
             func: self.func.clone(),
             request: PhantomData,
             response: PhantomData,
-            error: PhantomData,
             retry_strategy: self.retry_strategy.clone(),
         }
     }
