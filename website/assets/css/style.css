@@ -55,8 +55,6 @@
   --grid-template-columns-16: repeat(16, minmax(0, 1fr));
 }
 
-/* Tailwind v4 removed the preflight rule that gave buttons a pointer cursor
-   (buttons now default to `cursor: default`). Restore the v3 behavior. */
 @layer base {
   button,
   [role="button"] {
@@ -64,8 +62,6 @@
   }
 }
 
-/* Tailwind v4 changed the default border color from gray-200 to currentColor.
-   Restore the v3 default so unqualified `border` utilities render gray again. */
 @layer base {
   *,
   ::after,
@@ -79,11 +75,6 @@
 /* --------------------------------------------------------------------------
    Custom typography overrides migrated from the v3 configuration.
 
-   In Tailwind v4 the typography plugin emits its `.prose` styles in the
-   `utilities` layer (v4 aliases `addComponents` to `addUtilities`), so these
-   overrides must live in a layer declared after `utilities` to win over the
-   plugin defaults. This restores the pre-v4 behavior, where these rules were
-   unlayered and outranked the plugin's component-layer styles.
    -------------------------------------------------------------------------- */
 
 @layer prose;
