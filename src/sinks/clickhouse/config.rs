@@ -3,6 +3,7 @@
 use std::fmt;
 
 use http::{Request, StatusCode, Uri};
+use http_1::Request as RequestV1;
 use hyper::Body;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
@@ -20,10 +21,13 @@ use super::{
 };
 use crate::{
     config::{DynValidatedSink, SinkContext, ValidatedSink},
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{
+        Auth, HttpClient, MaybeAuth,
+        client_v1::{HttpClientV1, empty_body},
+    },
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpServiceV1},
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
@@ -310,6 +314,8 @@ impl ValidatedSink for ClickhouseConfig {
         let endpoint = self.endpoint.with_default_parts().uri;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let tls_settings_v1 = TlsSettings::from_options(self.tls.as_ref())?;
+        let client_v1 = HttpClientV1::new(tls_settings_v1.into(), &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
@@ -321,13 +327,13 @@ impl ValidatedSink for ClickhouseConfig {
             query_settings: self.query_settings,
         };
 
-        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), clickhouse_service_request_builder);
+        let service: HttpServiceV1<ClickhouseServiceRequestBuilder, PartitionKey> =
+            HttpServiceV1::new(client_v1.clone(), clickhouse_service_request_builder);
 
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
+            .settings(request_limits, ClickhouseRetryLogic)
             .service(service);
 
         // Resolve the encoding strategy (format + encoder) based on configuration.
@@ -351,7 +357,7 @@ impl ValidatedSink for ClickhouseConfig {
             request_builder,
         );
 
-        let healthcheck = Box::pin(healthcheck(client, endpoint, auth.clone()));
+        let healthcheck = Box::pin(healthcheck(client_v1, endpoint, auth.clone()));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
@@ -484,7 +490,7 @@ fn get_healthcheck_uri(endpoint: &Uri) -> String {
     uri
 }
 
-async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
+async fn healthcheck(client: HttpClientV1, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
     let uri = get_healthcheck_uri(&endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
@@ -492,9 +498,20 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
         auth.apply(&mut request);
     }
 
+    let (parts, _) = request.into_parts();
+    let mut builder = RequestV1::builder()
+        .method(parts.method.as_str())
+        .uri(parts.uri.to_string());
+    for (name, value) in &parts.headers {
+        builder = builder.header(name.as_str(), value.as_bytes());
+    }
+    let request = builder.body(empty_body())?;
+
     let response = client.send(request).await?;
 
-    match response.status() {
+    let status = StatusCode::from_u16(response.status().as_u16())
+        .expect("HTTP status codes are valid u16 values");
+    match status {
         StatusCode::OK => Ok(()),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
     }

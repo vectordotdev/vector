@@ -2,41 +2,53 @@
 
 use bytes::Bytes;
 use http::{
-    Request, StatusCode, Uri,
+    Request as RequestV0, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
+use http_1::Request as RequestV1;
 use snafu::ResultExt;
+use tracing::debug;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, HttpError},
+    http::{Auth, client_v1::HttpErrorV1},
     sinks::{
         HTTPRequestBuilderSnafu, UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpResponseV1, HttpServiceRequestBuilderV1},
             retries::RetryAction,
         },
     },
 };
 
 #[derive(Debug, Default, Clone)]
-pub struct ClickhouseRetryLogic {
-    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
-}
+pub(crate) struct ClickhouseRetryLogic;
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Error = HttpError;
+    type Error = HttpErrorV1;
     type Request = HttpRequest<PartitionKey>;
-    type Response = HttpResponse;
+    type Response = HttpResponseV1;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        self.inner.is_retriable_error(error)
+        error.is_retriable()
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        match response.http_response.status() {
+        let status = StatusCode::from_u16(response.http_response.status().as_u16())
+            .expect("HTTP status codes are valid u16 values");
+
+        if !status.is_success() {
+            debug!(
+                message = "HTTP response.",
+                %status,
+                body = %String::from_utf8_lossy(response.http_response.body()),
+            );
+        }
+
+        match status {
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let body = response.http_response.body();
 
@@ -56,7 +68,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                     RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
             }
-            _ => self.inner.should_retry_response(&response.http_response),
+            _ => RetryStrategy::Default.retry_action(status),
         }
     }
 }
@@ -72,11 +84,11 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) query_settings: QuerySettingsConfig,
 }
 
-impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
+impl HttpServiceRequestBuilderV1<PartitionKey> for ClickhouseServiceRequestBuilder {
     fn build(
         &self,
         mut request: HttpRequest<PartitionKey>,
-    ) -> Result<Request<Bytes>, crate::Error> {
+    ) -> Result<RequestV1<Bytes>, crate::Error> {
         let metadata = request.get_additional_metadata();
 
         let uri = set_uri_query(
@@ -102,7 +114,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             _ => "application/x-ndjson",
         };
 
-        let mut builder = Request::post(&uri)
+        let mut builder = RequestV0::post(&uri)
             .header(CONTENT_TYPE, content_type)
             .header(CONTENT_LENGTH, payload.len());
         if let Some(ce) = self.compression.content_encoding() {
@@ -112,10 +124,20 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             builder = auth.apply_builder(builder);
         }
 
-        builder
+        let request: RequestV0<Bytes> = builder
             .body(payload)
             .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::into)
+            .map_err(crate::Error::from)?;
+
+        let (parts, payload) = request.into_parts();
+        let mut builder = RequestV1::builder()
+            .method(parts.method.as_str())
+            .uri(parts.uri.to_string());
+        for (name, value) in &parts.headers {
+            builder = builder.header(name.as_str(), value.as_bytes());
+        }
+
+        builder.body(payload).map_err(Into::into)
     }
 }
 
