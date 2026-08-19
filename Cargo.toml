@@ -215,11 +215,11 @@ tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
-tokio-tungstenite = { version = "0.20.1", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 syn = { version = "3", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
+yawc = { version = "0.3.3", default-features = false }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tonic-health = { version = "0.11", default-features = false }
@@ -461,8 +461,11 @@ strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
 tempfile = { workspace = true, optional = true }
 tokio-postgres = { version = "0.7.18", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
+yawc = { workspace = true, optional = true }
+hyper1 = { package = "hyper", version = "1", default-features = false, features = ["server", "http1"], optional = true }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"], optional = true }
+http-body-util = { version = "0.1", default-features = false, optional = true }
 tonic = { workspace = true, optional = true }
 tonic-health = { workspace = true, optional = true }
 tonic-reflection = { workspace = true, optional = true }
@@ -533,6 +536,10 @@ vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
+yawc = { workspace = true }
+hyper1 = { package = "hyper", version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
 # `zdict_builder` exposes dictionary training, used only to build test fixtures.
 zstd = { workspace = true, features = ["zdict_builder"] }
 
@@ -800,7 +807,7 @@ sources-utils-net = ["sources-utils-net-tcp", "sources-utils-net-udp", "sources-
 sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
-sources-websocket = ["dep:tokio-tungstenite"]
+sources-websocket = ["dep:yawc"]
 sources-windows_event_log = ["dep:windows", "dep:quick-xml", "dep:governor"]
 sources-windows_event_log-integration-tests = ["sources-windows_event_log"]
 
@@ -987,8 +994,8 @@ sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
-sinks-websocket = ["dep:tokio-tungstenite"]
-sinks-websocket-server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
+sinks-websocket = ["dep:yawc"]
+sinks-websocket-server = ["dep:yawc", "dep:hyper1", "dep:hyper-util", "dep:http-body-util", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
 sinks-webhdfs = ["dep:opendal"]
 
 # Identifies that the build is a nightly build

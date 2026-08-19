@@ -28,6 +28,7 @@ exceptions = [
     { allow = ["MPL-2.0"], name = "vector-config-common", version = "*" },
     { allow = ["MPL-2.0"], name = "vector-config-macros", version = "*" },
     { allow = ["MPL-2.0"], name = "vrl", version = "*" },
+    { allow = ["MPL-2.0"], name = "yawc", version = "*" },
 ]
 
 [[licenses.clarify]]

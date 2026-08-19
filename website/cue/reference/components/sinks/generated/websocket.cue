@@ -206,6 +206,24 @@ generated: components: sinks: websocket: configuration: {
 			}
 		}
 	}
+	compression: {
+		description: """
+			Compression configuration for WebSocket connections.
+
+			When enabled, negotiates RFC 7692 permessage-deflate compression
+			with the remote peer to reduce bandwidth usage.
+			"""
+		required: false
+		type: object: options: level: {
+			description: """
+				Compression level (0-9). Higher values produce better compression at the cost of more CPU.
+
+				Defaults to 6 (balanced).
+				"""
+			required: false
+			type: uint: default: 6
+		}
+	}
 	encoding: {
 		description: """
 			Encoding configuration.

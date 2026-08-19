@@ -5,7 +5,6 @@ use std::{
     fmt::{Debug, Display, Formatter, Result},
 };
 
-use tokio_tungstenite::tungstenite::error::Error as TungsteniteError;
 use vector_common::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
@@ -64,7 +63,7 @@ impl InternalEvent for WebSocketConnectionShutdown {
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketConnectionError {
-    pub error: tokio_tungstenite::tungstenite::Error,
+    pub error: yawc::WebSocketError,
 }
 
 impl InternalEvent for WebSocketConnectionError {
@@ -172,7 +171,7 @@ impl InternalEvent for WebSocketMessageReceived<'_> {
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketReceiveError<'a> {
-    pub error: &'a TungsteniteError,
+    pub error: &'a yawc::WebSocketError,
 }
 
 impl InternalEvent for WebSocketReceiveError<'_> {
@@ -197,7 +196,7 @@ impl InternalEvent for WebSocketReceiveError<'_> {
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketSendError<'a> {
-    pub error: &'a TungsteniteError,
+    pub error: &'a yawc::WebSocketError,
 }
 
 impl InternalEvent for WebSocketSendError<'_> {
