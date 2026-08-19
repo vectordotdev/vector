@@ -1,17 +1,20 @@
 ## Overview
 
 This directory contains changelog "fragments" that are collected during a release to
-generate the project's user facing changelog.
+generate the project's user-facing changelog.
 
 The conventions used for this changelog logic follow [towncrier](https://towncrier.readthedocs.io/en/stable/markdown.html).
 
 The changelog fragments are located in `changelog.d/`.
 
-## Quick start
+## Prerequisites
 
-The scaffolder is the recommended workflow for all fragment types, but devs can also hand-write changelog fragments.
+Check whether [vdev](https://crates.io/crates/vdev) is installed, and that it is version
+0.3.15 or newer:
 
-Install `vdev`:
+    vdev --version
+
+If not:
 
     cargo binstall --manifest-path vdev/Cargo.toml vdev
     # or
@@ -19,13 +22,17 @@ Install `vdev`:
     # or use the prefix
     # cargo vdev <command>
 
-Then scaffold a fragment:
+## Quick start
+
+The scaffolder is the recommended workflow for all fragment types, but devs can also hand-write changelog fragments.
+
+Scaffold a fragment:
 
     vdev changelog new <type> <slug>
 
 > `vdev` fills in the filename, the required structure, and your authors line (auto-detected from `git config github.user`, `gh api user`, or a `users.noreply.github.com` email)
 
-Edit the file and validate:
+Edit the file and validate with:
 
     vdev check changelog-fragments
 
@@ -35,9 +42,17 @@ Examples:
     vdev changelog new enhancement retry_backoff_config
     vdev changelog new breaking env_var_interpolation
 
+### When do I need a fragment?
+
+Add a fragment when the change is user-observable: it alters behavior, configuration, output
+format, performance, or security posture that a Vector user would notice.
+
+Skip the fragment (and add the `no-changelog` label) for internal-only changes: refactors with
+no behavior change, CI/test tooling, documentation, or dependency bumps that don't affect behavior.
+
 ## Process
 
-Fragments for un-released changes are placed in the root of this directory during PRs.
+Fragments for unreleased changes are placed in the root of this directory during PRs.
 
 During a release when the changelog is generated, the fragments in the root of this
 directory are organized into the [releases directory](../website/cue/reference/releases)
@@ -50,14 +65,16 @@ This is enforced during CI.
 
 To mark a PR as not requiring user-facing changelog notes, add the label 'no-changelog'.
 
-To run the same check that is run in CI to validate that your changelog fragments have
-the correct syntax, commit the fragment additions and then run `vdev check changelog-fragments`.
+To validate your changelog fragments the same way CI does, commit the fragment additions and then run
+`vdev check changelog-fragments`.
+It validates the filename format, the `authors:` line, and the breaking-fragment structure
+(`## Summary` / `## Migration`).
 
 The format for fragments is: `<unique_name>.<fragment_type>.md`
 
 ### Fragment conventions
 
-When fragments used to generate the updated changelog, the content of the fragment file is
+When fragments are used to generate the updated changelog, the content of the fragment file is
 rendered as an item in a bulleted list under the "type" of fragment.
 
 The contents of the file must be valid markdown.
@@ -66,26 +83,37 @@ Filename rules:
 
 - The first segment (unique_name) should be a unique string related to the change.
   Optionally, if there is a GitHub issue associated with the change, it can be used as a prefix.
-  For example `42_very_important_change.breaking.md`, vs `very_important_change.breaking.md`.
-- The type must be one of the valid types in [Fragment types](#fragment-types)
-- Only the two period delimiters can be used.
+  For example, `42_very_important_change.breaking.md` vs `very_important_change.breaking.md`.
+- The type must be one of the valid types reported by `vdev changelog types`.
+- The filename must contain exactly two periods (separating the name, type, and extension).
 - The file must be markdown.
 
 #### Fragment types
 
-- `breaking`: A change that is incompatible with prior versions which requires users to make adjustments.
-- `security`: A change that is has implications for security.
-- `feature`: A change that is introducing a new feature.
-- `enhancement`: A change that is enhancing existing functionality in a user perceivable way.
-- `fix`: A change that is fixing a bug.
+The valid fragment types and their descriptions are defined by `vdev changelog types`:
+
+    $ vdev changelog types
+    breaking     A change that is incompatible with prior versions and requires users to make adjustments. If a change is also a fix or feature, breaking takes precedence.
+    security     A change that has security implications.
+    feature      A change that introduces a new feature.
+    enhancement  A change that enhances existing functionality in a user perceivable way.
+    fix          A change that fixes a bug.
 
 #### Fragment contents
 
 When fragments are rendered in the changelog, each fragment becomes an item in a markdown list.
 For this reason, when creating the content in a fragment, the format must be renderable as a markdown list.
 
-As an example, separating content with markdown header syntax should be avoided, as that will render
-as a heading in the main changelog and not the list. Instead, separate content with newlines.
+For example, avoid separating content with markdown header syntax, as it will render
+as a heading in the main changelog rather than a list item. Instead, separate content with newlines.
+
+A good fragment answers three questions:
+
+1. How does this change affect user-visible behavior?
+2. Which components are affected?
+3. Which config fields are introduced or affected?
+
+Finally, a good fragment is concise and avoids implementation details.
 
 ### Breaking changes
 
@@ -94,18 +122,13 @@ Breaking fragments (`*.breaking.md`) carry extra structured fields (title, optio
 guide from them. See [Examples](#examples) below for the exact shape — or just run the
 scaffolder from [Quick start](#quick-start).
 
-## Community Contributors
+## Authors
 
-When a PR is authored/has commits by a contributor from the Vector community, the fragment contents
-can optionally contain a line which specifies the community members involved in making the change.
-This is later used during the release process to render as a link to the github user profile for
-the authors specified.
-
-The process for adding this is simply to have the last line of the file be in this format:
+Every fragment must end with an `authors:` line:
 
     authors: <author1_gh_username> <author2_gh_username> <...>
 
-Do not include a leading `@` when specifying your username.
+Do not prefix usernames with `@`.
 
 ## Examples
 

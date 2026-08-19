@@ -605,7 +605,7 @@ generated: components: sinks: aws_sqs: configuration: {
 			[deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
 			"""
 		required: false
-		type: string: examples: ["{{ transaction_id }}"]
+		type: string: {}
 	}
 	message_group_id: {
 		description: """
@@ -614,7 +614,7 @@ generated: components: sinks: aws_sqs: configuration: {
 			Can be applied only to FIFO queues.
 			"""
 		required: false
-		type: string: examples: ["vector", "vector-%Y-%m-%d"]
+		type: string: {}
 	}
 	queue_url: {
 		description: "The URL of the Amazon SQS queue to which messages are sent."
