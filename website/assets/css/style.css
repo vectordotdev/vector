@@ -123,10 +123,10 @@
 .dark .prose code.badge-code {
   background-color: rgba(255, 255, 255, 0.2) !important;
 }
-.prose ul > li::before {
-  background-color: var(--color-gray-700);
+.prose ul > li::marker {
+  color: var(--color-gray-700);
 }
-.prose ol > li::before {
+.prose ol > li::marker {
   color: var(--color-gray-700);
 }
 .prose ul > li > :first-child,
@@ -195,10 +195,10 @@
 .dark .prose li {
   color: var(--color-gray-100);
 }
-.dark .prose ul > li::before {
-  background-color: var(--color-gray-100);
+.dark .prose ul > li::marker {
+  color: var(--color-gray-100);
 }
-.dark .prose ol > li::before {
+.dark .prose ol > li::marker {
   color: var(--color-gray-100);
 }
 .dark .prose a,
