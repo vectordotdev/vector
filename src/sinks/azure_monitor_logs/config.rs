@@ -13,6 +13,7 @@ use super::{
     sink::AzureMonitorLogsSink,
 };
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         prelude::*,
@@ -151,32 +152,24 @@ impl AzureMonitorLogsConfig {
         Ok(shared_key)
     }
 
-    fn get_time_generated_key(&self) -> Option<OwnedValuePath> {
-        self.time_generated_key
-            .clone()
-            .and_then(|k| k.path)
-            .or_else(|| log_schema().timestamp_key().cloned())
-    }
-
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
+        validated: &ValidatedAzureMonitorLogs,
         endpoint: HttpEndpoint,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = endpoint.into_uri();
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
 
-        let batch_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(MAX_BATCH_SIZE)?
-            .into_batcher_settings()?;
-
-        let shared_key = self.build_shared_key()?;
-        let time_generated_key = self.get_time_generated_key();
-
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
+
+        // Resolve the `log_schema()` fallback here, after the global log schema
+        // has been initialized, so a custom global timestamp key is honored.
+        let time_generated_key = validated
+            .time_generated_key
+            .clone()
+            .or_else(|| log_schema().timestamp_key().cloned());
 
         let service = AzureMonitorLogsService::new(
             client,
@@ -185,7 +178,7 @@ impl AzureMonitorLogsConfig {
             self.azure_resource_id.as_deref(),
             &self.log_type,
             time_generated_key.clone(),
-            shared_key,
+            validated.shared_key.clone(),
         )?;
         let healthcheck = service.healthcheck();
 
@@ -199,10 +192,10 @@ impl AzureMonitorLogsConfig {
             .service(service);
 
         let sink = AzureMonitorLogsSink::new(
-            batch_settings,
+            validated.batch_settings,
             self.encoding.clone(),
             service,
-            time_generated_key,
+            time_generated_key.clone(),
             protocol,
         );
 
@@ -212,14 +205,17 @@ impl AzureMonitorLogsConfig {
 
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
+#[derive(Clone, Debug)]
+pub struct ValidatedAzureMonitorLogs {
+    endpoint: HttpEndpoint,
+    batch_settings: BatcherSettings,
+    shared_key: pkey::PKey<pkey::Private>,
+    time_generated_key: Option<OwnedValuePath>,
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = HttpEndpoint::parse(&format!("https://{}.{}", self.customer_id, self.host))?;
-        self.build_inner(cx, endpoint).await
-    }
-
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
@@ -229,5 +225,121 @@ impl SinkConfig for AzureMonitorLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AzureMonitorLogsConfig {
+    type Validated = ValidatedAzureMonitorLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedAzureMonitorLogs> {
+        super::service::validate_log_type(&self.log_type)?;
+
+        let endpoint = HttpEndpoint::parse(&format!("https://{}.{}", self.customer_id, self.host))?;
+
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_SIZE)?
+            .into_batcher_settings()?;
+
+        let shared_key = self.build_shared_key()?;
+        // Only the configured key is retained here; the `log_schema()` fallback
+        // is resolved in `build`, after the global log schema has been
+        // initialized (validation runs before `init_log_schema` at startup).
+        let time_generated_key = self.time_generated_key.clone().and_then(|k| k.path);
+
+        Ok(ValidatedAzureMonitorLogs {
+            endpoint,
+            batch_settings,
+            shared_key,
+            time_generated_key,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAzureMonitorLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_inner(cx, validated, validated.endpoint.clone())
+            .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_retains_configured_time_generated_key_only() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "Vector".to_string(),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        // With `time_generated_key` unset, validation must not resolve the
+        // global `log_schema.timestamp_key` fallback (which isn't initialized
+        // yet at validation time in the startup path); it is resolved in `build`.
+        assert_eq!(validated.time_generated_key, None);
+    }
+
+    #[test]
+    fn validate_rejects_log_type_with_disallowed_characters() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "My Log Type".to_string(),
+            ..Default::default()
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("log type can only contain letters, numbers, and underscore (_)")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_log_type_exceeding_100_chars() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "a".repeat(101),
+            ..Default::default()
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("log type can only contain letters, numbers, and underscore (_)")
+        );
+    }
+
+    #[test]
+    fn validate_accepts_valid_log_type() {
+        let config = AzureMonitorLogsConfig {
+            customer_id: "97ce69d9-b4be-4241-8dbd-d265edcf06c4".to_string(),
+            shared_key: "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+                .to_string()
+                .into(),
+            log_type: "My_Log_Type_123".to_string(),
+            ..Default::default()
+        };
+
+        config.validate().expect("validation should succeed");
     }
 }
