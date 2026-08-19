@@ -320,7 +320,7 @@ generated: components: sinks: azure_blob: configuration: {
 		required: false
 		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
 		required_one_of_group: "azure_blob_credentials"
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
 		warnings: ["Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep connection strings secure and not expose them in logs, error messages, or version control systems."]
 	}
 	container_name: {

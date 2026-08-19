@@ -94,7 +94,7 @@ pub struct AzureBlobSinkConfig {
         connection strings secure and not expose them in logs, error messages, or version control systems."
     ))]
     #[configurable(metadata(
-        docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
+        docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net"
     ))]
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
