@@ -148,9 +148,10 @@ jobs:
           rust: true
           protoc: true
           cue: true
+          prettier: true
           libsasl2: true
           cargo-cache: true
-      - run: cd website && yarn install --frozen-lockfile
+          unixodbc: true
       - run: make check-generated-docs
 
   check-rust-docs:
@@ -165,6 +166,7 @@ jobs:
           rust: true
           protoc: true
           cargo-cache: true
+          unixodbc: true
       - run: cd rust-doc && make ci-docs-build
 
   test-vrl:
