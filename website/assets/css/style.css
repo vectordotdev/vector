@@ -57,10 +57,17 @@
 
 /* --------------------------------------------------------------------------
    Custom typography overrides migrated from the v3 configuration.
-   Keep them in the components layer so explicit utility classes still win.
+
+   In Tailwind v4 the typography plugin emits its `.prose` styles in the
+   `utilities` layer (v4 aliases `addComponents` to `addUtilities`), so these
+   overrides must live in a layer declared after `utilities` to win over the
+   plugin defaults. This restores the pre-v4 behavior, where these rules were
+   unlayered and outranked the plugin's component-layer styles.
    -------------------------------------------------------------------------- */
 
-@layer components {
+@layer prose;
+
+@layer prose {
 
 .prose a {
   color: var(--color-primary-dark);
