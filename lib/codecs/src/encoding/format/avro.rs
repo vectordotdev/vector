@@ -38,13 +38,15 @@ fn coerce_logical_types(
                 ))
             })
         }
-        (AvroValue::Long(millis), Schema::TimeMillis) => i32::try_from(millis)
-            .map(AvroValue::TimeMillis)
-            .map_err(|_| {
-                vector_common::Error::from(format!(
-                    "Avro time-millis value {millis} is out of range for i32"
-                ))
-            }),
+        (AvroValue::Long(millis), Schema::TimeMillis) => {
+            const MILLIS_PER_DAY: i64 = 86_400_000;
+            if !(0..MILLIS_PER_DAY).contains(&millis) {
+                return Err(vector_common::Error::from(format!(
+                    "Avro time-millis value {millis} is out of range (must be 0..={MILLIS_PER_DAY} - 1)"
+                )));
+            }
+            Ok(AvroValue::TimeMillis(millis as i32))
+        }
         (AvroValue::Record(fields), Schema::Record(record_schema)) => {
             let fields = fields
                 .into_iter()
@@ -506,5 +508,51 @@ mod tests {
                 )
             }
         ));
+    }
+
+    #[test]
+    fn rejects_time_millis_out_of_range() {
+        let schema = apache_avro::Schema::parse_str(indoc! {r#"
+            {
+                "type": "record",
+                "name": "Log",
+                "fields": [
+                    {
+                        "name": "time",
+                        "type": {"type": "int", "logicalType": "time-millis"}
+                    }
+                ]
+            }
+        "#})
+        .unwrap();
+        let named_schemas = resolve_named_schemas(&schema).unwrap();
+
+        // (Valid) minimum value
+        let value = AvroValue::Record(vec![("time".to_owned(), AvroValue::Long(0))]);
+        let coerced = coerce_logical_types(value, &schema, &named_schemas).unwrap();
+        assert!(matches!(
+            coerced,
+            AvroValue::Record(ref fields) if matches!(fields[0].1, AvroValue::TimeMillis(0))
+        ));
+
+        // (Valid): maximum value (MILLIS_PER_DAY - 1)
+        let value = AvroValue::Record(vec![("time".to_owned(), AvroValue::Long(86_399_999))]);
+        let coerced = coerce_logical_types(value, &schema, &named_schemas).unwrap();
+        assert!(matches!(
+            coerced,
+            AvroValue::Record(ref fields) if matches!(fields[0].1, AvroValue::TimeMillis(86_399_999))
+        ));
+
+        // (Invalid) negative value
+        let value = AvroValue::Record(vec![("time".to_owned(), AvroValue::Long(-1))]);
+        assert!(coerce_logical_types(value, &schema, &named_schemas).is_err());
+
+        // (Invalid) equal to MILLIS_PER_DAY
+        let value = AvroValue::Record(vec![("time".to_owned(), AvroValue::Long(86_400_000))]);
+        assert!(coerce_logical_types(value, &schema, &named_schemas).is_err());
+
+        // (Invalid) greater than MILLIS_PER_DAY
+        let value = AvroValue::Record(vec![("time".to_owned(), AvroValue::Long(90_000_000))]);
+        assert!(coerce_logical_types(value, &schema, &named_schemas).is_err());
     }
 }
