@@ -95,7 +95,7 @@ Otherwise, the stable release is your best bet.
 [chat]: https://chat.vector.dev
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [download page]: https://vector.dev/download/
-[nightly artifact list]: https://packages.timber.io/vector/nightly/
+[nightly artifact list]: https://dd-cose-releases.s3.amazonaws.com/vector/nightly/
 [@vectordotdev]: https://twitter.com/vectordotdev
 [GitHub repository]: https://github.com/vectordotdev/vector
 [GitHub subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions

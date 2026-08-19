@@ -53,11 +53,20 @@ publish_release_redirects() {
     local version_prefix="$3"
     local file
 
-    for file in $("$client" s3api list-objects-v2 --bucket "$bucket" --prefix "vector/$version_prefix/" --query 'Contents[*].Key' --output text | tr "\t" "\n" | grep "\-$VERSION_EXACT"); do
-        file=$(basename "$file")
-        # vector-$version-amd64.deb -> vector-amd64.deb
-        echo -n "" | s3_copy "$client" - "s3://$bucket/vector/$version_prefix/${file/-$VERSION_EXACT/}" --website-redirect "/vector/$version_prefix/$file"
-    done
+    if [[ "$client" == "legacy_aws" ]]; then
+        for file in $("$client" s3api list-objects-v2 --bucket "$bucket" --prefix "vector/$version_prefix/" --query 'Contents[*].Key' --output text | tr "\t" "\n" | grep "\-$VERSION_EXACT"); do
+            file=$(basename "$file")
+            # vector-$version-amd64.deb -> vector-amd64.deb
+            echo -n "" | s3_copy "$client" - "s3://$bucket/vector/$version_prefix/${file/-$VERSION_EXACT/}" --website-redirect "/vector/$version_prefix/$file"
+        done
+    else
+        find "$td" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file; do
+            file_name=$(basename "$file")
+            # S3's REST endpoint does not follow website redirects, so COSE
+            # aliases are full copies of the corresponding release artifact.
+            s3_copy "$client" "$file" "s3://$bucket/vector/$version_prefix/${file_name/-$VERSION_EXACT/}"
+        done
+    fi
 }
 
 publish_release_artifacts() {
@@ -167,10 +176,10 @@ elif [[ "$CHANNEL" == "release" ]]; then
     file=$(basename "$file")
     # vector-$version-amd64.deb -> vector-latest-amd64.deb
     echo -n "" | s3_copy legacy_aws - "s3://$LEGACY_BUCKET/vector/latest/${file/$VERSION_EXACT/latest}" --website-redirect "/vector/latest/$file"
-    echo -n "" | s3_copy cose_aws - "s3://$COSE_BUCKET/vector/latest/${file/$VERSION_EXACT/latest}" --website-redirect "/vector/latest/$file"
+    s3_copy cose_aws "$td/$file" "s3://$COSE_BUCKET/vector/latest/${file/$VERSION_EXACT/latest}"
     # vector-$version-amd64.deb -> vector-amd64.deb
     echo -n "" | s3_copy legacy_aws - "s3://$LEGACY_BUCKET/vector/latest/${file/$VERSION_EXACT-/}" --website-redirect "/vector/latest/$file"
-    echo -n "" | s3_copy cose_aws - "s3://$COSE_BUCKET/vector/latest/${file/$VERSION_EXACT-/}" --website-redirect "/vector/latest/$file"
+    s3_copy cose_aws "$td/$file" "s3://$COSE_BUCKET/vector/latest/${file/$VERSION_EXACT-/}"
   done
   echo "Added latest symlinks"
 
