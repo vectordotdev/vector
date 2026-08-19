@@ -2,9 +2,8 @@
 
 use std::fmt;
 
-use http::{Request, StatusCode, Uri};
-use http_1::Request as RequestV1;
-use hyper::Body;
+use http::{StatusCode, Uri};
+use http_1::Request;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::{
@@ -22,12 +21,12 @@ use super::{
 use crate::{
     config::{DynValidatedSink, SinkContext, ValidatedSink},
     http::{
-        Auth, HttpClient, MaybeAuth,
-        client_v1::{HttpClientV1, empty_body},
+        Auth, HttpClient as LegacyHttpClient, MaybeAuth,
+        client_v1::{HttpClient, empty_body},
     },
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpServiceV1},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
@@ -313,9 +312,9 @@ impl ValidatedSink for ClickhouseConfig {
         } = validated;
         let endpoint = self.endpoint.with_default_parts().uri;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = LegacyHttpClient::new(tls_settings, &cx.proxy)?;
         let tls_settings_v1 = TlsSettings::from_options(self.tls.as_ref())?;
-        let client_v1 = HttpClientV1::new(tls_settings_v1.into(), &cx.proxy)?;
+        let client_v1 = HttpClient::new(tls_settings_v1.into(), &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
@@ -327,8 +326,8 @@ impl ValidatedSink for ClickhouseConfig {
             query_settings: self.query_settings,
         };
 
-        let service: HttpServiceV1<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpServiceV1::new(client_v1.clone(), clickhouse_service_request_builder);
+        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
+            HttpService::new(client_v1.clone(), clickhouse_service_request_builder);
 
         let request_limits = self.request.into_settings();
 
@@ -369,7 +368,7 @@ impl ClickhouseConfig {
     /// based on the user's configuration, ensuring they are consistent.
     async fn resolve_strategy(
         &self,
-        client: &HttpClient,
+        client: &LegacyHttpClient,
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
@@ -413,7 +412,7 @@ impl ClickhouseConfig {
 
     async fn resolve_arrow_schema(
         &self,
-        client: &HttpClient,
+        client: &LegacyHttpClient,
         endpoint: String,
         database: &Template,
         auth: Option<&Auth>,
@@ -490,22 +489,13 @@ fn get_healthcheck_uri(endpoint: &Uri) -> String {
     uri
 }
 
-async fn healthcheck(client: HttpClientV1, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
     let uri = get_healthcheck_uri(&endpoint);
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply(&mut request);
+        auth.apply_v1(&mut request);
     }
-
-    let (parts, _) = request.into_parts();
-    let mut builder = RequestV1::builder()
-        .method(parts.method.as_str())
-        .uri(parts.uri.to_string());
-    for (name, value) in &parts.headers {
-        builder = builder.header(name.as_str(), value.as_bytes());
-    }
-    let request = builder.body(empty_body())?;
 
     let response = client.send(request).await?;
 

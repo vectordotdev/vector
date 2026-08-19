@@ -20,25 +20,25 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::{HttpClientV1, HttpErrorV1, full_body},
+    http::client_v1::{HttpClient, HttpError, full_body},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::util::{http::HttpRequest, sink},
 };
 
 /// Builds a native `http 1` request from a buffered HTTP sink request.
-pub(crate) trait HttpServiceRequestBuilderV1<T: Send> {
+pub(crate) trait HttpServiceRequestBuilder<T: Send> {
     fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
 }
 
 /// The response returned by the native `http 1` sink service.
 #[derive(Debug)]
-pub(crate) struct HttpResponseV1 {
+pub(crate) struct HttpResponse {
     pub http_response: Response<Bytes>,
     pub events_byte_size: GroupedCountByteSize,
     pub raw_byte_size: usize,
 }
 
-impl sink::Response for HttpResponseV1 {
+impl sink::Response for HttpResponse {
     fn is_successful(&self) -> bool {
         self.http_response.status().is_success()
     }
@@ -48,7 +48,7 @@ impl sink::Response for HttpResponseV1 {
     }
 }
 
-impl DriverResponse for HttpResponseV1 {
+impl DriverResponse for HttpResponse {
     fn event_status(&self) -> EventStatus {
         if self.http_response.status().is_success() {
             EventStatus::Delivered
@@ -70,18 +70,18 @@ impl DriverResponse for HttpResponseV1 {
 
 /// Native `http 1` equivalent of the legacy `HttpService`.
 #[derive(Clone)]
-pub(crate) struct HttpServiceV1<B, T: Send> {
-    client: HttpClientV1,
+pub(crate) struct HttpService<B, T: Send> {
+    client: HttpClient,
     request_builder: Arc<B>,
     _phantom: PhantomData<fn() -> T>,
 }
 
-impl<B, T> HttpServiceV1<B, T>
+impl<B, T> HttpService<B, T>
 where
-    B: HttpServiceRequestBuilderV1<T> + Send + Sync + 'static,
+    B: HttpServiceRequestBuilder<T> + Send + Sync + 'static,
     T: Send + 'static,
 {
-    pub(crate) fn new(client: HttpClientV1, request_builder: B) -> Self {
+    pub(crate) fn new(client: HttpClient, request_builder: B) -> Self {
         Self {
             client,
             request_builder: Arc::new(request_builder),
@@ -90,13 +90,13 @@ where
     }
 }
 
-impl<B, T> Service<HttpRequest<T>> for HttpServiceV1<B, T>
+impl<B, T> Service<HttpRequest<T>> for HttpService<B, T>
 where
-    B: HttpServiceRequestBuilderV1<T> + Send + Sync + 'static,
+    B: HttpServiceRequestBuilder<T> + Send + Sync + 'static,
     T: Send + 'static,
 {
-    type Response = HttpResponseV1;
-    type Error = HttpErrorV1;
+    type Response = HttpResponse;
+    type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -116,7 +116,7 @@ where
                 .inspect_err(|error| {
                     emit!(SinkRequestBuildError { error });
                 })
-                .map_err(HttpErrorV1::from)?;
+                .map_err(HttpError::from)?;
             let byte_size = request.body().len();
             let (protocol, endpoint) = protocol_endpoint(request.uri());
             let response = client.send(request.map(full_body)).await?;
@@ -130,8 +130,8 @@ where
             }
 
             let (parts, body) = response.into_parts();
-            let body = body.collect().await.map_err(HttpErrorV1::new)?.to_bytes();
-            Ok(HttpResponseV1 {
+            let body = body.collect().await.map_err(HttpError::new)?.to_bytes();
+            Ok(HttpResponse {
                 http_response: Response::from_parts(parts, body),
                 events_byte_size,
                 raw_byte_size,
@@ -140,16 +140,16 @@ where
     }
 }
 
-pub(crate) fn http_response_retry_logic_v1<Request: Clone + Send + Sync + 'static>(
+pub(crate) fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: super::http::RetryStrategy,
 ) -> super::http::HttpStatusRetryLogic<
-    impl Fn(&HttpResponseV1) -> http::StatusCode + Clone + Send + Sync + 'static,
+    impl Fn(&HttpResponse) -> http::StatusCode + Clone + Send + Sync + 'static,
     Request,
-    HttpResponseV1,
-    HttpErrorV1,
+    HttpResponse,
+    HttpError,
 > {
     super::http::HttpStatusRetryLogic::new_with_error(
-        |response: &HttpResponseV1| {
+        |response: &HttpResponse| {
             let status = http::StatusCode::from_u16(response.http_response.status().as_u16())
                 .expect("HTTP status codes are valid u16 values");
             if !status.is_success() {

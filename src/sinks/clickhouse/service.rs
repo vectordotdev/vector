@@ -1,24 +1,24 @@
 //! Service implementation for the `Clickhouse` sink.
 
 use bytes::Bytes;
-use http::{
-    Request as RequestV0, StatusCode, Uri,
+use http::{StatusCode, Uri};
+use http_1::{
+    Request,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
-use http_1::Request as RequestV1;
 use snafu::ResultExt;
 use tracing::debug;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, client_v1::HttpErrorV1},
+    http::{Auth, client_v1::HttpError},
     sinks::{
-        HTTPRequestBuilderSnafu, UriParseSnafu,
+        UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
             http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpResponseV1, HttpServiceRequestBuilderV1},
+            http_v1::{HttpResponse, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
     },
@@ -28,9 +28,9 @@ use crate::{
 pub(crate) struct ClickhouseRetryLogic;
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Error = HttpErrorV1;
+    type Error = HttpError;
     type Request = HttpRequest<PartitionKey>;
-    type Response = HttpResponseV1;
+    type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_retriable()
@@ -84,11 +84,11 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) query_settings: QuerySettingsConfig,
 }
 
-impl HttpServiceRequestBuilderV1<PartitionKey> for ClickhouseServiceRequestBuilder {
+impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
     fn build(
         &self,
         mut request: HttpRequest<PartitionKey>,
-    ) -> Result<RequestV1<Bytes>, crate::Error> {
+    ) -> Result<Request<Bytes>, crate::Error> {
         let metadata = request.get_additional_metadata();
 
         let uri = set_uri_query(
@@ -102,8 +102,6 @@ impl HttpServiceRequestBuilderV1<PartitionKey> for ClickhouseServiceRequestBuild
             self.query_settings,
         )?;
 
-        let auth: Option<Auth> = self.auth.clone();
-
         // Extract format before taking payload to avoid borrow checker issues
         let format = metadata.format;
         let payload = request.take_payload();
@@ -114,30 +112,18 @@ impl HttpServiceRequestBuilderV1<PartitionKey> for ClickhouseServiceRequestBuild
             _ => "application/x-ndjson",
         };
 
-        let mut builder = RequestV0::post(&uri)
+        let mut builder = Request::post(uri.to_string())
             .header(CONTENT_TYPE, content_type)
             .header(CONTENT_LENGTH, payload.len());
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
         }
-        if let Some(auth) = auth {
-            builder = auth.apply_builder(builder);
+        let mut request = builder.body(payload).map_err(crate::Error::from)?;
+        if let Some(auth) = &self.auth {
+            auth.apply_v1(&mut request);
         }
 
-        let request: RequestV0<Bytes> = builder
-            .body(payload)
-            .context(HTTPRequestBuilderSnafu)
-            .map_err(crate::Error::from)?;
-
-        let (parts, payload) = request.into_parts();
-        let mut builder = RequestV1::builder()
-            .method(parts.method.as_str())
-            .uri(parts.uri.to_string());
-        for (name, value) in &parts.headers {
-            builder = builder.header(name.as_str(), value.as_bytes());
-        }
-
-        builder.body(payload).map_err(Into::into)
+        Ok(request)
     }
 }
 

@@ -45,12 +45,12 @@ pub(crate) type RequestBody = UnsyncBoxBody<Bytes, BoxError>;
 const HTTP1_ALPN: &[u8] = b"\x08http/1.1";
 
 #[derive(Debug)]
-pub(crate) struct HttpErrorV1 {
+pub(crate) struct HttpError {
     source: BoxError,
     retriable: bool,
 }
 
-impl HttpErrorV1 {
+impl HttpError {
     pub(crate) fn new(source: impl Error + Send + Sync + 'static) -> Self {
         Self {
             source: Box::new(source),
@@ -63,19 +63,19 @@ impl HttpErrorV1 {
     }
 }
 
-impl std::fmt::Display for HttpErrorV1 {
+impl std::fmt::Display for HttpError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(formatter, "HTTP request failed: {}", self.source)
     }
 }
 
-impl Error for HttpErrorV1 {
+impl Error for HttpError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(self.source.as_ref())
     }
 }
 
-impl From<BoxError> for HttpErrorV1 {
+impl From<BoxError> for HttpError {
     fn from(source: BoxError) -> Self {
         Self {
             source,
@@ -84,9 +84,9 @@ impl From<BoxError> for HttpErrorV1 {
     }
 }
 
-impl crate::sinks::util::http::HttpErrorClassify for HttpErrorV1 {
+impl crate::sinks::util::http::HttpErrorClassify for HttpError {
     fn is_retriable(&self) -> bool {
-        HttpErrorV1::is_retriable(self)
+        HttpError::is_retriable(self)
     }
 }
 
@@ -103,13 +103,13 @@ pub(crate) fn full_body(bytes: Bytes) -> RequestBody {
 }
 
 #[derive(Clone)]
-pub(crate) struct HttpClientV1 {
+pub(crate) struct HttpClient {
     client: Client<HttpProxyConnectorV1, RequestBody>,
     routes: Arc<RoutePlanner>,
     user_agent: HeaderValue,
 }
 
-impl HttpClientV1 {
+impl HttpClient {
     pub(crate) fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
         let routes = Arc::new(RoutePlanner::new(proxy)?);
         let connector = HttpProxyConnectorV1::new(tls, Arc::clone(&routes))?;
@@ -125,7 +125,7 @@ impl HttpClientV1 {
     pub(crate) async fn send(
         &self,
         mut request: Request<RequestBody>,
-    ) -> Result<Response<Incoming>, HttpErrorV1> {
+    ) -> Result<Response<Incoming>, HttpError> {
         let span = tracing::info_span!("http");
         async move {
             default_request_headers(&mut request, &self.user_agent);
@@ -133,10 +133,7 @@ impl HttpClientV1 {
             if let Route::ForwardProxy {
                 authorization: Some(authorization),
                 ..
-            } = self
-                .routes
-                .route(request.uri())
-                .map_err(HttpErrorV1::from)?
+            } = self.routes.route(request.uri()).map_err(HttpError::from)?
                 && !request.headers().contains_key(PROXY_AUTHORIZATION)
             {
                 request
@@ -165,7 +162,7 @@ impl HttpClientV1 {
                     Ok(response)
                 }
                 Err(error) => {
-                    let error = HttpErrorV1::new(error);
+                    let error = HttpError::new(error);
                     emit!(GotHttpWarning {
                         error: &error,
                         roundtrip
