@@ -1,4 +1,4 @@
-use vector_lib::event::{Event, Metric, MetricKind};
+use vector_lib::event::{Event, Metric};
 
 use super::{ComponentMetricType, Validator};
 use crate::components::validation::{
@@ -243,15 +243,12 @@ fn sum_counters(
     let mut sum: f64 = 0.0;
     let mut errs = Vec::new();
 
+    // The `internal_metrics` source collecting this telemetry emits counters incrementally, so
+    // every observation is a distinct contribution. Summing also correctly accumulates metrics
+    // split over several series, such as `component_errors_total` broken down by `error_type`.
     for m in metrics {
         match m.value() {
-            vector_lib::event::MetricValue::Counter { value } => {
-                if let MetricKind::Absolute = m.data().kind {
-                    sum = *value;
-                } else {
-                    sum += *value;
-                }
-            }
+            vector_lib::event::MetricValue::Counter { value } => sum += *value,
             _ => errs.push(format!("{metric_name}: metric value is not a counter",)),
         }
     }

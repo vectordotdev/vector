@@ -48,7 +48,7 @@ const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
 static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
 
 // Older deprecated counter key name
-const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
+pub const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
 static CARDINALITY_COUNTER_KEY: Key = Key::from_static_name(CARDINALITY_COUNTER_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.

@@ -20,6 +20,10 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+mod delta;
+
+use delta::DeltaState;
+
 /// Configuration for the `internal_metrics` source.
 #[serde_as]
 #[configurable_component(source(
@@ -113,12 +117,21 @@ impl SourceConfig for InternalMetricsConfig {
             .as_deref()
             .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
 
+        let controller = Controller::get()?;
+
+        // Scrape now so that a source built after Vector has already been running does not report
+        // the whole accumulated registry as one enormous first increment. Also covers reloads,
+        // which rebuild sources.
+        let mut deltas = DeltaState::default();
+        deltas.seed(controller.capture_metrics());
+
         Ok(Box::pin(
             InternalMetrics {
                 namespace,
                 host_key,
                 pid_key,
-                controller: Controller::get()?,
+                controller,
+                deltas,
                 interval,
                 out: cx.out,
                 shutdown: cx.shutdown,
@@ -141,6 +154,7 @@ struct InternalMetrics<'a> {
     host_key: OptionalValuePath,
     pid_key: Option<String>,
     controller: &'a Controller,
+    deltas: DeltaState,
     interval: time::Duration,
     out: SourceSender,
     shutdown: ShutdownSignal,
@@ -156,7 +170,9 @@ impl InternalMetrics<'_> {
             let hostname = crate::get_hostname();
             let pid = std::process::id().to_string();
 
-            let metrics = self.controller.capture_metrics();
+            let mut metrics = self.controller.capture_metrics();
+            self.deltas.convert(&mut metrics);
+
             let count = metrics.len();
             let byte_size = metrics.size_of();
             let json_size = metrics.estimated_json_encoded_size_of();
@@ -208,13 +224,44 @@ mod tests {
     use crate::{
         event::{
             Event,
-            metric::{Metric, MetricValue},
+            metric::{Metric, MetricKind, MetricValue},
         },
         test_util::{
-            self,
+            self, collect_ready,
             components::{SOURCE_TAGS, run_and_assert_source_compliance},
         },
     };
+
+    /// Builds and runs the source for a single scrape, letting the caller record metrics in
+    /// between so they land after the build-time seed. The default 1s interval fires once
+    /// immediately, so exactly one scrape is collected.
+    async fn scrape_once(record: impl FnOnce()) -> Vec<Metric> {
+        test_util::trace_init();
+
+        let (tx, rx) = SourceSender::new_test();
+        let source = InternalMetricsConfig::default()
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        record();
+
+        tokio::spawn(source);
+        time::sleep(time::Duration::from_millis(100)).await;
+
+        collect_ready(rx)
+            .await
+            .into_iter()
+            .map(Event::into_metric)
+            .collect()
+    }
+
+    fn find<'a>(metrics: &'a [Metric], name: &str) -> &'a Metric {
+        metrics
+            .iter()
+            .find(|metric| metric.name() == name)
+            .unwrap_or_else(|| panic!("{name} not emitted, got {metrics:?}"))
+    }
 
     #[test]
     fn generate_config() {
@@ -346,6 +393,83 @@ mod tests {
 
         assert!(metric.tag_value("host").is_some());
         assert!(metric.tag_value("pid").is_none());
+    }
+
+    /// The scenario from OPA-5040: every observation lands inside a single scrape interval, which
+    /// previously left the sink with only a baseline and nothing to emit.
+    #[tokio::test]
+    async fn emits_increments_for_counters_and_histograms() {
+        let counter_name = CounterName::iter().next().unwrap();
+        let histogram_name = HistogramName::iter().next().unwrap();
+
+        let metrics = scrape_once(|| {
+            counter!(counter_name).increment(3);
+            histogram!(histogram_name).record(5.0);
+            histogram!(histogram_name).record(6.0);
+        })
+        .await;
+
+        let counter = find(&metrics, counter_name.as_str());
+        assert_eq!(counter.kind(), MetricKind::Incremental);
+        assert_eq!(counter.value(), &MetricValue::Counter { value: 3.0 });
+
+        let histogram = find(&metrics, histogram_name.as_str());
+        assert_eq!(histogram.kind(), MetricKind::Incremental);
+        match histogram.value() {
+            MetricValue::AggregatedHistogram { count, sum, .. } => {
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 11.0);
+            }
+            value => panic!("wrong type: {value:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn gauges_stay_absolute() {
+        let gauge_name = GaugeName::iter().next().unwrap();
+
+        let metrics = scrape_once(|| gauge!(gauge_name).set(2.0)).await;
+
+        let gauge = find(&metrics, gauge_name.as_str());
+        assert_eq!(gauge.kind(), MetricKind::Absolute);
+        assert_eq!(gauge.value(), &MetricValue::Gauge { value: 2.0 });
+
+        // Declared a counter but non-monotonic, so it is left absolute too.
+        let cardinality = find(&metrics, vector_lib::metrics::CARDINALITY_COUNTER_KEY_NAME);
+        assert_eq!(cardinality.kind(), MetricKind::Absolute);
+    }
+
+    /// The build-time scrape keeps a source added to an already-running Vector from reporting the
+    /// whole accumulated registry as its first increment.
+    #[tokio::test]
+    async fn build_time_scrape_excludes_prior_activity() {
+        let counter_name = CounterName::iter().next().unwrap();
+
+        test_util::trace_init();
+        counter!(counter_name).increment(10);
+
+        let (tx, rx) = SourceSender::new_test();
+        let source = InternalMetricsConfig::default()
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        counter!(counter_name).increment(5);
+
+        tokio::spawn(source);
+        time::sleep(time::Duration::from_millis(100)).await;
+
+        let metrics = collect_ready(rx)
+            .await
+            .into_iter()
+            .map(Event::into_metric)
+            .collect::<Vec<_>>();
+
+        // 5, not the 15 now held by the registry.
+        assert_eq!(
+            find(&metrics, counter_name.as_str()).value(),
+            &MetricValue::Counter { value: 5.0 }
+        );
     }
 
     #[tokio::test]
