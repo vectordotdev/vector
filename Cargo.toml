@@ -876,7 +876,6 @@ sinks-logs = [
   "sinks-axiom",
   "sinks-azure_blob",
   "sinks-azure_logs_ingestion",
-  "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-chronicle",
   "sinks-clickhouse",
@@ -945,7 +944,6 @@ sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
-sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]
