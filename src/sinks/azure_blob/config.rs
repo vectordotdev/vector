@@ -1,3 +1,8 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with format_with expands to a must_use let binding"
+)]
+
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::fs::File;
@@ -13,6 +18,7 @@ use azure_core::{
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
 
 use bytes::Bytes;
+use derivative::Derivative;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -297,35 +303,38 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct ValidatedAzureBlob {
+    // The connection string contains credentials (AccountKey / SAS token),
+    // so it is intentionally omitted from diagnostics.
+    #[derivative(Debug = "ignore")]
     parsed_connection_string: ParsedConnectionString,
+    // The container URL may embed a SAS token as its query string, so it is
+    // rendered without the query.
+    #[derivative(Debug(format_with = "fmt_container_url"))]
     container_url: Url,
     batcher_settings: BatcherSettings,
     blob_time_format: String,
     blob_append_uuid: bool,
+    #[derivative(Debug(format_with = "fmt_confined_blob_prefix"))]
     confined_blob_prefix: ConfinedTemplate,
 }
 
-impl fmt::Debug for ValidatedAzureBlob {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // The connection string contains credentials (AccountKey / SAS token),
-        // so it is intentionally omitted from diagnostics. The container URL
-        // may embed a SAS token as its query string, so it is rendered without
-        // the query.
-        let mut container_url = self.container_url.clone();
-        container_url.set_query(None);
-        f.debug_struct("ValidatedAzureBlob")
-            .field("container_url", &container_url)
-            .field("batcher_settings", &self.batcher_settings)
-            .field("blob_time_format", &self.blob_time_format)
-            .field("blob_append_uuid", &self.blob_append_uuid)
-            .field(
-                "confined_blob_prefix",
-                &self.confined_blob_prefix.to_string(),
-            )
-            .finish()
-    }
+/// Formats a container URL without its query string, so a SAS token embedded
+/// as a query parameter is not leaked into diagnostics.
+fn fmt_container_url(url: &Url, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let mut url = url.clone();
+    url.set_query(None);
+    fmt::Debug::fmt(&url, f)
+}
+
+/// Formats a confined template as its rendered string.
+fn fmt_confined_blob_prefix(
+    template: &ConfinedTemplate,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    fmt::Debug::fmt(&template.to_string(), f)
 }
 
 #[async_trait::async_trait]
