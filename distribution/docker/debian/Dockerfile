@@ -14,7 +14,6 @@ LABEL org.opencontainers.image.url="https://vector.dev"
 LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
 LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 
-# libsasl2-2: rdkafka GSSAPI. libodbc2: unixODBC (sources-odbc).
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd libsasl2-2 libodbc2 && rm -rf /var/lib/apt/lists/*
 
