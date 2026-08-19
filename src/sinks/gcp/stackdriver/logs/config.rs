@@ -25,7 +25,7 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
+            BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
@@ -51,11 +51,13 @@ impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
     "gcp_stackdriver_logs",
     "Deliver logs to GCP's Cloud Operations suite."
 ))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct StackdriverConfig {
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     #[serde(flatten)]
     pub(super) log_name: StackdriverLogName,
@@ -122,8 +124,9 @@ pub(super) struct StackdriverConfig {
     pub confinement: ConfinementConfig,
 }
 
-pub(super) fn default_endpoint() -> String {
-    "https://logging.googleapis.com/v2/entries:write".to_string()
+pub(super) fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://logging.googleapis.com/v2/entries:write")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
@@ -288,7 +291,7 @@ impl SinkConfig for StackdriverConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let uri: Uri = self.endpoint.parse()?;
+        let uri = self.endpoint.clone().into_uri();
 
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
             uri: uri.clone(),

@@ -1,5 +1,6 @@
 mod config_builder;
 mod loader;
+mod representation;
 mod secret;
 mod source;
 
@@ -20,8 +21,8 @@ pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
 use super::{
-    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, format,
-    validation, vars,
+    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, validation,
+    vars,
 };
 use crate::signal;
 
@@ -269,10 +270,10 @@ where
     }
 }
 
-/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
+/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a JSON object.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
-) -> Result<toml::value::Table, Vec<String>> {
+) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
 }
 
@@ -342,7 +343,7 @@ where
     // Via configurations that load from raw string, skip interpolation of env
     let with_vars = prepare_input(input, false)?;
 
-    format::deserialize(&with_vars, format)
+    representation::deserialize_config(&with_vars, format)
 }
 
 #[cfg(not(windows))]

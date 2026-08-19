@@ -60,11 +60,9 @@ pub struct PrometheusRemoteWriteConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
 
     /// Defines the behavior for handling conflicting metric metadata.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
@@ -80,7 +78,6 @@ pub struct PrometheusRemoteWriteConfig {
     ///
     /// When enabled, any metric sample with a NaN value will be filtered out
     /// during parsing, preventing downstream processing of invalid metrics.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     skip_nan_values: bool,
 }
@@ -106,8 +103,8 @@ fn default_path() -> String {
 }
 
 impl GenerateConfig for PrometheusRemoteWriteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "127.0.0.1:9090".parse().unwrap(),
             path: default_path(),
             tls: None,
@@ -223,7 +220,7 @@ mod test {
     use crate::{
         SourceSender,
         config::{SinkConfig, SinkContext},
-        sinks::prometheus::remote_write::RemoteWriteConfig,
+        sinks::{prometheus::remote_write::RemoteWriteConfig, util::HttpEndpoint},
         test_util::{self, wait_for_tcp},
         tls::MaybeTlsSettings,
     };
@@ -268,7 +265,8 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("{}://localhost:{}/", proto, address.port()),
+            endpoint: HttpEndpoint::parse(&format!("{}://localhost:{}/", proto, address.port()))
+                .unwrap(),
             tls: tls.map(|tls| tls.options),
             ..Default::default()
         };
@@ -464,7 +462,8 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("http://localhost:{}/", address.port()),
+            endpoint: HttpEndpoint::parse(&format!("http://localhost:{}/", address.port()))
+                .unwrap(),
             ..Default::default()
         };
         let (sink, _) = sink
@@ -692,7 +691,11 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("http://localhost:{}/api/v1/write", address.port()),
+            endpoint: HttpEndpoint::parse(&format!(
+                "http://localhost:{}/api/v1/write",
+                address.port()
+            ))
+            .unwrap(),
             ..Default::default()
         };
         let (sink, _) = sink

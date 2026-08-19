@@ -17,9 +17,18 @@ use super::proto::{
     resource::v1::Resource,
 };
 
+// Tag key for the scalar `InstrumentationScope::name` field.
+const SCOPE_NAME_KEY: &str = "scope.name";
+// Tag key for the scalar `InstrumentationScope::version` field.
+const SCOPE_VERSION_KEY: &str = "scope.version";
+// Prefix routing a tag into the resource attribute set.
+const RESOURCE_PREFIX: &str = "resource.";
+// Prefix routing a tag into the scope attribute set.
+const SCOPE_PREFIX: &str = "scope.";
+
 impl ResourceMetrics {
     pub fn into_event_iter(self) -> impl Iterator<Item = Event> {
-        let resource = self.resource.clone();
+        let resource = self.resource;
 
         self.scope_metrics
             .into_iter()
@@ -28,20 +37,20 @@ impl ResourceMetrics {
                 let resource = resource.clone();
 
                 scope_metrics.metrics.into_iter().flat_map(move |metric| {
-                    let metric_name = metric.name.clone();
+                    let metric_name = metric.name;
                     match metric.data {
                         Some(Data::Gauge(g)) => {
-                            Self::convert_gauge(g, &resource, &scope, &metric_name)
+                            Self::convert_gauge(g, &resource, &scope, metric_name)
                         }
-                        Some(Data::Sum(s)) => Self::convert_sum(s, &resource, &scope, &metric_name),
+                        Some(Data::Sum(s)) => Self::convert_sum(s, &resource, &scope, metric_name),
                         Some(Data::Histogram(h)) => {
-                            Self::convert_histogram(h, &resource, &scope, &metric_name)
+                            Self::convert_histogram(h, &resource, &scope, metric_name)
                         }
                         Some(Data::ExponentialHistogram(e)) => {
-                            Self::convert_exp_histogram(e, &resource, &scope, &metric_name)
+                            Self::convert_exp_histogram(e, &resource, &scope, metric_name)
                         }
                         Some(Data::Summary(su)) => {
-                            Self::convert_summary(su, &resource, &scope, &metric_name)
+                            Self::convert_summary(su, &resource, &scope, metric_name)
                         }
                         _ => Vec::new(),
                     }
@@ -53,12 +62,8 @@ impl ResourceMetrics {
         gauge: Gauge,
         resource: &Option<Resource>,
         scope: &Option<InstrumentationScope>,
-        metric_name: &str,
+        metric_name: String,
     ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-
         gauge
             .data_points
             .into_iter()
@@ -77,12 +82,8 @@ impl ResourceMetrics {
         sum: Sum,
         resource: &Option<Resource>,
         scope: &Option<InstrumentationScope>,
-        metric_name: &str,
+        metric_name: String,
     ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-
         sum.data_points
             .into_iter()
             .map(move |point| {
@@ -102,12 +103,8 @@ impl ResourceMetrics {
         histogram: Histogram,
         resource: &Option<Resource>,
         scope: &Option<InstrumentationScope>,
-        metric_name: &str,
+        metric_name: String,
     ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-
         histogram
             .data_points
             .into_iter()
@@ -127,12 +124,8 @@ impl ResourceMetrics {
         histogram: ExponentialHistogram,
         resource: &Option<Resource>,
         scope: &Option<InstrumentationScope>,
-        metric_name: &str,
+        metric_name: String,
     ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-
         histogram
             .data_points
             .into_iter()
@@ -152,12 +145,8 @@ impl ResourceMetrics {
         summary: Summary,
         resource: &Option<Resource>,
         scope: &Option<InstrumentationScope>,
-        metric_name: &str,
+        metric_name: String,
     ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-
         summary
             .data_points
             .into_iter()
@@ -210,19 +199,14 @@ struct ExpHistogramMetric {
 pub fn build_metric_tags(
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
-    attributes: &[KeyValue],
+    attributes: Vec<KeyValue>,
 ) -> MetricTags {
     let mut tags = MetricTags::default();
 
     if let Some(res) = resource {
         for attr in res.attributes {
-            if let Some(value) = &attr.value
-                && let Some(pb_value) = &value.value
-            {
-                tags.insert(
-                    format!("resource.{}", attr.key.clone()),
-                    TagValue::from(pb_value.clone()),
-                );
+            if let Some(pb_value) = attr.value.and_then(|value| value.value) {
+                tags.insert(format!("resource.{}", attr.key), TagValue::from(pb_value));
             }
         }
     }
@@ -235,22 +219,15 @@ pub fn build_metric_tags(
             tags.insert("scope.version".to_string(), scope.version);
         }
         for attr in scope.attributes {
-            if let Some(value) = &attr.value
-                && let Some(pb_value) = &value.value
-            {
-                tags.insert(
-                    format!("scope.{}", attr.key.clone()),
-                    TagValue::from(pb_value.clone()),
-                );
+            if let Some(pb_value) = attr.value.and_then(|value| value.value) {
+                tags.insert(format!("scope.{}", attr.key), TagValue::from(pb_value));
             }
         }
     }
 
     for attr in attributes {
-        if let Some(value) = &attr.value
-            && let Some(pb_value) = &value.value
-        {
-            tags.insert(attr.key.clone(), TagValue::from(pb_value.clone()));
+        if let Some(pb_value) = attr.value.and_then(|value| value.value) {
+            tags.insert(attr.key, TagValue::from(pb_value));
         }
     }
 
@@ -261,7 +238,7 @@ impl SumMetric {
     fn into_metric(self, metric_name: String) -> Event {
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let value = self.point.value.to_f64().unwrap_or(0.0);
-        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+        let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
         let kind = if self.aggregation_temporality == AggregationTemporality::Delta as i32 {
             MetricKind::Incremental
         } else {
@@ -286,7 +263,7 @@ impl GaugeMetric {
     fn into_metric(self, metric_name: String) -> Event {
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let value = self.point.value.to_f64().unwrap_or(0.0);
-        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+        let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
 
         MetricEvent::new(
             metric_name,
@@ -302,7 +279,7 @@ impl GaugeMetric {
 impl HistogramMetric {
     fn into_metric(self, metric_name: String) -> Event {
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
-        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+        let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
         let buckets = match self.point.bucket_counts.len() {
             0 => Vec::new(),
             n => {
@@ -348,7 +325,7 @@ impl ExpHistogramMetric {
     fn into_metric(self, metric_name: String) -> Event {
         // we have to convert Exponential Histogram to agg histogram using scale and base
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
-        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+        let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
 
         let scale = self.point.scale;
         // from Opentelemetry docs: base = 2**(2**(-scale))
@@ -403,7 +380,7 @@ impl ExpHistogramMetric {
 impl SummaryMetric {
     fn into_metric(self, metric_name: String) -> Event {
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
-        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+        let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
 
         let quantiles: Vec<Quantile> = self
             .point
@@ -444,31 +421,31 @@ impl ToF64 for Option<NumberDataPointValue> {
     }
 }
 
-fn push_key_value(attributes: &mut Vec<KeyValue>, key: &str, value: AnyValue) {
+fn push_key_value(attributes: &mut Vec<KeyValue>, key: String, value: AnyValue) {
     if key.trim().is_empty() {
         return;
     }
     attributes.push(KeyValue {
-        key: key.to_string(),
+        key,
         value: Some(value),
     });
 }
 
-pub fn split_metric_tags(tags: &MetricTags) -> (Resource, InstrumentationScope, Vec<KeyValue>) {
+pub fn split_metric_tags(tags: MetricTags) -> (Resource, InstrumentationScope, Vec<KeyValue>) {
     let mut resource_attributes = Vec::new();
     let mut scope_name = String::new();
     let mut scope_version = String::new();
     let mut scope_attributes = Vec::new();
     let mut attributes = Vec::new();
 
-    for (key, tag_set) in tags.iter_sets().filter(|(key, _)| !key.trim().is_empty()) {
+    for (mut key, tag_set) in tags.into_iter_sets() {
         // `scope.name`/`scope.version` are scalar string fields on `InstrumentationScope`,
         // not attributes, so they collapse to a single representative value.
-        if key == "scope.name" {
-            scope_name = tag_set.as_single().unwrap_or_default().to_string();
+        if key == SCOPE_NAME_KEY {
+            scope_name = tag_set.into_single().unwrap_or_default();
             continue;
-        } else if key == "scope.version" {
-            scope_version = tag_set.as_single().unwrap_or_default().to_string();
+        } else if key == SCOPE_VERSION_KEY {
+            scope_version = tag_set.into_single().unwrap_or_default();
             continue;
         }
 
@@ -476,10 +453,12 @@ pub fn split_metric_tags(tags: &MetricTags) -> (Resource, InstrumentationScope, 
             continue;
         };
 
-        if let Some(rest) = key.strip_prefix("resource.") {
-            push_key_value(&mut resource_attributes, rest, value);
-        } else if let Some(rest) = key.strip_prefix("scope.") {
-            push_key_value(&mut scope_attributes, rest, value);
+        if key.starts_with(RESOURCE_PREFIX) {
+            key.drain(..RESOURCE_PREFIX.len());
+            push_key_value(&mut resource_attributes, key, value);
+        } else if key.starts_with(SCOPE_PREFIX) {
+            key.drain(..SCOPE_PREFIX.len());
+            push_key_value(&mut scope_attributes, key, value);
         } else {
             push_key_value(&mut attributes, key, value);
         }
@@ -517,17 +496,17 @@ fn reject_duplicate_values(
 }
 
 fn reject_invalid_sum(
-    count: &u64,
-    sum: &f64,
+    count: u64,
+    sum: f64,
     description: &str,
 ) -> Result<Option<f64>, vector_common::Error> {
     if sum.is_nan() {
         return Err(format!("{description} sum must not be NaN").into());
     }
-    if *count == 0 && *sum != 0.0 {
+    if count == 0 && sum != 0.0 {
         Err(format!("{description} sum ({sum}) must be zero when count is zero").into())
     } else {
-        let sum = if *sum >= 0.0 { Some(*sum) } else { None };
+        let sum = (sum >= 0.0).then_some(sum);
         Ok(sum)
     }
 }
@@ -555,7 +534,7 @@ impl OTLPDataConverter {
         }
     }
 
-    fn metric_value_to_data(self, value: &MetricValue) -> Result<Data, vector_common::Error> {
+    fn metric_value_to_data(self, value: MetricValue) -> Result<Data, vector_common::Error> {
         match value {
             MetricValue::Counter { value } => self.counter(value),
             MetricValue::Gauge { value } => self.gauge(value),
@@ -581,13 +560,13 @@ impl OTLPDataConverter {
             }
         }
     }
-    fn counter(self, value: &f64) -> Result<Data, vector_common::Error> {
+    fn counter(self, value: f64) -> Result<Data, vector_common::Error> {
         if value.is_nan() {
             return Err("counter value must not be NaN".into());
         }
         match self.kind {
             MetricKind::Absolute => {
-                if *value < 0.0 {
+                if value < 0.0 {
                     Err("absolute counter value cannot be negative".into())
                 } else {
                     Ok(Data::Sum(Sum {
@@ -595,7 +574,7 @@ impl OTLPDataConverter {
                             attributes: self.attrs,
                             start_time_unix_nano: self.start_time_ns,
                             time_unix_nano: self.timestamp_ns,
-                            value: Some(NumberDataPointValue::AsDouble(*value)),
+                            value: Some(NumberDataPointValue::AsDouble(value)),
                             exemplars: Vec::new(),
                             flags: 0,
                         }],
@@ -609,17 +588,17 @@ impl OTLPDataConverter {
                     attributes: self.attrs,
                     start_time_unix_nano: self.start_time_ns,
                     time_unix_nano: self.timestamp_ns,
-                    value: Some(NumberDataPointValue::AsDouble(*value)),
+                    value: Some(NumberDataPointValue::AsDouble(value)),
                     exemplars: Vec::new(),
                     flags: 0,
                 }],
                 aggregation_temporality: self.temporality,
-                is_monotonic: *value >= 0.0,
+                is_monotonic: value >= 0.0,
             })),
         }
     }
 
-    fn gauge(self, value: &f64) -> Result<Data, vector_common::Error> {
+    fn gauge(self, value: f64) -> Result<Data, vector_common::Error> {
         if value.is_nan() {
             return Err("gauge value must not be NaN".into());
         }
@@ -629,7 +608,7 @@ impl OTLPDataConverter {
                     attributes: self.attrs,
                     start_time_unix_nano: 0,
                     time_unix_nano: self.timestamp_ns,
-                    value: Some(NumberDataPointValue::AsDouble(*value)),
+                    value: Some(NumberDataPointValue::AsDouble(value)),
                     exemplars: Vec::new(),
                     flags: 0,
                 }],
@@ -639,7 +618,7 @@ impl OTLPDataConverter {
                     attributes: self.attrs,
                     start_time_unix_nano: self.start_time_ns,
                     time_unix_nano: self.timestamp_ns,
-                    value: Some(NumberDataPointValue::AsDouble(*value)),
+                    value: Some(NumberDataPointValue::AsDouble(value)),
                     exemplars: Vec::new(),
                     flags: 0,
                 }],
@@ -651,9 +630,9 @@ impl OTLPDataConverter {
 
     fn aggregated_histogram(
         self,
-        buckets: &[Bucket],
-        count: &u64,
-        sum: &f64,
+        mut buckets: Vec<Bucket>,
+        count: u64,
+        sum: f64,
     ) -> Result<Data, vector_common::Error> {
         if let Some(bucket) = buckets.iter().find(|bucket| bucket.upper_limit.is_nan()) {
             return Err(format!(
@@ -663,7 +642,6 @@ impl OTLPDataConverter {
             .into());
         }
 
-        let mut buckets = buckets.to_owned();
         buckets.sort_by(|a, b| a.upper_limit.total_cmp(&b.upper_limit));
 
         reject_duplicate_values(
@@ -701,7 +679,7 @@ impl OTLPDataConverter {
         };
 
         let bucket_counts_sum: u64 = bucket_counts.iter().sum();
-        if bucket_counts_sum != *count {
+        if bucket_counts_sum != count {
             return Err(format!(
                 "histogram bucket_counts sum ({bucket_counts_sum}) does not equal count ({count})"
             )
@@ -713,7 +691,7 @@ impl OTLPDataConverter {
                 attributes: self.attrs,
                 start_time_unix_nano: self.start_time_ns,
                 time_unix_nano: self.timestamp_ns,
-                count: *count,
+                count,
                 sum,
                 bucket_counts,
                 explicit_bounds,
@@ -728,9 +706,9 @@ impl OTLPDataConverter {
 
     fn aggregated_summary(
         self,
-        quantiles: &[Quantile],
-        count: &u64,
-        sum: &f64,
+        mut quantiles: Vec<Quantile>,
+        count: u64,
+        sum: f64,
     ) -> Result<Data, vector_common::Error> {
         if matches!(self.kind, MetricKind::Incremental) {
             return Err("OTLP serializer does not support Delta summary metric values".into());
@@ -753,7 +731,6 @@ impl OTLPDataConverter {
             )
             .into());
         }
-        let mut quantiles = quantiles.to_owned();
         quantiles.sort_by(|a, b| a.quantile.total_cmp(&b.quantile));
 
         reject_duplicate_values(
@@ -768,7 +745,7 @@ impl OTLPDataConverter {
             })?;
 
         let quantile_values = quantiles
-            .iter()
+            .into_iter()
             .map(|quantile| ValueAtQuantile {
                 quantile: quantile.quantile,
                 value: quantile.value,
@@ -780,7 +757,7 @@ impl OTLPDataConverter {
                 attributes: self.attrs,
                 start_time_unix_nano: 0,
                 time_unix_nano: self.timestamp_ns,
-                count: *count,
+                count,
                 sum,
                 quantile_values,
                 flags: 0,
@@ -789,7 +766,7 @@ impl OTLPDataConverter {
     }
 }
 fn metric_value_to_data(
-    value: &MetricValue,
+    value: MetricValue,
     kind: MetricKind,
     timestamp_ns: u64,
     start_time_ns: u64,
@@ -799,9 +776,15 @@ fn metric_value_to_data(
 }
 
 pub fn metric_event_to_export_request(
-    metric: &MetricEvent,
+    metric: MetricEvent,
 ) -> Result<ExportMetricsServiceRequest, vector_common::Error> {
-    let (start_time_ns, timestamp_ns): (u64, u64) = match metric.timestamp() {
+    let (series, data, _metadata) = metric.into_parts();
+    let (time, kind, value) = data.into_parts();
+    let tags = series.tags;
+    let namespace = series.name.namespace;
+    let name = series.name.name;
+
+    let (start_time_ns, timestamp_ns): (u64, u64) = match time.timestamp {
         Some(timestamp) => {
             let timestamp_nanos = timestamp.timestamp_nanos_opt().ok_or_else(|| -> vector_common::Error {
 	            format!("metric timestamp {timestamp} is outside the range representable as an OTLP nanosecond timestamp").into()
@@ -810,7 +793,7 @@ pub fn metric_event_to_export_request(
 	            format!("metric timestamp {timestamp_nanos} is before the Unix epoch and cannot be encoded as an OTLP nanosecond timestamp").into()
 	        })?;
 
-            match (metric.kind(), metric.interval_ms()) {
+            match (kind, time.interval_ms) {
                 (MetricKind::Incremental, Some(interval)) => (
                     timestamp_ns,
                     timestamp_ns.saturating_add(u64::from(interval.get()) * 1_000_000),
@@ -821,23 +804,13 @@ pub fn metric_event_to_export_request(
         None => (0, 0),
     };
 
-    let empty_tags = MetricTags::default();
-    let tags = metric.tags().unwrap_or(&empty_tags);
-    let (resource, scope, attributes) = split_metric_tags(tags);
+    let (resource, scope, attributes) = split_metric_tags(tags.unwrap_or_default());
 
-    let kind = metric.kind();
-
-    let name = match metric.namespace() {
-        Some(namespace) => format!("{namespace}.{}", metric.name()),
-        None => metric.name().to_string(),
+    let name = match namespace {
+        Some(namespace) => format!("{namespace}.{name}"),
+        None => name,
     };
-    let data = metric_value_to_data(
-        metric.value(),
-        kind,
-        timestamp_ns,
-        start_time_ns,
-        attributes,
-    )?;
+    let data = metric_value_to_data(value, kind, timestamp_ns, start_time_ns, attributes)?;
 
     Ok(ExportMetricsServiceRequest {
         resource_metrics: vec![ResourceMetrics {
@@ -880,8 +853,9 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        let data = metric_value_to_data(metric.value(), metric.kind(), 1_000, 0, Vec::new())
-            .expect("counter should encode");
+        let data =
+            metric_value_to_data(metric.value().clone(), metric.kind(), 1_000, 0, Vec::new())
+                .expect("counter should encode");
 
         match data {
             Data::Sum(sum) => {
@@ -902,7 +876,8 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         );
-        let data = metric_value_to_data(metric.value(), metric.kind(), 1, 0, Vec::new()).unwrap();
+        let data =
+            metric_value_to_data(metric.value().clone(), metric.kind(), 1, 0, Vec::new()).unwrap();
         match data {
             Data::Sum(sum) => assert_eq!(
                 sum.aggregation_temporality,
@@ -920,7 +895,7 @@ mod tests {
         let interval_ns = 10_000_000; // 10ms
 
         let sum_point = |metric: MetricEvent| {
-            let request = metric_event_to_export_request(&metric).expect("counter should encode");
+            let request = metric_event_to_export_request(metric).expect("counter should encode");
             match request.resource_metrics[0].scope_metrics[0].metrics[0]
                 .data
                 .clone()
@@ -979,7 +954,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(-1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -991,7 +966,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -1003,7 +978,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -1037,7 +1012,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -1069,7 +1044,8 @@ mod tests {
             },
         );
 
-        let data = metric_value_to_data(metric.value(), metric.kind(), 42, 0, Vec::new()).unwrap();
+        let data =
+            metric_value_to_data(metric.value().clone(), metric.kind(), 42, 0, Vec::new()).unwrap();
         match data {
             Data::Histogram(histogram) => {
                 let point = histogram.data_points.into_iter().next().unwrap();
@@ -1107,7 +1083,8 @@ mod tests {
             },
         );
 
-        let data = metric_value_to_data(metric.value(), metric.kind(), 42, 0, Vec::new()).unwrap();
+        let data =
+            metric_value_to_data(metric.value().clone(), metric.kind(), 42, 0, Vec::new()).unwrap();
         match data {
             Data::Histogram(histogram) => {
                 let point = histogram.data_points.into_iter().next().unwrap();
@@ -1144,7 +1121,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -1174,7 +1151,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -1205,7 +1182,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -1235,7 +1212,7 @@ mod tests {
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        assert!(metric_event_to_export_request(&metric).is_err());
+        assert!(metric_event_to_export_request(metric).is_err());
     }
 
     #[test]
@@ -1250,7 +1227,7 @@ mod tests {
         .with_namespace(Some("vector"))
         .with_timestamp(Some(Utc::now()));
 
-        let request = metric_event_to_export_request(&metric).expect("should encode");
+        let request = metric_event_to_export_request(metric).expect("should encode");
         assert_eq!(
             request.resource_metrics[0].scope_metrics[0].metrics[0].name,
             "vector.requests"
@@ -1263,7 +1240,7 @@ mod tests {
             MetricValue::Gauge { value: 1.0 },
         )
         .with_timestamp(Some(Utc::now()));
-        let request = metric_event_to_export_request(&metric).expect("should encode");
+        let request = metric_event_to_export_request(metric).expect("should encode");
         assert_eq!(
             request.resource_metrics[0].scope_metrics[0].metrics[0].name,
             "requests"
@@ -1272,15 +1249,15 @@ mod tests {
 
     #[test]
     fn gauge_to_otlp_gauge() {
-        let attrs = vec![str_to_key_value("host", &TagValue::from("localhost"))];
+        let attrs = vec![str_to_key_value("host", TagValue::from("localhost"))];
         let metric = MetricEvent::new(
             "cpu",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 12.5 },
         );
 
-        let data =
-            metric_value_to_data(metric.value(), metric.kind(), 5, 0, attrs.clone()).unwrap();
+        let data = metric_value_to_data(metric.value().clone(), metric.kind(), 5, 0, attrs.clone())
+            .unwrap();
         let point = number_data_point(data);
         assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(12.5)));
         assert_eq!(point.attributes, attrs);
@@ -1312,7 +1289,8 @@ mod tests {
             },
         );
 
-        let data = metric_value_to_data(metric.value(), metric.kind(), 42, 0, Vec::new()).unwrap();
+        let data =
+            metric_value_to_data(metric.value().clone(), metric.kind(), 42, 0, Vec::new()).unwrap();
         match data {
             Data::Histogram(histogram) => {
                 let point = histogram.data_points.into_iter().next().unwrap();
@@ -1350,7 +1328,8 @@ mod tests {
             },
         );
 
-        let data = metric_value_to_data(metric.value(), metric.kind(), 42, 0, Vec::new()).unwrap();
+        let data =
+            metric_value_to_data(metric.value().clone(), metric.kind(), 42, 0, Vec::new()).unwrap();
         match data {
             Data::Histogram(histogram) => {
                 let point = histogram.data_points.into_iter().next().unwrap();
@@ -1387,7 +1366,8 @@ mod tests {
             },
         );
 
-        let data = metric_value_to_data(metric.value(), metric.kind(), 1, 0, Vec::new()).unwrap();
+        let data =
+            metric_value_to_data(metric.value().clone(), metric.kind(), 1, 0, Vec::new()).unwrap();
         match data {
             Data::Summary(summary) => {
                 let point = summary.data_points.into_iter().next().unwrap();

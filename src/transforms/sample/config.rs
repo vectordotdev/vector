@@ -60,16 +60,16 @@ pub struct SampleConfig {
     ///
     /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
     /// dropped. This differs from `ratio` which allows more precise control over the number of events
-    /// retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
+    /// retained and values greater than 1/2.
+    #[configurable(required_one_of = "sampling_strategy")]
     pub rate: Option<u64>,
 
-    /// The rate at which events are forwarded, expressed as a percentage
+    /// The rate at which events are forwarded, expressed as a percentage.
     ///
     /// For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
     /// the rest are dropped. This differs from `rate` allowing the configuration of a higher
-    /// precision value and also the ability to retain values of greater than 50% of all events. It is
-    /// an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = 0.13, docs::required))]
+    /// precision value and also the ability to retain values of greater than 50% of all events.
+    #[configurable(required_one_of = "sampling_strategy", metadata(docs::examples = 0.13))]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub ratio: Option<f64>,
 
@@ -163,8 +163,8 @@ impl SampleConfig {
 }
 
 impl GenerateConfig for SampleConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             rate: None,
             ratio: Some(0.1),
             ratio_field: None,

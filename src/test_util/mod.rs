@@ -20,7 +20,7 @@ use std::{
 use chrono::{DateTime, SubsecRound, Utc};
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, stream, task::noop_waker_ref};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
@@ -99,7 +99,8 @@ where
 {
     let generated = T::generate_config();
 
-    let toml_cfg = toml::to_string(&generated).unwrap();
+    // TOML cannot represent JSON null; strip None-valued fields before serializing.
+    let toml_cfg = toml::to_string(&crate::generate::strip_nulls(generated.clone())).unwrap();
     toml::from_str::<T>(&toml_cfg).unwrap_or_else(|e| {
         panic!("Invalid config generated from TOML string:\n\n{e}\n'{toml_cfg}'")
     });

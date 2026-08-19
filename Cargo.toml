@@ -154,7 +154,7 @@ async-compression = { version = "0.4.42", default-features = false, features = [
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 axum = { version = "0.6.20", default-features = false }
-base64 = { version = "0.22.1", default-features = false }
+base64 = { version = "0.23.0", default-features = false, features = ["std"] }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
 chrono = { version = "0.4.44", default-features = false, features = ["clock", "serde"] }
@@ -163,11 +163,11 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.6.5"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
-convert_case = { version = "0.8", default-features = false }
+convert_case = { version = "0.10", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 cuckoo-clock = { version = "0.2.7" , default-features = false }
-darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
+darling = { version = "0.23.0", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
@@ -180,25 +180,25 @@ humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
-itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
-ordered-float = { version = "4.6.0", default-features = false }
+ordered-float = { version = "5.3.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.11" }
-proptest-derive = { version = "0.6.0" }
+proptest-derive = { version = "0.8.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
 quickcheck = { version = "1.1.0" }
-rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
-rand_distr = { version = "0.5.1", default-features = false }
+rand = { version = "0.10.1", default-features = false, features = ["thread_rng"] }
+rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
@@ -206,10 +206,11 @@ rust_decimal = { version = "1.40.0", default-features = false, features = ["std"
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
+serde_path_to_error = "0.1.14"
 serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
-socket2 = { version = "0.5.10", default-features = false }
+socket2 = { version = "0.6.3", default-features = false }
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
@@ -217,7 +218,7 @@ tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
-syn = { version = "2", default-features = false }
+syn = { version = "3", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -232,13 +233,13 @@ vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-common-macros = { path = "lib/vector-common-macros" }
-vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-lib = { path = "lib/vector-lib", default-features = false }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
 zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
-serial_test = { version = "3.4" }
+serial_test = { version = "4.0" }
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
@@ -336,9 +337,9 @@ tower = { version = "0.5.2", default-features = false, features = ["buffer", "li
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
 # Serde
 serde.workspace = true
-serde-toml-merge = { version = "0.3.11", default-features = false }
 serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
+serde_path_to_error.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["macros", "std"] }
 serde_yaml.workspace = true
 
@@ -352,7 +353,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # Databricks Zerobus
-databricks-zerobus-ingest-sdk = { version = "2.3.1", optional = true, features = ["arrow-flight"] }
+databricks-zerobus-ingest-sdk = { version = "2.6.0", optional = true, features = ["arrow-flight"] }
 
 # GCP
 goauth = { version = "0.16.0", optional = true }
@@ -373,9 +374,9 @@ greptimedb-ingester = { version = "0.17.0", default-features = false, optional =
 # External libs
 arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
-arrow = { version = "58.2.0", default-features = false, features = ["ipc"], optional = true }
-arrow-schema = { version = "58.2.0", default-features = false, optional = true }
-parquet = { version = "58.2.0", default-features = false, features = [
+arrow = { version = "59.1.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "59.1.0", default-features = false, optional = true }
+parquet = { version = "59.1.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
@@ -415,10 +416,15 @@ http = { version = "0.2.9", default-features = false }
 http-1 = { package = "http", version = "1.0", default-features = false, features = ["std"] }
 http-serde = "1.1.3"
 http-body = { version = "0.4.6", default-features = false }
+http-body-1 = { package = "http-body", version = "1", default-features = false }
+http-body-util = { version = "0.1", default-features = false }
 humantime.workspace = true
 hyper = { version = "0.14.32", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream", "backports", "deprecated"] }
+hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["client", "http1", "http2"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
+hyper-openssl-1 = { package = "hyper-openssl", version = "0.10", default-features = false, features = ["client-legacy"] }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
+hyper-util = { version = "0.1", default-features = false, features = ["client", "client-legacy", "http1", "http2", "tokio"] }
 indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
@@ -427,7 +433,7 @@ k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31
 kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 libc.workspace = true
-lru = { version = "0.16.3", default-features = false }
+lru = { version = "0.18.2", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.7.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
@@ -512,7 +518,7 @@ approx = "0.5.1"
 strum.workspace = true
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
-base64 = "0.22.1"
+base64.workspace = true
 criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc.workspace = true
@@ -532,7 +538,8 @@ vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.4"
-zstd.workspace = true
+# `zdict_builder` exposes dictionary training, used only to build test fixtures.
+zstd = { workspace = true, features = ["zdict_builder"] }
 
 [patch.crates-io]
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
@@ -548,7 +555,6 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
 default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
-antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-api-client", "sources-dnstap"]
@@ -875,7 +881,6 @@ sinks-logs = [
   "sinks-axiom",
   "sinks-azure_blob",
   "sinks-azure_logs_ingestion",
-  "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-chronicle",
   "sinks-clickhouse",
@@ -944,7 +949,6 @@ sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
-sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "dep:rust_decimal", "codecs-arrow"]

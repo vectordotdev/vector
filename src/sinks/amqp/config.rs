@@ -119,14 +119,15 @@ impl Default for AmqpSinkConfig {
 }
 
 impl GenerateConfig for AmqpSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"connection_string = "amqp://localhost:5672/%2f"
-            routing_key = "user_id"
-            exchange = "test"
-            encoding.codec = "json"
-            max_channels = 4"#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"connection_string: "amqp://localhost:5672/%2f"
+            routing_key: user_id
+            exchange: test
+            encoding:
+              codec: json
+            max_channels: 4"#,
+        })
         .unwrap()
     }
 }

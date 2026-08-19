@@ -176,11 +176,12 @@ impl HttpSinkConfig {
 }
 
 impl GenerateConfig for HttpSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"uri = "https://10.22.212.22:9000/endpoint"
-            encoding.codec = "json""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"uri: https://10.22.212.22:9000/endpoint
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }

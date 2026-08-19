@@ -336,8 +336,8 @@ pub(crate) const fn default_cache_size() -> usize {
 // =============================================================================
 
 impl GenerateConfig for Config {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             global: Inner {
                 mode: Mode::Exact,
                 value_limit: default_value_limit(),

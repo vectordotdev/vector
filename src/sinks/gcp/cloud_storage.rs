@@ -2,10 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::{
-    Uri,
-    header::{HeaderName, HeaderValue},
-};
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -36,10 +33,10 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
-            partitioner::KeyPartitioner, request_builder::EncodeResult,
-            service::TowerRequestConfigDefaults, timezone_to_offset,
+            BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint, RequestBuilder,
+            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
     template::{ConfinementConfig, Template, TemplateParseError},
@@ -92,7 +89,6 @@ pub struct GcsSinkConfig {
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
     #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
-    #[configurable(metadata(docs::advanced))]
     metadata: Option<HashMap<String, String>>,
 
     /// A prefix to apply to all object keys.
@@ -107,7 +103,6 @@ pub struct GcsSinkConfig {
         docs::examples = "year=%Y/month=%m/day=%d/",
         docs::examples = "application_id={{ application_id }}/date=%F/"
     ))]
-    #[configurable(metadata(docs::advanced))]
     key_prefix: Option<String>,
 
     /// The timestamp format for the time component of the object key.
@@ -127,7 +122,6 @@ pub struct GcsSinkConfig {
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_time_format")]
-    #[configurable(metadata(docs::advanced))]
     filename_time_format: String,
 
     /// Whether or not to append a UUID v4 token to the end of the object key.
@@ -139,13 +133,11 @@ pub struct GcsSinkConfig {
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
     #[serde(default = "crate::serde::default_true")]
-    #[configurable(metadata(docs::advanced))]
     filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.
     ///
     /// If not specified, the extension is determined by the compression scheme used.
-    #[configurable(metadata(docs::advanced))]
     filename_extension: Option<String>,
 
     #[serde(flatten)]
@@ -194,7 +186,7 @@ pub struct GcsSinkConfig {
     #[configurable(metadata(docs::examples = "http://localhost:9000"))]
     #[configurable(validation(format = "uri"))]
     #[serde(default = "default_endpoint")]
-    endpoint: String,
+    endpoint: HttpEndpoint,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -243,7 +235,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
-        endpoint: Default::default(),
+        endpoint: default_endpoint(),
         request: Default::default(),
         auth: Default::default(),
         tls: Default::default(),
@@ -254,12 +246,14 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
 }
 
 impl GenerateConfig for GcsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            bucket = "my-bucket"
-            credentials_path = "/path/to/credentials.json"
-            framing.method = "newline_delimited"
-            encoding.codec = "json"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            bucket: my-bucket
+            credentials_path: /path/to/credentials.json
+            framing:
+              method: newline_delimited
+            encoding:
+              codec: json
         "#})
         .unwrap()
     }
@@ -270,7 +264,7 @@ impl GenerateConfig for GcsSinkConfig {
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
-        let base_url = format!("{}/{}/", self.endpoint, self.bucket);
+        let base_url = self.endpoint.append_path(&format!("{}/", self.bucket))?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
@@ -301,7 +295,7 @@ impl GcsSinkConfig {
     fn build_sink(
         &self,
         client: HttpClient,
-        base_url: String,
+        base_url: HttpEndpoint,
         auth: GcpAuthenticator,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
@@ -311,7 +305,7 @@ impl GcsSinkConfig {
 
         let partitioner = self.key_partitioner()?;
 
-        let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
+        let protocol = get_http_scheme_from_uri(base_url.as_uri());
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
@@ -539,7 +533,7 @@ mod tests {
         let sink = config
             .build_sink(
                 client,
-                mock_endpoint.to_string(),
+                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 context,
             )

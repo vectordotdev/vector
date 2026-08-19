@@ -55,11 +55,12 @@ fn default_process() -> UnconfinedTemplate {
 }
 
 impl GenerateConfig for PapertrailConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"endpoint = "logs.papertrailapp.com:12345"
-            encoding.codec = "json""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: "logs.papertrailapp.com:12345"
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
@@ -184,7 +185,6 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 mod tests {
     use bytes::BytesMut;
     use futures::{future::ready, stream};
-    use serde::Deserialize;
     use tokio_util::codec::Encoder as _;
     use vector_lib::{
         codecs::JsonSerializerConfig,
@@ -207,12 +207,10 @@ mod tests {
     async fn component_spec_compliance() {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-        let config = PapertrailConfig::generate_config().to_string();
-        let mut config = PapertrailConfig::deserialize(
-            toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-        )
-        .expect("config should be valid");
-        config.endpoint = mock_endpoint.into();
+        let mut config: PapertrailConfig =
+            serde_json::from_value(PapertrailConfig::generate_config())
+                .expect("config should be valid");
+        config.endpoint = mock_endpoint.try_into().unwrap();
         config.tls = Some(TlsEnableableConfig::default());
 
         let context = SinkContext::default();

@@ -147,6 +147,7 @@ jobs:
           rust: true
           protoc: true
           cue: true
+          prettier: true
           libsasl2: true
           cargo-cache: true
       - run: make check-generated-docs
@@ -161,6 +162,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
+          protoc: true
           cargo-cache: true
       - run: cd rust-doc && make ci-docs-build
 

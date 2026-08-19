@@ -1,0 +1,50 @@
+transforms:
+  my_transform_id:
+    type: lua
+    inputs:
+      - my-source-or-transform-id
+    hooks:
+      process: |-
+        function (event, emit)
+          event.log.field = "value" -- set value of a field
+          event.log.another_field = nil -- remove field
+          event.log.first, event.log.second = nil, event.log.first -- rename field
+          -- Very important! Emit the processed event.
+          emit(event)
+        end
+    measure_cpu_usage: false
+    metric_tag_values: single
+    search_dirs:
+      - /etc/vector/lua
+    source: |-
+      function init()
+        count = 0
+      end
+
+      function process()
+        count = count + 1
+      end
+
+      function timer_handler(emit)
+        emit(make_counter(counter))
+        counter = 0
+      end
+
+      function shutdown(emit)
+        emit(make_counter(counter))
+      end
+
+      function make_counter(value)
+        return metric = {
+          name = "event_counter",
+          kind = "incremental",
+          timestamp = os.date("!*t"),
+          counter = {
+            value = value
+          }
+         }
+      end
+    timers:
+      - handler: timer_handler
+        interval_seconds: 2
+    version: "2"

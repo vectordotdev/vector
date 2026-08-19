@@ -42,8 +42,8 @@ pub struct WindowConfig {
 }
 
 impl GenerateConfig for WindowConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(r#"flush_when = ".message == \"value\"""#).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(r#"flush_when: '.message == "value"'"#).unwrap()
     }
 }
 

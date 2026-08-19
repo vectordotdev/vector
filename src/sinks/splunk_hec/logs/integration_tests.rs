@@ -26,7 +26,7 @@ use crate::{
             },
             logs::config::HecLogsSinkConfig,
         },
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
     template::Template,
     test_util::{
@@ -120,7 +120,7 @@ async fn config(
 
     HecLogsSinkConfig {
         default_token: get_token().await.into(),
-        endpoint: splunk_hec_address(),
+        endpoint: HttpEndpoint::parse(&splunk_hec_address()).unwrap(),
         host_key: Some(OptionalTargetPath::event("host")),
         indexed_fields,
         index: None,

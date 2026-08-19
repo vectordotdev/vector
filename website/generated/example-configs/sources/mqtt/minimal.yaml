@@ -1,0 +1,4 @@
+sources:
+  my_source_id:
+    type: mqtt
+    host: mqtt.example.com

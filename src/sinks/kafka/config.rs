@@ -58,7 +58,6 @@ pub struct KafkaSinkConfig {
     ///
     /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has
     /// no key.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "user_id"))]
     #[configurable(metadata(docs::examples = ".my_topic"))]
     #[configurable(metadata(docs::examples = "%my_topic"))]
@@ -69,12 +68,10 @@ pub struct KafkaSinkConfig {
 
     // These batching options will **not** override librdkafka_options values.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub compression: KafkaCompression,
 
@@ -86,7 +83,6 @@ pub struct KafkaSinkConfig {
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[serde(default = "default_socket_timeout_ms")]
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     pub socket_timeout_ms: Duration,
 
@@ -95,7 +91,6 @@ pub struct KafkaSinkConfig {
     #[configurable(metadata(docs::examples = 150000, docs::examples = 450000))]
     #[serde(default = "default_message_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Message Timeout"))]
-    #[configurable(metadata(docs::advanced))]
     pub message_timeout_ms: Duration,
 
     /// The time window used for the `rate_limit_num` option.
@@ -117,7 +112,6 @@ pub struct KafkaSinkConfig {
     /// [config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #[serde(default)]
     #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
     ))]
@@ -126,7 +120,6 @@ pub struct KafkaSinkConfig {
     /// The log field name to use for the Kafka headers.
     ///
     /// If omitted, no headers are written.
-    #[configurable(metadata(docs::advanced))]
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     #[configurable(metadata(docs::examples = "headers"))]
     pub headers_key: Option<ConfigTargetPath>,
@@ -259,8 +252,8 @@ impl KafkaSinkConfig {
 }
 
 impl GenerateConfig for KafkaSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: Template::try_from("topic-1234".to_owned()).unwrap(),
             healthcheck_topic: None,

@@ -1,0 +1,4 @@
+sources:
+  my_source_id:
+    type: stdin
+    max_length: 102400
