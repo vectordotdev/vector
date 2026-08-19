@@ -31,8 +31,8 @@
 //!   prove that the reader had already acknowledged it.
 //!
 //! This code does not guess a new checkpoint or move the writer. It only trims data that is provably
-//! beyond the durable writer checkpoint and calculates the unread byte count used to initialize
-//! buffer occupancy.
+//! beyond the durable writer checkpoint and calculates the unread byte count and physical reader
+//! boundary used to initialize the runtime reader.
 
 use std::{
     io::{self, ErrorKind},
@@ -46,7 +46,9 @@ use super::{
     Filesystem,
     common::{MAX_FILE_ID, data_file_id_in_range, parse_data_file_id},
     io::AsyncFile,
-    reader::{BufferReader, ReadToken, ReaderError, RecordReader, decode_record_payload},
+    reader::{
+        BufferReader, ReadBoundary, ReadToken, ReaderError, RecordReader, decode_record_payload,
+    },
     record::{RecordStatus, try_as_record_archive, validate_record_archive},
 };
 use crate::Bufferable;
@@ -87,6 +89,16 @@ struct CheckpointBoundaryScanResult {
     last_checkpoint_record_id: Option<u64>,
     last_checkpoint_record_next_id: Option<u64>,
     has_trailing_corrupt_records: bool,
+}
+
+struct CheckpointBoundaryRecovery {
+    unread_bytes: u64,
+    acknowledged_prefix_bytes: u64,
+}
+
+pub(super) struct RecoveredWindow {
+    pub(super) unread_bytes: u64,
+    pub(super) read_boundary: ReadBoundary,
 }
 
 #[derive(Clone, Copy)]
@@ -184,11 +196,16 @@ impl CheckpointBoundaryScanResult {
         );
     }
 
-    /// Returns the checkpoint-live bytes after excluding the acknowledged prefix.
-    fn unread_bytes(mut self, skip_through_record_id: u64) -> u64 {
-        self.reconcile_corrupt_acknowledged_prefix(skip_through_record_id, None);
+    /// Finalizes the reader boundary after excluding its acknowledged prefix.
+    fn recover(mut self, skip_through_record_id: Option<u64>) -> CheckpointBoundaryRecovery {
+        if let Some(skip_through_record_id) = skip_through_record_id {
+            self.reconcile_corrupt_acknowledged_prefix(skip_through_record_id, None);
+        }
         debug_assert!(self.logical_file_size >= self.acknowledged_prefix_bytes);
-        self.logical_file_size - self.acknowledged_prefix_bytes
+        CheckpointBoundaryRecovery {
+            unread_bytes: self.logical_file_size - self.acknowledged_prefix_bytes,
+            acknowledged_prefix_bytes: self.acknowledged_prefix_bytes,
+        }
     }
 }
 
@@ -251,12 +268,12 @@ impl<'a> CheckpointBoundaryScan<'a> {
         }
     }
 
+    fn recover(self) -> CheckpointBoundaryRecovery {
+        self.result.recover(self.acknowledged_through_record_id)
+    }
+
     fn recovered_bytes(self) -> u64 {
-        if let Some(acknowledged_through_record_id) = self.acknowledged_through_record_id {
-            self.result.unread_bytes(acknowledged_through_record_id)
-        } else {
-            self.result.logical_file_size
-        }
+        self.recover().unread_bytes
     }
 }
 
@@ -268,7 +285,9 @@ where
 {
     /// Reconciles the checkpointed data-file window and returns its authoritative unread byte
     /// count.
-    pub(super) async fn reconcile_checkpoint_window(&self) -> Result<u64, ReaderError<T>> {
+    pub(super) async fn reconcile_checkpoint_window(
+        &self,
+    ) -> Result<RecoveredWindow, ReaderError<T>> {
         let reader_file_id = self.ledger().get_current_reader_file_id();
         let writer_file_id = self.ledger().get_current_writer_file_id();
         let reader_last_record_id = self.ledger().state().get_last_reader_record_id();
@@ -292,6 +311,7 @@ where
             .iter()
             .position(|&data_file_id| data_file_id == effective_reader_file_id)
             .expect("effective reader file ID must be in the checkpoint window");
+        let mut reader_byte_offset = None;
 
         for &data_file_id in &checkpoint_data_file_ids[effective_reader_position..] {
             let data_file_path = self.ledger().get_data_file_path(data_file_id);
@@ -306,11 +326,15 @@ where
                     writer_next_record_id,
                 );
                 let scan = self.reconcile_checkpoint_boundary_data_file(scan).await?;
-                scan.recovered_bytes()
+                let recovery = scan.recover();
+                reader_byte_offset = Some(recovery.acknowledged_prefix_bytes);
+                recovery.unread_bytes
             } else if data_file_id == effective_reader_file_id {
                 let scan = CheckpointBoundaryScan::reader(boundary_file, reader_last_record_id);
                 let scan = self.reconcile_checkpoint_boundary_data_file(scan).await?;
-                scan.recovered_bytes()
+                let recovery = scan.recover();
+                reader_byte_offset = Some(recovery.acknowledged_prefix_bytes);
+                recovery.unread_bytes
             } else if data_file_id == writer_file_id {
                 let scan = CheckpointBoundaryScan::writer(boundary_file, writer_next_record_id);
                 let scan = self.reconcile_checkpoint_boundary_data_file(scan).await?;
@@ -329,7 +353,13 @@ where
             };
         }
 
-        Ok(unread_buffer_size)
+        Ok(RecoveredWindow {
+            unread_bytes: unread_buffer_size,
+            read_boundary: ReadBoundary::new(
+                effective_reader_file_id,
+                reader_byte_offset.expect("effective reader boundary must be scanned"),
+            ),
+        })
     }
 
     /// Lists the checkpoint-window files in reader-to-writer order.
@@ -785,6 +815,7 @@ mod tests {
                 .reconcile_checkpoint_window()
                 .await
                 .expect("recovery should not fail")
+                .unread_bytes
         }
 
         fn set_checkpoint(

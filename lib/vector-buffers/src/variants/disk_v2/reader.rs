@@ -228,6 +228,26 @@ pub(super) struct RecordReader<R, T> {
     _t: PhantomData<T>,
 }
 
+/// Physical byte boundary where normal unread records begin after startup recovery.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ReadBoundary {
+    data_file_id: u16,
+    byte_offset: u64,
+}
+
+impl ReadBoundary {
+    pub(super) const fn new(data_file_id: u16, byte_offset: u64) -> Self {
+        Self {
+            data_file_id,
+            byte_offset,
+        }
+    }
+
+    fn is_reached(self, data_file_id: u16, byte_offset: u64) -> bool {
+        self.data_file_id == data_file_id && byte_offset >= self.byte_offset
+    }
+}
+
 impl<R, T> RecordReader<R, T>
 where
     R: AsyncRead + Unpin,
@@ -437,6 +457,7 @@ where
     data_file_start_record_id: Option<u64>,
     data_file_record_count: u64,
     data_file_marked_record_count: u64,
+    startup_read_boundary: Option<ReadBoundary>,
     ready_to_read: bool,
     record_acks: OrderedAcknowledgements<u64, u64>,
     data_file_acks: OrderedAcknowledgements<u64, ()>,
@@ -466,6 +487,7 @@ where
             data_file_start_record_id: None,
             data_file_record_count: 0,
             data_file_marked_record_count: 0,
+            startup_read_boundary: None,
             ready_to_read: false,
             record_acks: OrderedAcknowledgements::from_acked(next_expected_record_id),
             data_file_acks: OrderedAcknowledgements::from_acked(0),
@@ -871,12 +893,16 @@ where
     /// If an error occurs during seeking to the next record, an error variant will be returned
     /// describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
-    pub(super) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
+    pub(super) async fn seek_to_next_record(
+        &mut self,
+        read_boundary: ReadBoundary,
+    ) -> Result<(), ReaderError<T>> {
         // We don't try seeking again once we're all caught up.
         if self.ready_to_read {
             warn!("Reader already initialized.");
             return Ok(());
         }
+        self.startup_read_boundary = Some(read_boundary);
 
         // We rely on `next` to close out the data file if we've actually reached the end, and we
         // also rely on it to reset the data file before trying to read, and we _also_ rely on it to
@@ -1006,6 +1032,7 @@ where
             "Synchronized with ledger. Reader ready."
         );
 
+        self.startup_read_boundary = None;
         self.ready_to_read = true;
 
         Ok(())
@@ -1075,6 +1102,19 @@ where
                     continue;
                 }
                 break token;
+            }
+
+            // Checkpoint recovery has already classified the bytes before this boundary as
+            // acknowledged and the bytes at or after it as unread. Stop startup replay before
+            // consuming the first unread frame. This matters for a corrupt frame, whose record ID
+            // cannot be decoded and therefore cannot trigger the token-based unread check below.
+            let reader_file_id = self.ledger.get_current_reader_file_id();
+            if !self.ready_to_read
+                && self
+                    .startup_read_boundary
+                    .is_some_and(|boundary| boundary.is_reached(reader_file_id, self.bytes_read))
+            {
+                return Ok(None);
             }
 
             self.ensure_ready_for_read().await.context(IoSnafu)?;

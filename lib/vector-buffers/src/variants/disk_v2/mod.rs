@@ -267,25 +267,27 @@ where
         let finalizer = Arc::clone(&ledger).spawn_finalizer();
 
         let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
-        let mut unread_buffer_size = reader
+        let mut recovered_window = reader
             .reconcile_checkpoint_window()
             .await
             .context(ReaderSeekFailedSnafu)?;
         if writer
-            .align_with_reader_ahead_checkpoint(unread_buffer_size)
+            .align_with_reader_ahead_checkpoint(recovered_window.unread_bytes)
             .await
             .context(WriterSeekFailedSnafu)?
         {
-            unread_buffer_size = reader
+            recovered_window = reader
                 .reconcile_checkpoint_window()
                 .await
                 .context(ReaderSeekFailedSnafu)?;
         }
         reader
-            .seek_to_next_record()
+            .seek_to_next_record(recovered_window.read_boundary)
             .await
             .context(ReaderSeekFailedSnafu)?;
         writer.publish_current_position();
+
+        let unread_buffer_size = recovered_window.unread_bytes;
 
         // Install the authoritative buffer size now that the reader is positioned at the first
         // unread record. Startup recovery treats the durable ledger checkpoint as the logical
