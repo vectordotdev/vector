@@ -11,13 +11,13 @@ use crate::sinks::util::{
 };
 
 #[derive(Debug, Clone)]
-pub(super) struct HoneycombSvcRequestBuilderV1 {
+pub(super) struct HoneycombSvcRequestBuilder {
     pub(super) uri: HttpEndpoint,
     pub(super) api_key: SensitiveString,
     pub(super) compression: Compression,
 }
 
-impl HttpServiceRequestBuilderV1<()> for HoneycombSvcRequestBuilderV1 {
+impl HttpServiceRequestBuilderV1<()> for HoneycombSvcRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
         let mut builder =
             Request::post(self.uri.to_string()).header(HTTP_HEADER_HONEYCOMB, self.api_key.inner());

@@ -9,7 +9,7 @@ use vrl::value::Kind;
 
 use super::{
     encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
-    service::HoneycombSvcRequestBuilderV1, sink::HoneycombSink,
+    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 use crate::{
     http::{client_v1::HttpClientV1, client_v1::full_body},
@@ -118,7 +118,7 @@ impl SinkConfig for HoneycombConfig {
 
         let uri = self.build_uri()?;
 
-        let honeycomb_service_request_builder = HoneycombSvcRequestBuilderV1 {
+        let honeycomb_service_request_builder = HoneycombSvcRequestBuilder {
             uri: uri.clone(),
             api_key: self.api_key.clone(),
             compression: self.compression,
