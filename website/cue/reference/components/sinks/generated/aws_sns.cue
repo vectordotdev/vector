@@ -614,7 +614,7 @@ generated: components: sinks: aws_sns: configuration: {
 			Can be applied only to FIFO queues.
 			"""
 		required: false
-		type: string: examples: ["vector", "vector-%Y-%m-%d"]
+		type: string: examples: ["vector", "vector-{{ date }}"]
 	}
 	region: {
 		description: """

@@ -19,7 +19,7 @@ use tokio::{
 };
 use tokio_util::{codec::Encoder as _, time::delay_queue::Expired};
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, TimeZone,
+    EstimatedJsonEncodedSizeOf,
     codecs::{
         TextSerializerConfig,
         encoding::{Framer, FramingConfig},
@@ -40,7 +40,6 @@ use crate::{
     sinks::util::{
         StreamSink,
         path_confinement::{ConfineError, PathConfinement},
-        timezone_to_offset,
     },
     template::{ConfinementConfig, UnconfinedTemplate},
 };
@@ -58,11 +57,11 @@ pub struct FileSinkConfig {
     /// File path to write events to.
     ///
     /// Compression format extension must be explicit.
-    #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log"))]
+    #[configurable(metadata(docs::examples = "/tmp/vector-{{ date }}.log"))]
     #[configurable(metadata(
-        docs::examples = "/tmp/application-{{ application_id }}-%Y-%m-%d.log"
+        docs::examples = "/tmp/application-{{ application_id }}-{{ date }}.log"
     ))]
-    #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log.zst"))]
+    #[configurable(metadata(docs::examples = "/tmp/vector-{{ date }}.log.zst"))]
     #[configurable(metadata(
         docs::warnings = "Rendered paths are confined to `base_dir` (derived from the literal prefix of `path` when unset). See the `base_dir` option."
     ))]
@@ -73,7 +72,7 @@ pub struct FileSinkConfig {
     /// When `path` contains event-field references (`{{ field }}`), Vector
     /// confines every rendered path to this directory. If unset, the base
     /// directory is derived from the literal prefix of `path` (the portion
-    /// before the first `{{` or `%`). Configuration fails if `path`
+    /// before the first `{{`). Configuration fails if `path`
     /// references event fields and no non-root base directory can be
     /// derived.
     #[configurable(metadata(docs::examples = "/var/log/vector"))]
@@ -110,10 +109,6 @@ pub struct FileSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub timezone: Option<TimeZone>,
-
-    #[configurable(derived)]
-    #[serde(default)]
     pub internal_metrics: FileInternalMetricsConfig,
 
     #[configurable(derived)]
@@ -140,12 +135,11 @@ pub struct FileTruncateConfig {
 impl GenerateConfig for FileSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            path: UnconfinedTemplate::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
+            path: UnconfinedTemplate::try_from("/tmp/vector-{{ date }}.log").unwrap(),
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: Default::default(),
             truncate: Default::default(),
             base_dir: None,
@@ -245,9 +239,9 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx)?;
+        let sink = FileSink::new(self)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -281,15 +275,10 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
-
-        let offset = config
-            .timezone
-            .or(cx.globals.timezone)
-            .and_then(timezone_to_offset);
 
         // Config validation runs regardless of the opt-out: a relative
         // `base_dir` is a syntactic error, not a confinement decision.
@@ -315,7 +304,7 @@ impl FileSink {
         };
 
         Ok(Self {
-            path: config.path.clone().with_tz_offset(offset),
+            path: config.path.clone(),
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
@@ -742,7 +731,6 @@ impl StreamSink<Event> for FileSink {
 mod tests {
     use std::convert::TryInto;
 
-    use chrono::{SubsecRound, Utc};
     use futures::{SinkExt, stream};
     use similar_asserts::assert_eq;
     use vector_lib::{
@@ -758,8 +746,7 @@ mod tests {
         test_util::{
             components::{FILE_SINK_TAGS, assert_sink_compliance},
             lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
-            random_lines_with_stream, random_metrics_with_stream,
-            random_metrics_with_stream_timestamp, temp_dir, temp_file, trace_init,
+            random_lines_with_stream, random_metrics_with_stream, temp_dir, temp_file, trace_init,
         },
     };
 
@@ -778,7 +765,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -807,7 +793,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -836,7 +821,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -870,7 +854,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -981,7 +964,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -996,7 +978,7 @@ mod tests {
 
         let sink_handle = tokio::spawn(async move {
             assert_sink_compliance(&FILE_SINK_TAGS, async move {
-                let sink = FileSink::new(&config, SinkContext::default()).unwrap();
+                let sink = FileSink::new(&config).unwrap();
                 VectorSink::from_event_streamsink(sink)
                     .run(Box::pin(rx.map(Into::into)))
                     .await
@@ -1040,7 +1022,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -1064,9 +1045,8 @@ mod tests {
     async fn metric_many_partitions() {
         let directory = temp_dir();
 
-        let format = "%Y-%m-%d-%H-%M-%S";
-        let mut template = directory.to_string_lossy().to_string();
-        template.push_str(&format!("/{format}.log"));
+        // Partition by the metric name so each metric lands in its own file.
+        let template = format!("{}/{{{{ name }}}}.log", directory.to_string_lossy());
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
@@ -1074,7 +1054,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -1084,37 +1063,20 @@ mod tests {
         };
 
         let metric_count = 3;
-        let timestamp = Utc::now().trunc_subsecs(3);
-        let timestamp_offset = Duration::from_secs(1);
-
-        let (input, _events) = random_metrics_with_stream_timestamp(
-            metric_count,
-            None,
-            None,
-            timestamp,
-            timestamp_offset,
-        );
+        let (input, _events) = random_metrics_with_stream(metric_count, None, None);
 
         run_assert_sink(&config, input.clone().into_iter()).await;
 
-        let output = (0..metric_count).map(|index| {
-            let expected_timestamp = timestamp + (timestamp_offset * index as u32);
-            let expected_filename =
-                directory.join(format!("{}.log", expected_timestamp.format(format)));
-
-            lines_from_file(expected_filename)
-        });
-        for (input, output) in input.iter().zip(output) {
-            // The format will partition by second and metrics are a second apart.
+        for input in input.iter() {
+            let metric_name = input.as_metric().name();
+            let output = lines_from_file(directory.join(format!("{metric_name}.log")));
+            // Each metric has a unique random name, so its file holds exactly one metric.
             assert_eq!(
                 output.len(),
                 1,
                 "Expected the output file to contain one metric"
             );
-            let output = &output[0];
-
-            let metric_name = input.as_metric().name();
-            assert!(output.contains(metric_name));
+            assert!(output[0].contains(metric_name));
         }
     }
 
@@ -1128,7 +1090,6 @@ mod tests {
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -1154,7 +1115,6 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
             internal_metrics: Default::default(),
             truncate: Default::default(),
             base_dir: None,
@@ -1205,7 +1165,7 @@ mod tests {
             cfg.base_dir = base_dir.clone();
             cfg.confinement
                 .dangerously_allow_unconfined_template_resolution = *hatch;
-            let result = FileSink::new(&cfg, SinkContext::default());
+            let result = FileSink::new(&cfg);
             match expected {
                 NoConfinement => assert!(result.unwrap().confinement.is_none(), "path={path:?}"),
                 Confined => assert!(result.unwrap().confinement.is_some(), "path={path:?}"),
@@ -1232,7 +1192,7 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg).unwrap();
         assert!(sink.partition_event(&event).is_none());
     }
 
@@ -1249,7 +1209,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "/etc/passwd");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg).unwrap();
         let confined = sink.partition_event(&event).unwrap();
         let confined_str = String::from_utf8_lossy(&confined);
         assert!(
@@ -1271,7 +1231,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "tenant-a");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg).unwrap();
         let rendered = sink.partition_event(&event).unwrap();
         let rendered_str = String::from_utf8_lossy(&rendered);
         assert!(rendered_str.ends_with("/tenant-a.log"), "{rendered_str}");
@@ -1284,7 +1244,7 @@ mod tests {
         let mut cfg = base_config("{{ key }}");
         cfg.confinement
             .dangerously_allow_unconfined_template_resolution = true;
-        let sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let sink = FileSink::new(&cfg).unwrap();
         assert!(sink.confinement.is_none());
     }
 
@@ -1298,7 +1258,7 @@ mod tests {
         cfg.confinement
             .dangerously_allow_unconfined_template_resolution = true;
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg).unwrap();
         assert!(sink.confinement.is_none());
 
         let mut event = Event::Log(LogEvent::from("payload"));
@@ -1317,7 +1277,7 @@ mod tests {
         let mut cfg = base_config(&path);
         cfg.base_dir = Some(dir.join("does-not-yet-exist"));
         // No filesystem precondition is established.
-        let _ = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let _ = FileSink::new(&cfg).unwrap();
     }
 
     async fn run_assert_log_sink(config: &FileSinkConfig, events: Vec<String>) {
@@ -1342,7 +1302,7 @@ mod tests {
 
     async fn run_assert_sink(config: &FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
         assert_sink_compliance(&FILE_SINK_TAGS, async move {
-            let sink = FileSink::new(config, SinkContext::default()).unwrap();
+            let sink = FileSink::new(config).unwrap();
             VectorSink::from_event_streamsink(sink)
                 .run(Box::pin(stream::iter(events.map(Into::into))))
                 .await

@@ -36,12 +36,6 @@ impl Template {
         }
     }
 
-    /// Set the tz offset used when rendering strftime specifiers.
-    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.inner.tz_offset = tz_offset;
-        self
-    }
-
     /// Returns the names of the fields referenced by this template, if any.
     ///
     /// This is a read-only inspection that does not render, so it is available before confinement

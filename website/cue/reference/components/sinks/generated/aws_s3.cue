@@ -1041,8 +1041,8 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "date=%F"
-			examples: ["date=%F/hour=%H", "year=%Y/month=%m/day=%d", "application_id={{ application_id }}/date=%F"]
+			default: ""
+			examples: ["date={{ date }}/hour={{ hour }}", "year={{ year }}/month={{ month }}/day={{ day }}", "application_id={{ application_id }}/date={{ date }}"]
 			syntax: "template"
 		}
 	}

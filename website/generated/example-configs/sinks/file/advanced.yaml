@@ -9,5 +9,4 @@ sinks:
     encoding:
       codec: json
     idle_timeout_secs: 30
-    path: /tmp/vector-%Y-%m-%d.log
-    timezone: local
+    path: /tmp/vector-{{ date }}.log

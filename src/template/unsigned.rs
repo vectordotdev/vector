@@ -1,4 +1,4 @@
-use super::parsing::{parse_template, render_metric_field, render_timestamp};
+use super::parsing::{parse_template, render_metric_field};
 use super::*;
 
 /// The source of a `uint` template. May be a constant numeric value or a template string.
@@ -35,7 +35,6 @@ impl TryFrom<UnsignedIntTemplateSource> for UnsignedIntTemplate {
             UnsignedIntTemplateSource::Number(num) => Ok(UnsignedIntTemplate {
                 src: UnsignedIntTemplateSource::Number(num),
                 parts: Vec::new(),
-                tz_offset: None,
             }),
             UnsignedIntTemplateSource::String(s) => UnsignedIntTemplate::try_from(s),
         }
@@ -69,7 +68,6 @@ impl From<u64> for UnsignedIntTemplate {
         UnsignedIntTemplate {
             src: UnsignedIntTemplateSource::Number(num),
             parts: Vec::new(),
-            tz_offset: None,
         }
     }
 }
@@ -87,7 +85,6 @@ impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
                     Ok(num) => Ok(UnsignedIntTemplate {
                         src: UnsignedIntTemplateSource::Number(num),
                         parts,
-                        tz_offset: None,
                     }),
                     Err(_) => Err(TemplateParseError::InvalidNumericTemplate {
                         template: src.into_owned(),
@@ -97,7 +94,6 @@ impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
                 Ok(UnsignedIntTemplate {
                     parts,
                     src: UnsignedIntTemplateSource::String(src.into_owned()),
-                    tz_offset: None,
                 })
             }
         })
@@ -137,12 +133,6 @@ impl UnsignedIntTemplate {
         }
     }
 
-    /// set tz offset
-    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.tz_offset = tz_offset;
-        self
-    }
-
     fn render_event(&self, event: EventRef<'_>) -> Result<u64, TemplateRenderingError> {
         let mut missing_keys = Vec::new();
         let mut out = String::with_capacity(20);
@@ -169,9 +159,6 @@ impl UnsignedIntTemplate {
                             Cow::Borrowed("")
                         }),
                     );
-                }
-                Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.tz_offset))
                 }
             }
         }

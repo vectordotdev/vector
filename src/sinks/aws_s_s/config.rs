@@ -34,7 +34,7 @@ pub(super) struct BaseSSSinkConfig {
     ///
     /// Can be applied only to FIFO queues.
     #[configurable(metadata(docs::examples = "vector"))]
-    #[configurable(metadata(docs::examples = "vector-%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "vector-{{ date }}"))]
     pub(super) message_group_id: Option<String>,
 
     /// The message deduplication ID value to allow AWS to identify duplicate messages.

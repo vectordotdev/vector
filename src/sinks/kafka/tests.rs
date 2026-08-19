@@ -193,7 +193,7 @@ mod integration_test {
         librdkafka_options: HashMap<String, String>,
     ) -> crate::Result<KafkaSink> {
         let topic = format!("test-{}", random_string(10));
-        let topic = Template::try_from(format!("{topic}-%Y%m%d")).unwrap();
+        let topic = Template::try_from(topic.clone()).unwrap();
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
             topic: topic.clone(),
@@ -337,8 +337,8 @@ mod integration_test {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let topic_prefix = format!("test-trace-{}", random_string(10));
-            let topic_now = format!("{}-{}", topic_prefix, chrono::Utc::now().format("%Y%m%d"));
-            let topic = Template::try_from(format!("{topic_prefix}-%Y%m%d")).unwrap();
+            let topic_now = topic_prefix.clone();
+            let topic = Template::try_from(topic_prefix.clone()).unwrap();
             let key_field = ConfigTargetPath::try_from("trace_key".to_string()).unwrap();
             let headers_key = ConfigTargetPath::try_from("trace_headers".to_string()).unwrap();
             let trace_key = "trace-partition-key";
@@ -476,7 +476,7 @@ mod integration_test {
         }
 
         let topic = format!("test-{}", random_string(10));
-        let topic_template = Template::try_from(format!("{topic}-%Y%m%d")).unwrap();
+        let topic_template = Template::try_from(topic.clone()).unwrap();
         let headers_key = ConfigTargetPath::try_from("headers_key".to_string()).unwrap();
         let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
@@ -497,7 +497,7 @@ mod integration_test {
             acknowledgements: Default::default(),
             confinement: Default::default(),
         };
-        let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
+
         println!("Topic name generated in test: {topic:?}");
 
         let num_events = 1000;

@@ -122,8 +122,8 @@ pub struct AzureBlobSinkConfig {
     /// Prefixes are useful for partitioning objects, such as by creating a blob key that
     /// stores blobs under a particular directory. If using a prefix for this purpose, it must end
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
-    #[configurable(metadata(docs::examples = "date/%F/hour/%H/"))]
-    #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d/"))]
+    #[configurable(metadata(docs::examples = "date={{ date }}/hour={{ hour }}/"))]
+    #[configurable(metadata(docs::examples = "year={{ year }}/month={{ month }}/day={{ day }}/"))]
     #[configurable(metadata(
         docs::examples = "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"
     ))]
@@ -344,7 +344,7 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
+const DEFAULT_KEY_PREFIX: &str = "";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 

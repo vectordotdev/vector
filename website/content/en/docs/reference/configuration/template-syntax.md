@@ -16,28 +16,43 @@ the `aws_s3` sink:
 {{< tab title="YAML" >}}
 
 ```yaml
+transforms:
+  add_date:
+    type: "remap"
+    inputs:
+      - "my-source-id"
+    source: |
+      .date = format_timestamp!(.timestamp, format: "%Y-%m-%d")
+
 sinks:
   backup:
     type: "aws_s3"
     bucket: "all_application_logs"
-    key_prefix: "application_id={{ application_id }}/date=%F/"
+    key_prefix: "application_id={{ application_id }}/date={{ date }}"
 ```
 
 {{< /tab >}}
 {{< tab title="TOML" >}}
 
 ```toml
+[transforms.add_date]
+  type = "remap"
+  inputs = ["my-source-id"]
+  source = '''
+    .date = format_timestamp!(.timestamp, format: "%Y-%m-%d")
+  '''
+
 [sinks.backup]
   type = "aws_s3"
   bucket = "all_application_logs"
-  key_prefix = "application_id={{ application_id }}/date=%F/"
+  key_prefix = "application_id={{ application_id }}/date={{ date }}"
 ```
 
 {{< /tab >}}
 {{< /tabs >}}
 
-Notice that Vector allows direct field references as well as "strftime" specifiers. If we were to run the following log
-event through Vector:
+Vector allows direct field references via the `{{ ... }}` syntax. If we were to run the following log event through
+Vector:
 
 ```json
 {
@@ -79,32 +94,6 @@ option = "{{ .parent.child }}"
 {{< /tab >}}
 {{< /tabs >}}
 
-### Strftime specifiers
-
-In addition to directly accessing fields, Vector offers a shortcut for injecting [strftime specifiers][strftime]:
-
-{{< tabs default="YAML" >}}
-{{< tab title="YAML" >}}
-
-```yaml
-option: "year=%Y/month=%m/day=%d/"
-```
-
-{{< /tab >}}
-{{< tab title="TOML" >}}
-
-```toml
-option = "year=%Y/month=%m/day=%d/"
-```
-
-{{< /tab >}}
-{{< /tabs >}}
-
-{{< info >}}
-The value is derived from the [`timestamp` field](/docs/architecture/data-model/log/#timestamps)
-and the name of this field can be changed via the [global `timestamp_key` option](/docs/reference/configuration/schema/#log_schema.timestamp_key).
-{{< /info >}}
-
 ### Escaping
 
 You can escape this syntax by prefixing the character with a `\`. For example, you can escape the event field syntax
@@ -127,26 +116,7 @@ option = "\{{ field_name }}"
 {{< /tab >}}
 {{< /tabs >}}
 
-And [strftime] specified like so:
-
-{{< tabs default="YAML" >}}
-{{< tab title="YAML" >}}
-
-```yaml
-option: "year=\\%Y/month=\\%m/day=\\%d/"
-```
-
-{{< /tab >}}
-{{< tab title="TOML" >}}
-
-```toml
-option = "year=\%Y/month=\%m/day=\%d/"
-```
-
-{{< /tab >}}
-{{< /tabs >}}
-
-Each of the values above would be treated literally.
+The value above would be treated literally.
 
 ## How it works
 
@@ -154,6 +124,49 @@ Each of the values above would be treated literally.
 
 You can find additional examples for accessing fields in the
 [path expression reference][path_expression_examples] documentation.
+
+### Formatting timestamps
+
+Vector's template syntax does not support [strftime][strftime] specifiers. To partition or name outputs by a formatted
+timestamp, use the [`remap` transform][remap] to format the timestamp into a field, then reference that field in the
+template:
+
+{{< tabs default="YAML" >}}
+{{< tab title="YAML" >}}
+
+```yaml
+transforms:
+  add_date:
+    type: "remap"
+    inputs:
+      - "my-source-id"
+    source: |
+      .date = format_timestamp!(.timestamp, format: "%Y-%m-%d")
+
+sinks:
+  backup:
+    type: "aws_s3"
+    key_prefix: "date={{ date }}/"
+```
+
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```toml
+[transforms.add_date]
+  type = "remap"
+  inputs = ["my-source-id"]
+  source = '''
+    .date = format_timestamp!(.timestamp, format: "%Y-%m-%d")
+  '''
+
+[sinks.backup]
+  type = "aws_s3"
+  key_prefix = "date={{ date }}/"
+```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 ### Fallback values
 

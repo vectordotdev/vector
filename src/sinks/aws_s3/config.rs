@@ -73,9 +73,11 @@ pub struct S3SinkConfig {
     /// in `/` to act as a directory path. A trailing `/` is **not** automatically added.
     #[serde(default = "default_key_prefix")]
     #[configurable(metadata(docs::templateable))]
-    #[configurable(metadata(docs::examples = "date=%F/hour=%H"))]
-    #[configurable(metadata(docs::examples = "year=%Y/month=%m/day=%d"))]
-    #[configurable(metadata(docs::examples = "application_id={{ application_id }}/date=%F"))]
+    #[configurable(metadata(docs::examples = "date={{ date }}/hour={{ hour }}"))]
+    #[configurable(metadata(docs::examples = "year={{ year }}/month={{ month }}/day={{ day }}"))]
+    #[configurable(metadata(
+        docs::examples = "application_id={{ application_id }}/date={{ date }}"
+    ))]
     pub key_prefix: String,
 
     /// The timestamp format for the time component of the object key.
@@ -190,7 +192,7 @@ pub struct S3SinkConfig {
 }
 
 pub(super) fn default_key_prefix() -> String {
-    "date=%F".to_string()
+    "".to_string()
 }
 
 pub(super) fn default_filename_time_format() -> String {
@@ -278,7 +280,7 @@ impl S3SinkConfig {
         // Configure our partitioning/batching.
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
+        let key_prefix = Template::try_from(self.key_prefix.clone())?;
         let key_prefix = key_prefix.confine(&self.confinement, Self::NAME, "key_prefix")?;
 
         let ssekms_key_id = self

@@ -17,7 +17,7 @@ sinks:
     type: "aws_s3"
     region: "us-east-1"
     bucket: "my-log-archives"
-    key_prefix: "date=%Y-%m-%d" # daily partitions, hive friendly format
+    key_prefix: "date={{ date }}" # daily partitions, hive friendly format
     compression: "gzip" # compress final objects
     framing:
       method: "newline_delimited" # new line delimited...

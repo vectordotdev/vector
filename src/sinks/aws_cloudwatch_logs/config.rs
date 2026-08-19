@@ -99,7 +99,7 @@ pub struct CloudwatchLogsSinkConfig {
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     #[configurable(metadata(docs::examples = "{{ host }}"))]
-    #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "{{ date }}"))]
     #[configurable(metadata(docs::examples = "stream-name"))]
     pub stream_name: Template,
 

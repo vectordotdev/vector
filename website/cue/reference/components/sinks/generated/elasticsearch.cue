@@ -286,8 +286,8 @@ generated: components: sinks: elasticsearch: configuration: {
 				description: "The name of the index to write events to."
 				required:    false
 				type: string: {
-					default: "vector-%Y.%m.%d"
-					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
+					default: "vector"
+					examples: ["application-{{ application_id }}-{{ date }}", "{{ index }}"]
 					syntax: "template"
 				}
 			}
@@ -300,7 +300,7 @@ generated: components: sinks: elasticsearch: configuration: {
 				description: "Version field value."
 				required:    false
 				type: string: {
-					examples: ["{{ obj_version }}-%Y-%m-%d", "123"]
+					examples: ["{{ obj_version }}-{{ date }}", "123"]
 					syntax: "template"
 				}
 			}

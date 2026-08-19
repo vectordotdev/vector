@@ -1,4 +1,4 @@
-use super::parsing::{parse_template, render_metric_field, render_timestamp};
+use super::parsing::{parse_template, render_metric_field};
 use super::*;
 
 impl fmt::Debug for UnconfinedTemplate {
@@ -6,7 +6,6 @@ impl fmt::Debug for UnconfinedTemplate {
         f.debug_struct("UnconfinedTemplate")
             .field("src", &self.src)
             .field("is_static", &self.is_static)
-            .field("tz_offset", &self.tz_offset)
             .finish()
     }
 }
@@ -48,7 +47,6 @@ impl TryFrom<Cow<'_, str>> for UnconfinedTemplate {
                 .map(|part| match part {
                     Part::Literal(lit) => lit.len(),
                     Part::Reference(_path) => 1,
-                    Part::Strftime(parsed) => parsed.reserve_size(),
                 })
                 .sum();
 
@@ -57,7 +55,6 @@ impl TryFrom<Cow<'_, str>> for UnconfinedTemplate {
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
-                tz_offset: None,
             }
         })
     }
@@ -79,12 +76,6 @@ impl fmt::Display for UnconfinedTemplate {
 impl ConfigurableString for UnconfinedTemplate {}
 
 impl UnconfinedTemplate {
-    /// Set tz offset.
-    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.tz_offset = tz_offset;
-        self
-    }
-
     /// Renders the given template with data from the event, returning raw bytes.
     pub fn render<'a>(
         &self,
@@ -112,9 +103,6 @@ impl UnconfinedTemplate {
         for part in &self.parts {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
-                Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.tz_offset))
-                }
                 Part::Reference(key) => {
                     out.push_str(
                         &match event {
@@ -162,7 +150,7 @@ impl UnconfinedTemplate {
     }
 
     /// Longest leading substring of the template source that is rendered
-    /// verbatim — no `{{ field }}` reference and no strftime specifier.
+    /// verbatim — no `{{ field }}` reference.
     ///
     /// Sinks use this to derive a confinement boundary from the
     /// operator-authored portion of the template.
@@ -172,14 +160,6 @@ impl UnconfinedTemplate {
         while i < bytes.len() {
             // `{{` starts a field reference.
             if bytes[i] == b'{' && bytes.get(i + 1) == Some(&b'{') {
-                break;
-            }
-            // Any `%` may start a strftime sequence. `%%` is an escaped `%`,
-            // but in a mixed literal like `/tmp/100%%/%Y/` the whole segment
-            // is processed by chrono, which decodes `%%` to `%` and expands
-            // `%Y` to the year. We cannot know what chrono will emit without
-            // an actual timestamp, so stop at the first `%` unconditionally.
-            if bytes[i] == b'%' {
                 break;
             }
             i += 1;

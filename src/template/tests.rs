@@ -1,10 +1,5 @@
-use chrono::{Offset, TimeZone, Utc};
-use chrono_tz::Tz;
-use vector_lib::{
-    config::LogNamespace,
-    lookup::{PathPrefix, metadata_path},
-    metric_tags,
-};
+use chrono::{TimeZone, Utc};
+use vector_lib::{lookup::metadata_path, metric_tags};
 use vrl::event_path;
 
 use super::*;
@@ -29,7 +24,6 @@ fn get_fields() {
         .get_fields()
         .unwrap();
     let f6 = UnsignedIntTemplate::from(123u64).get_fields();
-    let f7 = UnsignedIntTemplate::try_from("%s").unwrap().get_fields();
 
     assert_eq!(f1, vec!["foo"]);
     assert_eq!(f2, vec!["foo", "bar"]);
@@ -37,7 +31,6 @@ fn get_fields() {
     assert_eq!(f4, None);
     assert_eq!(f5, vec!["foo", "bar"]);
     assert_eq!(f6, None);
-    assert_eq!(f7, None);
 }
 
 #[test]
@@ -45,16 +38,15 @@ fn literal_prefix() {
     let cases = [
         ("/var/log/app.log", "/var/log/app.log"),
         ("/var/log/{{ host }}/app.log", "/var/log/"),
-        ("/var/log/%Y/{{ host }}.log", "/var/log/"),
+        // `%` is an ordinary literal character now that strftime specifiers
+        // are no longer part of the template syntax.
+        ("/var/log/%Y/{{ host }}.log", "/var/log/%Y/"),
         ("/srv-{{ id }}.log", "/srv-"),
         ("{{ full_path }}", ""),
         ("/{{ tenant }}/app.log", "/"),
-        // `%%` stops the prefix scan — in mixed segments like
-        // `100%%/%Y/{{ x }}` chrono decodes `%%` while expanding `%Y`,
-        // so we cannot determine the rendered prefix without a timestamp.
-        ("100%%-literal/{{ x }}", "100"),
+        ("100%%-literal/{{ x }}", "100%%-literal/"),
         ("no-template-at-all", "no-template-at-all"),
-        ("only-strftime-%F.log", "only-strftime-"),
+        ("only-strftime-%F.log", "only-strftime-%F.log"),
         // single `{` is not a field opener
         ("a{b/{{ c }}", "a{b/"),
     ];
@@ -67,7 +59,7 @@ fn literal_prefix() {
 #[test]
 fn is_dynamic() {
     assert!(
-        UnconfinedTemplate::try_from("/kube-demo/%F")
+        !UnconfinedTemplate::try_from("/kube-demo/%F")
             .unwrap()
             .is_dynamic()
     );
@@ -197,154 +189,6 @@ fn render_log_dynamic_weird_junk() {
 }
 
 #[test]
-fn render_log_timestamp_strftime_style() {
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
-
-    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
-}
-
-#[test]
-fn render_log_timestamp_strftime_style_namespace() {
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event.as_mut_log().insert(event_path!("@timestamp"), ts);
-    // use Vector namespace instead of legacy
-    LogNamespace::Vector.insert_vector_metadata(
-        event.as_mut_log(),
-        Some(vrl::path!("foo")),
-        vrl::path!("foo"),
-        "bar",
-    );
-    let new_schema = event
-        .as_mut_log()
-        .metadata()
-        .schema_definition()
-        .as_ref()
-        .clone()
-        .with_meaning(parse_target_path("@timestamp").unwrap(), "timestamp");
-    event
-        .as_mut_log()
-        .metadata_mut()
-        .set_schema_definition(&std::sync::Arc::new(new_schema));
-
-    let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
-
-    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
-}
-
-#[test]
-fn render_log_timestamp_multiple_strftime_style() {
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let template = UnconfinedTemplate::try_from("abcd-%F_%T").unwrap();
-
-    assert_eq!(
-        Ok(Bytes::from("abcd-2001-02-03_04:05:06")),
-        template.render(&event)
-    )
-}
-
-#[test]
-fn render_log_dynamic_with_strftime() {
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event.as_mut_log().insert(event_path!("foo"), "butts");
-    event.as_mut_log().insert(
-        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-        ts,
-    );
-
-    let template = UnconfinedTemplate::try_from("{{ foo }}-%F_%T").unwrap();
-
-    assert_eq!(
-        Ok(Bytes::from("butts-2001-02-03_04:05:06")),
-        template.render(&event)
-    )
-}
-
-#[test]
-fn render_log_dynamic_with_nested_strftime() {
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event.as_mut_log().insert(event_path!("format"), "%F");
-    event.as_mut_log().insert(
-        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-        ts,
-    );
-
-    let template = UnconfinedTemplate::try_from("nested {{ format }} %T").unwrap();
-
-    assert_eq!(
-        Ok(Bytes::from("nested %F 04:05:06")),
-        template.render(&event)
-    )
-}
-
-#[test]
-fn render_log_dynamic_with_reverse_nested_strftime() {
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event
-        .as_mut_log()
-        .insert(&parse_target_path("\"%F\"").unwrap(), "foo");
-    event.as_mut_log().insert(
-        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-        ts,
-    );
-
-    let template = UnconfinedTemplate::try_from("nested {{ \"%F\" }} %T").unwrap();
-
-    assert_eq!(
-        Ok(Bytes::from("nested foo 04:05:06")),
-        template.render(&event)
-    )
-}
-
-#[test]
-fn render_metric_timestamp() {
-    let template = UnconfinedTemplate::try_from("timestamp %F %T").unwrap();
-
-    assert_eq!(
-        Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
-        template.render(&sample_metric())
-    );
-}
-
-#[test]
 fn render_metric_with_tags() {
     let template =
         UnconfinedTemplate::try_from("name={{name}} component={{tags.component}}").unwrap();
@@ -392,42 +236,6 @@ fn render_metric_without_namespace() {
     );
 }
 
-#[test]
-fn render_log_with_timezone() {
-    let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
-
-    let template = UnconfinedTemplate::try_from("vector-%Y-%m-%d-%H.log").unwrap();
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event.as_mut_log().insert(
-        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-        ts,
-    );
-
-    let tz: Tz = "Asia/Singapore".parse().unwrap();
-    let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
-    assert_eq!(
-        Ok(Bytes::from("vector-2001-02-03-12.log")),
-        template.with_tz_offset(offset).render(&event)
-    );
-}
-
-#[test]
-fn render_log_unsigned_int_with_timezone() {
-    let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
-
-    let template = UnsignedIntTemplate::try_from("%Y%m%d%H").unwrap();
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event.as_mut_log().insert(event_path!("timestamp"), ts);
-
-    let tz: Tz = "Asia/Singapore".parse().unwrap();
-    let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
-
-    assert_eq!(
-        Ok(2001020312),
-        template.with_tz_offset(offset).render(&event)
-    );
-}
-
 fn sample_metric() -> Metric {
     Metric::new(
         "a-counter",
@@ -439,30 +247,6 @@ fn sample_metric() -> Metric {
             .single()
             .expect("invalid timestamp"),
     ))
-}
-
-#[test]
-fn strftime_error() {
-    assert_eq!(
-        UnconfinedTemplate::try_from("%E").unwrap_err(),
-        TemplateParseError::StrftimeError
-    );
-}
-
-#[test]
-fn strftime_non_int_result() {
-    let template = UnsignedIntTemplate::try_from("a-%s").unwrap();
-    let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
-
-    let mut event = Event::Log(LogEvent::from("hello world"));
-    event.as_mut_log().insert(event_path!("timestamp"), ts);
-
-    assert_eq!(
-        Err(TemplateRenderingError::NotNumeric {
-            input: "a-981173106".to_owned()
-        }),
-        template.render(&event)
-    );
 }
 
 #[test]

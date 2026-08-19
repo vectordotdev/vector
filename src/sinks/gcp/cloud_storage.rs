@@ -101,10 +101,10 @@ pub struct GcsSinkConfig {
     /// in `/` in order to act as a directory path. A trailing `/` is **not** automatically added.
     #[configurable(metadata(docs::templateable))]
     #[configurable(metadata(
-        docs::examples = "date=%F/",
-        docs::examples = "date=%F/hour=%H/",
-        docs::examples = "year=%Y/month=%m/day=%d/",
-        docs::examples = "application_id={{ application_id }}/date=%F/"
+        docs::examples = "date={{ date }}/",
+        docs::examples = "date={{ date }}/hour={{ hour }}/",
+        docs::examples = "year={{ year }}/month={{ month }}/day={{ day }}/",
+        docs::examples = "application_id={{ application_id }}/date={{ date }}/"
     ))]
     key_prefix: Option<String>,
 
@@ -114,7 +114,7 @@ pub struct GcsSinkConfig {
     /// sent to S3, such that the resulting object key is functionally equivalent to joining the key
     /// prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
     ///
-    /// This would represent a `key_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
+    /// This would represent a `key_prefix` set to `date={{ date }}/` and the timestamp of Mon Jul 18 2022
     /// 20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
     /// timestamps in seconds since the Unix epoch.
     ///
@@ -322,7 +322,7 @@ impl GcsSinkConfig {
     }
 
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        let tpl = Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
+        let tpl = Template::try_from(self.key_prefix.as_deref().unwrap_or(""))
             .context(KeyPrefixTemplateSnafu)?;
         let tpl = tpl.confine(&self.confinement, Self::NAME, "key_prefix")?;
         Ok(KeyPartitioner::new(tpl, None))

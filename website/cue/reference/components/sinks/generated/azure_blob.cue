@@ -221,8 +221,8 @@ generated: components: sinks: azure_blob: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "blob/%F/"
-			examples: ["date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
+			default: ""
+			examples: ["date={{ date }}/hour={{ hour }}/", "year={{ year }}/month={{ month }}/day={{ day }}/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
 			syntax: "template"
 		}
 	}

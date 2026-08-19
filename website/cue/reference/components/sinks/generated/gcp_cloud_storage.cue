@@ -715,7 +715,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 			sent to S3, such that the resulting object key is functionally equivalent to joining the key
 			prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
 
-			This would represent a `key_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
+			This would represent a `key_prefix` set to `date={{ date }}/` and the timestamp of Mon Jul 18 2022
 			20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
 			timestamps in seconds since the Unix epoch.
 
@@ -807,7 +807,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
+			examples: ["date={{ date }}/", "date={{ date }}/hour={{ hour }}/", "year={{ year }}/month={{ month }}/day={{ day }}/", "application_id={{ application_id }}/date={{ date }}/"]
 			syntax: "template"
 		}
 	}

@@ -41,7 +41,7 @@ pub struct KafkaSinkConfig {
     #[configurable(metadata(docs::templateable))]
     #[configurable(metadata(
         docs::examples = "topic-1234",
-        docs::examples = "logs-{{unit}}-%Y-%m-%d"
+        docs::examples = "logs-{{unit}}-{{ date }}"
     ))]
     pub topic: Template,
 

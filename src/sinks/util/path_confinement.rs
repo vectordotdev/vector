@@ -446,8 +446,8 @@ mod tests {
                 Some("/srv/tenants"),
                 Base("/srv/tenants"),
             ),
-            // `%%` stops scan conservatively; base truncates to /tmp
-            ("/tmp/100%%/{{ x }}.log", None, Base("/tmp")),
+            // `%` is an ordinary literal character; base truncates to /tmp/100%%
+            ("/tmp/100%%/{{ x }}.log", None, Base("/tmp/100%%")),
             // relative explicit base is always rejected
             ("{{ x }}", Some("relative/dir"), ErrNotAbsolute),
             // static path inside explicit base_dir → confinement applies
@@ -523,9 +523,9 @@ mod tests {
             ("/var/log/{{ host }}/app.log", "/etc/passwd", false),
             // string-prefix confusion: /var/logs ≠ /var/log
             ("/var/log/{{ x }}", "/var/logs/x", false),
-            // %% base is /tmp; both %% and % variants fall under it
+            // base is /tmp/100%%/; only the exact literal prefix matches
             ("/tmp/100%%/{{ x }}.log", "/tmp/100%%/value.log", true),
-            ("/tmp/100%%/{{ x }}.log", "/tmp/100%/value.log", true),
+            ("/tmp/100%%/{{ x }}.log", "/tmp/100%/value.log", false),
         ];
         for (tpl_src, rendered, expect_ok) in cases {
             let tpl = UnconfinedTemplate::try_from(*tpl_src).unwrap();

@@ -614,7 +614,7 @@ generated: components: sinks: aws_sqs: configuration: {
 			Can be applied only to FIFO queues.
 			"""
 		required: false
-		type: string: examples: ["vector", "vector-%Y-%m-%d"]
+		type: string: examples: ["vector", "vector-{{ date }}"]
 	}
 	queue_url: {
 		description: "The URL of the Amazon SQS queue to which messages are sent."

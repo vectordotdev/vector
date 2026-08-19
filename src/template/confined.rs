@@ -16,12 +16,6 @@ impl fmt::Display for ConfinedTemplate {
 }
 
 impl ConfinedTemplate {
-    /// Set tz offset on the wrapped template.
-    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.inner.tz_offset = tz_offset;
-        self
-    }
-
     /// Run the confinement check against a raw string without going through a normal render.
     ///
     /// Callers that bypass template rendering entirely (e.g. the elasticsearch sink's

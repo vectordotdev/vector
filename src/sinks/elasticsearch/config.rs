@@ -309,7 +309,7 @@ pub struct BulkConfig {
 
     /// The name of the index to write events to.
     #[serde(default = "default_index")]
-    #[configurable(metadata(docs::examples = "application-{{ application_id }}-%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "application-{{ application_id }}-{{ date }}"))]
     #[configurable(metadata(docs::examples = "{{ index }}"))]
     pub index: Template,
 
@@ -318,7 +318,7 @@ pub struct BulkConfig {
     pub template_fallback_index: Option<String>,
 
     /// Version field value.
-    #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "{{ obj_version }}-{{ date }}"))]
     #[configurable(metadata(docs::examples = "123"))]
     pub version: Option<UnconfinedTemplate>,
 
@@ -338,7 +338,7 @@ fn default_bulk_action() -> UnconfinedTemplate {
 }
 
 fn default_index() -> Template {
-    Template::try_from("vector-%Y.%m.%d").expect("unable to parse template")
+    Template::try_from("vector").expect("unable to parse template")
 }
 
 const fn default_version_type() -> VersionType {

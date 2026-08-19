@@ -20,7 +20,7 @@ sinks:
     grant_read: 79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be
     grant_read_acp: 79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be
     grant_write_acp: 79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be
-    key_prefix: date=%F
+    key_prefix: date={{ date }}/hour={{ hour }}
     region: us-east-1
     server_side_encryption: AES256
     ssekms_key_id: abcd1234

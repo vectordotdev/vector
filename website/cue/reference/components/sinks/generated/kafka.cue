@@ -773,7 +773,7 @@ generated: components: sinks: kafka: configuration: {
 		description: "The Kafka topic name to write events to."
 		required:    true
 		type: string: {
-			examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
+			examples: ["topic-1234", "logs-{{unit}}-{{ date }}"]
 			syntax: "template"
 		}
 	}

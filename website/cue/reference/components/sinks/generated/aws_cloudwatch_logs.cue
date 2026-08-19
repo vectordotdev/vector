@@ -957,7 +957,7 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 			"""
 		required: true
 		type: string: {
-			examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
+			examples: ["{{ host }}", "{{ date }}", "stream-name"]
 			syntax: "template"
 		}
 	}

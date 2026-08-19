@@ -21,7 +21,7 @@ use crate::{
 fn default_config(encoding: EncodingConfigWithFraming) -> WebHdfsConfig {
     WebHdfsConfig {
         root: "/tmp/".to_string(),
-        prefix: "%F/".to_string(),
+        prefix: String::new(),
         endpoint: "http://127.0.0.1:9870".to_string(),
         encoding,
         compression: Compression::gzip_default(),

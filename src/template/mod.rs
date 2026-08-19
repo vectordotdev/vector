@@ -9,10 +9,6 @@ mod unsigned;
 use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
 
 use bytes::Bytes;
-use chrono::{
-    FixedOffset, Utc,
-    format::{Item, strftime::StrftimeItems},
-};
 use http::Uri;
 use regex::Regex;
 
@@ -23,10 +19,7 @@ use vector_lib::{
     lookup::lookup_v2::parse_target_path,
 };
 
-use crate::{
-    config::log_schema,
-    event::{EventRef, Metric, Value},
-};
+use crate::event::{EventRef, Metric, Value};
 
 use confinement::ConfinementChecker;
 use parsing::Part;
@@ -47,8 +40,6 @@ static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
-    #[snafu(display("Invalid strftime item"))]
-    StrftimeError,
     #[snafu(display(
         "Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)",
         path
@@ -123,9 +114,6 @@ pub struct UnconfinedTemplate {
 
     #[serde(skip)]
     reserve_size: usize,
-
-    #[serde(skip)]
-    tz_offset: Option<FixedOffset>,
 }
 
 /// A template that has passed through confinement via [`Template::confine`].
@@ -176,9 +164,6 @@ pub struct UnsignedIntTemplate {
 
     #[serde(skip)]
     parts: Vec<Part>,
-
-    #[serde(skip)]
-    tz_offset: Option<FixedOffset>,
 }
 
 /// Serializable config fragment for template confinement.

@@ -83,7 +83,7 @@ impl GenerateConfig for WebHdfsConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             root: "/".to_string(),
-            prefix: "%F/".to_string(),
+            prefix: "date={{ date }}/".to_string(),
             endpoint: "http://127.0.0.1:9870".to_string(),
 
             encoding: (

@@ -34,7 +34,7 @@ generated: components: sinks: file: configuration: {
 			When `path` contains event-field references (`{{ field }}`), Vector
 			confines every rendered path to this directory. If unset, the base
 			directory is derived from the literal prefix of `path` (the portion
-			before the first `{{` or `%`). Configuration fails if `path`
+			before the first `{{`). Configuration fails if `path`
 			references event fields and no non-root base directory can be
 			derived.
 			"""
@@ -623,21 +623,10 @@ generated: components: sinks: file: configuration: {
 			"""
 		required: true
 		type: string: {
-			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
+			examples: ["/tmp/vector-{{ date }}.log", "/tmp/application-{{ application_id }}-{{ date }}.log", "/tmp/vector-{{ date }}.log.zst"]
 			syntax: "template"
 		}
 		warnings: ["Rendered paths are confined to `base_dir` (derived from the literal prefix of `path` when unset). See the `base_dir` option."]
-	}
-	timezone: {
-		description: """
-			Timezone to use for any date specifiers in template strings.
-
-			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone. It will default to the [globally configured timezone](https://vector.dev/docs/reference/configuration/global-options/#timezone).
-
-			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-			"""
-		required: false
-		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 	truncate: {
 		description: "Configuration for truncating files."

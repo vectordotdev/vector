@@ -54,7 +54,7 @@ async fn sends_request() {
 async fn sends_authenticated_request() {
     let outputs = send_request(
         indoc! {r#"
-                tenant_id: "tenant-%Y"
+                tenant_id: "tenant-{{ tags.region }}"
                 auth:
                   strategy: "basic"
                   user: "user"
@@ -84,7 +84,7 @@ async fn sends_authenticated_request() {
 async fn sends_authenticated_aws_request() {
     let outputs = send_request(
         indoc! {r#"
-                tenant_id: "tenant-%Y"
+                tenant_id: "tenant-{{ tags.region }}"
                 aws:
                   region: "foo"
                 auth:
@@ -121,7 +121,7 @@ async fn sends_x_scope_orgid_header() {
 #[tokio::test]
 async fn sends_templated_x_scope_orgid_header() {
     let outputs = send_request(
-        r#"tenant_id: "tenant-%Y""#,
+        r#"tenant_id: "tenant-{{ tags.region }}""#,
         vec![create_event("gauge-3".into(), 12.0)],
     )
     .await;
@@ -131,8 +131,7 @@ async fn sends_templated_x_scope_orgid_header() {
     let orgid = headers["x-scope-orgid"]
         .to_str()
         .expect("Missing x-scope-orgid header");
-    assert!(orgid.starts_with("tenant-20"));
-    assert_eq!(orgid.len(), 11);
+    assert_eq!(orgid, "tenant-us-west-1");
 }
 
 #[tokio::test]

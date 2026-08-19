@@ -15,6 +15,6 @@ sinks:
     endpoint: https://storage.googleapis.com
     filename_append_uuid: true
     filename_time_format: "%s"
-    key_prefix: date=%F/
+    key_prefix: date={{ date }}/
     storage_class: ARCHIVE
     timezone: local
