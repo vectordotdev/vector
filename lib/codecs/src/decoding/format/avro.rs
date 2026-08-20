@@ -91,15 +91,13 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 pub struct AvroDeserializerOptions {
     /// The Avro schema definition.
     /// **Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
-    /// * `Date`
     /// * `Decimal`
     /// * `Duration`
     /// * `Fixed`
-    /// * `TimeMillis`
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#,
         docs::additional_props_description = r#"Supports most avro data types, unsupported data types includes
-        ["decimal", "duration", "local-timestamp-millis", "local-timestamp-micros"]"#,
+        ["decimal", "duration", "fixed"]"#,
     ))]
     pub schema: String,
 
@@ -190,9 +188,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         }
         AvroValue::Boolean(boolean) => Ok(VrlValue::from(boolean)),
         AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),
-        AvroValue::Date(_) => Err(vector_common::Error::from(
-            "AvroValue::Date is not supported",
-        )),
+        AvroValue::Date(days) => Ok(VrlValue::from(days)),
         AvroValue::Decimal(_) => Err(vector_common::Error::from(
             "AvroValue::Decimal is not supported",
         )),
@@ -220,9 +216,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             .map(|v| VrlValue::Object(v.into_iter().collect())),
         AvroValue::String(string) => Ok(VrlValue::from(string)),
         AvroValue::TimeMicros(time_micros) => Ok(VrlValue::from(time_micros)),
-        AvroValue::TimeMillis(_) => Err(vector_common::Error::from(
-            "AvroValue::TimeMillis is not supported",
-        )),
+        AvroValue::TimeMillis(millis) => Ok(VrlValue::from(millis)),
         AvroValue::TimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
         AvroValue::TimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
         AvroValue::Union(_, v) => try_from(*v),

@@ -280,7 +280,6 @@ fn generate_avro_test_case_record() -> Result<()> {
     generate_test_case(schema, value, "record")
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_date() -> Result<()> {
     let schema = r#"
     {
@@ -297,6 +296,42 @@ fn generate_avro_test_case_date() -> Result<()> {
     }
     let value = Test { date_field: 19646 };
     generate_test_case(schema, value, "date")
+}
+
+fn generate_avro_test_case_named_record_reference() -> Result<()> {
+    let schema = r#"
+    {
+        "type": "record",
+        "name": "Outer",
+        "fields": [
+            {
+                "name": "first",
+                "type": {
+                    "type": "record",
+                    "name": "Inner",
+                    "fields": [
+                        {"name": "date", "type": "int", "logicalType": "date"}
+                    ]
+                }
+            },
+            {"name": "second", "type": "Inner"}
+        ]
+    }
+    "#;
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Inner {
+        date: i32,
+    }
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct Test {
+        first: Inner,
+        second: Inner,
+    }
+    let value = Test {
+        first: Inner { date: 20_000 },
+        second: Inner { date: 20_001 },
+    };
+    generate_test_case(schema, value, "named_record_reference")
 }
 
 #[allow(unused)]
@@ -320,7 +355,6 @@ fn generate_avro_test_case_decimal_var() -> Result<()> {
     generate_test_case_from_value(schema, record, "decimal_var")
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_time_millis() -> Result<()> {
     let schema = r#"
     {
@@ -488,15 +522,18 @@ fn main() -> Result<()> {
     generate_avro_test_case_array()?;
     generate_avro_test_case_boolean()?;
     generate_avro_test_case_bytes()?;
+    generate_avro_test_case_date()?;
     generate_avro_test_case_double()?;
     generate_avro_test_case_enum()?;
     generate_avro_test_case_float()?;
     generate_avro_test_case_int()?;
     generate_avro_test_case_long()?;
     generate_avro_test_case_map()?;
+    generate_avro_test_case_named_record_reference()?;
     generate_avro_test_case_record()?;
     generate_avro_test_case_string()?;
     generate_avro_test_case_time_micros()?;
+    generate_avro_test_case_time_millis()?;
     generate_avro_test_case_timestamp_micros()?;
     generate_avro_test_case_timestamp_millis()?;
     generate_avro_test_case_local_timestamp_micros()?;
