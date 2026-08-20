@@ -158,7 +158,7 @@ pub enum MetricTypeConfig {
 }
 
 impl MetricConfig {
-    fn field(&self) -> &str {
+    const fn field(&self) -> &str {
         self.field.get_ref()
     }
 }
