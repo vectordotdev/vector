@@ -163,7 +163,7 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 		type: object: {
 			examples: [{
 				label_1: "value_1"
-				label_2: "{{ template_value_2 }}"
+				label_2: "label-{{ template_value_2 }}"
 			}]
 			options: "*": {
 				description: "A key, value pair that describes a log entry."
@@ -412,7 +412,7 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 		type: object: {
 			examples: [{
 				instanceId: "Twilight"
-				zone:       "{{ zone }}"
+				zone:       "zone-{{ zone }}"
 			}]
 			options: {
 				"*": {

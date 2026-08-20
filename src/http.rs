@@ -811,6 +811,8 @@ impl IntoIterator for QueryParameterValue {
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
+mod client_v1;
+
 #[cfg(test)]
 mod transport_tests;
 

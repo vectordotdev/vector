@@ -573,7 +573,7 @@ generated: components: sinks: humio_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["json", "none", "{{ event_type }}"]
+			examples: ["json", "none", "event_type-{{ event_type }}"]
 			syntax: "template"
 		}
 	}
@@ -603,7 +603,7 @@ generated: components: sinks: humio_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ host }}", "custom_index"]
+			examples: ["index-{{ host }}", "custom_index"]
 			syntax: "template"
 		}
 	}
