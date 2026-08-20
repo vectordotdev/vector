@@ -27,21 +27,12 @@ administration: {
 				filename: "\(tag)-\(extra).\(_file_type)"
 			}
 
-			// Calculate the stable-release download URL without needing site templating.
-			// Nightly downloads remain on packages.timber.io and are selected by the
-			// website template.
+			// Calculate the download URL without needing site templating.
 			if _file_type != "deb" {
-				download_url:         "\(urls.vector_github_release_assets)/v{v2}/vector-{v2}-\(_version_postfix)\(filename)"
-				nightly_download_url: "https://packages.timber.io/vector/{v1}/vector-{v2}-\(_version_postfix)\(filename)"
+				download_url: "\(urls.vector_packages_root)/vector/{v1}/vector-{v2}-\(_version_postfix)\(filename)"
 			}
 			if _file_type == "deb" {
-				download_url:         "\(urls.vector_github_release_assets)/v{v2}/vector_{v2}-1_\(_version_postfix)\(filename)"
-				nightly_download_url: "https://packages.timber.io/vector/{v1}/vector_{v2}-1_\(_version_postfix)\(filename)"
-				// Releases through 0.20 used a hyphenated name without the package
-				// revision. Keep their release-page buttons working after the stable
-				// download migration.
-				legacy_download_url: "\(urls.vector_github_release_assets)/v{v2}/vector-{v2}-\(_version_postfix)\(filename)"
-				legacy_max_minor:    20
+				download_url: "\(urls.vector_packages_root)/vector/{v1}/vector_{v2}-1_\(_version_postfix)\(filename)"
 			}
 
 			// Unused fields
@@ -126,7 +117,7 @@ administration: {
 						arch:   "ARMv7"
 						tag:    "armv7hl"
 						// Releases through 0.32 used armv7 rather than armv7hl.
-						legacy_download_url: "\(urls.vector_github_release_assets)/v{v2}/vector-{v2}-1.armv7.rpm"
+						legacy_download_url: "\(urls.vector_packages_root)/vector/{v1}/vector-{v2}-1.armv7.rpm"
 						legacy_max_minor:    32
 					},
 					{

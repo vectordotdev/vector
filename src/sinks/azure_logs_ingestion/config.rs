@@ -11,7 +11,7 @@ use crate::{
         azure_common::config::AzureAuthentication,
         prelude::*,
         util::{
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
@@ -47,7 +47,7 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(
         docs::examples = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
     ))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
     ///
@@ -114,7 +114,7 @@ pub struct AzureLogsIngestionConfig {
 impl Default for AzureLogsIngestionConfig {
     fn default() -> Self {
         Self {
-            endpoint: Default::default(),
+            endpoint: HttpEndpoint::parse("http://localhost:8080").unwrap(),
             dcr_immutable_id: Default::default(),
             stream_name: Default::default(),
             auth: Default::default(),
@@ -135,14 +135,14 @@ impl AzureLogsIngestionConfig {
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
-        endpoint: UriSerde,
+        endpoint: HttpEndpoint,
         dcr_immutable_id: String,
         stream_name: String,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
         timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = endpoint.with_default_parts().uri;
+        let endpoint = endpoint.into_uri();
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
 
         let batch_settings = self
@@ -191,7 +191,7 @@ impl_generate_config_from_default!(AzureLogsIngestionConfig);
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint: UriSerde = self.endpoint.parse()?;
+        let endpoint = self.endpoint.clone();
 
         let credential: Arc<dyn TokenCredential> = self.auth.credential().await?;
 

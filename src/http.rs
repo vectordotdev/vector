@@ -754,11 +754,9 @@ impl ParameterValue {
     }
 
     /// Returns the raw string value of the parameter.
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn value(&self) -> &str {
+    pub const fn value(&self) -> &str {
         match self {
-            ParameterValue::String(s) => s,
-            ParameterValue::Typed { value, .. } => value,
+            ParameterValue::String(value) | ParameterValue::Typed { value, .. } => value.as_str(),
         }
     }
 
@@ -812,6 +810,8 @@ impl IntoIterator for QueryParameterValue {
 }
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
+
+mod client_v1;
 
 #[cfg(test)]
 mod transport_tests;

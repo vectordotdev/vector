@@ -680,7 +680,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 		description: "API endpoint for Google Cloud Storage"
 		required:    false
 		type: string: {
-			default: "https://storage.googleapis.com"
+			default: "https://storage.googleapis.com/"
 			examples: ["http://localhost:9000"]
 		}
 	}

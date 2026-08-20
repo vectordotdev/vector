@@ -27,7 +27,7 @@ administration: interfaces: msi: {
 				VECTORCFG
 				"""#
 			install: #"""
-				powershell Invoke-WebRequest https://github.com/vectordotdev/vector/releases/download/v{version}/vector-{version}-{arch}.msi -OutFile vector-{version}-{arch}.msi && \
+				powershell Invoke-WebRequest https://dd-cose-releases.s3.amazonaws.com/vector/{version}/vector-{arch}.msi -OutFile vector-{version}-{arch}.msi && \
 					msiexec /i vector-{version}-{arch}.msi /quiet
 				"""#
 			logs:      null

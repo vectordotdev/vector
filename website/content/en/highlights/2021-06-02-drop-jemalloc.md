@@ -33,7 +33,7 @@ allocator which is a sensible default otherwise. As we have a better understandi
 likely we will revisit this decision.
 
 [0_14]: /releases/0.14.0
-[0_14_full]: https://github.com/vectordotdev/vector/releases/tag/v0.14.0
+[0_14_full]: /releases/0.14.0
 [gnu_allocator]: https://www.gnu.org/software/libc/manual/html_node/The-GNU-Allocator.html
 [jemalloc]: https://github.com/jemalloc/jemalloc
 [musl_allocator]: https://musl.libc.org/releases.html

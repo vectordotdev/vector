@@ -15,13 +15,10 @@ VECTOR_VERSION="${VECTOR_VERSION:-"0.57.0"}"
 # Accept either a bare release number or a Git tag name.
 VECTOR_VERSION="${VECTOR_VERSION#v}"
 
-# PACKAGE_ROOT remains an override for package mirrors. Official releases are
-# downloaded from the matching immutable GitHub Release.
-if [ -n "${PACKAGE_ROOT:-}" ]; then
-    PACKAGE_URL="${PACKAGE_ROOT}/${VECTOR_VERSION}"
-else
-    PACKAGE_URL="https://github.com/vectordotdev/vector/releases/download/v${VECTOR_VERSION}"
-fi
+# If PACKAGE_ROOT is unset or empty, use the public COSE release bucket.
+# PACKAGE_ROOT remains an override for package mirrors.
+PACKAGE_ROOT="${PACKAGE_ROOT:-"https://dd-cose-releases.s3.amazonaws.com/vector"}"
+PACKAGE_URL="${PACKAGE_ROOT}/${VECTOR_VERSION}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "

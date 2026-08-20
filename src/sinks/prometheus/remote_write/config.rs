@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use http::{HeaderValue, Uri, header::AUTHORIZATION};
-use snafu::prelude::*;
 
 #[cfg(feature = "aws-core")]
 use super::Errors;
@@ -12,10 +11,10 @@ use super::{
 use crate::{
     http::HttpClient,
     sinks::{
-        UriParseSnafu,
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
         util::{
+            HttpEndpoint,
             auth::Auth,
             http::{OrderedHeaderName, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfig,
@@ -52,7 +51,8 @@ pub struct RemoteWriteConfig {
     ///
     /// The endpoint should include the scheme and the path to write to.
     #[configurable(metadata(docs::examples = "https://localhost:8087/api/v1/write"))]
-    pub endpoint: String,
+    #[derivative(Default(value = "default_endpoint()"))]
+    pub endpoint: HttpEndpoint,
 
     /// The default namespace for any metrics sent.
     ///
@@ -138,6 +138,10 @@ const fn default_compression() -> Compression {
     Compression::Snappy
 }
 
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://localhost:8087/api/v1/write").unwrap()
+}
+
 impl_generate_config_from_default!(RemoteWriteConfig);
 
 /// Outbound HTTP request settings for the Prometheus remote write sink.
@@ -197,7 +201,7 @@ impl SinkConfig for RemoteWriteConfig {
             })
             .transpose()?;
 
-        let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
+        let endpoint = self.endpoint.clone();
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let request_settings = self.request.tower.into_settings();
         let validated_headers = Arc::new(validate_headers(
@@ -242,7 +246,7 @@ impl SinkConfig for RemoteWriteConfig {
 
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
-            None => endpoint.clone(),
+            None => endpoint.as_uri().clone(),
         };
 
         let healthcheck = healthcheck(

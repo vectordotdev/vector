@@ -37,9 +37,7 @@
         {{ end }}
         {{ if $showOption }}
         {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
-        {{ if eq $version "nightly" }}
-          {{ $url = .nightly_download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
-        {{ else if and .legacy_download_url .legacy_max_minor }}
+        {{ if and (ne $version "nightly") .legacy_download_url .legacy_max_minor }}
           {{/* Historical Vector releases on this site are all 0.x. */}}
           {{ $versionParts := split $version "." }}
           {{ $minorVersion := int (index $versionParts 1) }}
@@ -70,14 +68,4 @@
     </div>
   </div>
   {{ end }}
-</div>
-
-{{ $link := printf "https://github.com/vectordotdev/vector/releases/tag/v%s" $version }}
-{{ if eq $version "nightly" }}
-  {{ $link = "https://packages.timber.io/vector/nightly/latest" }}
-{{ end }}
-<div class="mt-8">
-  <a href="{{ $link }}" class="text-sm dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary dark:text-primary text-secondary" rel="noopener" target="_blank">
-    browse all files...
-  </a>
 </div>

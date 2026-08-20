@@ -19,7 +19,7 @@ administration: interfaces: rpm: {
 
 	role_implementations: [Name=string]: {
 		commands: role_implementations._systemd_commands & {
-			install:   "sudo rpm -i https://github.com/vectordotdev/vector/releases/download/v{version}/vector-{version}-1.{arch}.rpm"
+			install:   "sudo rpm -i https://dd-cose-releases.s3.amazonaws.com/vector/{version}/vector-{version}-1.{arch}.rpm"
 			uninstall: "sudo rpm -e vector"
 			upgrade:   null
 		}
