@@ -426,7 +426,11 @@ impl ChunkedGelfDecoder {
         if let Some(max_length) = self.max_length {
             let length = message_state.current_length();
             if length > max_length {
-                state_lock.remove(&message_id);
+                // Abort on removal, or the task outlives its entry and the live-task count is
+                // no longer bounded by `pending_messages_limit`.
+                if let Some(dropped) = state_lock.remove(&message_id) {
+                    dropped.timeout_task.abort();
+                }
                 return Err(ChunkedGelfDecoderError::MaxLengthExceed {
                     message_id,
                     sequence_number,
@@ -964,6 +968,39 @@ mod tests {
         let frame = decoder.decode_eof(&mut two_chunks[1]).unwrap();
         assert_eq!(frame, Some(Bytes::from(two_chunks_expected)));
         assert_eq!(decoder.state.lock().unwrap().len(), 0);
+    }
+
+    #[rstest]
+    #[tokio::test(start_paused = true)]
+    async fn decode_max_length_exceeded_does_not_leak_timeout_task(
+        two_chunks_message: ([BytesMut; 2], String),
+    ) {
+        // An unaborted task outlives its entry, unbounding the live-task count.
+        let (mut chunks, _) = two_chunks_message;
+        let mut decoder = ChunkedGelfDecoder {
+            max_length: Some(5),
+            ..Default::default()
+        };
+
+        assert!(decoder.decode_eof(&mut chunks[0]).unwrap().is_none());
+        let timeout_task = {
+            let state = decoder.state.lock().unwrap();
+            state
+                .values()
+                .next()
+                .map(|message_state| message_state.timeout_task.abort_handle())
+                .expect("a message should be pending")
+        };
+        assert!(!timeout_task.is_finished());
+
+        assert!(decoder.decode_eof(&mut chunks[1]).is_err());
+        assert_eq!(decoder.state.lock().unwrap().len(), 0);
+
+        tokio::task::yield_now().await;
+        assert!(
+            timeout_task.is_finished(),
+            "the timeout task must be aborted when the message is dropped",
+        );
     }
 
     #[rstest]
