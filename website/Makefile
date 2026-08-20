@@ -1,4 +1,5 @@
 CUE = ../scripts/cue.sh
+VDEV ?= cargo vdev
 
 export CI ?= false
 
@@ -10,7 +11,12 @@ export SERVER_PORT ?= 1313
 clean:
 	rm -rf public resources data/cargo-lock.toml data/docs.json
 
-setup:
+.PHONY: setup-vdev
+setup-vdev:
+	cd .. && scripts/environment/prepare.sh --modules=vdev,prettier
+
+.PHONY: setup
+setup: setup-vdev
 	yarn
 
 # Copy Cargo data such as the dependency information file
@@ -18,13 +24,15 @@ cargo-data:
 	cp -f ../Cargo.lock data/cargo-lock.toml
 
 # Build JSON from CUE sources with `make cue-build`. Run other commands with `make cue-*`
+cue-build:
+	${CUE} build
+
 cue-%:
 	${CUE} $*
 
+.PHONY: config-examples
 config-examples:
-	yarn config-examples
-
-VDEV ?= cargo vdev
+	@:
 
 generate-vrl-docs:
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
