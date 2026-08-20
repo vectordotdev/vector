@@ -197,11 +197,12 @@ pub enum OutOfOrderAction {
 
 impl GenerateConfig for LokiConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"endpoint = "http://localhost:3100"
-            encoding.codec = "json"
-            labels = {}"#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: http://localhost:3100
+            encoding:
+              codec: json
+            labels: {}"#,
+        })
         .unwrap()
     }
 }

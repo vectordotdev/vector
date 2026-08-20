@@ -661,7 +661,7 @@ generated: components: sinks: websocket: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				30,
+				30
 			]
 			unit: "seconds"
 		}
@@ -677,7 +677,7 @@ generated: components: sinks: websocket: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				5,
+				5
 			]
 			unit: "seconds"
 		}
