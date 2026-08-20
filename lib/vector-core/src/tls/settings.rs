@@ -223,6 +223,17 @@ impl TlsSettings {
         })
     }
 
+    /// Forces the given protocols to be advertised via ALPN, unless the user already set
+    /// `alpn_protocols` explicitly. Used by protocols like gRPC that require a specific ALPN
+    /// value (`h2`) to be negotiated by the underlying HTTP/2 stack, but whose source config
+    /// doesn't expose an `alpn_protocols` option for users to set it themselves.
+    pub fn set_default_alpn_protocols(&mut self, protocols: &[&str]) -> Result<()> {
+        if self.alpn_protocols.is_none() {
+            self.alpn_protocols = Some(encode_alpn_protocols(protocols)?);
+        }
+        Ok(())
+    }
+
     /// The configured SNI server name override, if any.
     pub fn server_name(&self) -> Option<&str> {
         self.server_name.as_deref()
@@ -421,6 +432,23 @@ fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
     leaked
 }
 
+/// Encodes a list of protocol names into ALPN "wire format": each protocol name prefixed by
+/// its byte length.
+fn encode_alpn_protocols<S: AsRef<str>>(protocols: &[S]) -> Result<Vec<u8>> {
+    let mut data: Vec<u8> = Vec::new();
+    for protocol in protocols {
+        let protocol = protocol.as_ref();
+        data.push(
+            protocol
+                .len()
+                .try_into()
+                .context(EncodeAlpnProtocolsSnafu)?,
+        );
+        data.extend_from_slice(protocol.as_bytes());
+    }
+    Ok(data)
+}
+
 impl TlsConfig {
     fn load_authorities(&self) -> Result<Vec<X509>> {
         match &self.ca_file {
@@ -456,21 +484,14 @@ impl TlsConfig {
         }
     }
 
-    /// The input must be in ALPN "wire format".
+    /// The result is in ALPN "wire format".
     ///
     /// It consists of a sequence of supported protocol names prefixed by their byte length.
     fn parse_alpn_protocols(&self) -> Result<Option<Vec<u8>>> {
-        match &self.alpn_protocols {
-            None => Ok(None),
-            Some(protocols) => {
-                let mut data: Vec<u8> = Vec::new();
-                for str in protocols {
-                    data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
-                    data.append(&mut str.clone().into_bytes());
-                }
-                Ok(Some(data))
-            }
-        }
+        self.alpn_protocols
+            .as_deref()
+            .map(encode_alpn_protocols)
+            .transpose()
     }
 
     /// Parse identity from a PEM encoded certificate + key pair of files
@@ -655,6 +676,14 @@ impl MaybeTlsSettings {
             MaybeTls::Tls(_) => "https",
         }
     }
+
+    /// See [`TlsSettings::set_default_alpn_protocols`]. A no-op when TLS is not enabled.
+    pub fn set_default_alpn_protocols(&mut self, protocols: &[&str]) -> Result<()> {
+        if let MaybeTls::Tls(tls) = self {
+            tls.set_default_alpn_protocols(protocols)?;
+        }
+        Ok(())
+    }
 }
 
 impl From<TlsSettings> for MaybeTlsSettings {
@@ -736,6 +765,34 @@ mod test {
         let settings =
             TlsSettings::from_options(Some(&options)).expect("Failed to parse alpn_protocols");
         assert_eq!(settings.alpn_protocols, Some(vec![2, 104, 50]));
+    }
+
+    #[test]
+    fn set_default_alpn_protocols_applies_when_unset() {
+        let mut settings = TlsSettings::from_options(None).unwrap();
+        settings.set_default_alpn_protocols(&["h2"]).unwrap();
+        assert_eq!(settings.alpn_protocols, Some(vec![2, 104, 50]));
+    }
+
+    #[test]
+    fn set_default_alpn_protocols_preserves_explicit_config() {
+        let options = TlsConfig {
+            alpn_protocols: Some(vec![String::from("http/1.1")]),
+            ..Default::default()
+        };
+        let mut settings = TlsSettings::from_options(Some(&options)).unwrap();
+        settings.set_default_alpn_protocols(&["h2"]).unwrap();
+        assert_eq!(
+            settings.alpn_protocols,
+            Some(vec![8, 104, 116, 116, 112, 47, 49, 46, 49])
+        );
+    }
+
+    #[test]
+    fn maybe_tls_settings_set_default_alpn_protocols_is_noop_without_tls() {
+        let mut settings = MaybeTlsSettings::Raw(());
+        settings.set_default_alpn_protocols(&["h2"]).unwrap();
+        assert!(matches!(settings, MaybeTlsSettings::Raw(())));
     }
 
     #[test]
