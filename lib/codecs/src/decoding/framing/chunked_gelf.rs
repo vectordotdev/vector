@@ -451,9 +451,11 @@ impl ChunkedGelfDecoder {
             src.advance(2);
             self.decode_chunk(src)?
         } else {
+            // Slice defensively: a frame here is only known to be non-empty, and one shorter
+            // than the magic is reachable from an unauthenticated sender.
             trace!(
-                "Received an unchunked GELF message. First two bytes of message: {:?}",
-                &src[0..2]
+                "Received an unchunked GELF message. First bytes of message: {:?}",
+                &src[..src.len().min(GELF_MAGIC.len())]
             );
             Some(src)
         };
@@ -813,6 +815,21 @@ mod tests {
         assert!(logs_contain(
             "Message was not fully received within the timeout window. Discarding it"
         ));
+    }
+
+    #[rstest]
+    #[case::one_byte(&b"x"[..])]
+    #[case::two_bytes(&b"xy"[..])]
+    #[tokio::test]
+    #[traced_test]
+    async fn decode_short_unchunked_frame_does_not_panic(#[case] payload: &[u8]) {
+        // The trace log on that branch formats two bytes. `traced_test` enables the level.
+        let mut src = BytesMut::from(payload);
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let frame = decoder.decode_eof(&mut src).expect("must not fail");
+
+        assert_eq!(frame, Some(Bytes::copy_from_slice(payload)));
     }
 
     #[tokio::test]
