@@ -40,8 +40,9 @@
         {{ if and (ne $version "nightly") .legacy_download_url .legacy_max_minor }}
           {{/* Historical Vector releases on this site are all 0.x. */}}
           {{ $versionParts := split $version "." }}
+          {{ $majorVersion := int (index $versionParts 0) }}
           {{ $minorVersion := int (index $versionParts 1) }}
-          {{ if le $minorVersion .legacy_max_minor }}
+          {{ if and (eq $majorVersion 0) (le $minorVersion .legacy_max_minor) }}
             {{ $url = .legacy_download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
           {{ end }}
         {{ end }}

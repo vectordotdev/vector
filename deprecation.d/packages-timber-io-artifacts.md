@@ -20,9 +20,10 @@ The Vector installer and the download instructions on
 
 | Artifact | Migration outcome |
 | --- | --- |
-| Stable Vector releases, installers, and package-manager downloads | Migrated to `dd-cose-releases` under `vector/<version>/` |
-| `packages.timber.io/vector` versioned, `latest`, and version-alias URLs | Removed after the deprecation period |
-| Existing nightly and custom builds | Will be deleted; not migrated |
+| Stable Vector releases, installers, and package-manager downloads | Migrated to exact-version paths under `dd-cose-releases/vector/<version>/`; COSE does not provide stable `latest` or `.X` aliases |
+| `packages.timber.io/vector` versioned, `latest`, and version-alias URLs | Remain readable after publishing stops; final removal follows a separately announced retention and decommission date |
+| Existing nightly builds | Not migrated; old-bucket builds older than seven days will be deleted |
+| Existing custom builds | Not migrated; removed only after consumer and retention checks |
 | Future nightly and custom builds | Published to `dd-cose-releases` under `vector/nightly/` and `vector/custom/` |
 | Helm charts | [GitHub Release assets](https://github.com/vectordotdev/helm-charts/releases); `https://helm.vector.dev` remains the Helm repository index |
-| Legacy Timber agent, CLI, and CloudWatch Lambda artifacts | Will be deleted; not migrated |
+| Legacy Timber agent, CLI, and CloudWatch Lambda artifacts | Not migrated; removed only after consumer and retention checks |
