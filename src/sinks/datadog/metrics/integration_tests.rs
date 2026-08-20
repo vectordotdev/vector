@@ -7,7 +7,7 @@ use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},

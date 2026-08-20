@@ -17,13 +17,14 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformContext,
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
+        TransformContext, ValidatedSink,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
         Healthcheck, VectorSink,
-        splunk_hec::common::SplunkHecDefaultBatchSettings,
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        splunk_hec::{common::SplunkHecDefaultBatchSettings, logs::config::ValidatedHecLogsSink},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
     template::Template,
     tls::TlsConfig,
@@ -67,7 +68,7 @@ pub struct HumioMetricsConfig {
         docs::examples = "http://127.0.0.1",
         docs::examples = "https://example.com",
     ))]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The source of events sent to this sink.
     ///
@@ -80,7 +81,7 @@ pub struct HumioMetricsConfig {
     #[configurable(metadata(
         docs::examples = "json",
         docs::examples = "none",
-        docs::examples = "{{ event_type }}"
+        docs::examples = "event_type-{{ event_type }}"
     ))]
     event_type: Option<Template>,
 
@@ -113,7 +114,10 @@ pub struct HumioMetricsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
+    #[configurable(metadata(
+        docs::examples = "index-{{ host }}",
+        docs::examples = "custom_index"
+    ))]
     index: Option<Template>,
 
     #[configurable(derived)]
@@ -143,16 +147,16 @@ pub struct HumioMetricsConfig {
     pub confinement: crate::template::ConfinementConfig,
 }
 
-fn default_endpoint() -> String {
-    HOST.to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse(HOST).expect("static default endpoint should be a valid http(s) URL")
 }
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(indoc! {r#"
-                host_key = "hostname"
-                token = "${HUMIO_TOKEN}"
-            "#})
+        serde_yaml::from_str(indoc! {r#"
+            host_key: hostname
+            token: ${HUMIO_TOKEN}
+        "#})
         .unwrap()
     }
 }
@@ -160,12 +164,65 @@ impl GenerateConfig for HumioMetricsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::metric()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedHumioMetrics {
+    hec: ValidatedHecLogsSink,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HumioMetricsConfig {
+    type Validated = ValidatedHumioMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedHumioMetrics> {
+        let humio_logs = self.build_humio_logs_config();
+        let validated = humio_logs.validate_with_component_name(Self::NAME)?;
+        Ok(ValidatedHumioMetrics { hec: validated.hec })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHumioMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self
             .transform
             .build_transform(&TransformContext::new_with_globals(cx.globals.clone()));
 
-        let sink = HumioLogsConfig {
+        let humio_logs = self.build_humio_logs_config();
+
+        // Route through the inner Humio helper threaded with our own component
+        // type, so per-template security warnings carry `humio_metrics` rather
+        // than the delegated `humio_logs`/`splunk_hec_logs`.
+        let (sink, healthcheck) = humio_logs.build_from_validated(cx, &validated.hec)?;
+
+        let sink = HumioMetricsSink {
+            inner: sink,
+            transform,
+        };
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+    }
+}
+
+impl HumioMetricsConfig {
+    fn build_humio_logs_config(&self) -> HumioLogsConfig {
+        HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
             source: self.source.clone(),
@@ -189,30 +246,7 @@ impl SinkConfig for HumioMetricsConfig {
                 Some(lookup::owned_value_path!("timestamp")),
             ),
             confinement: self.confinement.clone(),
-        };
-
-        // Route through the inner Humio helper threaded with our own component
-        // type, so per-template security warnings carry `humio_metrics` rather
-        // than the delegated `humio_logs`/`splunk_hec_logs`.
-        let (sink, healthcheck) = sink.build_with_component_type(cx, Self::NAME)?;
-
-        let sink = HumioMetricsSink {
-            inner: sink,
-            transform,
-        };
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::metric()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        }
     }
 }
 
@@ -266,6 +300,31 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_unconfined_template() {
+        use crate::config::ValidatedSink;
+
+        let config = HumioMetricsConfig {
+            transform: MetricToLogConfig::default(),
+            token: "token".to_string().into(),
+            endpoint: default_endpoint(),
+            source: None,
+            event_type: None,
+            host_key: config_host_key(),
+            indexed_fields: vec![],
+            index: Some("{{ index }}".try_into().unwrap()),
+            compression: Compression::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            confinement: Default::default(),
+        };
+
+        let result = config.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_endpoint_field() {
         let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
@@ -274,7 +333,10 @@ mod tests {
         "#})
         .unwrap();
 
-        assert_eq!("https://localhost:9200/".to_string(), config.endpoint);
+        assert_eq!(
+            HttpEndpoint::parse("https://localhost:9200/").unwrap(),
+            config.endpoint
+        );
         let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
@@ -282,7 +344,10 @@ mod tests {
         "#})
         .unwrap();
 
-        assert_eq!("https://localhost:9200/".to_string(), config.endpoint);
+        assert_eq!(
+            HttpEndpoint::parse("https://localhost:9200/").unwrap(),
+            config.endpoint
+        );
     }
 
     #[tokio::test]
@@ -296,9 +361,9 @@ mod tests {
         let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{addr}");
+        config.endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
@@ -362,9 +427,9 @@ mod tests {
         let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{addr}");
+        config.endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);

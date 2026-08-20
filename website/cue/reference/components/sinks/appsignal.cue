@@ -18,7 +18,6 @@ components: sinks: appsignal: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   100
 				max_bytes:    450_000_000
 				timeout_secs: 1.0

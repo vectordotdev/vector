@@ -147,6 +147,7 @@ jobs:
           rust: true
           protoc: true
           cue: true
+          prettier: true
           libsasl2: true
           cargo-cache: true
       - run: make check-generated-docs

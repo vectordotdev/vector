@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: nginx_metrics
+    endpoints:
+      - http://localhost:8000/basic_status
