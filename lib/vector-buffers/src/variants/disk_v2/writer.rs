@@ -286,6 +286,16 @@ impl FinalizerGuard {
         self.error_on_drop = false;
     }
 
+    /// Disarms the guard only after a visibility flush succeeds.
+    ///
+    /// If the flush fails, returning through `?` drops the still-armed guard and marks its
+    /// finalizers as errored.
+    fn complete_after_flush(mut self, flush_result: io::Result<()>) -> io::Result<()> {
+        flush_result?;
+        self.error_on_drop = false;
+        Ok(())
+    }
+
     /// Returns the finalizers for reattachment to the recovered record on buffer-full retry.
     fn into_inner(mut self) -> EventFinalizerGroups {
         self.error_on_drop = false;
@@ -298,6 +308,28 @@ impl Drop for FinalizerGuard {
         if self.error_on_drop {
             self.finalizers.update_status(EventStatus::Errored);
         }
+    }
+}
+
+#[cfg(test)]
+mod finalizer_guard_tests {
+    use super::FinalizerGuard;
+    use crate::test::SizedRecord;
+    use std::io;
+    use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus, Finalizable};
+
+    #[test]
+    fn errors_record_when_visibility_flush_fails() {
+        let mut record = SizedRecord::new(64);
+        let (batch, mut status) = BatchNotifier::new_with_receiver();
+        record.add_batch_notifier(batch);
+        let finalizers = FinalizerGuard::new(record.take_finalizer_groups());
+
+        let result = finalizers
+            .complete_after_flush(Err(io::Error::other("injected visibility flush failure")));
+
+        assert!(result.is_err());
+        assert_eq!(status.try_recv(), Ok(BatchStatus::Errored));
     }
 }
 
@@ -1734,10 +1766,24 @@ where
         &mut self,
         record: T,
     ) -> Result<TryWriteOutcome<T>, WriterError<T>> {
-        self.try_write_record_inner(record)
+        self.try_write_record_inner(record, false)
             .await
             .map(|inner| match inner {
                 // A zero-byte write is the sentinel for a silently dropped oversized record.
+                Ok(0) => TryWriteOutcome::Dropped,
+                Ok(_) => TryWriteOutcome::Written,
+                Err(record) => TryWriteOutcome::Full(record),
+            })
+    }
+
+    /// Attempts to write a record and waits for an accepted record to become visible to readers.
+    pub(crate) async fn try_write_record_and_flush(
+        &mut self,
+        record: T,
+    ) -> Result<TryWriteOutcome<T>, WriterError<T>> {
+        self.try_write_record_inner(record, true)
+            .await
+            .map(|inner| match inner {
                 Ok(0) => TryWriteOutcome::Dropped,
                 Ok(_) => TryWriteOutcome::Written,
                 Err(record) => TryWriteOutcome::Full(record),
@@ -1748,6 +1794,7 @@ where
     async fn try_write_record_inner(
         &mut self,
         mut record: T,
+        flush_after_write: bool,
     ) -> Result<Result<usize, T>, WriterError<T>> {
         // If the buffer is already full, we definitely can't complete this write.
         if self.is_buffer_full() {
@@ -1860,11 +1907,7 @@ where
             // We always return errors here because flushing the record won't return a recoverable
             // error like `DataFileFull`, as that gets checked during archiving. The guard fires
             // Errored automatically on `?` exit.
-            let result = writer.flush_record(token).await?;
-            // The record has been accepted by the file writer; disarm so finalizers resolve as
-            // Delivered. The flush result below independently controls when progress is published.
-            record_finalizers.disarm();
-            result
+            writer.flush_record(token).await?
         } else {
             // The record would not fit given the current size of the buffer, so we need to recover it from the
             // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
@@ -1893,6 +1936,18 @@ where
         // reader, after all shared state reflects the readable bytes.
         if let Some(flush_result) = flush_result {
             self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
+        }
+
+        if flush_after_write {
+            let flush_result = self.flush().await;
+            record_finalizers
+                .complete_after_flush(flush_result)
+                .context(IoSnafu)?;
+        } else {
+            // Direct `BufferWriter` callers retain the original buffered-write contract: once the
+            // writer owns the serialized record, its finalizers resolve as Delivered even if a
+            // separate later flush fails.
+            record_finalizers.disarm();
         }
 
         // A record at or above the write-buffer size forces the buffered writer to
@@ -1932,9 +1987,20 @@ where
     /// If an error occurred while writing the record, an error variant will be returned describing
     /// the error.
     #[instrument(skip_all, level = "debug")]
-    pub async fn write_record(&mut self, mut record: T) -> Result<usize, WriterError<T>> {
+    pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
+        self.write_record_inner(record, false).await
+    }
+
+    async fn write_record_inner(
+        &mut self,
+        mut record: T,
+        flush_after_write: bool,
+    ) -> Result<usize, WriterError<T>> {
         loop {
-            match self.try_write_record_inner(record).await? {
+            match self
+                .try_write_record_inner(record, flush_after_write)
+                .await?
+            {
                 Ok(bytes_written) => return Ok(bytes_written),
                 Err(old_record) => {
                     record = old_record;
@@ -1952,15 +2018,16 @@ where
     /// Writes a record, preserving whether the blocking write completed by dropping an unwritable
     /// record.
     ///
-    /// Unlike [`Self::try_write_record`], this waits for reader progress when the buffer is full.
+    /// Unlike [`Self::try_write_record`], this waits for reader progress when the buffer is full and
+    /// waits for an accepted record to become visible before resolving its finalizers.
     #[instrument(skip_all, level = "debug")]
-    pub async fn write_record_outcome(
+    pub(crate) async fn write_record_outcome_and_flush(
         &mut self,
         record: T,
     ) -> Result<TryWriteOutcome<T>, WriterError<T>> {
         // `write_record` reports a zero-byte write as the sentinel for an unwritable record that
         // was dropped; every other byte count means the record was written.
-        match self.write_record(record).await? {
+        match self.write_record_inner(record, true).await? {
             0 => Ok(TryWriteOutcome::Dropped),
             _ => Ok(TryWriteOutcome::Written),
         }

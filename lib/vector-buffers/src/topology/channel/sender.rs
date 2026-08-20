@@ -113,17 +113,9 @@ impl<T: Bufferable> DiskV2Sender<T> {
                 response,
             } => {
                 let result = if blocking {
-                    writer.write_record_outcome(item).await
+                    writer.write_record_outcome_and_flush(item).await
                 } else {
-                    writer.try_write_record(item).await
-                };
-                let result = match result {
-                    Ok(outcome) => writer
-                        .flush()
-                        .await
-                        .map(|()| outcome)
-                        .map_err(|source| disk_v2::WriterError::Io { source }),
-                    other => other,
+                    writer.try_write_record_and_flush(item).await
                 };
                 let shutting_down = matches!(&result, Err(disk_v2::WriterError::Shutdown));
                 let failed = result.is_err() && !shutting_down;
@@ -614,6 +606,61 @@ mod tests {
                     Ok(BatchStatus::Errored),
                     "a full item whose requester was cancelled must not resolve as Delivered",
                 );
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn disk_writer_returns_full_item_with_its_finalizers() {
+        with_temp_dir(|data_dir| {
+            let data_dir = data_dir.to_path_buf();
+
+            async move {
+                let config = DiskBufferConfigBuilder::from_path(data_dir)
+                    .max_buffer_size(4096)
+                    .max_data_file_size(1024)
+                    .max_record_size(1024)
+                    .build()
+                    .expect("disk buffer config should be valid");
+                let (writer, _reader) =
+                    Buffer::<SizedRecord>::from_config(config, BufferUsageHandle::noop())
+                        .await
+                        .expect("disk buffer should initialize");
+                let sender = DiskV2Sender::new(writer);
+
+                loop {
+                    let item = SizedRecord::new(128);
+                    match sender
+                        .write(item, false)
+                        .await
+                        .expect("nonblocking write should succeed")
+                    {
+                        TryWriteOutcome::Written => {}
+                        TryWriteOutcome::Full(_) => break,
+                        TryWriteOutcome::Dropped => panic!("record should fit in the buffer"),
+                    }
+                }
+
+                let mut full_item = SizedRecord::new(128);
+                let (batch, mut status) = BatchNotifier::new_with_receiver();
+                full_item.add_batch_notifier(batch);
+                let returned_item = match sender
+                    .write(full_item, false)
+                    .await
+                    .expect("nonblocking full write should succeed")
+                {
+                    TryWriteOutcome::Full(item) => item,
+                    TryWriteOutcome::Written => panic!("full buffer should reject the record"),
+                    TryWriteOutcome::Dropped => panic!("record should fit in the buffer"),
+                };
+
+                assert!(
+                    status.try_recv().is_err(),
+                    "returning the item must not finalize it"
+                );
+                drop(returned_item);
+                assert_eq!(status.await, BatchStatus::Delivered);
             }
         })
         .await;
