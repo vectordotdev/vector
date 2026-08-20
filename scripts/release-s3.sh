@@ -142,7 +142,6 @@ if [[ "$CHANNEL" == "nightly" ]]; then
 
   # Add "latest" nightly files
   echo "Uploading all artifacts to s3://$COSE_BUCKET/vector/nightly/latest"
-  cose_aws s3 rm --recursive "s3://$COSE_BUCKET/vector/nightly/latest"
   s3_copy cose_aws "$td_nightly" "s3://$COSE_BUCKET/vector/nightly/latest" --recursive
   echo "Uploaded archives"
 
