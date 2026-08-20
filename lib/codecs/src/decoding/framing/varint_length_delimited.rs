@@ -106,10 +106,9 @@ impl Decoder for VarintLengthDelimitedDecoder {
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // First, peek at the varint length prefix.
         let (length, prefix_length) = match self.decode_varint(src)? {
-            Some((length, prefix_length)) => (
-                usize::try_from(length).unwrap_or(usize::MAX),
-                prefix_length,
-            ),
+            Some((length, prefix_length)) => {
+                (usize::try_from(length).unwrap_or(usize::MAX), prefix_length)
+            }
             None => return Ok(None), // Incomplete varint
         };
 
