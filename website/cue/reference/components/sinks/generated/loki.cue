@@ -763,10 +763,9 @@ generated: components: sinks: loki: configuration: {
 		required: true
 		type: object: {
 			examples: [{
-				"\"*\"":             "{{ metadata }}"
-				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
-				source:              "vector"
-				"{{ event_field }}": "{{ some_other_event_field }}"
+				"event_{{ event_field }}": "value_{{ some_other_event_field }}"
+				"pod_labels_*":            "pod_labels_{{ kubernetes.pod_labels }}"
+				source:                    "vector"
 			}]
 			options: "*": {
 				description: "A Loki label."
@@ -1028,10 +1027,9 @@ generated: components: sinks: loki: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				"\"*\"":             "{{ metadata }}"
-				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
-				source:              "vector"
-				"{{ event_field }}": "{{ some_other_event_field }}"
+				"event_{{ event_field }}": "value_{{ some_other_event_field }}"
+				"pod_labels_*":            "pod_labels_{{ kubernetes.pod_labels }}"
+				source:                    "vector"
 			}]
 			options: "*": {
 				description: "Loki structured metadata."
