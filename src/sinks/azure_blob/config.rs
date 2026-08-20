@@ -254,7 +254,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             auth: None,
-            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;").into()),
             account_name: None,
             blob_endpoint: None,
             container_name: String::from("logs"),
