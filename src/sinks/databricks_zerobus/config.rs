@@ -155,7 +155,7 @@ pub struct ZerobusSinkConfig {
     /// [zerobus_endpoint]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#get-your-workspace-url-and-zerobus-ingest-endpoint
     #[configurable(metadata(docs::examples = "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com"))]
     #[configurable(metadata(docs::examples = "https://dbc-f6e5d4c3-b2a1.cloud.databricks.com"))]
-    pub unity_catalog_endpoint: String,
+    pub unity_catalog_endpoint: HttpEndpoint,
 
     /// Databricks authentication configuration.
     ///
@@ -203,7 +203,10 @@ impl GenerateConfig for ZerobusSinkConfig {
             )
             .expect("valid example ingestion endpoint"),
             table_name: "main.default.logs".to_string(),
-            unity_catalog_endpoint: "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com".to_string(),
+            unity_catalog_endpoint: HttpEndpoint::parse(
+                "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com",
+            )
+            .expect("valid example unity catalog endpoint"),
             auth: DatabricksAuthentication::OAuth {
                 client_id: SensitiveString::from("${DATABRICKS_CLIENT_ID}".to_string()),
                 client_secret: SensitiveString::from("${DATABRICKS_CLIENT_SECRET}".to_string()),
@@ -306,29 +309,11 @@ impl ZerobusSinkConfig {
             });
         }
 
-        if self.unity_catalog_endpoint.is_empty() {
-            return Err(ZerobusSinkError::ConfigError {
-                message: "unity_catalog_endpoint cannot be empty".to_string(),
-            });
-        }
-
-        // The build-time healthcheck resolves `{endpoint}/oidc/v1/token` and
-        // `{endpoint}/api/2.1/unity-catalog/tables/{name}` as `http::Uri`s, so the
-        // endpoint must be an absolute http(s) URL. Validate here (pure, env-free)
-        // so `vector validate --no-environment` catches misconfigurations at
-        // validate time instead of deferring to the healthcheck at build.
-        let uri = self
-            .unity_catalog_endpoint
-            .parse::<http::Uri>()
-            .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Invalid Unity Catalog endpoint URL: {}", e),
-            })?;
-        if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
-            return Err(ZerobusSinkError::ConfigError {
-                message: "Databricks Unity Catalog endpoint must be an absolute http(s) URL"
-                    .to_string(),
-            });
-        }
+        // `unity_catalog_endpoint` is an `HttpEndpoint`: deserialization already
+        // guarantees it is an absolute http(s) URL with a nonempty host and a
+        // valid numeric port (the healthcheck builds `{endpoint}/oidc/v1/token`
+        // and `{endpoint}/api/2.1/unity-catalog/tables/{name}` from it), so no
+        // further validation is needed here.
 
         // Validate authentication credentials
         match &self.auth {
@@ -397,7 +382,8 @@ mod tests {
         ZerobusSinkConfig {
             ingestion_endpoint: HttpEndpoint::parse("https://test.databricks.com").unwrap(),
             table_name: "test.default.logs".to_string(),
-            unity_catalog_endpoint: "https://test-workspace.databricks.com".to_string(),
+            unity_catalog_endpoint: HttpEndpoint::parse("https://test-workspace.databricks.com")
+                .unwrap(),
             auth: DatabricksAuthentication::OAuth {
                 client_id: SensitiveString::from("test-client-id".to_string()),
                 client_secret: SensitiveString::from("test-client-secret".to_string()),
@@ -549,63 +535,36 @@ auth:
     }
 
     #[test]
-    fn test_config_validation_empty_unity_catalog_endpoint() {
-        let mut config = create_test_config();
-        config.unity_catalog_endpoint = "".to_string();
-
-        let result = config.validate();
-        assert!(result.is_err());
-
-        if let Err(crate::sinks::databricks_zerobus::error::ZerobusSinkError::ConfigError {
-            message,
-        }) = result
-        {
-            assert!(message.contains("unity_catalog_endpoint cannot be empty"));
-        } else {
-            panic!("Expected ConfigError for empty unity_catalog_endpoint");
-        }
-    }
-
-    #[test]
-    fn test_config_validation_invalid_unity_catalog_endpoint_uri() {
-        let mut config = create_test_config();
-        config.unity_catalog_endpoint = "not a uri".to_string();
-
-        let result = config.validate();
-        assert!(result.is_err());
-
-        if let Err(crate::sinks::databricks_zerobus::error::ZerobusSinkError::ConfigError {
-            message,
-        }) = result
-        {
-            assert!(message.contains("Invalid Unity Catalog endpoint URL"));
-        } else {
-            panic!("Expected ConfigError for malformed unity_catalog_endpoint");
-        }
-    }
-
-    #[test]
-    fn test_config_validation_unity_catalog_endpoint_requires_scheme_and_authority() {
-        // The healthcheck builds absolute http(s) URLs from this value, so a
-        // relative path (no scheme/authority) or a non-http scheme must be
-        // rejected at validate time.
+    fn test_config_rejects_invalid_unity_catalog_endpoint() {
+        // `unity_catalog_endpoint` is an `HttpEndpoint`, so a malformed endpoint
+        // is rejected at deserialization time (config load) rather than at
+        // validate time. `http::Uri` alone would accept an empty host
+        // (`http://:8080`) and a non-numeric port (`http://localhost:notaport`),
+        // both of which `HttpEndpoint` rejects.
         for bad in [
-            "my-unity-catalog",
+            "",
+            "not a uri",
             "//workspace.databricks.com",
             "ftp://workspace.databricks.com",
+            "http://:8080",
+            "http://localhost:notaport",
         ] {
-            let mut config = create_test_config();
-            config.unity_catalog_endpoint = bad.to_string();
-            let result = config.validate();
-            assert!(result.is_err(), "expected error for endpoint={bad:?}");
-            if let Err(crate::sinks::databricks_zerobus::error::ZerobusSinkError::ConfigError {
-                message,
-            }) = result
-            {
-                assert!(message.contains("absolute http(s) URL"));
-            } else {
-                panic!("Expected ConfigError for endpoint={bad:?}");
-            }
+            let config = format!(
+                r#"
+ingestion_endpoint: "https://test.databricks.com"
+table_name: "test.default.logs"
+unity_catalog_endpoint: {bad:?}
+auth:
+  strategy: oauth
+  client_id: "test-client-id"
+  client_secret: "test-client-secret"
+"#
+            );
+            let result: Result<ZerobusSinkConfig, _> = serde_yaml::from_str(&config);
+            assert!(
+                result.is_err(),
+                "expected deserialization error for endpoint={bad:?}"
+            );
         }
     }
 
