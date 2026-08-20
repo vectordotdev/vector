@@ -357,6 +357,17 @@ impl ValidatedSink for HttpSinkConfig {
             }
         }
 
+        // `Template::default()` — produced by delegating sinks such as
+        // `opentelemetry` before the user supplies a URI — yields an empty
+        // template whose `is_static` is false, so `is_dynamic()` reports true
+        // even though there is nothing to render. Reject the empty URI up
+        // front rather than deferring a guaranteed per-request failure.
+        if self.uri.is_empty() {
+            return Err("uri must not be empty, e.g. `https://example.com/endpoint`"
+                .to_string()
+                .into());
+        }
+
         // A static URI can be parsed and checked for embedded credentials up
         // front; dynamic URIs are only validated at render time.
         if !self.uri.is_dynamic() {
@@ -667,6 +678,29 @@ mod tests {
         config
             .validate()
             .expect("dynamic uri validation is deferred to render time");
+    }
+
+    #[test]
+    fn validate_rejects_empty_default_uri() {
+        use crate::config::ValidatedSink;
+        // `Template::default()` — produced by delegating sinks such as
+        // `opentelemetry` before the user supplies a URI — is empty but reports
+        // `is_dynamic() == true` (the derived default leaves `is_static` false),
+        // so it must be rejected explicitly rather than deferred as a dynamic
+        // template that can never render.
+        let mut config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        config.uri = Template::default();
+        assert!(
+            config.validate().is_err(),
+            "empty default uri should fail validation"
+        );
     }
 
     #[test]
