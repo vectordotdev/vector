@@ -137,7 +137,7 @@ impl MessageState {
         let chunk_bitmap_id = 1 << sequence_number;
         self.chunks_bitmap |= chunk_bitmap_id;
         self.current_length += chunk.remaining();
-        self.chunks[sequence_number as usize] = chunk;
+        self.chunks[sequence_number as usize] = Bytes::copy_from_slice(&chunk);
     }
 
     fn is_complete(&self) -> bool {
@@ -148,18 +148,20 @@ impl MessageState {
         self.current_length
     }
 
-    fn retrieve_message(&self) -> Option<Bytes> {
-        if self.is_complete() {
-            self.timeout_task.abort();
-            let chunks = &self.chunks[0..self.total_chunks as usize];
-            let mut message = BytesMut::new();
-            for chunk in chunks {
-                message.extend_from_slice(chunk);
-            }
-            Some(message.freeze())
-        } else {
-            None
+    /// Peak is ~2x the message: a contiguous destination coexists with the chunks it copies
+    /// from. Reserving exactly keeps a growing buffer from adding slack on top of that.
+    fn retrieve_message(&mut self) -> Option<Bytes> {
+        if !self.is_complete() {
+            return None;
         }
+
+        self.timeout_task.abort();
+        let mut message = BytesMut::with_capacity(self.current_length);
+        for chunk in &mut self.chunks[0..self.total_chunks as usize] {
+            message.extend_from_slice(chunk);
+            *chunk = Bytes::new();
+        }
+        Some(message.freeze())
     }
 }
 
@@ -295,7 +297,7 @@ pub struct ChunkedGelfDecoder {
     // message, so we have to read all the bytes from the message (datagram)
     bytes_decoder: BytesDecoder,
     decompression_config: ChunkedGelfDecompressionConfig,
-    state: Arc<Mutex<HashMap<u64, MessageState>>>,
+    state: Arc<Mutex<HashMap<u64, Box<MessageState>>>>,
     timeout: Duration,
     pending_messages_limit: Option<usize>,
     max_length: Option<usize>,
@@ -399,7 +401,7 @@ impl ChunkedGelfDecoder {
                     );
                 }
             });
-            MessageState::new(total_chunks, timeout_handle)
+            Box::new(MessageState::new(total_chunks, timeout_handle))
         });
 
         ensure!(
@@ -1001,6 +1003,44 @@ mod tests {
             timeout_task.is_finished(),
             "the timeout task must be aborted when the message is dropped",
         );
+    }
+
+    #[tokio::test]
+    async fn add_chunk_does_not_retain_the_source_buffer() {
+        // `BytesDecoder` slices the read buffer without copying, so retaining it would pin
+        // the whole buffer (>= 8 KiB) per chunk.
+        let mut chunk = create_chunk(1u64, 0u8, 2u8, &"foo");
+        let source_range = chunk.as_ptr_range();
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        assert!(decoder.decode_eof(&mut chunk).unwrap().is_none());
+
+        let state = decoder.state.lock().unwrap();
+        let message_state = state.values().next().expect("message pending");
+        let stored = message_state.chunks[0].as_ptr();
+        assert!(
+            !source_range.contains(&stored),
+            "the stored chunk must not alias the decoder's input buffer"
+        );
+    }
+
+    #[tokio::test]
+    async fn retrieve_message_releases_chunks_while_assembling() {
+        // Does not lower the 2x peak, just shortens how long the source side is held.
+        let mut state = MessageState::new(2, tokio::spawn(async {}));
+        state.add_chunk(0, Bytes::from_static(b"foo"));
+        state.add_chunk(1, Bytes::from_static(b"bar"));
+
+        let message = state
+            .retrieve_message()
+            .expect("message should be complete");
+
+        assert_eq!(message, Bytes::from_static(b"foobar"));
+        assert!(
+            state.chunks[..2].iter().all(Bytes::is_empty),
+            "each chunk must be released as it is copied"
+        );
+        assert_eq!(state.current_length(), 6);
     }
 
     #[rstest]
