@@ -367,7 +367,12 @@ impl ChunkedGelfDecoder {
 
         let mut state_lock = self.state.lock().expect("poisoned lock");
 
-        if let Some(pending_messages_limit) = self.pending_messages_limit {
+        // Only a new message grows the table, so the limit applies on insert. Checking it
+        // before the lookup rejected chunks of messages already pending, which could then
+        // never complete and expired instead.
+        if !state_lock.contains_key(&message_id)
+            && let Some(pending_messages_limit) = self.pending_messages_limit
+        {
             ensure!(
                 state_lock.len() < pending_messages_limit,
                 PendingMessagesLimitReachedSnafu {
@@ -932,6 +937,33 @@ mod tests {
             }
         ));
         assert!(decoder.state.lock().unwrap().len() == 1);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn decode_accepts_chunks_of_pending_messages_at_the_limit(
+        two_chunks_message: ([BytesMut; 2], String),
+        three_chunks_message: ([BytesMut; 3], String),
+    ) {
+        // The limit bounds how many messages may be pending, not which chunks are accepted.
+        let (mut two_chunks, two_chunks_expected) = two_chunks_message;
+        let (mut three_chunks, _) = three_chunks_message;
+        let mut decoder = ChunkedGelfDecoder {
+            pending_messages_limit: Some(1),
+            ..Default::default()
+        };
+
+        let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
+        assert!(frame.is_none());
+        assert_eq!(decoder.state.lock().unwrap().len(), 1);
+
+        // The table is full, so a new message id is rejected.
+        assert!(decoder.decode_eof(&mut three_chunks[0]).is_err());
+
+        // ...but the pending message still completes.
+        let frame = decoder.decode_eof(&mut two_chunks[1]).unwrap();
+        assert_eq!(frame, Some(Bytes::from(two_chunks_expected)));
+        assert_eq!(decoder.state.lock().unwrap().len(), 0);
     }
 
     #[rstest]
