@@ -77,8 +77,11 @@ publish_release_artifacts() {
     echo "Uploading artifacts to s3://$bucket/vector/$version_prefix/"
     s3_copy "$client" "$td" "s3://$bucket/vector/$version_prefix/" --recursive
 
-    if [[ "$client" == "legacy_aws" ]] &&
-       [[ "$version_prefix" == "${VERSION_MAJOR_X}" || "$version_prefix" == "${VERSION_MINOR_X}" || "$version_prefix" == "latest" ]] ; then
+    # `latest` is mutable in both buckets, so remove aliases that are no longer
+    # produced by the current build. Only legacy publishes mutable X prefixes.
+    if [[ "$version_prefix" == "latest" ]] ||
+       [[ "$client" == "legacy_aws" &&
+          ( "$version_prefix" == "${VERSION_MAJOR_X}" || "$version_prefix" == "${VERSION_MINOR_X}" ) ]] ; then
         echo "Deleting old artifacts from s3://$bucket/vector/$version_prefix/"
         "$client" s3 rm "s3://$bucket/vector/$version_prefix/" --recursive --exclude "*$VERSION_EXACT*"
         echo "Deleted old versioned artifacts"
@@ -173,8 +176,7 @@ elif [[ "$CHANNEL" == "release" ]]; then
   done
 
   # The COSE bucket exposes immutable exact releases and one floating stable
-  # channel. Updating an alias only requires PutObject; historical objects do
-  # not need to be deleted.
+  # channel. Only the mutable latest prefix is pruned when it is updated.
   for i in "$VERSION_EXACT" "latest"; do
     publish_release_artifacts cose_aws "$COSE_BUCKET" "$i"
   done
