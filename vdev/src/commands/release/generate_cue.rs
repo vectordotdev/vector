@@ -1032,10 +1032,10 @@ mod tests {
             package metadata
 
             versions: [string, ...string] & [
-            	"0.10.0",
-            	"0.9.1",
-            	"0.9.0",
-            	"0.8.2",
+            "0.10.0",
+            "0.9.1",
+            "0.9.0",
+            "0.8.2",
             ]
         "#};
         assert_eq!(out, expected);
@@ -1097,8 +1097,8 @@ mod tests {
             package metadata
 
             versions: [string, ...string] & [
-            	"0.15.0",
-            	"0.14.1",
+            "0.15.0",
+            "0.14.1",
             ]
         "#};
         fs::write(versions_cue_dir.join("versions.cue"), existing).unwrap();
