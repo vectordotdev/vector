@@ -99,13 +99,7 @@ build() {
 echo "Building Docker images for $REPOS"
 
 if [[ "$CHANNEL" == "release" ]]; then
-  VERSION_EXACT="$VERSION"
-  # shellcheck disable=SC2001
-  VERSION_MINOR_X=$(echo "$VERSION" | sed 's/\.[0-9]*$/.X/g')
-  # shellcheck disable=SC2001
-  VERSION_MAJOR_X=$(echo "$VERSION" | sed 's/\.[0-9]*\.[0-9]*$/.X/g')
-
-  for VERSION_TAG in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" latest; do
+  for VERSION_TAG in "$VERSION" latest; do
     build alpine "$VERSION_TAG"
     build debian "$VERSION_TAG"
     build distroless-static "$VERSION_TAG"

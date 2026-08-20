@@ -77,7 +77,8 @@ publish_release_artifacts() {
     echo "Uploading artifacts to s3://$bucket/vector/$version_prefix/"
     s3_copy "$client" "$td" "s3://$bucket/vector/$version_prefix/" --recursive
 
-    if [[ "$version_prefix" == "${VERSION_MAJOR_X}" || "$version_prefix" == "${VERSION_MINOR_X}" || "$version_prefix" == "latest" ]] ; then
+    if [[ "$client" == "legacy_aws" ]] &&
+       [[ "$version_prefix" == "${VERSION_MAJOR_X}" || "$version_prefix" == "${VERSION_MINOR_X}" || "$version_prefix" == "latest" ]] ; then
         echo "Deleting old artifacts from s3://$bucket/vector/$version_prefix/"
         "$client" s3 rm "s3://$bucket/vector/$version_prefix/" --recursive --exclude "*$VERSION_EXACT*"
         echo "Deleted old versioned artifacts"
@@ -165,8 +166,16 @@ elif [[ "$CHANNEL" == "release" ]]; then
   # shellcheck disable=SC2001
   VERSION_MAJOR_X="$(echo "$VERSION" | sed 's/\.[0-9]*\.[0-9]*$/.X/g')"
 
+  # Preserve all existing release paths in the legacy bucket during the
+  # migration window.
   for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" "latest"; do
     publish_release_artifacts legacy_aws "$LEGACY_BUCKET" "$i"
+  done
+
+  # The COSE bucket exposes immutable exact releases and one floating stable
+  # channel. Updating an alias only requires PutObject; historical objects do
+  # not need to be deleted.
+  for i in "$VERSION_EXACT" "latest"; do
     publish_release_artifacts cose_aws "$COSE_BUCKET" "$i"
   done
 
@@ -189,6 +198,8 @@ elif [[ "$CHANNEL" == "release" ]]; then
     verify_artifact \
       "https://packages.timber.io/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
       "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
+  done
+  for i in "$VERSION_EXACT" "latest"; do
     verify_artifact \
       "$COSE_PUBLIC_URL/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
       "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
