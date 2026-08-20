@@ -11384,6 +11384,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3"
+dependencies = [
+ "proc-macro2 1.0.106",
+ "quote 1.0.45",
+ "unicode-ident",
+]
+
+[[package]]
 name = "sync_wrapper"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12915,7 +12926,7 @@ dependencies = [
  "serde_yaml",
  "sha2 0.11.0",
  "strum 0.28.0",
- "syn 2.0.117",
+ "syn 3.0.3",
  "tempfile",
  "toml",
  "toml_edit 0.23.9",
