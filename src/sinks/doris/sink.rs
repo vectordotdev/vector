@@ -17,13 +17,7 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    /// Creates a new `DorisSink` from pre-validated values.
-    ///
-    /// Batch settings and confined templates are computed during the
-    /// `ValidatedSink::validate` phase and passed in here, so `build` does not
-    /// recompute them.
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn new(
+    pub const fn new(
         service: S,
         batch_settings: BatcherSettings,
         database: ConfinedTemplate,
