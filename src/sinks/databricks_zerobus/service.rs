@@ -317,7 +317,7 @@ impl ZerobusService {
         proxy: &ProxyConfig,
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
             .unity_catalog_url(&config.unity_catalog_endpoint)
             .application_name(config.user_agent_suffix());
         builder = builder.connector_factory(build_connector_factory(proxy)?);
@@ -586,7 +586,7 @@ impl ZerobusService {
         config.validate()?;
 
         let sdk = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
             .unity_catalog_url(&config.unity_catalog_endpoint)
             .build()
             .map_err(|e| ZerobusSinkError::ConfigError {
@@ -703,12 +703,13 @@ mod tests {
     use crate::sinks::databricks_zerobus::config::{
         DatabricksAuthentication, ZerobusStreamOptions,
     };
+    use crate::sinks::util::HttpEndpoint;
     use databricks_zerobus_ingest_sdk::ZerobusError;
     use vector_lib::sensitive_string::SensitiveString;
 
     fn test_config() -> ZerobusSinkConfig {
         ZerobusSinkConfig {
-            ingestion_endpoint: "https://127.0.0.1:1".to_string(),
+            ingestion_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),
             table_name: "test.default.logs".to_string(),
             unity_catalog_endpoint: "https://127.0.0.1:1".to_string(),
             auth: DatabricksAuthentication::OAuth {
