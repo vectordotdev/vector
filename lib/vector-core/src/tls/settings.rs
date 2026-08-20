@@ -302,25 +302,17 @@ impl TlsSettings {
                 }
             }
         }
-        if self.authorities.is_empty() {
+        if self.should_load_native_roots(for_server) {
             debug!("Fetching system root certs.");
 
             cfg_if! {
                 if #[cfg(windows)] {
-                    load_windows_certs(context).unwrap();
+                    load_windows_certs(context)?;
                 } else if #[cfg(target_os = "macos")] {
-                    cfg_if! { // Panic in release builds, warn in debug builds.
-                        if #[cfg(debug_assertions)] {
-                            if let Err(error) = load_mac_certs(context) {
-                                warn!("Failed to load macOS certs: {error}");
-                            }
-                        } else {
-                            load_mac_certs(context).unwrap();
-                        }
-                    }
+                    load_mac_certs(context)?;
                 }
             }
-        } else {
+        } else if !self.authorities.is_empty() {
             let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
             for authority in &self.authorities {
                 store
@@ -350,6 +342,11 @@ impl TlsSettings {
         }
 
         Ok(())
+    }
+
+    fn should_load_native_roots(&self, for_server: bool) -> bool {
+        self.authorities.is_empty()
+            && (self.verify_certificate || (!for_server && self.identity.is_some()))
     }
 
     /// Apply per-connection TLS settings.
@@ -837,6 +834,37 @@ mod test {
         let settings = TlsSettings::from_options(None).expect("Failed to generate null settings");
         assert!(settings.identity.is_none());
         assert_eq!(settings.authorities.len(), 0);
+    }
+
+    #[test]
+    fn apply_context_skips_system_roots_when_verification_is_disabled() {
+        use openssl::ssl::SslMethod;
+
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            verify_certificate: Some(false),
+            ..Default::default()
+        }))
+        .expect("Failed to generate TLS settings");
+        let mut context = SslContextBuilder::new(SslMethod::tls()).unwrap();
+
+        // In particular, this must not access the macOS keychain or Windows certificate store.
+        settings
+            .apply_context(&mut context)
+            .expect("TLS context setup should not load native roots when verification is off");
+    }
+
+    #[test]
+    fn client_identity_loads_system_roots_when_verification_is_disabled() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            verify_certificate: Some(false),
+            crt_file: Some(TEST_PEM_CLIENT_CRT_PATH.into()),
+            key_file: Some(TEST_PEM_CLIENT_KEY_PATH.into()),
+            ..Default::default()
+        }))
+        .expect("Failed to load client identity");
+
+        // Avoid native certificate-store access in this unit test.
+        assert!(settings.should_load_native_roots(false));
     }
 
     #[test]

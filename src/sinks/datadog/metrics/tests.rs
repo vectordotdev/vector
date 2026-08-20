@@ -19,6 +19,20 @@ use crate::{
 };
 
 #[tokio::test]
+async fn pure_validation_does_not_load_tls_files_but_full_build_does() {
+    let config = indoc! {r#"
+        default_api_key = "local-key"
+        tls.enabled = true
+        tls.ca_file = "/definitely/missing/vector-datadog-ca.pem"
+    "#};
+    let (config, cx) =
+        load_sink_with_context::<DatadogMetricsConfig>(config, SinkContext::default()).unwrap();
+
+    assert!(crate::config::ValidatedSink::validate(&config).is_ok());
+    assert!(config.build(cx).await.is_err());
+}
+
+#[tokio::test]
 async fn global_options() {
     let config = "";
     let cx = SinkContext {

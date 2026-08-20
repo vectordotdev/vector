@@ -1,20 +1,16 @@
 use std::sync::{Arc, Mutex};
 
+use futures_util::FutureExt;
 use indoc::indoc;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
-use vector_lib::{
-    config::{AcknowledgementsConfig, proxy::ProxyConfig},
-    configurable::configurable_component,
-    stream::BatcherSettings,
-};
+use vector_lib::{config::AcknowledgementsConfig, configurable::configurable_component};
 
 use super::{
-    apm_stats::{Aggregator, flush_apm_stats_thread},
+    apm_stats::{Aggregator, flush_apm_stats},
     service::TraceApiRetry,
 };
 use crate::{
-    common::datadog,
     config::{DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
@@ -28,10 +24,9 @@ use crate::{
         },
         util::{
             BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
-            service::ServiceBuilderExt,
+            TowerRequestSettings, service::ServiceBuilderExt,
         },
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 3.2MB for uncompressed payloads.
@@ -71,6 +66,12 @@ pub struct DatadogTracesConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedDatadogTraces {
+    batcher_settings: vector_lib::stream::BatcherSettings,
+    request_limits: TowerRequestSettings,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -132,14 +133,13 @@ impl DatadogTracesConfig {
         &self,
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
-        batcher_settings: BatcherSettings,
+        validated: &ValidatedDatadogTraces,
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
-        let request_limits = self.request.into_settings();
         let endpoints = self.generate_traces_endpoint_configuration(dd_common)?;
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, TraceApiRetry)
+            .settings(validated.request_limits.clone(), TraceApiRetry)
             .service(TraceApiService::new(client.clone()));
 
         // Object responsible for caching/processing APM stats from incoming trace events.
@@ -157,45 +157,30 @@ impl DatadogTracesConfig {
         )?;
 
         // shutdown= Sender that the sink signals when input stream is exhausted.
-        // tripwire= Receiver that APM stats flush thread listens for exit signal on.
+        // tripwire= Receiver that the APM stats flusher listens for the exit signal on.
         let (shutdown, tripwire) = channel::<Sender<()>>();
 
-        let sink = TracesSink::new(
-            service,
-            request_builder,
-            batcher_settings,
-            shutdown,
-            endpoints.traces_endpoint.protocol().to_string(),
-        );
-
-        // Send the APM stats payloads independently of the sink framework.
-        // This is necessary to comply with what the APM stats backend of Datadog expects with
-        // respect to receiving stats payloads.
-        crate::spawn_in_current_span(flush_apm_stats_thread(
+        // Construct the APM stats flusher here; `TracesSink::run` drives it so build spawns no task.
+        let protocol = endpoints.traces_endpoint.protocol().to_string();
+        let flusher = flush_apm_stats(
             tripwire,
             client,
             compression,
             endpoints,
             Arc::clone(&apm_stats_aggregator),
-        ));
+        )
+        .boxed();
+
+        let sink = TracesSink::new(
+            service,
+            request_builder,
+            validated.batcher_settings,
+            shutdown,
+            protocol,
+            flusher,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
-    }
-
-    pub fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let default_tls_config;
-
-        let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
-            }),
-            false,
-        )?;
-        Ok(HttpClient::new(tls_settings, proxy)?)
     }
 }
 
@@ -215,16 +200,17 @@ impl SinkConfig for DatadogTracesConfig {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ValidatedTraces {
-    batcher_settings: BatcherSettings,
-}
-
 #[async_trait::async_trait]
 impl ValidatedSink for DatadogTracesConfig {
-    type Validated = ValidatedTraces;
+    type Validated = ValidatedDatadogTraces;
 
-    fn validate(&self) -> crate::Result<ValidatedTraces> {
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        if self.local_dd_common.endpoint.is_some() {
+            self.local_dd_common.validate_endpoint()?;
+        } else if let Some(site) = self.local_dd_common.site.as_deref() {
+            HttpEndpoint::parse(&Self::traces_base_endpoint(None, site))?;
+        }
+
         let batcher_settings = self
             .batch
             .validate()?
@@ -232,27 +218,21 @@ impl ValidatedSink for DatadogTracesConfig {
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
-        let site = self
-            .local_dd_common
-            .site
-            .clone()
-            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
-        let base = Self::traces_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
-        HttpEndpoint::parse(&base)?;
-
-        Ok(ValidatedTraces { batcher_settings })
+        Ok(ValidatedDatadogTraces {
+            batcher_settings,
+            request_limits: self.request.into_settings(),
+        })
     }
 
     async fn build(
         &self,
-        validated: &ValidatedTraces,
+        validated: &Self::Validated,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
+        let dd_common = self.local_dd_common.with_globals_from(&cx)?;
+        let client = self.local_dd_common.build_client(&cx.proxy, true)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(&dd_common, client, validated.batcher_settings)?;
+        let sink = self.build_sink(&dd_common, client, validated)?;
 
         Ok((sink, healthcheck))
     }
@@ -286,6 +266,19 @@ mod test {
             local_dd_common: LocalDatadogCommonConfig::new(
                 Some("not a uri".to_string()),
                 None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_local_site_without_endpoint() {
+        let config = DatadogTracesConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                None,
+                Some("bad site".to_string()),
                 None,
             ),
             ..Default::default()

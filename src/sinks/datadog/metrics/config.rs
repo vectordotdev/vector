@@ -1,7 +1,5 @@
 use tower::ServiceBuilder;
-use vector_lib::{
-    config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings,
-};
+use vector_lib::{configurable::configurable_component, stream::BatcherSettings};
 
 use super::{
     request_builder::DatadogMetricsRequestBuilder,
@@ -9,7 +7,6 @@ use super::{
     sink::DatadogMetricsSink,
 };
 use crate::{
-    common::datadog,
     config::{
         AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
     },
@@ -19,10 +16,9 @@ use crate::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{
             HttpEndpoint, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
-            batch::BatchConfig,
+            TowerRequestSettings, batch::BatchConfig,
         },
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
@@ -194,6 +190,13 @@ pub struct DatadogMetricsConfig {
     pub request: TowerRequestConfig,
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedDatadogMetrics {
+    batcher_settings: BatcherSettings,
+    sketches_batcher_settings: BatcherSettings,
+    request_limits: TowerRequestSettings,
+}
+
 impl_generate_config_from_default!(DatadogMetricsConfig);
 
 #[async_trait::async_trait]
@@ -212,49 +215,37 @@ impl SinkConfig for DatadogMetricsConfig {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ValidatedMetrics {
-    batcher_settings: BatcherSettings,
-    sketches_batcher_settings: BatcherSettings,
-}
-
 #[async_trait::async_trait]
 impl ValidatedSink for DatadogMetricsConfig {
-    type Validated = ValidatedMetrics;
+    type Validated = ValidatedDatadogMetrics;
 
-    fn validate(&self) -> crate::Result<ValidatedMetrics> {
+    fn validate(&self) -> crate::Result<Self::Validated> {
         let (batcher_settings, sketches_batcher_settings) =
             resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
+        let request_limits = self.request.into_settings();
 
-        let site = self
-            .local_dd_common
-            .site
-            .clone()
-            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
-        let base = Self::metrics_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
-        HttpEndpoint::parse(&base)?;
+        if self.local_dd_common.endpoint.is_some() {
+            self.local_dd_common.validate_endpoint()?;
+        } else if let Some(site) = self.local_dd_common.site.as_deref() {
+            HttpEndpoint::parse(&Self::metrics_base_endpoint(None, site))?;
+        }
 
-        Ok(ValidatedMetrics {
+        Ok(ValidatedDatadogMetrics {
             batcher_settings,
             sketches_batcher_settings,
+            request_limits,
         })
     }
 
     async fn build(
         &self,
-        validated: &ValidatedMetrics,
+        validated: &Self::Validated,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
+        let dd_common = self.local_dd_common.with_globals_from(&cx)?;
+        let client = self.local_dd_common.build_client(&cx.proxy, true)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(
-            &dd_common,
-            client,
-            validated.batcher_settings,
-            validated.sketches_batcher_settings,
-        )?;
+        let sink = self.build_sink(&dd_common, client, validated)?;
 
         Ok((sink, healthcheck))
     }
@@ -295,36 +286,15 @@ impl DatadogMetricsConfig {
         ))
     }
 
-    fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let default_tls_config;
-
-        let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
-            }),
-            false,
-        )?;
-        let client = HttpClient::new(tls_settings, proxy)?;
-        Ok(client)
-    }
-
     fn build_sink(
         &self,
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
-        batcher_settings: BatcherSettings,
-        sketches_batcher_settings: BatcherSettings,
+        validated: &ValidatedDatadogMetrics,
     ) -> crate::Result<VectorSink> {
-        // TODO: revisit our concurrency and batching defaults
-        let request_limits = self.request.into_settings();
-
         let endpoint_configuration = self.generate_metrics_endpoint_configuration(dd_common)?;
         let service = ServiceBuilder::new()
-            .settings(request_limits, DatadogMetricsRetryLogic)
+            .settings(validated.request_limits.clone(), DatadogMetricsRetryLogic)
             .service(DatadogMetricsService::new(
                 client,
                 dd_common.default_api_key.inner(),
@@ -345,8 +315,8 @@ impl DatadogMetricsConfig {
         let sink = DatadogMetricsSink::new(
             service,
             request_builder,
-            batcher_settings,
-            sketches_batcher_settings,
+            validated.batcher_settings,
+            validated.sketches_batcher_settings,
             protocol,
             self.series_api_version,
         );
@@ -405,6 +375,19 @@ mod tests {
             local_dd_common: LocalDatadogCommonConfig::new(
                 Some("not a uri".to_string()),
                 None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_local_site_without_endpoint() {
+        let config = DatadogMetricsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                None,
+                Some("bad site".to_string()),
                 None,
             ),
             ..Default::default()

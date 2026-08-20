@@ -19,9 +19,9 @@ use crate::{
     sinks::util::{Compression, Compressor},
 };
 
-/// Flushes cached APM stats buckets to Datadog on a 10 second interval.
-/// When the sink signals this thread that it is shutting down, all remaining
-/// buckets are flush before the thread exits.
+/// Polls cached APM stats buckets and flushes them to Datadog on a 10 second interval.
+/// When the sink signals shutdown, all remaining buckets are force-flushed before this future
+/// acknowledges shutdown and completes.
 ///
 /// # arguments
 ///
@@ -30,7 +30,7 @@ use crate::{
 /// * `compression`              - Compression to use when creating the HTTP requests.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
 /// * `aggregator`               - The Aggregator object containing cached stats buckets.
-pub async fn flush_apm_stats_thread(
+pub async fn flush_apm_stats(
     mut tripwire: Receiver<Sender<()>>,
     client: HttpClient,
     compression: Compression,
@@ -48,7 +48,7 @@ pub async fn flush_apm_stats_thread(
     let mut interval =
         tokio::time::interval(std::time::Duration::from_nanos(BUCKET_DURATION_NANOSECONDS));
 
-    debug!("Starting APM stats flushing thread.");
+    debug!("Starting APM stats flusher.");
 
     loop {
         tokio::select! {
@@ -61,10 +61,9 @@ pub async fn flush_apm_stats_thread(
             // sink has signaled us that the process is shutting down
             Ok(sink_shutdown_ack_sender) => {
 
-                debug!("APM stats flushing thread received exit condition. Flushing remaining stats before exiting.");
+                debug!("APM stats flusher received shutdown. Flushing remaining stats before completing.");
                 sender.flush_apm_stats(true).await;
 
-                // signal the sink (who tripped the tripwire), that we are done flushing
                 _ = sink_shutdown_ack_sender.send(());
                 break;
             }

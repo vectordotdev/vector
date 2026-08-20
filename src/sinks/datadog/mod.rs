@@ -3,8 +3,10 @@ use http::{Request, StatusCode, Uri};
 use hyper::{body::Body, client::connect::Connect};
 use snafu::Snafu;
 use vector_lib::{
-    config::AcknowledgementsConfig, configurable::configurable_component,
-    sensitive_string::SensitiveString, tls::TlsEnableableConfig,
+    config::{AcknowledgementsConfig, proxy::ProxyConfig},
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 use super::Healthcheck;
@@ -102,6 +104,13 @@ impl LocalDatadogCommonConfig {
         }
     }
 
+    pub fn with_globals_from(
+        &self,
+        cx: &crate::config::SinkContext,
+    ) -> Result<DatadogCommonConfig, ConfigurationError> {
+        self.with_globals(cx.extra_context.get_or_default::<datadog::Options>())
+    }
+
     pub fn with_globals(
         &self,
         config: datadog::Options,
@@ -116,6 +125,36 @@ impl LocalDatadogCommonConfig {
                 .ok_or(ConfigurationError::ApiKeyRequired)?,
             acknowledgements: self.acknowledgements,
         })
+    }
+
+    pub fn validate_endpoint(&self) -> crate::Result<()> {
+        if let Some(endpoint) = &self.endpoint {
+            HttpEndpoint::parse(endpoint)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_endpoint_with_path(&self, path: &str) -> crate::Result<()> {
+        if let Some(endpoint) = &self.endpoint {
+            HttpEndpoint::parse(endpoint)?.append_path(path)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn build_client(
+        &self,
+        proxy: &ProxyConfig,
+        default_tls: bool,
+    ) -> crate::Result<HttpClient> {
+        let tls = match (self.tls.as_ref(), default_tls) {
+            (Some(config), _) => MaybeTlsSettings::from_config(Some(config), false)?,
+            (None, true) => MaybeTlsSettings::enable_client()?,
+            (None, false) => MaybeTlsSettings::from_config(None, false)?,
+        };
+
+        Ok(HttpClient::new(tls, proxy)?)
     }
 }
 
