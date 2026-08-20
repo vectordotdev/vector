@@ -1,27 +1,20 @@
 use indoc::indoc;
 use vector_config::component::GenerateConfig;
-use vector_lib::{
-    codecs::{
-        JsonSerializerConfig,
-        encoding::{FramingConfig, SerializerConfig},
-    },
-    configurable::configurable_component,
-};
+use vector_lib::{codecs::encoding::SerializerConfig, configurable::configurable_component};
 
 use crate::{
-    codecs::{EncodingConfigWithFraming, Transformer},
     config::{
         AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
-        http::config::{HttpMethod, HttpSinkConfig, ValidatedHttp},
+        http::config::{HttpSinkConfig, ValidatedHttp},
     },
 };
 
 /// Configuration for the `OpenTelemetry` sink.
 #[configurable_component(sink("opentelemetry", "Deliver OTLP data over HTTP."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct OpenTelemetryConfig {
     /// Protocol configuration
     #[configurable(derived)]
@@ -38,30 +31,6 @@ pub struct OpenTelemetryConfig {
 pub enum Protocol {
     /// Send data over HTTP.
     Http(HttpSinkConfig),
-}
-
-impl Default for Protocol {
-    fn default() -> Self {
-        Protocol::Http(HttpSinkConfig {
-            encoding: EncodingConfigWithFraming::new(
-                Some(FramingConfig::NewlineDelimited),
-                SerializerConfig::Json(JsonSerializerConfig::default()),
-                Transformer::default(),
-            ),
-            uri: Default::default(),
-            method: HttpMethod::Post,
-            auth: Default::default(),
-            compression: Default::default(),
-            payload_prefix: Default::default(),
-            payload_suffix: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            tls: Default::default(),
-            acknowledgements: Default::default(),
-            retry_strategy: Default::default(),
-            confinement: Default::default(),
-        })
-    }
 }
 
 impl GenerateConfig for OpenTelemetryConfig {
@@ -156,7 +125,8 @@ mod test {
 
     #[test]
     fn validate_produces_usable_state() {
-        let config = OpenTelemetryConfig::default();
+        let config: OpenTelemetryConfig =
+            serde_json::from_value(OpenTelemetryConfig::generate_config()).unwrap();
         config.validate().expect("validation should succeed");
     }
 }
