@@ -252,6 +252,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write # Required by the reusable publish workflow
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.event.review.commit_id }}
