@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 ARG HUGO_VERSION=0.154.5
-ARG CUE_VERSION=0.16.1
+ARG CUE_VERSION=0.17.1
 ARG NODE_VERSION=24
 
 ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"

@@ -10,7 +10,8 @@ use vrl::value::Kind;
 
 use super::{
     encoder::{
-        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+        StackdriverLabelConfig as EncoderLabelConfig, StackdriverLogsEncoder,
+        StackdriverResource as EncoderResource,
     },
     request_builder::StackdriverLogsRequestBuilder,
     service::StackdriverLogsServiceRequestBuilder,
@@ -30,7 +31,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::ConfinementConfig,
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 #[derive(Debug, Snafu)]
@@ -193,7 +194,7 @@ pub(super) struct StackdriverLabelConfig {
     ))]
     #[configurable(metadata(docs::examples = "labels_examples()"))]
     #[serde(default)]
-    pub(super) labels: HashMap<String, Template>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 fn labels_examples() -> HashMap<String, String> {
@@ -239,7 +240,7 @@ pub(super) struct StackdriverResource {
     #[serde(flatten)]
     #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
     #[configurable(metadata(docs::examples = "label_examples()"))]
-    pub(super) labels: HashMap<String, Template>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 fn label_examples() -> HashMap<String, String> {
@@ -284,37 +285,14 @@ impl ValidatedSink for StackdriverConfig {
             .clone()
             .confine(&self.confinement, Self::NAME, "log_id")?;
 
-        // Confine every label value template. Stackdriver identifies
-        // destinations by `resource.type + resource.labels`, so an event-
-        // controlled label like `resource.labels.zone: "{{ zone }}"` is as
-        // steerable as `log_id` unless we confine it too. Same for arbitrary
-        // log-entry labels in `label_config.labels`.
-        let resource = ConfinedStackdriverResource {
+        let resource = EncoderResource {
             type_: self.resource.type_.clone(),
-            labels: self
-                .resource
-                .labels
-                .clone()
-                .into_iter()
-                .map(|(k, v)| {
-                    v.confine(&self.confinement, Self::NAME, "resource.labels")
-                        .map(|v| (k, v))
-                })
-                .collect::<crate::Result<_>>()?,
+            labels: self.resource.labels.clone(),
         };
 
-        let label_config = ConfinedStackdriverLabelConfig {
+        let label_config = EncoderLabelConfig {
             labels_key: self.label_config.labels_key.clone(),
-            labels: self
-                .label_config
-                .labels
-                .clone()
-                .into_iter()
-                .map(|(k, v)| {
-                    v.confine(&self.confinement, Self::NAME, "label_config.labels")
-                        .map(|v| (k, v))
-                })
-                .collect::<crate::Result<_>>()?,
+            labels: self.label_config.labels.clone(),
         };
 
         let encoder = StackdriverLogsEncoder::new(
