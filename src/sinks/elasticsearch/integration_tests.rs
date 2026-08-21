@@ -60,21 +60,24 @@ fn aws_api_version() -> ElasticsearchApiVersion {
 
 fn aws_server() -> HttpEndpoint {
     HttpEndpoint::parse(
-        &std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into()),
+        &std::env::var("ELASTICSEARCH_AWS_ADDRESS")
+            .unwrap_or_else(|_| "http://localhost:4571".into()),
     )
     .unwrap()
 }
 
 fn http_server() -> HttpEndpoint {
     HttpEndpoint::parse(
-        &std::env::var("ELASTICSEARCH_HTTP_ADDRESS").unwrap_or_else(|_| "http://localhost:9200".into()),
+        &std::env::var("ELASTICSEARCH_HTTP_ADDRESS")
+            .unwrap_or_else(|_| "http://localhost:9200".into()),
     )
     .unwrap()
 }
 
 fn https_server() -> HttpEndpoint {
     HttpEndpoint::parse(
-        &std::env::var("ELASTICSEARCH_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:9201".into()),
+        &std::env::var("ELASTICSEARCH_HTTPS_ADDRESS")
+            .unwrap_or_else(|_| "https://localhost:9201".into()),
     )
     .unwrap()
 }
