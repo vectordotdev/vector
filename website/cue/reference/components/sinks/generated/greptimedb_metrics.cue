@@ -75,7 +75,7 @@ generated: components: sinks: greptimedb_metrics: configuration: {
 		type: string: {
 			default: "public"
 			examples: [
-				"public",
+				"public"
 			]
 		}
 	}

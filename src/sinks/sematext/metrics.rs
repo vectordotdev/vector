@@ -25,7 +25,7 @@ use crate::{
         Healthcheck, HealthcheckError, VectorSink,
         influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
-            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, EncodedEvent, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
         },
@@ -94,16 +94,18 @@ pub struct SematextMetricsConfig {
 
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(indoc! {r#"
-            default_namespace = "vector"
-            token = "${SEMATEXT_TOKEN}"
+        serde_yaml::from_str(indoc! {r#"
+            default_namespace: vector
+            token: ${SEMATEXT_TOKEN}
         "#})
         .unwrap()
     }
 }
 
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
-    let uri = format!("{endpoint}/health");
+    let uri = HttpEndpoint::parse(&endpoint)?
+        .append_path("health")?
+        .into_uri();
 
     let request = Request::get(uri)
         .body(Body::empty())
@@ -135,6 +137,7 @@ impl SinkConfig for SematextMetricsConfig {
         };
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
+        let endpoint = HttpEndpoint::parse(&endpoint)?;
         let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, client)?;
 
         Ok((sink, healthcheck))
@@ -149,7 +152,7 @@ impl SinkConfig for SematextMetricsConfig {
     }
 }
 
-fn write_uri(endpoint: &str) -> Result<Uri> {
+fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
     encode_uri(
         endpoint,
         "write",

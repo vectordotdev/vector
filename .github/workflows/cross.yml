@@ -15,7 +15,7 @@ jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       CARGO_INCREMENTAL: 0
       CARGO_PROFILE_RELEASE_LTO: thin # fat LTO OOMs/timeouts on standard 16GB runners; thin is sufficient to verify linking

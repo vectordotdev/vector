@@ -888,3 +888,47 @@ fn untagged_disjoint_variants_schema_uses_one_of() {
         })
     );
 }
+
+/// A struct where exactly one of two optional fields must be provided.
+#[derive(Clone, Debug)]
+#[configurable_component]
+struct RequiredOneOfConfig {
+    /// First option.
+    #[configurable(required_one_of = "group")]
+    source: Option<String>,
+
+    /// Second option.
+    #[configurable(required_one_of = "group")]
+    file: Option<String>,
+}
+
+#[test]
+fn required_one_of_generates_one_of_constraint() {
+    assert_eq!(
+        generate_test_schema::<RequiredOneOfConfig>(),
+        json!({
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "source": { "type": ["string", "null"] },
+                        "file":   { "type": ["string", "null"] }
+                    }
+                },
+                {
+                    "_required_one_of_constraint": true,
+                    "oneOf": [
+                        {
+                            "required": ["source"],
+                            "properties": { "source": { "not": { "type": "null" } } }
+                        },
+                        {
+                            "required": ["file"],
+                            "properties": { "file": { "not": { "type": "null" } } }
+                        }
+                    ]
+                }
+            ]
+        })
+    );
+}

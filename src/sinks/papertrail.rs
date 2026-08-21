@@ -56,10 +56,11 @@ fn default_process() -> UnconfinedTemplate {
 
 impl GenerateConfig for PapertrailConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"endpoint = "logs.papertrailapp.com:12345"
-            encoding.codec = "json""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: "logs.papertrailapp.com:12345"
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
@@ -209,7 +210,7 @@ mod tests {
         let mut config: PapertrailConfig =
             serde_json::from_value(PapertrailConfig::generate_config())
                 .expect("config should be valid");
-        config.endpoint = mock_endpoint.into();
+        config.endpoint = mock_endpoint.try_into().unwrap();
         config.tls = Some(TlsEnableableConfig::default());
 
         let context = SinkContext::default();

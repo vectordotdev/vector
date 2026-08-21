@@ -62,32 +62,30 @@ type CacheValue = (Program, String, MeaningList);
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
-    /// Required if `file` is missing.
-    ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(
-        docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
-        docs::required,
-        docs::syntax_override = "vrl_program"
-    ))]
+    #[configurable(
+        required_one_of = "program",
+        metadata(
+            docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
+            docs::syntax_override = "vrl_program"
+        )
+    )]
     pub source: Option<String>,
 
     /// File path to the [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
     /// If a relative path is provided, its root is the current working directory.
     ///
-    /// Required if `source` is missing.
-    ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(required_one_of = "program")]
     pub file: Option<PathBuf>,
 
     /// File paths to the [Vector Remap Language][vrl] (VRL) programs to execute for each event.
     ///
     /// If a relative path is provided, its root is the current working directory.
     ///
-    /// Required if `source` or `file` are missing.
-    ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(required_one_of = "program")]
     pub files: Option<Vec<PathBuf>>,
 
     /// When set to `single`, metric tag values are exposed as single strings, the
@@ -96,6 +94,11 @@ pub struct RemapConfig {
     ///
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
+    ///
+    /// When set to `auto`, single-value tags are exposed as strings and multi-value tags as
+    /// arrays. Writes follow the same convention -- assigning a string or null produces a
+    /// single tag, assigning an array produces a multi-value tag. This preserves the
+    /// underlying shape of metrics that mix single- and multi-value tags.
     #[serde(default)]
     pub metric_tag_values: MetricTagValues,
 
@@ -108,7 +111,6 @@ pub struct RemapConfig {
     /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
 
     /// Drops any event that encounters an error during processing.
@@ -606,14 +608,7 @@ where
             .map(|log| log.namespace())
             .unwrap_or(LogNamespace::Legacy);
 
-        let mut target = VrlTarget::new(
-            event,
-            self.program.info(),
-            match self.metric_tag_values {
-                MetricTagValues::Single => false,
-                MetricTagValues::Full => true,
-            },
-        );
+        let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
         let result = self.run_vrl(&mut target);
 
         match result {

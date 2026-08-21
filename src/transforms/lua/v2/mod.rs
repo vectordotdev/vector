@@ -4,14 +4,13 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 pub use vector_lib::event::lua;
 use vector_lib::{
-    codecs::MetricTagValues,
     configurable::configurable_component,
     transform::runtime_transform::{RuntimeTransform, Timer},
 };
 
 use crate::{
     config::{self, CONFIG_PATHS, ComponentKey, DataType, Input, OutputId, TransformOutput},
-    event::{Event, lua::event::LuaEvent},
+    event::{Event, MetricTagMode, lua::event::LuaEvent},
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
     schema::Definition,
@@ -45,6 +44,29 @@ pub enum BuildError {
 
     #[snafu(display("Cannot call GC in Lua runtime: {}", source))]
     RuntimeErrorGc { source: mlua::Error },
+}
+
+/// How metric tags are exposed to Lua scripts.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LuaMetricTagValues {
+    /// Tag values are exposed as single strings, the same as they were before this config
+    /// option. Tags with multiple values show the last assigned value, and null values
+    /// are ignored.
+    #[default]
+    Single,
+    /// All tags are exposed as arrays of either string or null values.
+    Full,
+}
+
+impl From<LuaMetricTagValues> for MetricTagMode {
+    fn from(value: LuaMetricTagValues) -> Self {
+        match value {
+            LuaMetricTagValues::Single => Self::Single,
+            LuaMetricTagValues::Full => Self::Full,
+        }
+    }
 }
 
 /// Configuration for the version two of the `lua` transform.
@@ -86,7 +108,7 @@ pub struct LuaConfig {
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    metric_tag_values: MetricTagValues,
+    metric_tag_values: LuaMetricTagValues,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -226,7 +248,7 @@ pub struct Lua {
     hook_process: mlua::RegistryKey,
     hook_shutdown: Option<mlua::RegistryKey>,
     timers: Vec<(Timer, mlua::RegistryKey)>,
-    multi_value_tags: bool,
+    tag_mode: MetricTagMode,
     source_id: Arc<ComponentKey>,
 }
 
@@ -296,8 +318,6 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
-        let multi_value_tags = config.metric_tag_values == MetricTagValues::Full;
-
         Ok(Self {
             lua,
             invocations_after_gc: 0,
@@ -305,7 +325,7 @@ impl Lua {
             hook_init,
             hook_process,
             hook_shutdown,
-            multi_value_tags,
+            tag_mode: config.metric_tag_values.into(),
             source_id: Arc::new(key),
         })
     }
@@ -327,7 +347,7 @@ impl Lua {
                 .call((
                     LuaEvent {
                         event,
-                        metric_multi_value_tags: self.multi_value_tags,
+                        metric_tag_mode: self.tag_mode,
                     },
                     emit,
                 ))
@@ -387,7 +407,7 @@ impl RuntimeTransform for Lua {
                     .call((
                         LuaEvent {
                             event,
-                            metric_multi_value_tags: self.multi_value_tags,
+                            metric_tag_mode: self.tag_mode,
                         },
                         wrap_emit_fn(scope, emit_fn, source_id)?,
                     ))

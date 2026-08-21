@@ -18,7 +18,6 @@ components: sinks: gcp_stackdriver_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -68,7 +67,7 @@ components: sinks: gcp_stackdriver_logs: {
 		resource: type: object: examples: [{
 			type:       "gce_instance"
 			instanceId: "Twilight"
-			zone:       "{{ zone }}"
+			zone:       "zone-{{ zone }}"
 		}]
 		project_id: type: string: examples: ["my-project"]
 		log_id: type: string: examples: ["my-log"]
