@@ -44,9 +44,6 @@ impl ElasticsearchCommon {
         proxy_config: &ProxyConfig,
         version: &mut Option<usize>,
     ) -> crate::Result<Self> {
-        // `HttpEndpoint` already validated the scheme and host at load time,
-        // so `check_endpoint` is no longer needed. Extract auth from the
-        // URI's userinfo (if any) via `UriSerde`'s credential extraction.
         let uri = UriSerde::try_from(endpoint.as_uri().clone())?;
 
         // get auth from config or uri
