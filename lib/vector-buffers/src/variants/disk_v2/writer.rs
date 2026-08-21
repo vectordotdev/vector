@@ -1822,6 +1822,9 @@ where
     }
 
     #[instrument(skip_all, level = "debug")]
+    // Finalizer handling plus the inline Antithesis capacity assertion pushes this just over the
+    // line limit; keeping both next to the write they validate makes their ordering explicit.
+    #[allow(clippy::too_many_lines)]
     async fn try_write_record_inner(
         &mut self,
         mut record: T,

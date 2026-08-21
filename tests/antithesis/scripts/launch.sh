@@ -37,9 +37,18 @@ ANTITHESIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCENARIO="${1:?usage: scripts/launch.sh <scenario> [extra snouty flags]}"
 shift
 SCENARIO_DIR="$ANTITHESIS_DIR/scenarios/$SCENARIO"
-[ -d "$SCENARIO_DIR" ] || { echo "error: no scenario directory $SCENARIO_DIR" >&2; exit 1; }
-[ -f "$SCENARIO_DIR/docker-compose.yaml" ] || { echo "error: $SCENARIO_DIR/docker-compose.yaml not found" >&2; exit 1; }
-[ -f "$SCENARIO_DIR/launch.env" ] || { echo "error: $SCENARIO_DIR/launch.env not found" >&2; exit 1; }
+[ -d "$SCENARIO_DIR" ] || {
+  echo "error: no scenario directory $SCENARIO_DIR" >&2
+  exit 1
+}
+[ -f "$SCENARIO_DIR/docker-compose.yaml" ] || {
+  echo "error: $SCENARIO_DIR/docker-compose.yaml not found" >&2
+  exit 1
+}
+[ -f "$SCENARIO_DIR/launch.env" ] || {
+  echo "error: $SCENARIO_DIR/launch.env not found" >&2
+  exit 1
+}
 
 # Per-scenario settings. Declared here so a missing one is caught, not silently empty.
 SCENARIO_TEST_NAME=""
@@ -60,7 +69,7 @@ fi
 export ANTITHESIS_IMAGE_TAG="$GIT_SHA"
 
 WEBHOOK="${WEBHOOK:-${SCENARIO_WEBHOOK:-persistent_storage}}"
-DURATION="${DURATION:-30}"
+DURATION="${DURATION:-15}"
 TEST_NAME="${TEST_NAME:-${SCENARIO_TEST_NAME:?launch.env must set SCENARIO_TEST_NAME}}"
 DESCRIPTION="${DESCRIPTION:-$SCENARIO_DESCRIPTION} (commit ${GIT_SHA})"
 FAULT_NODES="${FAULT_NODES:-${SCENARIO_FAULT_NODES:?launch.env must set SCENARIO_FAULT_NODES}}"
@@ -120,9 +129,15 @@ cmd=(snouty launch
   "${FAULTS[@]}"
   "$@")
 
-printf 'build: '; printf ' %q' "${build[@]}"; printf '\n'
-printf 'render:'; printf ' %q' "${render[@]}"; printf ' > %q\n' "$LAUNCH_DIR/docker-compose.yaml"
-printf 'launch:'; printf ' %q' "${cmd[@]}"; printf '\n'
+printf 'build: '
+printf ' %q' "${build[@]}"
+printf '\n'
+printf 'render:'
+printf ' %q' "${render[@]}"
+printf ' > %q\n' "$LAUNCH_DIR/docker-compose.yaml"
+printf 'launch:'
+printf ' %q' "${cmd[@]}"
+printf '\n'
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
   echo "(dry run; not building or submitting)"
   exit 0

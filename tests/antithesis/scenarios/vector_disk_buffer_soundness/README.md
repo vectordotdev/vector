@@ -57,8 +57,8 @@ before the driver retries it.
 
 ## Launch
 
-From `tests/antithesis/scenarios`:
+From `tests/antithesis`:
 
 ```sh
-./launch.sh vector_disk_buffer_soundness
+./scripts/launch.sh vector_disk_buffer_soundness
 ```

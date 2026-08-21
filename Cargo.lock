@@ -258,6 +258,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "vector-buffers",
 ]
 
 [[package]]
