@@ -2,7 +2,6 @@ use std::{
     fmt,
     io::Error as IoError,
     marker::Unpin,
-    ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll, ready},
 };
@@ -21,6 +20,13 @@ use super::EncodedEvent;
 use crate::internal_events::{SocketBytesSent, SocketEventsSent, SocketMode};
 
 pub(crate) const MAX_PENDING_ITEMS: usize = 1_000;
+
+/// Cap on the total encoded size retained in a [`PendingBatch`].
+///
+/// [`MAX_PENDING_ITEMS`] alone does not bound memory: a single encoded event can be arbitrarily
+/// large, so an item-only cap lets a batch of big log records grow without limit while the remote
+/// is unavailable.
+pub(crate) const MAX_PENDING_BYTES: usize = 4 * 1_024 * 1_024;
 
 pub enum ShutdownCheck {
     Error(IoError),
@@ -108,34 +114,68 @@ struct State {
 
 /// In-memory resend queue for socket stream sinks.
 ///
+/// Bounded by both event count ([`MAX_PENDING_ITEMS`]) and total encoded size
+/// ([`MAX_PENDING_BYTES`]) so that large records cannot pin an unbounded amount of memory while
+/// the remote is unreachable.
+///
 /// If a sink task is cancelled while events are buffered here, we mark them
 /// `Errored` so batch-level acks do not default to `Delivered`.
 #[derive(Default)]
-pub(crate) struct PendingBatch(Vec<EncodedEvent<Bytes>>);
+pub(crate) struct PendingBatch {
+    events: Vec<EncodedEvent<Bytes>>,
+    encoded_bytes: usize,
+}
 
 impl PendingBatch {
     pub(crate) const fn new() -> Self {
-        Self(Vec::new())
+        Self {
+            events: Vec::new(),
+            encoded_bytes: 0,
+        }
     }
-}
 
-impl Deref for PendingBatch {
-    type Target = Vec<EncodedEvent<Bytes>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub(crate) const fn len(&self) -> usize {
+        self.events.len()
     }
-}
 
-impl DerefMut for PendingBatch {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    pub(crate) const fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    /// Whether collection should stop because either bound has been reached.
+    ///
+    /// The byte bound is checked after the fact so that a single event larger than
+    /// [`MAX_PENDING_BYTES`] is still collected rather than stalling the sink forever.
+    pub(crate) const fn is_full(&self) -> bool {
+        self.events.len() >= MAX_PENDING_ITEMS || self.encoded_bytes >= MAX_PENDING_BYTES
+    }
+
+    pub(crate) fn push(&mut self, encoded: EncodedEvent<Bytes>) {
+        self.encoded_bytes = self.encoded_bytes.saturating_add(encoded.item.len());
+        self.events.push(encoded);
+    }
+
+    /// The first `count` queued events, for feeding into the socket.
+    pub(crate) fn head(&self, count: usize) -> &[EncodedEvent<Bytes>] {
+        &self.events[..count.min(self.events.len())]
+    }
+
+    /// Retire the first `count` events, marking them `Delivered`.
+    ///
+    /// Called after each successful flush so a partially flushed batch does not have to be
+    /// resent from the start on the next reconnect.
+    pub(crate) fn ack_delivered(&mut self, count: usize) {
+        let count = count.min(self.events.len());
+        for encoded in self.events.drain(..count) {
+            self.encoded_bytes = self.encoded_bytes.saturating_sub(encoded.item.len());
+            encoded.finalizers.update_status(EventStatus::Delivered);
+        }
     }
 }
 
 impl Drop for PendingBatch {
     fn drop(&mut self) {
-        for encoded in self.0.drain(..) {
+        for encoded in self.events.drain(..) {
             encoded.finalizers.update_status(EventStatus::Errored);
         }
     }
@@ -280,8 +320,20 @@ mod tests {
     use vector_lib::event::{BatchNotifier, BatchStatus, EventFinalizer};
     use vector_lib::json_size::JsonSize;
 
-    use super::{PendingBatch, is_peer_shutdown_error, peer_shutdown_io_error};
+    use super::{
+        MAX_PENDING_BYTES, MAX_PENDING_ITEMS, PendingBatch, is_peer_shutdown_error,
+        peer_shutdown_io_error,
+    };
     use crate::sinks::util::EncodedEvent;
+
+    fn encoded(len: usize) -> EncodedEvent<Bytes> {
+        EncodedEvent {
+            item: Bytes::from(vec![b'x'; len]),
+            finalizers: Default::default(),
+            byte_size: len,
+            json_byte_size: JsonSize::zero(),
+        }
+    }
 
     #[test]
     fn detects_typed_peer_shutdown_error() {
@@ -311,5 +363,60 @@ mod tests {
         }
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+    }
+
+    #[test]
+    fn pending_batch_is_full_on_byte_bound_before_item_bound() {
+        let mut pending = PendingBatch::new();
+        let chunk = MAX_PENDING_BYTES / 4;
+
+        for _ in 0..4 {
+            assert!(!pending.is_full());
+            pending.push(encoded(chunk));
+        }
+
+        assert!(pending.is_full());
+        assert!(pending.len() < MAX_PENDING_ITEMS);
+    }
+
+    #[test]
+    fn pending_batch_always_accepts_one_oversized_event() {
+        let mut pending = PendingBatch::new();
+        assert!(!pending.is_full());
+        pending.push(encoded(MAX_PENDING_BYTES * 2));
+        assert_eq!(pending.len(), 1);
+    }
+
+    #[test]
+    fn pending_batch_ack_delivered_retires_only_the_flushed_prefix() {
+        let (batch, mut delivered) = BatchNotifier::new_with_receiver();
+        let (retained_batch, mut retained) = BatchNotifier::new_with_receiver();
+
+        let mut pending = PendingBatch::new();
+        pending.push(EncodedEvent {
+            finalizers: super::EventFinalizers::new(EventFinalizer::new(batch)),
+            ..encoded(MAX_PENDING_BYTES / 2)
+        });
+        pending.push(EncodedEvent {
+            finalizers: super::EventFinalizers::new(EventFinalizer::new(retained_batch)),
+            ..encoded(MAX_PENDING_BYTES / 2)
+        });
+        assert!(pending.is_full());
+
+        pending.ack_delivered(1);
+
+        assert_eq!(delivered.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(pending.len(), 1);
+        // The freed bytes are returned to the budget so collection can resume.
+        assert!(!pending.is_full());
+        // The unflushed event stays queued and unfinalized, ready for the next chunk.
+        assert!(retained.try_recv().is_err());
+    }
+
+    #[test]
+    fn pending_batch_head_is_clamped_to_length() {
+        let mut pending = PendingBatch::new();
+        pending.push(encoded(4));
+        assert_eq!(pending.head(MAX_PENDING_ITEMS).len(), 1);
     }
 }

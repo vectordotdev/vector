@@ -19,7 +19,7 @@ use tokio::{
 use tokio_util::codec::Encoder;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
-    finalization::EventStatus, json_size::JsonSize,
+    json_size::JsonSize,
 };
 
 use crate::{
@@ -326,19 +326,20 @@ where
             })
             .peekable();
 
-        // Keep a full batch in memory until a flush succeeds. If the connection fails after
-        // partially writing bytes, we resend the whole batch on reconnect (at-least-once).
+        // Keep queued events in memory until a flush succeeds. If the connection fails after
+        // partially writing bytes, we resend the unflushed events on reconnect (at-least-once).
         let mut pending_batch = PendingBatch::new();
         let mut connection: Option<(BytesSink<MaybeTlsStream<TcpStream>>, OpenToken<fn(usize)>)> =
             None;
         let mut send_failure_backoff = Self::fresh_send_failure_backoff();
+        let mut flush_chunk = MAX_PENDING_ITEMS;
 
         loop {
             if pending_batch.is_empty() {
                 poll_fn(|cx| {
                     let mut input = Pin::new(&mut input);
                     loop {
-                        if pending_batch.len() >= MAX_PENDING_ITEMS {
+                        if pending_batch.is_full() {
                             return Poll::Ready(());
                         }
                         match input.as_mut().poll_peek(cx) {
@@ -385,31 +386,49 @@ where
                 connection = Some((sink, open_token));
             }
 
-            let send_result: std::io::Result<()> = async {
-                let (sink, _open_token) = connection
-                    .as_mut()
-                    .expect("connection should be initialized before send");
-                for enc in pending_batch.iter() {
-                    let wire = EncodedEvent {
-                        item: enc.item.clone(),
-                        finalizers: Default::default(),
-                        byte_size: enc.byte_size,
-                        json_byte_size: enc.json_byte_size,
-                    };
-                    sink.feed(wire).await?;
-                }
-                sink.flush().await
-            }
-            .await;
-
-            match send_result {
-                Ok(()) => {
-                    for enc in pending_batch.drain(..) {
-                        enc.finalizers.update_status(EventStatus::Delivered);
+            // Flush in chunks and retire each chunk as soon as it lands. A peer that closes the
+            // connection at a fixed record or byte boundary would otherwise make every reconnect
+            // restart from the first event, resending the same prefix forever without the suffix
+            // ever being attempted.
+            let mut send_error = None;
+            while !pending_batch.is_empty() {
+                let chunk_len = flush_chunk.min(pending_batch.len());
+                let chunk_result: std::io::Result<()> = async {
+                    let (sink, _open_token) = connection
+                        .as_mut()
+                        .expect("connection should be initialized before send");
+                    for enc in pending_batch.head(chunk_len) {
+                        let wire = EncodedEvent {
+                            item: enc.item.clone(),
+                            finalizers: Default::default(),
+                            byte_size: enc.byte_size,
+                            json_byte_size: enc.json_byte_size,
+                        };
+                        sink.feed(wire).await?;
                     }
-                    send_failure_backoff.reset();
+                    sink.flush().await
                 }
-                Err(error) => {
+                .await;
+
+                match chunk_result {
+                    Ok(()) => {
+                        pending_batch.ack_delivered(chunk_len);
+                        // Ramp back up so a transient failure does not permanently cap throughput.
+                        flush_chunk = flush_chunk.saturating_mul(2).min(MAX_PENDING_ITEMS);
+                    }
+                    Err(error) => {
+                        // Halve the unit of work so a peer limit smaller than the current chunk
+                        // converges on a size that fits instead of failing indefinitely.
+                        flush_chunk = (chunk_len / 2).max(1);
+                        send_error = Some(error);
+                        break;
+                    }
+                }
+            }
+
+            match send_error {
+                None => send_failure_backoff.reset(),
+                Some(error) => {
                     if is_peer_shutdown_error(&error) {
                         emit!(TcpSocketConnectionShutdown {});
                     }
