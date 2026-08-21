@@ -15,8 +15,13 @@ use std::{collections::HashMap, future::ready, time::Duration};
 
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
-use http::{Uri, response::Parts};
+use http::{
+    HeaderMap, Uri,
+    header::{HeaderName, HeaderValue},
+    response::Parts,
+};
 use hyper::{Body, Request};
+use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
@@ -43,13 +48,51 @@ pub(crate) struct GenericHttpClientInputs {
     /// Timeout for the HTTP request.
     pub timeout: Duration,
     /// Map of Header+Value to apply to HTTP request.
-    pub headers: HashMap<String, Vec<String>>,
+    pub headers: HeaderMap<HeaderValue>,
     /// Content type of the HTTP request, determined by the source.
     pub content_type: String,
     pub auth: Option<Auth>,
     pub tls: TlsSettings,
     pub proxy: ProxyConfig,
     pub shutdown: ShutdownSignal,
+}
+
+#[derive(Debug, Snafu)]
+pub(crate) enum HeaderError {
+    #[snafu(display("Invalid HTTP header name {name:?}: {source}"))]
+    InvalidName {
+        name: String,
+        source: http::header::InvalidHeaderName,
+    },
+    #[snafu(display("Invalid value for HTTP header {name:?}: {source}"))]
+    InvalidValue {
+        name: String,
+        source: http::header::InvalidHeaderValue,
+    },
+}
+
+pub(crate) fn build_headers(
+    headers: &HashMap<String, Vec<String>>,
+) -> Result<HeaderMap<HeaderValue>, HeaderError> {
+    let mut parsed = HeaderMap::new();
+
+    for (name, values) in headers {
+        let header_name =
+            HeaderName::from_bytes(name.as_bytes()).with_context(|_| InvalidNameSnafu {
+                name: name.to_owned(),
+            })?;
+
+        for value in values {
+            let mut header_value =
+                HeaderValue::from_bytes(value.as_bytes()).with_context(|_| InvalidValueSnafu {
+                    name: name.to_owned(),
+                })?;
+            header_value.set_sensitive(true);
+            parsed.append(header_name.clone(), header_value);
+        }
+    }
+
+    Ok(parsed)
 }
 
 /// The default interval to call the HTTP endpoint if none is configured.
@@ -185,10 +228,8 @@ pub(crate) async fn call<
             };
 
             // add user specified headers
-            for (header, values) in &inputs.headers {
-                for value in values {
-                    builder = builder.header(header, value);
-                }
+            for (header, value) in &inputs.headers {
+                builder = builder.header(header, value);
             }
 
             // set ACCEPT header if not user specified
@@ -305,5 +346,48 @@ pub(crate) async fn call<
             emit!(StreamClosedError { count });
             Err(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn headers_are_normalized_and_sensitive() {
+        let headers = build_headers(&HashMap::from([(
+            "X-Private-Token".to_string(),
+            vec!["secret".to_string(), "another-secret".to_string()],
+        )]))
+        .unwrap();
+
+        let values = headers
+            .get_all("x-private-token")
+            .iter()
+            .collect::<Vec<_>>();
+        assert_eq!(values.len(), 2);
+        assert!(values.iter().all(|value| value.is_sensitive()));
+    }
+
+    #[test]
+    fn invalid_header_name_is_rejected() {
+        let error = build_headers(&HashMap::from([(
+            "invalid header".to_string(),
+            vec!["value".to_string()],
+        )]))
+        .unwrap_err();
+
+        assert!(error.to_string().contains("Invalid HTTP header name"));
+    }
+
+    #[test]
+    fn invalid_header_value_is_rejected() {
+        let error = build_headers(&HashMap::from([(
+            "x-header".to_string(),
+            vec!["invalid\nvalue".to_string()],
+        )]))
+        .unwrap_err();
+
+        assert!(error.to_string().contains("Invalid value for HTTP header"));
     }
 }
