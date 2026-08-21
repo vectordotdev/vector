@@ -1,0 +1,22 @@
+version: 1
+applications:
+  - appRoot: website
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - source ~/.nvm/nvm.sh
+            - nvm use 24.11.0
+            - export CI=true
+        build:
+          commands:
+            - export DEPLOY_PRIME_URL="https://$(echo "${AWS_BRANCH}" | sed 's/[./]/-/g').d1a7j77663uxsc.amplifyapp.com"
+            - if [[ "${AWS_BRANCH}" == "website" ]]; then DEPLOY_COMMAND="ci-production-build"; else DEPLOY_COMMAND="ci-preview-build"; fi
+            - make "${DEPLOY_COMMAND}"
+      artifacts:
+        baseDirectory: public
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
