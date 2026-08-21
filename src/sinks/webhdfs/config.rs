@@ -22,6 +22,11 @@ use crate::{
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
 
+/// The default WebHDFS endpoint, used when `endpoint` is not configured.
+fn default_endpoint() -> String {
+    "http://127.0.0.1:9870".to_string()
+}
+
 /// Configuration for the `webhdfs` sink.
 #[configurable_component(sink("webhdfs", "WebHDFS."))]
 #[derive(Clone, Debug)]
@@ -53,7 +58,7 @@ pub struct WebHdfsConfig {
     /// For more information, see the [HDFS Architecture][hdfs_arch] documentation.
     ///
     /// [hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes
-    #[serde(default)]
+    #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:9870"))]
     pub endpoint: String,
 
@@ -85,7 +90,7 @@ impl GenerateConfig for WebHdfsConfig {
         serde_json::to_value(Self {
             root: "/".to_string(),
             prefix: "%F/".to_string(),
-            endpoint: "http://127.0.0.1:9870".to_string(),
+            endpoint: default_endpoint(),
 
             encoding: (
                 Some(NewlineDelimitedEncoderConfig::new()),
