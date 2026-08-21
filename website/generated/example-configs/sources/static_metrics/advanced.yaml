@@ -1,7 +1,7 @@
 sources:
   my_source_id:
     type: static_metrics
-    interval_secs: 1
+    interval_secs: 1.0
     metrics:
       - kind: absolute
         name: my-metric
@@ -9,5 +9,5 @@ sources:
           env: production
         value:
           gauge:
-            value: 1
+            value: 1.0
     namespace: static

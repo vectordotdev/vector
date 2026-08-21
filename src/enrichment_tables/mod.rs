@@ -42,7 +42,6 @@ pub mod mmdb;
 #[enum_dispatch(EnrichmentTableConfig)]
 #[configurable(metadata(
     docs::enum_tag_description = "enrichment table type",
-    docs::common = false,
     docs::required = false,
 ))]
 pub enum EnrichmentTables {

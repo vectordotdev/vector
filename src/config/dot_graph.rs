@@ -6,7 +6,6 @@ use vector_lib::configurable::configurable_component;
 ///
 /// Configure output for component when generated with graph command
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct GraphConfig {
@@ -32,7 +31,6 @@ pub struct GraphConfig {
 }
 
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 /// A collection of graph edge attributes in graphviz DOT language, related to a single input

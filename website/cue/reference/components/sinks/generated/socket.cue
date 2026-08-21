@@ -101,7 +101,7 @@ generated: components: sinks: socket: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -593,7 +593,7 @@ generated: components: sinks: socket: configuration: {
 		required:      false
 		type: uint: {
 			examples: [
-				65536,
+				65536
 			]
 			unit: "bytes"
 		}

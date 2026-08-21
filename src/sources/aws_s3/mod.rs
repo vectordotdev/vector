@@ -10,7 +10,9 @@ use vector_common::compression::gzip_multiple_decoder;
 use vector_lib::{
     codecs::{
         NewlineDelimitedDecoderConfig,
-        decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions},
+        decoding::{
+            DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions, OversizedAction,
+        },
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
@@ -35,7 +37,6 @@ pub mod sqs;
 
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Compression {
@@ -172,7 +173,10 @@ pub struct AwsS3Config {
 const fn default_framing() -> FramingConfig {
     // This is used for backwards compatibility. It used to be the only (hardcoded) option.
     FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
-        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
+        newline_delimited: NewlineDelimitedDecoderOptions {
+            max_length: None,
+            oversized_action: OversizedAction::Drop,
+        },
     })
 }
 
