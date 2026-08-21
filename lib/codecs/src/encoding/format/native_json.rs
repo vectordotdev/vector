@@ -90,7 +90,7 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
                 buckets: buckets!(f64::NEG_INFINITY => 0 ,2.0 => 1, f64::INFINITY => 0),
             },
         ));

@@ -689,21 +689,24 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
             kind: TransformParseErrorKind::IntError,
         })?;
 
+    // A histogram is allowed to report no sum at all, so an absent path is not an error here. A
+    // path that is present but not a float still is.
     let sum = log
         .get(event_path!("aggregated_histogram", "sum"))
-        .ok_or_else(|| TransformError::PathNotFound {
-            path: "aggregated_histogram.sum".to_string(),
-        })?
-        .as_float()
-        .ok_or_else(|| TransformError::ParseError {
-            path: "aggregated_histogram.sum".to_string(),
-            kind: TransformParseErrorKind::FloatError,
-        })?;
+        .map(|sum| {
+            sum.as_float()
+                .map(|sum| *sum)
+                .ok_or_else(|| TransformError::ParseError {
+                    path: "aggregated_histogram.sum".to_string(),
+                    kind: TransformParseErrorKind::FloatError,
+                })
+        })
+        .transpose()?;
 
     Ok(MetricValue::AggregatedHistogram {
         buckets,
         count: count as u64,
-        sum: *sum,
+        sum,
     })
 }
 
@@ -1920,7 +1923,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
                     count: 5,
-                    sum: 18.0,
+                    sum: Some(18.0),
                     buckets: vec![
                         Bucket {
                             upper_limit: 1.0,
@@ -1948,6 +1951,86 @@ mod tests {
                 "host" => "localhost",
             )))
             .with_timestamp(Some(ts()))
+        );
+    }
+
+    /// A histogram is allowed to report no sum, so an absent `sum` field is not a missing-path
+    /// error. A present-but-unparseable one still is, which `transform_histogram_invalid_sum`
+    /// covers.
+    #[tokio::test]
+    async fn transform_histogram_without_sum() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "aggregated_histogram": {
+            "count": 3,
+            "buckets": [
+              {
+                "upper_limit": 1.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 2.0,
+                "count": 2
+              }
+            ]
+          },
+          "kind": "absolute",
+          "name": "test.transform.histogram"
+        }"#;
+        let log = create_log_event(json_str);
+        let metric = do_transform(config, log).await.unwrap();
+        assert_eq!(
+            metric.as_metric().value(),
+            &MetricValue::AggregatedHistogram {
+                count: 3,
+                sum: None,
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 2.0,
+                        count: 2,
+                    },
+                ],
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn transform_histogram_invalid_sum() {
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
+
+        let json_str = r#"{
+          "aggregated_histogram": {
+            "sum": "not a number",
+            "count": 3,
+            "buckets": [
+              {
+                "upper_limit": 1.0,
+                "count": 1
+              },
+              {
+                "upper_limit": 2.0,
+                "count": 2
+              }
+            ]
+          },
+          "kind": "absolute",
+          "name": "test.transform.histogram"
+        }"#;
+        let log = create_log_event(json_str);
+        assert!(
+            do_transform(config, log).await.is_none(),
+            "a sum that is present but not a float must still be rejected"
         );
     }
 

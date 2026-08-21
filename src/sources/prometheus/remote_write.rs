@@ -316,7 +316,7 @@ mod test {
                 MetricValue::AggregatedHistogram {
                     buckets: vector_lib::buckets![ 2.3 => 11, 4.2 => 85 ],
                     count: 96,
-                    sum: 156.2,
+                    sum: Some(156.2),
                 },
             )
             .with_timestamp(Some(timestamp()))

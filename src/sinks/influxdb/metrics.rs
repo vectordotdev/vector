@@ -490,7 +490,9 @@ fn get_type_and_fields(
                 })
                 .collect();
             fields.insert("count".into(), Field::UnsignedInt(*count));
-            fields.insert("sum".into(), Field::Float(*sum));
+            if let Some(sum) = sum {
+                fields.insert("sum".into(), Field::Float(*sum));
+            }
 
             ("histogram", Some(fields))
         }
@@ -752,7 +754,7 @@ mod tests {
                 MetricValue::AggregatedHistogram {
                     buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                     count: 6,
-                    sum: 12.5,
+                    sum: Some(12.5),
                 },
             )
             .with_namespace(Some("ns"))
@@ -795,7 +797,7 @@ mod tests {
                 MetricValue::AggregatedHistogram {
                     buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                     count: 6,
-                    sum: 12.5,
+                    sum: Some(12.5),
                 },
             )
             .with_namespace(Some("ns"))

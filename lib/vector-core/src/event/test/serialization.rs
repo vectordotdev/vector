@@ -69,6 +69,101 @@ fn back_and_forth_through_bytes() {
         .quickcheck(inner as fn(EventArray) -> TestResult);
 }
 
+mod histogram_sum {
+    use crate::event::metric::{Bucket, MetricValue};
+    use crate::event::proto;
+    use similar_asserts::assert_eq;
+
+    fn histogram(sum: Option<f64>) -> MetricValue {
+        MetricValue::AggregatedHistogram {
+            buckets: vec![Bucket {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum,
+        }
+    }
+
+    fn encode(sum: Option<f64>) -> proto::metric::Value {
+        proto::MetricValue::from(histogram(sum))
+    }
+
+    /// A histogram carrying a sum keeps encoding as `AggregatedHistogram3`, exactly as before this
+    /// field became optional. That is what leaves the checked-in native-encoding fixtures
+    /// byte-identical and lets an older peer keep decoding these.
+    #[test]
+    fn reported_sum_encodes_as_v3() {
+        assert!(
+            matches!(
+                encode(Some(12.5)),
+                proto::metric::Value::AggregatedHistogram3(_)
+            ),
+            "a histogram with a sum must still encode as AggregatedHistogram3"
+        );
+    }
+
+    /// Only the case that `AggregatedHistogram3` cannot represent reaches for the new message.
+    #[test]
+    fn unreported_sum_encodes_as_v4() {
+        assert!(
+            matches!(encode(None), proto::metric::Value::AggregatedHistogram4(_)),
+            "a histogram without a sum must encode as AggregatedHistogram4"
+        );
+    }
+
+    #[test]
+    fn both_survive_a_round_trip() {
+        for sum in [Some(12.5), Some(0.0), None] {
+            let decoded = MetricValue::from(encode(sum));
+            assert_eq!(decoded, histogram(sum), "round-trip lost the sum {sum:?}");
+        }
+    }
+
+    /// Versions 1 through 3 have no way to say "no sum", so whatever they carry was reported --
+    /// including a zero, which proto3 implicit presence does not even write to the wire. Reading
+    /// those as `None` would silently reinterpret every previously encoded zero.
+    #[test]
+    fn legacy_versions_decode_as_a_reported_sum() {
+        let bucket3 = proto::HistogramBucket3 {
+            upper_limit: 1.0,
+            count: 3,
+        };
+
+        let v3 = proto::metric::Value::AggregatedHistogram3(proto::AggregatedHistogram3 {
+            buckets: vec![bucket3.clone()],
+            count: 3,
+            sum: 0.0,
+        });
+        assert_eq!(MetricValue::from(v3), histogram(Some(0.0)));
+
+        let v2 = proto::metric::Value::AggregatedHistogram2(proto::AggregatedHistogram2 {
+            buckets: vec![proto::HistogramBucket {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum: 0.0,
+        });
+        assert_eq!(MetricValue::from(v2), histogram(Some(0.0)));
+
+        let v1 = proto::metric::Value::AggregatedHistogram1(proto::AggregatedHistogram1 {
+            buckets: vec![1.0],
+            counts: vec![3],
+            count: 3,
+            sum: 0.0,
+        });
+        assert_eq!(MetricValue::from(v1), histogram(Some(0.0)));
+    }
+
+    /// `PartialEq` has to keep these apart, or none of the above proves anything.
+    #[test]
+    fn an_unreported_sum_differs_from_zero() {
+        assert_ne!(histogram(None), histogram(Some(0.0)));
+        assert_eq!(histogram(None), histogram(None));
+    }
+}
+
 #[test]
 fn serialization() {
     let mut event = LogEvent::from("raw log line");
