@@ -9,12 +9,13 @@ applications:
             - nvm use 24.11.0
             - node --version
         build:
-          - |
-            if [[ "${AWS_BRANCH}" == "website" ]]; then
-              make ci-production-build
-            else
-              make ci-preview-build
-            fi
+          commands:
+            - |
+              if [[ "${AWS_BRANCH}" == "website" ]]; then
+                make ci-production-build
+              else
+                make ci-preview-build
+              fi
       artifacts:
         baseDirectory: public
         files:
