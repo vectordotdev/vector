@@ -1,5 +1,17 @@
 name: vector-disk-buffer-soundness
 
+x-vector-build: &vector-build
+  context: ../../../..
+  dockerfile: tests/antithesis/Dockerfile
+  target: vector
+  args:
+    SCENARIO: vector_disk_buffer_soundness
+
+x-workload-build: &workload-build
+  context: ../../../..
+  dockerfile: tests/antithesis/Dockerfile
+  target: workload
+
 x-node-health: &node-health
   test: ["CMD", "curl", "-fsS", "http://localhost:9598/metrics"]
   interval: 5s
@@ -12,11 +24,10 @@ services:
     container_name: vector
     hostname: vector
     platform: linux/amd64
-    build:
-      context: ../../../..
-      dockerfile: tests/antithesis/scenarios/vector_disk_buffer_soundness/Dockerfile
-      target: vector
+    init: true
+    build: *vector-build
     image: vdbs-vector:${ANTITHESIS_IMAGE_TAG:-dev}
+    entrypoint: ["/usr/bin/vector", "--config", "/etc/vector/vector.yaml"]
     environment:
       NO_COLOR: "1"
       # The pressure gate deliberately generates retries; suppress their expected
@@ -33,11 +44,9 @@ services:
     hostname: oracle
     platform: linux/amd64
     init: true
-    build:
-      context: ../../../..
-      dockerfile: tests/antithesis/scenarios/vector_disk_buffer_soundness/Dockerfile
-      target: oracle
+    build: *workload-build
     image: vdbs-oracle:${ANTITHESIS_IMAGE_TAG:-dev}
+    entrypoint: ["/usr/bin/disk_soundness_oracle"]
     environment:
       NO_COLOR: "1"
       SCENARIO_NAME: "vector_disk_buffer_soundness"
@@ -58,11 +67,9 @@ services:
     hostname: workload
     platform: linux/amd64
     init: true
-    build:
-      context: ../../../..
-      dockerfile: tests/antithesis/scenarios/vector_disk_buffer_soundness/Dockerfile
-      target: workload
+    build: *workload-build
     image: vdbs-workload:${ANTITHESIS_IMAGE_TAG:-dev}
+    entrypoint: ["sleep", "infinity"]
     environment:
       NO_COLOR: "1"
       VECTOR_SOURCE_URL: "http://vector:8080/"

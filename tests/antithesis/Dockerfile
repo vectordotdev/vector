@@ -61,10 +61,15 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
       --config 'profile.release.debug = true' \
       --config "target.x86_64-unknown-linux-gnu.rustflags = ${SANCOV_RUSTFLAGS}" \
     && D=target/x86_64-unknown-linux-gnu/release \
-    && cp "$D/oracle" "$D/parallel_driver_produce" "$D/eventually_conservation" /usr/local/bin/ \
+    && cp "$D/oracle" "$D/parallel_driver_produce" "$D/eventually_conservation" \
+          "$D/disk_soundness_oracle" "$D/parallel_driver_disk_soundness" \
+          "$D/parallel_driver_disk_corruption" "$D/eventually_disk_soundness" \
+          /usr/local/bin/ \
     && echo "validating instrumentation symbols..." \
     && nm /usr/local/bin/oracle | grep -q __sanitizer_cov_trace_pc_guard \
     && nm /usr/local/bin/oracle | grep -q antithesis_load_libvoidstar \
+    && nm /usr/local/bin/disk_soundness_oracle | grep -q __sanitizer_cov_trace_pc_guard \
+    && nm /usr/local/bin/parallel_driver_disk_corruption | grep -q __sanitizer_cov_trace_pc_guard \
     && echo "instrumentation OK"
 
 #####################################
@@ -89,14 +94,21 @@ ENTRYPOINT ["/usr/bin/vector"]
 FROM debian:stable-slim AS workload
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=workload-build /usr/local/bin/oracle /usr/bin/oracle
+COPY --from=workload-build /usr/local/bin/oracle /usr/local/bin/disk_soundness_oracle /usr/bin/
 # The workload is scenario-agnostic. Environment variables point these commands
 # at the selected topology, so every scenario uses the same test command image.
 COPY --from=workload-build /usr/local/bin/parallel_driver_produce /opt/antithesis/test/v1/vector/parallel_driver_produce
 COPY --from=workload-build /usr/local/bin/eventually_conservation /opt/antithesis/test/v1/vector/eventually_conservation
+COPY --from=workload-build /usr/local/bin/parallel_driver_disk_soundness /opt/antithesis/test/v1/disk/parallel_driver_disk_soundness
+COPY --from=workload-build /usr/local/bin/parallel_driver_disk_corruption /opt/antithesis/test/v1/disk/parallel_driver_disk_corruption
+COPY --from=workload-build /usr/local/bin/eventually_disk_soundness /opt/antithesis/test/v1/disk/eventually_disk_soundness
 RUN mkdir -p /symbols \
  && ln -s /usr/bin/oracle /symbols/oracle \
+ && ln -s /usr/bin/disk_soundness_oracle /symbols/disk_soundness_oracle \
  && ln -s /opt/antithesis/test/v1/vector/parallel_driver_produce /symbols/parallel_driver_produce \
- && ln -s /opt/antithesis/test/v1/vector/eventually_conservation /symbols/eventually_conservation
+ && ln -s /opt/antithesis/test/v1/vector/eventually_conservation /symbols/eventually_conservation \
+ && ln -s /opt/antithesis/test/v1/disk/parallel_driver_disk_soundness /symbols/parallel_driver_disk_soundness \
+ && ln -s /opt/antithesis/test/v1/disk/parallel_driver_disk_corruption /symbols/parallel_driver_disk_corruption \
+ && ln -s /opt/antithesis/test/v1/disk/eventually_disk_soundness /symbols/eventually_disk_soundness
 ENV NO_COLOR=1
 ENTRYPOINT ["/usr/bin/oracle"]
