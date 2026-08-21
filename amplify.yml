@@ -10,9 +10,8 @@ applications:
             - export CI=true
         build:
           commands:
-            - export DEPLOY_PRIME_URL="https://$(echo "${AWS_BRANCH}" | sed 's/[./]/-/g').d1a7j77663uxsc.amplifyapp.com"
-            - if [[ "${AWS_BRANCH}" == "website" ]]; then DEPLOY_COMMAND="ci-production-build"; else DEPLOY_COMMAND="ci-preview-build"; fi
-            - make "${DEPLOY_COMMAND}"
+            - test "${AWS_BRANCH}" = "website"
+            - make ci-production-build
       artifacts:
         baseDirectory: public
         files:
