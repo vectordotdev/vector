@@ -1696,6 +1696,139 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
     }
 }
 
+#[tokio::test]
+async fn standard_grpc_health_check_works() {
+    use tonic::transport::Channel;
+    use tonic_health::pb::{
+        HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
+    };
+
+    test_util::trace_init();
+
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+
+    let source = get_source_config_with_headers(grpc_addr, http_addr, false);
+
+    let (sender, _output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+    let server = source
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(grpc_addr).await;
+
+    let channel = Channel::from_shared(format!("http://{grpc_addr}"))
+        .unwrap()
+        .connect()
+        .await
+        .unwrap();
+    let mut client = HealthClient::new(channel);
+
+    // The aggregate server health, which is what load balancers check by default.
+    let response = client
+        .check(HealthCheckRequest {
+            service: String::new(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
+
+    // Each OTLP service is also reported by name. These names are spelled out rather than taken
+    // from `NamedService` because they are what a probe puts on the wire, so a rename should fail
+    // here rather than silently follow the code.
+    for service in [
+        "opentelemetry.proto.collector.logs.v1.LogsService",
+        "opentelemetry.proto.collector.metrics.v1.MetricsService",
+        "opentelemetry.proto.collector.trace.v1.TraceService",
+    ] {
+        let response = client
+            .check(HealthCheckRequest {
+                service: service.to_string(),
+            })
+            .await
+            .unwrap_or_else(|error| panic!("health check for {service} failed: {error}"));
+        assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
+    }
+
+    // An unknown service name gets a real gRPC status rather than an unrouted HTTP 404.
+    let status = client
+        .check(HealthCheckRequest {
+            service: "not.a.real.Service".to_string(),
+        })
+        .await
+        .expect_err("expected an error for an unregistered service");
+    assert_eq!(status.code(), tonic::Code::NotFound);
+}
+
+#[tokio::test]
+async fn health_checks_are_not_counted_as_received_bytes() {
+    use crate::metrics::Controller;
+    use tonic::transport::Channel;
+    use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
+
+    // Sums `component_received_bytes_total` across whatever the source has recorded so far.
+    fn received_bytes() -> f64 {
+        Controller::get()
+            .unwrap()
+            .capture_metrics()
+            .iter()
+            .filter(|metric| metric.name() == "component_received_bytes_total")
+            .map(|metric| match metric.value() {
+                MetricValue::Counter { value } => *value,
+                value => {
+                    panic!("component_received_bytes_total should be a counter, got {value:?}")
+                }
+            })
+            .sum()
+    }
+
+    test_util::trace_init();
+
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+
+    let source = get_source_config_with_headers(grpc_addr, http_addr, false);
+
+    let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+    let server = source
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(grpc_addr).await;
+
+    let channel = Channel::from_shared(format!("http://{grpc_addr}"))
+        .unwrap()
+        .connect()
+        .await
+        .unwrap();
+
+    let mut health_client = HealthClient::new(channel.clone());
+    for _ in 0..5 {
+        health_client
+            .check(HealthCheckRequest {
+                service: String::new(),
+            })
+            .await
+            .unwrap();
+    }
+
+    // A probe carries no events, so it must not show up in the source's byte accounting even
+    // though it shares the listener with the OTLP services.
+    assert_eq!(received_bytes(), 0.0);
+
+    // The same listener still accounts for real OTLP traffic.
+    LogsServiceClient::new(channel)
+        .export(create_test_logs_request())
+        .await
+        .unwrap();
+    let events = test_util::collect_ready(logs_output).await;
+    assert_eq!(events.len(), 1);
+
+    assert!(received_bytes() > 0.0);
+}
+
 #[cfg(test)]
 mod otlp_decoding_config_tests {
     use indoc::indoc;
