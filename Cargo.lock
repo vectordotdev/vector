@@ -12656,18 +12656,6 @@ dependencies = [
 
 [[package]]
 name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "futures",
- "futures-task",
- "pin-project",
- "tracing 0.1.44",
-]
-
-[[package]]
-name = "tracing-futures"
 version = "0.3.0"
 source = "git+https://github.com/tokio-rs/tracing?rev=e0642d949891546a3bb7e47080365ee7274f05cd#e0642d949891546a3bb7e47080365ee7274f05cd"
 dependencies = [
@@ -12759,7 +12747,7 @@ dependencies = [
  "futures",
  "tower-service",
  "tracing 0.2.0",
- "tracing-futures 0.3.0",
+ "tracing-futures",
 ]
 
 [[package]]
@@ -13187,7 +13175,6 @@ dependencies = [
  "arc-swap",
  "arr_macro",
  "arrow 59.2.0",
- "arrow-schema 59.2.0",
  "assert_cmd",
  "async-compression",
  "async-nats",
@@ -13261,7 +13248,6 @@ dependencies = [
  "headers 0.3.9",
  "heim",
  "hex",
- "hickory-proto",
  "hostname 0.4.2",
  "http 0.2.12",
  "http 1.5.0",
@@ -13269,7 +13255,6 @@ dependencies = [
  "http-body 1.1.0",
  "http-body-util",
  "http-serde",
- "humantime",
  "hyper 0.14.32",
  "hyper 1.11.0",
  "hyper-openssl 0.10.2",
@@ -13373,7 +13358,6 @@ dependencies = [
  "tower-test",
  "tracing 0.1.44",
  "tracing-core 0.1.36",
- "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-subscriber",
  "tracing-tower",
@@ -13572,6 +13556,7 @@ dependencies = [
  "http 0.2.12",
  "hyper-proxy",
  "indexmap 2.14.0",
+ "inventory",
  "ipnet",
  "metrics",
  "metrics-tracing-context",
@@ -13614,7 +13599,6 @@ dependencies = [
  "toml 0.9.12+spec-1.1.0",
  "tonic 0.11.0",
  "tracing 0.1.44",
- "tracing-subscriber",
  "url",
  "urlencoding",
  "uuid",
