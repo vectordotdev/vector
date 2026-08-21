@@ -149,7 +149,7 @@ fn generate_avro_test_case_fixed() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "fixed_field", "type":"fixed", "size": 16}
+            {"name": "fixed_field", "type": {"type": "fixed", "name": "fixed_field", "size": 16}}
         ]
     }
     "#;
@@ -166,7 +166,7 @@ fn generate_avro_test_case_enum() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "enum_field", "type": "enum", "symbols" : ["Spades", "Hearts", "Diamonds", "Clubs"]}
+            {"name": "enum_field", "type": {"type": "enum", "name": "Suit", "symbols": ["Spades", "Hearts", "Diamonds", "Clubs"]}}
         ]
     }
     "#;
@@ -217,7 +217,7 @@ fn generate_avro_test_case_array() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "array_field", "type": "array", "items" : "string"}
+            {"name": "array_field", "type": {"type": "array", "items": "string"}}
         ]
     }
     "#;
@@ -242,7 +242,7 @@ fn generate_avro_test_case_map() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "map_field", "type": "map", "values" : "long","default": {}}
+            {"name": "map_field", "type": {"type": "map", "values": "long"}, "default": {}}
         ]
     }
     "#;
@@ -472,7 +472,8 @@ fn generate_test_case_from_value(schema: &str, value: Value, filename: &str) -> 
     let schema = Schema::parse_str(schema)?;
 
     let value = value.resolve(&schema)?;
-    let bytes = apache_avro::to_avro_datum(&schema, value)?;
+    let writer = apache_avro::writer::datum::GenericDatumWriter::builder(&schema).build()?;
+    let bytes = writer.write_value_to_vec(value)?;
 
     let mut schema_file = File::create(format!("{FIXTURES_PATH}/{filename}.avsc"))?;
     let mut avro_file = File::create(format!("{FIXTURES_PATH}/{filename}.avro"))?;
