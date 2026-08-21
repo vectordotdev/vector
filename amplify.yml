@@ -1,0 +1,20 @@
+version: 1
+applications:
+  - appRoot: website
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - source ~/.nvm/nvm.sh
+            - nvm use 24.11.0
+        build:
+          commands:
+            - test "${AWS_BRANCH}" = "website"
+            - make ci-production-build
+      artifacts:
+        baseDirectory: public
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
