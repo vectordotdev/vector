@@ -277,6 +277,32 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
+    let (writer, reader, ledger, _usage) = create_buffer_v2_with_data_file_count_limit_and_usage(
+        data_dir,
+        max_data_file_size,
+        data_file_count_limit,
+        error_on_full,
+    )
+    .await;
+    (writer, reader, ledger)
+}
+
+/// Like [`create_buffer_v2_with_data_file_count_limit`], but also returns the buffer usage handle.
+pub(crate) async fn create_buffer_v2_with_data_file_count_limit_and_usage<P, R>(
+    data_dir: P,
+    max_data_file_size: u64,
+    data_file_count_limit: u64,
+    error_on_full: bool,
+) -> (
+    BufferWriter<R, FilesystemUnderTest>,
+    BufferReader<R, FilesystemUnderTest>,
+    Arc<Ledger<FilesystemUnderTest>>,
+    BufferUsageHandle,
+)
+where
+    P: AsRef<Path>,
+    R: Bufferable,
+{
     // We do this here, despite the fact that configuration builder also implicitly does it, because our error message
     // can be more pointed given that we're running tests, whereas the user-visible error message is just about getting
     // them to set a valid amount without needing to understand the internals.
@@ -304,9 +330,10 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    (writer, reader, ledger, usage_handle)
 }
 
 /// Creates a disk v2 buffer with the specified maximum record size, but returns a handle to the

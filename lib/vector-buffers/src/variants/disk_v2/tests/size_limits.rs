@@ -6,8 +6,10 @@ use tracing::Instrument;
 use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
 
 use super::{
-    create_buffer_v2_with_data_file_count_limit, create_buffer_v2_with_max_data_file_size,
-    create_buffer_v2_with_max_record_size_and_usage, read_next, read_next_some,
+    create_buffer_v2_with_data_file_count_limit,
+    create_buffer_v2_with_data_file_count_limit_and_usage,
+    create_buffer_v2_with_max_data_file_size, create_buffer_v2_with_max_record_size_and_usage,
+    read_next, read_next_some,
 };
 
 use crate::{
@@ -488,9 +490,14 @@ async fn writer_marks_shed_record_errored_when_reject() {
             let mut second_record = SizedRecord::new(write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, _reader, ledger) =
-                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2, true)
-                    .await;
+            let (mut writer, _reader, ledger, usage) =
+                create_buffer_v2_with_data_file_count_limit_and_usage(
+                    data_dir,
+                    max_data_file_size,
+                    2,
+                    true,
+                )
+                .await;
 
             assert_buffer_is_empty!(ledger);
 
@@ -519,6 +526,14 @@ async fn writer_marks_shed_record_errored_when_reject() {
             drop(second_write_result);
 
             assert_eq!(status.await, BatchStatus::Errored);
+
+            // The shed record is recorded as an intentional drop, and as received so occupancy stays
+            // balanced: one written, one shed.
+            let snapshot = usage.snapshot();
+            assert_eq!(snapshot.received_event_count, 2);
+            assert_eq!(snapshot.sent_event_count, 0);
+            assert_eq!(snapshot.dropped_event_count, 0);
+            assert_eq!(snapshot.dropped_event_count_intentional, 1);
         }
     })
     .await;

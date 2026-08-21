@@ -1691,8 +1691,10 @@ where
     ) -> Result<Result<usize, T>, WriterError<T>> {
         // If the buffer is already full, we definitely can't complete this write.
         if self.is_buffer_full() {
-            // `reject` sheds this record; mark its finalizers errored rather than delivered.
+            // `reject` sheds this record: record the drop and mark its finalizers errored.
             if self.config.error_on_full {
+                self.ledger
+                    .track_rejected_record(record.event_count() as u64);
                 record
                     .take_finalizer_groups()
                     .update_status(EventStatus::Errored);
@@ -1816,9 +1818,11 @@ where
             // errors if we encounter them, but if we recover the record successfully, we're returning
             // `Ok(Err(record))` to signal that our attempt failed but the record is able to be retried again later.
             let mut record = writer.recover_archived_record(&token)?;
-            // `reject` sheds this record, so let the guard error its finalizers on drop; other modes
-            // reattach them so the record can be retried (block) or overflowed.
+            // `reject` sheds this record: record the drop and let the guard error its finalizers.
+            // Other modes reattach them so the record can be retried (block) or overflowed.
             if self.config.error_on_full {
+                self.ledger
+                    .track_rejected_record(record_events.get() as u64);
                 drop(record_finalizers);
             } else {
                 record.merge_finalizer_groups(record_finalizers.into_inner());
