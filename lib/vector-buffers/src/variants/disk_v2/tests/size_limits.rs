@@ -528,12 +528,13 @@ async fn writer_marks_shed_record_errored_when_reject() {
             assert_eq!(status.await, BatchStatus::Errored);
 
             // The shed record is recorded as an intentional drop, and as received so occupancy stays
-            // balanced: one written, one shed.
+            // balanced: one written, one shed. Its byte size is tracked too (not zeroed).
             let snapshot = usage.snapshot();
             assert_eq!(snapshot.received_event_count, 2);
             assert_eq!(snapshot.sent_event_count, 0);
             assert_eq!(snapshot.dropped_event_count, 0);
             assert_eq!(snapshot.dropped_event_count_intentional, 1);
+            assert!(snapshot.dropped_event_byte_size_intentional > 0);
         }
     })
     .await;

@@ -1705,7 +1705,7 @@ where
             // `reject` sheds this record: record the drop and mark its finalizers errored.
             if self.config.error_on_full {
                 self.ledger
-                    .track_rejected_record(record.event_count() as u64);
+                    .track_rejected_record(record.event_count() as u64, record.size_of() as u64);
                 record
                     .take_finalizer_groups()
                     .update_status(EventStatus::Errored);
@@ -1833,7 +1833,7 @@ where
             // Other modes reattach them so the record can be retried (block) or overflowed.
             if self.config.error_on_full {
                 self.ledger
-                    .track_rejected_record(record_events.get() as u64);
+                    .track_rejected_record(record_events.get() as u64, record.size_of() as u64);
                 drop(record_finalizers);
             } else {
                 record.merge_finalizer_groups(record_finalizers.into_inner());
