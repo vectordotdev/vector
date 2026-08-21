@@ -19,7 +19,7 @@ use crate::{
     http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
         HealthcheckError,
-        util::{BatchConfig, Compression, SinkBatchSettings, auth::Auth},
+        util::{BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, auth::Auth},
     },
     template::Template,
     test_util::{
@@ -58,16 +58,28 @@ fn aws_api_version() -> ElasticsearchApiVersion {
     }
 }
 
-fn aws_server() -> String {
-    std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+fn aws_server() -> HttpEndpoint {
+    HttpEndpoint::parse(
+        &std::env::var("ELASTICSEARCH_AWS_ADDRESS")
+            .unwrap_or_else(|_| "http://localhost:4571".into()),
+    )
+    .unwrap()
 }
 
-fn http_server() -> String {
-    std::env::var("ELASTICSEARCH_HTTP_ADDRESS").unwrap_or_else(|_| "http://localhost:9200".into())
+fn http_server() -> HttpEndpoint {
+    HttpEndpoint::parse(
+        &std::env::var("ELASTICSEARCH_HTTP_ADDRESS")
+            .unwrap_or_else(|_| "http://localhost:9200".into()),
+    )
+    .unwrap()
 }
 
-fn https_server() -> String {
-    std::env::var("ELASTICSEARCH_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:9201".into())
+fn https_server() -> HttpEndpoint {
+    HttpEndpoint::parse(
+        &std::env::var("ELASTICSEARCH_HTTPS_ADDRESS")
+            .unwrap_or_else(|_| "https://localhost:9201".into()),
+    )
+    .unwrap()
 }
 
 impl ElasticsearchCommon {
@@ -620,7 +632,7 @@ async fn distributed_insert_events_failover() {
         endpoints: vec![
             http_server(),
             https_server(),
-            "http://localhost:2347".into(),
+            HttpEndpoint::parse("http://localhost:2347").unwrap(),
         ],
         doc_type: "log_lines".into(),
         compression: Compression::None,
