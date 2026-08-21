@@ -1,0 +1,14 @@
+sinks:
+  my_sink_id:
+    type: splunk_hec_metrics
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    default_namespace: service
+    default_token: ${SPLUNK_HEC_TOKEN}
+    endpoint: https://http-inputs-hec.splunkcloud.com
+    host_key: host
+    index: index-{{ host }}
+    source: source-{{ file }}
+    sourcetype: sourcetype-{{ sourcetype }}

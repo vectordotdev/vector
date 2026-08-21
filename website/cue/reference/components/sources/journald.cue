@@ -72,7 +72,6 @@ components: sources: journald: {
 					description: "The time at which the event appeared in the journal."
 				}
 				"*": {
-					common:      false
 					description: "Any Journald field"
 					required:    false
 					type: string: {

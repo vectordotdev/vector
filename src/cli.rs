@@ -449,10 +449,6 @@ pub enum SubCommand {
     #[command(hide = true)]
     Completion(completion::Opts),
 
-    /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
-    #[command(hide = true)]
-    Config(config::Opts),
-
     /// List available components, then exit.
     List(list::Opts),
 
@@ -486,7 +482,6 @@ impl SubCommand {
     )]
     pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
         match self {
-            Self::Config(c) => c.dangerously_allow_env_var_interpolation,
             Self::Graph(g) => g.dangerously_allow_env_var_interpolation,
             Self::Test(t) => t.dangerously_allow_env_var_interpolation,
             Self::Validate(v) => v.dangerously_allow_env_var_interpolation,
@@ -503,7 +498,6 @@ impl SubCommand {
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
-            Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema(opts) => generate_schema::cmd(opts),

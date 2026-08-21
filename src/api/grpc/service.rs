@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures::{StreamExt as FuturesStreamExt, stream};
-use rand::{Rng, SeedableRng as _, rngs::SmallRng};
+use rand::{RngExt, SeedableRng as _, rngs::SmallRng};
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::time::{self, interval};

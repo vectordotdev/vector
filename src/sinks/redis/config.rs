@@ -183,16 +183,19 @@ pub struct RedisSinkConfig {
 
 impl GenerateConfig for RedisSinkConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
+        serde_yaml::from_str(indoc::indoc! {
             r#"
-            url = "redis://127.0.0.1:6379/0"
-            key = "vector"
-            data_type = "list"
-            list.method = "lpush"
-            encoding.codec = "json"
-            batch.max_events = 1
+            url: "redis://127.0.0.1:6379/0"
+            key: vector
+            data_type: list
+            list:
+              method: lpush
+            encoding:
+              codec: json
+            batch:
+              max_events: 1
             "#,
-        )
+        })
         .unwrap()
     }
 }
