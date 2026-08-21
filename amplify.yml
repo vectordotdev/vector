@@ -5,8 +5,9 @@ applications:
       phases:
         preBuild:
           commands:
-            - source ~/.nvm/nvm.sh
+            - source "${NVM_DIR}/nvm.sh"
             - nvm use 24.11.0
+            - node --version
         build:
           commands:
             - test "${AWS_BRANCH}" = "website"
