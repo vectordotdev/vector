@@ -162,7 +162,7 @@ impl TcpConnector {
     }
 
     async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {
-        let ip = dns::Resolver
+        let ip = dns::Resolver::default()
             .lookup_ip(self.host.clone())
             .await
             .context(DnsSnafu)?
