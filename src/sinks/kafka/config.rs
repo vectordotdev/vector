@@ -346,12 +346,12 @@ pub struct ValidatedKafkaSink {
 #[async_trait::async_trait]
 impl ValidatedSink for KafkaSinkConfig {
     type Validated = ValidatedKafkaSink;
-
     fn validate(&self) -> crate::Result<ValidatedKafkaSink> {
-        self.validate_batch_librdkafka_conflicts()?;
-        // Validate the full librdkafka configuration (unknown keys and invalid
-        // values) without connecting to any broker.
-        let _ = self.to_rdkafka()?.create_native_config()?;
+        // Build the librdkafka ClientConfig (pure: just key-value pairs) to
+        // surface batch/librdkafka conflicts. Native config creation — which
+        // can load `plugin.library.paths` and run plugin initialization — is
+        // deferred to `build()` per the split-component-build-lifecycle RFC.
+        let _ = self.to_rdkafka()?;
         let topic = self
             .topic
             .clone()
@@ -509,8 +509,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn validate_rejects_unknown_librdkafka_option() {
+    #[tokio::test]
+    async fn build_rejects_unknown_librdkafka_option() {
         let config: KafkaSinkConfig = serde_yaml::from_str(
             r#"
             bootstrap_servers: "localhost:9092"
@@ -522,14 +522,19 @@ mod tests {
             "#,
         )
         .unwrap();
+        let validated = config
+            .validate()
+            .expect("validation is pure and should succeed");
         assert!(
-            config.validate().is_err(),
-            "an unknown librdkafka option should fail validation"
+            ValidatedSink::build(&config, &validated, SinkContext::default())
+                .await
+                .is_err(),
+            "an unknown librdkafka option should fail build"
         );
     }
 
-    #[test]
-    fn validate_rejects_invalid_librdkafka_option_value() {
+    #[tokio::test]
+    async fn build_rejects_invalid_librdkafka_option_value() {
         let config: KafkaSinkConfig = serde_yaml::from_str(
             r#"
             bootstrap_servers: "localhost:9092"
@@ -541,9 +546,14 @@ mod tests {
             "#,
         )
         .unwrap();
+        let validated = config
+            .validate()
+            .expect("validation is pure and should succeed");
         assert!(
-            config.validate().is_err(),
-            "an invalid value for a known librdkafka option should fail validation"
+            ValidatedSink::build(&config, &validated, SinkContext::default())
+                .await
+                .is_err(),
+            "an invalid value for a known librdkafka option should fail build"
         );
     }
 }
