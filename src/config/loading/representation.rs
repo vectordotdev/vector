@@ -10,6 +10,7 @@ const LARGE_INTEGER_ERROR: &str =
 const NON_FINITE_FLOAT_ERROR: &str =
     "non-finite float values are not supported in Vector configuration";
 
+#[cfg(test)]
 pub(super) fn deserialize_config<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: DeserializeOwned,
