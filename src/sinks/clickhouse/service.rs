@@ -1,5 +1,7 @@
 //! Service implementation for the `Clickhouse` sink.
 
+use std::collections::HashMap;
+
 use bytes::Bytes;
 use http::{
     Request, StatusCode, Uri,
@@ -70,6 +72,7 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) insert_random_shard: bool,
     pub(super) compression: Compression,
     pub(super) query_settings: QuerySettingsConfig,
+    pub(super) extra_query_params: HashMap<String, String>,
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
@@ -88,6 +91,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             self.date_time_best_effort,
             self.insert_random_shard,
             self.query_settings,
+            &self.extra_query_params,
         )?;
 
         let auth: Option<Auth> = self.auth.clone();
@@ -140,10 +144,12 @@ fn set_uri_query(
     date_time_best_effort: bool,
     insert_random_shard: bool,
     query_settings: QuerySettingsConfig,
+    extra_query_params: &HashMap<String, String>,
 ) -> crate::Result<Uri> {
     // Use ClickHouse query parameters with the Identifier type (introduced in 21.12) so
     // the server handles identifier quoting — no client-side escaping required.
-    let query = url::form_urlencoded::Serializer::new(String::new())
+    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+    serializer
         .append_pair(
             "query",
             &format!(
@@ -152,8 +158,11 @@ fn set_uri_query(
             ),
         )
         .append_pair("param_database", database)
-        .append_pair("param_table", table)
-        .finish();
+        .append_pair("param_table", table);
+    for (k, v) in extra_query_params {
+        serializer.append_pair(k, v);
+    }
+    let query = serializer.finish();
 
     let mut uri = uri.to_string();
     if !uri.ends_with('/') {
@@ -229,6 +238,7 @@ mod tests {
             true,
             false,
             QuerySettingsConfig::default(),
+            &HashMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -251,6 +261,7 @@ mod tests {
             false,
             false,
             QuerySettingsConfig::default(),
+            &HashMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -272,6 +283,7 @@ mod tests {
             true,
             false,
             QuerySettingsConfig::default(),
+            &HashMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -294,6 +306,7 @@ mod tests {
             true,
             false,
             QuerySettingsConfig::default(),
+            &HashMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -322,6 +335,7 @@ mod tests {
                     ..AsyncInsertSettingsConfig::default()
                 },
             },
+            &HashMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -350,6 +364,7 @@ mod tests {
                 false,
                 false,
                 QuerySettingsConfig::default(),
+                &HashMap::new(),
             )
             .unwrap();
             let p = parse_query_params(&uri);
@@ -400,7 +415,44 @@ mod tests {
             false,
             false,
             QuerySettingsConfig::default(),
+            &HashMap::new(),
         )
         .unwrap_err();
+    }
+
+    #[test]
+    fn extra_query_params_are_appended() {
+        let mut extra = HashMap::new();
+        extra.insert(
+            "deduplicate_blocks_in_dependent_materialized_views".to_string(),
+            "0".to_string(),
+        );
+        extra.insert("insert_quorum".to_string(), "2".to_string());
+
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_table",
+            Format::JsonEachRow,
+            None,
+            false,
+            false,
+            QuerySettingsConfig::default(),
+            &extra,
+        )
+        .unwrap();
+
+        let params = parse_query_params(&uri);
+        assert_eq!(
+            params.get("deduplicate_blocks_in_dependent_materialized_views"),
+            Some(&"0".to_string())
+        );
+        assert_eq!(params.get("insert_quorum"), Some(&"2".to_string()));
+        // Existing params are still present
+        assert!(params.contains_key("query"));
+        assert_eq!(
+            params.get("param_database"),
+            Some(&"my_database".to_string())
+        );
     }
 }
