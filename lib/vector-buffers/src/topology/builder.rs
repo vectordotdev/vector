@@ -122,9 +122,9 @@ impl<T: Bufferable> TopologyBuilder<T> {
                         return Err(TopologyError::OverflowWhenLast);
                     }
                 }
-                // If there's already an inner stage, then blocking or dropping the newest events
-                // doesn't no sense.  Overflowing is the only valid transition to another stage.
-                WhenFull::Block | WhenFull::DropNewest => {
+                // If there's already an inner stage, then blocking, dropping, or rejecting the newest
+                // events doesn't make sense.  Overflowing is the only valid transition to another stage.
+                WhenFull::Block | WhenFull::DropNewest | WhenFull::Reject => {
                     if current_stage.is_some() {
                         return Err(TopologyError::NextStageNotUsed { stage_idx });
                     }

@@ -712,6 +712,16 @@ where
         self.usage_handle
             .increment_dropped_event_count_and_byte_size(count, byte_size, false);
     }
+
+    /// Records a record shed by a full `reject`-mode buffer (the outer `BufferSender` does not
+    /// instrument disk stages). Counted as received then intentionally dropped so occupancy stays
+    /// balanced while the drop count and byte metrics are surfaced.
+    pub fn track_rejected_record(&self, count: u64, byte_size: u64) {
+        self.usage_handle
+            .increment_received_event_count_and_byte_size(count, byte_size);
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(count, byte_size, true);
+    }
 }
 
 impl<FS> Ledger<FS>
