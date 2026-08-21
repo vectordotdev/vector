@@ -430,6 +430,17 @@ impl SourceConfig for Config {
             )
             .with_source_metadata(
                 Self::NAME,
+                self.namespace_annotation_fields
+                    .namespace_annotations
+                    .path
+                    .clone()
+                    .map(|x| LegacyKey::Overwrite(x.path)),
+                &owned_value_path!("namespace_annotations"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
                 self.node_annotation_fields
                     .node_labels
                     .path
@@ -1464,6 +1475,12 @@ mod tests {
                         None
                     )
                     .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "namespace_annotations"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "node_labels"),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
@@ -1584,6 +1601,11 @@ mod tests {
                 )
                 .with_event_field(
                     &owned_value_path!("kubernetes", "namespace_labels"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
+                )
+                .with_event_field(
+                    &owned_value_path!("kubernetes", "namespace_annotations"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None
                 )
