@@ -17,7 +17,7 @@ use vector_lib::{
 
 use super::sink::S3RequestOptions;
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, AwsTimeout, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{
         AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
@@ -163,6 +163,15 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
+    /// Client timeout configuration for AWS requests.
+    ///
+    /// These settings bound how long the client waits when connecting to and reading from the
+    /// AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+    /// `read_timeout_seconds = 30`).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub timeout: AwsTimeout,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -219,6 +228,7 @@ impl GenerateConfig for S3SinkConfig {
             request: TowerRequestConfig::default(),
             tls: Some(TlsConfig::default()),
             auth: AwsAuthentication::default(),
+            timeout: AwsTimeout::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
             force_path_style: Default::default(),
@@ -417,6 +427,7 @@ impl S3SinkConfig {
             proxy,
             self.tls.as_ref(),
             self.force_path_style,
+            &self.timeout,
         )
         .await
     }
@@ -509,6 +520,7 @@ mod tests {
             request: Default::default(),
             tls: Default::default(),
             auth: Default::default(),
+            timeout: Default::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
             force_path_style: true,

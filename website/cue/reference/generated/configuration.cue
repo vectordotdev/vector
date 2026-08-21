@@ -873,6 +873,62 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"aws_secrets_manager\""
 					}
+					client_timeout: {
+						type: object: options: {
+							connect_timeout_seconds: {
+								type: uint: {
+									default: 5
+									examples: [20]
+									unit: "seconds"
+								}
+								description: """
+																		The connection timeout for AWS requests
+
+																		Limits the amount of time allowed to initiate a socket connection.
+																		"""
+								required: false
+							}
+							operation_timeout_seconds: {
+								type: uint: {
+									examples: [20]
+									unit: "seconds"
+								}
+								description: """
+																		The operation timeout for AWS requests
+
+																		Limits the amount of time allowed for an operation to be fully serviced; an
+																		operation represents the full request/response lifecycle of a call to a service.
+																		Take care when configuring this settings to allow enough time for the polling
+																		interval configured in `poll_secs`
+																		"""
+								required: false
+							}
+							read_timeout_seconds: {
+								type: uint: {
+									default: 30
+									examples: [20]
+									unit: "seconds"
+								}
+								description: """
+																		The read timeout for AWS requests
+
+																		Limits the amount of time allowed to read the first byte of a response from the
+																		time the request is initiated. Take care when configuring this settings to allow
+																		enough time for the polling interval configured in `poll_secs`
+																		"""
+								required: false
+							}
+						}
+						description: """
+														Client timeout configuration for AWS requests.
+
+														These settings bound how long the client waits when connecting to and reading from the
+														AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+														`read_timeout_seconds = 30`).
+														"""
+						required:      false
+						relevant_when: "type = \"aws_secrets_manager\""
+					}
 					secret_id: {
 						type: string: {}
 						description:   "ID of the secret to resolve."

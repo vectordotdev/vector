@@ -177,7 +177,7 @@ pub(super) struct Config {
     #[derivative(Default)]
     #[serde(default)]
     #[serde(flatten)]
-    pub(super) timeout: Option<AwsTimeout>,
+    pub(super) timeout: AwsTimeout,
 
     /// Configuration for deferring events to another queue based on their age.
     #[configurable(derived)]
