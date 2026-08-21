@@ -112,6 +112,23 @@ impl<T: Bufferable> DiskV2Sender<T> {
                 blocking,
                 response,
             } => {
+                // Filtering is unconditional and independent of current occupancy. For overflow
+                // buffers, `BufferSender` diverts items that are not fully encodable before they
+                // reach this actor; anything arriving here can therefore be filtered and written
+                // as one cancellation-safe operation.
+                let pre_count = item.event_count() as u64;
+                let pre_size = item.size_of() as u64;
+                let Some(item) = item.filter_unencodable() else {
+                    writer.track_dropped(pre_count, pre_size);
+                    let _ = response.send(Ok(TryWriteOutcome::Dropped));
+                    return None;
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
+
                 let result = if blocking {
                     writer.write_record_outcome_and_flush(item).await
                 } else {
@@ -256,6 +273,22 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
+    /// Whether this backend can only persist items satisfying [`Bufferable::is_fully_encodable`].
+    ///
+    /// In-memory stages hold the in-memory representation and have no wire format, so they can
+    /// accept any item regardless of its nesting depth. Disk stages encode to protobuf on write
+    /// and cannot.
+    ///
+    /// Callers use this to avoid assuming a stage is constrained: an item that one stage cannot
+    /// encode may be perfectly storable by another, so the check must be asked of the specific
+    /// stage rather than applied to every topology.
+    pub(crate) fn requires_encodable_items(&self) -> bool {
+        match self {
+            Self::InMemory(_) => false,
+            Self::DiskV2(_) => true,
+        }
+    }
+
     pub(crate) async fn send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
         match self {
             Self::InMemory(tx) => tx
@@ -442,20 +475,47 @@ impl<T: Bufferable> BufferSender<T> {
                 TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
                 TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
             },
-            WhenFull::Overflow => match self.base.try_send(item).await? {
-                TryWriteOutcome::Written => UsageAccounting::Accepted,
-                TryWriteOutcome::Full(item) => {
+            WhenFull::Overflow => {
+                // An item the base stage can never encode is routed to the overflow stage
+                // intact, whatever the current occupancy. Deciding this here, rather than
+                // letting the backend filter it, is what makes the behaviour
+                // state-independent: previously an over-nested item was pruned while the
+                // disk had room and forwarded whole once the disk reported full, so the
+                // same item took different paths at 99% and 100%.
+                //
+                // The check is gated on the base stage actually having a wire-format
+                // constraint. A memory stage overflowing to disk can store an over-nested
+                // item perfectly well, so diverting it past memory would send an item the
+                // base could have kept to a stage that must drop it.
+                if self.base.requires_encodable_items() && !item.is_fully_encodable() {
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))
                         .send(item, send_reference)
                         .await?;
                     UsageAccounting::NotAccepted
+                } else {
+                    match self.base.try_send(item).await? {
+                        TryWriteOutcome::Written => UsageAccounting::Accepted,
+                        TryWriteOutcome::Full(item) => {
+                            self.overflow
+                                .as_mut()
+                                .unwrap_or_else(|| unreachable!("overflow must exist"))
+                                .send(item, send_reference)
+                                .await?;
+                            UsageAccounting::NotAccepted
+                        }
+                        TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+                    }
                 }
-                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
-            },
+            }
         };
 
+        // Backend filter drops are accounted directly through the backend's own
+        // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
+        // stage's `received` / `dropped` metrics even when the `BufferSender`
+        // does not carry instrumentation. This block only reports fullness-driven
+        // drops captured via `was_dropped`.
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
         {

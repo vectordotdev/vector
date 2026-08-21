@@ -268,7 +268,7 @@ generated: components: sinks: websocket: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -661,7 +661,7 @@ generated: components: sinks: websocket: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				30,
+				30
 			]
 			unit: "seconds"
 		}
@@ -677,7 +677,7 @@ generated: components: sinks: websocket: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				5,
+				5
 			]
 			unit: "seconds"
 		}

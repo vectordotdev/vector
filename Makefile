@@ -283,7 +283,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch test-integration-opensearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
@@ -451,12 +451,7 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ve
 .PHONY: check-generated-docs
 check-generated-docs: generate-docs ## Checks that machine-generated component docs and examples are up-to-date.
 	$(VDEV) check generated-docs
-	@if test -n "$$(git status --porcelain -- website/generated/example-configs)"; then \
-		echo "Generated component examples are out of date. Run 'make generate-example-configs' and commit the changes."; \
-		git status --short -- website/generated/example-configs; \
-		exit 1; \
-	fi
-	VECTOR_BIN=$(abspath $(CARGO_TARGET_DIR)/debug/vector) $(MAKE) -C website validate-config-examples
+	$(VDEV) check component-examples
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
