@@ -17,11 +17,10 @@ pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
-use std::{convert::Infallible, fmt::Debug, io::Read, net::SocketAddr, sync::Arc, time::Duration};
+use std::{convert::Infallible, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{Server, service::make_service_fn};
@@ -62,7 +61,13 @@ use crate::{
     internal_events::{HttpBytesReceived, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::{self, util::http::emit_decompress_error},
+    sources::{
+        self,
+        util::{
+            decompression::{CappedDecoder, max_decompressed_size_bytes},
+            http::emit_decompress_error,
+        },
+    },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -87,22 +92,18 @@ pub struct DatadogAgentConfig {
 
     /// If this is set to `true`, when incoming events contain a Datadog API key, it is
     /// stored in the event metadata and used if the event is sent to a Datadog sink.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
     /// If this is set to `true`, logs are not accepted by the component.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
     /// If this is set to `true`, metrics (beta) are not accepted by the component.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
     /// If this is set to `true`, traces (alpha) are not accepted by the component.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
@@ -112,13 +113,11 @@ pub struct DatadogAgentConfig {
     /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
     /// If this is set to `true`, when log events contain the field `ddtags`, the string value that
     /// contains a list of key:value pairs set by the Agent is parsed and expanded into an array.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     parse_ddtags: bool,
 
@@ -126,7 +125,6 @@ pub struct DatadogAgentConfig {
     /// For example, `system.cpu.usage` would be split into namespace `system` and name `cpu.usage`.
     /// If `false`, the full metric name is used without splitting. This may be useful if you are using a
     /// default namespace for metrics in sinks connected to this source.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     split_metric_namespace: bool,
 
@@ -168,8 +166,8 @@ pub struct DatadogAgentConfig {
 }
 
 impl GenerateConfig for DatadogAgentConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
@@ -478,26 +476,29 @@ impl DatadogAgentSource {
             for encoding in encodings.rsplit(',').map(str::trim) {
                 body = match encoding {
                     "identity" => body,
-                    "gzip" | "x-gzip" => {
-                        let mut decoded = Vec::new();
-                        MultiGzDecoder::new(body.reader())
-                            .read_to_end(&mut decoded)
-                            .map_err(|error| emit_decompress_error(encoding, error))?;
-                        decoded.into()
-                    }
-                    "zstd" => {
-                        let mut decoded = Vec::new();
-                        zstd::stream::copy_decode(body.reader(), &mut decoded)
-                            .map_err(|error| emit_decompress_error(encoding, error))?;
-                        decoded.into()
-                    }
-                    "deflate" | "x-deflate" => {
-                        let mut decoded = Vec::new();
-                        ZlibDecoder::new(body.reader())
-                            .read_to_end(&mut decoded)
-                            .map_err(|error| emit_decompress_error(encoding, error))?;
-                        decoded.into()
-                    }
+                    // Cap each decompressed payload so a compression bomb cannot drive
+                    // unbounded allocation on this unauthenticated HTTP listener.
+                    "gzip" | "x-gzip" => CappedDecoder::gzip(body.reader())
+                        .decompress()
+                        .map_err(|error| {
+                            emit_decompress_error(encoding, error, max_decompressed_size_bytes())
+                        })?
+                        .into(),
+                    "zstd" => CappedDecoder::zstd_http(body.reader())
+                        .map_err(|error| {
+                            emit_decompress_error(encoding, error, max_decompressed_size_bytes())
+                        })?
+                        .decompress()
+                        .map_err(|error| {
+                            emit_decompress_error(encoding, error, max_decompressed_size_bytes())
+                        })?
+                        .into(),
+                    "deflate" | "x-deflate" => CappedDecoder::zlib(body.reader())
+                        .decompress()
+                        .map_err(|error| {
+                            emit_decompress_error(encoding, error, max_decompressed_size_bytes())
+                        })?
+                        .into(),
                     encoding => {
                         return Err(ErrorMessage::new(
                             StatusCode::UNSUPPORTED_MEDIA_TYPE,

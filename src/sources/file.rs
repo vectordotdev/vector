@@ -580,7 +580,7 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
                     checkpoints.update(entry.file_id, entry.offset);
@@ -839,6 +839,7 @@ mod tests {
     };
 
     use encoding_rs::UTF_16LE;
+    use indoc::indoc;
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{Duration, sleep, timeout};
@@ -887,16 +888,17 @@ mod tests {
 
     #[test]
     fn parse_config() {
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-            include = [ "/var/log/**/*.log" ]
-            file_key = "file"
-            glob_minimum_cooldown_ms = 1000
-            multi_line_timeout = 1000
-            max_read_bytes = 2048
-            line_delimiter = "\n"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            file_key: file
+            glob_minimum_cooldown_ms: 1000
+            multi_line_timeout: 1000
+            max_read_bytes: 2048
+            line_delimiter: "\n"
+            "#,
+        })
         .unwrap();
         assert_eq!(config, FileConfig::default());
         assert_eq!(
@@ -907,25 +909,27 @@ mod tests {
             }
         );
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        [fingerprint]
-        strategy = "device_and_inode"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            fingerprint:
+              strategy: device_and_inode
+            "#,
+        })
         .unwrap();
         assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        [fingerprint]
-        strategy = "checksum"
-        bytes = 128
-        ignored_header_bytes = 512
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            fingerprint:
+              strategy: checksum
+              bytes: 128
+              ignored_header_bytes: 512
+            "#,
+        })
         .unwrap();
         assert_eq!(
             config.fingerprint,
@@ -935,31 +939,34 @@ mod tests {
             }
         );
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        [encoding]
-        charset = "utf-16le"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            encoding:
+              charset: utf-16le
+            "#,
+        })
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        read_from = "beginning"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            read_from: beginning
+            "#,
+        })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        read_from = "end"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            read_from: end
+            "#,
+        })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::End);
     }
@@ -2571,7 +2578,7 @@ mod tests {
                     let mut rx = rx;
                     while let Some(event) = rx.next().await {
                         counter.fetch_add(1, Ordering::SeqCst);
-                        let _ = relay_tx.send(event);
+                        relay_tx.send(event).ok(); // receiver gone means pipeline is shutting down
                     }
                 });
 

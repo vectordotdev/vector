@@ -9,8 +9,8 @@ use aws_types::region::Region;
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
 use vector_lib::codecs::{
-    CharacterDelimitedEncoder,
-    encoding::{Framer, Serializer},
+    CharacterDelimitedEncoderConfig, LengthDelimitedEncoderConfig,
+    encoding::{Framer, FramingConfig, SerializerConfig},
 };
 #[cfg(feature = "aws-core")]
 use vector_lib::config::proxy::ProxyConfig;
@@ -25,17 +25,19 @@ use crate::aws::AwsAuthentication;
 use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
+    config::{DynValidatedSink, ValidatedSink},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
             http::{
                 HttpService, OrderedHeaderName, RequestConfig, RetryStrategy,
                 http_response_retry_logic,
             },
         },
     },
+    template::ConfinementConfig,
 };
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -107,6 +109,9 @@ pub struct HttpSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 /// HTTP method.
@@ -165,6 +170,7 @@ impl HttpSinkConfig {
         Ok(HttpClient::new(tls, cx.proxy())?)
     }
 
+    #[cfg(test)]
     pub(super) fn build_encoder(&self) -> crate::Result<Encoder<Framer>> {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         Ok(Encoder::<Framer>::new(framer, serializer))
@@ -172,11 +178,12 @@ impl HttpSinkConfig {
 }
 
 impl GenerateConfig for HttpSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"uri = "https://10.22.212.22:9000/endpoint"
-            encoding.codec = "json""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"uri: https://10.22.212.22:9000/endpoint
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
@@ -213,22 +220,58 @@ pub(super) fn validate_headers(
     Ok(headers)
 }
 
+/// Returns the effective framing configuration for the `http` sink (which is
+/// message-based): the explicit framing if set, otherwise the default for the
+/// serializer. This mirrors the framer selection in
+/// `EncodingConfigWithFraming::build` without building the serializer (which
+/// may read files for codecs such as protobuf).
+fn effective_framer_config(encoding: &EncodingConfigWithFraming) -> FramingConfig {
+    match encoding.config().0 {
+        Some(framing) => framing.clone(),
+        None => match encoding.config().1 {
+            SerializerConfig::Json(_) => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(b','))
+            }
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
+                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
+            SerializerConfig::Gelf(_) => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
+            }
+            SerializerConfig::Protobuf(_) => {
+                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
+            SerializerConfig::Cef(_)
+            | SerializerConfig::Csv(_)
+            | SerializerConfig::Logfmt
+            | SerializerConfig::NativeJson
+            | SerializerConfig::RawMessage
+            | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
+            #[cfg(feature = "codecs-syslog")]
+            SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
+            #[cfg(feature = "codecs-opentelemetry")]
+            SerializerConfig::Otlp => FramingConfig::Bytes,
+        },
+    }
+}
+
 pub(super) fn validate_payload_wrapper(
     payload_prefix: &str,
     payload_suffix: &str,
-    encoder: &Encoder<Framer>,
+    serializer: &SerializerConfig,
+    framer: &FramingConfig,
 ) -> crate::Result<(String, String)> {
     let payload = [payload_prefix, "{}", payload_suffix].join("");
     match (
-        encoder.serializer(),
-        encoder.framer(),
+        serializer,
+        framer,
         serde_json::from_str::<serde_json::Value>(&payload),
     ) {
-        (
-            Serializer::Json(_),
-            Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
-            Err(_),
-        ) => Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into()),
+        (SerializerConfig::Json(_), FramingConfig::CharacterDelimited(cfg), Err(_))
+            if cfg.character_delimited.delimiter == b',' =>
+        {
+            Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into())
+        }
         _ => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
     }
 }
@@ -236,10 +279,58 @@ pub(super) fn validate_payload_wrapper(
 #[async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().1.input_type())
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let mut files = Vec::new();
+        if let Some(tls) = &self.tls {
+            if let Some(crt_file) = &tls.crt_file {
+                files.push(crt_file)
+            }
+            if let Some(key_file) = &tls.key_file {
+                files.push(key_file)
+            }
+        };
+        files
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedHttp {
+    batch_settings: BatcherSettings,
+    transformer: Transformer,
+    template_headers: BTreeMap<String, Template>,
+    payload_prefix: String,
+    payload_suffix: String,
+    content_type: Option<String>,
+    content_encoding: Option<String>,
+    converted_static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
+    request_limits: TowerRequestSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HttpSinkConfig {
+    type Validated = ValidatedHttp;
+
+    fn validate(&self) -> crate::Result<ValidatedHttp> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
-        let encoder = self.build_encoder()?;
+        let serializer_config = self.encoding.config().1;
+        let framer_config = effective_framer_config(&self.encoding);
         let transformer = self.encoding.transformer();
 
         let request = self.request.clone();
@@ -247,36 +338,70 @@ impl SinkConfig for HttpSinkConfig {
         validate_headers(&request.headers, self.auth.is_some())?;
         let (static_headers, template_headers) = request.split_headers();
 
-        let (payload_prefix, payload_suffix) =
-            validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
-
-        let client = self.build_http_client(&cx)?;
-
-        let healthcheck = match cx.healthcheck.uri {
-            Some(healthcheck_uri) => {
-                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+        // Pure confinement checks for the URI and templated headers. The actual
+        // confinement (with the component name threaded from the
+        // `opentelemetry`/`axiom` delegations) happens in `build_from_validated`;
+        // running the checks here lets `vector validate --no-environment` catch
+        // unconfined routing templates. Skipped under the full opt-out, where
+        // `confine` only emits a warning.
+        if !self
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            self.uri
+                .clone()
+                .confine(&self.confinement, Self::NAME, "uri")?;
+            for tpl in template_headers.values() {
+                tpl.clone()
+                    .confine(&self.confinement, Self::NAME, "request.headers")?;
             }
-            None => future::ok(()).boxed(),
-        };
+        }
+
+        // `Template::default()` — produced by delegating sinks such as
+        // `opentelemetry` before the user supplies a URI — yields an empty
+        // template whose `is_static` is false, so `is_dynamic()` reports true
+        // even though there is nothing to render. Reject the empty URI up
+        // front rather than deferring a guaranteed per-request failure.
+        if self.uri.is_empty() {
+            return Err("uri must not be empty, e.g. `https://example.com/endpoint`"
+                .to_string()
+                .into());
+        }
+
+        // A static URI can be parsed and checked for embedded credentials up
+        // front; dynamic URIs are only validated at render time.
+        if !self.uri.is_dynamic() {
+            let uri_serde: UriSerde = self.uri.get_ref().parse()?;
+            self.auth.choose_one(&uri_serde.auth)?;
+            if uri_serde.uri.scheme().is_none() || uri_serde.uri.authority().is_none() {
+                return Err(format!(
+                    "uri must include a scheme and host, e.g. `https://example.com/endpoint`; got `{}`",
+                    self.uri.get_ref()
+                )
+                .into());
+            }
+        }
+
+        let (payload_prefix, payload_suffix) = validate_payload_wrapper(
+            &self.payload_prefix,
+            &self.payload_suffix,
+            serializer_config,
+            &framer_config,
+        )?;
 
         let content_type = {
-            use Framer::*;
-            use Serializer::*;
-            match (encoder.serializer(), encoder.framer()) {
-                (RawMessage(_) | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
-                (Json(_), NewlineDelimited(_)) => Some(CONTENT_TYPE_NDJSON.to_owned()),
-                (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
+            use FramingConfig::*;
+            use SerializerConfig::*;
+            match (serializer_config, &framer_config) {
+                (RawMessage | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
+                (Json(_), NewlineDelimited) => Some(CONTENT_TYPE_NDJSON.to_owned()),
+                (Json(_), CharacterDelimited(cfg)) if cfg.character_delimited.delimiter == b',' => {
                     Some(CONTENT_TYPE_JSON.to_owned())
                 }
                 #[cfg(feature = "codecs-opentelemetry")]
-                (Otlp(_), _) => Some("application/x-protobuf".to_owned()),
+                (Otlp, _) => Some("application/x-protobuf".to_owned()),
                 _ => None,
             }
-        };
-
-        let request_builder = HttpRequestBuilder {
-            encoder: HttpEncoder::new(encoder, transformer, payload_prefix, payload_suffix),
-            compression: self.compression,
         };
 
         let content_encoding = self.compression.is_compressed().then(|| {
@@ -296,12 +421,81 @@ impl SinkConfig for HttpSinkConfig {
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
 
+        let request_limits = self.request.tower.into_settings();
+
+        Ok(ValidatedHttp {
+            batch_settings,
+            transformer,
+            template_headers,
+            payload_prefix,
+            payload_suffix,
+            content_type,
+            content_encoding,
+            converted_static_headers,
+            request_limits,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHttp,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_from_validated(validated, cx, Self::NAME).await
+    }
+}
+
+impl HttpSinkConfig {
+    /// Builds the sink from the validated state. Confinement of the URI and
+    /// templated headers happens here (not in `validate`) because the
+    /// `component_name` threaded from the `opentelemetry`/`axiom` delegations
+    /// must appear in per-template security warnings.
+    pub(crate) async fn build_from_validated(
+        &self,
+        validated: &ValidatedHttp,
+        cx: SinkContext,
+        component_name: &'static str,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedHttp {
+            batch_settings,
+            transformer,
+            template_headers,
+            payload_prefix,
+            payload_suffix,
+            content_type,
+            content_encoding,
+            converted_static_headers,
+            request_limits,
+        } = validated;
+
+        let client = self.build_http_client(&cx)?;
+
+        let healthcheck = match cx.healthcheck.uri {
+            Some(healthcheck_uri) => {
+                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+            }
+            None => future::ok(()).boxed(),
+        };
+
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
+        let request_builder = HttpRequestBuilder {
+            encoder: HttpEncoder::new(
+                encoder,
+                transformer.clone(),
+                payload_prefix.clone(),
+                payload_suffix.clone(),
+            ),
+            compression: self.compression,
+        };
+
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
             self.method,
             self.auth.clone(),
-            converted_static_headers,
-            content_type,
-            content_encoding,
+            converted_static_headers.clone(),
+            content_type.clone(),
+            content_encoding.clone(),
         );
 
         let service = match &self.auth {
@@ -334,45 +528,40 @@ impl SinkConfig for HttpSinkConfig {
             _ => HttpService::new(client, http_sink_request_builder),
         };
 
-        let request_limits = self.request.tower.into_settings();
-
         let service = ServiceBuilder::new()
             .settings(
-                request_limits,
+                request_limits.clone(),
                 http_response_retry_logic(self.retry_strategy.clone()),
             )
             .service(service);
 
+        let uri = self
+            .uri
+            .clone()
+            .confine(&self.confinement, component_name, "uri")?;
+
+        // Confine every templated header value. Header-based routing
+        // (e.g. `X-Scope-OrgID: "{{ tenant }}"`) is as steerable as URI
+        // routing — an event that controls the header field picks the
+        // destination tenant unless we confine the header template too.
+        let template_headers = template_headers
+            .clone()
+            .into_iter()
+            .map(|(name, tpl)| {
+                tpl.confine(&self.confinement, component_name, "request.headers")
+                    .map(|tpl| (name, tpl))
+            })
+            .collect::<crate::Result<BTreeMap<_, _>>>()?;
+
         let sink = HttpSink::new(
             service,
-            self.uri.clone(),
+            uri,
             template_headers,
-            batch_settings,
+            *batch_settings,
             request_builder,
         );
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
-    }
-
-    fn files_to_watch(&self) -> Vec<&PathBuf> {
-        let mut files = Vec::new();
-        if let Some(tls) = &self.tls {
-            if let Some(crt_file) = &tls.crt_file {
-                files.push(crt_file)
-            }
-            if let Some(key_file) = &tls.key_file {
-                files.push(key_file)
-            }
-        };
-        files
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -382,6 +571,7 @@ mod tests {
 
     use super::*;
     use crate::components::validation::prelude::*;
+    use crate::template::{ConfinementConfig, Template};
 
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
@@ -416,6 +606,7 @@ mod tests {
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),
                 retry_strategy: RetryStrategy::default(),
+                confinement: ConfinementConfig::default(),
             };
 
             let external_resource = ExternalResource::new(
@@ -437,4 +628,157 @@ mod tests {
     }
 
     register_validatable_component!(HttpSinkConfig);
+
+    #[test]
+    fn validate_rejects_static_uri_with_auth_conflict() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://user:pass@localhost:9000/endpoint"
+            auth:
+              strategy: basic
+              user: user
+              password: pass
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "embedded credentials plus auth should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_static_uri() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        config.validate().expect("valid static uri should validate");
+    }
+
+    #[test]
+    fn validate_accepts_dynamic_uri() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://example.com/{{ path }}"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect("dynamic uri validation is deferred to render time");
+    }
+
+    #[test]
+    fn validate_rejects_empty_default_uri() {
+        use crate::config::ValidatedSink;
+        // `Template::default()` — produced by delegating sinks such as
+        // `opentelemetry` before the user supplies a URI — is empty but reports
+        // `is_dynamic() == true` (the derived default leaves `is_static` false),
+        // so it must be rejected explicitly rather than deferred as a dynamic
+        // template that can never render.
+        let mut config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        config.uri = Template::default();
+        assert!(
+            config.validate().is_err(),
+            "empty default uri should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_relative_static_uri() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "/ingest"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "relative static uri should fail validation"
+        );
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_uri() {
+        let template: Template = "{{ endpoint }}".try_into().unwrap();
+        let err = template
+            .confine(&ConfinementConfig::default(), "http", "uri")
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("no literal string prefix"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_uri() {
+        let cfg = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let template: Template = "{{ endpoint }}".try_into().unwrap();
+        assert!(template.confine(&cfg, "http", "uri").is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_host_redirect_at_render() {
+        use crate::event::Event;
+        use vector_lib::event::LogEvent;
+        use vrl::event_path;
+
+        let template: Template = "https://logs.example.com/ingest/{{ tenant }}"
+            .try_into()
+            .unwrap();
+        let template = template
+            .confine(&ConfinementConfig::default(), "http", "uri")
+            .unwrap();
+
+        // Attacker tries to redirect to a different host via the tenant field.
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../evil.com/steal?data=");
+        assert!(template.render_string(&event).is_err());
+    }
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://127.0.0.1:9000/endpoint"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        // JSON + newline-delimited framing maps to the NDJSON content type.
+        assert_eq!(validated.content_type.as_deref(), Some(CONTENT_TYPE_JSON));
+        assert_eq!(validated.payload_prefix, "");
+        assert_eq!(validated.payload_suffix, "");
+        assert!(validated.template_headers.is_empty());
+        assert!(validated.converted_static_headers.is_empty());
+    }
 }

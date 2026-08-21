@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"union_field","type":["string","int"]}]}
+{"type":"record","name":"test","fields":[{"name":"union_field","type":["string","int"]}]}

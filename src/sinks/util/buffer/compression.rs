@@ -7,7 +7,7 @@ use vector_lib::configurable::{
     Configurable, GenerateError, Metadata, ToValue,
     attributes::CustomAttribute,
     schema::{
-        SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
+        SchemaGenerator, SchemaObject, apply_metadata, generate_const_string_schema,
         generate_enum_schema, generate_one_of_schema, generate_struct_schema,
         get_or_generate_schema,
     },
@@ -285,7 +285,7 @@ pub fn generate_string_schema(
         const_metadata.set_title(title);
     }
     const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
-    apply_base_metadata(&mut const_schema, const_metadata);
+    apply_metadata(&mut const_schema, const_metadata);
     const_schema
 }
 
@@ -300,7 +300,6 @@ impl Configurable for Compression {
         metadata.set_title("Compression configuration.");
         metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
-        metadata.add_custom_attribute(CustomAttribute::flag("docs::advanced"));
         metadata
     }
 
@@ -343,7 +342,7 @@ impl Configurable for Compression {
             zstd_string_subschema,
             snappy_string_subschema,
         ]);
-        apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
+        apply_metadata(&mut all_string_oneof_subschema, string_metadata);
 
         // Next we'll create a full schema for the given algorithms.
         //
@@ -375,7 +374,7 @@ impl Configurable for Compression {
         let mut full_metadata =
             Metadata::with_description("Compression algorithm and compression level.");
         full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
-        apply_base_metadata(&mut full_subschema, full_metadata);
+        apply_metadata(&mut full_subschema, full_metadata);
 
         // Finally, we zip both schemas together.
         Ok(generate_one_of_schema(&[

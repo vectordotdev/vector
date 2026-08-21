@@ -499,7 +499,7 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
 mod tests {
     use std::num::NonZeroUsize;
 
-    use rand::{Rng as _, SeedableRng as _, rngs::SmallRng};
+    use rand::{RngExt as _, SeedableRng as _, rngs::SmallRng};
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 
@@ -637,7 +637,7 @@ mod tests {
         // With the 10th message in the channel no space should be left
         assert_eq!(0, tx.available_capacity());
 
-        // Attemting to produce one more then the max capacity should block
+        // Attempting to produce one more then the max capacity should block
         let mut send_final = spawn({
             let msg_clone = msg.clone();
             async { tx.send(msg_clone).await }

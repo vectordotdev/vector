@@ -4,7 +4,6 @@ components: sinks: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: aws_s3: components._aws & {
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    10000000
 				timeout_secs: 300.0
 			}

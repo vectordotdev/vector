@@ -5,8 +5,8 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+[lints]
+workspace = true
 
 [dependencies]
 async-recursion = "1.1.1"
@@ -31,6 +31,12 @@ tokio = { workspace = true, features = ["rt", "macros", "rt-multi-thread", "sync
 tracing = { workspace = true, features = ["attributes"] }
 vector-config = { path = "../vector-config", default-features = false }
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
+antithesis_sdk = { workspace = true, optional = true, features = ["full"] }
+serde_json = { workspace = true, optional = true }
+
+[features]
+antithesis-disk-asserts = ["dep:antithesis_sdk", "dep:serde_json"]
+test = []
 
 [dev-dependencies]
 clap.workspace = true
@@ -42,8 +48,9 @@ metrics-util = { workspace = true, features = ["debugging"] }
 proptest.workspace = true
 quickcheck.workspace = true
 rand.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true
-temp-dir = "0.1.16"
+temp-dir = "0.2.0"
 tokio-test.workspace = true
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }

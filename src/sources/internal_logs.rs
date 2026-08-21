@@ -210,10 +210,11 @@ async fn run(
 mod tests {
     use futures::Stream;
     use tokio::time::{Duration, sleep};
-    use vector_lib::{event::Value, lookup::OwnedTargetPath};
+    use vector_lib::{SpanField, event::Value, lookup::OwnedTargetPath};
     use vrl::value::kind::Collection;
 
     use serial_test::serial;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -238,11 +239,15 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn receives_logs() {
-        trace::init(false, false, "debug", 10);
+        trace::init(false, false, "debug", 10, None);
         trace::reset_early_buffer();
 
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
     }
+
+    // Register test-specific span fields so they appear in the SPAN_FIELDS allowlist.
+    inventory::submit!(SpanField("component_new_field"));
+    inventory::submit!(SpanField("component_numerical_field"));
 
     async fn run_test() {
         let test_id: u8 = rand::random();
@@ -285,7 +290,7 @@ mod tests {
         sleep(Duration::from_millis(1)).await;
         let mut events = collect_ready(rx).await;
         let test_id = Value::from(test_id.to_string());
-        events.retain(|event| event.as_log().get("test_id") == Some(&test_id));
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id));
 
         let end = chrono::Utc::now();
 
@@ -316,9 +321,9 @@ mod tests {
             assert_eq!(log["metadata.level"], "ERROR".into());
             // The first log event occurs outside our custom span
             if i == 0 {
-                assert!(log.get("vector.component_id").is_none());
-                assert!(log.get("vector.component_kind").is_none());
-                assert!(log.get("vector.component_type").is_none());
+                assert!(log.get(event_path!("vector", "component_id")).is_none());
+                assert!(log.get(event_path!("vector", "component_kind")).is_none());
+                assert!(log.get(event_path!("vector", "component_type")).is_none());
             } else if i < 3 {
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "source".into());
@@ -332,7 +337,7 @@ mod tests {
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
                 assert_eq!(log["vector.component_new_field"], "baz".into());
                 assert_eq!(log["vector.component_numerical_field"], 1.into());
-                assert!(log.get("vector.ignored_field").is_none());
+                assert!(log.get(event_path!("vector", "ignored_field")).is_none());
             }
         }
     }
@@ -350,12 +355,53 @@ mod tests {
         rx
     }
 
+    // Register a span field through the same macro downstream crates would use, then verify
+    // that emitting a log inside a span carrying that field captures it onto the log event.
+    // This is the regression check for `register_extra_span_field!` extending the
+    // `SpanFields::record` allowlist beyond the built-in `component_*` prefix.
+    vector_lib::register_extra_span_field!("internal_logs_test_extra_field");
+
+    #[tokio::test]
+    #[serial]
+    async fn registered_extra_span_field_is_captured() {
+        trace::init(false, false, "info", 10, None);
+        trace::reset_early_buffer();
+
+        let test_id: u8 = rand::random();
+        let rx = start_source().await;
+
+        {
+            let span = error_span!(
+                "extras",
+                component_id = "foo",
+                internal_logs_test_extra_field = "captured",
+                some_other_field = "dropped",
+            );
+            let _enter = span.enter();
+            error!(message = "With extra field.", %test_id);
+        }
+
+        sleep(Duration::from_millis(1)).await;
+        let mut events = collect_ready(rx).await;
+        let test_id_value = Value::from(test_id.to_string());
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id_value));
+
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(
+            log["vector.internal_logs_test_extra_field"],
+            "captured".into()
+        );
+        // The unregistered span field is still filtered out.
+        assert!(log.get(event_path!("vector", "some_other_field")).is_none());
+    }
+
     // NOTE: This test requires #[serial] because it directly interacts with global tracing state.
     // This is a pre-existing limitation around tracing initialization in tests.
     #[tokio::test]
     #[serial]
     async fn repeated_logs_are_not_rate_limited() {
-        trace::init(false, false, "info", 10);
+        trace::init(false, false, "info", 10, None);
         trace::reset_early_buffer();
 
         let rx = start_source().await;
@@ -373,7 +419,7 @@ mod tests {
             .iter()
             .filter(|e| {
                 e.as_log()
-                    .get("message")
+                    .get(event_path!("message"))
                     .map(|m| m.to_string_lossy() == "Repeated test message.")
                     .unwrap_or(false)
             })

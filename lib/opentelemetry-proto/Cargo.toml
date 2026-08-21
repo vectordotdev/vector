@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints]
+workspace = true
+
 [build-dependencies]
 prost-build.workspace = true
 tonic-build.workspace = true
@@ -18,4 +21,5 @@ ordered-float.workspace = true
 prost.workspace = true
 tonic.workspace = true
 vrl.workspace = true
+vector-common = { path = "../vector-common", default-features = false }
 vector-core = { path = "../vector-core", default-features = false }

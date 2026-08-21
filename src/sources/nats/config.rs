@@ -182,13 +182,13 @@ pub const fn default_subscription_capacity() -> usize {
 }
 
 impl GenerateConfig for NatsSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
             r#"
-            connection_name = "vector"
-            subject = "from.vector"
-            url = "nats://127.0.0.1:4222""#,
-        )
+            connection_name: vector
+            subject: from.vector
+            url: "nats://127.0.0.1:4222""#,
+        })
         .unwrap()
     }
 }
