@@ -128,18 +128,11 @@ impl<L> Controller<L> {
         self.in_flight.emit(inner.in_flight as u64);
     }
 
-    /// Adjust the controller to a response, based on type of response
-    /// given (backpressure or not) and if it should be used as a valid
-    /// RTT measurement.
-    fn adjust_to_response_inner(&self, start: Instant, is_back_pressure: bool, use_rtt: bool) {
+    /// Adjust the controller to a completed request, based on type of response given
+    /// (backpressure or not) and if it should be used as a valid RTT measurement.
+    fn adjust_to_response_inner(&self, rtt: Option<Duration>, is_back_pressure: bool) {
         let now = instant_now();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
-
-        let rtt = now.saturating_duration_since(start);
-        if use_rtt {
-            self.observed_rtt.emit(rtt);
-        }
-        let rtt = rtt.as_secs_f64();
 
         if is_back_pressure {
             inner.had_back_pressure = true;
@@ -149,19 +142,19 @@ impl<L> Controller<L> {
         let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
 
         #[cfg(test)]
-        {
-            if use_rtt {
-                stats.observed_rtt.add(rtt, now);
-            }
-            stats.in_flight.add(inner.in_flight, now);
-        }
+        stats.in_flight.add(inner.in_flight, now);
 
         inner.in_flight -= 1;
         self.in_flight.emit(inner.in_flight as u64);
 
-        if use_rtt {
+        if let Some(rtt) = rtt {
+            self.observed_rtt.emit(rtt);
+            let rtt = rtt.as_secs_f64();
+            #[cfg(test)]
+            stats.observed_rtt.add(rtt, now);
             inner.current_rtt.update(rtt);
         }
+
         let current_rtt = inner.current_rtt.average();
 
         // When the RTT values are all exactly the same, as for the
@@ -268,21 +261,83 @@ impl<L> Controller<L>
 where
     L: RetryLogic,
 {
+    /// Report the outcome of a single request attempt.
+    ///
+    /// `MeasureAttempt` calls this from inside the retry layer, where one call is one attempt.
+    /// The limiter itself only sees the final outcome of a retry sequence, so without this the
+    /// round-trip time would include the backoff between attempts and a deferral that was later
+    /// retried into a success would not register as back pressure at all.
+    pub(super) fn record_attempt(
+        &self,
+        start: Instant,
+        response: &Result<L::Response, crate::Error>,
+    ) {
+        let now = instant_now();
+        let action = self.classify(response);
+        let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
+
+        if action.is_back_pressure {
+            inner.had_back_pressure = true;
+        }
+
+        // Only the attempt that the service actually processed is a valid latency measurement.
+        if !action.is_success {
+            return;
+        }
+
+        let rtt = now.saturating_duration_since(start);
+        self.observed_rtt.emit(rtt);
+        let rtt = rtt.as_secs_f64();
+
+        #[cfg(test)]
+        {
+            let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
+            stats.observed_rtt.add(rtt, now);
+        }
+
+        inner.current_rtt.update(rtt);
+    }
+
+    /// Adjust the controller to the final outcome of a request whose attempts were reported
+    /// individually by `record_attempt`.
+    ///
+    /// The round-trip time comes from those attempts, but an outcome that never reached the
+    /// service is only visible here. The retry layer returns a readiness error between attempts
+    /// without calling the service, so classify the outcome again to catch it.
+    pub(super) fn adjust_to_completion(&self, response: &Result<L::Response, crate::Error>) {
+        self.adjust_to_response_inner(None, self.classify(response).is_back_pressure)
+    }
+
+    /// Adjust the controller to a response, timing the whole call. This is the path taken when no
+    /// `MeasureAttempt` is paired with this controller, as in the distributed service stack, where
+    /// the limiter already sits inside the retry layer.
     pub(super) fn adjust_to_response(
         &self,
         start: Instant,
         response: &Result<L::Response, crate::Error>,
     ) {
+        let action = self.classify(response);
+        // Only adjust to the RTT when the request was successfully processed.
+        let rtt = action
+            .is_success
+            .then(|| instant_now().saturating_duration_since(start));
+        self.adjust_to_response_inner(rtt, action.is_back_pressure)
+    }
+
+    fn classify(&self, response: &Result<L::Response, crate::Error>) -> Classification {
         // It would be better to avoid generating the string in Retry(_)
         // just to throw it away here, but it's probably not worth the
         // effort.
-        let response_action = response
-            .as_ref()
-            .map(|resp| self.logic.should_retry_response(resp));
-        let is_back_pressure = match &response_action {
-            Ok(action) => matches!(action, RetryAction::Retry(_)),
+        match response {
+            Ok(resp) => {
+                let action = self.logic.should_retry_response(resp);
+                Classification {
+                    is_success: matches!(action, RetryAction::Successful),
+                    is_back_pressure: matches!(action, RetryAction::Retry(_)),
+                }
+            }
             Err(error) => {
-                if let Some(error) = error.downcast_ref::<L::Error>() {
+                let is_back_pressure = if let Some(error) = error.downcast_ref::<L::Error>() {
                     self.logic.is_retriable_error(error)
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     true
@@ -295,11 +350,19 @@ where
                         %error
                     );
                     false
+                };
+                Classification {
+                    is_success: false,
+                    is_back_pressure,
                 }
             }
-        };
-        // Only adjust to the RTT when the request was successfully processed.
-        let use_rtt = matches!(response_action, Ok(RetryAction::Successful));
-        self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
+        }
     }
+}
+
+/// How the controller reads a response: whether the service processed the request, and whether it
+/// signalled back pressure.
+struct Classification {
+    is_success: bool,
+    is_back_pressure: bool,
 }

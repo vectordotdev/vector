@@ -1,0 +1,20 @@
+# Simulate a backend that returns retriable errors for a while and then
+# recovers. The retry layer resends the request until it succeeds, but the
+# concurrency limiter wraps the retry layer, so it times the whole retry
+# sequence rather than the attempt that actually succeeded. The observed
+# round-trip time has to stay near the real backend latency, otherwise the
+# controller treats retry backoff as service latency.
+
+params:
+  requests: 20
+  delay: 0.100
+  concurrency: 1
+  failures: 5
+  failures_after: 2
+
+stats: {}
+
+controller:
+  observed_rtt:
+    min: [0.100, 0.102]
+    max: [0.100, 0.300]

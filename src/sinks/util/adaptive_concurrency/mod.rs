@@ -1,5 +1,6 @@
 //! Limit the max number of requests being concurrently processed.
 
+mod attempt;
 mod controller;
 mod future;
 mod layer;
@@ -9,7 +10,8 @@ mod service;
 #[cfg(test)]
 pub mod tests;
 
-pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
+pub(crate) use attempt::MeasureAttempt;
+pub(crate) use layer::{AdaptiveConcurrencyLimitLayer, measured_pair};
 pub(crate) use service::AdaptiveConcurrencyLimit;
 use vector_lib::configurable::configurable_component;
 
