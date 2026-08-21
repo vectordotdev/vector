@@ -7,6 +7,8 @@ pub mod reduce;
 #[cfg(feature = "transforms-impl-sample")]
 pub mod sample;
 
+#[cfg(feature = "transforms-absolute_to_incremental")]
+pub mod absolute_to_incremental;
 #[cfg(feature = "transforms-aggregate")]
 pub mod aggregate;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
