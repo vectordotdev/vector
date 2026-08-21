@@ -7,7 +7,6 @@ applications:
           commands:
             - source ~/.nvm/nvm.sh
             - nvm use 24.11.0
-            - export CI=true
         build:
           commands:
             - test "${AWS_BRANCH}" = "website"
