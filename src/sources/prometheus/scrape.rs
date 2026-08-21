@@ -4,7 +4,7 @@ use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{Uri, response::Parts};
 use serde_with::serde_as;
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
 
 use super::parser;
@@ -34,6 +34,90 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
                                   did you mean to use /metrics?\
                                   This behavior changed in version 0.11.";
 
+/// Errors returned when a `scrape_delay` value cannot be parsed.
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub(crate) enum ScrapeDelayParseError {
+    #[snafu(display("A delay in seconds must be a valid integer"))]
+    SecondsParse,
+    #[snafu(display("The delay is too large to schedule"))]
+    DelayTooLarge,
+    // last case evaluated must explain all valid formats accepted
+    #[snafu(display("Must be \"none\", \"auto\", or a delay in seconds such as \"30s\""))]
+    UnableToParse,
+}
+
+/// When scrapes happen, relative to the configured scrape interval.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+// No `#[serde(untagged)]`: `try_from`/`into` already make this (de)serialize as a plain string, so
+// the enum representation is never used, and `Configurable` rejects untagged enums that have more
+// than one unit variant.
+#[serde(try_from = "String", into = "String")]
+#[configurable(metadata(docs::examples = "none"))]
+#[configurable(metadata(docs::examples = "auto"))]
+#[configurable(metadata(docs::examples = "30s"))]
+pub(crate) enum ScrapeDelay {
+    /// Scrape as soon as the source starts, then once every `scrape_interval_secs` exactly.
+    #[default]
+    None,
+
+    /// Scrape once per interval, choosing a position inside each interval independently.
+    ///
+    /// Under normal polling, the source starts one scrape round in each interval, but it does not
+    /// remain at one fixed phase. Intervals missed while the schedule is not polled are skipped
+    /// rather than replayed. This reduces persistent alignment with other periodic work. Two
+    /// consecutive scrape starts can be anywhere from nearly zero to nearly two intervals apart,
+    /// which can increase short-lived overlap and load compared with a fixed cadence. The scheduler
+    /// does not enforce a minimum gap between starts or place an upper bound on in-flight scrapes.
+    ///
+    /// The positions come from a hash of the host name, the component ID and the scrape number
+    /// rather than from a random number, so the sequence is reproducible relative to source start.
+    /// Different seeds normally produce different sequences, but individual scrapes can still
+    /// coincide, and instances with the same host name and component ID use the same sequence.
+    Auto,
+
+    /// Scrape after exactly this many seconds, written as `30s`.
+    ///
+    /// This is the manual counterpart to `auto`: give each source a different value to stagger them
+    /// by hand.
+    Fixed(Duration),
+}
+
+impl TryFrom<String> for ScrapeDelay {
+    type Error = ScrapeDelayParseError;
+
+    fn try_from(input: String) -> std::result::Result<Self, Self::Error> {
+        match input.as_str() {
+            "none" => Ok(Self::None),
+            "auto" => Ok(Self::Auto),
+            s => match s.strip_suffix('s') {
+                Some(secs) => {
+                    let delay = secs
+                        .parse::<u64>()
+                        .map(Duration::from_secs)
+                        .map_err(|_| Self::Error::SecondsParse)?;
+
+                    std::time::Instant::now()
+                        .checked_add(delay)
+                        .map(|_| Self::Fixed(delay))
+                        .ok_or(Self::Error::DelayTooLarge)
+                }
+                None => Err(Self::Error::UnableToParse),
+            },
+        }
+    }
+}
+
+impl From<ScrapeDelay> for String {
+    fn from(delay: ScrapeDelay) -> String {
+        match delay {
+            ScrapeDelay::None => "none".to_owned(),
+            ScrapeDelay::Auto => "auto".to_owned(),
+            ScrapeDelay::Fixed(delay) => format!("{}s", delay.as_secs()),
+        }
+    }
+}
+
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
 #[configurable_component(source(
@@ -55,6 +139,31 @@ pub struct PrometheusScrapeConfig {
     #[serde(rename = "scrape_interval_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     interval: Duration,
+
+    /// When scrapes happen, relative to the configured scrape interval.
+    ///
+    /// `none` scrapes as soon as the source starts and then every `scrape_interval_secs` exactly,
+    /// which means the source raises load at one unvarying period, and sources that share an
+    /// interval all scrape at the same instant.
+    ///
+    /// A delay in seconds, such as `30s`, holds the first scrape back by exactly that much and then
+    /// keeps the same fixed cadence. Give each source a different value to stagger them by hand.
+    ///
+    /// `auto` chooses a position inside each interval independently. Under normal polling, the
+    /// source starts one scrape round in each interval, but it does not remain at one fixed phase;
+    /// intervals missed while the schedule is not polled are skipped rather than replayed. This
+    /// reduces persistent alignment with other periodic work and with sources sharing the same
+    /// interval. Two consecutive scrape starts can be anywhere from nearly zero to nearly two
+    /// intervals apart, which can increase short-lived overlap and load compared with a fixed
+    /// cadence. The scheduler does not enforce a minimum gap between starts or place an upper bound
+    /// on in-flight scrapes. The positions come from a hash of the host name, the component ID and
+    /// the scrape number rather than from a random number, so the sequence is reproducible relative
+    /// to source start. Hash-derived positions do not guarantee distinct slots: individual scrapes
+    /// can still coincide, and instances with the same host name and component ID use the same
+    /// sequence.
+    #[serde(default)]
+    #[configurable(metadata(docs::human_name = "Scrape Delay"))]
+    scrape_delay: ScrapeDelay,
 
     /// The timeout for each scrape request.
     #[serde(default = "default_timeout")]
@@ -99,6 +208,23 @@ pub struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
+impl PrometheusScrapeConfig {
+    /// The delay applied before the first scrape.
+    ///
+    /// Only the first scrape is moved; every scrape after it is driven by the configured interval,
+    /// so this shifts the phase of the source without ever changing the spacing between samples.
+    ///
+    /// `auto` sits with `none` here on purpose. It has no separate initial offset: its first scrape
+    /// is simply the first of the jittered ones, placed inside the first interval by the schedule
+    /// itself.
+    const fn first_scrape_delay(&self) -> Duration {
+        match self.scrape_delay {
+            ScrapeDelay::None | ScrapeDelay::Auto => Duration::ZERO,
+            ScrapeDelay::Fixed(delay) => delay,
+        }
+    }
+}
+
 fn query_example() -> serde_json::Value {
     serde_json::json! ({
         "match[]": [
@@ -113,6 +239,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
         serde_json::to_value(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             interval: default_interval(),
+            scrape_delay: ScrapeDelay::None,
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -145,9 +272,27 @@ impl SourceConfig for PrometheusScrapeConfig {
 
         warn_if_interval_too_low(self.timeout, self.interval);
 
+        // Picks where inside each interval this source scrapes. The component ID gives sources in
+        // this Vector instance different deterministic sequences, and the host name does the same
+        // for instances with different host names. These inputs reduce persistent alignment but do
+        // not guarantee distinct positions. If the host name cannot be read, only the component ID
+        // differentiates the sequences.
+        let delay_seed = format!(
+            "{}\0{}",
+            crate::get_hostname().unwrap_or_default(),
+            cx.key.id()
+        );
+
+        let first_scrape_delay = self.first_scrape_delay();
+
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
+            initial_delay: first_scrape_delay,
+            jitter_seed: match self.scrape_delay {
+                ScrapeDelay::Auto => Some(delay_seed),
+                ScrapeDelay::None | ScrapeDelay::Fixed(_) => None,
+            },
             timeout: self.timeout,
             headers: HashMap::new(),
             content_type: "text/plain".to_string(),
@@ -320,12 +465,12 @@ mod test {
         service::{make_service_fn, service_fn},
     };
     use similar_asserts::assert_eq;
-    use tokio::time::{Duration, sleep};
+    use tokio::time::{Duration, sleep, timeout};
     use warp::Filter;
 
     use super::*;
     use crate::{
-        Error, config,
+        Error, SourceSender, config,
         http::{ParameterValue, QueryParameterValue},
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
@@ -338,6 +483,137 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
+    }
+
+    #[test]
+    fn scrape_delay_defaults_to_none() {
+        let config: PrometheusScrapeConfig = toml::from_str(
+            r#"
+                endpoints = ["http://localhost:9090/metrics"]
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.scrape_delay, ScrapeDelay::None);
+    }
+
+    #[test]
+    fn scrape_delay_parses_every_form() {
+        let parse = |delay: &str| {
+            let config: PrometheusScrapeConfig = toml::from_str(&format!(
+                r#"
+                    endpoints = ["http://localhost:9090/metrics"]
+                    scrape_delay = "{delay}"
+                "#
+            ))
+            .unwrap();
+
+            config.scrape_delay
+        };
+
+        assert_eq!(parse("none"), ScrapeDelay::None);
+        assert_eq!(parse("auto"), ScrapeDelay::Auto);
+        assert_eq!(parse("30s"), ScrapeDelay::Fixed(Duration::from_secs(30)));
+        assert_eq!(parse("0s"), ScrapeDelay::Fixed(Duration::ZERO));
+    }
+
+    #[test]
+    fn scrape_delay_rejects_invalid_values() {
+        for delay in ["30", "auto+30s", "thirty seconds", "", "s"] {
+            let parsed = ScrapeDelay::try_from(delay.to_string());
+
+            assert!(
+                parsed.is_err(),
+                "expected `{delay}` to be rejected, got {parsed:?}"
+            );
+        }
+
+        // Well-formed, but too far out to turn into a schedule.
+        assert_eq!(
+            ScrapeDelay::try_from(format!("{}s", u64::MAX)),
+            Err(ScrapeDelayParseError::DelayTooLarge)
+        );
+    }
+
+    #[test]
+    fn scrape_delay_round_trips_through_a_string() {
+        for delay in ["none", "auto", "30s"] {
+            let parsed = ScrapeDelay::try_from(delay.to_string()).unwrap();
+
+            assert_eq!(String::from(parsed), delay);
+        }
+    }
+
+    #[test]
+    fn only_a_fixed_delay_holds_back_the_first_scrape() {
+        let first_scrape_delay = |delay| {
+            let config: PrometheusScrapeConfig = toml::from_str(&format!(
+                r#"
+                    endpoints = ["http://localhost:9090/metrics"]
+                    scrape_interval_secs = 60
+                    scrape_delay = "{delay}"
+                "#
+            ))
+            .unwrap();
+
+            config.first_scrape_delay()
+        };
+
+        // A fixed delay is taken literally; the interval has no say in it.
+        assert_eq!(first_scrape_delay("30s"), Duration::from_secs(30));
+
+        // `auto` has no initial offset of its own to add. Its first scrape is the first of the
+        // jittered ones, which the schedule already places somewhere inside the first interval;
+        // adding a delay on top would only push every scrape out of its interval.
+        assert_eq!(first_scrape_delay("auto"), Duration::ZERO);
+
+        assert_eq!(first_scrape_delay("none"), Duration::ZERO);
+    }
+
+    #[tokio::test]
+    async fn scrape_delay_defers_the_first_request() {
+        let (_guard, in_addr) = next_addr();
+        let (request_tx, mut request_rx) = tokio::sync::mpsc::unbounded_channel();
+        let dummy_endpoint = warp::path!("metrics").map(move || {
+            request_tx.send(()).unwrap();
+            "test_metric 1\n"
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let source_config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            interval: Duration::from_secs(10),
+            scrape_delay: ScrapeDelay::Fixed(Duration::from_secs(2)),
+            timeout: default_timeout(),
+            instance_tag: None,
+            endpoint_tag: None,
+            honor_labels: false,
+            query: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+        let (out, _events) = SourceSender::new_test();
+        let source = source_config
+            .build(SourceContext::new_test(out, None))
+            .await
+            .unwrap();
+        let source_task = tokio::spawn(source);
+
+        assert!(
+            timeout(Duration::from_millis(500), request_rx.recv())
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            timeout(Duration::from_secs(3), request_rx.recv())
+                .await
+                .unwrap(),
+            Some(())
+        );
+
+        source_task.abort();
     }
 
     #[tokio::test]
@@ -356,6 +632,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            scrape_delay: ScrapeDelay::None,
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -390,6 +667,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            scrape_delay: ScrapeDelay::None,
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -442,6 +720,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            scrape_delay: ScrapeDelay::None,
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -508,6 +787,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
             interval: Duration::from_secs(1),
+            scrape_delay: ScrapeDelay::None,
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -563,6 +843,7 @@ mod test {
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
             interval: Duration::from_secs(1),
+            scrape_delay: ScrapeDelay::None,
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -683,6 +964,7 @@ mod test {
                 honor_labels: false,
                 query: HashMap::new(),
                 interval: Duration::from_secs(1),
+                scrape_delay: ScrapeDelay::None,
                 timeout: default_timeout(),
                 tls: None,
                 auth: None,
@@ -771,6 +1053,7 @@ mod integration_tests {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://prometheus:9090/metrics".into()],
             interval: Duration::from_secs(1),
+            scrape_delay: ScrapeDelay::None,
             timeout: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
