@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     future::Future,
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -400,6 +400,7 @@ pub struct CertificateMetadata {
     pub organization_name: Option<String>,
     pub organizational_unit_name: Option<String>,
     pub common_name: Option<String>,
+    pub subject_altnames: Vec<String>,
 }
 
 impl CertificateMetadata {
@@ -425,6 +426,10 @@ impl CertificateMetadata {
         }
         components.join(",")
     }
+
+    pub fn subject_altnames(&self) -> String {
+        self.subject_altnames.join(",")
+    }
 }
 
 impl From<X509> for CertificateMetadata {
@@ -434,6 +439,37 @@ impl From<X509> for CertificateMetadata {
             let data_string = entry.data().to_string().unwrap_or_default();
             subject_metadata.insert(entry.object().to_string(), data_string);
         }
+        let subject_altnames = cert
+            .subject_alt_names()
+            .map(|names| {
+                names
+                    .iter()
+                    .filter_map(|name| {
+                        if let Some(dns) = name.dnsname() {
+                            Some(format!("DNS:{dns}"))
+                        } else if let Some(email) = name.email() {
+                            Some(format!("email:{email}"))
+                        } else if let Some(uri) = name.uri() {
+                            Some(format!("URI:{uri}"))
+                        } else {
+                            name.ipaddress().and_then(|ip| match ip.len() {
+                                4 => Some(format!(
+                                    "IP Address:{}",
+                                    IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3]))
+                                )),
+                                16 => Some(format!(
+                                    "IP Address:{}",
+                                    IpAddr::V6(Ipv6Addr::from(u128::from_be_bytes(
+                                        ip.try_into().expect("ip address length checked"),
+                                    )))
+                                )),
+                                _ => None,
+                            })
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         Self {
             country_name: subject_metadata.get("countryName").cloned(),
             state_or_province_name: subject_metadata.get("stateOrProvinceName").cloned(),
@@ -441,6 +477,7 @@ impl From<X509> for CertificateMetadata {
             organization_name: subject_metadata.get("organizationName").cloned(),
             organizational_unit_name: subject_metadata.get("organizationalUnitName").cloned(),
             common_name: subject_metadata.get("commonName").cloned(),
+            subject_altnames,
         }
     }
 }
@@ -472,6 +509,13 @@ impl Connected for MaybeTlsIncomingStream<TcpStream> {
 
 #[cfg(test)]
 mod test {
+    use openssl::{
+        hash::MessageDigest,
+        pkey::PKey,
+        rsa::Rsa,
+        x509::{X509NameBuilder, extension::SubjectAlternativeName},
+    };
+
     use super::*;
 
     #[test]
@@ -483,6 +527,7 @@ mod test {
             organization_name: Some("organization".to_owned()),
             organizational_unit_name: Some("org_unit".to_owned()),
             state_or_province_name: Some("state".to_owned()),
+            subject_altnames: vec!["DNS:example.com".to_owned()],
         };
 
         let expected = format!(
@@ -506,6 +551,7 @@ mod test {
             organization_name: Some("organization".to_owned()),
             organizational_unit_name: Some("org_unit".to_owned()),
             state_or_province_name: None,
+            subject_altnames: vec![],
         };
 
         let expected = format!(
@@ -516,5 +562,68 @@ mod test {
             example_meta.country_name.as_ref().unwrap()
         );
         assert_eq!(expected, example_meta.subject());
+    }
+
+    #[test]
+    fn certificate_metadata_subject_altnames() {
+        let example_meta = CertificateMetadata {
+            common_name: None,
+            country_name: None,
+            locality_name: None,
+            organization_name: None,
+            organizational_unit_name: None,
+            state_or_province_name: None,
+            subject_altnames: vec![
+                "DNS:example.com".to_owned(),
+                "IP Address:1.2.3.4".to_owned(),
+            ],
+        };
+        assert_eq!(
+            "DNS:example.com,IP Address:1.2.3.4",
+            example_meta.subject_altnames()
+        );
+
+        let empty_meta = CertificateMetadata {
+            common_name: None,
+            country_name: None,
+            locality_name: None,
+            organization_name: None,
+            organizational_unit_name: None,
+            state_or_province_name: None,
+            subject_altnames: vec![],
+        };
+        assert_eq!("", empty_meta.subject_altnames());
+    }
+
+    #[test]
+    fn certificate_metadata_from_x509() {
+        let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+
+        let mut name = X509NameBuilder::new().unwrap();
+        name.append_entry_by_text("CN", "example.com").unwrap();
+        let name = name.build();
+
+        let mut builder = X509::builder().unwrap();
+        builder.set_version(2).unwrap();
+        builder.set_subject_name(&name).unwrap();
+        builder.set_issuer_name(&name).unwrap();
+        builder.set_pubkey(&key).unwrap();
+        let san = SubjectAlternativeName::new()
+            .dns("example.com")
+            .email("admin@example.com")
+            .uri("https://example.com")
+            .ip("1.2.3.4")
+            .build(&builder.x509v3_context(None, None))
+            .unwrap();
+        builder.append_extension(san).unwrap();
+        builder.sign(&key, MessageDigest::sha256()).unwrap();
+        let cert = builder.build();
+
+        let metadata = CertificateMetadata::from(cert);
+
+        assert_eq!(
+            "DNS:example.com,email:admin@example.com,URI:https://example.com,IP Address:1.2.3.4",
+            metadata.subject_altnames()
+        );
     }
 }

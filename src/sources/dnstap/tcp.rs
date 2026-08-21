@@ -19,7 +19,7 @@ use crate::{
     internal_events::{SocketEventsReceived, SocketMode},
     sources::util::{
         framestream::{FrameHandler, TcpFrameHandler},
-        net::SocketListenAddr,
+        net::{SocketListenAddr, build_tls_client_metadata},
     },
 };
 
@@ -266,11 +266,7 @@ impl<T: FrameHandler + Clone> TcpFrameHandler for DnstapFrameHandler<T> {
     }
 
     fn insert_tls_client_metadata(&mut self, metadata: Option<CertificateMetadata>) {
-        self.tls_client_metadata = metadata.map(|c| {
-            let mut metadata = ObjectMap::new();
-            metadata.insert("subject".into(), c.subject().into());
-            metadata
-        });
+        self.tls_client_metadata = metadata.map(|c| build_tls_client_metadata(&c));
     }
 
     fn allowed_origins(&self) -> Option<&[IpNet]> {
