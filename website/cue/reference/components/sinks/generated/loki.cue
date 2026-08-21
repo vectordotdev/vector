@@ -764,7 +764,7 @@ generated: components: sinks: loki: configuration: {
 		type: object: {
 			examples: [{
 				"event_{{ event_field }}": "value_{{ some_other_event_field }}"
-				"pod_labels_*":            "pod_labels_{{ kubernetes.pod_labels }}"
+				"pod_labels_*":            "{{ kubernetes.pod_labels }}"
 				source:                    "vector"
 			}]
 			options: "*": {
@@ -1028,7 +1028,7 @@ generated: components: sinks: loki: configuration: {
 		type: object: {
 			examples: [{
 				"event_{{ event_field }}": "value_{{ some_other_event_field }}"
-				"pod_labels_*":            "pod_labels_{{ kubernetes.pod_labels }}"
+				"pod_labels_*":            "{{ kubernetes.pod_labels }}"
 				source:                    "vector"
 			}]
 			options: "*": {

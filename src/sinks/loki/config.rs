@@ -139,7 +139,7 @@ fn loki_labels_examples() -> HashMap<String, String> {
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
         "pod_labels_*".to_string(),
-        "pod_labels_{{ kubernetes.pod_labels }}".to_string(),
+        "{{ kubernetes.pod_labels }}".to_string(),
     );
     examples.insert(
         "event_{{ event_field }}".to_string(),
@@ -153,7 +153,7 @@ fn loki_structured_metadata_examples() -> HashMap<String, String> {
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
         "pod_labels_*".to_string(),
-        "pod_labels_{{ kubernetes.pod_labels }}".to_string(),
+        "{{ kubernetes.pod_labels }}".to_string(),
     );
     examples.insert(
         "event_{{ event_field }}".to_string(),
