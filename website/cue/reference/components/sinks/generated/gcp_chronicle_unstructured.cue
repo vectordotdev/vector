@@ -558,7 +558,7 @@ generated: components: sinks: gcp_chronicle_unstructured: configuration: {
 	}
 	endpoint: {
 		description: """
-			An absolute http(s) URL.
+			An absolute HTTP(S) URL.
 
 			The endpoint to send data to.
 
