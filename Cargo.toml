@@ -77,6 +77,7 @@ start = false
 # libc requirements are defined by `cross`
 # https://github.com/rust-embedded/cross#supported-targets
 # Though, it seems like aarch64 libc is actually 2.18 and not 2.19
+# libodbc: glibc ODBC builds only; `libodbc1` covers older distros (Debian 11 / Ubuntu 20.04).
 [package.metadata.deb.variants.arm-unknown-linux-gnueabi]
 depends = "libc6 (>= 2.15)"
 
@@ -84,13 +85,13 @@ depends = "libc6 (>= 2.15)"
 depends = "libc6 (>= 2.15)"
 
 [package.metadata.deb.variants.x86_64-unknown-linux-gnu]
-depends = "libc6 (>= 2.15)"
+depends = "libc6 (>= 2.15), libodbc2 | libodbc1"
 
 [package.metadata.deb.variants.x86_64-unknown-linux-musl]
 depends = ""
 
 [package.metadata.deb.variants.aarch64-unknown-linux-gnu]
-depends = "libc6 (>= 2.18)"
+depends = "libc6 (>= 2.18), libodbc2 | libodbc1"
 
 [package.metadata.deb.variants.aarch64-unknown-linux-musl]
 depends = ""
@@ -364,6 +365,10 @@ lapin = { version = "4.3.0", default-features = false, features = ["tokio", "nat
 async-rs = { version = "0.8", default-features = false, features = ["tokio"], optional = true }
 deadpool = { version = "0.13.0", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
+# ODBC
+odbc-api = { version = "19.1.0", optional = true }
+cron = { version = "0.15.0", features = ["serde"], optional = true }
+
 # Opentelemetry
 
 hex = { version = "0.4.3", default-features = false, optional = true }
@@ -554,12 +559,22 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # macOS releases pick it up through the `target-aarch64-apple-darwin` feature (see target
 # table below). Local dev builds skip it so they don't need `libsasl2-dev` / cyrus-sasl
 # installed, and so rdkafka's build script doesn't link GSSAPI.
-default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
+#
+# Note on odbc: not in `sources-logs` (dynamic libodbc). Enabled on default and the
+# *-unknown-linux-gnu targets (x86_64 + aarch64); omitted from musl/arm and Apple
+# release targets so those releases stay static / linkable without a sysroot libodbc.
+# The gnu cross images install the matching target-arch unixODBC dev files
+# (see scripts/cross/bootstrap-ubuntu.sh). macOS links libodbc against the Homebrew
+# dylib, so the GA archive (target-aarch64-apple-darwin) omits it to stay self-
+# contained and launchable on clean Macs (otherwise: unresolved libodbc.*.dylib).
+# Note `default` still includes it, so macOS dev/source builds require a Homebrew
+# libodbc at build + run time.
+default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "sources-odbc"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
-docs = ["enable-api-client", "sources-dnstap"]
+docs = ["enable-api-client", "sources-dnstap", "sources-odbc"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
+default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build", "sources-odbc"]
 
 # Enables Kerberos / GSSAPI SASL support for kafka via dynamic linkage to a
 # system-provided libsasl2 (and the host's GSS implementation). Requires
@@ -583,7 +598,7 @@ vendored = ["gssapi-vendored"]
 base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib", "codecs-parquet"]
 enable-api-client = ["base", "api-client"]
 default-musl = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
-default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored"]
+default-no-api-client = ["base", "sources-dnstap", "tikv-jemallocator", "vendored", "sources-odbc"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -596,20 +611,21 @@ vrl-functions-crypto = ["vrl/enable_crypto_functions"]
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
 
-all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
+all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "sources-odbc", "transforms-logs"]
 all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
+# sources-odbc: glibc release targets only (x86_64 + aarch64); see note on `default` above.
 target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
-target-aarch64-unknown-linux-gnu =      ["target-base", "tikv-jemallocator"]
+target-aarch64-unknown-linux-gnu =      ["target-base", "tikv-jemallocator", "sources-odbc"]
 target-aarch64-unknown-linux-musl =     ["target-base", "tikv-jemallocator"]
 target-armv7-unknown-linux-gnueabihf =  ["target-base", "tikv-jemallocator"]
 target-armv7-unknown-linux-musleabihf = ["target-base"]
 target-arm-unknown-linux-gnueabi =      ["target-base", "tikv-jemallocator"]
 target-arm-unknown-linux-musleabi =     ["target-base"]
-target-x86_64-unknown-linux-gnu =       ["target-base", "tikv-jemallocator", "vendored"]
+target-x86_64-unknown-linux-gnu =       ["target-base", "tikv-jemallocator", "vendored", "sources-odbc"]
 target-x86_64-unknown-linux-musl =      ["target-base", "tikv-jemallocator"]
 # Apple targets opt into `gssapi` (dynamic linkage to system libsasl2 + Apple's
 # GSS framework). The `gssapi-vendored` path does not currently link on
@@ -769,6 +785,7 @@ sources-mongodb_metrics = ["dep:mongodb"]
 sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
+sources-odbc = ["dep:odbc-api", "dep:cron", "dep:windows"]
 sources-okta = ["sources-utils-http-client"]
 sources-opentelemetry = [
   "dep:hex",
@@ -1030,6 +1047,7 @@ all-integration-tests = [
   "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "odbc-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
   "postgres_sink-integration-tests",
@@ -1099,6 +1117,7 @@ mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 mqtt-integration-tests = ["sinks-mqtt", "sources-mqtt"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
+odbc-integration-tests = ["sources-odbc"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 postgres_sink-integration-tests = ["sinks-postgres"]
