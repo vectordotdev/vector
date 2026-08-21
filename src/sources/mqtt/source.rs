@@ -330,6 +330,54 @@ fn keep_buffered_event_after_disconnect(event: &MqttEvent, acknowledgements: boo
     }
 }
 
+/// Whether a request rumqttc had queued in `connection.pending` (moved there
+/// by `EventLoop::clean()`, either drained from the outgoing request channel
+/// or resurrected from rumqttc's own outgoing-publish/QoS 2 state) when the
+/// connection died should survive into the next connection.
+///
+/// Deliberately an exhaustive match with no wildcard arm: `Request` is a
+/// third-party enum, so reasoning about it variant-by-variant means a future
+/// rumqttc upgrade that adds one must fail to compile here until someone
+/// decides which bucket it belongs in, instead of a wildcard silently
+/// picking a default (which is exactly how this scrub originally missed
+/// `PubComp` -- the previous `!matches!(request, A | B | C)` form kept
+/// everything not explicitly named, the wrong default for a connection-
+/// scoped packet).
+const fn keep_pending_request_after_disconnect(request: &rumqttc::Request) -> bool {
+    match request {
+        // Each of these carries connection-scoped state: a packet id that's
+        // only valid on the connection that just died (a fresh session can
+        // reuse it, acking -- or, for PubComp, completing -- the wrong
+        // exchange), or a Disconnect that would tear down the very
+        // connection it gets replayed onto. This source never builds a
+        // `Publish` or `PubRel` itself (subscribe-only, so it's never the
+        // QoS 1/2 publisher these belong to), but if either ever appeared
+        // here regardless, the safe default for a connection-scoped packet
+        // is still to drop it.
+        rumqttc::Request::PubAck(_)
+        | rumqttc::Request::PubRec(_)
+        | rumqttc::Request::PubComp(_)
+        | rumqttc::Request::Disconnect(_)
+        | rumqttc::Request::Publish(_)
+        | rumqttc::Request::PubRel(_) => false,
+        // This source never unsubscribes, and SubAck/UnsubAck are broker-to-
+        // client packets in the protocol -- rumqttc's `Request` enum has
+        // client-authored variants of the same name, but there's no code
+        // path that constructs one here. Unreachable in practice; dropped
+        // for the same reason as above in case that ever changes.
+        rumqttc::Request::Unsubscribe(_)
+        | rumqttc::Request::SubAck(_)
+        | rumqttc::Request::UnsubAck(_) => false,
+        // Harmless to replay: a resubscribe is idempotent (and
+        // `ProtocolState::pending_resubscribe`'s own SUBACK-confirmation
+        // retry doesn't depend on this surviving either way), and keepalive
+        // packets carry no session-scoped state at all.
+        rumqttc::Request::Subscribe(_)
+        | rumqttc::Request::PingReq(_)
+        | rumqttc::Request::PingResp(_) => true,
+    }
+}
+
 fn publish_ack_decision(acknowledgements: bool, qos: QoS) -> PublishAckDecision {
     let defer_ack = acknowledgements && publish_supports_end_to_end_acknowledgements(qos);
 
@@ -714,20 +762,11 @@ impl MqttSource {
             pending_acks.clear();
             // `EventLoop::clean()` moved any queued-but-unsent requests into
             // `connection.pending` for automatic replay on the next
-            // connection. A PUBACK/PUBREC references a packet id that was
-            // only valid on the connection that just died (replaying it could
-            // ack the wrong publish), and a replayed `Disconnect` would kill
-            // the fresh connection the moment it comes up -- drop both.
-            // (`Subscribe` requests are left in: replaying one is a harmless,
-            // idempotent re-subscribe.)
-            connection.pending.retain(|request| {
-                !matches!(
-                    request,
-                    rumqttc::Request::PubAck(_)
-                        | rumqttc::Request::PubRec(_)
-                        | rumqttc::Request::Disconnect(_)
-                )
-            });
+            // connection; keep only what's safe to replay -- see
+            // `keep_pending_request_after_disconnect`.
+            connection
+                .pending
+                .retain(keep_pending_request_after_disconnect);
             // rumqttc buffers batches of incoming packets in `state.events`
             // and yields them one per poll; `clean()` does NOT clear that
             // buffer, so events from the dead connection would otherwise be
@@ -938,6 +977,45 @@ mod tests {
                 keep_buffered_event_after_disconnect(&event, acknowledgements),
                 keep,
                 "event {event:?} with acknowledgements={acknowledgements}"
+            );
+        }
+    }
+
+    // Every `rumqttc::Request` variant, named explicitly (no catch-all): the
+    // exhaustive match in `keep_pending_request_after_disconnect` is the
+    // real guard (a 13th variant fails to compile), but this test pins down
+    // *which* bucket each of today's 12 variants falls into, so a change to
+    // any single one shows up as a one-line diff instead of requiring a
+    // re-derivation from the match arms.
+    #[test]
+    fn pending_request_scrub_matrix_for_disconnect() {
+        for (request, keep) in [
+            (rumqttc::Request::PubAck(rumqttc::PubAck::new(7)), false),
+            (rumqttc::Request::PubRec(rumqttc::PubRec::new(7)), false),
+            (rumqttc::Request::PubComp(rumqttc::PubComp::new(7)), false),
+            (rumqttc::Request::Disconnect(rumqttc::Disconnect), false),
+            (rumqttc::Request::Publish(publish(7)), false),
+            (rumqttc::Request::PubRel(rumqttc::PubRel::new(7)), false),
+            (
+                rumqttc::Request::Unsubscribe(rumqttc::Unsubscribe::new("topic")),
+                false,
+            ),
+            (
+                rumqttc::Request::SubAck(rumqttc::SubAck::new(7, vec![])),
+                false,
+            ),
+            (rumqttc::Request::UnsubAck(rumqttc::UnsubAck::new(7)), false),
+            (
+                rumqttc::Request::Subscribe(rumqttc::Subscribe::new("topic", QoS::AtLeastOnce)),
+                true,
+            ),
+            (rumqttc::Request::PingReq(rumqttc::PingReq), true),
+            (rumqttc::Request::PingResp(rumqttc::PingResp), true),
+        ] {
+            assert_eq!(
+                keep_pending_request_after_disconnect(&request),
+                keep,
+                "request {request:?}"
             );
         }
     }
