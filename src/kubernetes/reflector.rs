@@ -6,7 +6,10 @@ use futures::StreamExt;
 use futures_util::Stream;
 use kube::{
     Resource,
-    runtime::{reflector::store, watcher},
+    runtime::{
+        reflector::{ObjectRef, store},
+        watcher,
+    },
 };
 use tokio::pin;
 use tokio_util::time::DelayQueue;
@@ -21,7 +24,7 @@ pub async fn custom_reflector<K, W>(
     delay_deletion: Duration,
 ) where
     K: Resource + Clone + std::fmt::Debug,
-    K::DynamicType: Eq + Hash + Clone,
+    K::DynamicType: Eq + Hash + Clone + Default,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
     pin!(stream);
@@ -104,9 +107,13 @@ pub async fn custom_reflector<K, W>(
                         match event {
                             watcher::Event::Delete(ref obj) => {
                                 let meta_desc = MetaDescribe::from_meta(obj.meta());
-                                if !meta_cache.contains(&meta_desc) {
+                                if !meta_cache.contains(&meta_desc)
+                                    && store_holds_same_uid(&store, obj)
+                                {
                                     trace!(message = "Processing Delete event.", event_type = std::any::type_name::<K>(), event = ?event);
                                     store.apply_watcher_event(&event);
+                                } else {
+                                    trace!(message = "Skipping delayed Delete event; resource is still in use or was recreated with a new UID.", event_type = std::any::type_name::<K>(), event = ?event);
                                 }
                             },
                             _ => store.apply_watcher_event(&event),
@@ -122,6 +129,25 @@ pub async fn custom_reflector<K, W>(
             }
         }
     }
+}
+
+/// Returns `true` if the store either no longer tracks the object's key or
+/// still holds the exact same incarnation (matched by UID).
+///
+/// The reflector store is keyed by name and namespace only. When a resource is
+/// recreated with the same name and namespace but a new UID, a delayed `Delete`
+/// for the old incarnation must not be reconciled, otherwise it would evict the
+/// live resource from the store and stop its logs from being collected. See
+/// https://github.com/vectordotdev/vector/issues/12014.
+fn store_holds_same_uid<K>(store: &store::Writer<K>, obj: &K) -> bool
+where
+    K: Resource + Clone + std::fmt::Debug,
+    K::DynamicType: Eq + Hash + Clone + Default,
+{
+    store
+        .as_reader()
+        .get(&ObjectRef::from_obj(obj))
+        .is_none_or(|current| current.meta().uid == obj.meta().uid)
 }
 
 #[cfg(test)]
@@ -232,5 +258,110 @@ mod tests {
         tokio::time::sleep(Duration::from_secs(5)).await;
         // Ensure the Resource is still available after Applied event
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
+    }
+
+    #[tokio::test]
+    async fn delayed_delete_should_not_evict_recreated_object_with_new_uid() {
+        // Regression test for https://github.com/vectordotdev/vector/issues/12014.
+        // A resource recreated with the same name and namespace but a new UID
+        // must not be evicted by the delayed `Delete` of its predecessor.
+        let store_w = store::Writer::default();
+        let store = store_w.as_reader();
+        let old = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("name".to_string()),
+                namespace: Some("namespace".to_string()),
+                uid: Some("old-uid".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let new = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("name".to_string()),
+                namespace: Some("namespace".to_string()),
+                uid: Some("new-uid".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let (mut tx, rx) = mpsc::channel::<_>(5);
+        // The old incarnation is observed, then replaced by the new incarnation,
+        // and only afterwards does the (delayed) deletion of the old one arrive.
+        tx.send(Ok(watcher::Event::Apply(old.clone())))
+            .await
+            .unwrap();
+        tx.send(Ok(watcher::Event::Apply(new.clone())))
+            .await
+            .unwrap();
+        tx.send(Ok(watcher::Event::Delete(old.clone())))
+            .await
+            .unwrap();
+        let meta_cache = MetaCache::new();
+        tokio::spawn(custom_reflector(
+            store_w,
+            meta_cache,
+            rx,
+            Duration::from_secs(2),
+        ));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // The live (new) incarnation is present.
+        assert_eq!(store.get(&ObjectRef::from_obj(&new)).as_deref(), Some(&new));
+        // After the deletion delay elapses, the live incarnation must remain.
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert_eq!(store.get(&ObjectRef::from_obj(&new)).as_deref(), Some(&new));
+    }
+
+    #[tokio::test]
+    async fn recreate_within_delay_window_should_keep_new_incarnation() {
+        // The classic ordering observed in
+        // https://github.com/vectordotdev/vector/issues/13467: a pod is deleted
+        // and recreated with the same name/namespace but a new UID within the
+        // deletion delay window. Adding the UID to the `MetaCache` alone (see
+        // https://github.com/vectordotdev/vector/pull/21303) regresses this case
+        // because the store is keyed by name/namespace; the delayed deletion of
+        // the old UID must not evict the recreated pod.
+        let store_w = store::Writer::default();
+        let store = store_w.as_reader();
+        let old = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("name".to_string()),
+                namespace: Some("namespace".to_string()),
+                uid: Some("old-uid".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let new = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("name".to_string()),
+                namespace: Some("namespace".to_string()),
+                uid: Some("new-uid".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let (mut tx, rx) = mpsc::channel::<_>(5);
+        tx.send(Ok(watcher::Event::Apply(old.clone())))
+            .await
+            .unwrap();
+        tx.send(Ok(watcher::Event::Delete(old.clone())))
+            .await
+            .unwrap();
+        tx.send(Ok(watcher::Event::Apply(new.clone())))
+            .await
+            .unwrap();
+        let meta_cache = MetaCache::new();
+        tokio::spawn(custom_reflector(
+            store_w,
+            meta_cache,
+            rx,
+            Duration::from_secs(2),
+        ));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert_eq!(store.get(&ObjectRef::from_obj(&new)).as_deref(), Some(&new));
+        // The old incarnation's delayed deletion fires here; the new one stays.
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert_eq!(store.get(&ObjectRef::from_obj(&new)).as_deref(), Some(&new));
     }
 }
