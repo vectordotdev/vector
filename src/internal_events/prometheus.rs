@@ -3,6 +3,8 @@
 #[cfg(feature = "sources-prometheus-scrape")]
 use std::borrow::Cow;
 
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+use vector_lib::internal_event::GaugeName;
 #[cfg(feature = "sources-prometheus-scrape")]
 use vector_lib::prometheus::parser::ParserError;
 use vector_lib::{
@@ -87,5 +89,51 @@ impl InternalEvent for PrometheusNormalizationError {
             count: 1,
             reason: normalization_reason
         });
+    }
+}
+
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub struct PrometheusKubernetesSdTargetsDiscovered {
+    pub count: usize,
+}
+
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
+    fn emit(self) {
+        debug!(
+            message = "Prometheus Kubernetes SD discovered targets.",
+            count = self.count,
+        );
+        vector_lib::gauge!(GaugeName::PrometheusKubernetesSdTargetsDiscovered)
+            .set(self.count as f64);
+    }
+}
+
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub struct PrometheusKubernetesSdAnnotationParseError<'a> {
+    pub pod: &'a str,
+    pub namespace: &'a str,
+    pub error: &'a str,
+}
+
+#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesSdAnnotationParseError<'_> {
+    fn emit(self) {
+        warn!(
+            message = "Failed to parse prometheus.io annotations on pod.",
+            pod = %self.pod,
+            namespace = %self.namespace,
+            error = %self.error,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
     }
 }
