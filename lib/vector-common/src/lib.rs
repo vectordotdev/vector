@@ -12,6 +12,7 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
+pub use pastey; // Exported so that registered_event! doesn't need pastey in other crates
 pub use vector_common_macros::NamedInternalEvent;
 
 #[cfg(feature = "btreemap")]

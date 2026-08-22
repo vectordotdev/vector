@@ -95,7 +95,6 @@ noisy_float = "0.2.1"
 rand.workspace = true
 rand_distr.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]
