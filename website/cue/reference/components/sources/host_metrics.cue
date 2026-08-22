@@ -166,6 +166,7 @@ components: sources: host_metrics: {
 		memory_total_bytes: _host & _memory_gauge & {description: "The total number of bytes of main memory."}
 		memory_used_bytes: _host & _memory_linux & {description: "The number of bytes of main memory used by programs or caches."}
 		memory_wired_bytes: _host & _memory_macos & {description: "The number of wired bytes of main memory."}
+		oom_kill: _host & _memory_counter & _linux & {description: "The number of Out-Of-Memory (OOM) kill events recorded."}
 
 		// Host network
 		network_receive_bytes_total: _host & _network_counter & {description: "The number of bytes received on this interface."}
@@ -177,15 +178,15 @@ components: sources: host_metrics: {
 		network_transmit_packets_total: _host & _network_nomac & {description: "The number of packets transmitted on this interface."}
 
 		// Host tcp
-		tcp_connections_total: _host & _tcp_linux & _tcp_gauge & {description: "The number of TCP connections."}
-		tcp_tx_queued_bytes_total: _host & _tcp_linux & {
+		tcp_connections_total: _host & _linux & _tcp_gauge & {description: "The number of TCP connections."}
+		tcp_tx_queued_bytes_total: _host & _linux & {
 			description: "The number of bytes in the send queue across all connections."
 			type:        "gauge"
 			tags: _host_metrics_tags & {
 				collector: examples: ["tcp"]
 			}
 		}
-		tcp_rx_queued_bytes_total: _host & _tcp_linux & {
+		tcp_rx_queued_bytes_total: _host & _linux & {
 			description: "The number of bytes in the receive queue across all connections."
 			type:        "gauge"
 			tags: _host_metrics_tags & {
@@ -300,7 +301,7 @@ components: sources: host_metrics: {
 			}
 		}
 
-		_tcp_linux: {relevant_when: "OS is Linux"}
+		_linux: {relevant_when: "OS is Linux"}
 		_tcp_gauge: {
 			type: "gauge"
 			tags: _host_metrics_tags & {
