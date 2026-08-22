@@ -78,7 +78,7 @@ pub struct PrometheusScrapeConfig {
     /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
     /// is renamed by prepending `exported_` to the original name.
     ///
-    /// This matches Prometheus’ `honor_labels` configuration.
+    /// This matches Prometheus' `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
 
@@ -91,6 +91,15 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
+
+    /// Custom HTTP headers to include in the scrape request.
+    ///
+    /// This allows you to add arbitrary HTTP headers to the request. This is useful for authentication,
+    /// custom routing, or any other HTTP header-based functionality.
+    #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An HTTP header name and value."))]
+    #[configurable(metadata(docs::examples = "headers_example()"))]
+    headers: HashMap<String, String>,
 
     #[configurable(derived)]
     tls: Option<TlsConfig>,
@@ -108,6 +117,13 @@ fn query_example() -> serde_json::Value {
     })
 }
 
+fn headers_example() -> serde_json::Value {
+    serde_json::json!({
+        "X-Custom-Header": "custom-value",
+        "Authorization": "Bearer token123"
+    })
+}
+
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
@@ -118,6 +134,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             tls: None,
             auth: None,
         })
@@ -145,11 +162,17 @@ impl SourceConfig for PrometheusScrapeConfig {
 
         warn_if_interval_too_low(self.timeout, self.interval);
 
+        // Convert HashMap<String, String> to HashMap<String, Vec<String>>
+        let headers = self.headers
+            .iter()
+            .map(|(k, v)| (k.clone(), vec![v.clone()]))
+            .collect::<HashMap<String, Vec<String>>>();
+
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
             timeout: self.timeout,
-            headers: HashMap::new(),
+            headers,
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             tls,
@@ -361,6 +384,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -395,6 +419,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -447,6 +472,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -513,6 +539,7 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -582,6 +609,7 @@ mod test {
                     ]),
                 ),
             ]),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -684,6 +712,7 @@ mod test {
                 query: HashMap::new(),
                 interval: Duration::from_secs(1),
                 timeout: default_timeout(),
+                headers: HashMap::new(),
                 tls: None,
                 auth: None,
             },
@@ -776,6 +805,7 @@ mod integration_tests {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
