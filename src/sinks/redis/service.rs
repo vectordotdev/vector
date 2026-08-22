@@ -68,6 +68,13 @@ impl Service<RedisRequest> for RedisService {
                         pipe.publish(kv.key, kv.value.as_ref());
                     }
                 }
+                super::DataType::String => {
+                    if count > 1 {
+                        pipe.atomic().set(kv.key, kv.value.as_ref());
+                    } else {
+                        pipe.set(kv.key, kv.value.as_ref());
+                    }
+                }
             }
         }
 
