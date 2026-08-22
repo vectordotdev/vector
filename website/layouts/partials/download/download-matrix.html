@@ -38,7 +38,7 @@
         {{ if $showOption }}
         {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
         {{ if and (ne $version "nightly") .legacy_download_url .legacy_max_minor }}
-          {{/* Historical Vector releases on this site are all 0.x. */}}
+          {{/* ARMv7 RPM releases through 0.32 used armv7 instead of armv7hl. */}}
           {{ $versionParts := split $version "." }}
           {{ $majorVersion := int (index $versionParts 0) }}
           {{ $minorVersion := int (index $versionParts 1) }}
