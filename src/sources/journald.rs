@@ -39,7 +39,7 @@ use vector_lib::{
 };
 use vrl::{
     event_path,
-    value::{Kind, Value, kind::Collection},
+    value::{Kind, Value, kind::Collection, value::simdutf_bytes_utf8_lossy},
 };
 
 use crate::{
@@ -954,7 +954,7 @@ fn fixup_unit(unit: &str) -> String {
 }
 
 fn decode_record(line: &[u8], remap: bool) -> Result<Record, JsonError> {
-    let mut record = serde_json::from_str::<JsonValue>(&String::from_utf8_lossy(line))?;
+    let mut record = serde_json::from_str::<JsonValue>(&simdutf_bytes_utf8_lossy(line))?;
     // journalctl will output non-ASCII values using an array
     // of integers. Look for those values and re-parse them.
     if let Some(record) = record.as_object_mut() {
@@ -988,7 +988,7 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
             })
         })
         .collect::<Option<Vec<u8>>>()
-        .map(|array| String::from_utf8_lossy(&array).into())
+        .map(|array| simdutf_bytes_utf8_lossy(&array).into())
 }
 
 fn remap_priority(priority: &mut JsonValue) {
