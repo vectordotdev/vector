@@ -1,0 +1,86 @@
+# Helm values for Vector, used across all phases of the k8s-autoscaling guide:
+#
+#   helm upgrade --install vector vectordotdev/vector \
+#     --namespace vector-perf \
+#     --version 0.56.0 \
+#     -f values.yaml \
+#     --set replicas=<n>
+#
+# Only the initial install (replicas=1) goes through Helm. After that, every
+# phase scales the Deployment directly via `kubectl scale` / `kubectl
+# autoscale`, so the live replica count drifts from this file — a later
+# `helm upgrade` without --set replicas would scale it back down to 1.
+#
+# Chart 0.56.0 pulls image tag 0.56.0-distroless-libc by default. The
+# throughput/HPA equilibrium numbers in this guide were measured against
+# that image; a different Vector version can shift the saturation point.
+
+role: Stateless-Aggregator
+
+resources:
+  requests:
+    cpu: "1000m"
+    memory: "2Gi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+customConfig:
+  data_dir: /vector-data-dir
+
+  api:
+    enabled: true
+    address: "0.0.0.0:8686"
+
+  sources:
+    in:
+      type: http_server
+      address: "0.0.0.0:9000"
+      framing:
+        method: newline_delimited
+      decoding:
+        codec: bytes
+
+  transforms:
+    apache_parser:
+      inputs: ["in"]
+      type: remap
+      source: |
+        . = parse_regex!(.message, r'^(?P<host>[\w\.]+) - (?P<user>[\w\-]+) \[(?P<timestamp>[^\]]*)\] "(?P<method>[\w]+) (?P<path>[^"]*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$')
+
+  sinks:
+    out:
+      inputs: ["apache_parser"]
+      type: socket
+      mode: tcp
+      address: "consumer:9000"
+      encoding:
+        codec: json
+
+readinessProbe:
+  grpc:
+    port: 8686
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+
+containerPorts:
+  - name: http-in
+    containerPort: 9000
+    protocol: TCP
+  - name: api
+    containerPort: 8686
+    protocol: TCP
+
+service:
+  enabled: true
+  type: ClusterIP
+  ports:
+    - port: 9000
+      protocol: TCP
+      targetPort: 9000
+      name: http-in
+    - port: 8686
+      protocol: TCP
+      targetPort: 8686
+      name: api

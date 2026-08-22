@@ -1,0 +1,54 @@
+Provisions the single-node K3s cluster (EC2 c5.4xlarge) used by the
+k8s-autoscaling guide's benchmark. See ../k8s-autoscaling.md for the guide
+this cluster is meant to reproduce.
+
+Prerequisites
+--------------
+- Terraform >= 1.0
+- An AWS account/credentials with permission to create EC2 instances, key
+  pairs, and security groups in the default VPC of the target region
+- An SSH key pair to access the instance:
+
+    ssh-keygen -t ed25519 -f ~/.ssh/vector_tests -N ""
+
+Usage
+-----
+1. From this directory, initialize Terraform:
+
+    terraform init
+
+2. Apply, supplying `my_cidr` (the only variable with no default):
+
+    terraform apply \
+      -var="my_cidr=$(curl -s https://checkip.amazonaws.com)/32"
+
+   This creates the key pair, security group, and EC2 instance, installs
+   K3s/Helm/grpcurl via user-data, and fetches a kubeconfig once K3s is
+   active — written to ./kubeconfig (gitignored). Resources are named
+   "vector-perf" by default; if you're sharing an AWS account with another
+   concurrent reproduction, also pass `-var="cluster_suffix=<your-username>"`
+   to avoid name collisions.
+
+3. Use the generated kubeconfig with kubectl/helm and with
+   ../scripts/run-experiment.sh:
+
+    export KUBECONFIG=$(terraform output -raw kubeconfig_path)
+    kubectl get nodes
+
+4. When finished, tear the cluster down (pass the same `-var` flags you
+   applied with):
+
+    terraform destroy \
+      -var="my_cidr=$(curl -s https://checkip.amazonaws.com)/32"
+
+Variables
+---------
+See variables.tf for the full list and defaults. Notably:
+- `my_cidr`   — required; CIDR allowed to reach SSH (22) and the K3s API
+                (6443) on the instance, e.g. your own IP as a /32.
+- `cluster_suffix` — optional; appended to the default "vector-perf"
+                resource names (key pair, security group) if set. Only
+                needed to avoid collisions with another concurrent
+                reproduction in the same account.
+- `ssh_public_key_path` / `ssh_private_key_path` — default to
+  ~/.ssh/vector_tests(.pub); point these at your own key pair if different.
