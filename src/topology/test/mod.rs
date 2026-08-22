@@ -14,6 +14,7 @@ use tokio::{
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     config::{ComponentKey, OutputId},
+    metrics::Controller,
     source_sender::SourceSenderItem,
 };
 
@@ -417,6 +418,57 @@ async fn topology_remove_one_transform() {
     let res2 = h_out2.await.unwrap();
     assert_eq!(vec!["this transformed"], res1);
     assert_eq!(Vec::<String>::new(), res2);
+}
+
+#[tokio::test]
+async fn topology_removes_metrics_for_removed_component() {
+    trace_init();
+
+    let (_input, source) = basic_source();
+    let mut config = Config::builder();
+    config.add_source("metric_cleanup_input", source);
+    config.add_transform(
+        "metric_cleanup_transform",
+        &["metric_cleanup_input"],
+        basic_transform(" transformed", 0.0),
+    );
+    config.add_sink(
+        "metric_cleanup_output",
+        &["metric_cleanup_transform"],
+        basic_sink(10).1,
+    );
+
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
+    let metrics = Controller::get().unwrap();
+    let belongs_to_removed_component = |metric: &crate::event::Metric| {
+        metric.tags().and_then(|tags| tags.get("component_id")) == Some("metric_cleanup_transform")
+    };
+    assert!(
+        metrics
+            .capture_metrics()
+            .iter()
+            .any(belongs_to_removed_component)
+    );
+
+    let mut config = Config::builder();
+    config.add_source("metric_cleanup_input", basic_source().1);
+    config.add_sink(
+        "metric_cleanup_output",
+        &["metric_cleanup_input"],
+        basic_sink(10).1,
+    );
+    topology
+        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    assert!(
+        !metrics
+            .capture_metrics()
+            .iter()
+            .any(belongs_to_removed_component)
+    );
+    topology.stop().await;
 }
 
 #[tokio::test]
