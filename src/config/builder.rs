@@ -94,6 +94,8 @@ impl From<Config> for ConfigBuilder {
             sources,
             sinks,
             transforms,
+            acknowledgement_required: _,
+            acknowledgement_best_effort: _,
             tests,
             secret,
             graceful_shutdown_duration,
