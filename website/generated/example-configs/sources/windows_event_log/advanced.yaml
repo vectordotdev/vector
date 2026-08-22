@@ -1,0 +1,21 @@
+sources:
+  my_source_id:
+    type: windows_event_log
+    batch_size: 100
+    channels:
+      - System,Application,Security
+    checkpoint_interval_secs: 5
+    connection_timeout_secs: 30
+    data_dir: /var/lib/vector
+    event_query: "*[System[Level=1 or Level=2 or Level=3]]"
+    event_timeout_ms: 5000
+    events_per_second: 100
+    ignore_event_ids:
+      - 4624
+    include_xml: false
+    max_event_age_secs: 86400
+    max_event_data_length: 1024
+    only_event_ids:
+      - 1000
+    read_existing_events: false
+    render_message: true

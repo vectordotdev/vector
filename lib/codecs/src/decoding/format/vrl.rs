@@ -4,7 +4,7 @@ use vector_config_macros::configurable_component;
 use vector_core::{
     compile_vrl,
     config::{DataType, LogNamespace},
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, MetricTagMode, TargetEvents, VrlTarget},
     schema,
 };
 use vrl::{
@@ -45,7 +45,6 @@ pub struct VrlDeserializerOptions {
     ///
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
 }
 
@@ -148,7 +147,7 @@ impl VrlDeserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let mut runtime = Runtime::default();
-        let mut target = VrlTarget::new(event, self.program.info(), true);
+        let mut target = VrlTarget::new(event, self.program.info(), MetricTagMode::Full);
         match runtime.resolve(&mut target, &self.program, &self.timezone) {
             Ok(_) => match target.into_events(log_namespace) {
                 TargetEvents::One(event) => Ok(smallvec![event]),

@@ -150,8 +150,10 @@ impl TopologyController {
         }
     }
 
+    /// Stops the topology. Returns `true` if every component finished on its own before the
+    /// graceful shutdown deadline, or `false` if any component had to be forcefully killed.
     #[cfg_attr(not(feature = "api"), allow(unused_mut))]
-    pub async fn stop(mut self) {
+    pub async fn stop(mut self) -> bool {
         // Phase 1: Mark the gRPC API as unavailable so that external probes
         // (e.g. Kubernetes readiness) fail early and stop routing traffic
         // to this instance.
@@ -162,7 +164,7 @@ impl TopologyController {
 
         // Phase 2: Drain the topology -- shuts down sources, waits for
         // in-flight events to flush through transforms and sinks.
-        self.topology.stop().await;
+        self.topology.stop().await
     }
 
     // The `sources_finished` method on `RunningTopology` only considers sources that are currently

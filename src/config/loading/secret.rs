@@ -8,13 +8,15 @@ use futures::TryFutureExt;
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use toml::value::Table;
 use vector_lib::config::ComponentKey;
 
 use crate::{
     config::{
         SecretBackend,
-        loading::{ComponentHint, Loader, deserialize_table, prepare_input, process::Process},
+        loading::{
+            ComponentHint, Loader, deserialize_config_map, prepare_input, process::Process,
+            representation::ConfigMap,
+        },
     },
     secrets::SecretBackends,
     signal,
@@ -115,9 +117,9 @@ impl Process for SecretBackendLoader {
         Ok(config_string)
     }
 
-    fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if table.contains_key("secret") {
-            let additional = deserialize_table::<SecretBackendOuter>(table)?;
+    fn merge(&mut self, map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        if map.contains_key("secret") {
+            let additional = deserialize_config_map::<SecretBackendOuter>(map)?;
             self.backends.extend(additional.secret);
         }
         Ok(())

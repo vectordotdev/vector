@@ -18,7 +18,6 @@ pub use vector_common::{
 };
 pub use vector_config as configurable;
 pub use vector_config::impl_generate_config_from_default;
-#[cfg(feature = "vrl")]
 pub use vector_core::compile_vrl;
 pub use vector_core::{
     EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, emit, event, fanout,
@@ -31,7 +30,6 @@ pub use vector_stream as stream;
 pub use vector_tap as tap;
 #[cfg(feature = "vector-top")]
 pub use vector_top as top;
-#[cfg(feature = "vrl")]
 pub use vrl;
 
 pub mod config {
