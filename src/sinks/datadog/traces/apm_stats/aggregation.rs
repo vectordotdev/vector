@@ -5,7 +5,7 @@ use vrl::event_path;
 
 use super::{
     BUCKET_DURATION_NANOSECONDS, ClientStatsBucket, ClientStatsPayload, PartitionKey,
-    bucket::Bucket,
+    bucket::{Bucket, PayloadBucketEntry},
 };
 use crate::event::{ObjectMap, TraceEvent, Value};
 
@@ -94,6 +94,11 @@ pub(crate) struct BucketAggregationKey {
     pub(crate) ty: String,
     pub(crate) status_code: u32,
     pub(crate) synthetics: bool,
+}
+
+struct FlushedPayload {
+    stats: Vec<ClientStatsBucket>,
+    tags: Vec<String>,
 }
 
 pub struct Aggregator {
@@ -190,6 +195,13 @@ impl Aggregator {
         };
 
         let weight = super::weight::extract_weight_from_root_span(&spans);
+        let container_tags: Vec<String> = trace
+            .get(event_path!("tags"))
+            .and_then(|v| v.as_object())
+            .and_then(|tags| tags.get("_dd.tags.container"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
+            .unwrap_or_default();
         let payload_aggkey = PayloadAggregationKey {
             env: partition_key.env.clone().unwrap_or_default(),
             hostname: partition_key.hostname.clone().unwrap_or_default(),
@@ -213,7 +225,14 @@ impl Aggregator {
                 return;
             }
 
-            self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
+            self.handle_span(
+                span,
+                weight,
+                is_top,
+                synthetics,
+                payload_aggkey.clone(),
+                &container_tags,
+            );
         });
     }
 
@@ -226,6 +245,7 @@ impl Aggregator {
         is_top: bool,
         synthetics: bool,
         payload_aggkey: PayloadAggregationKey,
+        payload_tags: &[String],
     ) {
         // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/statsraw.go#L147-L182
 
@@ -258,15 +278,11 @@ impl Aggregator {
 
         match self.buckets.get_mut(&btime) {
             Some(b) => {
-                b.add(span, weight, is_top, aggkey);
+                b.add(span, weight, is_top, aggkey, payload_tags);
             }
             None => {
-                let mut b = Bucket {
-                    start: btime,
-                    duration: BUCKET_DURATION_NANOSECONDS,
-                    data: BTreeMap::new(),
-                };
-                b.add(span, weight, is_top, aggkey);
+                let mut b = Bucket::new(btime, BUCKET_DURATION_NANOSECONDS);
+                b.add(span, weight, is_top, aggkey, payload_tags);
 
                 debug!("Created {} start_time bucket.", btime);
                 self.buckets.insert(btime, b);
@@ -318,17 +334,17 @@ impl Aggregator {
     ///
     /// * `flush_cutoff_time` - Timestamp in nanos to use to determine what buckets to keep in the cache and which to export.
     fn get_client_stats_payloads(&mut self, flush_cutoff_time: u64) -> Vec<ClientStatsPayload> {
-        let client_stats_buckets = self.export_buckets(flush_cutoff_time);
+        let client_stats_payloads = self.export_buckets(flush_cutoff_time);
 
-        client_stats_buckets
+        client_stats_payloads
             .into_iter()
-            .map(|(payload_aggkey, csb)| {
+            .map(|(payload_aggkey, payload)| {
                 ClientStatsPayload {
                     env: payload_aggkey.env,
                     hostname: payload_aggkey.hostname,
                     container_id: payload_aggkey.container_id,
                     version: payload_aggkey.version,
-                    stats: csb,
+                    stats: payload.stats,
                     // All the following fields are left unset by the trace-agent:
                     // https://github.com/DataDog/datadog-agent/blob/42e72dd/pkg/trace/stats/concentrator.go#L216-L227
                     service: "".to_string(),
@@ -337,7 +353,7 @@ impl Aggregator {
                     runtime_id: "".to_string(),
                     lang: "".to_string(),
                     tracer_version: "".to_string(),
-                    tags: vec![],
+                    tags: payload.tags,
                 }
             })
             .collect::<Vec<ClientStatsPayload>>()
@@ -351,8 +367,8 @@ impl Aggregator {
     fn export_buckets(
         &mut self,
         flush_cutoff_time: u64,
-    ) -> BTreeMap<PayloadAggregationKey, Vec<ClientStatsBucket>> {
-        let mut m = BTreeMap::<PayloadAggregationKey, Vec<ClientStatsBucket>>::new();
+    ) -> BTreeMap<PayloadAggregationKey, FlushedPayload> {
+        let mut m = BTreeMap::<PayloadAggregationKey, FlushedPayload>::new();
 
         self.buckets.retain(|&bucket_start, bucket| {
             let retain = bucket_start > flush_cutoff_time;
@@ -360,16 +376,36 @@ impl Aggregator {
             if !retain {
                 debug!("Flushing {} start_time bucket.", bucket_start);
 
-                bucket.export().into_iter().for_each(|(payload_key, csb)| {
-                    match m.get_mut(&payload_key) {
-                        None => {
-                            m.insert(payload_key.clone(), vec![csb]);
-                        }
-                        Some(s) => {
-                            s.push(csb);
-                        }
-                    };
-                })
+                bucket
+                    .export()
+                    .into_iter()
+                    .for_each(|(payload_key, payload)| {
+                        let PayloadBucketEntry {
+                            stats: client_stats_bucket,
+                            tags,
+                        } = payload;
+
+                        match m.get_mut(&payload_key) {
+                            None => {
+                                m.insert(
+                                    payload_key.clone(),
+                                    FlushedPayload {
+                                        stats: vec![client_stats_bucket],
+                                        tags,
+                                    },
+                                );
+                            }
+                            Some(flushed_payload) => {
+                                flushed_payload.stats.push(client_stats_bucket);
+
+                                // The payload only carries one tag set per payload key, so keep the
+                                // first non-empty container tags observed for the flushed buckets.
+                                if flushed_payload.tags.is_empty() {
+                                    flushed_payload.tags = tags;
+                                }
+                            }
+                        };
+                    })
             }
             retain
         });
@@ -430,5 +466,112 @@ fn is_partial_snapshot(span: &ObjectMap) -> bool {
     match get_metric_value_float(span, PARTIAL_VERSION_KEY) {
         Some(f) => f >= 0.0,
         None => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use chrono::{TimeZone, Utc};
+    use ordered_float::NotNan;
+    use vrl::event_path;
+
+    use super::{Aggregator, BUCKET_DURATION_NANOSECONDS, PartitionKey, align_timestamp};
+    use crate::event::{ObjectMap, TraceEvent, Value};
+
+    fn partition_key() -> PartitionKey {
+        PartitionKey {
+            api_key: None,
+            env: None,
+            hostname: None,
+            agent_version: None,
+            target_tps: None,
+            error_tps: None,
+        }
+    }
+
+    fn make_span(start: u64) -> ObjectMap {
+        ObjectMap::from([
+            ("service".into(), Value::from("a_service")),
+            ("name".into(), Value::from("a_name")),
+            ("resource".into(), Value::from("a_resource")),
+            ("type".into(), Value::from("a_type")),
+            ("trace_id".into(), Value::Integer(123)),
+            ("span_id".into(), Value::Integer(456)),
+            ("parent_id".into(), Value::Integer(789)),
+            (
+                "start".into(),
+                Value::from(Utc.timestamp_nanos(start as i64)),
+            ),
+            ("duration".into(), Value::Integer(0)),
+            ("error".into(), Value::Integer(0)),
+            ("meta".into(), Value::Object(ObjectMap::new())),
+            (
+                "metrics".into(),
+                Value::Object(ObjectMap::from([(
+                    "_top_level".into(),
+                    Value::Float(NotNan::new(1.0).unwrap()),
+                )])),
+            ),
+        ])
+    }
+
+    fn make_trace(start: u64, container_id: &str, container_tags: &str) -> TraceEvent {
+        let mut trace = TraceEvent::default();
+        trace.insert(
+            event_path!("tags"),
+            Value::Object(ObjectMap::from([(
+                "_dd.tags.container".into(),
+                Value::from(container_tags),
+            )])),
+        );
+        trace.insert(event_path!("container_id"), container_id);
+        trace.insert(
+            event_path!("spans"),
+            Value::Array(vec![Value::from(make_span(start))]),
+        );
+        trace
+    }
+
+    #[test]
+    fn stats_payload_flush_preserves_tags_for_retained_buckets() {
+        let mut agg = Aggregator::new(Arc::from("a_key"));
+        let current_bucket = align_timestamp(
+            Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range") as u64,
+        );
+        let old_bucket = current_bucket - (BUCKET_DURATION_NANOSECONDS * 3);
+        agg.oldest_timestamp = old_bucket;
+
+        agg.handle_trace(
+            &partition_key(),
+            &make_trace(old_bucket, "old-container", "location:old_location"),
+        );
+        agg.handle_trace(
+            &partition_key(),
+            &make_trace(
+                current_bucket,
+                "retained-container",
+                "location:retained_location",
+            ),
+        );
+
+        let first_flush = agg.flush(false);
+        assert_eq!(first_flush.len(), 1);
+        assert_eq!(first_flush[0].container_id, "old-container");
+        assert_eq!(
+            first_flush[0].tags,
+            vec!["location:old_location".to_string()]
+        );
+
+        let second_flush = agg.flush(true);
+        assert_eq!(second_flush.len(), 1);
+        assert_eq!(second_flush[0].container_id, "retained-container");
+        assert_eq!(
+            second_flush[0].tags,
+            vec!["location:retained_location".to_string()]
+        );
     }
 }
