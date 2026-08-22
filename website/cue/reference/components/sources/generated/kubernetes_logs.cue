@@ -503,6 +503,6 @@ generated: components: sources: kubernetes_logs: configuration: {
 	use_apiserver_cache: {
 		description: "Determines if requests to the kube-apiserver can be served by a cache."
 		required:    false
-		type: bool: default: false
+		type: bool: default: true
 	}
 }
