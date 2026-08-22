@@ -1,4 +1,6 @@
 #[cfg(feature = "sources-utils-net-tcp")]
+pub mod proxy_protocol;
+#[cfg(feature = "sources-utils-net-tcp")]
 mod tcp;
 #[cfg(feature = "sources-utils-net-udp")]
 mod udp;
