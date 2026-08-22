@@ -39,6 +39,19 @@ generated: components: sources: statsd: configuration: {
 			type: uint: unit: "seconds"
 		}
 	}
+	max_length: {
+		description: """
+			The maximum buffer size of incoming messages.
+
+			Messages larger than this are truncated.
+			"""
+		relevant_when: "mode = \"unix\""
+		required:      false
+		type: uint: {
+			default: 102400
+			unit:    "bytes"
+		}
+	}
 	mode: {
 		description: "The type of socket to use."
 		required:    true
@@ -87,6 +100,18 @@ generated: components: sources: statsd: configuration: {
 		type: uint: {
 			default: 30
 			unit:    "seconds"
+		}
+	}
+	socket_type: {
+		description:   "The type of Unix socket to use."
+		relevant_when: "mode = \"unix\""
+		required:      false
+		type: string: {
+			default: "stream"
+			enum: {
+				datagram: "Datagram socket (connectionless)."
+				stream:   "Stream socket (connection-oriented)."
+			}
 		}
 	}
 	tls: {
