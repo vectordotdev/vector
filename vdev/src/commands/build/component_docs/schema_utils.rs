@@ -14,10 +14,12 @@ fn scalar_const_key(value: &Value) -> Option<String> {
     }
 }
 
-fn format_required_one_of_note(members: &[&str]) -> String {
+/// Render the docs note for an exclusive field group. `lead` is the prefix describing the
+/// cardinality, e.g. `"Exactly one"` or `"At most one"`.
+fn format_exclusive_group_note(lead: &str, members: &[&str], trailer: &str) -> String {
     match members {
         [] | [_] => String::new(),
-        [a, b] => format!("Exactly one of `{a}` or `{b}` must be set."),
+        [a, b] => format!("{lead} of `{a}` or `{b}` {trailer}."),
         _ => {
             let all_but_last = members[..members.len() - 1]
                 .iter()
@@ -25,7 +27,7 @@ fn format_required_one_of_note(members: &[&str]) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             let last = members.last().unwrap();
-            format!("Exactly one of {all_but_last}, or `{last}` must be set.")
+            format!("{lead} of {all_but_last}, or `{last}` {trailer}.")
         }
     }
 }
@@ -44,13 +46,24 @@ impl SchemaContext {
             format!("{raw_title}\n\n{raw_description}")
         };
 
-        let note = if let Some(Value::Array(members)) =
-            get_schema_metadata(schema, "docs::required_one_of")
-        {
-            let names: Vec<&str> = members.iter().filter_map(|m| m.as_str()).collect();
-            format_required_one_of_note(&names)
-        } else {
-            String::new()
+        let exclusive_group = [
+            ("docs::required_one_of", "Exactly one", "must be set"),
+            ("docs::mutually_exclusive", "At most one", "can be set"),
+        ]
+        .into_iter()
+        .find_map(
+            |(key, lead, trailer)| match get_schema_metadata(schema, key) {
+                Some(Value::Array(members)) => Some((members, lead, trailer)),
+                _ => None,
+            },
+        );
+
+        let note = match exclusive_group {
+            Some((members, lead, trailer)) => {
+                let names: Vec<&str> = members.iter().filter_map(|m| m.as_str()).collect();
+                format_exclusive_group_note(lead, &names, trailer)
+            }
+            None => String::new(),
         };
 
         let description = if note.is_empty() {
@@ -412,21 +425,20 @@ impl SchemaContext {
             }
         }
 
-        if let Some(Value::Array(arr)) = get_schema_metadata(source_schema, "docs::required_one_of")
-        {
-            resolved_schema
-                .as_object_mut()
-                .unwrap()
-                .insert("required_one_of".to_string(), Value::Array(arr.clone()));
-        }
-
-        if let Some(Value::String(group)) =
-            get_schema_metadata(source_schema, "docs::required_one_of_group")
-        {
-            resolved_schema.as_object_mut().unwrap().insert(
-                "required_one_of_group".to_string(),
-                Value::String(group.clone()),
-            );
+        for key in [
+            "required_one_of",
+            "required_one_of_group",
+            "mutually_exclusive",
+            "mutually_exclusive_group",
+        ] {
+            if let Some(value) = get_schema_metadata(source_schema, &format!("docs::{key}"))
+                && matches!(value, Value::Array(_) | Value::String(_))
+            {
+                resolved_schema
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(key.to_string(), value.clone());
+            }
         }
 
         if let Some(Value::String(condition)) =

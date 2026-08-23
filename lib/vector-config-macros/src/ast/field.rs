@@ -240,6 +240,17 @@ impl<'a> Field<'a> {
         self.attrs.required_one_of.as_deref()
     }
 
+    /// The `mutually_exclusive` group name, if any.
+    ///
+    /// When set, this field is part of a named group where *at most* one member may be provided.
+    /// Unlike `required_one_of`, omitting every member is valid, so no JSON Schema constraint is
+    /// generated — "at most one" cannot be expressed without also making the group required.
+    /// Mutual exclusivity is enforced by the component's own validation; this attribute exists so
+    /// the docs render the constraint and the example-config generator emits only one member.
+    pub fn mutually_exclusive(&self) -> Option<&str> {
+        self.attrs.mutually_exclusive.as_deref()
+    }
+
     /// Metadata (custom attributes) for the field, if any.
     ///
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
@@ -281,6 +292,7 @@ struct Attributes {
     #[darling(skip)]
     delegated_ty: Option<syn::Type>,
     required_one_of: Option<String>,
+    mutually_exclusive: Option<String>,
 }
 
 impl Attributes {

@@ -362,6 +362,13 @@ _values: {
 	required_one_of?: [...string]
 	required_one_of_group?: string
 
+	// `mutually_exclusive` documents that at most one field from the listed group
+	// may be set. All members share the same list. Unlike `required_one_of`,
+	// setting none of them is valid, so there is no schema-level constraint; the
+	// component's own validation rejects setting more than one.
+	mutually_exclusive?: [...string]
+	mutually_exclusive_group?: string
+
 	// `minimal` marks an option as part of the minimal example configuration.
 	minimal?: bool
 

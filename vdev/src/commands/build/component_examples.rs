@@ -345,49 +345,79 @@ where
         })
         .collect::<std::collections::HashMap<_, _>>();
 
-    let mut selected = HashSet::new();
-    let mut groups = HashSet::new();
-    for param in params.values() {
-        let Some(group) = param
-            .get("required_one_of")
-            .and_then(Value::as_array)
-            .filter(|group| !group.is_empty())
-        else {
-            continue;
-        };
-        let group_key = group[0].as_str().unwrap_or_default();
-        if !groups.insert(group_key) {
-            continue;
-        }
-        let member = group
-            .iter()
-            .filter_map(Value::as_str)
-            .find(|member| {
-                params
-                    .get(*member)
-                    .is_some_and(|param| get_example_value(param, |_| false).is_some())
-            })
-            .or_else(|| group[0].as_str());
-        if let Some(member) = member {
-            selected.insert(member);
-        }
-    }
+    // `required_one_of` means exactly one member must be set, so the chosen member is forced into
+    // the example even when the variant's filter would otherwise skip it.
+    let (required_one_of, _) = split_exclusive_groups(params, "required_one_of", |param| {
+        get_example_value(param, |_| false).is_some()
+    });
+
+    // `mutually_exclusive` means at most one member may be set, and none is also valid. The chosen
+    // member is subject to the variant's filter like any other field; the rest are dropped so the
+    // generated example doesn't violate the component's own validation.
+    let (_, excluded) = split_exclusive_groups(params, "mutually_exclusive", |param| {
+        filter(param) && get_example_value(param, |_| false).is_some()
+    });
 
     params
         .iter()
         .filter(|(key, param)| {
-            let in_group = param
-                .get("required_one_of")
-                .and_then(Value::as_array)
-                .is_some_and(|group| !group.is_empty());
-            (!in_group || selected.contains(key.as_str()))
-                && (filter(param) || selected.contains(key.as_str()))
+            let key = key.as_str();
+            let forced = required_one_of.contains(key);
+            !excluded.contains(key)
+                && (exclusive_group(param, "required_one_of").is_none() || forced)
+                && (filter(param) || forced)
                 && matches_relevant_when(param, &discriminators)
         })
         .filter_map(|(key, param)| {
             get_example_value(param, &deep_filter).map(|value| (key.clone(), value))
         })
         .collect()
+}
+
+/// The ordered member list of the exclusive group named by `key` that `param` belongs to, if any.
+///
+/// Every member of a group carries the same list, so the list doubles as the group's identity.
+fn exclusive_group<'a>(param: &'a Value, key: &str) -> Option<Vec<&'a str>> {
+    let members: Vec<&str> = param
+        .get(key)?
+        .as_array()?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    (!members.is_empty()).then_some(members)
+}
+
+/// Partition the members of every exclusive group named by `key` into the single member that may
+/// appear in the example and the others, which must be omitted for the example to stay valid.
+///
+/// Within a group the first member satisfying `usable` is chosen, falling back to the first member
+/// so a group always resolves to exactly one candidate.
+fn split_exclusive_groups<'a, F>(
+    params: &'a Map<String, Value>,
+    key: &str,
+    usable: F,
+) -> (HashSet<&'a str>, HashSet<&'a str>)
+where
+    F: Fn(&Value) -> bool,
+{
+    let (mut chosen, mut dropped, mut seen) = (HashSet::new(), HashSet::new(), HashSet::new());
+    for param in params.values() {
+        let Some(members) = exclusive_group(param, key) else {
+            continue;
+        };
+        // Groups are visited once per member; key off the first member to handle each group once.
+        if !seen.insert(members[0]) {
+            continue;
+        }
+        let pick = members
+            .iter()
+            .copied()
+            .find(|member| params.get(*member).is_some_and(&usable))
+            .unwrap_or(members[0]);
+        chosen.insert(pick);
+        dropped.extend(members.into_iter().filter(|member| *member != pick));
+    }
+    (chosen, dropped)
 }
 
 fn matches_relevant_when(
@@ -799,6 +829,73 @@ mod tests {
         assert_eq!(
             docs["components"]["sources"]["demo"]["example_configs"]["minimal"]["toml"],
             "minimal"
+        );
+    }
+
+    /// Two optional params in the same `mutually_exclusive` group, both carrying examples.
+    fn mutually_exclusive_params() -> Map<String, Value> {
+        let param = |group: [&str; 2], example: &str| {
+            serde_json::json!({
+                "required": false,
+                "mutually_exclusive": group,
+                "mutually_exclusive_group": "endpoint",
+                "type": { "string": { "examples": [example] } }
+            })
+        };
+        let group = ["url", "region"];
+        Map::from_iter([
+            ("url".to_owned(), param(group, "https://api.eu.axiom.co")),
+            ("region".to_owned(), param(group, "mumbai.axiom.co")),
+        ])
+    }
+
+    #[test]
+    fn advanced_example_emits_one_mutually_exclusive_member() {
+        let params = mutually_exclusive_params();
+        let advanced = make_example_params(&params, |_| true, |_| true);
+
+        // Both members have examples, so without group handling both would be emitted, producing a
+        // config the component's own validation rejects.
+        assert_eq!(
+            advanced,
+            Map::from_iter([(
+                "url".to_owned(),
+                Value::String("https://api.eu.axiom.co".to_owned())
+            )])
+        );
+    }
+
+    #[test]
+    fn minimal_example_omits_optional_mutually_exclusive_members() {
+        let params = mutually_exclusive_params();
+        let minimal = make_example_params(&params, selected_for_minimal, selected_for_minimal);
+
+        // Neither member is required, and "at most one" permits none, so the minimal example must
+        // not force one in the way `required_one_of` does.
+        assert!(minimal.is_empty(), "expected no params, got {minimal:?}");
+    }
+
+    #[test]
+    fn required_one_of_still_forces_a_member() {
+        let param = |example: &str| {
+            serde_json::json!({
+                "required": false,
+                "required_one_of": ["source", "file"],
+                "required_one_of_group": "input",
+                "type": { "string": { "examples": [example] } }
+            })
+        };
+        let params = Map::from_iter([
+            ("source".to_owned(), param("stdin")),
+            ("file".to_owned(), param("/var/log/syslog")),
+        ]);
+
+        // Exactly one must be set, so the member is emitted even though the minimal filter would
+        // otherwise skip an optional field.
+        let minimal = make_example_params(&params, selected_for_minimal, selected_for_minimal);
+        assert_eq!(
+            minimal,
+            Map::from_iter([("source".to_owned(), Value::String("stdin".to_owned()))])
         );
     }
 

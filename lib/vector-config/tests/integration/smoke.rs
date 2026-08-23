@@ -932,3 +932,48 @@ fn required_one_of_generates_one_of_constraint() {
         })
     );
 }
+
+/// A struct where at most one of two optional fields may be provided.
+#[derive(Clone, Debug)]
+#[configurable_component]
+struct MutuallyExclusiveConfig {
+    /// First option.
+    #[configurable(mutually_exclusive = "group")]
+    url: Option<String>,
+
+    /// Second option.
+    #[configurable(mutually_exclusive = "group")]
+    region: Option<String>,
+}
+
+#[test]
+fn mutually_exclusive_generates_no_schema_constraint() {
+    // Unlike `required_one_of`, no `oneOf` constraint is emitted: setting neither field is valid,
+    // and JSON Schema can't express "at most one" without also requiring the group.
+    assert_eq!(
+        generate_test_schema::<MutuallyExclusiveConfig>(),
+        json!({
+            "type": "object",
+            "properties": {
+                "url": { "type": ["string", "null"] },
+                "region": { "type": ["string", "null"] }
+            }
+        })
+    );
+}
+
+#[test]
+fn mutually_exclusive_annotates_group_metadata() {
+    let root = generate_root_schema::<MutuallyExclusiveConfig>().expect("should generate schema");
+    let schema = serde_json::to_value(root.schema).expect("serialize schema to JSON");
+
+    for field in ["url", "region"] {
+        let metadata = &schema["properties"][field]["_metadata"];
+        assert_eq!(
+            metadata["docs::mutually_exclusive"],
+            json!(["url", "region"]),
+            "{field} should carry the full group member list"
+        );
+        assert_eq!(metadata["docs::mutually_exclusive_group"], json!("group"));
+    }
+}

@@ -241,16 +241,65 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     }
 }
 
+/// Which flavor of mutual exclusivity a field group expresses.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum ExclusiveKind {
+    /// Exactly one member must be set. Enforced in the JSON Schema via a `oneOf` constraint.
+    RequiredOneOf,
+    /// At most one member may be set; all members may also be omitted. Documentation-only, since
+    /// JSON Schema cannot express "at most one" without also making the group required.
+    MutuallyExclusive,
+}
+
+impl ExclusiveKind {
+    /// The `docs::` metadata key carrying the group's member list.
+    fn members_key(self) -> &'static str {
+        match self {
+            Self::RequiredOneOf => "docs::required_one_of",
+            Self::MutuallyExclusive => "docs::mutually_exclusive",
+        }
+    }
+
+    /// The `docs::` metadata key carrying the group's name.
+    fn group_key(self) -> &'static str {
+        match self {
+            Self::RequiredOneOf => "docs::required_one_of_group",
+            Self::MutuallyExclusive => "docs::mutually_exclusive_group",
+        }
+    }
+
+    /// The attribute name, for use in compile errors.
+    fn attr_name(self) -> &'static str {
+        match self {
+            Self::RequiredOneOf => "required_one_of",
+            Self::MutuallyExclusive => "mutually_exclusive",
+        }
+    }
+}
+
 #[derive(Clone)]
-struct RequiredOneOf {
+struct ExclusiveGroup {
+    kind: ExclusiveKind,
     group: String,
     members: Vec<String>,
+}
+
+/// The exclusive group attribute set on a field, if any.
+fn field_exclusive_group<'a>(field: &'a Field<'_>) -> Option<(ExclusiveKind, &'a str)> {
+    field
+        .required_one_of()
+        .map(|group| (ExclusiveKind::RequiredOneOf, group))
+        .or_else(|| {
+            field
+                .mutually_exclusive()
+                .map(|group| (ExclusiveKind::MutuallyExclusive, group))
+        })
 }
 
 fn generate_named_struct_field(
     container: &Container<'_>,
     field: &Field<'_>,
-    required_one_of: Option<RequiredOneOf>,
+    exclusive_group: Option<ExclusiveGroup>,
 ) -> proc_macro2::TokenStream {
     let field_name = field
         .ident()
@@ -263,39 +312,41 @@ fn generate_named_struct_field(
 
     let field_schema = generate_struct_field(field);
 
-    // Inject docs::required_one_of and docs::required_one_of_group metadata so the CUE doc
-    // builder can render the mutual exclusivity constraint and its group name.
-    let inject_required_one_of = required_one_of.map(|RequiredOneOf { group, members }| {
-        let member_lits: Vec<syn::LitStr> = members
-            .iter()
-            .map(|m| syn::LitStr::new(m, proc_macro2::Span::call_site()))
-            .collect();
-        quote! {
-            if let Some(meta) = subschema.extensions.get_mut("_metadata") {
-                if let Some(obj) = meta.as_object_mut() {
+    // Inject the group's member list and name as `docs::` metadata so the CUE doc builder can
+    // render the mutual exclusivity constraint, and so the example generator can emit only one
+    // member of the group.
+    let inject_exclusive_group = exclusive_group.map(
+        |ExclusiveGroup {
+             kind,
+             group,
+             members,
+         }| {
+            let member_lits: Vec<syn::LitStr> = members
+                .iter()
+                .map(|m| syn::LitStr::new(m, proc_macro2::Span::call_site()))
+                .collect();
+            let (members_key, group_key) = (kind.members_key(), kind.group_key());
+            quote! {
+                {
+                    let mut obj = ::serde_json::Map::new();
                     obj.insert(
-                        "docs::required_one_of".to_owned(),
+                        #members_key.to_owned(),
                         ::serde_json::Value::Array(vec![#(::serde_json::Value::String(#member_lits.to_owned())),*]),
                     );
                     obj.insert(
-                        "docs::required_one_of_group".to_owned(),
+                        #group_key.to_owned(),
                         ::serde_json::Value::String(#group.to_owned()),
                     );
+                    match subschema.extensions.get_mut("_metadata").and_then(::serde_json::Value::as_object_mut) {
+                        Some(meta) => meta.extend(obj),
+                        None => {
+                            subschema.extensions.insert("_metadata".to_owned(), ::serde_json::Value::Object(obj));
+                        }
+                    }
                 }
-            } else {
-                let mut obj = ::serde_json::Map::new();
-                obj.insert(
-                    "docs::required_one_of".to_owned(),
-                    ::serde_json::Value::Array(vec![#(::serde_json::Value::String(#member_lits.to_owned())),*]),
-                );
-                obj.insert(
-                    "docs::required_one_of_group".to_owned(),
-                    ::serde_json::Value::String(#group.to_owned()),
-                );
-                subschema.extensions.insert("_metadata".to_owned(), ::serde_json::Value::Object(obj));
             }
-        }
-    });
+        },
+    );
 
     // If the field is flattened, we store it into a different list of flattened subschemas vs adding it directly as a
     // field via `properties`/`required`.
@@ -336,7 +387,7 @@ fn generate_named_struct_field(
     quote! {
         {
             #field_schema
-            #inject_required_one_of
+            #inject_exclusive_group
             #integrate_field
         }
     }
@@ -362,76 +413,98 @@ fn build_named_struct_generate_schema_fn(
     container: &Container<'_>,
     fields: &[Field<'_>],
 ) -> proc_macro2::TokenStream {
-    // Validate required_one_of usage before building groups.
+    // Validate exclusive group usage before building groups.
     // Scan ALL fields (including non-visible) so #[serde(skip)] fields are caught too.
     for field in fields.iter() {
-        if field.required_one_of().is_some() {
-            if !field.visible() {
-                return syn::Error::new(
-                    field.span(),
-                    "`required_one_of` cannot be applied to a `#[serde(skip)]` field",
-                )
-                .to_compile_error();
-            }
-            if field.flatten() {
-                return syn::Error::new(
-                    field.span(),
-                    "`required_one_of` cannot be applied to a `#[serde(flatten)]` field",
-                )
-                .to_compile_error();
-            }
-            if !is_option_type(field.ty())
-                && field.default_value().is_none()
-                && container.default_value().is_none()
-            {
-                return syn::Error::new(
-                    field.span(),
-                    "`required_one_of` requires the field to be optional; use `Option<T>` or add `#[serde(default)]`",
-                )
-                .to_compile_error();
-            }
-            if field.skip_deserializing() {
-                return syn::Error::new(
-                    field.span(),
-                    "`required_one_of` cannot be applied to a `#[serde(skip_deserializing)]` field; users cannot set its value",
-                )
-                .to_compile_error();
-            }
+        if field.required_one_of().is_some() && field.mutually_exclusive().is_some() {
+            return syn::Error::new(
+                field.span(),
+                "`required_one_of` and `mutually_exclusive` cannot both be applied to the same field",
+            )
+            .to_compile_error();
+        }
+        let Some((kind, _)) = field_exclusive_group(field) else {
+            continue;
+        };
+        let attr = kind.attr_name();
+        if !field.visible() {
+            return syn::Error::new(
+                field.span(),
+                format!("`{attr}` cannot be applied to a `#[serde(skip)]` field"),
+            )
+            .to_compile_error();
+        }
+        if field.flatten() {
+            return syn::Error::new(
+                field.span(),
+                format!("`{attr}` cannot be applied to a `#[serde(flatten)]` field"),
+            )
+            .to_compile_error();
+        }
+        if !is_option_type(field.ty())
+            && field.default_value().is_none()
+            && container.default_value().is_none()
+        {
+            return syn::Error::new(
+                field.span(),
+                format!(
+                    "`{attr}` requires the field to be optional; use `Option<T>` or add `#[serde(default)]`"
+                ),
+            )
+            .to_compile_error();
+        }
+        if field.skip_deserializing() {
+            return syn::Error::new(
+                field.span(),
+                format!(
+                    "`{attr}` cannot be applied to a `#[serde(skip_deserializing)]` field; users cannot set its value"
+                ),
+            )
+            .to_compile_error();
         }
     }
 
-    // Collect required_one_of groups at macro-expansion time: group_name -> [serde field names].
-    let mut groups: std::collections::BTreeMap<String, Vec<String>> =
+    // Collect exclusive groups at macro-expansion time: (kind, group_name) -> [serde field names].
+    // The kind is part of the key so the same group name can't silently merge two different flavors.
+    let mut groups: std::collections::BTreeMap<(ExclusiveKind, String), Vec<String>> =
         std::collections::BTreeMap::new();
     for field in fields.iter().filter(|f| f.visible()) {
-        if let Some(group) = field.required_one_of() {
+        if let Some((kind, group)) = field_exclusive_group(field) {
             groups
-                .entry(group.to_string())
+                .entry((kind, group.to_string()))
                 .or_default()
                 .push(field.name().to_string());
         }
     }
 
-    // Build a per-field map: serde field name -> RequiredOneOf annotation.
-    let field_group_members: std::collections::HashMap<String, RequiredOneOf> = fields
+    // Build a per-field map: serde field name -> exclusive group annotation.
+    let field_group_members: std::collections::HashMap<String, ExclusiveGroup> = fields
         .iter()
         .filter(|f| f.visible())
         .filter_map(|f| {
-            f.required_one_of().map(|group| {
+            field_exclusive_group(f).map(|(kind, group)| {
                 (
                     f.name().to_string(),
-                    RequiredOneOf {
+                    ExclusiveGroup {
+                        kind,
                         group: group.to_string(),
-                        members: groups[group].clone(),
+                        members: groups[&(kind, group.to_string())].clone(),
                     },
                 )
             })
         })
         .collect();
 
-    // For each group, push a oneOf schema into `flattened_subschemas` so the JSON Schema
-    // expresses the "exactly one of" constraint via allOf.
-    let group_pushes = groups.values().map(|members| {
+    // For each `required_one_of` group, push a oneOf schema into `flattened_subschemas` so the JSON
+    // Schema expresses the "exactly one of" constraint via allOf.
+    //
+    // `mutually_exclusive` groups get no constraint: JSON Schema cannot express "at most one"
+    // without also requiring the group, which is exactly the semantics we're avoiding. Their mutual
+    // exclusivity is enforced by the component's own validation and documented via metadata.
+    let group_pushes = groups
+        .iter()
+        .filter(|((kind, _), _)| *kind == ExclusiveKind::RequiredOneOf)
+        .map(|(_, members)| {
         let required_entries = members.iter().map(|name| {
             quote! {
                 {
@@ -522,10 +595,13 @@ fn build_named_struct_generate_schema_fn(
 
 fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::TokenStream {
     for field in fields.iter() {
-        if field.required_one_of().is_some() {
+        if let Some((kind, _)) = field_exclusive_group(field) {
             return syn::Error::new(
                 field.span(),
-                "`required_one_of` is not supported on tuple struct fields",
+                format!(
+                    "`{}` is not supported on tuple struct fields",
+                    kind.attr_name()
+                ),
             )
             .to_compile_error();
         }
@@ -550,10 +626,13 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
 
 fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::TokenStream {
     for field in fields.iter() {
-        if field.required_one_of().is_some() {
+        if let Some((kind, _)) = field_exclusive_group(field) {
             return syn::Error::new(
                 field.span(),
-                "`required_one_of` is not supported on newtype struct fields",
+                format!(
+                    "`{}` is not supported on newtype struct fields",
+                    kind.attr_name()
+                ),
             )
             .to_compile_error();
         }
@@ -837,10 +916,13 @@ fn get_field_schema_ty<'a>(field: &'a Field<'a>) -> &'a syn::Type {
 }
 
 fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
-    if field.required_one_of().is_some() {
+    if let Some((kind, _)) = field_exclusive_group(field) {
         return syn::Error::new(
             field.span(),
-            "`required_one_of` is not supported on enum variant fields",
+            format!(
+                "`{}` is not supported on enum variant fields",
+                kind.attr_name()
+            ),
         )
         .to_compile_error();
     }
@@ -945,10 +1027,13 @@ fn generate_enum_newtype_struct_variant_schema(
     is_potentially_ambiguous: bool,
 ) -> proc_macro2::TokenStream {
     let field = variant.fields().first().expect("must exist");
-    if field.required_one_of().is_some() {
+    if let Some((kind, _)) = field_exclusive_group(field) {
         return syn::Error::new(
             field.span(),
-            "`required_one_of` is not supported on enum variant fields",
+            format!(
+                "`{}` is not supported on enum variant fields",
+                kind.attr_name()
+            ),
         )
         .to_compile_error();
     }
