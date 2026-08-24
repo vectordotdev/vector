@@ -425,14 +425,15 @@ impl SchemaContext {
             }
         }
 
-        for key in [
-            "required_one_of",
-            "required_one_of_group",
-            "mutually_exclusive",
-            "mutually_exclusive_group",
+        // Exclusive group annotations: the member list is an array, the group name a string.
+        for (key, is_expected_shape) in [
+            ("required_one_of", Value::is_array as fn(&Value) -> bool),
+            ("required_one_of_group", Value::is_string),
+            ("mutually_exclusive", Value::is_array),
+            ("mutually_exclusive_group", Value::is_string),
         ] {
             if let Some(value) = get_schema_metadata(source_schema, &format!("docs::{key}"))
-                && matches!(value, Value::Array(_) | Value::String(_))
+                && is_expected_shape(value)
             {
                 resolved_schema
                     .as_object_mut()
