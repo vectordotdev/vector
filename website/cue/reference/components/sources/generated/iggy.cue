@@ -544,6 +544,22 @@ generated: components: sources: iggy: configuration: {
 		required: false
 		type: string: default: "topic"
 	}
+	partition_id_key_field: {
+		description: """
+			The key under which the source partition ID is recorded on each
+			event (Legacy log namespace only).
+			"""
+		required: false
+		type: string: default: "partition_id"
+	}
+	offset_key_field: {
+		description: """
+			The key under which the source message offset is recorded on each
+			event (Legacy log namespace only).
+			"""
+		required: false
+		type: string: default: "offset"
+	}
 	url: {
 		description: """
 			The Iggy [connection string][iggy_conn] of the server to consume from.

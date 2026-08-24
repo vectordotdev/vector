@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeSet, HashMap},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use chrono::Utc;
@@ -40,9 +40,27 @@ struct PartitionState {
     committed: u64,
     max_delivered: Option<u64>,
     rejected: BTreeSet<u64>,
+    /// Number of polled messages registered for acknowledgement whose final
+    /// status has not arrived yet. When this reaches zero, everything the
+    /// source has polled so far has settled downstream.
+    in_flight: usize,
 }
 
 impl PartitionState {
+    const fn mark_in_flight(&mut self) {
+        self.in_flight += 1;
+    }
+
+    /// Settle one in-flight message once its acknowledgement arrives.
+    const fn settle(&mut self) {
+        self.in_flight = self.in_flight.saturating_sub(1);
+    }
+
+    /// Whether every polled message so far has settled downstream.
+    const fn is_settled(&self) -> bool {
+        self.in_flight == 0
+    }
+
     fn record_delivered(&mut self, offset: u64) {
         self.max_delivered = Some(self.max_delivered.map_or(offset, |m| m.max(offset)));
         self.recompute_pending();
@@ -93,6 +111,8 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
         "ack for offset {offset} arrived out of order (partition {partition_id}, committed={})",
         state.committed
     );
+    // Every acknowledgement settles exactly one registered message.
+    state.settle();
     match status {
         BatchStatus::Delivered => {
             state.record_delivered(offset);
@@ -192,6 +212,8 @@ struct MessageMetadata<'a> {
     topic: &'a str,
     stream_key: Option<&'a OwnedValuePath>,
     topic_key: Option<&'a OwnedValuePath>,
+    partition_id_key: Option<&'a OwnedValuePath>,
+    offset_key: Option<&'a OwnedValuePath>,
     stream_path: &'a OwnedValuePath,
     topic_path: &'a OwnedValuePath,
     partition_id_path: &'a OwnedValuePath,
@@ -217,7 +239,10 @@ impl AckTracker<'_> {
             self.ack_streams.insert(partition_id, stream);
             finalizer
         });
-        self.partitions.entry(partition_id).or_default();
+        self.partitions
+            .entry(partition_id)
+            .or_default()
+            .mark_in_flight();
         finalizer.add(offset, receiver);
     }
 }
@@ -317,14 +342,14 @@ async fn process_received_message(
                         metadata.log_namespace.insert_source_metadata(
                             IggySourceConfig::NAME,
                             log,
-                            None::<LegacyKey<&OwnedValuePath>>,
+                            metadata.partition_id_key.map(LegacyKey::InsertIfEmpty),
                             metadata.partition_id_path,
                             i64::from(partition_id),
                         );
                         metadata.log_namespace.insert_source_metadata(
                             IggySourceConfig::NAME,
                             log,
-                            None::<LegacyKey<&OwnedValuePath>>,
+                            metadata.offset_key.map(LegacyKey::InsertIfEmpty),
                             metadata.offset_path,
                             i64::try_from(offset).unwrap_or(i64::MAX),
                         );
@@ -419,6 +444,8 @@ pub async fn run_iggy_source(
         topic,
         stream_key: config.stream_key_field.path.as_ref(),
         topic_key: config.topic_key_field.path.as_ref(),
+        partition_id_key: config.partition_id_key_field.path.as_ref(),
+        offset_key: config.offset_key_field.path.as_ref(),
         stream_path: &stream_path,
         topic_path: &topic_path,
         partition_id_path: &partition_id_path,
@@ -452,9 +479,15 @@ pub async fn run_iggy_source(
     // The Iggy SDK polls relative to the server-stored consumer offset, so
     // the committed offset must stay close to the consumed position or
     // every poll re-fetches the same window. Commit eagerly once roughly
-    // half a batch has been acknowledged, with the timer below as a
-    // backstop for sparse traffic and shutdown.
+    // half a batch has been acknowledged. A sparse poll (fewer than that
+    // half-batch worth of messages) would otherwise stay uncommitted until
+    // the timer below fires, so also commit once a partition's polled
+    // messages have all settled downstream; the gap guard paces those
+    // commits to the poll cadence so fast sinks do not trigger one broker
+    // round trip per message. The timer remains a backstop for shutdown.
     let commit_after = u64::from((config.batch_length / 2).max(1));
+    let settled_commit_gap = Duration::from_millis(config.poll_interval_ms.max(1));
+    let mut last_settled_commit: Option<Instant> = None;
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
@@ -487,11 +520,23 @@ pub async fn run_iggy_source(
                 let should_commit = match partitions.get_mut(&partition_id) {
                     Some(state) => {
                         record_ack(state, partition_id, status, offset);
-                        matches!(status, BatchStatus::Delivered) && state.lag() >= commit_after
+                        if !matches!(status, BatchStatus::Delivered) {
+                            None
+                        } else if state.lag() >= commit_after {
+                            // Threshold reached; no pacing needed.
+                            Some(false)
+                        } else {
+                            let paced = last_settled_commit
+                                .is_none_or(|t| t.elapsed() >= settled_commit_gap);
+                            (state.lag() > 0 && state.is_settled() && paced).then_some(true)
+                        }
                     }
-                    None => false,
+                    None => None,
                 };
-                if should_commit {
+                if let Some(settled) = should_commit {
+                    if settled {
+                        last_settled_commit = Some(Instant::now());
+                    }
                     commit_offsets(
                         &consumer,
                         stream,
@@ -766,5 +811,39 @@ mod tests {
         s.record_rejection(0);
         assert_eq!(s.pending, None);
         assert_eq!(s.lag(), 0);
+    }
+
+    #[test]
+    fn settle_tracks_in_flight_messages() {
+        let mut s = PartitionState::default();
+        assert!(s.is_settled());
+        s.mark_in_flight();
+        s.mark_in_flight();
+        assert!(!s.is_settled());
+        s.record_delivered(1);
+        s.record_delivered(2);
+        s.settle();
+        assert!(!s.is_settled());
+        s.settle();
+        assert!(s.is_settled());
+        // A fully settled sparse batch has committable lag even though it
+        // never reaches the eager-commit threshold.
+        assert_eq!(s.lag(), 2);
+    }
+
+    #[test]
+    fn rejection_also_settles_and_fences_sparse_batch() {
+        let mut s = PartitionState::default();
+        s.mark_in_flight();
+        s.record_delivered(5);
+        s.settle();
+        assert_eq!(s.pending, Some(5));
+        s.mark_in_flight();
+        s.record_rejection(7);
+        // The rejected message settles too when its acknowledgement arrives,
+        // but the fence holds the pending offset below it.
+        s.settle();
+        assert!(s.is_settled());
+        assert_eq!(s.pending, Some(5));
     }
 }

@@ -115,6 +115,18 @@ pub struct IggySourceConfig {
     #[derivative(Default(value = "default_topic_key_field()"))]
     pub topic_key_field: OptionalValuePath,
 
+    /// The key under which the source partition ID is recorded on each event
+    /// (Legacy log namespace only).
+    #[serde(default = "default_partition_id_key_field")]
+    #[derivative(Default(value = "default_partition_id_key_field()"))]
+    pub partition_id_key_field: OptionalValuePath,
+
+    /// The key under which the source message offset is recorded on each
+    /// event (Legacy log namespace only).
+    #[serde(default = "default_offset_key_field")]
+    #[derivative(Default(value = "default_offset_key_field()"))]
+    pub offset_key_field: OptionalValuePath,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
@@ -147,6 +159,14 @@ pub fn default_stream_key_field() -> OptionalValuePath {
 
 pub fn default_topic_key_field() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("topic"))
+}
+
+pub fn default_partition_id_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("partition_id"))
+}
+
+pub fn default_offset_key_field() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("offset"))
 }
 
 impl GenerateConfig for IggySourceConfig {
@@ -230,14 +250,20 @@ impl SourceConfig for IggySourceConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                None,
+                self.partition_id_key_field
+                    .path
+                    .clone()
+                    .map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("partition_id"),
                 Kind::integer(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                None,
+                self.offset_key_field
+                    .path
+                    .clone()
+                    .map(LegacyKey::InsertIfEmpty),
                 &owned_value_path!("offset"),
                 Kind::integer(),
                 None,
