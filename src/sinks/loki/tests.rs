@@ -119,7 +119,7 @@ async fn healthcheck_includes_auth() {
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
-    healthcheck(config.clone(), client)
+    healthcheck(config.endpoint.clone(), config.auth.clone(), client)
         .await
         .expect("healthcheck failed");
 
@@ -149,7 +149,7 @@ async fn healthcheck_grafana_cloud() {
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
-    healthcheck(config, client)
+    healthcheck(config.endpoint.clone(), config.auth.clone(), client)
         .await
         .expect("healthcheck failed");
 }

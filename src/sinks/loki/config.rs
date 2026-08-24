@@ -246,7 +246,10 @@ impl SinkConfig for LokiConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedLokiSink {
+    /// The push URL: `endpoint` with `path` appended. Used by `LokiService`.
     pub(super) endpoint: HttpEndpoint,
+    /// The pathless base URL, used by the healthcheck (which appends `ready/` to it).
+    pub(super) base_endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) request_limits: TowerRequestSettings,
     pub(super) transformer: Transformer,
@@ -274,7 +277,7 @@ impl ValidatedSink for LokiConfig {
         // Extract basic-auth credentials embedded in the endpoint URL and strip
         // the userinfo, so credentials are sent as an `Authorization` header
         // rather than in the request URL.
-        let (endpoint, endpoint_auth) = self.endpoint.clone().extract_basic_auth()?;
+        let (base_endpoint, endpoint_auth) = self.endpoint.clone().extract_basic_auth()?;
         let auth = self.auth.choose_one(&endpoint_auth)?;
 
         let request_limits = match self.out_of_order_action {
@@ -307,12 +310,15 @@ impl ValidatedSink for LokiConfig {
             "structured_metadata[key]",
         )?;
 
-        endpoint.append_path(&self.path)?;
+        // The push URL appends `path`; the healthcheck appends `ready`/`` to the
+        // pathless base, so both are retained.
+        let endpoint = base_endpoint.append_path(&self.path)?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
         Ok(ValidatedLokiSink {
             endpoint,
+            base_endpoint,
             auth,
             request_limits,
             transformer,
@@ -338,7 +344,12 @@ impl ValidatedSink for LokiConfig {
 
         let sink = LokiSink::from_validated(config.clone(), validated.clone(), client.clone())?;
 
-        let healthcheck = healthcheck(config, client).boxed();
+        let healthcheck = healthcheck(
+            validated.base_endpoint.clone(),
+            validated.auth.clone(),
+            client,
+        )
+        .boxed();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }

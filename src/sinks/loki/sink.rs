@@ -510,12 +510,7 @@ impl LokiSink {
         let protocol = get_http_scheme_from_uri(config.endpoint.as_uri());
         let service = tower::ServiceBuilder::new()
             .settings(validated.request_limits.clone(), LokiRetryLogic)
-            .service(LokiService::new(
-                client,
-                config.endpoint,
-                config.path,
-                config.auth,
-            )?);
+            .service(LokiService::new(client, config.endpoint, config.auth));
 
         let batch_encoder = match config.compression {
             Compression::Snappy => LokiBatchEncoder(LokiBatchEncoding::Protobuf),

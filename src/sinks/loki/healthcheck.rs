@@ -1,30 +1,37 @@
-use super::config::LokiConfig;
-use crate::http::HttpClient;
+use crate::{
+    http::{Auth, HttpClient},
+    sinks::util::HttpEndpoint,
+};
 
 async fn fetch_status(
-    endpoint: &str,
-    config: &LokiConfig,
+    base_endpoint: &HttpEndpoint,
+    path: &str,
+    auth: &Option<Auth>,
     client: &HttpClient,
 ) -> crate::Result<http::StatusCode> {
-    let endpoint = config.endpoint.append_path(endpoint)?;
+    let endpoint = base_endpoint.append_path(path)?;
 
     let mut req = http::Request::get(endpoint.as_uri())
         .body(hyper::Body::empty())
         .expect("Building request never fails.");
 
-    if let Some(auth) = &config.auth {
+    if let Some(auth) = auth {
         auth.apply(&mut req);
     }
 
     Ok(client.send(req).await?.status())
 }
 
-pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let status = match fetch_status("ready", &config, &client).await? {
+pub async fn healthcheck(
+    base_endpoint: HttpEndpoint,
+    auth: Option<Auth>,
+    client: HttpClient,
+) -> crate::Result<()> {
+    let status = match fetch_status(&base_endpoint, "ready", &auth, &client).await? {
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
-            fetch_status("", &config, &client).await?
+            fetch_status(&base_endpoint, "", &auth, &client).await?
         }
         status => status,
     };
