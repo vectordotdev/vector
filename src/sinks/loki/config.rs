@@ -7,7 +7,7 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{prelude::*, util::UriSerde},
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
 
 const fn default_compression() -> Compression {
@@ -62,7 +62,7 @@ pub struct LokiConfig {
     #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
     #[configurable(metadata(docs::required = true))]
-    pub labels: HashMap<Template, Template>,
+    pub labels: HashMap<Template, UnconfinedTemplate>,
 
     /// Whether or not to delete fields from the event when they are used as labels.
     #[serde(default = "crate::serde::default_false")]
@@ -79,7 +79,7 @@ pub struct LokiConfig {
     #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
     #[serde(default)]
-    pub structured_metadata: HashMap<Template, Template>,
+    pub structured_metadata: HashMap<Template, UnconfinedTemplate>,
 
     /// Whether or not to delete fields from the event when they are used in structured metadata.
     #[serde(default = "crate::serde::default_false")]
