@@ -320,6 +320,29 @@ impl HttpEndpoint {
         self.0
     }
 
+    /// Extracts basic-auth credentials embedded in the authority, returning the
+    /// endpoint with userinfo stripped alongside the credentials.
+    ///
+    /// `http::Uri` preserves userinfo in the authority; sinks that send
+    /// credentials as an `Authorization` header (rather than in the URL) call
+    /// this during validation.
+    pub fn extract_basic_auth(self) -> crate::Result<(Self, Option<Auth>)> {
+        let uri = self.into_uri();
+        let Some(authority) = uri.authority() else {
+            return Ok((Self::new(uri)?, None));
+        };
+        // Skip the round-trip when there is no userinfo to strip, so the URI is
+        // preserved verbatim (including an empty path).
+        if !authority.as_str().contains('@') {
+            return Ok((Self::new(uri)?, None));
+        }
+        let (authority, auth) = get_basic_auth(authority)?;
+        let mut parts = uri.into_parts();
+        parts.authority = Some(authority);
+        let uri = Uri::from_parts(parts)?;
+        Ok((Self::new(uri)?, auth))
+    }
+
     /// Returns the URL scheme (`http` or `https`) of this endpoint.
     ///
     /// [`HttpEndpoint::new`] guarantees the scheme is an absolute `http`/`https`
@@ -618,6 +641,27 @@ mod tests {
                 Err(HttpEndpointError::InvalidPort { .. })
             ));
         }
+    }
+
+    #[test]
+    fn http_endpoint_extracts_embedded_basic_auth() {
+        let (endpoint, auth) = HttpEndpoint::parse("http://user:pass@example.com:8080/path")
+            .unwrap()
+            .extract_basic_auth()
+            .unwrap();
+        assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
+        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[test]
+    fn http_endpoint_extract_basic_auth_without_userinfo() {
+        let (endpoint, auth) = HttpEndpoint::parse("http://example.com:8080")
+            .unwrap()
+            .extract_basic_auth()
+            .unwrap();
+        // `http::Uri` normalizes a bare host:port to a trailing slash.
+        assert_eq!(endpoint.to_string(), "http://example.com:8080/");
+        assert!(auth.is_none());
     }
 
     #[test]

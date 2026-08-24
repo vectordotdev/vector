@@ -507,7 +507,7 @@ impl LokiSink {
     ) -> crate::Result<Self> {
         let compression = config.compression;
 
-        let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
+        let protocol = get_http_scheme_from_uri(config.endpoint.as_uri());
         let service = tower::ServiceBuilder::new()
             .settings(validated.request_limits.clone(), LokiRetryLogic)
             .service(LokiService::new(

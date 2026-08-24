@@ -8,7 +8,7 @@ async fn fetch_status(
 ) -> crate::Result<http::StatusCode> {
     let endpoint = config.endpoint.append_path(endpoint)?;
 
-    let mut req = http::Request::get(endpoint.uri)
+    let mut req = http::Request::get(endpoint.as_uri())
         .body(hyper::Body::empty())
         .expect("Building request never fails.");
 

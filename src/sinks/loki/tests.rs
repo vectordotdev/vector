@@ -6,7 +6,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         prelude::*,
-        util::test::{build_test_server, load_sink},
+        util::{HttpEndpoint, test::{build_test_server, load_sink}},
     },
     test_util,
 };
@@ -109,12 +109,7 @@ async fn healthcheck_includes_auth() {
 
     let (_guard, addr) = test_util::addr::next_addr();
     let endpoint = format!("http://{addr}");
-    config.endpoint = endpoint
-        .clone()
-        .parse::<http::Uri>()
-        .expect("could not create URI")
-        .try_into()
-        .unwrap();
+    config.endpoint = HttpEndpoint::parse(&endpoint).unwrap();
 
     let (rx, _trigger, server) = build_test_server(addr);
     tokio::spawn(server);

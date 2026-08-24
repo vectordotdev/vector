@@ -12,7 +12,7 @@ use crate::{
     schema,
     sinks::{
         prelude::*,
-        util::{UriSerde, service::TowerRequestSettings},
+        util::{HttpEndpoint, service::TowerRequestSettings},
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
@@ -34,7 +34,7 @@ pub struct LokiConfig {
     ///
     /// The `path` value is appended to this.
     #[configurable(metadata(docs::examples = "http://localhost:3100"))]
-    pub endpoint: UriSerde,
+    pub endpoint: HttpEndpoint,
 
     /// The path to use in the URL of the Loki instance.
     #[serde(default = "default_loki_path")]
@@ -246,6 +246,7 @@ impl SinkConfig for LokiConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedLokiSink {
+    pub(super) endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) request_limits: TowerRequestSettings,
     pub(super) transformer: Transformer,
@@ -270,7 +271,11 @@ impl ValidatedSink for LokiConfig {
             }
         }
 
-        let auth = self.auth.choose_one(&self.endpoint.auth)?;
+        // Extract basic-auth credentials embedded in the endpoint URL and strip
+        // the userinfo, so credentials are sent as an `Authorization` header
+        // rather than in the request URL.
+        let (endpoint, endpoint_auth) = self.endpoint.clone().extract_basic_auth()?;
+        let auth = self.auth.choose_one(&endpoint_auth)?;
 
         let request_limits = match self.out_of_order_action {
             OutOfOrderAction::Accept => self.request.into_settings(),
@@ -302,17 +307,12 @@ impl ValidatedSink for LokiConfig {
             "structured_metadata[key]",
         )?;
 
-        if !matches!(self.endpoint.uri.scheme_str(), Some("http" | "https"))
-            || self.endpoint.uri.authority().is_none()
-        {
-            return Err("Loki endpoint must be an absolute http(s) URL".into());
-        }
-
-        self.endpoint.append_path(&self.path)?;
+        endpoint.append_path(&self.path)?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
         Ok(ValidatedLokiSink {
+            endpoint,
             auth,
             request_limits,
             transformer,
@@ -332,6 +332,7 @@ impl ValidatedSink for LokiConfig {
 
         let config = LokiConfig {
             auth: validated.auth.clone(),
+            endpoint: validated.endpoint.clone(),
             ..self.clone()
         };
 
@@ -454,10 +455,38 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_non_http_endpoint() {
+    fn validate_extracts_endpoint_basic_auth() {
         let config: LokiConfig = serde_yaml::from_str(
             r#"
-            endpoint: "ftp://example.com"
+            endpoint: "http://user:pass@localhost:3100"
+            labels:
+              test_name: "placeholder"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        assert!(
+            validated.auth.is_some(),
+            "credentials embedded in the endpoint must be extracted as auth"
+        );
+        assert!(
+            !validated.endpoint.to_string().contains('@'),
+            "userinfo must be stripped from the endpoint retained for build"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_conflicting_auth() {
+        let config: LokiConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "http://user:pass@localhost:3100"
+            auth:
+              strategy: "basic"
+              user: "other"
+              password: "other"
             labels:
               test_name: "placeholder"
             encoding:
@@ -468,7 +497,7 @@ mod tests {
 
         assert!(
             config.validate().is_err(),
-            "a non-http(s) endpoint must be rejected before it reaches the HTTP client"
+            "explicit auth and endpoint-embedded auth must not both be configured"
         );
     }
 
