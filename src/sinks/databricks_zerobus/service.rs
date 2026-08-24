@@ -318,7 +318,12 @@ impl ZerobusService {
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
             .endpoint(config.ingestion_endpoint.to_string())
-            .unity_catalog_url(config.unity_catalog_endpoint.to_string().trim_end_matches('/'))
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .application_name(config.user_agent_suffix());
         builder = builder.connector_factory(build_connector_factory(proxy)?);
         let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
@@ -587,7 +592,12 @@ impl ZerobusService {
 
         let sdk = ZerobusSdk::builder()
             .endpoint(config.ingestion_endpoint.to_string())
-            .unity_catalog_url(config.unity_catalog_endpoint.to_string().trim_end_matches('/'))
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .build()
             .map_err(|e| ZerobusSinkError::ConfigError {
                 message: format!("Failed to create Zerobus SDK: {}", e),
