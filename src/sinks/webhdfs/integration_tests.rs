@@ -14,7 +14,7 @@ use vector_lib::{
 use super::WebHdfsConfig;
 use crate::{
     config::{SinkConfig, SinkContext, ValidatedSink},
-    sinks::util::{BatchConfig, Compression},
+    sinks::util::{BatchConfig, Compression, HttpEndpoint},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
@@ -115,7 +115,7 @@ fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
         // Write test file in local with random_string.
         root: format!("/tmp/{}/", random_string(10)),
         prefix: "%F-".to_string(),
-        endpoint: endpoint.to_string(),
+        endpoint: HttpEndpoint::parse(endpoint).unwrap(),
 
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
