@@ -482,12 +482,16 @@ pub async fn run_iggy_source(
     // half a batch has been acknowledged. A sparse poll (fewer than that
     // half-batch worth of messages) would otherwise stay uncommitted until
     // the timer below fires, so also commit once a partition's polled
-    // messages have all settled downstream; the gap guard paces those
-    // commits to the poll cadence so fast sinks do not trigger one broker
-    // round trip per message. The timer remains a backstop for shutdown.
+    // messages have all settled downstream. Pacing for those settled
+    // commits is tracked per partition: one partition's commit cannot
+    // include another partition's not-yet-acknowledged offset, so a
+    // global gap guard would leave late-arriving partitions uncommitted
+    // until the timer. This caps settled commits at one per partition per
+    // poll interval without suppressing any partition's progress. The
+    // timer remains a backstop for shutdown.
     let commit_after = u64::from((config.batch_length / 2).max(1));
     let settled_commit_gap = Duration::from_millis(config.poll_interval_ms.max(1));
-    let mut last_settled_commit: Option<Instant> = None;
+    let mut last_settled_commits: HashMap<u32, Instant> = HashMap::new();
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
@@ -526,7 +530,8 @@ pub async fn run_iggy_source(
                             // Threshold reached; no pacing needed.
                             Some(false)
                         } else {
-                            let paced = last_settled_commit
+                            let paced = last_settled_commits
+                                .get(&partition_id)
                                 .is_none_or(|t| t.elapsed() >= settled_commit_gap);
                             (state.lag() > 0 && state.is_settled() && paced).then_some(true)
                         }
@@ -535,7 +540,7 @@ pub async fn run_iggy_source(
                 };
                 if let Some(settled) = should_commit {
                     if settled {
-                        last_settled_commit = Some(Instant::now());
+                        last_settled_commits.insert(partition_id, Instant::now());
                     }
                     commit_offsets(
                         &consumer,
