@@ -4,7 +4,7 @@ use vrl::value::Kind;
 
 use super::{
     healthcheck::healthcheck,
-    sink::{LokiSink, confine_template_map},
+    sink::{LokiSink, confine_template_keys},
 };
 use crate::{
     config::{DynValidatedSink, ValidatedSink},
@@ -14,7 +14,7 @@ use crate::{
         prelude::*,
         util::{UriSerde, service::TowerRequestSettings},
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
 
 const fn default_compression() -> Compression {
@@ -69,7 +69,7 @@ pub struct LokiConfig {
     #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
     #[configurable(metadata(docs::required = true))]
-    pub labels: HashMap<Template, Template>,
+    pub labels: HashMap<Template, UnconfinedTemplate>,
 
     /// Whether or not to delete fields from the event when they are used as labels.
     #[serde(default = "crate::serde::default_false")]
@@ -86,7 +86,7 @@ pub struct LokiConfig {
     #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
     #[serde(default)]
-    pub structured_metadata: HashMap<Template, Template>,
+    pub structured_metadata: HashMap<Template, UnconfinedTemplate>,
 
     /// Whether or not to delete fields from the event when they are used in structured metadata.
     #[serde(default = "crate::serde::default_false")]
@@ -250,8 +250,8 @@ pub struct ValidatedLokiSink {
     pub(super) request_limits: TowerRequestSettings,
     pub(super) transformer: Transformer,
     pub(super) tenant_id: Option<ConfinedTemplate>,
-    pub(super) labels: HashMap<ConfinedTemplate, ConfinedTemplate>,
-    pub(super) structured_metadata: HashMap<ConfinedTemplate, ConfinedTemplate>,
+    pub(super) labels: HashMap<ConfinedTemplate, UnconfinedTemplate>,
+    pub(super) structured_metadata: HashMap<ConfinedTemplate, UnconfinedTemplate>,
     pub(super) batch_settings: BatcherSettings,
 }
 
@@ -289,19 +289,17 @@ impl ValidatedSink for LokiConfig {
             .map(|template| template.confine(&self.confinement, LokiConfig::NAME, "tenant_id"))
             .transpose()?;
 
-        let labels = confine_template_map(
+        let labels = confine_template_keys(
             self.labels.clone(),
             &self.confinement,
             LokiConfig::NAME,
             "labels[key]",
-            "labels[value]",
         )?;
-        let structured_metadata = confine_template_map(
+        let structured_metadata = confine_template_keys(
             self.structured_metadata.clone(),
             &self.confinement,
             LokiConfig::NAME,
             "structured_metadata[key]",
-            "structured_metadata[value]",
         )?;
 
         if !matches!(self.endpoint.uri.scheme_str(), Some("http" | "https"))
