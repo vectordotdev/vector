@@ -72,9 +72,11 @@ async fn publish_and_check(conf: IggySinkConfig) -> Result<(), IggyError> {
     let mut output = Vec::with_capacity(num_events);
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
     while output.len() < num_events && tokio::time::Instant::now() < deadline {
-        if let Some(Ok(received)) = consumer.next().await {
-            output.push(String::from_utf8_lossy(&received.message.payload).to_string());
-        }
+        let Ok(Some(Ok(received))) = tokio::time::timeout_at(deadline, consumer.next()).await
+        else {
+            continue;
+        };
+        output.push(String::from_utf8_lossy(&received.message.payload).to_string());
     }
 
     assert_eq!(output, input);
