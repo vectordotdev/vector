@@ -6,7 +6,10 @@ use crate::{
     http::HttpClient,
     sinks::{
         prelude::*,
-        util::{HttpEndpoint, test::{build_test_server, load_sink}},
+        util::{
+            HttpEndpoint,
+            test::{build_test_server, load_sink},
+        },
     },
     test_util,
 };

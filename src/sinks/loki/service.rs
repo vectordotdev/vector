@@ -114,8 +114,8 @@ impl Service<LokiRequest> for LokiService {
             Compression::Snappy => "application/x-protobuf",
             _ => "application/json",
         };
-        let mut req = http::Request::post(self.endpoint.as_uri())
-            .header("Content-Type", content_type);
+        let mut req =
+            http::Request::post(self.endpoint.as_uri()).header("Content-Type", content_type);
 
         let metadata = request.get_metadata().clone();
 
