@@ -13,3 +13,20 @@
 {{ $babelOpts := dict "noComments" true }}
 {{ $compiled := resources.Get $searchJs | js.Build $jsOpts | babel $babelOpts | fingerprint "sha256" }}
 <script src="{{ $compiled.RelPermalink }}"></script>
+<script type="module">
+  const ranking = new URLSearchParams(window.location.search).get("ranking");
+
+  window.loadPagefind = async () => {
+    const pagefind = await import("/pagefind/pagefind.js");
+    if (ranking === "docs") {
+      await pagefind.options({
+        ranking: {
+          pageLength: 0,
+          termSaturation: 0.4
+        }
+      });
+    }
+    await pagefind.init();
+    return pagefind;
+  };
+</script>

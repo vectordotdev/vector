@@ -88,6 +88,14 @@ typesense-production:
 	yarn typesense-index
 	yarn typesense-sync:production
 
+# Local Pagefind comparison prototype. The production and preview targets continue
+# to use Typesense until search quality has been evaluated.
+pagefind:
+	yarn pagefind --site public
+
+pagefind-prototype: clean setup cargo-data structured-data production-build pagefind
+	python3 -m http.server $(SERVER_PORT) --bind $(SERVER_BIND) --directory ./public
+
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
 	make setup cargo-data structured-data production-build

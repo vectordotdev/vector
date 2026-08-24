@@ -3,6 +3,12 @@ import Typesense from "typesense";
 import React, { createElement, Fragment, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
+declare global {
+  interface Window {
+    loadPagefind?: () => Promise<any>;
+  }
+}
+
 // // Algolia search
 // const appId = process.env.ALGOLIA_APP_ID
 const apiKey = process.env.TYPESENSE_PUBLIC_API_KEY;
@@ -36,6 +42,61 @@ let searchClient = new Typesense.Client({
   ],
   connectionTimeoutSeconds: 2
 });
+
+const searchMode = new URLSearchParams(window.location.search).get("search") === "pagefind" ? "pagefind" : "typesense";
+
+type PagefindHit = {
+  kind: "pagefind";
+  category: string;
+  content: string;
+  title: string;
+  url: string;
+};
+
+const pagefindCategories = {
+  blog: "Blog",
+  docs: "Documentation",
+  guides: "Guides",
+  highlights: "Highlights",
+  releases: "Release notes"
+};
+
+let pagefindModule: Promise<any> | undefined;
+
+const getPagefind = async () => {
+  if (!window.loadPagefind) {
+    throw new Error("Pagefind is unavailable. Run `make pagefind-prototype` before opening this mode.");
+  }
+
+  pagefindModule ??= window.loadPagefind();
+  return pagefindModule;
+};
+
+const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
+  const pagefind = await getPagefind();
+  const search = await pagefind.debouncedSearch(query);
+
+  if (!search) {
+    return [];
+  }
+
+  return Promise.all(
+    search.results.slice(0, 10).map(async (result) => {
+      const data = await result.data();
+      const subResult = data.sub_results[0];
+      const title = subResult?.title ?? data.meta.title ?? data.url;
+      const section = data.url.split("/").filter(Boolean)[0];
+
+      return {
+        kind: "pagefind",
+        category: pagefindCategories[section] ?? "Website",
+        content: subResult?.excerpt ?? data.excerpt,
+        title,
+        url: subResult?.url ?? data.url
+      };
+    })
+  );
+};
 
 const CommandIcon: React.FC = ({ children }) => {
   return (
@@ -83,6 +144,18 @@ const Result = ({ hit, components, category }) => {
           {hit.content && <span dangerouslySetInnerHTML={{ __html: hit.content }} />}
           {!hit.content && <span style={{ wordBreak: "break-word" }}>{hit.document.itemUrl}</span>}
         </p>
+      </div>
+    </a>
+  );
+};
+
+const PagefindResult = ({ hit }: { hit: PagefindHit }) => {
+  return (
+    <a href={hit.url}>
+      <div className="border-r border-gray-300 py-4 pl-2 h-full leading-relaxed">{hit.category}</div>
+      <div className="p-2 block">
+        <div className="text-gray-800 text-md mb-1 font-medium leading-relaxed">{hit.title}</div>
+        <p className="text-gray-600 text-sm" dangerouslySetInnerHTML={{ __html: hit.content }} />
       </div>
     </a>
   );
@@ -158,16 +231,31 @@ const Autocomplete = (props) => {
 };
 
 const Search = () => {
+  const isPagefindPrototype = searchMode === "pagefind";
+  const isPagefindDocsRanking =
+    isPagefindPrototype && new URLSearchParams(window.location.search).get("ranking") === "docs";
+
   return (
     <Autocomplete
       aria-label="Search query results"
       openOnFocus={false}
       detachedMediaQuery=""
       defaultActiveItemId={0}
+      placeholder={
+        isPagefindDocsRanking
+          ? "Search (Pagefind docs ranking)"
+          : isPagefindPrototype
+            ? "Search (Pagefind prototype)"
+            : "Search"
+      }
       getSources={({ query }) => [
         {
           sourceId: "queryResults",
           async getItems() {
+            if (isPagefindPrototype) {
+              return pagefindResults(query);
+            }
+
             const results = (query) =>
               searchClient
                 .collections("vector_docs")
@@ -210,10 +298,14 @@ const Search = () => {
             return await results(query);
           },
           getItemUrl({ item }) {
-            return item.document.itemUrl;
+            return item.kind === "pagefind" ? item.url : item.document.itemUrl;
           },
           templates: {
             item({ item, components }) {
+              if (item.kind === "pagefind") {
+                return <PagefindResult hit={item} />;
+              }
+
               const highlight =
                 (item.highlights.length && item.highlights.find((h) => h.field === "content" || {}).value) ||
                 item.document["content"];
