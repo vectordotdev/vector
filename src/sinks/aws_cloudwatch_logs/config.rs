@@ -29,7 +29,7 @@ use crate::{
             http::{OrderedHeaderName, RequestConfig, validate_headers},
         },
     },
-    template::{ConfinedTemplate, ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
     tls::TlsConfig,
 };
 
@@ -106,7 +106,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[configurable(metadata(docs::examples = "stream-{{ host }}"))]
     #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "stream-name"))]
-    pub stream_name: Template,
+    pub stream_name: UnconfinedTemplate,
 
     /// The [AWS region][aws_region] of the target service.
     ///
@@ -235,7 +235,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedCloudwatchLogs {
     group_template: ConfinedTemplate,
-    stream_template: ConfinedTemplate,
+    stream_template: UnconfinedTemplate,
     batcher_settings: BatcherSettings,
     headers: BTreeMap<OrderedHeaderName, HeaderValue>,
 }
@@ -249,10 +249,7 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
             self.group_name
                 .clone()
                 .confine(&self.confinement, Self::NAME, "group_name")?;
-        let stream_template =
-            self.stream_name
-                .clone()
-                .confine(&self.confinement, Self::NAME, "stream_name")?;
+        let stream_template = self.stream_name.clone();
         let batcher_settings = self.batch.into_batcher_settings()?;
         let headers = validate_headers(&self.request.headers)?;
 
