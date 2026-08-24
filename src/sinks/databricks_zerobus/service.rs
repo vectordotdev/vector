@@ -83,13 +83,23 @@ pub struct ZerobusRequest {
 pub struct ZerobusResponse {
     pub events_byte_size: GroupedCountByteSize,
     pub status: vector_lib::event::EventStatus,
+    /// Size, in bytes, of the batch as encoded to an Arrow IPC stream by
+    /// `encoded_byte_size`. `None` when no bytes were actually sent (the
+    /// `errored()` path).
+    ///
+    /// This is the uncompressed Arrow IPC frame size Vector builds, not the
+    /// SDK's actual wire size: `ZerobusArrowStream` re-encodes via Arrow
+    /// Flight and applies `stream_options.compression` in its own background
+    /// sender task, which is not observable from here.
+    pub bytes_sent: Option<usize>,
 }
 
 impl ZerobusResponse {
-    const fn delivered(events_byte_size: GroupedCountByteSize) -> Self {
+    const fn delivered(events_byte_size: GroupedCountByteSize, bytes_sent: usize) -> Self {
         Self {
             events_byte_size,
             status: vector_lib::event::EventStatus::Delivered,
+            bytes_sent: Some(bytes_sent),
         }
     }
 
@@ -100,6 +110,7 @@ impl ZerobusResponse {
         Self {
             events_byte_size: vector_lib::config::telemetry().create_request_count_byte_size(),
             status: vector_lib::event::EventStatus::Errored,
+            bytes_sent: None,
         }
     }
 }
@@ -111,6 +122,10 @@ impl DriverResponse for ZerobusResponse {
 
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        self.bytes_sent
     }
 }
 
@@ -409,6 +424,36 @@ impl ZerobusService {
         Ok(batch)
     }
 
+    /// Size, in bytes, of `batch` serialized as an Arrow IPC stream frame.
+    ///
+    /// This is the real number of bytes Vector produces for the batch, used
+    /// to report `component_sent_bytes_total`. It is not necessarily the
+    /// number of bytes the SDK puts on the wire: `ZerobusArrowStream`
+    /// re-encodes via Arrow Flight and applies `stream_options.compression`
+    /// in its own background sender task, which this can't observe.
+    fn encoded_byte_size(
+        arrow_schema: &arrow::datatypes::Schema,
+        batch: &arrow::record_batch::RecordBatch,
+    ) -> Result<usize, ZerobusSinkError> {
+        let mut buffer = Vec::new();
+        let mut writer = arrow::ipc::writer::StreamWriter::try_new(&mut buffer, arrow_schema)
+            .map_err(|e| ZerobusSinkError::EncodingError {
+                message: format!("Failed to create Arrow IPC stream writer: {}", e),
+            })?;
+        writer
+            .write(batch)
+            .map_err(|e| ZerobusSinkError::EncodingError {
+                message: format!("Failed to serialize Arrow batch: {}", e),
+            })?;
+        writer
+            .finish()
+            .map_err(|e| ZerobusSinkError::EncodingError {
+                message: format!("Failed to finalize Arrow IPC stream: {}", e),
+            })?;
+        drop(writer);
+        Ok(buffer.len())
+    }
+
     /// Ensure we have an active stream, creating one if necessary.
     ///
     /// Also used as the healthcheck: resolving the schema verifies the table
@@ -486,6 +531,7 @@ impl ZerobusService {
         stream: Arc<ActiveStream>,
         batch: arrow::record_batch::RecordBatch,
         events_byte_size: GroupedCountByteSize,
+        bytes_sent: usize,
     ) -> Result<ZerobusResponse, ZerobusSinkError> {
         // Slot lock is not held here — concurrent ingests acquire read guards
         // on the inner `RwLock` and run truly in parallel.
@@ -505,7 +551,7 @@ impl ZerobusService {
         };
 
         match result {
-            Ok(()) => Ok(ZerobusResponse::delivered(events_byte_size)),
+            Ok(()) => Ok(ZerobusResponse::delivered(events_byte_size, bytes_sent)),
             Err(e) => {
                 if e.is_retryable() {
                     // Clear the slot so the next attempt creates a fresh stream,
@@ -549,8 +595,11 @@ impl Service<ZerobusRequest> for ZerobusService {
         Box::pin(async move {
             let schema = service.ensure_schema().await?;
             let batch = Self::encode_batch(schema, &request.events)?;
+            let bytes_sent = Self::encoded_byte_size(&schema.arrow_schema, &batch)?;
             let stream = service.get_or_create_stream(schema).await?;
-            service.ingest(stream, batch, events_byte_size).await
+            service
+                .ingest(stream, batch, events_byte_size, bytes_sent)
+                .await
         })
     }
 }
@@ -741,12 +790,66 @@ mod tests {
             .unwrap();
 
         let stream = current_stream(&service).await;
-        let result = service
-            .ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
-            .await;
+        let response = service
+            .ingest(
+                stream,
+                dummy_batch(),
+                GroupedCountByteSize::new_untagged(),
+                0,
+            )
+            .await
+            .unwrap();
 
-        assert!(result.is_ok());
         assert!(service.has_active_stream().await);
+        // A delivered response must always carry a `bytes_sent` value so the
+        // driver can emit `component_sent_bytes_total`.
+        assert_eq!(response.bytes_sent(), Some(0));
+    }
+
+    /// Regression test for OPA-6289: the delivered path must report a real
+    /// `bytes_sent` (derived from the actual Arrow IPC frame size) so the
+    /// sink emits `component_sent_bytes_total` like other sinks.
+    #[tokio::test]
+    async fn ingest_reports_encoded_byte_size_on_delivered() {
+        let service = ZerobusService::new_with_mock(test_config(), MockStream::succeeding())
+            .await
+            .unwrap();
+
+        let stream = current_stream(&service).await;
+        let bytes_sent =
+            ZerobusService::encoded_byte_size(&arrow::datatypes::Schema::empty(), &dummy_batch())
+                .unwrap();
+        let response = service
+            .ingest(
+                stream,
+                dummy_batch(),
+                GroupedCountByteSize::new_untagged(),
+                bytes_sent,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.bytes_sent(), Some(bytes_sent));
+        assert!(bytes_sent > 0, "an Arrow IPC stream frame is never empty");
+    }
+
+    #[test]
+    fn encoded_byte_size_grows_with_batch_contents() {
+        use arrow::array::Int32Array;
+        use arrow::datatypes::{DataType, Field, Schema};
+
+        let empty_schema = Schema::empty();
+        let empty_size = ZerobusService::encoded_byte_size(&empty_schema, &dummy_batch()).unwrap();
+
+        let schema = Schema::new(vec![Field::new("n", DataType::Int32, false)]);
+        let batch = arrow::record_batch::RecordBatch::try_new(
+            Arc::new(schema.clone()),
+            vec![Arc::new(Int32Array::from((0..1024).collect::<Vec<_>>()))],
+        )
+        .unwrap();
+        let populated_size = ZerobusService::encoded_byte_size(&schema, &batch).unwrap();
+
+        assert!(populated_size > empty_size);
     }
 
     #[tokio::test]
@@ -762,7 +865,12 @@ mod tests {
 
         let stream = current_stream(&service).await;
         let err = service
-            .ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_batch(),
+                GroupedCountByteSize::new_untagged(),
+                0,
+            )
             .await
             .unwrap_err();
 
@@ -783,7 +891,12 @@ mod tests {
 
         let stream = current_stream(&service).await;
         let err = service
-            .ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_batch(),
+                GroupedCountByteSize::new_untagged(),
+                0,
+            )
             .await
             .unwrap_err();
 
@@ -805,7 +918,12 @@ mod tests {
         let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
+                .ingest(
+                    stream,
+                    dummy_batch(),
+                    GroupedCountByteSize::new_untagged(),
+                    0
+                )
                 .await
                 .is_ok()
         );
@@ -824,7 +942,12 @@ mod tests {
         // Second ingest fails and clears the stream.
         let stream = current_stream(&service).await;
         let err = service
-            .ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
+            .ingest(
+                stream,
+                dummy_batch(),
+                GroupedCountByteSize::new_untagged(),
+                0,
+            )
             .await
             .unwrap_err();
         assert!(ZerobusRetryLogic.is_retriable_error(&err));
@@ -838,7 +961,12 @@ mod tests {
         let stream = current_stream(&service).await;
         assert!(
             service
-                .ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
+                .ingest(
+                    stream,
+                    dummy_batch(),
+                    GroupedCountByteSize::new_untagged(),
+                    0
+                )
                 .await
                 .is_ok()
         );
@@ -886,14 +1014,24 @@ mod tests {
         let s1 = service.clone();
         let t1 = tokio::spawn(async move {
             let stream = current_stream(&s1).await;
-            s1.ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
-                .await
+            s1.ingest(
+                stream,
+                dummy_batch(),
+                GroupedCountByteSize::new_untagged(),
+                0,
+            )
+            .await
         });
         let s2 = service.clone();
         let t2 = tokio::spawn(async move {
             let stream = current_stream(&s2).await;
-            s2.ingest(stream, dummy_batch(), GroupedCountByteSize::new_untagged())
-                .await
+            s2.ingest(
+                stream,
+                dummy_batch(),
+                GroupedCountByteSize::new_untagged(),
+                0,
+            )
+            .await
         });
 
         // Wait until both ingests are inside the gate (both `Arc`s alive).
@@ -1005,6 +1143,7 @@ mod tests {
         let inner = tower::service_fn(|_req: ZerobusRequest| async move {
             Ok::<_, crate::Error>(ZerobusResponse::delivered(
                 GroupedCountByteSize::new_untagged(),
+                0,
             ))
         });
         let mut svc = RetryableErrorAsErrored { inner };
