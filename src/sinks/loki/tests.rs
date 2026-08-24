@@ -1,3 +1,8 @@
+use futures::SinkExt;
+use hyper::{
+    Body, Server,
+    service::{make_service_fn, service_fn},
+};
 use vector_lib::config::{log_schema, proxy::ProxyConfig};
 use vrl::event_path;
 
@@ -132,6 +137,68 @@ async fn healthcheck_includes_auth() {
             "Basic dXNlcm5hbWU6c29tZV9wYXNzd29yZA=="
         )),
         output[0].0.headers.get("authorization")
+    );
+}
+
+#[tokio::test]
+async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
+    let (mut config, _cx) = load_sink::<LokiConfig>(
+        r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding.codec = "json"
+        "#,
+    )
+    .unwrap();
+
+    let (_guard, addr) = test_util::addr::next_addr();
+    let endpoint = format!("http://{addr}/loki");
+    config.endpoint = HttpEndpoint::parse(&endpoint).unwrap();
+
+    // `/ready` returns 404 (the fallback trigger); the base path returns 200.
+    // Every request path is recorded so the fallback URL can be asserted.
+    let (tx, rx) = futures::channel::mpsc::channel(8);
+    let service = make_service_fn(move |_| {
+        let tx = tx.clone();
+        async move {
+            Ok::<_, std::convert::Infallible>(service_fn(move |req: http::Request<Body>| {
+                let mut tx = tx.clone();
+                async move {
+                    let path = req.uri().path().to_string();
+                    let status = if path == "/loki/ready" {
+                        http::StatusCode::NOT_FOUND
+                    } else {
+                        http::StatusCode::OK
+                    };
+                    drop(tx.send(path).await);
+                    Ok::<_, std::convert::Infallible>(
+                        http::Response::builder()
+                            .status(status)
+                            .body(Body::empty())
+                            .unwrap(),
+                    )
+                }
+            }))
+        }
+    });
+    let server = Server::bind(&addr).serve(service);
+    tokio::spawn(server);
+
+    let tls =
+        TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
+    let proxy = ProxyConfig::default();
+    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+
+    healthcheck(config.endpoint.clone(), config.auth.clone(), client)
+        .await
+        .expect("healthcheck failed");
+
+    // The fallback must probe the base path with a trailing slash (`/loki/`,
+    // not `/loki`), matching the pre-`HttpEndpoint` behavior.
+    let requests: Vec<String> = rx.take(2).collect::<Vec<_>>().await;
+    assert_eq!(
+        requests,
+        vec!["/loki/ready".to_string(), "/loki/".to_string()]
     );
 }
 

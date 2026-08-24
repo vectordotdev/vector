@@ -31,7 +31,12 @@ pub async fn healthcheck(
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
-            fetch_status(&base_endpoint, "", &auth, &client).await?
+            // Probe the base path with a trailing slash (`/loki/`, not `/loki`):
+            // `append_path("/")` preserves the trailing slash that `append_path("")`
+            // drops, matching the pre-`HttpEndpoint` behavior. Reverse proxies
+            // commonly redirect `/loki` to `/loki/`, and the healthcheck rejects
+            // non-200 responses rather than following them.
+            fetch_status(&base_endpoint, "/", &auth, &client).await?
         }
         status => status,
     };
