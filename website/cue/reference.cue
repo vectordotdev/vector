@@ -253,7 +253,7 @@ _values: {
 	}
 }
 
-#Protocol: "http" | "tcp" | "udp" | "unix" | "unix_datagram" | "unix_stream"
+#Protocol: "http" | "quic" | "tcp" | "udp" | "unix" | "unix_datagram" | "unix_stream" | "ws"
 
 #Service: {
 	// `description` describes the components with a single paragraph.

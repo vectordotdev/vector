@@ -12,7 +12,7 @@ components: _iggy: {
 					}
 					direction: "incoming"
 					port:      8090
-					protocols: ["tcp"]
+					protocols: ["tcp", "quic", "http", "ws"]
 					ssl: "optional"
 				}
 			}
@@ -27,7 +27,7 @@ components: _iggy: {
 						url:   urls.iggy
 					}
 					direction: "outgoing"
-					protocols: ["tcp"]
+					protocols: ["tcp", "quic", "http", "ws"]
 					ssl: "optional"
 				}
 			}

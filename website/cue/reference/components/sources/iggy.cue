@@ -25,7 +25,6 @@ components: sources: iggy: {
 	}
 
 	classes: {
-		commonly_used: false
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
 		development:   "beta"
@@ -50,6 +49,22 @@ components: sources: iggy: {
 					required:    true
 					type: string: {
 						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					}
+				}
+				offset: {
+					description: "The Iggy offset at the time the message was retrieved."
+					required:    true
+					type: uint: {
+						examples: [100]
+						unit: null
+					}
+				}
+				partition_id: {
+					description: "The Iggy partition the message was consumed from."
+					required:    true
+					type: uint: {
+						examples: [0]
+						unit: null
 					}
 				}
 				source_type: {
