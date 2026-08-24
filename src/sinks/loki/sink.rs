@@ -6,7 +6,7 @@ use tokio_util::codec::Encoder as _;
 use vrl::path::{OwnedTargetPath, parse_target_path};
 
 use super::{
-    config::{LokiConfig, OutOfOrderAction},
+    config::{LokiConfig, OutOfOrderAction, ValidatedLokiSink},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
@@ -21,9 +21,12 @@ use crate::{
     template::ConfinementConfig,
 };
 
+#[cfg(test)]
+use crate::config::ValidatedSink;
+
 /// Attach the sink's confinement config to every key template in a
 /// `label`-style HashMap. Values are metadata and remain unconfined.
-fn confine_template_keys(
+pub(super) fn confine_template_keys(
     map: HashMap<Template, UnconfinedTemplate>,
     config: &ConfinementConfig,
     component_name: &'static str,
@@ -486,30 +489,27 @@ pub struct LokiSink {
 }
 
 impl LokiSink {
+    #[cfg(test)]
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
-        let compression = config.compression;
+        let validated = config.validate()?;
+        Self::from_validated(config, validated, client)
+    }
 
-        // if Vector is configured to allow events with out of order timestamps, then we can
-        // safely enable concurrency settings.
-        //
-        // For rewritten timestamps, we use a static concurrency of 1 to avoid out-of-order
-        // timestamps across requests. We used to support concurrency across partitions (Loki
-        // streams) but this was lost in #9506. Rather than try to re-add it, since Loki no longer
-        // requires in-order processing for version >= 2.4, instead we just keep the static limit
-        // of 1 for now.
-        let request_limits = match config.out_of_order_action {
-            OutOfOrderAction::Accept => config.request.into_settings(),
-            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
-                let mut settings = config.request.into_settings();
-                settings.concurrency = Some(1);
-                settings
-            }
-        };
+    /// Builds the sink from already-validated state. No pure validation is
+    /// repeated here: auth, request limits, encoder, confined templates and
+    /// batch settings all come from `validated`.
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
+    pub fn from_validated(
+        config: LokiConfig,
+        validated: ValidatedLokiSink,
+        client: HttpClient,
+    ) -> crate::Result<Self> {
+        let compression = config.compression;
 
         let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
         let service = tower::ServiceBuilder::new()
-            .settings(request_limits, LokiRetryLogic)
+            .settings(validated.request_limits.clone(), LokiRetryLogic)
             .service(LokiService::new(
                 client,
                 config.endpoint,
@@ -517,31 +517,13 @@ impl LokiSink {
                 config.auth,
             )?);
 
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
         let batch_encoder = match config.compression {
             Compression::Snappy => LokiBatchEncoder(LokiBatchEncoding::Protobuf),
             _ => LokiBatchEncoder(LokiBatchEncoding::Json),
         };
 
-        let tenant_id = config
-            .tenant_id
-            .map(|template| template.confine(&config.confinement, LokiConfig::NAME, "tenant_id"))
-            .transpose()?;
-
-        let labels = confine_template_keys(
-            config.labels,
-            &config.confinement,
-            LokiConfig::NAME,
-            "labels[key]",
-        )?;
-        let structured_metadata = confine_template_keys(
-            config.structured_metadata,
-            &config.confinement,
-            LokiConfig::NAME,
-            "structured_metadata[key]",
-        )?;
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             request_builder: LokiRequestBuilder {
@@ -549,16 +531,16 @@ impl LokiSink {
                 encoder: batch_encoder,
             },
             encoder: EventEncoder {
-                key_partitioner: KeyPartitioner::new(tenant_id),
-                transformer,
+                key_partitioner: KeyPartitioner::new(validated.tenant_id),
+                transformer: validated.transformer,
                 encoder,
-                labels,
-                structured_metadata,
+                labels: validated.labels,
+                structured_metadata: validated.structured_metadata,
                 remove_label_fields: config.remove_label_fields,
                 remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,
             },
-            batch_settings: config.batch.into_batcher_settings()?,
+            batch_settings: validated.batch_settings,
             out_of_order_action: config.out_of_order_action,
             service,
             protocol,
