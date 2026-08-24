@@ -562,7 +562,7 @@ generated: components: sinks: webhdfs: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "http://127.0.0.1:9870"
+			default: "http://127.0.0.1:9870/"
 			examples: ["http://127.0.0.1:9870"]
 		}
 	}
