@@ -198,19 +198,56 @@ mod tests {
     }
 
     #[test]
-    fn decode_incomplete_frame_leaves_buffer_intact() {
-        let mut input = BytesMut::from(&[0x05, b'f', b'o'][..]);
+    fn decode_frames_split_across_read_buffer() {
+        const FRAME_LENGTH: usize = 87;
+        const FRAME_COUNT: usize = 200;
+        const READ_BUFFER_SIZE: usize = 8 * 1024;
+
+        let mut encoded = Vec::new();
+
+        for index in 0..FRAME_COUNT {
+            let byte = b'A' + (index % 26) as u8;
+
+            // FRAME_LENGTH fits in a single-byte varint.
+            encoded.push(FRAME_LENGTH as u8);
+            encoded.extend_from_slice(&[byte; FRAME_LENGTH]);
+        }
+
         let mut decoder = VarintLengthDelimitedDecoder::default();
+        let mut input = BytesMut::new();
+        let mut decoded = Vec::new();
+        let mut chunks = encoded.chunks(READ_BUFFER_SIZE);
 
-        assert_eq!(decoder.decode(&mut input).unwrap(), None);
-        assert_eq!(&input[..], &[0x05, b'f', b'o'][..]);
+        input.extend_from_slice(chunks.next().unwrap());
 
-        input.extend_from_slice(b"oba");
-        assert_eq!(
-            decoder.decode(&mut input).unwrap().unwrap(),
-            Bytes::from("fooba")
-        );
+        while let Some(frame) = decoder.decode(&mut input).unwrap() {
+            decoded.push(frame);
+        }
+
+        // 93 complete 88-byte frames fit in the first read, followed by the
+        // length prefix and seven payload bytes of the next frame.
+        assert_eq!(decoded.len(), 93);
+        assert_eq!(input.len(), 8);
+        assert_eq!(input[0], FRAME_LENGTH as u8);
+
+        for chunk in chunks {
+            input.extend_from_slice(chunk);
+
+            while let Some(frame) = decoder.decode(&mut input).unwrap() {
+                decoded.push(frame);
+            }
+        }
+
+        assert_eq!(decoder.decode_eof(&mut input).unwrap(), None);
         assert!(input.is_empty());
+        assert_eq!(decoded.len(), FRAME_COUNT);
+
+        for (index, frame) in decoded.iter().enumerate() {
+            let expected = b'A' + (index % 26) as u8;
+
+            assert_eq!(frame.len(), FRAME_LENGTH);
+            assert!(frame.iter().all(|byte| *byte == expected));
+        }
     }
 
     #[test]
