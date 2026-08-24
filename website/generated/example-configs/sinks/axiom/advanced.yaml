@@ -8,4 +8,4 @@ sinks:
     dataset: ${AXIOM_DATASET}
     org_id: ${AXIOM_ORG_ID}
     token: ${AXIOM_TOKEN}
-    url: ${AXIOM_URL}
+    url: https://api.eu.axiom.co

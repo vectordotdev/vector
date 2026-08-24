@@ -40,8 +40,11 @@ pub struct UrlOrRegion {
     /// This takes precedence over `region` if both are set (but both should not be set).
     #[configurable(mutually_exclusive = "endpoint")]
     #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(docs::examples = "${AXIOM_URL}"))]
+    // The concrete URL comes first: the example-config generator emits the first example, and
+    // `vector validate --no-environment` does not interpolate `${AXIOM_URL}`, which would then
+    // fail this field's `uri` format validation.
     #[configurable(metadata(docs::examples = "https://api.eu.axiom.co"))]
+    #[configurable(metadata(docs::examples = "${AXIOM_URL}"))]
     pub url: Option<String>,
 
     /// The Axiom regional edge domain to use for ingestion.

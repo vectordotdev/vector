@@ -472,6 +472,6 @@ generated: components: sinks: axiom: configuration: {
 		mutually_exclusive: ["url", "region"]
 		mutually_exclusive_group: "endpoint"
 		required:                 false
-		type: string: examples: ["${AXIOM_URL}", "https://api.eu.axiom.co"]
+		type: string: examples: ["https://api.eu.axiom.co", "${AXIOM_URL}"]
 	}
 }
