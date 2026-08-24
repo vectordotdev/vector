@@ -387,6 +387,21 @@ fn exclusive_group<'a>(param: &'a Value, key: &str) -> Option<Vec<&'a str>> {
     (!members.is_empty()).then_some(members)
 }
 
+/// Members of any exclusive group among `params` that must be omitted so at most one member of
+/// each group appears. `usable` decides which member is preferred when several would qualify.
+///
+/// This only ever drops members, so the result is safe wherever a group cannot be forced in: a
+/// group that resolves to a member producing no value simply contributes nothing.
+fn excluded_group_members(
+    params: &Map<String, Value>,
+    usable: impl Fn(&Value) -> bool,
+) -> HashSet<&str> {
+    ["required_one_of", "mutually_exclusive"]
+        .into_iter()
+        .flat_map(|key| split_exclusive_groups(params, key, &usable).1)
+        .collect()
+}
+
 /// Partition the members of every exclusive group named by `key` into the single member that may
 /// appear in the example and the others, which must be omitted for the example to stay valid.
 ///
@@ -459,9 +474,12 @@ where
                     if matches!(item_kind.as_str(), "array" | "object") {
                         let options = item_type.get("options").and_then(Value::as_object)?;
                         let mut object = Map::new();
-                        for (key, option) in
-                            options.iter().filter(|(_, option)| deep_filter(option))
-                        {
+                        // Nested structs carry their own exclusive groups, so filter them here too:
+                        // emitting two members of one group would produce an invalid config.
+                        let excluded = excluded_group_members(options, &deep_filter);
+                        for (key, option) in options.iter().filter(|(key, option)| {
+                            deep_filter(option) && !excluded.contains(key.as_str())
+                        }) {
                             let option_types = option.get("type")?.as_object()?;
                             for option_type in option_types.values() {
                                 let candidate = if item_kind == "array" {
@@ -873,6 +891,41 @@ mod tests {
         // Neither member is required, and "at most one" permits none, so the minimal example must
         // not force one in the way `required_one_of` does.
         assert!(minimal.is_empty(), "expected no params, got {minimal:?}");
+    }
+
+    #[test]
+    fn nested_object_emits_one_mutually_exclusive_member() {
+        // A struct nested inside an object field carries its own group. The top-level scan only
+        // sees the parent field, so the nested options must be filtered while the object is built.
+        let member = |group: [&str; 2], example: &str| {
+            serde_json::json!({
+                "required": false,
+                "mutually_exclusive": group,
+                "mutually_exclusive_group": "endpoint",
+                "type": { "string": { "examples": [example] } }
+            })
+        };
+        let group = ["url", "region"];
+        let params = Map::from_iter([(
+            "endpoint".to_owned(),
+            serde_json::json!({
+                "required": false,
+                "type": { "object": { "items": { "type": { "object": { "options": {
+                    "url": member(group, "https://api.eu.axiom.co"),
+                    "region": member(group, "mumbai.axiom.co"),
+                } } } } } }
+            }),
+        )]);
+
+        let advanced = make_example_params(&params, |_| true, |_| true);
+        let nested = advanced["endpoint"]
+            .as_object()
+            .expect("endpoint should be an object");
+        assert_eq!(
+            nested.keys().collect::<Vec<_>>(),
+            ["url"],
+            "expected only one group member, got {nested:?}"
+        );
     }
 
     #[test]
