@@ -84,9 +84,15 @@ async fn publish_and_check(conf: IggySinkConfig) -> Result<(), IggyError> {
 
     let mut output = Vec::with_capacity(num_events);
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
-    while output.len() < num_events && tokio::time::Instant::now() < deadline {
-        if let Some(Ok(received)) = consumer.next().await {
-            output.push(String::from_utf8_lossy(&received.message.payload).to_string());
+    while output.len() < num_events {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match tokio::time::timeout(remaining, consumer.next()).await {
+            Ok(Some(Ok(received))) => {
+                output.push(String::from_utf8_lossy(&received.message.payload).to_string());
+            }
+            Ok(Some(Err(error))) => panic!("verifier read failed: {error}"),
+            Ok(None) => panic!("verifier stream ended before every message arrived"),
+            Err(_) => break,
         }
     }
 
