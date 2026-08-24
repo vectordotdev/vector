@@ -387,6 +387,57 @@ fn exclusive_group<'a>(param: &'a Value, key: &str) -> Option<Vec<&'a str>> {
     (!members.is_empty()).then_some(members)
 }
 
+/// Build the example object for a struct nested inside an array or map field.
+///
+/// Nested structs carry their own exclusive groups, so those are filtered here too: emitting two
+/// members of one group would produce a config the component's validation rejects. Selection
+/// requires renderability rather than just `deep_filter`, because picking a member that yields no
+/// value would drop the rest and leave a `required_one_of` group with nothing set, which is
+/// equally invalid.
+fn build_nested_object(
+    options: &Map<String, Value>,
+    item_kind: &str,
+    deep_filter: impl Fn(&Value) -> bool,
+) -> Option<Map<String, Value>> {
+    let excluded = excluded_group_members(options, |option| {
+        deep_filter(option) && renders_nested_value(option, item_kind)
+    });
+    let mut object = Map::new();
+    for (key, option) in options
+        .iter()
+        .filter(|(key, option)| deep_filter(option) && !excluded.contains(key.as_str()))
+    {
+        for option_type in option.get("type")?.as_object()?.values() {
+            let candidate = if item_kind == "array" {
+                get_array_value(option_type)
+            } else {
+                get_value(option_type)
+            };
+            if let Some(candidate) = candidate {
+                object.insert(key.clone(), candidate);
+            }
+        }
+    }
+    Some(object)
+}
+
+/// Whether any of `option`'s types yields a concrete value, mirroring how the nested-object loop
+/// renders each option. Used so group selection prefers a member that actually produces output.
+fn renders_nested_value(option: &Value, item_kind: &str) -> bool {
+    option
+        .get("type")
+        .and_then(Value::as_object)
+        .is_some_and(|types| {
+            types.values().any(|option_type| {
+                if item_kind == "array" {
+                    get_array_value(option_type).is_some()
+                } else {
+                    get_value(option_type).is_some()
+                }
+            })
+        })
+}
+
 /// Members of any exclusive group among `params` that must be omitted so at most one member of
 /// each group appears. `usable` decides which member is preferred when several would qualify.
 ///
@@ -473,25 +524,7 @@ where
                 for (item_kind, item_type) in item_types {
                     if matches!(item_kind.as_str(), "array" | "object") {
                         let options = item_type.get("options").and_then(Value::as_object)?;
-                        let mut object = Map::new();
-                        // Nested structs carry their own exclusive groups, so filter them here too:
-                        // emitting two members of one group would produce an invalid config.
-                        let excluded = excluded_group_members(options, &deep_filter);
-                        for (key, option) in options.iter().filter(|(key, option)| {
-                            deep_filter(option) && !excluded.contains(key.as_str())
-                        }) {
-                            let option_types = option.get("type")?.as_object()?;
-                            for option_type in option_types.values() {
-                                let candidate = if item_kind == "array" {
-                                    get_array_value(option_type)
-                                } else {
-                                    get_value(option_type)
-                                };
-                                if let Some(candidate) = candidate {
-                                    object.insert(key.clone(), candidate);
-                                }
-                            }
-                        }
+                        let object = build_nested_object(options, item_kind, &deep_filter)?;
                         if !object.is_empty() {
                             value = Some(if kind == "array" {
                                 Value::Array(vec![Value::Object(object)])
@@ -925,6 +958,41 @@ mod tests {
             nested.keys().collect::<Vec<_>>(),
             ["url"],
             "expected only one group member, got {nested:?}"
+        );
+    }
+
+    #[test]
+    fn nested_group_skips_unrenderable_member() {
+        // The first member passes `deep_filter` but has no default, example, or enum, so it renders
+        // nothing. Selecting it would exclude `file` and leave the group with no member set, which
+        // violates the nested exactly-one constraint just as setting two would.
+        let params = Map::from_iter([(
+            "config".to_owned(),
+            serde_json::json!({
+                "required": false,
+                "type": { "object": { "items": { "type": { "object": { "options": {
+                    "source": {
+                        "required": false,
+                        "required_one_of": ["source", "file"],
+                        "type": { "string": {} }
+                    },
+                    "file": {
+                        "required": false,
+                        "required_one_of": ["source", "file"],
+                        "type": { "string": { "examples": ["/etc/vector/script.vrl"] } }
+                    },
+                } } } } } }
+            }),
+        )]);
+
+        let advanced = make_example_params(&params, |_| true, |_| true);
+        let nested = advanced["config"]
+            .as_object()
+            .expect("config should be an object");
+        assert_eq!(
+            nested.keys().collect::<Vec<_>>(),
+            ["file"],
+            "expected the renderable member, got {nested:?}"
         );
     }
 

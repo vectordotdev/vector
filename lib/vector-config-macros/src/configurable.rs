@@ -246,8 +246,9 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
 enum ExclusiveKind {
     /// Exactly one member must be set. Enforced in the JSON Schema via a `oneOf` constraint.
     RequiredOneOf,
-    /// At most one member may be set; all members may also be omitted. Documentation-only, since
-    /// JSON Schema cannot express "at most one" without also making the group required.
+    /// At most one member may be set; all members may also be omitted. Documentation-only: the
+    /// `oneOf` constraint used for `RequiredOneOf` would also make the group required, and no
+    /// replacement constraint is emitted (see the note where groups are pushed).
     MutuallyExclusive,
 }
 
@@ -498,9 +499,11 @@ fn build_named_struct_generate_schema_fn(
     // For each `required_one_of` group, push a oneOf schema into `flattened_subschemas` so the JSON
     // Schema expresses the "exactly one of" constraint via allOf.
     //
-    // `mutually_exclusive` groups get no constraint: JSON Schema cannot express "at most one"
-    // without also requiring the group, which is exactly the semantics we're avoiding. Their mutual
-    // exclusivity is enforced by the component's own validation and documented via metadata.
+    // `mutually_exclusive` groups get no constraint. The `oneOf` above would also make the group
+    // required, which is the semantics we're avoiding. "At most one" *is* expressible in JSON
+    // Schema by negating each pair of simultaneously-set members, but emitting that is deliberately
+    // out of scope here: these groups are documentation-only, and their exclusivity is enforced by
+    // the component's own validation. See https://github.com/vectordotdev/vector/issues/26175.
     let group_pushes = groups
         .iter()
         .filter(|((kind, _), _)| *kind == ExclusiveKind::RequiredOneOf)
