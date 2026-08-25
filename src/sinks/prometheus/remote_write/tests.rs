@@ -79,7 +79,7 @@ async fn sends_authenticated_request() {
     assert_eq!(req.metadata[0].metric_family_name, "gauge-2");
 }
 
-#[cfg(feature = "aws-config")]
+#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn sends_authenticated_aws_request() {
     let outputs = send_request(

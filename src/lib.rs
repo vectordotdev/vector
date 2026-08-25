@@ -71,7 +71,7 @@ pub mod amqp;
 pub mod api;
 pub mod app;
 pub mod async_read;
-#[cfg(feature = "aws-config")]
+#[cfg(feature = "aws-core")]
 pub mod aws;
 pub mod common;
 pub mod completion;
