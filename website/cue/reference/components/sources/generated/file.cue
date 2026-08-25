@@ -83,7 +83,7 @@ generated: components: sources: file: configuration: {
 		type: string: {
 			default: "file"
 			examples: [
-				"path",
+				"path"
 			]
 		}
 	}
@@ -197,7 +197,7 @@ generated: components: sources: file: configuration: {
 		required:    false
 		type: uint: {
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}
@@ -227,7 +227,7 @@ generated: components: sources: file: configuration: {
 		type: string: {
 			default: "\n"
 			examples: [
-				"\r\n",
+				"\r\n"
 			]
 		}
 	}
@@ -337,7 +337,7 @@ generated: components: sources: file: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"offset",
+			"offset"
 		]
 	}
 	oldest_first: {

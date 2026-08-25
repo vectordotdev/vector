@@ -1,9 +1,8 @@
 # Quick Reference for Vector Development
 
-This guide provides quick commands and coding conventions for Vector development. It's designed to help both AI assistants and human
-contributors get started quickly.
+This guide provides quick commands and coding conventions for Vector development.
 
-**For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).**
+For comprehensive information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Project Summary
 
@@ -58,59 +57,76 @@ When working on Vector's Rust codebase, follow this iterative development cycle:
 
 Run this cycle after any code modification.
 
-When editing markdown files (*.md), run `make check-markdown` after changes.
+### Final validation step
 
-## Two Different Workflows
+After the task is complete run the following `make` commands to check for errors in tests and other
+targets.
+
+1. Run `make fmt` to format your code.
+2. Run `make test SCOPE="<scope>"` to run tests. `<scope>` is a test filter passed to `cargo nextest`.
+
+## Code change workflows and validation
 
 ### Rust Development (Most Common)
 
-If you're working on Vector's Rust codebase (sources, sinks, transforms, core functionality):
+If you're working on Vector's Rust codebase:
 
-**Format your code:**
-
-```bash
-make fmt
-```
-
-**Check formatting:**
+#### Running tests
 
 ```bash
-make check-fmt
-```
-
-**Run Clippy (linter):**
-
-```bash
-make check-clippy
-```
-
-**Auto-fix Clippy issues:**
-
-```bash
-make clippy-fix
-```
-
-**Run unit tests:**
-
-```bash
+# Run all tests
 make test
-# or
-cargo nextest run --workspace --no-default-features --features "${FEATURES}"
+
+# Target a single test
+make test SCOPE="test_some_function"
+
+# Filter to a specific package
+make test SCOPE="-p vector"
+
+# Use a nextest filter expression (note the quoting)
+make test SCOPE="-E 'test(foo) and not test(bar)'"
+
+# Run tests for a specific feature only
+make test FEATURES="sources-file"
+
+# Run tests matching a substring for a specific feature only
+make test FEATURES="sources-file" SCOPE="truncate"
 ```
 
-**Run integration tests:**
+#### Running integration tests
 
 ```bash
 # See available integration tests:
 cargo vdev int show
 
 # Run a specific integration test
-cargo vdev integration run <integration-name>
+cargo vdev int run <integration-name>
 ```
 
 See [Integration Tests](#integration-tests) section below for more details.
 
-**Before committing (recommended checks):**
+#### If editing any markdown files
+
+```bash
+make check-markdown
+```
+
+#### If changing any user facing documentation, including examples, component configuration or VRL functions
+
+```bash
+make generate-docs
+```
+
+#### If modifying any external dependencies
+
+Requires `dd-rust-license-tool`
+
+```bash
+make build-licenses
+```
+
+
+#### Before committing (recommended checks)
 
 ```bash
 make fmt                      # Format code
@@ -135,8 +151,8 @@ If you're working on vector.dev website or documentation content:
 **Run the site locally:**
 
 ```bash
-cd website
-make serve
+make generate-docs
+cd website && make serve
 # Navigate to http://localhost:1313
 ```
 
@@ -230,41 +246,6 @@ cargo vdev int test aws
 
 See [docs/DEVELOPING.md](docs/DEVELOPING.md#integration-tests) for adding new integration tests.
 
-### Key Files
-
-- `Makefile` - Common build/test/check targets
-- `vdev/` - Custom development CLI tool
-- `src/` - Rust source code
-- `website/` - Hugo-based documentation site
-- `tests/` - Integration and behavior tests
-
-## Common Issues
-
-### Formatting Fails
-
-Run `make fmt` before committing. Formatting must be exact.
-
-### Clippy Errors
-
-Run `make clippy-fix` to auto-fix many issues. Manual fixes may be required.
-
-### Generated Docs Out of Sync
-
-Documentation is generated from code. Run:
-
-```bash
-make check-generated-docs
-```
-
-### License Check Fails
-
-After adding/updating dependencies:
-
-```bash
-cargo install dd-rust-license-tool --locked
-make build-licenses
-```
-
 ## Git Conventions
 
 - **Commit messages:** Do NOT include co-authoring information from coding agents (i.e. avoid "Co-Authored-By: Claude" attribution)
@@ -285,16 +266,3 @@ When an open pull request exists, never rewrite published commits or force-push 
 ## Creating Pull Requests
 
 Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
-
-### PR Title Format
-
-PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
-
-Examples:
-
-```text
-feat(kafka source): add consumer group lag metric
-fix(loki sink): handle empty label sets correctly
-docs(internal docs): update contributing guide
-chore(deps): bump tokio to X
-```

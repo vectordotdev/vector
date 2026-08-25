@@ -14,14 +14,11 @@
                 {{ partial "heading.html" (dict "text" $name "level" 3 "anchor" true "icon" false) }}
               </span>
 
-              {{/* Config labels */}}
               <span class="flex justify-between space-x-1">
-                {{ if $v.common }}
-                  {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
-                {{ end }}
-
                 {{ if $v.required }}
                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                {{ else if $v.required_when }}
+                  {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
                 {{ else if $v.required_one_of }}
                   {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                 {{ else }}
@@ -214,9 +211,9 @@
             {{ end }}
 
             {{/* "Relevant when" conditions */}}
-            {{ with .relevant_when }}
+            {{ if and .relevant_when (ne .relevant_when .required_when) }}
               <div class="mt-2 text-sm flex justify-end">
-                <span> Relevant when: <code>{{ . }}</code> </span>
+                <span> Relevant when: <code>{{ .relevant_when }}</code> </span>
               </div>
             {{ end }}
           </div>
@@ -515,12 +512,10 @@
             </span>
 
             <span class="flex space-x-1">
-              {{ if $v.common }}
-                {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
-              {{ end }}
-
               {{ if $v.required }}
                 {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+              {{ else if $v.required_when }}
+                {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
               {{ else if $v.required_one_of }}
                 {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
               {{ else }}
@@ -623,12 +618,10 @@
                 </span>
 
                 <span class="flex space-x-1">
-                  {{ if $v.common }}
-                    {{ partial "badge.html" (dict "word" "common" "color" "indigo") }}
-                  {{ end }}
-
                   {{ if $v.required }}
                     {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                  {{ else if $v.required_when }}
+                    {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
                   {{ else if $v.required_one_of }}
                     {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                   {{ else }}
@@ -669,6 +662,8 @@
                               <span class="flex space-x-1">
                                 {{ if $v.required }}
                                   {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                                {{ else if $v.required_when }}
+                                  {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
                                 {{ else if $v.required_one_of }}
                                   {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
                                 {{ else }}
@@ -2047,12 +2042,10 @@
           </span>
 
           <span class="flex space-x-1">
-            {{ if $v.common }}
-              {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
-            {{ end }}
-
             {{ if $v.required }}
               {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+            {{ else if $v.required_when }}
+              {{ partial "badge.html" (dict "word" "required when:" "code" $v.required_when "code_class" "badge-code" "color" "orange") }}
             {{ else if $v.required_one_of }}
               {{ partial "badge.html" (dict "word" (printf "required (one of: %s)" $v.required_one_of_group) "color" "orange") }}
             {{ else }}
@@ -2133,9 +2126,9 @@
           </div>
         {{ end }}
 
-        {{ with $v.relevant_when }}
+        {{ if and $v.relevant_when (ne $v.relevant_when $v.required_when) }}
           <div class="mt-2">
-            <span> Relevant when: <code>{{ . }}</code> </span>
+            <span> Relevant when: <code>{{ $v.relevant_when }}</code> </span>
           </div>
         {{ end }}
 

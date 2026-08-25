@@ -33,14 +33,12 @@ components: sinks: [Name=string]: {
 		if !features.auto_generated {
 			if features.acknowledgements {
 				acknowledgements: {
-					common: true
 					description: """
 						Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
 						"""
 					required: false
 					type: object: options: {
 						enabled: {
-							common:      true
 							description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
 							warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
 							required: false
@@ -53,14 +51,12 @@ components: sinks: [Name=string]: {
 			if features.send != _|_ && features.send.batch != _|_ {
 				if features.send.batch.enabled {
 					batch: {
-						common:      features.send.batch.common
 						description: "Configures the sink batching behavior."
 						required:    false
 						type: object: {
 							examples: []
 							options: {
 								max_bytes: {
-									common:      true
 									description: "The maximum size of a batch that will be processed by a sink. This is based on the uncompressed size of the batched events, before they are serialized / compressed."
 									required:    false
 									type: uint: {
@@ -69,7 +65,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								max_events: {
-									common:      true
 									description: "The maximum size of a batch, in events, before it is flushed."
 									required:    false
 									type: uint: {
@@ -78,7 +73,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								timeout_secs: {
-									common:      true
 									description: "The maximum age of a batch before it is flushed."
 									required:    false
 									type: float: {
@@ -95,7 +89,6 @@ components: sinks: [Name=string]: {
 			if features.send != _|_ {
 				if features.send.compression.enabled {
 					compression: {
-						common: true
 						description: """
 							The compression strategy used to compress the encoded event data before transmission.
 
@@ -138,7 +131,6 @@ components: sinks: [Name=string]: {
 					encoding: {
 						description: "Configures how events are encoded into raw bytes."
 						required:    features.send.encoding.codec.enabled
-						if !features.send.encoding.codec.enabled {common: true}
 						type: object: {
 							if features.send.encoding.codec.enabled {
 								examples: [{codec: "json"}]
@@ -220,7 +212,6 @@ components: sinks: [Name=string]: {
 								}
 
 								except_fields: {
-									common:      false
 									description: "Prevent the sink from encoding the specified fields."
 									required:    false
 									type: array: {
@@ -233,7 +224,6 @@ components: sinks: [Name=string]: {
 								}
 
 								only_fields: {
-									common:      false
 									description: "Makes the sink encode only the specified fields."
 									required:    false
 									type: array: {
@@ -246,7 +236,6 @@ components: sinks: [Name=string]: {
 								}
 
 								timestamp_format: {
-									common:      false
 									description: "How to format event timestamps."
 									required:    false
 									type: string: {
@@ -268,14 +257,12 @@ components: sinks: [Name=string]: {
 					if features.send.encoding.codec.enabled {
 						if features.send.encoding.codec.framing {
 							framing: {
-								common:      false
 								description: "Configures in which way events encoded as byte frames should be separated in a payload."
 								required:    false
 								type: object: options: {
 									method: {
 										description: "The framing method."
 										required:    false
-										common:      true
 										type: string: {
 											default: "A suitable default is chosen depending on the sink type and the selected codec."
 											enum: {
@@ -316,7 +303,6 @@ components: sinks: [Name=string]: {
 
 				if features.send.request.enabled {
 					request: {
-						common:      false
 						description: "Configures the sink request behavior."
 						required:    false
 						if features.send.request.relevant_when != _|_ {
@@ -326,26 +312,22 @@ components: sinks: [Name=string]: {
 							examples: []
 							options: {
 								adaptive_concurrency: {
-									common:      false
 									description: "Configure the adaptive concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
 									required:    false
 									type: object: {
 										examples: []
 										options: {
 											decrease_ratio: {
-												common:      false
 												description: "The fraction of the current value to set the new concurrency limit when decreasing the limit. Valid values are greater than 0 and less than 1. Smaller values cause the algorithm to scale back rapidly when latency increases. Note that the new limit is rounded down after applying this ratio."
 												required:    false
 												type: float: default: 0.9
 											}
 											ewma_alpha: {
-												common:      false
 												description: "The adaptive concurrency algorithm uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with the current RTT. This value controls how heavily new measurements are weighted compared to older ones. Valid values are greater than 0 and less than 1. Smaller values cause this reference to adjust more slowly, which may be useful if a service has unusually high response variability."
 												required:    false
 												type: float: default: 0.7
 											}
 											rtt_deviation_scale: {
-												common: false
 												description: """
 												When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
 												"""
@@ -356,7 +338,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								concurrency: {
-									common: true
 									if features.send.request.adaptive_concurrency {
 										description: "The maximum number of in-flight requests allowed at any given time, or \"adaptive\" to allow Vector to automatically set the limit based on current network and service conditions."
 									}
@@ -370,7 +351,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								rate_limit_duration_secs: {
-									common:      true
 									description: "The time window, in seconds, used for the `rate_limit_num` option."
 									required:    false
 									type: uint: {
@@ -379,7 +359,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								rate_limit_num: {
-									common:      true
 									description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 									required:    false
 									type: uint: {
@@ -388,7 +367,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								retry_attempts: {
-									common:      false
 									description: "The maximum number of retries to make for failed requests. The default, for all intents and purposes, represents an infinite number of retries."
 									required:    false
 									type: uint: {
@@ -397,7 +375,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								retry_initial_backoff_secs: {
-									common:      false
 									description: "The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs."
 									required:    false
 									type: uint: {
@@ -406,7 +383,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								retry_max_duration_secs: {
-									common:      false
 									description: "The maximum amount of time, in seconds, to wait between retries."
 									required:    false
 									type: uint: {
@@ -415,7 +391,6 @@ components: sinks: [Name=string]: {
 									}
 								}
 								timeout_secs: {
-									common:      true
 									description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
 									required:    false
 									type: uint: {
@@ -426,7 +401,6 @@ components: sinks: [Name=string]: {
 
 								if features.send.request.headers {
 									headers: {
-										common:      false
 										description: "Options for custom headers."
 										required:    false
 										type: object: {
@@ -449,7 +423,6 @@ components: sinks: [Name=string]: {
 			if features.send != _|_ {
 				if features.send.send_buffer_bytes != _|_ {
 					send_buffer_bytes: {
-						common:      false
 						description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
 						required:    false
 						type: uint: {
@@ -465,14 +438,12 @@ components: sinks: [Name=string]: {
 
 				if features.send.keepalive != _|_ {
 					keepalive: {
-						common:      false
 						description: "Configures the TCP keepalive behavior for the connection to the sink."
 						required:    false
 						type: object: {
 							examples: []
 							options: {
 								time_secs: {
-									common:      false
 									description: "The time a connection needs to be idle before sending TCP keepalive probes."
 									required:    false
 									type: uint: {
@@ -661,11 +632,9 @@ components: sinks: [Name=string]: {
 	}
 
 	telemetry: metrics: {
-		buffer_byte_size:                     components.sources.internal_metrics.output.metrics.buffer_byte_size
 		buffer_discarded_events_total:        components.sources.internal_metrics.output.metrics.buffer_discarded_events_total
 		buffer_size_bytes:                    components.sources.internal_metrics.output.metrics.buffer_size_bytes
 		buffer_size_events:                   components.sources.internal_metrics.output.metrics.buffer_size_events
-		buffer_events:                        components.sources.internal_metrics.output.metrics.buffer_events
 		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
 		buffer_received_bytes_total:          components.sources.internal_metrics.output.metrics.buffer_received_bytes_total
 		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total

@@ -92,14 +92,13 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      # These dependencies share metrics-util layer traits and must be updated
+      # together to avoid incompatible trait implementations across versions.
       metrics:
         patterns:
           - "metrics"
           - "metrics-tracing-context"
           - "metrics-util"
-        update-types:
-          - "patch"
-          - "minor"
       netlink:
         patterns:
           - "netlink-*"
@@ -188,6 +187,9 @@ updates:
           - "http-*"
           - "hyper"
           - "hyper-*"
+          - "metrics"
+          - "metrics-tracing-context"
+          - "metrics-util"
           - "prost"
           - "prost-*"
           - "reqwest"

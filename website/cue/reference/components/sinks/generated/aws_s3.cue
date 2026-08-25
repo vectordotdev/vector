@@ -385,7 +385,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"gzip",
+			"gzip"
 		]
 	}
 	content_type: {
@@ -478,7 +478,7 @@ generated: components: sinks: aws_s3: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -884,7 +884,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"json",
+			"json"
 		]
 	}
 	filename_time_format: {

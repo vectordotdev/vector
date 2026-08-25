@@ -1,7 +1,7 @@
 package metadata
 
 releases: {
-	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "security" | "status" | "deprecation" | "revert"
+	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "security" | "status" | "revert"
 
 	#Commit: {
 		author:           string
@@ -13,8 +13,8 @@ releases: {
 		insertions_count: uint
 		pr_number:        uint | null
 		scopes: [string, ...string] | *[]
-		sha:  #CommitSha
-		type: #SemanticType
+		sha:   #CommitSha
+		type?: string
 	}
 
 	#CommitSha: =~"^[a-z0-9]{40}$"

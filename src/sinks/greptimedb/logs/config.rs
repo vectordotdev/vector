@@ -7,6 +7,7 @@ use vector_lib::{
 };
 
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
@@ -20,7 +21,7 @@ use crate::{
             },
         },
         prelude::*,
-        util::http::HttpService,
+        util::{HttpEndpoint, http::HttpService},
     },
     template::ConfinementConfig,
 };
@@ -29,15 +30,22 @@ fn extra_params_examples() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])
 }
 
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("http://localhost:4000")
+        .expect("static default endpoint should be a valid http(s) URL")
+}
+
 /// Configuration for the `greptimedb_logs` sink.
 #[configurable_component(sink("greptimedb_logs", "Ingest logs data into GreptimeDB."))]
-#[derive(Clone, Debug, Default, Derivative)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBLogsConfig {
     /// The endpoint of the GreptimeDB server.
     #[serde(alias = "host")]
+    #[derivative(Default(value = "default_endpoint()"))]
     #[configurable(metadata(docs::examples = "http://localhost:4000"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
@@ -93,7 +101,6 @@ pub struct GreptimeDBLogsConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to GreptimeDB.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "extra_params_examples()"))]
     pub extra_params: Option<HashMap<String, String>>,
@@ -101,7 +108,6 @@ pub struct GreptimeDBLogsConfig {
     /// Custom headers to add to the HTTP request sent to GreptimeDB.
     /// Note that these headers will override the existing headers.
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "Extra header key-value pairs."
     ))]
@@ -136,7 +142,38 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedGreptimeDBLogs {
+    confined_table: ConfinedTemplate,
+    confined_dbname: ConfinedTemplate,
+    confined_pipeline_name: ConfinedTemplate,
+    confined_pipeline_version: Option<ConfinedTemplate>,
+    auth: Option<Auth>,
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for GreptimeDBLogsConfig {
+    type Validated = ValidatedGreptimeDBLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedGreptimeDBLogs> {
         let confined_table = self
             .table
             .clone()
@@ -154,8 +191,6 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .clone()
             .map(|t| t.confine(&self.confinement, Self::NAME, "pipeline_version"))
             .transpose()?;
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let auth = match (self.username.clone(), self.password.clone()) {
             (Some(username), Some(password)) => Some(Auth::Basic {
@@ -164,6 +199,36 @@ impl SinkConfig for GreptimeDBLogsConfig {
             }),
             _ => None,
         };
+
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedGreptimeDBLogs {
+            confined_table,
+            confined_dbname,
+            confined_pipeline_name,
+            confined_pipeline_version,
+            auth,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedGreptimeDBLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedGreptimeDBLogs {
+            confined_table,
+            confined_dbname,
+            confined_pipeline_name,
+            confined_pipeline_version,
+            auth,
+            batch_settings,
+        } = validated;
+
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
             endpoint: self.endpoint.clone(),
             auth: auth.clone(),
@@ -189,14 +254,14 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {
-            dbname: confined_dbname,
-            table: confined_table,
-            pipeline_name: confined_pipeline_name,
-            pipeline_version: confined_pipeline_version,
+            dbname: confined_dbname.clone(),
+            table: confined_table.clone(),
+            pipeline_name: confined_pipeline_name.clone(),
+            pipeline_version: confined_pipeline_version.clone(),
         };
 
         let sink = GreptimeDBLogsHttpSink::new(
-            self.batch.into_batcher_settings()?,
+            *batch_settings,
             service,
             request_builder,
             logs_sink_setting,
@@ -209,23 +274,65 @@ impl SinkConfig for GreptimeDBLogsConfig {
         ));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::template::{ConfinementConfig, Template};
+    use indoc::indoc;
+
+    use super::*;
+    use crate::{
+        config::ValidatedSink,
+        template::{ConfinementConfig, Template},
+    };
+
+    #[test]
+    fn prepares_valid_config() {
+        let config = GreptimeDBLogsConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:4000").unwrap(),
+            table: "mytable".try_into().unwrap(),
+            dbname: "public".try_into().unwrap(),
+            pipeline_name: "greptime_identity".try_into().unwrap(),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.confined_table.to_string(), "mytable");
+        assert_eq!(validated.confined_dbname.to_string(), "public");
+        assert_eq!(
+            validated.confined_pipeline_name.to_string(),
+            "greptime_identity"
+        );
+        assert!(validated.auth.is_none());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        // `HttpEndpoint` rejects a malformed endpoint at load time, so
+        // deserialization fails.
+        let result: Result<GreptimeDBLogsConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "not a uri"
+            table: "mytable"
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a malformed endpoint"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_non_http_endpoint() {
+        // `HttpEndpoint` only accepts absolute http(s) URLs, so an `ftp://`
+        // endpoint is rejected at load time.
+        let result: Result<GreptimeDBLogsConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "ftp://example.com"
+            table: "mytable"
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a non-http endpoint"
+        );
+    }
 
     #[test]
     fn confinement_rejects_unconfined_table() {
