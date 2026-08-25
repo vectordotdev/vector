@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
+use derivative::Derivative;
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
@@ -240,11 +241,14 @@ impl SinkConfig for InfluxDbLogsConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct ValidatedInfluxDbLogs {
     measurement: String,
     tags: HashSet<KeyString>,
     batch: BatchSettings<Buffer>,
+    // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
+    #[derivative(Debug = "ignore")]
     uri: Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,

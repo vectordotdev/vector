@@ -1,6 +1,7 @@
 use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
+use derivative::Derivative;
 use futures::{SinkExt, future::BoxFuture, stream};
 use indoc::indoc;
 use tower::Service;
@@ -300,22 +301,16 @@ impl SinkConfig for InfluxDbConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct ValidatedInfluxDbMetrics {
+    // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
+    #[derivative(Debug = "ignore")]
     uri: http::Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,
+    #[derivative(Debug = "ignore")]
     batch: BatchSettings<MetricsBuffer>,
-}
-
-impl std::fmt::Debug for ValidatedInfluxDbMetrics {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ValidatedInfluxDbMetrics")
-            .field("uri", &self.uri)
-            .field("token", &self.token)
-            .field("protocol_version", &self.protocol_version)
-            .finish_non_exhaustive()
-    }
 }
 
 #[async_trait::async_trait]
