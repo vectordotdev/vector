@@ -37,7 +37,7 @@ fn config_debug_redacts_endpoint_credentials() {
 
     let debug = format!("{config:?}");
     assert!(!debug.contains("secret"));
-    assert!(debug.contains("http://<redacted>@example.com"));
+    assert!(debug.contains("http://example.com"));
 }
 
 #[tokio::test]
