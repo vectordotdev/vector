@@ -18,6 +18,12 @@ pub(crate) mod sqs;
 #[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
 pub(crate) mod s3;
 
+#[cfg(feature = "sources-aws_kinesis_streams")]
+pub(crate) mod kinesis;
+
+#[cfg(feature = "sources-aws_kinesis_streams")]
+pub(crate) mod dynamodb;
+
 #[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 pub(crate) mod websocket;
 
