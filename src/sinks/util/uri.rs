@@ -244,7 +244,7 @@ pub enum HttpEndpointError {
 /// re-parsing, so the scheme and authority are preserved and the result is
 /// still an absolute `http(s)` URL.
 #[configurable_component]
-#[configurable(title = "An absolute http(s) URL.", description = "")]
+#[configurable(title = "An absolute HTTP(S) URL.", description = "")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
 pub struct HttpEndpoint(Uri);
