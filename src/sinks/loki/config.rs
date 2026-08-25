@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use vrl::value::Kind;
 
 use super::{
-    append_loki_path,
     healthcheck::healthcheck,
     sink::{LokiSink, confine_template_keys},
 };
@@ -249,7 +248,8 @@ impl SinkConfig for LokiConfig {
 pub struct ValidatedLokiSink {
     /// The push URL: `endpoint` with `path` appended. Used by `LokiService`.
     pub(super) endpoint: HttpEndpoint,
-    /// The pathless base URL, used by the healthcheck (which appends `ready/` to it).
+    /// The credential-free configured endpoint, including any user-supplied base path.
+    /// The healthcheck appends `ready` or `/` to this URL.
     pub(super) base_endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) request_limits: TowerRequestSettings,
@@ -312,8 +312,8 @@ impl ValidatedSink for LokiConfig {
         )?;
 
         // The push URL appends `path`; the healthcheck appends `ready`/`` to the
-        // pathless base, so both are retained.
-        let endpoint = append_loki_path(&base_endpoint, &self.path)?;
+        // configured base endpoint, so both are retained.
+        let endpoint = base_endpoint.append_path(&self.path)?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -337,13 +337,7 @@ impl ValidatedSink for LokiConfig {
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
         let client = self.build_client(cx)?;
 
-        let config = LokiConfig {
-            auth: validated.auth.clone(),
-            endpoint: validated.endpoint.clone(),
-            ..self.clone()
-        };
-
-        let sink = LokiSink::from_validated(config.clone(), validated.clone(), client.clone())?;
+        let sink = LokiSink::from_validated(self, validated.clone(), client.clone())?;
 
         let healthcheck = healthcheck(
             validated.base_endpoint.clone(),
@@ -384,39 +378,12 @@ pub fn valid_label_name(label: &Template) -> bool {
 mod tests {
     use std::convert::TryInto;
 
-    use super::{super::append_loki_path, valid_label_name};
+    use super::valid_label_name;
     use crate::{
         config::ValidatedSink,
-        sinks::{loki::LokiConfig, util::HttpEndpoint},
+        sinks::loki::LokiConfig,
         template::{ConfinementConfig, Template},
     };
-
-    #[test]
-    fn append_loki_path_normalizes_repeated_boundary_slashes() {
-        for (endpoint, path, expected) in [
-            (
-                "https://example.com",
-                "//loki/api/v1/push",
-                "https://example.com/loki/api/v1/push",
-            ),
-            (
-                "https://example.com/prefix///",
-                "/loki/api/v1/push",
-                "https://example.com/prefix/loki/api/v1/push",
-            ),
-            (
-                "https://example.com/prefix///",
-                "//loki/api/v1/push",
-                "https://example.com/prefix/loki/api/v1/push",
-            ),
-        ] {
-            let endpoint = HttpEndpoint::parse(endpoint).unwrap();
-            assert_eq!(
-                append_loki_path(&endpoint, path).unwrap().to_string(),
-                expected
-            );
-        }
-    }
 
     #[test]
     fn valid_label_names() {
@@ -472,6 +439,26 @@ mod tests {
             rendered.starts_with("team-"),
             "operator-controlled prefix must be preserved in rendered tenant_id"
         );
+    }
+
+    #[test]
+    fn deserialize_rejects_non_http_endpoint() {
+        let result = serde_yaml::from_str::<LokiConfig>(
+            r#"
+            endpoint: "ftp://localhost:3100"
+            labels:
+              test_name: "placeholder"
+            encoding:
+              codec: json
+            "#,
+        );
+
+        assert!(
+            result.is_err(),
+            "non-http endpoints must fail at config load"
+        );
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("ftp://localhost:3100"), "{message}");
     }
 
     #[test]
@@ -554,9 +541,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!(
-            config.validate().is_err(),
-            "a path containing a space cannot be appended into a valid URI and must be rejected"
-        );
+        let message = config.validate().unwrap_err().to_string();
+        assert!(message.contains("path `foo bar`"), "{message}");
+        assert!(message.contains("http://localhost:3100"), "{message}");
     }
 }

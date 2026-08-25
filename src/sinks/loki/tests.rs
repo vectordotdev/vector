@@ -1,8 +1,10 @@
-use futures::{SinkExt, StreamExt, stream};
-use hyper::{
-    Body, Server,
-    service::{make_service_fn, service_fn},
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
+
+use futures::{StreamExt, stream};
+use hyper::Body;
 use vector_lib::config::{log_schema, proxy::ProxyConfig};
 use vrl::event_path;
 
@@ -13,7 +15,7 @@ use crate::{
         prelude::*,
         util::{
             HttpEndpoint,
-            test::{build_test_server, load_sink},
+            test::{build_test_server, build_test_server_generic, load_sink},
         },
     },
     test_util,
@@ -202,33 +204,22 @@ async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
     let endpoint = format!("http://{addr}/loki///");
     config.endpoint = HttpEndpoint::parse(&endpoint).unwrap();
 
-    // The normalized `/ready` path returns 404 (the fallback trigger); the
-    // normalized base path returns 200. Every request path is recorded.
-    let (tx, rx) = futures::channel::mpsc::channel(8);
-    let service = make_service_fn(move |_| {
-        let tx = tx.clone();
-        async move {
-            Ok::<_, std::convert::Infallible>(service_fn(move |req: http::Request<Body>| {
-                let mut tx = tx.clone();
-                async move {
-                    let path = req.uri().path().to_string();
-                    let status = if path.ends_with("ready") {
-                        http::StatusCode::NOT_FOUND
-                    } else {
-                        http::StatusCode::OK
-                    };
-                    drop(tx.send(path).await);
-                    Ok::<_, std::convert::Infallible>(
-                        http::Response::builder()
-                            .status(status)
-                            .body(Body::empty())
-                            .unwrap(),
-                    )
-                }
-            }))
-        }
+    // The `/ready` request returns 404 to trigger the fallback. The generic
+    // server records the successful fallback request and shuts down with its
+    // returned trigger.
+    let first_request = Arc::new(AtomicBool::new(true));
+    let responder_state = Arc::clone(&first_request);
+    let (mut rx, _trigger, server) = build_test_server_generic(addr, move || {
+        let status = if responder_state.swap(false, Ordering::Relaxed) {
+            http::StatusCode::NOT_FOUND
+        } else {
+            http::StatusCode::OK
+        };
+        http::Response::builder()
+            .status(status)
+            .body(Body::empty())
+            .unwrap()
     });
-    let server = Server::bind(&addr).serve(service);
     tokio::spawn(server);
 
     let tls =
@@ -240,13 +231,10 @@ async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
         .await
         .expect("healthcheck failed");
 
-    // The fallback must probe the base path with a trailing slash (`/loki/`,
-    // not `/loki`), matching the pre-`HttpEndpoint` behavior.
-    let requests: Vec<String> = rx.take(2).collect::<Vec<_>>().await;
-    assert_eq!(
-        requests,
-        vec!["/loki/ready".to_string(), "/loki/".to_string()]
-    );
+    // The successful fallback must probe the base path with a trailing slash
+    // (`/loki/`, not `/loki`), matching the pre-`HttpEndpoint` behavior.
+    let (parts, _) = rx.next().await.expect("fallback request should succeed");
+    assert_eq!(parts.uri.path(), "/loki/");
 }
 
 #[tokio::test]

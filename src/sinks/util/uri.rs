@@ -134,6 +134,10 @@ impl TryFrom<Uri> for UriSerde {
 }
 
 fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Auth>)> {
+    if !authority.as_str().contains('@') {
+        return Ok((authority.clone(), None));
+    }
+
     // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
@@ -174,9 +178,14 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
 
 fn extract_http_endpoint_basic_auth(
     authority: &Authority,
+    endpoint: &str,
 ) -> Result<(Authority, Option<Auth>), HttpEndpointError> {
-    let url = url::Url::parse(&format!("http://{authority}"))
-        .map_err(|source| HttpEndpointError::InvalidAuth { source })?;
+    let url = url::Url::parse(&format!("http://{authority}")).map_err(|source| {
+        HttpEndpointError::InvalidAuth {
+            endpoint: endpoint.to_owned(),
+            source,
+        }
+    })?;
     let has_auth = !url.username().is_empty() || url.password().is_some();
     let user = percent_decode_str(url.username())
         .decode_utf8_lossy()
@@ -184,14 +193,22 @@ fn extract_http_endpoint_basic_auth(
     let password = percent_decode_str(url.password().unwrap_or(""))
         .decode_utf8_lossy()
         .into_owned();
-    let host = url.host_str().ok_or(HttpEndpointError::NotAbsoluteHttp)?;
+    let host = url
+        .host_str()
+        .ok_or_else(|| HttpEndpointError::NotAbsoluteHttp {
+            endpoint: endpoint.to_owned(),
+        })?;
     let host_port = match authority.port() {
         Some(port) => format!("{host}:{}", port.as_str()),
         None => host.to_string(),
     };
-    let authority = host_port
-        .parse::<Authority>()
-        .map_err(|source| HttpEndpointError::InvalidUri { source })?;
+    let authority =
+        host_port
+            .parse::<Authority>()
+            .map_err(|source| HttpEndpointError::InvalidUri {
+                endpoint: endpoint.to_owned(),
+                source,
+            })?;
     let auth = has_auth.then_some(Auth::Basic {
         user,
         password: password.into(),
@@ -232,30 +249,41 @@ pub fn protocol_endpoint(uri: Uri) -> (String, String) {
 }
 
 /// Error returned when a configured endpoint cannot be used as an absolute HTTP URL.
-///
-/// Endpoint and path values are deliberately omitted so configuration errors
-/// cannot retain or display embedded credentials or tokens.
 #[derive(Debug, Snafu)]
 pub enum HttpEndpointError {
-    #[snafu(display("endpoint is not a valid URI: {source}"))]
-    InvalidUri { source: http::uri::InvalidUri },
+    #[snafu(display("endpoint `{endpoint}` is not a valid URI: {source}"))]
+    InvalidUri {
+        endpoint: String,
+        source: http::uri::InvalidUri,
+    },
 
-    #[snafu(display("endpoint contains invalid basic authentication: {source}"))]
-    InvalidAuth { source: url::ParseError },
+    #[snafu(display("endpoint `{endpoint}` contains invalid basic authentication: {source}"))]
+    InvalidAuth {
+        endpoint: String,
+        source: url::ParseError,
+    },
 
-    #[snafu(display("endpoint has an invalid path: {source}"))]
-    InvalidPath { source: http::uri::InvalidUri },
+    #[snafu(display("path `{path}` is not valid for endpoint `{endpoint}`: {source}"))]
+    InvalidPath {
+        endpoint: String,
+        path: String,
+        source: http::uri::InvalidUri,
+    },
 
-    #[snafu(display("endpoint cannot be reassembled from its parts: {source}"))]
-    InvalidUriParts { source: http::uri::InvalidUriParts },
+    #[snafu(display("path `{path}` cannot be applied to endpoint `{endpoint}`: {source}"))]
+    InvalidUriParts {
+        endpoint: String,
+        path: String,
+        source: http::uri::InvalidUriParts,
+    },
 
     #[snafu(display(
-        "endpoint must be an absolute http(s) URL, for example `https://example.com`"
+        "endpoint `{endpoint}` must be an absolute http(s) URL, for example `https://example.com`"
     ))]
-    NotAbsoluteHttp,
+    NotAbsoluteHttp { endpoint: String },
 
-    #[snafu(display("endpoint has an invalid port"))]
-    InvalidPort,
+    #[snafu(display("endpoint `{endpoint}` has an invalid port"))]
+    InvalidPort { endpoint: String },
 }
 
 /// A `Uri` proven to be an absolute `http`/`https` URL.
@@ -270,7 +298,7 @@ pub enum HttpEndpointError {
 /// endpoint is rejected at config load time with the config path in the error.
 ///
 /// Path composition goes through [`HttpEndpoint::append_path`], which
-/// manipates `Uri` parts directly instead of string-concatenating and
+/// manipulates `Uri` parts directly instead of string-concatenating and
 /// re-parsing, so the scheme and authority are preserved and the result is
 /// still an absolute `http(s)` URL.
 #[configurable_component]
@@ -280,14 +308,47 @@ pub enum HttpEndpointError {
 #[derivative(Debug)]
 #[serde(try_from = "String", into = "String")]
 pub struct HttpEndpoint {
-    #[derivative(Debug(format_with = "fmt_http_endpoint_uri"))]
+    #[derivative(Debug(format_with = "fmt_redacted_uri"))]
     uri: Uri,
     #[derivative(Debug = "ignore")]
     auth: Option<Auth>,
 }
 
-fn fmt_http_endpoint_uri(uri: &Uri, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    fmt::Display::fmt(uri, f)
+struct RedactedUri<'a>(&'a Uri);
+
+impl fmt::Display for RedactedUri<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt_redacted_uri(self.0, f)
+    }
+}
+
+fn fmt_redacted_uri(uri: &Uri, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if let Some(scheme) = uri.scheme_str() {
+        write!(f, "{scheme}://")?;
+    }
+    if let Some(authority) = uri.authority() {
+        if let Some((_, host_port)) = authority.as_str().rsplit_once('@') {
+            write!(f, "<redacted>@{host_port}")?;
+        } else {
+            f.write_str(authority.as_str())?;
+        }
+    }
+    if let Some(path_and_query) = uri.path_and_query() {
+        f.write_str(path_and_query.as_str())?;
+    }
+    Ok(())
+}
+
+fn redact_uri(uri: &Uri) -> String {
+    RedactedUri(uri).to_string()
+}
+
+fn redact_unparsed_endpoint(endpoint: &str) -> String {
+    if endpoint.contains('@') {
+        "<redacted endpoint>".to_owned()
+    } else {
+        endpoint.to_owned()
+    }
 }
 
 impl TryFrom<String> for HttpEndpoint {
@@ -317,13 +378,24 @@ impl HttpEndpoint {
     /// `http://localhost:notaport` parses with a nonempty host but a port that
     /// cannot be dialed. Both are checked explicitly.
     pub fn new(uri: Uri) -> Result<Self, HttpEndpointError> {
+        Self::new_with_diagnostic(uri, None)
+    }
+
+    fn new_with_diagnostic(
+        uri: Uri,
+        diagnostic_endpoint: Option<String>,
+    ) -> Result<Self, HttpEndpointError> {
         let has_valid_scheme_and_host = matches!(uri.scheme_str(), Some("http" | "https"))
             && uri.host().is_some_and(|host| !host.is_empty());
         if !has_valid_scheme_and_host {
-            return Err(HttpEndpointError::NotAbsoluteHttp);
+            return Err(HttpEndpointError::NotAbsoluteHttp {
+                endpoint: diagnostic_endpoint.unwrap_or_else(|| redact_uri(&uri)),
+            });
         }
         if authority_has_invalid_port(&uri) {
-            return Err(HttpEndpointError::InvalidPort);
+            return Err(HttpEndpointError::InvalidPort {
+                endpoint: diagnostic_endpoint.unwrap_or_else(|| redact_uri(&uri)),
+            });
         }
         let authority = uri
             .authority()
@@ -332,10 +404,16 @@ impl HttpEndpoint {
             return Ok(Self { uri, auth: None });
         }
 
-        let (authority, auth) = extract_http_endpoint_basic_auth(authority)?;
+        let endpoint = diagnostic_endpoint.unwrap_or_else(|| redact_uri(&uri));
+        let path = uri
+            .path_and_query()
+            .map(PathAndQuery::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let (authority, auth) = extract_http_endpoint_basic_auth(authority, &endpoint)?;
         let mut parts = uri.into_parts();
         parts.authority = Some(authority);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu)?;
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu { endpoint, path })?;
         Ok(Self { uri, auth })
     }
 
@@ -350,13 +428,32 @@ impl HttpEndpoint {
         // `host:port/path` without a scheme (it reads `host` as a scheme), so
         // the scheme is added up front rather than relying on the parser to
         // accept authority-form input.
+        let diagnostic_endpoint = redact_unparsed_endpoint(endpoint);
         let uri = if has_scheme(endpoint) {
-            endpoint.parse::<Uri>().context(InvalidUriSnafu)?
+            endpoint
+                .parse::<Uri>()
+                .map_err(|source| HttpEndpointError::InvalidUri {
+                    endpoint: diagnostic_endpoint.clone(),
+                    source,
+                })?
         } else {
             let endpoint = format!("https://{endpoint}");
-            endpoint.parse::<Uri>().context(InvalidUriSnafu)?
+            endpoint
+                .parse::<Uri>()
+                .map_err(|source| HttpEndpointError::InvalidUri {
+                    endpoint: diagnostic_endpoint.clone(),
+                    source,
+                })?
         };
-        Self::new(uri)
+        let diagnostic_endpoint = if uri
+            .authority()
+            .is_some_and(|authority| authority.as_str().contains('@'))
+        {
+            redact_uri(&uri)
+        } else {
+            diagnostic_endpoint
+        };
+        Self::new_with_diagnostic(uri, Some(diagnostic_endpoint))
     }
 
     /// Returns the underlying credential-free `Uri`.
@@ -403,15 +500,20 @@ impl HttpEndpoint {
             .as_ref()
             .map(PathAndQuery::path)
             .unwrap_or_default();
-        let joined = if base_path.is_empty() {
-            path.to_string()
-        } else if base_path.ends_with('/') {
-            format!("{base_path}{}", path.strip_prefix('/').unwrap_or(path))
-        } else {
-            format!("{base_path}/{}", path.strip_prefix('/').unwrap_or(path))
-        };
-        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu)?);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu)?;
+        let joined = format!(
+            "{}/{}",
+            base_path.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        );
+        let endpoint = self.to_string();
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
+            endpoint: endpoint.clone(),
+            path: path.to_owned(),
+        })?);
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
+            endpoint,
+            path: path.to_owned(),
+        })?;
         Ok(Self {
             uri,
             auth: self.auth.clone(),
@@ -434,8 +536,15 @@ impl HttpEndpoint {
             .map(PathAndQuery::path)
             .unwrap_or_default();
         let joined = format!("{base_path}{suffix}");
-        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu)?);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu)?;
+        let endpoint = self.to_string();
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
+            endpoint: endpoint.clone(),
+            path: suffix.to_owned(),
+        })?);
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
+            endpoint,
+            path: suffix.to_owned(),
+        })?;
         Ok(Self {
             uri,
             auth: self.auth.clone(),
@@ -555,6 +664,14 @@ mod tests {
         // `url::Url` rejects it. This must be a parse error, not a panic.
         let result = "http://user:pass@localhost:notaport/path".parse::<UriSerde>();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_skips_url_parser_without_userinfo() {
+        let uri = "http://localhost:notaport/path".parse::<Uri>().unwrap();
+        let parsed = UriSerde::try_from(uri.clone()).unwrap();
+        assert_eq!(parsed.uri, uri);
+        assert!(parsed.auth.is_none());
     }
 
     #[test]
@@ -678,10 +795,10 @@ mod tests {
             assert!(
                 matches!(
                     HttpEndpoint::parse(endpoint),
-                    Err(HttpEndpointError::NotAbsoluteHttp)
+                    Err(HttpEndpointError::NotAbsoluteHttp { .. })
                         | Err(HttpEndpointError::InvalidUri { .. })
                         | Err(HttpEndpointError::InvalidUriParts { .. })
-                        | Err(HttpEndpointError::InvalidPort)
+                        | Err(HttpEndpointError::InvalidPort { .. })
                         | Err(HttpEndpointError::InvalidAuth { .. })
                 ),
                 "expected `{endpoint}` to be rejected"
@@ -691,8 +808,10 @@ mod tests {
 
     #[test]
     fn http_endpoint_reports_unparseable_endpoints() {
-        let error = HttpEndpoint::parse("http://exa mple.com").unwrap_err();
+        let endpoint = "http://exa mple.com";
+        let error = HttpEndpoint::parse(endpoint).unwrap_err();
         assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
+        assert!(error.to_string().contains(endpoint));
     }
 
     #[test]
@@ -701,10 +820,9 @@ mod tests {
             "http://localhost:notaport",
             "https://example.com:notaport/path",
         ] {
-            assert!(matches!(
-                HttpEndpoint::parse(endpoint),
-                Err(HttpEndpointError::InvalidPort)
-            ));
+            let error = HttpEndpoint::parse(endpoint).unwrap_err();
+            assert!(matches!(error, HttpEndpointError::InvalidPort { .. }));
+            assert!(error.to_string().contains(endpoint));
         }
     }
 
@@ -719,14 +837,36 @@ mod tests {
             let error = HttpEndpoint::parse(endpoint).expect_err("endpoint should be rejected");
             let message = error.to_string();
             assert!(
-                !message.contains(endpoint),
-                "error must not echo the endpoint: {message}"
+                message.contains("<redacted"),
+                "error must identify redaction: {message}"
             );
             assert!(
                 !message.contains("secret"),
                 "error must not echo the password: {message}"
             );
         }
+    }
+
+    #[test]
+    fn http_endpoint_composition_errors_include_redacted_context() {
+        let endpoint = HttpEndpoint::parse("http://user:secret@example.com/base").unwrap();
+        let error = endpoint.append_path("foo bar").unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("path `foo bar`"), "{message}");
+        assert!(message.contains("http://example.com/base"), "{message}");
+        assert!(!message.contains("secret"), "{message}");
+
+        let mut parts = Uri::default().into_parts();
+        parts.scheme = Some(Scheme::HTTPS);
+        let source = Uri::from_parts(parts).unwrap_err();
+        let error = HttpEndpointError::InvalidUriParts {
+            endpoint: "https://example.com/base".to_owned(),
+            path: "foo".to_owned(),
+            source,
+        };
+        let message = error.to_string();
+        assert!(message.contains("path `foo`"), "{message}");
+        assert!(message.contains("https://example.com/base"), "{message}");
     }
     #[test]
     fn http_endpoint_extracts_embedded_basic_auth() {
@@ -836,15 +976,23 @@ mod tests {
                 .to_string(),
             "https://proxy/prefix/api/v1/series"
         );
-        // Only the single boundary slash is removed; significant leading
-        // slashes in the appended path are preserved (GCS object keys).
+        // Repeated slashes on both sides of the boundary collapse to one.
+        assert_eq!(
+            HttpEndpoint::parse("https://example.com/prefix///")
+                .unwrap()
+                .append_path("//loki/api/v1/push")
+                .unwrap()
+                .to_string(),
+            "https://example.com/prefix/loki/api/v1/push"
+        );
+        // The same boundary rule applies to every HttpEndpoint caller.
         assert_eq!(
             HttpEndpoint::parse("https://storage.googleapis.com/bucket/")
                 .unwrap()
                 .append_path("//archive/")
                 .unwrap()
                 .to_string(),
-            "https://storage.googleapis.com/bucket//archive/"
+            "https://storage.googleapis.com/bucket/archive/"
         );
     }
 
