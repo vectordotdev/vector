@@ -1,4 +1,4 @@
-use futures::SinkExt;
+use futures::{SinkExt, StreamExt, stream};
 use hyper::{
     Body, Server,
     service::{make_service_fn, service_fn},
@@ -137,6 +137,37 @@ async fn healthcheck_includes_auth() {
             "Basic dXNlcm5hbWU6c29tZV9wYXNzd29yZA=="
         )),
         output[0].0.headers.get("authorization")
+    );
+}
+
+#[tokio::test]
+async fn sink_uses_validated_endpoint_and_auth() {
+    let (_guard, addr) = test_util::addr::next_addr();
+    let config = format!(
+        r#"
+            endpoint = "http://user:pass@{addr}"
+            path = "/custom/loki/push"
+            labels = {{test_name = "placeholder"}}
+            encoding.codec = "json"
+        "#
+    );
+    let (config, cx) = load_sink::<LokiConfig>(&config).unwrap();
+    let client = config.build_client(cx).unwrap();
+    let sink = LokiSink::new(config, client).unwrap();
+
+    let (mut rx, _trigger, server) = build_test_server(addr);
+    tokio::spawn(server);
+
+    Box::new(sink)
+        .run(stream::iter([Event::Log(LogEvent::from("hello world"))]).boxed())
+        .await
+        .unwrap();
+
+    let (parts, _) = rx.next().await.expect("server should receive a request");
+    assert_eq!(parts.uri.path(), "/custom/loki/push");
+    assert_eq!(
+        parts.headers.get(http::header::AUTHORIZATION).unwrap(),
+        "Basic dXNlcjpwYXNz"
     );
 }
 

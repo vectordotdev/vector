@@ -131,7 +131,7 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
     // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
-    let mut url = url::Url::parse(&format!("http://{authority}"))?;
+    let url = url::Url::parse(&format!("http://{authority}"))?;
 
     let user = url.username();
     if !user.is_empty() {
@@ -142,17 +142,15 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
             .decode_utf8_lossy()
             .into_owned();
 
-        // These methods have the same failure condition as `username`,
-        // because we have a non-empty username, they cannot fail here.
-        url.set_username("")
-            .map_err(|_| "unexpected empty authority")?;
-        url.set_password(None)
-            .map_err(|_| "unexpected empty authority")?;
-
-        let authority = Uri::from_maybe_shared(String::from(url))?
-            .authority()
+        // Keep the original host and explicit port instead of taking them from
+        // `url`. The synthetic `http` scheme above would otherwise normalize
+        // port 80 away even when the actual endpoint uses HTTPS.
+        let authority = authority
+            .as_str()
+            .rsplit_once('@')
+            .map(|(_, host_port)| host_port)
             .ok_or_else(|| "unexpected empty authority".to_string())?
-            .clone();
+            .parse()?;
 
         Ok((
             authority,
@@ -303,11 +301,10 @@ impl HttpEndpoint {
                 endpoint: redact_userinfo(endpoint),
             })?
         } else {
-            format!("https://{endpoint}")
-                .parse::<Uri>()
-                .context(InvalidUriSnafu {
-                    endpoint: redact_userinfo(endpoint),
-                })?
+            let endpoint = format!("https://{endpoint}");
+            endpoint.parse::<Uri>().context(InvalidUriSnafu {
+                endpoint: redact_userinfo(&endpoint),
+            })?
         };
         Self::new(uri)
     }
@@ -668,19 +665,21 @@ mod tests {
 
     #[test]
     fn http_endpoint_redacts_userinfo_in_errors() {
-        // A malformed endpoint with embedded credentials must not echo the
-        // password in the error message.
-        let error = HttpEndpoint::parse("http://user:secret@localhost:notaport")
-            .expect_err("invalid port should be rejected");
-        let message = error.to_string();
-        assert!(
-            !message.contains("secret"),
-            "error must not echo the password: {message}"
-        );
-        assert!(
-            message.contains("<redacted>@"),
-            "error should mark the redacted userinfo: {message}"
-        );
+        for endpoint in [
+            "http://user:secret@localhost:notaport",
+            "user:secret@exa mple.com",
+        ] {
+            let error = HttpEndpoint::parse(endpoint).expect_err("endpoint should be rejected");
+            let message = error.to_string();
+            assert!(
+                !message.contains("secret"),
+                "error must not echo the password: {message}"
+            );
+            assert!(
+                message.contains("<redacted>@"),
+                "error should mark the redacted userinfo: {message}"
+            );
+        }
     }
     #[test]
     fn http_endpoint_extracts_embedded_basic_auth() {
@@ -690,6 +689,21 @@ mod tests {
             .unwrap();
         assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
         assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[test]
+    fn http_endpoint_extracts_auth_without_dropping_explicit_port() {
+        for endpoint in [
+            "user:pass@example.com:80",
+            "https://user:pass@example.com:80",
+        ] {
+            let (endpoint, auth) = HttpEndpoint::parse(endpoint)
+                .unwrap()
+                .extract_basic_auth()
+                .unwrap();
+            assert_eq!(endpoint.as_uri().authority().unwrap(), "example.com:80");
+            assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+        }
     }
 
     #[test]

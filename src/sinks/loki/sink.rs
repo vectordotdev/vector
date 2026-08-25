@@ -507,10 +507,14 @@ impl LokiSink {
     ) -> crate::Result<Self> {
         let compression = config.compression;
 
-        let protocol = get_http_scheme_from_uri(config.endpoint.as_uri());
+        let protocol = get_http_scheme_from_uri(validated.endpoint.as_uri());
         let service = tower::ServiceBuilder::new()
             .settings(validated.request_limits.clone(), LokiRetryLogic)
-            .service(LokiService::new(client, config.endpoint, config.auth));
+            .service(LokiService::new(
+                client,
+                validated.endpoint.clone(),
+                validated.auth.clone(),
+            ));
 
         let batch_encoder = match config.compression {
             Compression::Snappy => LokiBatchEncoder(LokiBatchEncoding::Protobuf),
