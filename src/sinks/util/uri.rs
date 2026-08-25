@@ -444,6 +444,7 @@ fn has_scheme(endpoint: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     fn test_parse(input: &str, expected_uri: &'static str, expected_auth: Option<(&str, &str)>) {
         let UriSerde { uri, auth } = input.parse().unwrap();
@@ -562,25 +563,28 @@ mod tests {
         assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
     }
 
-    #[test]
-    fn http_endpoint_auth_extraction_preserves_explicit_port() {
-        let endpoint = HttpEndpoint::parse("user:pass@example.com:80/path").unwrap();
+    #[rstest]
+    #[case::explicit_port(
+        "user:pass@example.com:80/path",
+        "https://example.com:80/path",
+        "user",
+        "pass"
+    )]
+    #[case::empty_username(":secret@example.com/path", "https://example.com/path", "", "secret")]
+    fn http_endpoint_auth_extraction_handles_userinfo(
+        #[case] endpoint: &str,
+        #[case] expected_endpoint: &str,
+        #[case] expected_user: &str,
+        #[case] expected_password: &str,
+    ) {
+        let endpoint = HttpEndpoint::parse(endpoint).unwrap();
         let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
 
-        assert_eq!(endpoint.to_string(), "https://example.com:80/path");
-        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
-    }
-
-    #[test]
-    fn http_endpoint_auth_extraction_accepts_empty_username() {
-        let endpoint = HttpEndpoint::parse(":secret@example.com/path").unwrap();
-        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
-
-        assert_eq!(endpoint.to_string(), "https://example.com/path");
+        assert_eq!(endpoint.to_string(), expected_endpoint);
         assert!(matches!(
             auth,
             Some(Auth::Basic { user, password })
-                if user.is_empty() && password.inner() == "secret"
+                if user == expected_user && password.inner() == expected_password
         ));
     }
 
