@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            BatchConfig, BoxedRawValue, TowerRequestSettings,
+            BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
@@ -34,7 +34,7 @@ pub struct KeepConfig {
         docs::examples = "https://backend.keep.com:8081/alerts/event/vectordev?provider_id=test",
     ))]
     #[configurable(validation(format = "uri"))]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The API key that is used to authenticate against Keep.
     #[configurable(metadata(docs::examples = "${KEEP_API_KEY}"))]
@@ -66,8 +66,9 @@ pub struct KeepConfig {
     pub retry_strategy: RetryStrategy,
 }
 
-fn default_endpoint() -> String {
-    "http://localhost:8080/alerts/event/vectordev?provider_id=test".to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("http://localhost:8080/alerts/event/vectordev?provider_id=test")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -120,18 +121,7 @@ impl ValidatedSink for KeepConfig {
 
     fn validate(&self) -> crate::Result<ValidatedKeep> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
-        let uri: Uri = self.endpoint.clone().try_into()?;
-        // Reject endpoints that parse but lack a scheme or authority (e.g.
-        // `backend.keep.com`). `http::Uri` accepts them, but the request path
-        // hands them to the HTTP client as a non-absolute target that
-        // deterministically fails at build time.
-        if uri.scheme().is_none() || uri.authority().is_none() {
-            return Err(format!(
-                "endpoint must include a scheme and host, e.g. `https://backend.keep.com`; got `{}`",
-                self.endpoint
-            )
-            .into());
-        }
+        let uri = self.endpoint.clone().into_uri();
         let request_limits = self.request.into_settings();
 
         Ok(ValidatedKeep {
@@ -226,21 +216,15 @@ mod tests {
     use crate::config::ValidatedSink;
 
     #[test]
-    fn validate_rejects_relative_endpoint() {
-        let config: KeepConfig = serde_yaml::from_str(
+    fn rejects_non_http_endpoint() {
+        let err = serde_yaml::from_str::<KeepConfig>(
             r#"
             api_key: "test-key"
-            endpoint: "backend.keep.com"
+            endpoint: "ftp://example.com"
             "#,
         )
-        .unwrap();
-        let err = config
-            .validate()
-            .expect_err("a relative endpoint must be rejected");
-        assert!(
-            err.to_string().contains("scheme and host"),
-            "unexpected error: {err}"
-        );
+        .expect_err("a non-http endpoint must be rejected");
+        assert!(err.to_string().contains("http"), "unexpected error: {err}");
     }
 
     #[test]
