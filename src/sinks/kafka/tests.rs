@@ -204,6 +204,7 @@ mod integration_test {
             auth: KafkaAuthConfig {
                 sasl: None,
                 tls: None,
+                msk_iam: None,
             },
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
@@ -478,7 +479,11 @@ mod integration_test {
         let topic = format!("test-{}", random_string(10));
         let topic_template = Template::try_from(format!("{topic}-%Y%m%d")).unwrap();
         let headers_key = ConfigTargetPath::try_from("headers_key".to_string()).unwrap();
-        let kafka_auth = KafkaAuthConfig { sasl, tls };
+        let kafka_auth = KafkaAuthConfig {
+            sasl,
+            tls,
+            msk_iam: None,
+        };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
             topic: topic_template.clone(),

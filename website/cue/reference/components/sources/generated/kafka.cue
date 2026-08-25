@@ -734,6 +734,24 @@ generated: components: sources: kafka: configuration: {
 			type: bool: default: false
 		}
 	}
+	msk_iam: {
+		description: """
+			Configuration for AWS MSK IAM authentication.
+
+			When set, Vector authenticates to the cluster using SASL `OAUTHBEARER` tokens signed with
+			the AWS credentials from the default credentials provider chain (environment variables,
+			shared credentials file, IMDS, IRSA, and so on).
+
+			AWS MSK IAM authentication requires TLS, so `tls` must not be disabled. It cannot be
+			combined with `sasl`.
+			"""
+		required: false
+		type: object: options: region: {
+			description: "The AWS region of the MSK cluster."
+			required:    true
+			type: string: examples: ["us-west-2"]
+		}
+	}
 	offset_key: {
 		description: """
 			Overrides the name of the log field used to add the offset to each event.

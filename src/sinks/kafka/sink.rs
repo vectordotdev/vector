@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rdkafka::{
     ClientConfig,
@@ -13,7 +13,7 @@ use vrl::path::OwnedTargetPath;
 use super::config::KafkaSinkConfig;
 use crate::{
     config::SinkHealthcheckOptions,
-    kafka::KafkaStatisticsContext,
+    kafka::{KafkaHealthcheckContext, KafkaStatisticsContext, MskIamTokenProvider},
     sinks::{
         kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
         prelude::*,
@@ -38,11 +38,13 @@ pub struct KafkaSink {
 
 pub(crate) fn create_producer(
     client_config: ClientConfig,
+    msk_iam_token_provider: Option<MskIamTokenProvider>,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
         .create_with_context(KafkaStatisticsContext {
             expose_lag_metrics: false,
             span: Span::current(),
+            msk_iam_token_provider,
         })
         .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
@@ -51,7 +53,7 @@ pub(crate) fn create_producer(
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig, topic: ConfinedTemplate) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka()?;
-        let producer = create_producer(producer_config)?;
+        let producer = create_producer(producer_config, config.auth.msk_iam_token_provider())?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -133,14 +135,53 @@ pub(crate) async fn healthcheck(
         },
     };
 
-    tokio::task::spawn_blocking(move || {
-        let producer: BaseProducer = client_config.create().unwrap();
+    let msk_iam_token_provider = config.auth.msk_iam_token_provider();
+    tokio::task::spawn_blocking(move || -> crate::Result<()> {
+        // One deadline bounds the whole healthcheck (token priming plus metadata fetch) so a
+        // slow token cold start cannot stack a second full timeout on top of the first.
+        let deadline = Instant::now() + healthcheck_options.timeout;
+        let producer: BaseProducer<KafkaHealthcheckContext> =
+            client_config.create_with_context(KafkaHealthcheckContext {
+                msk_iam_token_provider: msk_iam_token_provider.clone(),
+            })?;
+        if let Some(token_provider) = msk_iam_token_provider {
+            // Serve the initial OAuth token refresh event so an MSK IAM token is set before
+            // connecting to fetch metadata. librdkafka emits the refresh event asynchronously
+            // shortly after client creation and the token generation callback runs
+            // synchronously within `poll`, so poll until a token has been generated or the
+            // deadline elapses. Note a `poll` that dispatches the token callback blocks
+            // until token generation completes or times out, so the deadline can be
+            // overshot by that much.
+            while !token_provider.token_generated() && Instant::now() < deadline {
+                producer.poll(Duration::from_millis(100));
+            }
+            // Without a token, SASL authentication cannot even begin, so `fetch_metadata`
+            // could only report a generic transport failure. Failing here attributes the
+            // problem to token generation instead.
+            if !token_provider.token_generated() {
+                return Err(format!(
+                    "MSK IAM token was not generated within the healthcheck timeout ({:?}); \
+                     see any preceding token generation errors",
+                    healthcheck_options.timeout
+                )
+                .into());
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining < healthcheck_options.timeout / 2 {
+                warn!(
+                    message = "MSK IAM token generation consumed most of the healthcheck \
+                        timeout. If the subsequent metadata fetch times out, consider raising \
+                        `healthcheck.timeout` to accommodate slow credential resolution.",
+                    remaining_timeout = ?remaining,
+                );
+            }
+        }
         let topic = topic.as_deref();
 
         producer
             .client()
-            .fetch_metadata(topic, healthcheck_options.timeout)
-            .map(|_| ())
+            .fetch_metadata(topic, deadline.saturating_duration_since(Instant::now()))?;
+        Ok(())
     })
     .await??;
     trace!("Healthcheck completed.");

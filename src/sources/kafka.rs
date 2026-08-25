@@ -1281,6 +1281,7 @@ fn create_consumer(
             acknowledgements,
             callbacks,
             Span::current(),
+            config.auth.msk_iam_token_provider(),
         ))
         .context(CreateSnafu)?;
 
@@ -1321,11 +1322,13 @@ impl KafkaSourceContext {
         acknowledgements: bool,
         callbacks: UnboundedSender<KafkaCallback>,
         span: Span,
+        msk_iam_token_provider: Option<kafka::MskIamTokenProvider>,
     ) -> Self {
         Self {
             stats: kafka::KafkaStatisticsContext {
                 expose_lag_metrics,
                 span,
+                msk_iam_token_provider,
             },
             acknowledgements,
             consumer: OnceLock::default(),
@@ -1410,9 +1413,21 @@ impl KafkaSourceContext {
     }
 }
 
+// All `ClientContext` members are forwarded to the inner `KafkaStatisticsContext`; members
+// added to its implementation must be forwarded here as well to take effect for the source.
 impl ClientContext for KafkaSourceContext {
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool =
+        kafka::KafkaStatisticsContext::ENABLE_REFRESH_OAUTH_TOKEN;
+
     fn stats(&self, statistics: Statistics) {
         self.stats.stats(statistics)
+    }
+
+    fn generate_oauth_token(
+        &self,
+        oauthbearer_config: Option<&str>,
+    ) -> Result<rdkafka::client::OAuthToken, Box<dyn std::error::Error>> {
+        self.stats.generate_oauth_token(oauthbearer_config)
     }
 }
 
@@ -1615,6 +1630,42 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
+            ..make_config("topic", "group", LogNamespace::Legacy, None)
+        };
+        assert!(create_consumer(&config, true).is_err());
+    }
+
+    #[tokio::test]
+    async fn consumer_create_rejects_msk_iam_combined_with_sasl() {
+        let config = KafkaSourceConfig {
+            auth: kafka::KafkaAuthConfig {
+                sasl: Some(kafka::KafkaSaslConfig {
+                    enabled: Some(true),
+                    ..Default::default()
+                }),
+                tls: None,
+                msk_iam: Some(kafka::KafkaMskIamConfig {
+                    region: "us-east-1".into(),
+                }),
+            },
+            ..make_config("topic", "group", LogNamespace::Legacy, None)
+        };
+        assert!(create_consumer(&config, true).is_err());
+    }
+
+    #[tokio::test]
+    async fn consumer_create_rejects_msk_iam_with_disabled_tls() {
+        let config = KafkaSourceConfig {
+            auth: kafka::KafkaAuthConfig {
+                sasl: None,
+                tls: Some(crate::tls::TlsEnableableConfig {
+                    enabled: Some(false),
+                    ..Default::default()
+                }),
+                msk_iam: Some(kafka::KafkaMskIamConfig {
+                    region: "us-east-1".into(),
+                }),
+            },
             ..make_config("topic", "group", LogNamespace::Legacy, None)
         };
         assert!(create_consumer(&config, true).is_err());

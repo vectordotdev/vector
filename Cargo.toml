@@ -292,6 +292,7 @@ metrics.workspace = true
 metrics-tracing-context.workspace = true
 
 # AWS - Official SDK
+aws-msk-iam-sasl-signer = { version = "1.0.1", default-features = false, optional = true }
 aws-runtime = { version = "1.5.9", optional = true }
 aws-config = { version = "1.8.13", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
 aws-credential-types = { version = "1.2.4", default-features = false, features = ["hardcoded-credentials"], optional = true }
@@ -762,7 +763,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-static_metrics = []
 sources-journald = []
-sources-kafka = ["dep:rdkafka"]
+sources-kafka = ["dep:rdkafka", "dep:aws-msk-iam-sasl-signer", "dep:aws-types", "aws-config"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
@@ -970,7 +971,7 @@ sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
-sinks-kafka = ["dep:rdkafka"]
+sinks-kafka = ["dep:rdkafka", "dep:aws-msk-iam-sasl-signer", "dep:aws-types", "aws-config"]
 sinks-keep = []
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
