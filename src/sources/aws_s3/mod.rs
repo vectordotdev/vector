@@ -22,7 +22,10 @@ use vrl::value::{Kind, kind::Collection};
 
 use super::util::MultilineConfig;
 use crate::{
-    aws::{RegionOrEndpoint, auth::AwsAuthentication, create_client, create_client_and_region},
+    aws::{
+        AwsTimeout, RegionOrEndpoint, auth::AwsAuthentication, create_client,
+        create_client_and_region,
+    },
     codecs::DecodingConfig,
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
     config::{
@@ -135,6 +138,19 @@ pub struct AwsS3Config {
 
     #[configurable(derived)]
     tls_options: Option<TlsConfig>,
+
+    /// Client timeout configuration for S3 operations.
+    ///
+    /// These settings bound the S3 `GetObject` request and the read of its response body. Any
+    /// dimension left unset falls back to a safe default (`connect_timeout_seconds = 5`,
+    /// `read_timeout_seconds = 30`) so that a half-open or silently dropped connection — for
+    /// example one reaped by a NAT gateway idle timeout — cannot hang a polling task
+    /// indefinitely and stall S3 ingestion. `read_timeout_seconds` applies per-read rather than
+    /// to the whole request, so a slow but steadily progressing transfer of a large object is
+    /// not cut off.
+    #[configurable(derived)]
+    #[serde(default)]
+    timeout: AwsTimeout,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -285,7 +301,7 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             self.tls_options.as_ref(),
-            None,
+            &self.timeout,
         )
         .await?;
 
@@ -302,7 +318,7 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     sqs.tls_options.as_ref(),
-                    sqs.timeout.as_ref(),
+                    &sqs.timeout,
                 )
                 .await?;
 
@@ -1093,7 +1109,7 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             None,
-            None,
+            &AwsTimeout::default(),
         )
         .await
         .unwrap()
@@ -1113,7 +1129,7 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             None,
-            None,
+            &AwsTimeout::default(),
         )
         .await
         .unwrap()

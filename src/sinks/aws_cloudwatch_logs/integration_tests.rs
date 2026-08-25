@@ -11,7 +11,7 @@ use vrl::event_path;
 
 use super::*;
 use crate::{
-    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
+    aws::{AwsAuthentication, AwsTimeout, ClientBuilder, RegionOrEndpoint, create_client},
     config::{ProxyConfig, SinkConfig, SinkContext, log_schema},
     event::{Event, LogEvent, Value},
     sinks::{aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder, util::BatchConfig},
@@ -63,6 +63,7 @@ async fn cloudwatch_insert_log_event() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -117,6 +118,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -196,6 +198,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -276,6 +279,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -330,6 +334,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: Some(
             create_kms_client_test()
@@ -420,6 +425,7 @@ async fn cloudwatch_insert_log_event_batched() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -474,6 +480,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -570,6 +577,7 @@ async fn cloudwatch_healthcheck() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        timeout: Default::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -593,7 +601,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
         endpoint,
         &proxy,
         None,
-        None,
+        &AwsTimeout::default(),
     )
     .await
     .unwrap()
@@ -612,7 +620,7 @@ async fn create_kms_client_test() -> KMSClient {
         endpoint,
         &proxy,
         None,
-        None,
+        &AwsTimeout::default(),
     )
     .await
     .unwrap()

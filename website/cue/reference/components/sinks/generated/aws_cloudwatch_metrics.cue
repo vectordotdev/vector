@@ -442,6 +442,61 @@ generated: components: sinks: aws_cloudwatch_metrics: configuration: {
 			type: int: {}
 		}
 	}
+	timeout: {
+		description: """
+			Client timeout configuration for AWS requests.
+
+			These settings bound how long the client waits when connecting to and reading from the
+			AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+			`read_timeout_seconds = 30`).
+			"""
+		required: false
+		type: object: options: {
+			connect_timeout_seconds: {
+				description: """
+					The connection timeout for AWS requests
+
+					Limits the amount of time allowed to initiate a socket connection.
+					"""
+				required: false
+				type: uint: {
+					default: 5
+					examples: [20]
+					unit: "seconds"
+				}
+			}
+			operation_timeout_seconds: {
+				description: """
+					The operation timeout for AWS requests
+
+					Limits the amount of time allowed for an operation to be fully serviced; an
+					operation represents the full request/response lifecycle of a call to a service.
+					Take care when configuring this settings to allow enough time for the polling
+					interval configured in `poll_secs`
+					"""
+				required: false
+				type: uint: {
+					examples: [20]
+					unit: "seconds"
+				}
+			}
+			read_timeout_seconds: {
+				description: """
+					The read timeout for AWS requests
+
+					Limits the amount of time allowed to read the first byte of a response from the
+					time the request is initiated. Take care when configuring this settings to allow
+					enough time for the polling interval configured in `poll_secs`
+					"""
+				required: false
+				type: uint: {
+					default: 30
+					examples: [20]
+					unit: "seconds"
+				}
+			}
+		}
+	}
 	tls: {
 		description: "TLS configuration."
 		required:    false

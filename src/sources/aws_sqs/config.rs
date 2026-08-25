@@ -9,7 +9,7 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
-    aws::{auth::AwsAuthentication, create_client, region::RegionOrEndpoint},
+    aws::{AwsTimeout, auth::AwsAuthentication, create_client, region::RegionOrEndpoint},
     codecs::DecodingConfig,
     common::sqs::SqsClientBuilder,
     config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
@@ -98,6 +98,15 @@ pub struct AwsSqsConfig {
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    /// Client timeout configuration for AWS requests.
+    ///
+    /// These settings bound how long the client waits when connecting to and reading from the
+    /// AWS API. Any dimension left unset falls back to a default (`connect_timeout_seconds = 5`,
+    /// `read_timeout_seconds = 30`).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub timeout: AwsTimeout,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
@@ -168,7 +177,7 @@ impl AwsSqsConfig {
             self.region.endpoint(),
             &cx.proxy,
             self.tls.as_ref(),
-            None,
+            &self.timeout,
         )
         .await
     }
