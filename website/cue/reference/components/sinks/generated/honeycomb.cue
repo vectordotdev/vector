@@ -131,7 +131,7 @@ generated: components: sinks: honeycomb: configuration: {
 		description: "Honeycomb's endpoint to send logs to"
 		required:    false
 		type: string: {
-			default: "https://api.honeycomb.io"
+			default: "https://api.honeycomb.io/"
 			examples: ["https://api.honeycomb.io", "https://api.eu1.honeycomb.io"]
 		}
 	}

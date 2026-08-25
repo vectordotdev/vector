@@ -3,12 +3,10 @@ sinks:
     type: azure_blob
     inputs:
       - my-source-or-transform-id
-    account_name: mylogstorage
     blob_append_uuid: false
-    blob_endpoint: https://mylogstorage.blob.core.windows.net/
     blob_prefix: blob/%F/
     compression: gzip
-    connection_string: DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net
+    connection_string: DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net
     container_name: my-logs
     dangerously_allow_unconfined_template_resolution: false
     encoding:

@@ -357,7 +357,7 @@ generated: components: sinks: loki: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -763,10 +763,9 @@ generated: components: sinks: loki: configuration: {
 		required: true
 		type: object: {
 			examples: [{
-				"\"*\"":             "{{ metadata }}"
-				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
-				source:              "vector"
-				"{{ event_field }}": "{{ some_other_event_field }}"
+				"event_{{ event_field }}": "value_{{ some_other_event_field }}"
+				"pod_labels_*":            "{{ kubernetes.pod_labels }}"
+				source:                    "vector"
 			}]
 			options: "*": {
 				description: "A Loki label."
@@ -1028,10 +1027,9 @@ generated: components: sinks: loki: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				"\"*\"":             "{{ metadata }}"
-				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
-				source:              "vector"
-				"{{ event_field }}": "{{ some_other_event_field }}"
+				"event_{{ event_field }}": "value_{{ some_other_event_field }}"
+				"pod_labels_*":            "{{ kubernetes.pod_labels }}"
+				source:                    "vector"
 			}]
 			options: "*": {
 				description: "Loki structured metadata."

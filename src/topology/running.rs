@@ -22,7 +22,7 @@ use vector_lib::{
 };
 
 use super::{
-    BuiltBuffer, TaskHandle,
+    BuiltBuffer, TaskHandle, TaskResult,
     builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
@@ -147,7 +147,10 @@ impl RunningTopology {
     /// poll for when the tasks have completed. Once the returned future is
     /// dropped then everything from this RunningTopology instance is fully
     /// dropped.
-    pub fn stop(self) -> impl Future<Output = ()> {
+    ///
+    /// The returned future resolves to `true` if every component finished on its own before
+    /// the graceful shutdown deadline, or `false` if any component had to be forcefully killed.
+    pub fn stop(self) -> impl Future<Output = bool> {
         // Create handy handles collections of all tasks for the subsequent
         // operations.
         let mut wait_handles = Vec::new();
@@ -155,7 +158,8 @@ impl RunningTopology {
         // pump in self.tasks, and the other for source in self.source_tasks.
         let mut check_handles = HashMap::<ComponentKey, Vec<_>>::new();
 
-        let map_closure = |_result| ();
+        let map_closure =
+            |result: Result<TaskResult, tokio::task::JoinError>| matches!(result, Ok(Ok(_)));
 
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
@@ -202,9 +206,10 @@ impl RunningTopology {
                     message = "Failed to gracefully shut down in time. Killing components.",
                     internal_log_rate_limit = false
                 );
-            }) as future::BoxFuture<'static, ()>
+                false
+            }) as future::BoxFuture<'static, bool>
         } else {
-            Box::pin(future::pending()) as future::BoxFuture<'static, ()>
+            Box::pin(future::pending()) as future::BoxFuture<'static, bool>
         };
 
         // Reports in intervals which components are still running.
@@ -242,23 +247,26 @@ impl RunningTopology {
 
                 if all_done {
                     info!("Shutdown reporter exiting: all components shut down.");
-                    break;
+                    break true;
                 } else if deadline_passed {
                     error!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded.");
-                    break;
+                    break false;
                 }
             }
         };
 
         // Finishes once all tasks have shutdown.
-        let success = futures::future::join_all(wait_handles).map(|_| ());
+        let success =
+            futures::future::join_all(wait_handles).map(|results| results.into_iter().all(|ok| ok));
 
         // Aggregate future that ends once anything detects that all tasks have shutdown.
+        // Resolves to `true` only if the winning branch got there without forcing anything.
         let shutdown_complete_future = future::select_all(vec![
-            Box::pin(timeout) as future::BoxFuture<'static, ()>,
-            Box::pin(reporter) as future::BoxFuture<'static, ()>,
-            Box::pin(success) as future::BoxFuture<'static, ()>,
-        ]);
+            Box::pin(timeout) as future::BoxFuture<'static, bool>,
+            Box::pin(reporter) as future::BoxFuture<'static, bool>,
+            Box::pin(success) as future::BoxFuture<'static, bool>,
+        ])
+        .map(|(graceful, _index, _remaining)| graceful);
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
@@ -269,7 +277,8 @@ impl RunningTopology {
             trigger.cancel();
         }
 
-        futures::future::join(source_shutdown_complete, shutdown_complete_future).map(|_| ())
+        futures::future::join(source_shutdown_complete, shutdown_complete_future)
+            .map(|(_, graceful)| graceful)
     }
 
     /// Attempts to load a new configuration and update this running topology.

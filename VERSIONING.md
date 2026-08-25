@@ -130,7 +130,6 @@ here. Each minor release bump will include an upgrade guide in the
 [`internal_metrics` source]: https://vector.dev/docs/reference/configuration/sources/internal_metrics/
 [`lua` transform]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [`master` branch]: https://github.com/vectordotdev/vector/tree/master
-[nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [release notes]: https://vector.dev/releases/
 [release policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md

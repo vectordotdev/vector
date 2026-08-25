@@ -145,6 +145,22 @@ impl NatsAuthConfig {
     }
 }
 
+/// Validate the NATS TLS cert/key pairing without touching the filesystem.
+///
+/// Mirrors the pairing check in `from_tls_auth_config`.
+pub(crate) fn validate_tls_cert_key_pair(
+    tls_config: &TlsEnableableConfig,
+) -> Result<(), NatsConfigError> {
+    if !tls_config.enabled.unwrap_or(false) {
+        return Ok(());
+    }
+    match (&tls_config.options.crt_file, &tls_config.options.key_file) {
+        (Some(_), None) => Err(NatsConfigError::TlsMissingKey),
+        (None, Some(_)) => Err(NatsConfigError::TlsMissingCert),
+        _ => Ok(()),
+    }
+}
+
 pub(crate) fn from_tls_auth_config(
     connection_name: &str,
     auth_config: &Option<NatsAuthConfig>,
@@ -166,6 +182,8 @@ pub(crate) fn from_tls_auth_config(
                 return Ok(nats_options);
             }
 
+            validate_tls_cert_key_pair(tls_config)?;
+
             let nats_options = match &tls_config.options.ca_file {
                 None => nats_options,
                 Some(ca_file) => nats_options.add_root_certificates(ca_file.clone()),
@@ -176,8 +194,9 @@ pub(crate) fn from_tls_auth_config(
                 (Some(crt_file), Some(key_file)) => {
                     nats_options.add_client_certificate(crt_file.clone(), key_file.clone())
                 }
-                (Some(_crt_file), None) => return Err(NatsConfigError::TlsMissingKey),
-                (None, Some(_key_file)) => return Err(NatsConfigError::TlsMissingCert),
+                (Some(_), None) | (None, Some(_)) => {
+                    unreachable!("cert/key pairing validated by validate_tls_cert_key_pair")
+                }
             };
             Ok(nats_options)
         }

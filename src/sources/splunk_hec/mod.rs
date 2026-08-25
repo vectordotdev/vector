@@ -2081,7 +2081,7 @@ mod tests {
         sinks::{
             Healthcheck, VectorSink,
             splunk_hec::logs::config::HecLogsSinkConfig,
-            util::{BatchConfig, Compression, TowerRequestConfig},
+            util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
@@ -2171,7 +2171,7 @@ mod tests {
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
-            endpoint: format!("http://{address}"),
+            endpoint: HttpEndpoint::parse(&format!("http://{address}")).unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: None,

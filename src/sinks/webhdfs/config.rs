@@ -1,5 +1,3 @@
-use std::sync::Once;
-
 use opendal::{Operator, layers::LoggingLayer, services::Webhdfs};
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -7,21 +5,28 @@ use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input},
     configurable::configurable_component,
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    config::{DynValidatedSink, GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         opendal_common::*,
         util::{
-            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint,
             partitioner::KeyPartitioner,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
 };
+
+/// The default WebHDFS endpoint, used when `endpoint` is not configured.
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("http://127.0.0.1:9870")
+        .expect("static default endpoint should be a valid http(s) URL")
+}
 
 /// Configuration for the `webhdfs` sink.
 #[configurable_component(sink("webhdfs", "WebHDFS."))]
@@ -54,9 +59,9 @@ pub struct WebHdfsConfig {
     /// For more information, see the [HDFS Architecture][hdfs_arch] documentation.
     ///
     /// [hdfs_arch]: https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html#NameNode_and_DataNodes
-    #[serde(default)]
+    #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:9870"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
@@ -86,7 +91,7 @@ impl GenerateConfig for WebHdfsConfig {
         serde_json::to_value(Self {
             root: "/".to_string(),
             prefix: "%F/".to_string(),
-            endpoint: "http://127.0.0.1:9870".to_string(),
+            endpoint: default_endpoint(),
 
             encoding: (
                 Some(NewlineDelimitedEncoderConfig::new()),
@@ -106,16 +111,6 @@ impl GenerateConfig for WebHdfsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "webhdfs")]
 impl SinkConfig for WebHdfsConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let op = self.build_operator()?;
-
-        let check_op = op.clone();
-        let healthcheck = Box::pin(async move { Ok(check_op.check().await?) });
-
-        let sink = self.build_processor(op)?;
-        Ok((sink, healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -127,32 +122,76 @@ impl SinkConfig for WebHdfsConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedWebHdfs {
+    batcher_settings: BatcherSettings,
+    confined_prefix: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for WebHdfsConfig {
+    type Validated = ValidatedWebHdfs;
+
+    fn validate(&self) -> crate::Result<ValidatedWebHdfs> {
+        let batcher_settings = self.batch.into_batcher_settings()?;
+        let confined_prefix = self.confined_prefix()?;
+
+        Ok(ValidatedWebHdfs {
+            batcher_settings,
+            confined_prefix,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedWebHdfs,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let op = self.build_operator()?;
+
+        let check_op = op.clone();
+        let healthcheck = Box::pin(async move { Ok(check_op.check().await?) });
+
+        let sink = self.build_processor(op, validated)?;
+        Ok((sink, healthcheck))
+    }
 }
 
 impl WebHdfsConfig {
     pub fn build_operator(&self) -> crate::Result<Operator> {
-        ensure_opendal_http_transport();
+        install_opendal_defaults();
 
         // Build OpenDal Operator
         let mut builder = Webhdfs::default();
         // Prefix logic will be handled by key_partitioner.
         builder = builder.root(&self.root);
-        builder = builder.endpoint(&self.endpoint);
+        builder = builder.endpoint(&self.endpoint.to_string());
 
         let op = Operator::new(builder)?.layer(LoggingLayer::default());
         Ok(op)
     }
 
-    pub fn build_processor(&self, op: Operator) -> crate::Result<VectorSink> {
-        // Configure our partitioning/batching.
-        let batcher_settings = self.batch.into_batcher_settings()?;
+    pub fn build_processor(
+        &self,
+        op: Operator,
+        validated: &ValidatedWebHdfs,
+    ) -> crate::Result<VectorSink> {
+        let ValidatedWebHdfs {
+            batcher_settings,
+            confined_prefix,
+        } = validated.clone();
 
-        let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let request_builder = OpenDalRequestBuilder {
-            encoder: (transformer, encoder),
+            encoder: (self.encoding.transformer(), encoder),
             compression: self.compression,
         };
 
@@ -162,30 +201,33 @@ impl WebHdfsConfig {
         let sink = OpenDalSink::new(
             svc,
             request_builder,
-            self.key_partitioner()?,
+            KeyPartitioner::new(confined_prefix, None),
             batcher_settings,
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
+    fn confined_prefix(&self) -> crate::Result<ConfinedTemplate> {
         let prefix: Template = self.prefix.clone().try_into()?;
-        let prefix = prefix.confine(&self.confinement, Self::NAME, "prefix")?;
+        prefix.confine(&self.confinement, Self::NAME, "prefix")
+    }
+
+    pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
+        let prefix = self.confined_prefix()?;
         Ok(KeyPartitioner::new(prefix, None))
     }
 }
 
-/// Install OpenDAL's reqwest HTTP transport once for this process.
+/// Register OpenDAL services and install the native-tls HTTP transport.
 ///
-/// Required because we enable `http-transport-reqwest-native-tls` rather than
-/// the `http-transport-reqwest` alias (which would auto-install via
-/// `auto-register-services` but also enable rustls aws-lc-rs).
-fn ensure_opendal_http_transport() {
-    static INSTALL: Once = Once::new();
-    INSTALL.call_once(|| {
-        opendal_http_transport_reqwest::install_default();
-    });
+/// `opendal::install_default` registers enabled services, but HTTP-transport
+/// auto-install is gated on the `http-transport-reqwest` alias (rustls/aws-lc).
+/// We use `http-transport-reqwest-native-tls` instead, so the transport is
+/// installed separately. Both calls are idempotent.
+fn install_opendal_defaults() {
+    opendal::install_default();
+    opendal_http_transport_reqwest::install_default();
 }
 
 #[cfg(test)]
@@ -201,7 +243,7 @@ mod tests {
         WebHdfsConfig {
             root: "/tmp/test/".into(),
             prefix: String::new(),
-            endpoint: "http://127.0.0.1:9870".into(),
+            endpoint: HttpEndpoint::parse("http://127.0.0.1:9870").unwrap(),
             encoding: (
                 None::<vector_lib::codecs::encoding::FramingConfig>,
                 vector_lib::codecs::TextSerializerConfig::default(),
@@ -258,5 +300,24 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("tenant"), "../../escape");
         assert!(partitioner.partition(&event).is_none());
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config = WebHdfsConfig {
+            prefix: "%F/".into(),
+            ..base_config()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        // Bulk size-based defaults: 10 MB batches, 300s timeout.
+        assert_eq!(
+            validated.batcher_settings.timeout,
+            std::time::Duration::from_secs(300)
+        );
+        assert_eq!(validated.batcher_settings.size_limit, 10_000_000);
+        // The confined prefix retains the validated value.
+        assert_eq!(validated.confined_prefix.to_string(), "%F/");
     }
 }
