@@ -1,5 +1,11 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with format_with expands to a must_use let binding"
+)]
+
 use std::{fmt, str::FromStr};
 
+use derivative::Derivative;
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
 use snafu::{ResultExt, Snafu};
@@ -239,9 +245,29 @@ pub enum HttpEndpointError {
 /// still an absolute `http(s)` URL.
 #[configurable_component]
 #[configurable(title = "An absolute HTTP(S) URL.", description = "")]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Derivative, Clone, PartialEq, Eq)]
+#[derivative(Debug)]
 #[serde(try_from = "String", into = "String")]
-pub struct HttpEndpoint(Uri);
+pub struct HttpEndpoint(#[derivative(Debug(format_with = "fmt_http_endpoint_uri"))] Uri);
+
+fn fmt_http_endpoint_uri(uri: &Uri, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if let Some(scheme) = uri.scheme_str() {
+        write!(f, "{scheme}://")?;
+    }
+    if let Some(authority) = uri.authority() {
+        if authority.as_str().contains('@') {
+            f.write_str("<redacted>@")?;
+        }
+        f.write_str(authority.host())?;
+        if let Some(port) = authority.port() {
+            write!(f, ":{}", port.as_str())?;
+        }
+    }
+    if let Some(path_and_query) = uri.path_and_query() {
+        f.write_str(path_and_query.as_str())?;
+    }
+    Ok(())
+}
 
 impl TryFrom<String> for HttpEndpoint {
     type Error = HttpEndpointError;
@@ -537,6 +563,16 @@ mod tests {
             ));
             assert!(endpoint.as_uri().authority().is_some());
         }
+    }
+
+    #[test]
+    fn http_endpoint_debug_redacts_userinfo() {
+        let endpoint =
+            HttpEndpoint::parse("http://user:secret@example.com:8080/path?query=1").unwrap();
+        assert_eq!(
+            format!("{endpoint:?}"),
+            "HttpEndpoint(http://<redacted>@example.com:8080/path?query=1)"
+        );
     }
 
     #[test]
