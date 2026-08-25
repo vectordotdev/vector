@@ -695,18 +695,27 @@ mod tests {
 
     #[test]
     fn http_endpoint_extracts_auth_without_dropping_explicit_port() {
-        for (endpoint, expected_authority) in [
-            ("user:pass@example.com:80", "example.com:80"),
-            ("https://user:pass@example.com:80", "example.com:80"),
-            ("https://user:pass@127.000.000.001:80", "127.0.0.1:80"),
+        for endpoint in [
+            "user:pass@example.com:80",
+            "https://user:pass@example.com:80",
         ] {
             let (endpoint, auth) = HttpEndpoint::parse(endpoint)
                 .unwrap()
                 .extract_basic_auth()
                 .unwrap();
-            assert_eq!(endpoint.as_uri().authority().unwrap(), expected_authority);
+            assert_eq!(endpoint.as_uri().authority().unwrap(), "example.com:80");
             assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
         }
+    }
+
+    #[test]
+    fn http_endpoint_extracts_auth_with_normalized_host() {
+        let (endpoint, auth) = HttpEndpoint::parse("https://user:pass@127.000.000.001:8080")
+            .unwrap()
+            .extract_basic_auth()
+            .unwrap();
+        assert_eq!(endpoint.as_uri().authority().unwrap(), "127.0.0.1:8080");
+        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
     }
 
     #[test]
