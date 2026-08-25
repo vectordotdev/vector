@@ -515,6 +515,7 @@ impl LokiSink {
                 config.endpoint,
                 config.path,
                 config.auth,
+                config.keep_alive_requests,
             )?);
 
         let batch_encoder = match config.compression {
