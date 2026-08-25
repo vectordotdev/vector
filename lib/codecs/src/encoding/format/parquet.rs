@@ -234,6 +234,9 @@ fn reject_unsupported_arrow_types(
 #[derivative(Debug, Clone)]
 pub struct ParquetSerializer {
     schema: SchemaRef,
+    /// Variant-encoding plan for `schema`. Built once at construction; rebuilt
+    /// only in `AutoInfer` mode, which re-infers the schema per batch.
+    variant_plan: Arc<super::variant::VariantPlan>,
     writer_props: Arc<WriterProperties>,
     schema_mode: ParquetSchemaMode,
     /// Pre-built set of schema field names for O(1) strict-mode lookups.
@@ -264,8 +267,11 @@ impl ParquetSerializer {
                 .build(),
         );
 
+        let variant_plan = Arc::new(super::variant::VariantPlan::build(&schema_ref));
+
         Ok(Self {
             schema: schema_ref,
+            variant_plan,
             writer_props,
             schema_mode: config.schema_mode,
             schema_field_names,
@@ -366,12 +372,15 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                 self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
                     &events, schema,
                 ));
+                // The schema was just re-inferred, so the cached plan is stale.
+                self.variant_plan = Arc::new(super::variant::VariantPlan::build(&self.schema));
             }
             ParquetSchemaMode::Relaxed => {}
         }
 
         let record_batch =
-            build_record_batch(Arc::clone(&self.schema), &json_values).map_err(Box::new)?;
+            build_record_batch(Arc::clone(&self.schema), &self.variant_plan, json_values)
+                .map_err(Box::new)?;
 
         Self::write_record_batch(&record_batch, buffer, &self.writer_props).map_err(Box::new)?;
 
