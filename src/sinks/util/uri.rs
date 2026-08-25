@@ -131,7 +131,7 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
     // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
-    let mut url = url::Url::parse(&format!("http://{authority}"))?;
+    let url = url::Url::parse(&format!("http://{authority}"))?;
 
     let user = url.username();
     if !user.is_empty() {
@@ -142,17 +142,17 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
             .decode_utf8_lossy()
             .into_owned();
 
-        // These methods have the same failure condition as `username`,
-        // because we have a non-empty username, they cannot fail here.
-        url.set_username("")
-            .map_err(|_| "unexpected empty authority")?;
-        url.set_password(None)
-            .map_err(|_| "unexpected empty authority")?;
-
-        let authority = Uri::from_maybe_shared(String::from(url))?
-            .authority()
-            .ok_or_else(|| "unexpected empty authority".to_string())?
-            .clone();
+        // Rebuild the authority from the original host and port with userinfo
+        // stripped. `url::Url` drops a port that is the default for its
+        // synthetic `http://` scheme (e.g. port 80) even when the endpoint
+        // uses a different scheme (https) where that port is explicit, so the
+        // original host and port are used directly rather than round-tripping
+        // through the URL parser.
+        let host_port = match authority.port() {
+            Some(port) => format!("{}:{}", authority.host(), port.as_str()),
+            None => authority.host().to_string(),
+        };
+        let authority = host_port.parse::<Authority>()?;
 
         Ok((
             authority,
@@ -662,6 +662,19 @@ mod tests {
         // `http::Uri` normalizes a bare host:port to a trailing slash.
         assert_eq!(endpoint.to_string(), "http://example.com:8080/");
         assert!(auth.is_none());
+    }
+
+    #[test]
+    fn http_endpoint_extract_basic_auth_preserves_default_scheme_port() {
+        // A scheme-less endpoint defaults to https. Port 80 is http's default,
+        // so credential extraction must not drop it: the endpoint explicitly
+        // configured port 80 and must keep using it over https.
+        let (endpoint, auth) = HttpEndpoint::parse("user:pass@example.com:80")
+            .unwrap()
+            .extract_basic_auth()
+            .unwrap();
+        assert_eq!(endpoint.to_string(), "https://example.com:80/");
+        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
     }
 
     #[test]
