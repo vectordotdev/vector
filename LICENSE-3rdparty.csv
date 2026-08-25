@@ -495,7 +495,6 @@ newtype-uuid,https://github.com/oxidecomputer/newtype-uuid,MIT OR Apache-2.0,The
 nibble_vec,https://github.com/michaelsproul/rust_nibble_vec,MIT,Michael Sproul <micsproul@gmail.com>
 nix,https://github.com/nix-rust/nix,MIT,The nix-rust Project Developers
 nkeys,https://github.com/wasmcloud/nkeys,Apache-2.0,wasmCloud Team
-no-proxy,https://github.com/jdrouet/no-proxy,MIT,Jérémie Drouet <jeremie.drouet@gmail.com>
 nohash,https://github.com/tetcoin/nohash,Apache-2.0 OR MIT,Parity Technologies <admin@parity.io>
 nom,https://github.com/Geal/nom,MIT,contact@geoffroycouprie.com
 nom,https://github.com/rust-bakery/nom,MIT,contact@geoffroycouprie.com
