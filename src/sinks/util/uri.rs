@@ -1,11 +1,19 @@
 use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
-use percent_encoding::percent_decode_str;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
 
 use crate::http::Auth;
+
+/// Characters that must be percent-encoded in a URI userinfo.
+/// RFC 3986 unreserved characters are left as-is.
+const USERINFO: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
 
 /// A wrapper for `http::Uri` that implements `Deserialize` and `Serialize`.
 ///
@@ -81,6 +89,8 @@ impl fmt::Display for UriSerde {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.uri.authority(), &self.auth) {
             (Some(authority), Some(Auth::Basic { user, password })) => {
+                let user = utf8_percent_encode(user, USERINFO);
+                let password = utf8_percent_encode(password.inner(), USERINFO);
                 let authority = format!("{user}:{password}@{authority}");
                 let authority =
                     Authority::from_maybe_shared(authority).map_err(|_| std::fmt::Error)?;
@@ -131,39 +141,40 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
     // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
-    let mut url = url::Url::parse(&format!("http://{authority}"))?;
+    let url = url::Url::parse(&format!("http://{authority}"))?;
+    let Some((_, host_port)) = authority.as_str().rsplit_once('@') else {
+        return Ok((authority.clone(), None));
+    };
 
-    let user = url.username();
-    if !user.is_empty() {
-        let user = percent_decode_str(user).decode_utf8_lossy().into_owned();
-
-        let password = url.password().unwrap_or("");
-        let password = percent_decode_str(password)
+    let has_auth = !url.username().is_empty() || url.password().is_some();
+    let auth = has_auth.then(|| {
+        let user = percent_decode_str(url.username())
             .decode_utf8_lossy()
             .into_owned();
+        let password = percent_decode_str(url.password().unwrap_or(""))
+            .decode_utf8_lossy()
+            .into_owned();
+        Auth::Basic {
+            user,
+            password: password.into(),
+        }
+    });
 
-        // These methods have the same failure condition as `username`,
-        // because we have a non-empty username, they cannot fail here.
-        url.set_username("")
-            .map_err(|_| "unexpected empty authority")?;
-        url.set_password(None)
-            .map_err(|_| "unexpected empty authority")?;
+    // Rebuild the authority from the parsed URL so the host is normalized
+    // (e.g. host case), while retaining an explicit port from the raw
+    // authority (`url::Url` drops the port when it matches the scheme default).
+    let host = url
+        .host_str()
+        .ok_or_else(|| "unexpected empty authority".to_string())?;
+    let port = host_port
+        .rsplit_once(':')
+        .and_then(|(_, port)| port.parse::<u16>().ok());
+    let authority = match port {
+        Some(port) => format!("{host}:{port}"),
+        None => host.to_string(),
+    };
 
-        let authority = Uri::from_maybe_shared(String::from(url))?
-            .authority()
-            .ok_or_else(|| "unexpected empty authority".to_string())?
-            .clone();
-
-        Ok((
-            authority,
-            Some(Auth::Basic {
-                user,
-                password: password.into(),
-            }),
-        ))
-    } else {
-        Ok((authority.clone(), None))
-    }
+    Ok((authority.parse()?, auth))
 }
 
 /// Simplify the URI into a protocol and endpoint by removing the
@@ -490,6 +501,7 @@ fn has_scheme(endpoint: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     fn test_parse(input: &str, expected_uri: &'static str, expected_auth: Option<(&str, &str)>) {
         let UriSerde { uri, auth } = input.parse().unwrap();
@@ -530,6 +542,18 @@ mod tests {
         );
 
         test_parse("user@example.com", "example.com", Some(("user", "")));
+
+        test_parse(
+            "https://user:pass@example.com:80/api",
+            "https://example.com:80/api",
+            Some(("user", "pass")),
+        );
+
+        test_parse(
+            "https://:secret@example.com/api",
+            "https://example.com/api",
+            Some(("", "secret")),
+        );
     }
 
     #[test]
@@ -594,6 +618,52 @@ mod tests {
 
         assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
         assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[rstest]
+    #[case::explicit_port(
+        "user:pass@example.com:80/path",
+        "https://example.com:80/path",
+        "user",
+        "pass"
+    )]
+    #[case::empty_username(":secret@example.com/path", "https://example.com/path", "", "secret")]
+    fn http_endpoint_auth_extraction_handles_userinfo(
+        #[case] endpoint: &str,
+        #[case] expected_endpoint: &str,
+        #[case] expected_user: &str,
+        #[case] expected_password: &str,
+    ) {
+        let endpoint = HttpEndpoint::parse(endpoint).unwrap();
+        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
+
+        assert_eq!(endpoint.to_string(), expected_endpoint);
+        assert!(matches!(
+            auth,
+            Some(Auth::Basic { user, password })
+                if user == expected_user && password.inner() == expected_password
+        ));
+    }
+
+    #[test]
+    fn http_endpoint_auth_extraction_normalizes_host() {
+        let endpoint = HttpEndpoint::parse("user:pass@EXAMPLE.com/path").unwrap();
+        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
+
+        assert_eq!(endpoint.to_string(), "https://example.com/path");
+        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[test]
+    fn http_endpoint_auth_extraction_round_trips_encoded_password() {
+        let endpoint = HttpEndpoint::parse(":%2F@example.com/path").unwrap();
+        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
+
+        let uri_serde = UriSerde {
+            uri: endpoint.into_uri(),
+            auth,
+        };
+        assert_eq!(uri_serde.to_string(), "https://:%2F@example.com/path");
     }
 
     #[test]
