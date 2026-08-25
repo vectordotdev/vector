@@ -14,6 +14,8 @@ use chrono::DateTime;
 use derivative::Derivative;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
 use http::uri::{InvalidUri, Scheme, Uri};
+use hyper::client::HttpConnector;
+use hyper_proxy::ProxyConnector;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
@@ -110,6 +112,10 @@ pub(crate) enum PubsubError {
     Endpoint { source: tonic::transport::Error },
     #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
     EndpointTls { source: tonic::transport::Error },
+    #[snafu(display("Could not create proxy connector: {}", source))]
+    ProxyBuild { source: std::io::Error },
+    #[snafu(display("Could not configure proxy: {}", source))]
+    ProxyConfigure { source: InvalidUri },
     #[snafu(display(
         "`ack_deadline_secs` is outside the valid range of {} to {}",
         MIN_ACK_DEADLINE_SECS,
@@ -301,6 +307,27 @@ impl SourceConfig for PubsubConfig {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
 
+        // Build a proxy-aware connector only when proxy is enabled.
+        // We use a plain HttpConnector as the inner connector because tonic's
+        // service::Connector applies TLS on top (via endpoint.tls_config above).
+        // Using HttpsConnector here would cause double-TLS for non-proxied connections.
+        // We explicitly ensure no tunnel TLS via set_tls(None) for the same reason:
+        // tonic handles TLS for the tunneled connection to the destination server.
+        let proxy_connector = if cx.proxy.enabled {
+            let mut http_connector = HttpConnector::new();
+            // Allow non-HTTP schemes so tonic can connect to https:// endpoints.
+            http_connector.enforce_http(false);
+            let mut proxy_connector =
+                ProxyConnector::new(http_connector).context(ProxyBuildSnafu)?;
+            proxy_connector.set_tls(None);
+            cx.proxy
+                .configure(&mut proxy_connector)
+                .context(ProxyConfigureSnafu)?;
+            Some(proxy_connector)
+        } else {
+            None
+        };
+
         let token_generator = auth.spawn_regenerate_token();
 
         let protocol = uri
@@ -310,6 +337,7 @@ impl SourceConfig for PubsubConfig {
 
         let source = PubsubSource {
             endpoint,
+            proxy_connector,
             auth,
             token_generator,
             subscription: format!(
@@ -383,6 +411,7 @@ impl_generate_config_from_default!(PubsubConfig);
 #[derive(Clone)]
 struct PubsubSource {
     endpoint: Endpoint,
+    proxy_connector: Option<ProxyConnector<HttpConnector>>,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
     subscription: String,
@@ -474,7 +503,11 @@ impl PubsubSource {
     }
 
     async fn run_once(&mut self, busy_flag: &Arc<AtomicBool>) -> State {
-        let connection = match self.endpoint.connect().await {
+        let connection = match &self.proxy_connector {
+            Some(proxy) => self.endpoint.connect_with_connector(proxy.clone()).await,
+            None => self.endpoint.connect().await,
+        };
+        let connection = match connection {
             Ok(connection) => connection,
             Err(error) => {
                 emit!(GcpPubsubConnectError { error });
@@ -838,6 +871,43 @@ mod tests {
         .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
 
         assert_eq!(definitions, Some(expected_definition));
+    }
+
+    #[test]
+    fn proxy_connector_configured_when_enabled() {
+        use vector_lib::config::proxy::ProxyConfig;
+
+        let proxy_config = ProxyConfig {
+            enabled: true,
+            http: Some("http://proxy.example.com:3128".into()),
+            https: Some("http://proxy.example.com:3128".into()),
+            ..Default::default()
+        };
+
+        let mut http = hyper::client::HttpConnector::new();
+        http.enforce_http(false);
+        let mut proxy = hyper_proxy::ProxyConnector::new(http).unwrap();
+        proxy_config.configure(&mut proxy).unwrap();
+
+        assert_eq!(proxy.proxies().len(), 2);
+    }
+
+    #[test]
+    fn proxy_connector_empty_when_disabled() {
+        use vector_lib::config::proxy::ProxyConfig;
+
+        let proxy_config = ProxyConfig {
+            enabled: false,
+            http: Some("http://proxy.example.com:3128".into()),
+            ..Default::default()
+        };
+
+        let mut http = hyper::client::HttpConnector::new();
+        http.enforce_http(false);
+        let mut proxy = hyper_proxy::ProxyConnector::new(http).unwrap();
+        proxy_config.configure(&mut proxy).unwrap();
+
+        assert_eq!(proxy.proxies().len(), 0);
     }
 }
 
