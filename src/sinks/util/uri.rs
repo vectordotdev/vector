@@ -7,11 +7,19 @@ use std::{fmt, str::FromStr};
 
 use derivative::Derivative;
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
-use percent_encoding::percent_decode_str;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
 
 use crate::http::Auth;
+
+/// Percent-encode every byte except RFC 3986 unreserved characters so decoded
+/// usernames cannot change the structure of an authority when serialized.
+const USERNAME_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
 
 /// A wrapper for `http::Uri` that implements `Deserialize` and `Serialize`.
 ///
@@ -87,6 +95,7 @@ impl fmt::Display for UriSerde {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.uri.authority(), &self.auth) {
             (Some(authority), Some(Auth::Basic { user, password })) => {
+                let user = utf8_percent_encode(user, USERNAME_ENCODE_SET);
                 let authority = format!("{user}:{password}@{authority}");
                 let authority =
                     Authority::from_maybe_shared(authority).map_err(|_| std::fmt::Error)?;
@@ -741,6 +750,16 @@ mod tests {
             "http://user:**REDACTED**@example.com:8080/path?query=1"
         );
         assert!(!serialized.contains("hunter2"));
+    }
+
+    #[test]
+    fn http_endpoint_serialization_percent_encodes_username() {
+        let endpoint = HttpEndpoint::parse("http://us%20er:pass@example.com/api").unwrap();
+
+        assert_eq!(
+            String::from(endpoint),
+            "http://us%20er:**REDACTED**@example.com/api"
+        );
     }
 
     #[test]
