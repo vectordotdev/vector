@@ -14,7 +14,7 @@ use vrl::value::Kind;
 use crate::{
     codecs::DecodingConfig,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
+    nats::{NatsAuthConfig, NatsConfigError, apply_event_callback, from_tls_auth_config},
     serde::{default_decoding, default_framing_message_based},
     sources::{
         Source,
@@ -319,8 +319,10 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
-        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
-            .map(|options| options.subscription_capacity(config.subscriber_capacity))
+        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls).map(|options| {
+            let options = apply_event_callback(options, config.connection_name.clone());
+            options.subscription_capacity(config.subscriber_capacity)
+        })
     }
 }
 
