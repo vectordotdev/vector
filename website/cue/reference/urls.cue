@@ -242,7 +242,6 @@ urls: {
 	globbing:                                   "\(wikipedia)/wiki/Glob_(programming)"
 	glog:                                       "\(github)/google/glog"
 	graphql:                                    "https://graphql.org"
-	graphql_playground:                         "\(github)/graphql/graphql-playground"
 	graphviz:                                   "https://graphviz.org/"
 	greptimecloud:                              "https://greptime.cloud"
 	greptimedb:                                 "https://github.com/greptimeteam/greptimedb"
