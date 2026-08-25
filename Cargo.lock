@@ -13630,6 +13630,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "chrono-tz",
+ "cidr",
  "criterion",
  "crossbeam-utils",
  "derivative",

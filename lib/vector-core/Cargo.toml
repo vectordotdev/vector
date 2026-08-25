@@ -15,6 +15,7 @@ bitmask-enum = { version = "2.2.5", default-features = false }
 bytes = { workspace = true, features = ["serde"] }
 chrono.workspace = true
 chrono-tz.workspace = true
+cidr = { version = "0.3.1", default-features = false, features = ["std"] }
 crossbeam-utils.workspace = true
 derivative.workspace = true
 dyn-clone = { version = "1.0.20", default-features = false }

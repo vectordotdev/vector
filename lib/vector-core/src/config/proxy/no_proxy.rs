@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashSet, fmt, net::IpAddr, str::FromStr};
 
-use ipnet::IpNet;
+use cidr::IpCidr;
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
     de::{self, SeqAccess, Visitor},
@@ -15,18 +15,15 @@ use vector_config::{
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NoProxy {
     patterns: HashSet<Pattern>,
+    has_wildcard: bool,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum Pattern {
     Wildcard,
-    Ip {
+    IpCidr {
         source: String,
-        address: IpAddr,
-    },
-    Network {
-        source: String,
-        network: IpNet,
+        network: IpCidr,
     },
     Host {
         source: String,
@@ -57,20 +54,10 @@ impl Pattern {
             return Some(Self::Wildcard);
         }
 
-        if source.contains('/')
-            && let Ok(network) = IpNet::from_str(source)
-            && network.addr() == network.network()
-        {
-            return Some(Self::Network {
+        if let Ok(network) = IpCidr::from_str(source) {
+            return Some(Self::IpCidr {
                 source: source.to_owned(),
                 network,
-            });
-        }
-
-        if let Ok(address) = IpAddr::from_str(source) {
-            return Some(Self::Ip {
-                source: source.to_owned(),
-                address,
             });
         }
 
@@ -90,10 +77,7 @@ impl Pattern {
         let candidate = strip_ipv6_brackets(candidate);
         match self {
             Self::Wildcard => true,
-            Self::Ip { address, .. } => candidate
-                .parse::<IpAddr>()
-                .is_ok_and(|candidate| candidate == *address),
-            Self::Network { source, network } => {
+            Self::IpCidr { source, network } => {
                 candidate == source
                     || candidate
                         .parse::<IpAddr>()
@@ -111,9 +95,7 @@ impl Pattern {
     fn source(&self) -> &str {
         match self {
             Self::Wildcard => "*",
-            Self::Ip { source, .. } | Self::Network { source, .. } | Self::Host { source, .. } => {
-                source
-            }
+            Self::IpCidr { source, .. } | Self::Host { source, .. } => source,
         }
     }
 }
@@ -127,11 +109,15 @@ fn strip_ipv6_brackets(value: &str) -> &str {
 
 impl NoProxy {
     fn from_entries(entries: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
+        let patterns: HashSet<_> = entries
+            .into_iter()
+            .filter_map(|entry| Pattern::parse(entry.as_ref()))
+            .collect();
+        let has_wildcard = patterns.contains(&Pattern::Wildcard);
+
         Self {
-            patterns: entries
-                .into_iter()
-                .filter_map(|entry| Pattern::parse(entry.as_ref()))
-                .collect(),
+            patterns,
+            has_wildcard,
         }
     }
 
@@ -140,6 +126,10 @@ impl NoProxy {
     }
 
     pub fn matches(&self, candidate: &str) -> bool {
+        if self.has_wildcard {
+            return true;
+        }
+
         self.patterns
             .iter()
             .any(|pattern| pattern.matches(candidate))
@@ -267,6 +257,8 @@ mod tests {
             ("127.0.0.1", "127.0.0.2", false),
             ("192.168.0.0/16", "192.168.42.1", true),
             ("192.168.0.0/16", "192.169.0.1", false),
+            ("192.168.0.0/016", "192.168.42.1", true),
+            ("192.168.0.0/016", "192.169.0.1", false),
             ("192.168.0.0/16", "192.168.0.0/16", true),
             ("192.168.1.1/24", "192.168.1.2", false),
             ("192.168.1.1/33", "192.168.1.1/33", true),
@@ -274,6 +266,8 @@ mod tests {
             ("[2001:db8::1]", "[2001:db8::1]", false),
             ("2001:db8::/32", "[2001:db8:1::1]", true),
             ("2001:db8::/32", "2001:db9::1", false),
+            ("2001:db8::/0032", "[2001:db8:1::1]", true),
+            ("2001:db8::/0032", "2001:db9::1", false),
         ];
 
         for (pattern, candidate, expected) in cases {
