@@ -131,39 +131,26 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
     // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
-    let mut url = url::Url::parse(&format!("http://{authority}"))?;
+    let url = url::Url::parse(&format!("http://{authority}"))?;
+    let Some((_, host_port)) = authority.as_str().rsplit_once('@') else {
+        return Ok((authority.clone(), None));
+    };
 
-    let user = url.username();
-    if !user.is_empty() {
-        let user = percent_decode_str(user).decode_utf8_lossy().into_owned();
-
-        let password = url.password().unwrap_or("");
-        let password = percent_decode_str(password)
+    let has_auth = !url.username().is_empty() || url.password().is_some();
+    let auth = has_auth.then(|| {
+        let user = percent_decode_str(url.username())
             .decode_utf8_lossy()
             .into_owned();
+        let password = percent_decode_str(url.password().unwrap_or(""))
+            .decode_utf8_lossy()
+            .into_owned();
+        Auth::Basic {
+            user,
+            password: password.into(),
+        }
+    });
 
-        // These methods have the same failure condition as `username`,
-        // because we have a non-empty username, they cannot fail here.
-        url.set_username("")
-            .map_err(|_| "unexpected empty authority")?;
-        url.set_password(None)
-            .map_err(|_| "unexpected empty authority")?;
-
-        let authority = Uri::from_maybe_shared(String::from(url))?
-            .authority()
-            .ok_or_else(|| "unexpected empty authority".to_string())?
-            .clone();
-
-        Ok((
-            authority,
-            Some(Auth::Basic {
-                user,
-                password: password.into(),
-            }),
-        ))
-    } else {
-        Ok((authority.clone(), None))
-    }
+    Ok((host_port.parse()?, auth))
 }
 
 /// Simplify the URI into a protocol and endpoint by removing the
@@ -497,6 +484,18 @@ mod tests {
         );
 
         test_parse("user@example.com", "example.com", Some(("user", "")));
+
+        test_parse(
+            "https://user:pass@example.com:80/api",
+            "https://example.com:80/api",
+            Some(("user", "pass")),
+        );
+
+        test_parse(
+            "https://:secret@example.com/api",
+            "https://example.com/api",
+            Some(("", "secret")),
+        );
     }
 
     #[test]
@@ -561,6 +560,28 @@ mod tests {
 
         assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
         assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[test]
+    fn http_endpoint_auth_extraction_preserves_explicit_port() {
+        let endpoint = HttpEndpoint::parse("user:pass@example.com:80/path").unwrap();
+        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
+
+        assert_eq!(endpoint.to_string(), "https://example.com:80/path");
+        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[test]
+    fn http_endpoint_auth_extraction_accepts_empty_username() {
+        let endpoint = HttpEndpoint::parse(":secret@example.com/path").unwrap();
+        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
+
+        assert_eq!(endpoint.to_string(), "https://example.com/path");
+        assert!(matches!(
+            auth,
+            Some(Auth::Basic { user, password })
+                if user.is_empty() && password.inner() == "secret"
+        ));
     }
 
     #[test]
