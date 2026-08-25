@@ -1,3 +1,5 @@
+use super::append_loki_path;
+
 use crate::{
     http::{Auth, HttpClient},
     sinks::util::HttpEndpoint,
@@ -9,7 +11,7 @@ async fn fetch_status(
     auth: &Option<Auth>,
     client: &HttpClient,
 ) -> crate::Result<http::StatusCode> {
-    let endpoint = base_endpoint.append_path(path)?;
+    let endpoint = append_loki_path(base_endpoint, path)?;
 
     let mut req = http::Request::get(endpoint.as_uri())
         .body(hyper::Body::empty())
@@ -31,11 +33,10 @@ pub async fn healthcheck(
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
-            // Probe the base path with a trailing slash (`/loki/`, not `/loki`):
-            // `append_path("/")` preserves the trailing slash that `append_path("")`
-            // drops, matching the pre-`HttpEndpoint` behavior. Reverse proxies
-            // commonly redirect `/loki` to `/loki/`, and the healthcheck rejects
-            // non-200 responses rather than following them.
+            // Probe the normalized base path with one trailing slash (`/loki/`,
+            // not `/loki`), matching the pre-`HttpEndpoint` behavior. Reverse
+            // proxies commonly redirect `/loki` to `/loki/`, and the healthcheck
+            // rejects non-200 responses rather than following them.
             fetch_status(&base_endpoint, "/", &auth, &client).await?
         }
         status => status,

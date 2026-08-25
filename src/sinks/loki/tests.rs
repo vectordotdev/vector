@@ -183,11 +183,11 @@ async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
     .unwrap();
 
     let (_guard, addr) = test_util::addr::next_addr();
-    let endpoint = format!("http://{addr}/loki");
+    let endpoint = format!("http://{addr}/loki///");
     config.endpoint = HttpEndpoint::parse(&endpoint).unwrap();
 
-    // `/ready` returns 404 (the fallback trigger); the base path returns 200.
-    // Every request path is recorded so the fallback URL can be asserted.
+    // The normalized `/ready` path returns 404 (the fallback trigger); the
+    // normalized base path returns 200. Every request path is recorded.
     let (tx, rx) = futures::channel::mpsc::channel(8);
     let service = make_service_fn(move |_| {
         let tx = tx.clone();
@@ -196,7 +196,7 @@ async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
                 let mut tx = tx.clone();
                 async move {
                     let path = req.uri().path().to_string();
-                    let status = if path == "/loki/ready" {
+                    let status = if path.ends_with("ready") {
                         http::StatusCode::NOT_FOUND
                     } else {
                         http::StatusCode::OK

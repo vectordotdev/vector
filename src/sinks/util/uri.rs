@@ -133,9 +133,10 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
     // of panicking.
     let url = url::Url::parse(&format!("http://{authority}"))?;
 
-    let user = url.username();
-    if !user.is_empty() {
-        let user = percent_decode_str(user).decode_utf8_lossy().into_owned();
+    if authority.as_str().contains('@') {
+        let user = percent_decode_str(url.username())
+            .decode_utf8_lossy()
+            .into_owned();
 
         let password = url.password().unwrap_or("");
         let password = percent_decode_str(password)
@@ -691,6 +692,20 @@ mod tests {
             .unwrap();
         assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
         assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[test]
+    fn http_endpoint_extracts_basic_auth_with_empty_username() {
+        let (endpoint, auth) = HttpEndpoint::parse("https://:secret@example.com")
+            .unwrap()
+            .extract_basic_auth()
+            .unwrap();
+        assert_eq!(endpoint.as_uri().authority().unwrap(), "example.com");
+        assert!(matches!(
+            auth,
+            Some(Auth::Basic { user, password })
+                if user.is_empty() && password.inner() == "secret"
+        ));
     }
 
     #[test]
