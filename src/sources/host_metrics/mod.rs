@@ -562,36 +562,63 @@ where
 
 #[allow(clippy::missing_const_for_fn)]
 fn init_roots() {
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     {
         use std::sync::Once;
 
         static INIT: Once = Once::new();
 
         INIT.call_once(|| {
-            match std::env::var_os("PROCFS_ROOT") {
-                Some(procfs_root) => {
-                    info!(
-                        message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
-                        custom = ?procfs_root
-                    );
-                    heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
-                }
-                None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
-            };
+            #[cfg(target_os = "linux")]
+            {
+                match std::env::var_os("PROCFS_ROOT").filter(|root| !root.is_empty()) {
+                    Some(procfs_root) => {
+                        info!(
+                            message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
+                            custom = ?procfs_root
+                        );
+                        heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
+                    }
+                    None => {
+                        info!("PROCFS_ROOT is unset or empty. Using default '/proc' for procfs root.")
+                    }
+                };
 
-            match std::env::var_os("SYSFS_ROOT") {
-                Some(sysfs_root) => {
-                    info!(
-                        message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
-                        custom = ?sysfs_root
-                    );
-                    heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
+                match std::env::var_os("SYSFS_ROOT").filter(|root| !root.is_empty()) {
+                    Some(sysfs_root) => {
+                        info!(
+                            message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
+                            custom = ?sysfs_root
+                        );
+                        heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
+                    }
+                    None => {
+                        info!("SYSFS_ROOT is unset or empty. Using default '/sys' for sysfs root.")
+                    }
                 }
-                None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
+            }
+
+            match rootfs_root() {
+                Some(rootfs_root) => info!(
+                    message = "ROOTFS_ROOT is set in envvars. Using custom root for filesystem usage.",
+                    rootfs_root = ?rootfs_root,
+                ),
+                None => info!("ROOTFS_ROOT is unset or empty. Using mount points directly."),
             }
         });
     };
+}
+
+#[cfg(unix)]
+pub(super) fn rootfs_root() -> Option<PathBuf> {
+    std::env::var_os("ROOTFS_ROOT")
+        .filter(|rootfs_root| !rootfs_root.is_empty())
+        .map(PathBuf::from)
+}
+
+#[cfg(not(unix))]
+pub(super) fn rootfs_root() -> Option<PathBuf> {
+    None
 }
 
 impl FilterList {

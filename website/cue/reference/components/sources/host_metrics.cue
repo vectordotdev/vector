@@ -63,6 +63,14 @@ components: sources: host_metrics: {
 				examples: ["/mnt/host/sys"]
 			}
 		}
+
+		ROOTFS_ROOT: {
+			description: "Sets an arbitrary path to the host root filesystem. The filesystem collector resolves mount points relative to this path for capacity and inode metrics while preserving logical host mount point labels. A mount entry equal to this root is labeled `/`, and entries beneath it have the root prefix removed. When a container mount and a root-prefixed mount resolve to the same logical mount point, only the root-prefixed entry is reported. Can be used to expose host filesystem metrics from within a container. Unset or empty uses the process mount points directly. Only supported on Unix."
+			type: string: {
+				default: null
+				examples: ["/mnt/host"]
+			}
+		}
 	}
 
 	configuration: generated.components.sources.host_metrics.configuration
