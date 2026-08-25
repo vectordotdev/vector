@@ -880,6 +880,7 @@ sinks-logs = [
   "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
+  "sinks-azure_data_explorer",
   "sinks-azure_logs_ingestion",
   "sinks-blackhole",
   "sinks-chronicle",
@@ -948,6 +949,7 @@ sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
+sinks-azure_data_explorer = ["dep:azure_core", "dep:azure_identity", "dep:base64"]
 sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 sinks-blackhole = []
 sinks-chronicle = []
