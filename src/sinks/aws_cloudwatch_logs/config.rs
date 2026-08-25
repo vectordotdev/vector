@@ -1,18 +1,22 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
+use http::HeaderValue;
 use serde::{Deserialize, Deserializer, de};
 use tower::ServiceBuilder;
-use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component, schema};
+use vector_lib::{
+    codecs::JsonSerializerConfig, configurable::configurable_component, schema,
+    stream::BatcherSettings,
+};
 use vrl::value::Kind;
 
 use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     codecs::{Encoder, EncodingConfig},
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
+        SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -21,10 +25,11 @@ use crate::{
             retry::CloudwatchRetryLogic, service::CloudwatchLogsPartitionSvc, sink::CloudwatchSink,
         },
         util::{
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, http::RequestConfig,
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            http::{OrderedHeaderName, RequestConfig, validate_headers},
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
     tls::TlsConfig,
 };
 
@@ -68,7 +73,7 @@ where
         Ok(days)
     } else {
         let msg = format!("one of allowed values: {ALLOWED_VALUES:?}").to_owned();
-        let expected: &str = &msg[..];
+        let expected: &str = msg.as_str();
         Err(de::Error::invalid_value(
             de::Unexpected::Signed(days.into()),
             &expected,
@@ -88,7 +93,7 @@ pub struct CloudwatchLogsSinkConfig {
     ///
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     #[configurable(metadata(docs::examples = "group-name"))]
-    #[configurable(metadata(docs::examples = "{{ file }}"))]
+    #[configurable(metadata(docs::examples = "group-{{ file }}"))]
     pub group_name: Template,
 
     /// The [stream name][stream_name] of the target CloudWatch Logs stream.
@@ -98,10 +103,10 @@ pub struct CloudwatchLogsSinkConfig {
     /// unique per instance.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-    #[configurable(metadata(docs::examples = "{{ host }}"))]
+    #[configurable(metadata(docs::examples = "stream-{{ host }}"))]
     #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "stream-name"))]
-    pub stream_name: Template,
+    pub stream_name: UnconfinedTemplate,
 
     /// The [AWS region][aws_region] of the target service.
     ///
@@ -182,6 +187,10 @@ pub struct CloudwatchLogsSinkConfig {
         docs::additional_props_description = "A tag represented as a key-value pair"
     ))]
     pub tags: Option<HashMap<String, String>>,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 impl CloudwatchLogsSinkConfig {
@@ -202,33 +211,8 @@ impl CloudwatchLogsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batcher_settings = self.batch.into_batcher_settings()?;
-        let request_settings = self.request.tower.into_settings();
-        let client = self.create_client(cx.proxy()).await?;
-        let svc = ServiceBuilder::new()
-            .settings(request_settings, CloudwatchRetryLogic::new())
-            .service(CloudwatchLogsPartitionSvc::new(
-                self.clone(),
-                client.clone(),
-            )?);
-        let transformer = self.encoding.transformer();
-        let serializer = self.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
-        let healthcheck = healthcheck(self.clone(), client).boxed();
-        let sink = CloudwatchSink {
-            batcher_settings,
-            request_builder: CloudwatchRequestBuilder {
-                group_template: self.group_name.clone(),
-                stream_template: self.stream_name.clone(),
-                transformer,
-                encoder,
-            },
-
-            service: svc,
-        };
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -242,11 +226,79 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedCloudwatchLogs {
+    group_template: ConfinedTemplate,
+    batcher_settings: BatcherSettings,
+    headers: BTreeMap<OrderedHeaderName, HeaderValue>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for CloudwatchLogsSinkConfig {
+    type Validated = ValidatedCloudwatchLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedCloudwatchLogs> {
+        let group_template =
+            self.group_name
+                .clone()
+                .confine(&self.confinement, Self::NAME, "group_name")?;
+        let batcher_settings = self.batch.into_batcher_settings()?;
+        let headers = validate_headers(&self.request.headers)?;
+
+        Ok(ValidatedCloudwatchLogs {
+            group_template,
+            batcher_settings,
+            headers,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedCloudwatchLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedCloudwatchLogs {
+            group_template,
+            batcher_settings,
+            headers,
+        } = validated.clone();
+        let request_settings = self.request.tower.into_settings();
+        let client = self.create_client(cx.proxy()).await?;
+        let svc = ServiceBuilder::new()
+            .settings(request_settings, CloudwatchRetryLogic::new())
+            .service(CloudwatchLogsPartitionSvc::new(
+                self.clone(),
+                client.clone(),
+                headers.clone(),
+            ));
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+        let healthcheck = healthcheck(self.clone(), client).boxed();
+        let sink = CloudwatchSink {
+            batcher_settings,
+            request_builder: CloudwatchRequestBuilder {
+                group_template,
+                stream_template: self.stream_name.clone(),
+                transformer,
+                encoder,
+            },
+
+            service: svc,
+        };
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
 }
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config(JsonSerializerConfig::default().into())).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(default_config(JsonSerializerConfig::default().into())).unwrap()
     }
 }
 
@@ -268,6 +320,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         acknowledgements: Default::default(),
         kms_key: Default::default(),
         tags: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -282,10 +335,93 @@ impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::ValidatedSink;
     use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
+    use crate::template::{ConfinementConfig, Template};
+    use vector_lib::codecs::JsonSerializerConfig;
+
+    #[test]
+    fn prepares_valid_config() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group-{{ file }}".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.group_template.to_string(), "group-{{ file }}");
+        assert_eq!(validated.batcher_settings.item_limit, 10_000);
+    }
 
     #[test]
     fn test_generate_config() {
         crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_invalid_header_name() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+        config
+            .request
+            .headers
+            .insert("invalid header name".to_string(), "value".to_string());
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_header_value() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+        config.request.headers.insert(
+            "valid-header".to_string(),
+            "value\nwith newline".to_string(),
+        );
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_retains_valid_headers() {
+        let mut config = super::default_config(JsonSerializerConfig::default().into());
+        config.group_name = "group".try_into().unwrap();
+        config.stream_name = "stream".try_into().unwrap();
+        config
+            .request
+            .headers
+            .insert("x-custom-header".to_string(), "custom-value".to_string());
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.headers.len(), 1);
+        let (name, value) = validated.headers.iter().next().unwrap();
+        assert_eq!(name.inner(), "x-custom-header");
+        assert_eq!(value, "custom-value");
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_group_name() {
+        let template = Template::try_from("{{ group }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_group_name() {
+        let template = Template::try_from("{{ group }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_group_name() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "aws_cloudwatch_logs", "group_name");
+        assert!(result.is_ok());
     }
 }

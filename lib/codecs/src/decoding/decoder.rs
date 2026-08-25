@@ -116,6 +116,7 @@ mod tests {
     use bytes::Bytes;
     use futures::{StreamExt, stream};
     use tokio_util::io::StreamReader;
+    use vrl::event_path;
     use vrl::value::Value;
 
     use super::Decoder;
@@ -141,7 +142,7 @@ mod tests {
 
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
-        assert_eq!(event.get("foo").unwrap(), &Value::from(1));
+        assert_eq!(event.get(event_path!("foo")).unwrap(), &Value::from(1));
 
         let next = stream.next().await.unwrap();
         let error = next.unwrap_err();
@@ -149,6 +150,6 @@ mod tests {
 
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
-        assert_eq!(event.get("bar").unwrap(), &Value::from(2));
+        assert_eq!(event.get(event_path!("bar")).unwrap(), &Value::from(2));
     }
 }

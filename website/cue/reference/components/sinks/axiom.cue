@@ -4,7 +4,6 @@ components: sinks: axiom: {
 	title: "Axiom"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: axiom: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   1000
 				max_bytes:    1_048_576
 				timeout_secs: 1.0

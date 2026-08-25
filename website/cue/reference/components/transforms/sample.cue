@@ -8,7 +8,6 @@ components: transforms: sample: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false

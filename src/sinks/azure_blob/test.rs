@@ -34,10 +34,13 @@ fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
         blob_append_uuid: Default::default(),
         encoding,
         compression: Compression::gzip_default(),
+        tags: Default::default(),
+        metadata: Default::default(),
         batch: Default::default(),
         request: Default::default(),
         acknowledgements: Default::default(),
         tls: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -77,6 +80,8 @@ fn azure_blob_build_request_without_compression() {
             ),
         ),
         compression,
+        tags: None,
+        metadata: None,
     };
 
     let mut byte_size = GroupedCountByteSize::new_untagged();
@@ -125,6 +130,8 @@ fn azure_blob_build_request_with_compression() {
             ),
         ),
         compression,
+        tags: None,
+        metadata: None,
     };
 
     let mut byte_size = GroupedCountByteSize::new_untagged();
@@ -173,6 +180,8 @@ fn azure_blob_build_request_with_time_format() {
             ),
         ),
         compression,
+        tags: None,
+        metadata: None,
     };
 
     let mut byte_size = GroupedCountByteSize::new_untagged();
@@ -224,6 +233,8 @@ fn azure_blob_build_request_with_uuid() {
             ),
         ),
         compression,
+        tags: None,
+        metadata: None,
     };
 
     let mut byte_size = GroupedCountByteSize::new_untagged();
@@ -243,17 +254,14 @@ fn azure_blob_build_request_with_uuid() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_null_auth() {
-    let config: Result<AzureBlobSinkConfig, toml::de::Error> = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-        "#,
-    );
+    let config: Result<AzureBlobSinkConfig, _> =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth: {}
+        "#});
 
     match config {
         Ok(_) => panic!("Config parsing should have failed due to invalid auth config"),
@@ -270,22 +278,19 @@ async fn azure_blob_build_config_with_null_auth() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_client_id_and_secret() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     assert!(&config.auth.is_some());
 
@@ -312,23 +317,20 @@ async fn azure_blob_build_config_with_client_id_and_secret() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_client_certificate() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_certificate_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            certificate_path = "tests/data/ClientCertificateAuth.pfx"
-            certificate_password = "MockPassword123"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_certificate_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              certificate_path: tests/data/ClientCertificateAuth.pfx
+              certificate_password: MockPassword123
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     assert!(&config.auth.is_some());
 
@@ -350,22 +352,19 @@ async fn azure_blob_build_config_with_client_certificate() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_account_name() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let _ = config
@@ -376,16 +375,14 @@ async fn azure_blob_build_config_with_account_name() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_account_name_with_no_auth() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let sink = config.build(cx).await;
@@ -404,22 +401,19 @@ async fn azure_blob_build_config_with_account_name_with_no_auth() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_blob_endpoint() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            blob_endpoint = "https://localhost:10000/devstoreaccount1"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            blob_endpoint: "https://localhost:10000/devstoreaccount1"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let _ = config
@@ -430,16 +424,14 @@ async fn azure_blob_build_config_with_blob_endpoint() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_blob_endpoint_with_no_auth() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            blob_endpoint = "https://localhost:10000/devstoreaccount1"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            blob_endpoint: "https://localhost:10000/devstoreaccount1"
+            container_name: my-logs
+            encoding:
+              codec: json
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let sink = config.build(cx).await;
@@ -458,17 +450,15 @@ async fn azure_blob_build_config_with_blob_endpoint_with_no_auth() {
 
 #[tokio::test]
 async fn azure_blob_build_config_with_conflicting_connection_string_and_account_name() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let sink = config.build(cx).await;
@@ -489,22 +479,19 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_account_
 
 #[tokio::test]
 async fn azure_blob_build_config_with_conflicting_connection_string_and_client_id_and_secret() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            connection_string = "AccountName=mylogstorage;AccountKey=mockkey"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            connection_string: "AccountName=mylogstorage;AccountKey=mockkey"
+            container_name: my-logs
+            encoding:
+              codec: json
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     assert!(&config.auth.is_some());
 
@@ -528,29 +515,184 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_client_i
 
 #[tokio::test]
 async fn azure_blob_build_config_with_custom_ca_certificate() {
-    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
-        r#"
-            account_name = "mylogstorage"
-            container_name = "my-logs"
-
-            [encoding]
-            codec = "json"
-
-            [tls]
-            ca_file = "tests/data/ca/certs/ca.cert.pem"
-
-            [auth]
-            azure_credential_kind = "client_secret_credential"
-            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
-            azure_client_id = "mock-client-id"
-            azure_client_secret = "mock-client-secret"
-        "#,
-    )
-    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+    let config: AzureBlobSinkConfig =
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+            account_name: mylogstorage
+            container_name: my-logs
+            encoding:
+              codec: json
+            tls:
+              ca_file: tests/data/ca/certs/ca.cert.pem
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+        .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
     let _ = config
         .build(cx)
         .await
         .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
+
+#[test]
+fn azure_blob_build_request_with_blob_tags() {
+    use std::collections::BTreeMap;
+
+    let log = Event::Log(LogEvent::from("test message"));
+    let compression = Compression::None;
+    let container_name = String::from("logs");
+    let sink_config = AzureBlobSinkConfig {
+        blob_prefix: "blob".try_into().unwrap(),
+        container_name: container_name.clone(),
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+    };
+
+    let mut tags = BTreeMap::new();
+    tags.insert("Project".to_string(), "Blue".to_string());
+    tags.insert("Owner".to_string(), "ops team".to_string());
+
+    let key = sink_config
+        .key_partitioner()
+        .unwrap()
+        .partition(&log)
+        .expect("key wasn't provided");
+
+    let request_options = AzureBlobRequestOptions {
+        container_name,
+        blob_time_format: String::from(""),
+        blob_append_uuid: false,
+        encoder: (
+            Default::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::default().into(),
+                TextSerializerConfig::default().build().into(),
+            ),
+        ),
+        compression,
+        tags: Some(tags),
+        metadata: None,
+    };
+
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
+    let (metadata, request_metadata_builder, _events) =
+        request_options.split_input((key, vec![log]));
+
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
+    let request_metadata = request_metadata_builder.build(&payload);
+    let request = request_options.build_request(metadata, request_metadata, payload);
+
+    // BTreeMap ordering: "Owner" < "Project"; space is percent-encoded as %20.
+    assert_eq!(
+        request.tags,
+        Some("Owner=ops%20team&Project=Blue".to_string())
+    );
+    assert_eq!(request.blob_metadata, None);
+}
+
+#[test]
+fn azure_blob_build_request_with_blob_metadata() {
+    use std::collections::HashMap;
+
+    let log = Event::Log(LogEvent::from("test message"));
+    let compression = Compression::None;
+    let container_name = String::from("logs");
+    let sink_config = AzureBlobSinkConfig {
+        blob_prefix: "blob".try_into().unwrap(),
+        container_name: container_name.clone(),
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+    };
+
+    let mut metadata = HashMap::new();
+    metadata.insert("source".to_string(), "vector".to_string());
+
+    let key = sink_config
+        .key_partitioner()
+        .unwrap()
+        .partition(&log)
+        .expect("key wasn't provided");
+
+    let request_options = AzureBlobRequestOptions {
+        container_name,
+        blob_time_format: String::from(""),
+        blob_append_uuid: false,
+        encoder: (
+            Default::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::default().into(),
+                TextSerializerConfig::default().build().into(),
+            ),
+        ),
+        compression,
+        tags: None,
+        metadata: Some(metadata.clone()),
+    };
+
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
+    let (azure_metadata, request_metadata_builder, _events) =
+        request_options.split_input((key, vec![log]));
+
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
+    let request_metadata = request_metadata_builder.build(&payload);
+    let request = request_options.build_request(azure_metadata, request_metadata, payload);
+
+    assert_eq!(request.tags, None);
+    assert_eq!(request.blob_metadata, Some(metadata));
+}
+
+#[test]
+fn azure_blob_build_request_with_empty_blob_tags_and_metadata() {
+    use std::collections::{BTreeMap, HashMap};
+
+    let log = Event::Log(LogEvent::from("test message"));
+    let compression = Compression::None;
+    let container_name = String::from("logs");
+    let sink_config = AzureBlobSinkConfig {
+        blob_prefix: "blob".try_into().unwrap(),
+        container_name: container_name.clone(),
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+    };
+
+    let key = sink_config
+        .key_partitioner()
+        .unwrap()
+        .partition(&log)
+        .expect("key wasn't provided");
+
+    // Empty maps must collapse to `None` so we do not emit empty headers.
+    let request_options = AzureBlobRequestOptions {
+        container_name,
+        blob_time_format: String::from(""),
+        blob_append_uuid: false,
+        encoder: (
+            Default::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::default().into(),
+                TextSerializerConfig::default().build().into(),
+            ),
+        ),
+        compression,
+        tags: Some(BTreeMap::new()),
+        metadata: Some(HashMap::new()),
+    };
+
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
+    let (metadata, request_metadata_builder, _events) =
+        request_options.split_input((key, vec![log]));
+
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
+    let request_metadata = request_metadata_builder.build(&payload);
+    let request = request_options.build_request(metadata, request_metadata, payload);
+
+    assert_eq!(request.tags, None);
+    assert_eq!(request.blob_metadata, None);
 }

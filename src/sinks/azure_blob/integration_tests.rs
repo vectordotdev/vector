@@ -1,12 +1,15 @@
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
-use azure_core::http::StatusCode;
+use vrl::event_path;
+
+use azure_core::http::{RequestContent, StatusCode, Url};
 use azure_storage_blob::BlobContainerClient;
 
 use bytes::{Buf, BytesMut};
-use flate2::read::GzDecoder;
 use futures::{Stream, StreamExt, stream};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     ByteSizeOf,
     codecs::{
@@ -17,9 +20,10 @@ use vector_lib::{
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
+    config::ValidatedSink,
     event::{Event, EventArray, LogEvent},
     sinks::{
-        VectorSink, azure_common,
+        VectorSink, azure_blob, azure_common,
         util::{Compression, TowerRequestConfig},
     },
     test_util::{
@@ -30,11 +34,39 @@ use crate::{
 };
 
 #[tokio::test]
+async fn azure_blob_uploads_one_shot_with_shared_key() {
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let client = config.build_test_client().await;
+    let blob_name = format!("one-shot/{}.blob", random_string(10));
+    let payload = vec![b'x'; 3 * 1024 * 1024];
+
+    client
+        .blob_client(&blob_name)
+        .upload(RequestContent::from(payload), None)
+        .await
+        .expect("one-shot upload should succeed");
+}
+
+#[tokio::test]
+async fn azure_blob_uploads_multipart_with_shared_key() {
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let client = config.build_test_client().await;
+    let blob_name = format!("multipart/{}.blob", random_string(10));
+    let payload = vec![b'x'; 5 * 1024 * 1024];
+
+    client
+        .blob_client(&blob_name)
+        .upload(RequestContent::from(payload), None)
+        .await
+        .expect("multipart upload should commit the block list");
+}
+
+#[tokio::test]
 async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let client = config.build_test_client().await;
 
-    azure_common::config::build_healthcheck(config.container_name, client)
+    azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
@@ -45,7 +77,7 @@ async fn azure_blob_healthcheck_passed_with_oauth() {
     let config = AzureBlobSinkConfig::new_emulator_with_oauth().await;
     let client = config.build_test_client().await;
 
-    azure_common::config::build_healthcheck(config.container_name, client)
+    azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
         .await
         .expect("Failed to pass healthcheck");
@@ -61,7 +93,7 @@ async fn azure_blob_healthcheck_unknown_container() {
     let client = config.build_test_client().await;
 
     assert_eq!(
-        azure_common::config::build_healthcheck(config.container_name, client)
+        azure_blob::config::build_healthcheck(config.container_name, client)
             .unwrap()
             .await
             .unwrap_err()
@@ -243,6 +275,52 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached_with_oauth() {
     .await;
 }
 
+async fn assert_insert_lines_with_blob_tags_and_metadata(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("lines-tags-meta/into/blob/{}", random_string(10));
+
+    let mut tags = BTreeMap::new();
+    tags.insert("Project".to_string(), "Blue".to_string());
+    tags.insert("Owner".to_string(), "vector".to_string());
+
+    let mut metadata = HashMap::new();
+    metadata.insert("source".to_string(), "vector".to_string());
+    metadata.insert("environment".to_string(), "test".to_string());
+
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        tags: Some(tags.clone()),
+        metadata: Some(metadata.clone()),
+        ..config
+    };
+    let (_lines, input) = random_lines_with_stream(100, 10, None);
+
+    config.run_assert(input).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(blobs.len(), 1);
+
+    let blob_metadata = config.get_blob_metadata(blobs[0].clone()).await;
+    assert_eq!(blob_metadata, metadata);
+
+    let blob_tags = config.get_blob_tags(blobs[0].clone()).await;
+    let expected: HashMap<String, String> = tags.into_iter().collect();
+    assert_eq!(blob_tags, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_insert_lines_with_blob_tags_and_metadata() {
+    assert_insert_lines_with_blob_tags_and_metadata(AzureBlobSinkConfig::new_emulator().await)
+        .await;
+}
+
+#[tokio::test]
+async fn azure_blob_insert_lines_with_blob_tags_and_metadata_with_oauth() {
+    assert_insert_lines_with_blob_tags_and_metadata(
+        AzureBlobSinkConfig::new_emulator_with_oauth().await,
+    )
+    .await;
+}
+
 impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_ADDRESS").unwrap_or_else(|_| "localhost".into());
@@ -257,10 +335,13 @@ impl AzureBlobSinkConfig {
             blob_append_uuid: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
+            tags: None,
+            metadata: None,
             batch: Default::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
             tls: None,
+            confinement: Default::default(),
         };
 
         config.ensure_container().await;
@@ -281,12 +362,15 @@ impl AzureBlobSinkConfig {
             blob_append_uuid: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
+            tags: None,
+            metadata: None,
             batch: Default::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
             tls: Some(azure_common::config::AzureBlobTlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             }),
+            confinement: Default::default(),
         };
 
         config.ensure_container().await;
@@ -295,14 +379,24 @@ impl AzureBlobSinkConfig {
     }
 
     async fn build_test_client(&self) -> Arc<BlobContainerClient> {
-        azure_common::config::build_client(
+        let connection_string = self
+            .connection_string
+            .clone()
+            .expect("failed to unwrap connection_string")
+            .inner()
+            .to_string();
+        let parsed =
+            azure_common::connection_string::ParsedConnectionString::parse(&connection_string)
+                .expect("failed to parse connection string");
+        let container_url = parsed
+            .container_url(&self.container_name)
+            .expect("failed to build container URL");
+        let url = Url::parse(&container_url).expect("failed to parse container URL");
+
+        azure_blob::config::build_client(
             self.auth.clone(),
-            self.connection_string
-                .clone()
-                .expect("failed to unwrap connection_string")
-                .inner()
-                .to_string(),
-            self.container_name.clone(),
+            parsed,
+            url,
             &crate::config::ProxyConfig::default(),
             self.tls.clone(),
         )
@@ -312,7 +406,9 @@ impl AzureBlobSinkConfig {
 
     async fn to_sink(&self) -> VectorSink {
         let client = self.build_test_client().await;
-        self.build_processor(client).expect("Failed to create sink")
+        let validated = self.validate().expect("Failed to validate config");
+        self.build_processor(client, &validated)
+            .expect("Failed to create sink")
     }
 
     async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {
@@ -379,7 +475,7 @@ impl AzureBlobSinkConfig {
             .await
             .expect("Failed to download blob");
         let body_bytes = downloaded
-            .into_body()
+            .body
             .collect()
             .await
             .expect("Failed to read blob body");
@@ -388,13 +484,49 @@ impl AzureBlobSinkConfig {
         (content_type, content_encoding, self.get_blob_content(data))
     }
 
+    pub async fn get_blob_metadata(&self, blob: String) -> HashMap<String, String> {
+        let client = self.build_test_client().await;
+        let blob_client = client.blob_client(&blob);
+        let props_resp = blob_client
+            .get_properties(None)
+            .await
+            .expect("Failed to get blob properties");
+
+        const META_PREFIX: &str = "x-ms-meta-";
+        props_resp
+            .headers()
+            .iter()
+            .filter_map(|(name, value)| {
+                let key = name.as_str();
+                let suffix = key.get(META_PREFIX.len()..)?;
+                let prefix = key.get(..META_PREFIX.len())?;
+                if prefix.eq_ignore_ascii_case(META_PREFIX) {
+                    Some((suffix.to_string(), value.as_str().to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub async fn get_blob_tags(&self, blob: String) -> HashMap<String, String> {
+        let client = self.build_test_client().await;
+        let blob_client = client.blob_client(&blob);
+        let resp = blob_client
+            .get_tags(None)
+            .await
+            .expect("Failed to get blob tags");
+        let body = resp.into_model().expect("Failed to decode tags body");
+        HashMap::from(body)
+    }
+
     fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
         let body = BytesMut::from(data.as_slice()).freeze().reader();
 
         if self.compression == Compression::None {
             BufReader::new(body).lines().map(|l| l.unwrap()).collect()
         } else {
-            BufReader::new(GzDecoder::new(body))
+            BufReader::new(CappedDecoder::gzip(body).into_reader())
                 .lines()
                 .map(|l| l.unwrap())
                 .collect()
@@ -431,7 +563,7 @@ fn random_lines_with_stream_with_group_key(
         .map(move |(i, line)| {
             let mut log = LogEvent::from(line);
             let i = ((i / key) + 1) as i32;
-            log.insert("key", i);
+            log.insert(event_path!("key"), i);
             Event::from(log)
         })
         .fold((0, Vec::new()), |(mut size, mut events), event| {

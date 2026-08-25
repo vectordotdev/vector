@@ -4,7 +4,6 @@ components: sinks: opentelemetry: {
 	title: "Open Telemetry"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
