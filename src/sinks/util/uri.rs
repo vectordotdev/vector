@@ -199,34 +199,27 @@ pub fn protocol_endpoint(uri: Uri) -> (String, String) {
 }
 
 /// Error returned when a configured endpoint cannot be used as an absolute HTTP URL.
+///
+/// Endpoint and path values are deliberately omitted so configuration errors
+/// cannot retain or display embedded credentials or tokens.
 #[derive(Debug, Snafu)]
 pub enum HttpEndpointError {
-    #[snafu(display("endpoint `{endpoint}` is not a valid URI: {source}"))]
-    InvalidUri {
-        endpoint: String,
-        source: http::uri::InvalidUri,
-    },
+    #[snafu(display("endpoint is not a valid URI: {source}"))]
+    InvalidUri { source: http::uri::InvalidUri },
 
-    #[snafu(display("endpoint `{endpoint}` has an invalid path `{path}`: {source}"))]
-    InvalidPath {
-        endpoint: String,
-        path: String,
-        source: http::uri::InvalidUri,
-    },
+    #[snafu(display("endpoint has an invalid path: {source}"))]
+    InvalidPath { source: http::uri::InvalidUri },
 
-    #[snafu(display("endpoint `{endpoint}` cannot be reassembled from its parts: {source}"))]
-    InvalidUriParts {
-        endpoint: String,
-        source: http::uri::InvalidUriParts,
-    },
+    #[snafu(display("endpoint cannot be reassembled from its parts: {source}"))]
+    InvalidUriParts { source: http::uri::InvalidUriParts },
 
     #[snafu(display(
-        "endpoint must be an absolute http(s) URL, for example `https://example.com`; got `{endpoint}`"
+        "endpoint must be an absolute http(s) URL, for example `https://example.com`"
     ))]
-    NotAbsoluteHttp { endpoint: String },
+    NotAbsoluteHttp,
 
-    #[snafu(display("endpoint `{endpoint}` has an invalid port"))]
-    InvalidPort { endpoint: String },
+    #[snafu(display("endpoint has an invalid port"))]
+    InvalidPort,
 }
 
 /// A `Uri` proven to be an absolute `http`/`https` URL.
@@ -276,14 +269,10 @@ impl HttpEndpoint {
         let has_valid_scheme_and_host = matches!(uri.scheme_str(), Some("http" | "https"))
             && uri.host().is_some_and(|host| !host.is_empty());
         if !has_valid_scheme_and_host {
-            return Err(HttpEndpointError::NotAbsoluteHttp {
-                endpoint: redact_userinfo(&uri.to_string()),
-            });
+            return Err(HttpEndpointError::NotAbsoluteHttp);
         }
         if authority_has_invalid_port(&uri) {
-            return Err(HttpEndpointError::InvalidPort {
-                endpoint: redact_userinfo(&uri.to_string()),
-            });
+            return Err(HttpEndpointError::InvalidPort);
         }
         Ok(Self(uri))
     }
@@ -300,14 +289,10 @@ impl HttpEndpoint {
         // the scheme is added up front rather than relying on the parser to
         // accept authority-form input.
         let uri = if has_scheme(endpoint) {
-            endpoint.parse::<Uri>().context(InvalidUriSnafu {
-                endpoint: redact_userinfo(endpoint),
-            })?
+            endpoint.parse::<Uri>().context(InvalidUriSnafu)?
         } else {
             let endpoint = format!("https://{endpoint}");
-            endpoint.parse::<Uri>().context(InvalidUriSnafu {
-                endpoint: redact_userinfo(&endpoint),
-            })?
+            endpoint.parse::<Uri>().context(InvalidUriSnafu)?
         };
         Self::new(uri)
     }
@@ -375,13 +360,8 @@ impl HttpEndpoint {
         } else {
             format!("{base_path}/{}", path.strip_prefix('/').unwrap_or(path))
         };
-        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: redact_userinfo(&self.0.to_string()),
-            path: joined,
-        })?);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint: redact_userinfo(&self.0.to_string()),
-        })?;
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu)?);
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu)?;
         Self::new(uri)
     }
 
@@ -401,13 +381,8 @@ impl HttpEndpoint {
             .map(PathAndQuery::path)
             .unwrap_or_default();
         let joined = format!("{base_path}{suffix}");
-        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: redact_userinfo(&self.0.to_string()),
-            path: joined,
-        })?);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint: redact_userinfo(&self.0.to_string()),
-        })?;
+        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu)?);
+        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu)?;
         Self::new(uri)
     }
 }
@@ -462,59 +437,6 @@ fn has_scheme(endpoint: &str) -> bool {
     let mut chars = scheme.chars();
     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic())
         && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
-}
-
-/// Redacts userinfo from an endpoint string for error messages, so embedded
-/// basic-auth credentials are not echoed into logs or command output.
-///
-/// Leading scheme prefixes are skipped before inspecting the authority-like
-/// segment. Repeating this handles a defaulted `https://` prefix followed by a
-/// malformed original prefix such as `http:/`. An `@` later in the path or
-/// query is left untouched.
-fn redact_userinfo(endpoint: &str) -> String {
-    let mut authority_start = 0;
-    while let Some(rest) = endpoint.get(authority_start..) {
-        let Some(scheme_end) = rest.find(':') else {
-            break;
-        };
-        let Some(scheme) = rest.get(..scheme_end) else {
-            break;
-        };
-        let mut chars = scheme.chars();
-        let valid_scheme = matches!(chars.next(), Some(c) if c.is_ascii_alphabetic())
-            && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'));
-        if !valid_scheme {
-            break;
-        }
-
-        let after_colon = authority_start + scheme_end + 1;
-        let slash_count = endpoint
-            .get(after_colon..)
-            .unwrap_or_default()
-            .bytes()
-            .take_while(|byte| *byte == b'/')
-            .count();
-        let is_http = scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https");
-        if slash_count == 0 && !is_http {
-            break;
-        }
-        authority_start = after_colon + slash_count;
-    }
-
-    let Some(rest) = endpoint.get(authority_start..) else {
-        return endpoint.to_string();
-    };
-    // The authority ends at the first `/`, `?`, or `#`; `find` returns the
-    // byte offset of an ASCII delimiter, which is a valid char boundary.
-    let (authority, tail) = match rest.find(['/', '?', '#']) {
-        Some(i) => rest.split_at(i),
-        None => (rest, ""),
-    };
-    let Some((_, host_port)) = authority.rsplit_once('@') else {
-        return endpoint.to_string();
-    };
-    let prefix = endpoint.get(..authority_start).unwrap_or_default();
-    format!("{prefix}<redacted>@{host_port}{tail}")
 }
 
 #[cfg(test)]
@@ -669,10 +591,10 @@ mod tests {
             assert!(
                 matches!(
                     HttpEndpoint::parse(endpoint),
-                    Err(HttpEndpointError::NotAbsoluteHttp { .. })
+                    Err(HttpEndpointError::NotAbsoluteHttp)
                         | Err(HttpEndpointError::InvalidUri { .. })
                         | Err(HttpEndpointError::InvalidUriParts { .. })
-                        | Err(HttpEndpointError::InvalidPort { .. })
+                        | Err(HttpEndpointError::InvalidPort)
                 ),
                 "expected `{endpoint}` to be rejected"
             );
@@ -693,7 +615,7 @@ mod tests {
         ] {
             assert!(matches!(
                 HttpEndpoint::parse(endpoint),
-                Err(HttpEndpointError::InvalidPort { .. })
+                Err(HttpEndpointError::InvalidPort)
             ));
         }
     }
@@ -704,16 +626,17 @@ mod tests {
             "http://user:secret@localhost:notaport",
             "user:secret@exa mple.com",
             "http:/user:secret@example.com",
+            "http:://user:secret@example.com",
         ] {
             let error = HttpEndpoint::parse(endpoint).expect_err("endpoint should be rejected");
             let message = error.to_string();
             assert!(
-                !message.contains("secret"),
-                "error must not echo the password: {message}"
+                !message.contains(endpoint),
+                "error must not echo the endpoint: {message}"
             );
             assert!(
-                message.contains("<redacted>@"),
-                "error should mark the redacted userinfo: {message}"
+                !message.contains("secret"),
+                "error must not echo the password: {message}"
             );
         }
     }
