@@ -249,6 +249,25 @@ pub enum HttpEndpointError {
 #[serde(try_from = "String", into = "String")]
 pub struct HttpEndpoint(Uri);
 
+fn redact_uri(uri: &Uri) -> String {
+    if uri
+        .authority()
+        .is_some_and(|authority| authority.as_str().contains('@'))
+    {
+        "<redacted endpoint>".to_owned()
+    } else {
+        uri.to_string()
+    }
+}
+
+fn redact_unparsed_endpoint(endpoint: &str) -> String {
+    if endpoint.contains('@') {
+        "<redacted endpoint>".to_owned()
+    } else {
+        endpoint.to_owned()
+    }
+}
+
 impl TryFrom<String> for HttpEndpoint {
     type Error = HttpEndpointError;
 
@@ -276,12 +295,12 @@ impl HttpEndpoint {
             && uri.host().is_some_and(|host| !host.is_empty());
         if !has_valid_scheme_and_host {
             return Err(HttpEndpointError::NotAbsoluteHttp {
-                endpoint: uri.to_string(),
+                endpoint: redact_uri(&uri),
             });
         }
         if authority_has_invalid_port(&uri) {
             return Err(HttpEndpointError::InvalidPort {
-                endpoint: uri.to_string(),
+                endpoint: redact_uri(&uri),
             });
         }
         Ok(Self(uri))
@@ -298,14 +317,18 @@ impl HttpEndpoint {
         // `host:port/path` without a scheme (it reads `host` as a scheme), so
         // the scheme is added up front rather than relying on the parser to
         // accept authority-form input.
+        let parse = |value: &str| {
+            value
+                .parse::<Uri>()
+                .map_err(|source| HttpEndpointError::InvalidUri {
+                    endpoint: redact_unparsed_endpoint(endpoint),
+                    source,
+                })
+        };
         let uri = if has_scheme(endpoint) {
-            endpoint
-                .parse::<Uri>()
-                .context(InvalidUriSnafu { endpoint })?
+            parse(endpoint)?
         } else {
-            format!("https://{endpoint}")
-                .parse::<Uri>()
-                .context(InvalidUriSnafu { endpoint })?
+            parse(&format!("https://{endpoint}"))?
         };
         Self::new(uri)
     }
@@ -627,8 +650,10 @@ mod tests {
 
     #[test]
     fn http_endpoint_reports_unparseable_endpoints() {
-        let error = HttpEndpoint::parse("http://exa mple.com").unwrap_err();
+        let endpoint = "http://exa mple.com";
+        let error = HttpEndpoint::parse(endpoint).unwrap_err();
         assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
+        assert!(error.to_string().contains(endpoint));
     }
 
     #[test]
@@ -641,6 +666,18 @@ mod tests {
                 HttpEndpoint::parse(endpoint),
                 Err(HttpEndpointError::InvalidPort { .. })
             ));
+        }
+    }
+
+    #[test]
+    fn http_endpoint_errors_redact_userinfo() {
+        for endpoint in [
+            "http://user:secret@localhost:notaport",
+            "http://user:secret@exa mple.com",
+        ] {
+            let message = HttpEndpoint::parse(endpoint).unwrap_err().to_string();
+            assert!(message.contains("<redacted endpoint>"), "{message}");
+            assert!(!message.contains("secret"), "{message}");
         }
     }
 
