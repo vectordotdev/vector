@@ -388,12 +388,17 @@ impl HttpEndpoint {
         } else {
             format!("{base_path}/{}", path.strip_prefix('/').unwrap_or(path))
         };
-        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: self.0.to_string(),
-            path: joined,
-        })?);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint: self.0.to_string(),
+        parts.path_and_query =
+            Some(
+                joined
+                    .parse::<PathAndQuery>()
+                    .with_context(|_| InvalidPathSnafu {
+                        endpoint: redact_uri(&self.0),
+                        path: joined,
+                    })?,
+            );
+        let uri = Uri::from_parts(parts).with_context(|_| InvalidUriPartsSnafu {
+            endpoint: redact_uri(&self.0),
         })?;
         Self::new(uri)
     }
@@ -414,12 +419,17 @@ impl HttpEndpoint {
             .map(PathAndQuery::path)
             .unwrap_or_default();
         let joined = format!("{base_path}{suffix}");
-        parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: self.0.to_string(),
-            path: joined,
-        })?);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint: self.0.to_string(),
+        parts.path_and_query =
+            Some(
+                joined
+                    .parse::<PathAndQuery>()
+                    .with_context(|_| InvalidPathSnafu {
+                        endpoint: redact_uri(&self.0),
+                        path: joined,
+                    })?,
+            );
+        let uri = Uri::from_parts(parts).with_context(|_| InvalidUriPartsSnafu {
+            endpoint: redact_uri(&self.0),
         })?;
         Self::new(uri)
     }
@@ -676,6 +686,21 @@ mod tests {
             "http://user:secret@exa mple.com",
         ] {
             let message = HttpEndpoint::parse(endpoint).unwrap_err().to_string();
+            assert!(message.contains("<redacted endpoint>"), "{message}");
+            assert!(!message.contains("secret"), "{message}");
+        }
+    }
+
+    #[test]
+    fn http_endpoint_append_errors_redact_userinfo() {
+        let endpoint = HttpEndpoint::parse("https://user:secret@example.com/base").unwrap();
+
+        for error in [
+            endpoint.append_path("invalid path").unwrap_err(),
+            endpoint.append_raw_suffix(" invalid suffix").unwrap_err(),
+        ] {
+            assert!(matches!(&error, HttpEndpointError::InvalidPath { .. }));
+            let message = error.to_string();
             assert!(message.contains("<redacted endpoint>"), "{message}");
             assert!(!message.contains("secret"), "{message}");
         }
