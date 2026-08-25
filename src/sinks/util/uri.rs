@@ -320,6 +320,21 @@ impl HttpEndpoint {
         self.0
     }
 
+    /// Extracts basic-auth credentials embedded in the authority, returning a
+    /// credential-free endpoint alongside the credentials.
+    pub fn extract_basic_auth(self) -> crate::Result<(Self, Option<Auth>)> {
+        if !self
+            .as_uri()
+            .authority()
+            .is_some_and(|authority| authority.as_str().contains('@'))
+        {
+            return Ok((self, None));
+        }
+
+        let UriSerde { uri, auth } = self.into_uri().try_into()?;
+        Ok((Self::new(uri)?, auth))
+    }
+
     /// Returns the URL scheme (`http` or `https`) of this endpoint.
     ///
     /// [`HttpEndpoint::new`] guarantees the scheme is an absolute `http`/`https`
@@ -537,6 +552,15 @@ mod tests {
             ));
             assert!(endpoint.as_uri().authority().is_some());
         }
+    }
+
+    #[test]
+    fn http_endpoint_extracts_basic_auth() {
+        let endpoint = HttpEndpoint::parse("http://user:pass@example.com:8080/path").unwrap();
+        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
+
+        assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
+        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
     }
 
     #[test]
