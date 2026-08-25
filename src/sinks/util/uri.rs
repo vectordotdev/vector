@@ -467,10 +467,41 @@ fn has_scheme(endpoint: &str) -> bool {
 /// Redacts userinfo from an endpoint string for error messages, so embedded
 /// basic-auth credentials are not echoed into logs or command output.
 ///
-/// Only the authority portion (between the scheme and the first `/`, `?`, or
-/// `#`) is inspected; an `@` later in the path or query is left untouched.
+/// Leading scheme prefixes are skipped before inspecting the authority-like
+/// segment. Repeating this handles a defaulted `https://` prefix followed by a
+/// malformed original prefix such as `http:/`. An `@` later in the path or
+/// query is left untouched.
 fn redact_userinfo(endpoint: &str) -> String {
-    let Some((scheme, rest)) = endpoint.split_once("://") else {
+    let mut authority_start = 0;
+    while let Some(rest) = endpoint.get(authority_start..) {
+        let Some(scheme_end) = rest.find(':') else {
+            break;
+        };
+        let Some(scheme) = rest.get(..scheme_end) else {
+            break;
+        };
+        let mut chars = scheme.chars();
+        let valid_scheme = matches!(chars.next(), Some(c) if c.is_ascii_alphabetic())
+            && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'));
+        if !valid_scheme {
+            break;
+        }
+
+        let after_colon = authority_start + scheme_end + 1;
+        let slash_count = endpoint
+            .get(after_colon..)
+            .unwrap_or_default()
+            .bytes()
+            .take_while(|byte| *byte == b'/')
+            .count();
+        let is_http = scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https");
+        if slash_count == 0 && !is_http {
+            break;
+        }
+        authority_start = after_colon + slash_count;
+    }
+
+    let Some(rest) = endpoint.get(authority_start..) else {
         return endpoint.to_string();
     };
     // The authority ends at the first `/`, `?`, or `#`; `find` returns the
@@ -482,7 +513,8 @@ fn redact_userinfo(endpoint: &str) -> String {
     let Some((_, host_port)) = authority.rsplit_once('@') else {
         return endpoint.to_string();
     };
-    format!("{scheme}://<redacted>@{host_port}{tail}")
+    let prefix = endpoint.get(..authority_start).unwrap_or_default();
+    format!("{prefix}<redacted>@{host_port}{tail}")
 }
 
 #[cfg(test)]
@@ -671,6 +703,7 @@ mod tests {
         for endpoint in [
             "http://user:secret@localhost:notaport",
             "user:secret@exa mple.com",
+            "http:/user:secret@example.com",
         ] {
             let error = HttpEndpoint::parse(endpoint).expect_err("endpoint should be rejected");
             let message = error.to_string();
