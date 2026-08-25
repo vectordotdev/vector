@@ -4,4 +4,4 @@ transforms:
     inputs:
       - my-source-or-transform-id
     threshold: 100
-    window_secs: 1
+    window_secs: 1.0

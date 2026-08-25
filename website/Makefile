@@ -1,4 +1,5 @@
 CUE = ../scripts/cue.sh
+VDEV ?= cargo vdev
 
 export CI ?= false
 
@@ -10,8 +11,12 @@ export SERVER_PORT ?= 1313
 clean:
 	rm -rf public resources data/cargo-lock.toml data/docs.json
 
+.PHONY: setup-vdev
+setup-vdev:
+	cd .. && scripts/environment/prepare.sh --modules=vdev,prettier
+
 .PHONY: setup
-setup:
+setup: setup-vdev
 	yarn
 
 # Copy Cargo data such as the dependency information file
@@ -19,30 +24,18 @@ cargo-data:
 	cp -f ../Cargo.lock data/cargo-lock.toml
 
 # Build JSON from CUE sources with `make cue-build`. Run other commands with `make cue-*`
+cue-build:
+	$(VDEV) build docs-json
+
 cue-%:
 	${CUE} $*
 
+.PHONY: component-examples
+component-examples: setup-vdev
+	$(VDEV) build component-examples website/generated/example-configs
+
 .PHONY: config-examples
-config-examples: setup cue-build
-	yarn config-examples
-
-CARGO_TARGET_DIR ?= ../target
-
-ifeq ($(origin VECTOR_BIN), undefined)
-VALIDATE_VECTOR_BIN := $(abspath $(CARGO_TARGET_DIR)/debug/vector)
-VALIDATE_VECTOR_BUILD := true
-else
-VALIDATE_VECTOR_BIN := $(VECTOR_BIN)
-endif
-
-.PHONY: validate-config-examples
-validate-config-examples: config-examples
-ifeq ($(VALIDATE_VECTOR_BUILD),true)
-	CARGO_TARGET_DIR="$(abspath $(CARGO_TARGET_DIR))" cargo build --manifest-path ../Cargo.toml
-endif
-	VECTOR_BIN="$(VALIDATE_VECTOR_BIN)" yarn validate-config-examples
-
-VDEV ?= cargo vdev
+config-examples: component-examples
 
 generate-vrl-docs:
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
@@ -51,7 +44,7 @@ generate-vrl-docs:
 generate-deprecations-json:
 	$(VDEV) deprecation generate
 
-structured-data: generate-vrl-docs generate-deprecations-json config-examples
+structured-data: generate-vrl-docs generate-deprecations-json component-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \

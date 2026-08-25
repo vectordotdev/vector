@@ -17,7 +17,7 @@ use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_paylo
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
-        datadog::{DatadogMetricType, DatadogSeriesMetric},
+        datadog::{DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogSeriesMetric},
         http::ErrorMessage,
     },
     config::log_schema,
@@ -283,8 +283,8 @@ pub(crate) fn decode_ddseries_v2(
             };
 
             serie.resources.into_iter().for_each(|r| {
-                // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
-                // the hostname can be found in MetricSeries::resources and that is the only value stored there.
+                // As per https://github.com/DataDog/datadog-agent/blob/965622d50073913d95176606ebcbd0f7553627b6/pkg/serializer/internal/metrics/iterable_series.go#L201-L264
+                // MetricSeries::resources can contain host, device, and other series resources.
                 if r.r#type.eq("host") {
                     log_schema()
                         .host_key()
@@ -294,8 +294,11 @@ pub(crate) fn decode_ddseries_v2(
                     // and must be preserved as a plain `device` tag to match the v1 series behavior.
                     tags.replace("device".into(), r.name);
                 } else {
-                    // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
-                    tags.replace(format!("resource.{}", r.r#type), r.name);
+                    // Preserve other resources in the generic metric tags.
+                    tags.insert(
+                        format!("{DATADOG_METRIC_RESOURCE_TAG_PREFIX}{}", r.r#type),
+                        r.name,
+                    );
                 }
             });
             (!serie.source_type_name.is_empty())

@@ -334,7 +334,7 @@ releases: "0.18.0": {
 				"""
 		},
 		{
-			type:     "deprecation"
+			type:     "chore"
 			breaking: true
 			scopes: ["sinks"]
 			description: """
@@ -344,7 +344,7 @@ releases: "0.18.0": {
 				"""
 		},
 		{
-			type:     "deprecation"
+			type:     "chore"
 			breaking: true
 			scopes: ["sinks"]
 			description: """
@@ -354,7 +354,7 @@ releases: "0.18.0": {
 				"""
 		},
 		{
-			type:     "deprecation"
+			type:     "chore"
 			breaking: true
 			scopes: ["datadog_metrics sink"]
 			description: """

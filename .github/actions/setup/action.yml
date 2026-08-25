@@ -193,10 +193,10 @@ runs:
         echo "Installing cue"
         TEMP=$(mktemp -d)
         curl \
-          -L https://github.com/cue-lang/cue/releases/download/v0.16.1/cue_v0.16.1_linux_amd64.tar.gz \
-          -o "${TEMP}/cue_v0.16.1_linux_amd64.tar.gz"
+          -L https://github.com/cue-lang/cue/releases/download/v0.17.1/cue_v0.17.1_linux_amd64.tar.gz \
+          -o "${TEMP}/cue_v0.17.1_linux_amd64.tar.gz"
         tar \
-          -xvf "${TEMP}/cue_v0.16.1_linux_amd64.tar.gz" \
+          -xvf "${TEMP}/cue_v0.17.1_linux_amd64.tar.gz" \
           -C "${TEMP}"
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
@@ -220,8 +220,7 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
-          ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh', 'vdev/Cargo.toml') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
         restore-keys: |
           ${{ runner.os }}-cargo-binaries-
 

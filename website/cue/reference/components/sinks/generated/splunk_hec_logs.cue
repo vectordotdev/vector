@@ -221,7 +221,7 @@ generated: components: sinks: splunk_hec_logs: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -659,7 +659,7 @@ generated: components: sinks: splunk_hec_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ host }}", "custom_index"]
+			examples: ["index-{{ host }}", "custom_index"]
 			syntax: "template"
 		}
 	}
@@ -871,7 +871,7 @@ generated: components: sinks: splunk_hec_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+			examples: ["source-{{ file }}", "/var/log/syslog", "UDP:514"]
 			syntax: "template"
 		}
 	}
@@ -883,7 +883,7 @@ generated: components: sinks: splunk_hec_logs: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ sourcetype }}", "_json"]
+			examples: ["sourcetype-{{ sourcetype }}", "_json"]
 			syntax: "template"
 		}
 	}
