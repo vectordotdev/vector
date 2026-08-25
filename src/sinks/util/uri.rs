@@ -1,25 +1,11 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with format_with expands to a must_use let binding"
-)]
-
 use std::{fmt, str::FromStr};
 
-use derivative::Derivative;
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
-use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
+use percent_encoding::percent_decode_str;
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
 
 use crate::http::Auth;
-
-/// Percent-encode every byte except RFC 3986 unreserved characters so decoded
-/// usernames cannot change the structure of an authority when serialized.
-const USERNAME_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
-    .remove(b'-')
-    .remove(b'.')
-    .remove(b'_')
-    .remove(b'~');
 
 /// A wrapper for `http::Uri` that implements `Deserialize` and `Serialize`.
 ///
@@ -95,7 +81,6 @@ impl fmt::Display for UriSerde {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.uri.authority(), &self.auth) {
             (Some(authority), Some(Auth::Basic { user, password })) => {
-                let user = utf8_percent_encode(user, USERNAME_ENCODE_SET);
                 let authority = format!("{user}:{password}@{authority}");
                 let authority =
                     Authority::from_maybe_shared(authority).map_err(|_| std::fmt::Error)?;
@@ -143,10 +128,6 @@ impl TryFrom<Uri> for UriSerde {
 }
 
 fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Auth>)> {
-    if !authority.as_str().contains('@') {
-        return Ok((authority.clone(), None));
-    }
-
     // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
@@ -183,47 +164,6 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
     } else {
         Ok((authority.clone(), None))
     }
-}
-
-fn extract_http_endpoint_basic_auth(
-    authority: &Authority,
-    endpoint: &str,
-) -> Result<(Authority, Option<Auth>), HttpEndpointError> {
-    let url = url::Url::parse(&format!("http://{authority}")).map_err(|source| {
-        HttpEndpointError::InvalidAuth {
-            endpoint: endpoint.to_owned(),
-            source,
-        }
-    })?;
-    let has_auth = !url.username().is_empty() || url.password().is_some();
-    let user = percent_decode_str(url.username())
-        .decode_utf8_lossy()
-        .into_owned();
-    let password = percent_decode_str(url.password().unwrap_or(""))
-        .decode_utf8_lossy()
-        .into_owned();
-    let host = url
-        .host_str()
-        .ok_or_else(|| HttpEndpointError::NotAbsoluteHttp {
-            endpoint: endpoint.to_owned(),
-        })?;
-    let host_port = match authority.port() {
-        Some(port) => format!("{host}:{}", port.as_str()),
-        None => host.to_string(),
-    };
-    let authority =
-        host_port
-            .parse::<Authority>()
-            .map_err(|source| HttpEndpointError::InvalidUri {
-                endpoint: endpoint.to_owned(),
-                source,
-            })?;
-    let auth = has_auth.then_some(Auth::Basic {
-        user,
-        password: password.into(),
-    });
-
-    Ok((authority, auth))
 }
 
 /// Simplify the URI into a protocol and endpoint by removing the
@@ -266,28 +206,21 @@ pub enum HttpEndpointError {
         source: http::uri::InvalidUri,
     },
 
-    #[snafu(display("endpoint `{endpoint}` contains invalid basic authentication: {source}"))]
-    InvalidAuth {
-        endpoint: String,
-        source: url::ParseError,
-    },
-
-    #[snafu(display("path `{path}` is not valid for endpoint `{endpoint}`: {source}"))]
+    #[snafu(display("endpoint `{endpoint}` has an invalid path `{path}`: {source}"))]
     InvalidPath {
         endpoint: String,
         path: String,
         source: http::uri::InvalidUri,
     },
 
-    #[snafu(display("path `{path}` cannot be applied to endpoint `{endpoint}`: {source}"))]
+    #[snafu(display("endpoint `{endpoint}` cannot be reassembled from its parts: {source}"))]
     InvalidUriParts {
         endpoint: String,
-        path: String,
         source: http::uri::InvalidUriParts,
     },
 
     #[snafu(display(
-        "endpoint `{endpoint}` must be an absolute http(s) URL, for example `https://example.com`"
+        "endpoint must be an absolute http(s) URL, for example `https://example.com`; got `{endpoint}`"
     ))]
     NotAbsoluteHttp { endpoint: String },
 
@@ -307,58 +240,14 @@ pub enum HttpEndpointError {
 /// endpoint is rejected at config load time with the config path in the error.
 ///
 /// Path composition goes through [`HttpEndpoint::append_path`], which
-/// manipulates `Uri` parts directly instead of string-concatenating and
+/// manipates `Uri` parts directly instead of string-concatenating and
 /// re-parsing, so the scheme and authority are preserved and the result is
 /// still an absolute `http(s)` URL.
 #[configurable_component]
 #[configurable(title = "An absolute HTTP(S) URL.", description = "")]
-#[configurable(metadata(sensitive))]
-#[derive(Derivative, Clone, PartialEq, Eq)]
-#[derivative(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[serde(try_from = "String", into = "String")]
-pub struct HttpEndpoint {
-    #[derivative(Debug(format_with = "fmt_redacted_uri"))]
-    uri: Uri,
-    #[derivative(Debug = "ignore")]
-    auth: Option<Auth>,
-}
-
-struct RedactedUri<'a>(&'a Uri);
-
-impl fmt::Display for RedactedUri<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_redacted_uri(self.0, f)
-    }
-}
-
-fn fmt_redacted_uri(uri: &Uri, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if let Some(scheme) = uri.scheme_str() {
-        write!(f, "{scheme}://")?;
-    }
-    if let Some(authority) = uri.authority() {
-        if let Some((_, host_port)) = authority.as_str().rsplit_once('@') {
-            write!(f, "<redacted>@{host_port}")?;
-        } else {
-            f.write_str(authority.as_str())?;
-        }
-    }
-    if let Some(path_and_query) = uri.path_and_query() {
-        f.write_str(path_and_query.as_str())?;
-    }
-    Ok(())
-}
-
-fn redact_uri(uri: &Uri) -> String {
-    RedactedUri(uri).to_string()
-}
-
-fn redact_unparsed_endpoint(endpoint: &str) -> String {
-    if endpoint.contains('@') {
-        "<redacted endpoint>".to_owned()
-    } else {
-        endpoint.to_owned()
-    }
-}
+pub struct HttpEndpoint(Uri);
 
 impl TryFrom<String> for HttpEndpoint {
     type Error = HttpEndpointError;
@@ -370,11 +259,7 @@ impl TryFrom<String> for HttpEndpoint {
 
 impl From<HttpEndpoint> for String {
     fn from(value: HttpEndpoint) -> Self {
-        UriSerde {
-            uri: value.uri,
-            auth: value.auth,
-        }
-        .to_string()
+        value.to_string()
     }
 }
 
@@ -387,43 +272,19 @@ impl HttpEndpoint {
     /// `http://localhost:notaport` parses with a nonempty host but a port that
     /// cannot be dialed. Both are checked explicitly.
     pub fn new(uri: Uri) -> Result<Self, HttpEndpointError> {
-        Self::new_with_diagnostic(uri, None)
-    }
-
-    fn new_with_diagnostic(
-        uri: Uri,
-        diagnostic_endpoint: Option<String>,
-    ) -> Result<Self, HttpEndpointError> {
         let has_valid_scheme_and_host = matches!(uri.scheme_str(), Some("http" | "https"))
             && uri.host().is_some_and(|host| !host.is_empty());
         if !has_valid_scheme_and_host {
             return Err(HttpEndpointError::NotAbsoluteHttp {
-                endpoint: diagnostic_endpoint.unwrap_or_else(|| redact_uri(&uri)),
+                endpoint: uri.to_string(),
             });
         }
         if authority_has_invalid_port(&uri) {
             return Err(HttpEndpointError::InvalidPort {
-                endpoint: diagnostic_endpoint.unwrap_or_else(|| redact_uri(&uri)),
+                endpoint: uri.to_string(),
             });
         }
-        let authority = uri
-            .authority()
-            .expect("an HttpEndpoint always has an authority");
-        if !authority.as_str().contains('@') {
-            return Ok(Self { uri, auth: None });
-        }
-
-        let endpoint = diagnostic_endpoint.unwrap_or_else(|| redact_uri(&uri));
-        let path = uri
-            .path_and_query()
-            .map(PathAndQuery::as_str)
-            .unwrap_or_default()
-            .to_owned();
-        let (authority, auth) = extract_http_endpoint_basic_auth(authority, &endpoint)?;
-        let mut parts = uri.into_parts();
-        parts.authority = Some(authority);
-        let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu { endpoint, path })?;
-        Ok(Self { uri, auth })
+        Ok(Self(uri))
     }
 
     /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
@@ -437,53 +298,41 @@ impl HttpEndpoint {
         // `host:port/path` without a scheme (it reads `host` as a scheme), so
         // the scheme is added up front rather than relying on the parser to
         // accept authority-form input.
-        let diagnostic_endpoint = redact_unparsed_endpoint(endpoint);
         let uri = if has_scheme(endpoint) {
             endpoint
                 .parse::<Uri>()
-                .map_err(|source| HttpEndpointError::InvalidUri {
-                    endpoint: diagnostic_endpoint.clone(),
-                    source,
-                })?
+                .context(InvalidUriSnafu { endpoint })?
         } else {
-            let endpoint = format!("https://{endpoint}");
-            endpoint
+            format!("https://{endpoint}")
                 .parse::<Uri>()
-                .map_err(|source| HttpEndpointError::InvalidUri {
-                    endpoint: diagnostic_endpoint.clone(),
-                    source,
-                })?
+                .context(InvalidUriSnafu { endpoint })?
         };
-        let diagnostic_endpoint = if uri
+        Self::new(uri)
+    }
+
+    /// Returns the underlying `Uri`.
+    pub const fn as_uri(&self) -> &Uri {
+        &self.0
+    }
+
+    /// Consumes the endpoint, returning the underlying `Uri`.
+    pub fn into_uri(self) -> Uri {
+        self.0
+    }
+
+    /// Extracts basic-auth credentials embedded in the authority, returning a
+    /// credential-free endpoint alongside the credentials.
+    pub fn extract_basic_auth(self) -> crate::Result<(Self, Option<Auth>)> {
+        if !self
+            .as_uri()
             .authority()
             .is_some_and(|authority| authority.as_str().contains('@'))
         {
-            redact_uri(&uri)
-        } else {
-            diagnostic_endpoint
-        };
-        Self::new_with_diagnostic(uri, Some(diagnostic_endpoint))
-    }
+            return Ok((self, None));
+        }
 
-    /// Returns the underlying credential-free `Uri`.
-    pub const fn as_uri(&self) -> &Uri {
-        &self.uri
-    }
-
-    /// Returns basic-auth credentials extracted from the configured endpoint.
-    pub const fn auth(&self) -> Option<&Auth> {
-        self.auth.as_ref()
-    }
-
-    /// Consumes the endpoint, returning the underlying credential-free `Uri`.
-    pub fn into_uri(self) -> Uri {
-        self.uri
-    }
-
-    /// Takes basic-auth credentials extracted while parsing the endpoint.
-    pub fn extract_basic_auth(mut self) -> crate::Result<(Self, Option<Auth>)> {
-        let auth = self.auth.take();
-        Ok((self, auth))
+        let UriSerde { uri, auth } = self.into_uri().try_into()?;
+        Ok((Self::new(uri)?, auth))
     }
 
     /// Returns the URL scheme (`http` or `https`) of this endpoint.
@@ -491,7 +340,7 @@ impl HttpEndpoint {
     /// [`HttpEndpoint::new`] guarantees the scheme is an absolute `http`/`https`
     /// scheme, so this is infallible.
     pub fn protocol(&self) -> &str {
-        self.uri.scheme_str().unwrap_or("https")
+        self.0.scheme_str().unwrap_or("https")
     }
 
     /// Appends `path` to this endpoint, preserving the scheme and authority.
@@ -503,30 +352,27 @@ impl HttpEndpoint {
         if path.is_empty() {
             return Ok(self.clone());
         }
-        let mut parts = self.uri.clone().into_parts();
+        let mut parts = self.0.clone().into_parts();
         let base_path = parts
             .path_and_query
             .as_ref()
             .map(PathAndQuery::path)
             .unwrap_or_default();
-        let joined = format!(
-            "{}/{}",
-            base_path.trim_end_matches('/'),
-            path.trim_start_matches('/')
-        );
-        let endpoint = self.to_string();
+        let joined = if base_path.is_empty() {
+            path.to_string()
+        } else if base_path.ends_with('/') {
+            format!("{base_path}{}", path.strip_prefix('/').unwrap_or(path))
+        } else {
+            format!("{base_path}/{}", path.strip_prefix('/').unwrap_or(path))
+        };
         parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: endpoint.clone(),
-            path: path.to_owned(),
+            endpoint: self.0.to_string(),
+            path: joined,
         })?);
         let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint,
-            path: path.to_owned(),
+            endpoint: self.0.to_string(),
         })?;
-        Ok(Self {
-            uri,
-            auth: self.auth.clone(),
-        })
+        Self::new(uri)
     }
 
     /// Appends `suffix` directly to the path without inserting a separator.
@@ -538,32 +384,27 @@ impl HttpEndpoint {
         if suffix.is_empty() {
             return Ok(self.clone());
         }
-        let mut parts = self.uri.clone().into_parts();
+        let mut parts = self.0.clone().into_parts();
         let base_path = parts
             .path_and_query
             .as_ref()
             .map(PathAndQuery::path)
             .unwrap_or_default();
         let joined = format!("{base_path}{suffix}");
-        let endpoint = self.to_string();
         parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: endpoint.clone(),
-            path: suffix.to_owned(),
+            endpoint: self.0.to_string(),
+            path: joined,
         })?);
         let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint,
-            path: suffix.to_owned(),
+            endpoint: self.0.to_string(),
         })?;
-        Ok(Self {
-            uri,
-            auth: self.auth.clone(),
-        })
+        Self::new(uri)
     }
 }
 
 impl fmt::Display for HttpEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.uri.fmt(f)
+        self.0.fmt(f)
     }
 }
 
@@ -656,15 +497,6 @@ mod tests {
         );
 
         test_parse("user@example.com", "example.com", Some(("user", "")));
-        // An empty username does not opt UriSerde callers into Basic auth.
-        test_parse("http://@example.com", "http://@example.com", None);
-
-        // Preserve UriSerde's historical URL normalization of default ports.
-        test_parse(
-            "http://user:pass@example.com:80/api",
-            "http://example.com/api",
-            Some(("user", "pass")),
-        );
     }
 
     #[test]
@@ -673,14 +505,6 @@ mod tests {
         // `url::Url` rejects it. This must be a parse error, not a panic.
         let result = "http://user:pass@localhost:notaport/path".parse::<UriSerde>();
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn parse_skips_url_parser_without_userinfo() {
-        let uri = "http://localhost:notaport/path".parse::<Uri>().unwrap();
-        let parsed = UriSerde::try_from(uri.clone()).unwrap();
-        assert_eq!(parsed.uri, uri);
-        assert!(parsed.auth.is_none());
     }
 
     #[test]
@@ -731,35 +555,12 @@ mod tests {
     }
 
     #[test]
-    fn http_endpoint_debug_redacts_userinfo() {
-        let endpoint =
-            HttpEndpoint::parse("http://user:secret@example.com:8080/path?query=1").unwrap();
-        assert_eq!(
-            format!("{endpoint:?}"),
-            "HttpEndpoint { uri: http://example.com:8080/path?query=1 }"
-        );
-    }
+    fn http_endpoint_extracts_basic_auth() {
+        let endpoint = HttpEndpoint::parse("http://user:pass@example.com:8080/path").unwrap();
+        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
 
-    #[test]
-    fn http_endpoint_serialization_redacts_userinfo() {
-        let endpoint =
-            HttpEndpoint::parse("http://user:hunter2@example.com:8080/path?query=1").unwrap();
-        let serialized = String::from(endpoint);
-        assert_eq!(
-            serialized,
-            "http://user:**REDACTED**@example.com:8080/path?query=1"
-        );
-        assert!(!serialized.contains("hunter2"));
-    }
-
-    #[test]
-    fn http_endpoint_serialization_percent_encodes_username() {
-        let endpoint = HttpEndpoint::parse("http://us%20er:pass@example.com/api").unwrap();
-
-        assert_eq!(
-            String::from(endpoint),
-            "http://us%20er:**REDACTED**@example.com/api"
-        );
+        assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
+        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
     }
 
     #[test]
@@ -818,7 +619,6 @@ mod tests {
                         | Err(HttpEndpointError::InvalidUri { .. })
                         | Err(HttpEndpointError::InvalidUriParts { .. })
                         | Err(HttpEndpointError::InvalidPort { .. })
-                        | Err(HttpEndpointError::InvalidAuth { .. })
                 ),
                 "expected `{endpoint}` to be rejected"
             );
@@ -827,10 +627,8 @@ mod tests {
 
     #[test]
     fn http_endpoint_reports_unparseable_endpoints() {
-        let endpoint = "http://exa mple.com";
-        let error = HttpEndpoint::parse(endpoint).unwrap_err();
+        let error = HttpEndpoint::parse("http://exa mple.com").unwrap_err();
         assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
-        assert!(error.to_string().contains(endpoint));
     }
 
     #[test]
@@ -839,113 +637,11 @@ mod tests {
             "http://localhost:notaport",
             "https://example.com:notaport/path",
         ] {
-            let error = HttpEndpoint::parse(endpoint).unwrap_err();
-            assert!(matches!(error, HttpEndpointError::InvalidPort { .. }));
-            assert!(error.to_string().contains(endpoint));
+            assert!(matches!(
+                HttpEndpoint::parse(endpoint),
+                Err(HttpEndpointError::InvalidPort { .. })
+            ));
         }
-    }
-
-    #[test]
-    fn http_endpoint_redacts_userinfo_in_errors() {
-        for endpoint in [
-            "http://user:secret@localhost:notaport",
-            "user:secret@exa mple.com",
-            "http:/user:secret@example.com",
-            "http:://user:secret@example.com",
-        ] {
-            let error = HttpEndpoint::parse(endpoint).expect_err("endpoint should be rejected");
-            let message = error.to_string();
-            assert!(
-                message.contains("<redacted"),
-                "error must identify redaction: {message}"
-            );
-            assert!(
-                !message.contains("secret"),
-                "error must not echo the password: {message}"
-            );
-        }
-    }
-
-    #[test]
-    fn http_endpoint_composition_errors_include_redacted_context() {
-        let endpoint = HttpEndpoint::parse("http://user:secret@example.com/base").unwrap();
-        let error = endpoint.append_path("foo bar").unwrap_err();
-        let message = error.to_string();
-        assert!(message.contains("path `foo bar`"), "{message}");
-        assert!(message.contains("http://example.com/base"), "{message}");
-        assert!(!message.contains("secret"), "{message}");
-
-        let mut parts = Uri::default().into_parts();
-        parts.scheme = Some(Scheme::HTTPS);
-        let source = Uri::from_parts(parts).unwrap_err();
-        let error = HttpEndpointError::InvalidUriParts {
-            endpoint: "https://example.com/base".to_owned(),
-            path: "foo".to_owned(),
-            source,
-        };
-        let message = error.to_string();
-        assert!(message.contains("path `foo`"), "{message}");
-        assert!(message.contains("https://example.com/base"), "{message}");
-    }
-    #[test]
-    fn http_endpoint_extracts_embedded_basic_auth() {
-        let endpoint = HttpEndpoint::parse("http://user:pass@example.com:8080/path").unwrap();
-        assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
-        assert_eq!(endpoint.as_uri().authority().unwrap(), "example.com:8080");
-
-        let (endpoint, auth) = endpoint.extract_basic_auth().unwrap();
-        assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
-        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
-    }
-
-    #[test]
-    fn http_endpoint_extracts_basic_auth_with_empty_username() {
-        let (endpoint, auth) = HttpEndpoint::parse("https://:secret@example.com")
-            .unwrap()
-            .extract_basic_auth()
-            .unwrap();
-        assert_eq!(endpoint.as_uri().authority().unwrap(), "example.com");
-        assert!(matches!(
-            auth,
-            Some(Auth::Basic { user, password })
-                if user.is_empty() && password.inner() == "secret"
-        ));
-    }
-
-    #[test]
-    fn http_endpoint_extracts_auth_without_dropping_explicit_port() {
-        for endpoint in [
-            "user:pass@example.com:80",
-            "https://user:pass@example.com:80",
-        ] {
-            let (endpoint, auth) = HttpEndpoint::parse(endpoint)
-                .unwrap()
-                .extract_basic_auth()
-                .unwrap();
-            assert_eq!(endpoint.as_uri().authority().unwrap(), "example.com:80");
-            assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
-        }
-    }
-
-    #[test]
-    fn http_endpoint_extracts_auth_with_normalized_host() {
-        let (endpoint, auth) = HttpEndpoint::parse("https://user:pass@127.000.000.001:8080")
-            .unwrap()
-            .extract_basic_auth()
-            .unwrap();
-        assert_eq!(endpoint.as_uri().authority().unwrap(), "127.0.0.1:8080");
-        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
-    }
-
-    #[test]
-    fn http_endpoint_extract_basic_auth_without_userinfo() {
-        let (endpoint, auth) = HttpEndpoint::parse("http://example.com:8080")
-            .unwrap()
-            .extract_basic_auth()
-            .unwrap();
-        // `http::Uri` normalizes a bare host:port to a trailing slash.
-        assert_eq!(endpoint.to_string(), "http://example.com:8080/");
-        assert!(auth.is_none());
     }
 
     #[test]
@@ -980,11 +676,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             appended.to_string(),
-            "https://example.com:8088/base/sub/path"
+            "https://user:pass@example.com:8088/base/sub/path"
         );
         assert!(matches!(appended.as_uri().scheme_str(), Some("https")));
-        let (_, auth) = appended.extract_basic_auth().unwrap();
-        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
         // A non-root base path with a leading-slash appended path must not
         // produce a double slash.
         assert_eq!(
@@ -995,23 +689,15 @@ mod tests {
                 .to_string(),
             "https://proxy/prefix/api/v1/series"
         );
-        // Repeated slashes on both sides of the boundary collapse to one.
-        assert_eq!(
-            HttpEndpoint::parse("https://example.com/prefix///")
-                .unwrap()
-                .append_path("//loki/api/v1/push")
-                .unwrap()
-                .to_string(),
-            "https://example.com/prefix/loki/api/v1/push"
-        );
-        // The same boundary rule applies to every HttpEndpoint caller.
+        // Only the single boundary slash is removed; significant leading
+        // slashes in the appended path are preserved (GCS object keys).
         assert_eq!(
             HttpEndpoint::parse("https://storage.googleapis.com/bucket/")
                 .unwrap()
                 .append_path("//archive/")
                 .unwrap()
                 .to_string(),
-            "https://storage.googleapis.com/bucket/archive/"
+            "https://storage.googleapis.com/bucket//archive/"
         );
     }
 

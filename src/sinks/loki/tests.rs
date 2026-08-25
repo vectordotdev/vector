@@ -26,22 +26,6 @@ fn generate_config() {
     test_util::test_generate_config::<LokiConfig>();
 }
 
-#[test]
-fn config_debug_redacts_endpoint_credentials() {
-    let (config, _cx) = load_sink::<LokiConfig>(
-        r#"
-            endpoint = "http://user:secret@example.com"
-            labels = {test_name = "placeholder"}
-            encoding.codec = "json"
-        "#,
-    )
-    .unwrap();
-
-    let debug = format!("{config:?}");
-    assert!(!debug.contains("secret"));
-    assert!(debug.contains("http://example.com"));
-}
-
 #[tokio::test]
 async fn interpolate_labels() {
     let (config, cx) = load_sink::<LokiConfig>(

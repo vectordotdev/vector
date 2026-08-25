@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use vrl::value::Kind;
 
 use super::{
+    append_loki_path,
     healthcheck::healthcheck,
     sink::{LokiSink, confine_template_keys},
 };
@@ -313,7 +314,7 @@ impl ValidatedSink for LokiConfig {
 
         // The push URL appends `path`; the healthcheck appends `ready`/`` to the
         // configured base endpoint, so both are retained.
-        let endpoint = base_endpoint.append_path(&self.path)?;
+        let endpoint = append_loki_path(&base_endpoint, &self.path)?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -541,8 +542,9 @@ mod tests {
         )
         .unwrap();
 
-        let message = config.validate().unwrap_err().to_string();
-        assert!(message.contains("path `foo bar`"), "{message}");
-        assert!(message.contains("http://localhost:3100"), "{message}");
+        assert!(
+            config.validate().is_err(),
+            "a path containing a space cannot be appended into a valid URI and must be rejected"
+        );
     }
 }

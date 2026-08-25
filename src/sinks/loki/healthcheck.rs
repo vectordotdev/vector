@@ -1,3 +1,5 @@
+use super::append_loki_path;
+
 use crate::{
     http::{Auth, HttpClient},
     sinks::util::HttpEndpoint,
@@ -9,7 +11,7 @@ async fn fetch_status(
     auth: &Option<Auth>,
     client: &HttpClient,
 ) -> crate::Result<http::StatusCode> {
-    let endpoint = base_endpoint.append_path(path)?;
+    let endpoint = append_loki_path(base_endpoint, path)?;
 
     let mut req = http::Request::get(endpoint.as_uri())
         .body(hyper::Body::empty())

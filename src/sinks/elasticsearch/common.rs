@@ -44,10 +44,7 @@ impl ElasticsearchCommon {
         proxy_config: &ProxyConfig,
         version: &mut Option<usize>,
     ) -> crate::Result<Self> {
-        let uri = UriSerde {
-            uri: endpoint.as_uri().clone(),
-            auth: endpoint.auth().cloned(),
-        };
+        let uri = UriSerde::try_from(endpoint.as_uri().clone())?;
 
         // get auth from config or uri
         let auth = Self::extract_auth(config, proxy_config, &uri).await?;
