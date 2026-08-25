@@ -496,19 +496,16 @@ fn build_named_struct_generate_schema_fn(
         })
         .collect();
 
-    // For each `required_one_of` group, push a oneOf schema into `flattened_subschemas` so the JSON
-    // Schema expresses the "exactly one of" constraint via allOf.
+    // Push each group's constraint into `flattened_subschemas` so it lands in the same allOf block
+    // as any flattened-field subschemas.
     //
-    // `mutually_exclusive` groups get no constraint. The `oneOf` above would also make the group
-    // required, which is the semantics we're avoiding. "At most one" *is* expressible in JSON
-    // Schema by negating each pair of simultaneously-set members, but emitting that is deliberately
-    // out of scope here: these groups are documentation-only, and their exclusivity is enforced by
-    // the component's own validation. See https://github.com/vectordotdev/vector/issues/26175.
-    let group_pushes = groups
-        .iter()
-        .filter(|((kind, _), _)| *kind == ExclusiveKind::RequiredOneOf)
-        .map(|(_, members)| {
-        let required_entries = members.iter().map(|name| {
+    // `required_one_of` becomes a `oneOf` over "this member is set": exactly one must match.
+    //
+    // `mutually_exclusive` can't reuse that, since `oneOf` also requires the group. Instead it
+    // negates the union of every pair of simultaneously-set members, which forbids setting two
+    // without requiring any: `not: { anyOf: [ {allOf: [set(a), set(b)]}, ... ] }`.
+    let group_pushes = groups.iter().filter_map(|((kind, _), members)| {
+        let member_is_set = |name: &String| {
             quote! {
                 {
                     let mut s = ::vector_config::schema::SchemaObject::default();
@@ -532,15 +529,64 @@ fn build_named_struct_generate_schema_fn(
                     s
                 }
             }
-        });
-        quote! {
-            {
-                let mut constraint = ::vector_config::schema::generate_one_of_schema(&[#(#required_entries),*]);
-                constraint.extensions.insert(
-                    "_required_one_of_constraint".to_string(),
-                    ::serde_json::Value::Bool(true),
-                );
-                flattened_subschemas.push(constraint);
+        };
+
+        match kind {
+            ExclusiveKind::RequiredOneOf => {
+                let entries = members.iter().map(member_is_set);
+                Some(quote! {
+                    {
+                        let mut constraint = ::vector_config::schema::generate_one_of_schema(&[#(#entries),*]);
+                        constraint.extensions.insert(
+                            "_required_one_of_constraint".to_string(),
+                            ::serde_json::Value::Bool(true),
+                        );
+                        flattened_subschemas.push(constraint);
+                    }
+                })
+            }
+            ExclusiveKind::MutuallyExclusive => {
+                // A single-member group has no pair to forbid, so it needs no constraint.
+                let pairs = members
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, a)| members[i + 1..].iter().map(move |b| (a, b)))
+                    .map(|(a, b)| {
+                        let (a, b) = (member_is_set(a), member_is_set(b));
+                        quote! {
+                            ::vector_config::schema::SchemaObject {
+                                subschemas: Some(Box::new(::vector_config::schema::SubschemaValidation {
+                                    all_of: Some(vec![
+                                        ::vector_config::schema::Schema::Object(#a),
+                                        ::vector_config::schema::Schema::Object(#b),
+                                    ]),
+                                    ..Default::default()
+                                })),
+                                ..Default::default()
+                            }
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                if pairs.is_empty() {
+                    return None;
+                }
+                Some(quote! {
+                    {
+                        let both_set = ::vector_config::schema::generate_any_of_schema(&[#(#pairs),*]);
+                        let mut constraint = ::vector_config::schema::SchemaObject {
+                            subschemas: Some(Box::new(::vector_config::schema::SubschemaValidation {
+                                not: Some(Box::new(::vector_config::schema::Schema::Object(both_set))),
+                                ..Default::default()
+                            })),
+                            ..Default::default()
+                        };
+                        constraint.extensions.insert(
+                            "_mutually_exclusive_constraint".to_string(),
+                            ::serde_json::Value::Bool(true),
+                        );
+                        flattened_subschemas.push(constraint);
+                    }
+                })
             }
         }
     });

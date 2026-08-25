@@ -947,18 +947,79 @@ struct MutuallyExclusiveConfig {
 }
 
 #[test]
-fn mutually_exclusive_generates_no_schema_constraint() {
-    // Unlike `required_one_of`, no `oneOf` constraint is emitted: setting neither field is valid,
-    // and JSON Schema can't express "at most one" without also requiring the group.
+fn mutually_exclusive_generates_at_most_one_constraint() {
+    // "At most one" forbids setting two members without requiring any: negate the union of every
+    // pair of simultaneously-set members. Crucially there is no `required` at the top level, so
+    // `{}` still validates -- that is what distinguishes this from `required_one_of`.
+    let set = |field: &str| {
+        json!({
+            "required": [field],
+            "properties": { field: { "not": { "type": "null" } } }
+        })
+    };
     assert_eq!(
         generate_test_schema::<MutuallyExclusiveConfig>(),
         json!({
-            "type": "object",
-            "properties": {
-                "url": { "type": ["string", "null"] },
-                "region": { "type": ["string", "null"] }
-            }
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "url": { "type": ["string", "null"] },
+                        "region": { "type": ["string", "null"] }
+                    }
+                },
+                {
+                    "_mutually_exclusive_constraint": true,
+                    "not": { "anyOf": [ { "allOf": [set("url"), set("region")] } ] }
+                }
+            ]
         })
+    );
+}
+
+/// Three members, to check every pair is forbidden rather than just the first two.
+#[derive(Clone, Debug)]
+#[configurable_component]
+struct MutuallyExclusiveTripleConfig {
+    /// First option.
+    #[configurable(mutually_exclusive = "group")]
+    a: Option<String>,
+
+    /// Second option.
+    #[configurable(mutually_exclusive = "group")]
+    b: Option<String>,
+
+    /// Third option.
+    #[configurable(mutually_exclusive = "group")]
+    c: Option<String>,
+}
+
+#[test]
+fn mutually_exclusive_forbids_every_pair() {
+    let schema = generate_test_schema::<MutuallyExclusiveTripleConfig>();
+    let pairs = schema["allOf"][1]["not"]["anyOf"]
+        .as_array()
+        .expect("constraint should negate a list of pairs");
+
+    let named: Vec<Vec<String>> = pairs
+        .iter()
+        .map(|pair| {
+            pair["allOf"]
+                .as_array()
+                .expect("each forbidden combination is an allOf")
+                .iter()
+                .map(|member| member["required"][0].as_str().unwrap().to_owned())
+                .collect()
+        })
+        .collect();
+
+    assert_eq!(
+        named,
+        vec![
+            vec!["a".to_owned(), "b".to_owned()],
+            vec!["a".to_owned(), "c".to_owned()],
+            vec!["b".to_owned(), "c".to_owned()],
+        ]
     );
 }
 
@@ -967,8 +1028,9 @@ fn mutually_exclusive_annotates_group_metadata() {
     let root = generate_root_schema::<MutuallyExclusiveConfig>().expect("should generate schema");
     let schema = serde_json::to_value(root.schema).expect("serialize schema to JSON");
 
+    // The group constraint makes the root an allOf, so the properties live in its first branch.
     for field in ["url", "region"] {
-        let metadata = &schema["properties"][field]["_metadata"];
+        let metadata = &schema["allOf"][0]["properties"][field]["_metadata"];
         assert_eq!(
             metadata["docs::mutually_exclusive"],
             json!(["url", "region"]),
