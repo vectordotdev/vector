@@ -25,6 +25,26 @@ fn default_loki_path() -> String {
     "/loki/api/v1/push".to_string()
 }
 
+/// Appends Loki's push path while retaining the boundary normalization used by
+/// `UriSerde::append_path`: all trailing slashes on the endpoint and all
+/// leading slashes on the configured path collapse to one separator.
+fn append_loki_path(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
+    let mut parts = endpoint.as_uri().clone().into_parts();
+    let base_path = parts
+        .path_and_query
+        .as_ref()
+        .map(http::uri::PathAndQuery::path)
+        .unwrap_or_default();
+    let joined = format!(
+        "{}/{}",
+        base_path.trim_end_matches('/'),
+        path.trim_start_matches('/')
+    );
+    parts.path_and_query = Some(joined.parse()?);
+
+    Ok(HttpEndpoint::new(http::Uri::from_parts(parts)?)?)
+}
+
 /// Configuration for the `loki` sink.
 #[configurable_component(sink("loki", "Deliver log event data to the Loki aggregation system."))]
 #[derive(Clone, Debug)]
@@ -312,7 +332,7 @@ impl ValidatedSink for LokiConfig {
 
         // The push URL appends `path`; the healthcheck appends `ready`/`` to the
         // pathless base, so both are retained.
-        let endpoint = base_endpoint.append_path(&self.path)?;
+        let endpoint = append_loki_path(&base_endpoint, &self.path)?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -383,12 +403,39 @@ pub fn valid_label_name(label: &Template) -> bool {
 mod tests {
     use std::convert::TryInto;
 
-    use super::valid_label_name;
+    use super::{append_loki_path, valid_label_name};
     use crate::{
         config::ValidatedSink,
-        sinks::loki::LokiConfig,
+        sinks::{loki::LokiConfig, util::HttpEndpoint},
         template::{ConfinementConfig, Template},
     };
+
+    #[test]
+    fn append_loki_path_normalizes_repeated_boundary_slashes() {
+        for (endpoint, path, expected) in [
+            (
+                "https://example.com",
+                "//loki/api/v1/push",
+                "https://example.com/loki/api/v1/push",
+            ),
+            (
+                "https://example.com/prefix///",
+                "/loki/api/v1/push",
+                "https://example.com/prefix/loki/api/v1/push",
+            ),
+            (
+                "https://example.com/prefix///",
+                "//loki/api/v1/push",
+                "https://example.com/prefix/loki/api/v1/push",
+            ),
+        ] {
+            let endpoint = HttpEndpoint::parse(endpoint).unwrap();
+            assert_eq!(
+                append_loki_path(&endpoint, path).unwrap().to_string(),
+                expected
+            );
+        }
+    }
 
     #[test]
     fn valid_label_names() {

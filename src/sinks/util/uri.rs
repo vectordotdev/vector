@@ -142,15 +142,15 @@ fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Aut
             .decode_utf8_lossy()
             .into_owned();
 
-        // Rebuild the authority from the original host and port with userinfo
-        // stripped. `url::Url` drops a port that is the default for its
-        // synthetic `http://` scheme (e.g. port 80) even when the endpoint
-        // uses a different scheme (https) where that port is explicit, so the
-        // original host and port are used directly rather than round-tripping
-        // through the URL parser.
+        // Use the URL-normalized host, but keep the explicit port from the
+        // original authority. The synthetic `http://` URL drops port 80 even
+        // when the actual endpoint uses HTTPS and must retain that port.
+        let host = url
+            .host_str()
+            .ok_or_else(|| "unexpected empty authority".to_string())?;
         let host_port = match authority.port() {
-            Some(port) => format!("{}:{}", authority.host(), port.as_str()),
-            None => authority.host().to_string(),
+            Some(port) => format!("{host}:{}", port.as_str()),
+            None => host.to_string(),
         };
         let authority = host_port.parse::<Authority>()?;
 
@@ -276,12 +276,12 @@ impl HttpEndpoint {
             && uri.host().is_some_and(|host| !host.is_empty());
         if !has_valid_scheme_and_host {
             return Err(HttpEndpointError::NotAbsoluteHttp {
-                endpoint: uri.to_string(),
+                endpoint: redact_userinfo(&uri.to_string()),
             });
         }
         if authority_has_invalid_port(&uri) {
             return Err(HttpEndpointError::InvalidPort {
-                endpoint: uri.to_string(),
+                endpoint: redact_userinfo(&uri.to_string()),
             });
         }
         Ok(Self(uri))
@@ -299,13 +299,14 @@ impl HttpEndpoint {
         // the scheme is added up front rather than relying on the parser to
         // accept authority-form input.
         let uri = if has_scheme(endpoint) {
-            endpoint
-                .parse::<Uri>()
-                .context(InvalidUriSnafu { endpoint })?
+            endpoint.parse::<Uri>().context(InvalidUriSnafu {
+                endpoint: redact_userinfo(endpoint),
+            })?
         } else {
-            format!("https://{endpoint}")
-                .parse::<Uri>()
-                .context(InvalidUriSnafu { endpoint })?
+            let endpoint = format!("https://{endpoint}");
+            endpoint.parse::<Uri>().context(InvalidUriSnafu {
+                endpoint: redact_userinfo(&endpoint),
+            })?
         };
         Self::new(uri)
     }
@@ -374,11 +375,11 @@ impl HttpEndpoint {
             format!("{base_path}/{}", path.strip_prefix('/').unwrap_or(path))
         };
         parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: self.0.to_string(),
+            endpoint: redact_userinfo(&self.0.to_string()),
             path: joined,
         })?);
         let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint: self.0.to_string(),
+            endpoint: redact_userinfo(&self.0.to_string()),
         })?;
         Self::new(uri)
     }
@@ -400,11 +401,11 @@ impl HttpEndpoint {
             .unwrap_or_default();
         let joined = format!("{base_path}{suffix}");
         parts.path_and_query = Some(joined.parse::<PathAndQuery>().context(InvalidPathSnafu {
-            endpoint: self.0.to_string(),
+            endpoint: redact_userinfo(&self.0.to_string()),
             path: joined,
         })?);
         let uri = Uri::from_parts(parts).context(InvalidUriPartsSnafu {
-            endpoint: self.0.to_string(),
+            endpoint: redact_userinfo(&self.0.to_string()),
         })?;
         Self::new(uri)
     }
@@ -460,6 +461,27 @@ fn has_scheme(endpoint: &str) -> bool {
     let mut chars = scheme.chars();
     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic())
         && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+}
+
+/// Redacts userinfo from an endpoint string for error messages, so embedded
+/// basic-auth credentials are not echoed into logs or command output.
+///
+/// Only the authority portion (between the scheme and the first `/`, `?`, or
+/// `#`) is inspected; an `@` later in the path or query is left untouched.
+fn redact_userinfo(endpoint: &str) -> String {
+    let Some((scheme, rest)) = endpoint.split_once("://") else {
+        return endpoint.to_string();
+    };
+    // The authority ends at the first `/`, `?`, or `#`; `find` returns the
+    // byte offset of an ASCII delimiter, which is a valid char boundary.
+    let (authority, tail) = match rest.find(['/', '?', '#']) {
+        Some(i) => rest.split_at(i),
+        None => (rest, ""),
+    };
+    let Some((_, host_port)) = authority.rsplit_once('@') else {
+        return endpoint.to_string();
+    };
+    format!("{scheme}://<redacted>@{host_port}{tail}")
 }
 
 #[cfg(test)]
@@ -644,6 +666,24 @@ mod tests {
     }
 
     #[test]
+    fn http_endpoint_redacts_userinfo_in_errors() {
+        for endpoint in [
+            "http://user:secret@localhost:notaport",
+            "user:secret@exa mple.com",
+        ] {
+            let error = HttpEndpoint::parse(endpoint).expect_err("endpoint should be rejected");
+            let message = error.to_string();
+            assert!(
+                !message.contains("secret"),
+                "error must not echo the password: {message}"
+            );
+            assert!(
+                message.contains("<redacted>@"),
+                "error should mark the redacted userinfo: {message}"
+            );
+        }
+    }
+    #[test]
     fn http_endpoint_extracts_embedded_basic_auth() {
         let (endpoint, auth) = HttpEndpoint::parse("http://user:pass@example.com:8080/path")
             .unwrap()
@@ -651,6 +691,22 @@ mod tests {
             .unwrap();
         assert_eq!(endpoint.to_string(), "http://example.com:8080/path");
         assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+    }
+
+    #[test]
+    fn http_endpoint_extracts_auth_without_dropping_explicit_port() {
+        for (endpoint, expected_authority) in [
+            ("user:pass@example.com:80", "example.com:80"),
+            ("https://user:pass@example.com:80", "example.com:80"),
+            ("https://user:pass@127.000.000.001:80", "127.0.0.1:80"),
+        ] {
+            let (endpoint, auth) = HttpEndpoint::parse(endpoint)
+                .unwrap()
+                .extract_basic_auth()
+                .unwrap();
+            assert_eq!(endpoint.as_uri().authority().unwrap(), expected_authority);
+            assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
+        }
     }
 
     #[test]
@@ -662,19 +718,6 @@ mod tests {
         // `http::Uri` normalizes a bare host:port to a trailing slash.
         assert_eq!(endpoint.to_string(), "http://example.com:8080/");
         assert!(auth.is_none());
-    }
-
-    #[test]
-    fn http_endpoint_extract_basic_auth_preserves_default_scheme_port() {
-        // A scheme-less endpoint defaults to https. Port 80 is http's default,
-        // so credential extraction must not drop it: the endpoint explicitly
-        // configured port 80 and must keep using it over https.
-        let (endpoint, auth) = HttpEndpoint::parse("user:pass@example.com:80")
-            .unwrap()
-            .extract_basic_auth()
-            .unwrap();
-        assert_eq!(endpoint.to_string(), "https://example.com:80/");
-        assert!(matches!(auth, Some(Auth::Basic { user, .. }) if user == "user"));
     }
 
     #[test]
