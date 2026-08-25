@@ -14,9 +14,10 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use serde_json::json;
 use serde_with::serde_as;
 use vector_config::{
-    ConfigurableString, component::GenerateConfig, configurable_component,
+    Configurable, ConfigurableString, component::GenerateConfig, configurable_component,
     schema::generate_root_schema,
 };
 
@@ -288,14 +289,13 @@ impl TryFrom<String> for SocketListenAddr {
             Err(_) => {
                 let fd: usize = match input.as_str() {
                     "systemd" => Ok(0),
-                    s if s.starts_with("systemd#") => s[8..]
+                    s => s
+                        .strip_prefix("systemd#")
+                        .ok_or_else(|| "unable to parse".to_string())?
                         .parse::<usize>()
                         .map_err(|_| "failed to parse usize".to_string())?
                         .checked_sub(1)
                         .ok_or_else(|| "systemd indices start at 1".to_string()),
-
-                    // otherwise fail
-                    _ => Err("unable to parse".to_string()),
                 }?;
 
                 Ok(fd.into())
@@ -336,8 +336,8 @@ pub struct SimpleSourceConfig {
 }
 
 impl GenerateConfig for SimpleSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             listen_addr: default_simple_source_listen_addr(),
             timeout: default_simple_source_timeout(),
         })
@@ -382,8 +382,8 @@ pub struct SimpleSinkConfig {
 }
 
 impl GenerateConfig for SimpleSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoint: default_simple_sink_endpoint(),
             batch: default_simple_sink_batch(),
             encoding: default_simple_sink_encoding(),
@@ -464,8 +464,8 @@ pub enum TagConfig {
 }
 
 impl GenerateConfig for AwsBleepBloopSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             auth: AwsAuthentication::default(),
             folder_id: String::from("foo12"),
             batch: default_aws_bleep_bloop_sink_batch(),
@@ -524,8 +524,8 @@ pub mod vector_v2 {
     }
 
     impl GenerateConfig for VectorConfig {
-        fn generate_config() -> toml::Value {
-            toml::Value::try_from(Self {
+        fn generate_config() -> serde_json::Value {
+            serde_json::to_value(Self {
                 address: "0.0.0.0:6000".parse().unwrap(),
                 shutdown_timeout_secs: default_shutdown_timeout_secs(),
             })
@@ -564,12 +564,12 @@ pub enum VectorSourceConfig {
 }
 
 impl GenerateConfig for VectorSourceConfig {
-    fn generate_config() -> toml::Value {
-        let config = toml::Value::try_into::<self::vector_v2::VectorConfig>(
+    fn generate_config() -> serde_json::Value {
+        let config = serde_json::from_value::<self::vector_v2::VectorConfig>(
             self::vector_v2::VectorConfig::generate_config(),
         )
         .unwrap();
-        toml::Value::try_from(VectorConfigV2 {
+        serde_json::to_value(VectorConfigV2 {
             version: Some(V2::V2),
             config,
         })
@@ -664,42 +664,271 @@ enum WithTrailingUntaggedVariant {
 
 #[test]
 fn tagged_enum_with_trailing_untagged_variant_schema() {
-    let root =
-        generate_root_schema::<WithTrailingUntaggedVariant>().expect("should generate root schema");
+    assert_eq!(
+        generate_test_schema::<WithTrailingUntaggedVariant>(),
+        json!({
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["type", "value"],
+                    "properties": {
+                        "type": { "const": "Foo" },
+                        "value": { "type": "integer" },
+                    },
+                },
+                {
+                    "type": "object",
+                    "required": ["type"],
+                    "properties": {
+                        "type": { "const": "Bar" },
+                    },
+                },
+                { "type": "string" },
+                { "type": "integer" },
+            ],
+        })
+    );
+}
+
+fn generate_test_schema<T>() -> serde_json::Value
+where
+    T: Configurable + 'static,
+{
+    let root = generate_root_schema::<T>().expect("should generate root schema");
     let schema = serde_json::to_value(root.schema).expect("serialize schema to JSON");
+    prune_schema_for_test(schema)
+}
 
-    let one_of = schema
-        .get("oneOf")
-        .and_then(|v| v.as_array())
-        .expect("enum schema should use oneOf");
-
-    let mut tagged_schemas = 0usize;
-    let mut untagged_schemas = 0usize;
-
-    for subschema in one_of {
-        let properties = subschema.get("properties");
-        let required = subschema.get("required");
-
-        let has_type_property = properties.and_then(|p| p.get("type")).is_some();
-        let requires_type = required
-            .and_then(|r| r.as_array())
-            .map(|arr| arr.iter().any(|v| v == "type"))
-            .unwrap_or(false);
-
-        if has_type_property || requires_type {
-            tagged_schemas += 1;
-        } else {
-            untagged_schemas += 1;
-
-            // The untagged variants in this test are newtypes: one string and one integer.
-            let instance_type = subschema.get("type").and_then(|t| t.as_str());
-            assert!(matches!(instance_type, Some("string") | Some("integer")));
+fn prune_schema_for_test(mut schema: serde_json::Value) -> serde_json::Value {
+    fn prune(value: &mut serde_json::Value) {
+        match value {
+            serde_json::Value::Array(values) => values.iter_mut().for_each(prune),
+            serde_json::Value::Object(values) => {
+                values.retain(|key, _| {
+                    !matches!(
+                        key.as_str(),
+                        "title"
+                            | "description"
+                            | "_metadata"
+                            | "maximum"
+                            | "minimum"
+                            | "unevaluatedProperties"
+                    )
+                });
+                values.values_mut().for_each(prune);
+            }
+            _ => {}
         }
     }
 
-    assert_eq!(tagged_schemas, 2, "expected two tagged variants in schema");
+    prune(&mut schema);
+    schema
+}
+
+/// A tagged enum with overlapping trailing untagged numeric variants.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(tag = "type")]
+enum WithOverlappingTrailingUntaggedVariants {
+    /// Tagged struct variant.
+    Tagged {
+        /// Some numeric value.
+        value: u32,
+    },
+    #[serde(untagged)]
+    Integer(i64),
+    #[serde(untagged)]
+    Float(f64),
+}
+
+#[test]
+fn tagged_enum_with_overlapping_trailing_untagged_variants_uses_any_of() {
     assert_eq!(
-        untagged_schemas, 2,
-        "expected two untagged variants in schema"
+        generate_test_schema::<WithOverlappingTrailingUntaggedVariants>(),
+        json!({
+            "anyOf": [
+                {
+                    "type": "object",
+                    "required": ["type", "value"],
+                    "properties": {
+                        "type": { "const": "Tagged" },
+                        "value": { "type": "integer" },
+                    },
+                },
+                { "type": "integer" },
+                { "type": "number" },
+            ],
+        })
+    );
+}
+
+/// Untagged struct variants whose required fields can coexist.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedStructVariants {
+    /// A variant requiring `a`.
+    A {
+        /// The `a` value.
+        a: String,
+    },
+    /// A variant requiring `b`.
+    B {
+        /// The `b` value.
+        b: String,
+    },
+}
+
+#[test]
+fn untagged_struct_variants_with_distinct_required_fields_use_any_of() {
+    assert_eq!(
+        generate_test_schema::<UntaggedStructVariants>(),
+        json!({
+            "anyOf": [
+                {
+                    "type": "object",
+                    "required": ["a"],
+                    "properties": {
+                        "a": { "type": "string" },
+                    },
+                },
+                {
+                    "type": "object",
+                    "required": ["b"],
+                    "properties": {
+                        "b": { "type": "string" },
+                    },
+                },
+            ],
+        })
+    );
+}
+
+/// Untagged numeric variants with overlapping JSON representations.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedIntegerOrFloat {
+    /// An integer value.
+    Integer(i64),
+    /// A floating-point value.
+    Float(f64),
+}
+
+#[test]
+fn untagged_integer_or_float_schema_uses_any_of() {
+    assert_eq!(
+        generate_test_schema::<UntaggedIntegerOrFloat>(),
+        json!({
+            "anyOf": [
+                { "type": "integer" },
+                { "type": "number" },
+            ],
+        })
+    );
+}
+
+/// A fixed string value.
+#[derive(Clone, Debug)]
+#[configurable_component]
+enum FixedKind {
+    /// The only accepted kind.
+    #[serde(rename = "kind")]
+    Kind,
+}
+
+/// Untagged variants where a fixed string overlaps a free string.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedFixedOrFreeString {
+    Fixed(FixedKind),
+    Free(String),
+}
+
+#[test]
+fn untagged_fixed_or_free_string_schema_uses_any_of() {
+    assert_eq!(
+        generate_test_schema::<UntaggedFixedOrFreeString>(),
+        json!({
+            "anyOf": [
+                {
+                    "oneOf": [
+                        { "const": "kind" },
+                    ],
+                },
+                { "type": "string" },
+            ],
+        })
+    );
+}
+
+/// Untagged variants with disjoint JSON representations.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum UntaggedStringOrInteger {
+    /// A text value.
+    Text(String),
+    /// An integer value.
+    Number(i64),
+}
+
+#[test]
+fn untagged_disjoint_variants_schema_uses_one_of() {
+    // Disjoint variants can never match the same document, so the more precise `oneOf`
+    // must be preserved rather than widened to `anyOf`.
+    assert_eq!(
+        generate_test_schema::<UntaggedStringOrInteger>(),
+        json!({
+            "oneOf": [
+                { "type": "string" },
+                { "type": "integer" },
+            ],
+        })
+    );
+}
+
+/// A struct where exactly one of two optional fields must be provided.
+#[derive(Clone, Debug)]
+#[configurable_component]
+struct RequiredOneOfConfig {
+    /// First option.
+    #[configurable(required_one_of = "group")]
+    source: Option<String>,
+
+    /// Second option.
+    #[configurable(required_one_of = "group")]
+    file: Option<String>,
+}
+
+#[test]
+fn required_one_of_generates_one_of_constraint() {
+    assert_eq!(
+        generate_test_schema::<RequiredOneOfConfig>(),
+        json!({
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "source": { "type": ["string", "null"] },
+                        "file":   { "type": ["string", "null"] }
+                    }
+                },
+                {
+                    "_required_one_of_constraint": true,
+                    "oneOf": [
+                        {
+                            "required": ["source"],
+                            "properties": { "source": { "not": { "type": "null" } } }
+                        },
+                        {
+                            "required": ["file"],
+                            "properties": { "file": { "not": { "type": "null" } } }
+                        }
+                    ]
+                }
+            ]
+        })
     );
 }

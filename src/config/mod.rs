@@ -29,7 +29,6 @@ use crate::{
 
 pub mod api;
 mod builder;
-mod cmd;
 mod compiler;
 mod diff;
 pub mod dot_graph;
@@ -41,6 +40,7 @@ pub mod provider;
 pub mod schema;
 mod secret;
 mod sink;
+mod sink_validated;
 mod source;
 mod transform;
 pub mod unit_test;
@@ -49,18 +49,18 @@ mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
-pub use cmd::{Opts, cmd};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
-    COLLECTOR, CONFIG_PATHS, load, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_from_str_with_secrets, load_source_from_paths, merge_path_lists,
-    process_paths,
+    COLLECTOR, CONFIG_PATHS, env_var_interpolation_enabled, load, load_from_paths,
+    load_from_paths_with_provider_and_secrets, load_from_str, load_from_str_with_secrets,
+    load_source_from_paths, merge_path_lists, process_paths, set_env_var_interpolation,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use sink_validated::{DynValidatedSink, ValidatedSink};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
@@ -77,7 +77,7 @@ pub use vector_lib::{
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-// // This is not a comprehensive set; variants are added as needed.
+// This is not a comprehensive set; variants are added as needed.
 pub enum ComponentType {
     Transform,
     Sink,

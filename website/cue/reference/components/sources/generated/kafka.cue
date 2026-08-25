@@ -94,7 +94,7 @@ generated: components: sources: kafka: configuration: {
 					default: "bytes"
 					enum: {
 						avro: """
-															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+															Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 															[apache_avro]: https://avro.apache.org/
 															"""
@@ -369,6 +369,51 @@ generated: components: sources: kafka: configuration: {
 			}
 		}
 	}
+	decompression: {
+		description: """
+			Configuration for decompressing message payloads that were compressed by the producer.
+
+			This applies to application-level compression, where the producer compressed each message
+			payload before sending it. Compression negotiated at the Kafka protocol level is handled
+			transparently by the underlying client library and does not require this option.
+
+			Payloads are decompressed before `framing` and `decoding` are applied.
+			"""
+		required: false
+		type: object: options: {
+			algorithm: {
+				description: "The decompression algorithm."
+				required:    true
+				type: string: enum: {
+					gzip: """
+						[Gzip][gzip] decompression.
+
+						[gzip]: https://www.gzip.org/
+						"""
+					zlib: """
+						[Zlib][zlib] decompression.
+
+						[zlib]: https://zlib.net/
+						"""
+					zstd: """
+						[Zstandard][zstd] decompression.
+
+						[zstd]: https://facebook.github.io/zstd/
+						"""
+				}
+			}
+			dictionary_path: {
+				description: """
+					The path to a compression dictionary to use when decompressing payloads.
+
+					The dictionary must be the same as the one used by the producer when compressing the
+					payloads. Only supported with the `zstd` algorithm.
+					"""
+				required: false
+				type: string: examples: ["/etc/vector/compression.dict"]
+			}
+		}
+	}
 	drain_timeout_ms: {
 		description: """
 			Timeout to drain pending acknowledgements during shutdown or a Kafka
@@ -429,6 +474,29 @@ generated: components: sources: kafka: configuration: {
 																"""
 						required: false
 						type: uint: {}
+					}
+					oversized_action: {
+						description: """
+																The behavior when a frame exceeds `max_length`.
+
+																When set to `drop` (the default), the entire oversized frame is discarded.
+																When set to `truncate`, the frame is truncated to `max_length` bytes and the
+																remainder is discarded up to the next delimiter.
+
+																This option has no effect if `max_length` is not set.
+																"""
+						required: false
+						type: string: {
+							default: "drop"
+							enum: {
+								drop: "Drop the entire oversized frame."
+								truncate: """
+																			Truncate the frame to the maximum allowed size and emit the partial content.
+
+																			The remainder of the oversized frame is discarded up to the next delimiter.
+																			"""
+							}
+						}
 					}
 				}
 			}
@@ -549,22 +617,47 @@ generated: components: sources: kafka: configuration: {
 				description:   "Options for the newline delimited decoder."
 				relevant_when: "method = \"newline_delimited\""
 				required:      false
-				type: object: options: max_length: {
-					description: """
-						The maximum length of the byte buffer.
+				type: object: options: {
+					max_length: {
+						description: """
+																The maximum length of the byte buffer.
 
-						This length does *not* include the trailing delimiter.
+																This length does *not* include the trailing delimiter.
 
-						By default, no maximum length is enforced. If events are malformed, this can lead to
-						additional resource usage as events continue to be buffered in memory, and can potentially
-						lead to memory exhaustion in extreme cases.
+																By default, no maximum length is enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
 
-						If there is a risk of processing malformed data, such as logs with user-controlled input,
-						consider setting the maximum length to a reasonably large value as a safety net. This
-						prevents processing from being unbounded.
-						"""
-					required: false
-					type: uint: {}
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																prevents processing from being unbounded.
+																"""
+						required: false
+						type: uint: {}
+					}
+					oversized_action: {
+						description: """
+																The behavior when a line exceeds `max_length`.
+
+																When set to `drop` (the default), the entire oversized line is discarded.
+																When set to `truncate`, the line is truncated to `max_length` bytes and the
+																remainder is discarded up to the next newline.
+
+																This option has no effect if `max_length` is not set.
+																"""
+						required: false
+						type: string: {
+							default: "drop"
+							enum: {
+								drop: "Drop the entire oversized frame."
+								truncate: """
+																			Truncate the frame to the maximum allowed size and emit the partial content.
+
+																			The remainder of the oversized frame is discarded up to the next delimiter.
+																			"""
+							}
+						}
+					}
 				}
 			}
 			octet_counting: {
@@ -653,7 +746,7 @@ generated: components: sources: kafka: configuration: {
 		type: string: {
 			default: "offset"
 			examples: [
-				"offset",
+				"offset"
 			]
 		}
 	}
@@ -843,7 +936,7 @@ generated: components: sources: kafka: configuration: {
 		type: string: {
 			default: "topic"
 			examples: [
-				"topic",
+				"topic"
 			]
 		}
 	}

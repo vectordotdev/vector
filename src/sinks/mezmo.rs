@@ -21,44 +21,10 @@ use crate::{
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
     },
-    template::{Template, TemplateRenderingError},
+    template::{TemplateRenderingError, UnconfinedTemplate},
 };
 
 const PATH: &str = "/logs/ingest";
-
-/// Configuration for the `logdna` sink.
-#[configurable_component(sink("logdna", "Deliver log event data to LogDNA."))]
-#[configurable(metadata(
-    deprecated = "The `logdna` sink has been renamed. Please use `mezmo` instead."
-))]
-#[derive(Clone, Debug)]
-pub struct LogdnaConfig(MezmoConfig);
-
-impl GenerateConfig for LogdnaConfig {
-    fn generate_config() -> toml::Value {
-        <MezmoConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "logdna")]
-impl SinkConfig for LogdnaConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        warn!("DEPRECATED: The `logdna` sink has been renamed. Please use `mezmo` instead.");
-        self.0.build(cx).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.0.acknowledgements()
-    }
-}
 
 /// Configuration for the `mezmo` (formerly `logdna`) sink.
 #[configurable_component(sink("mezmo", "Deliver log event data to Mezmo."))]
@@ -81,7 +47,7 @@ pub struct MezmoConfig {
     /// The hostname that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "${HOSTNAME}"))]
     #[configurable(metadata(docs::examples = "my-local-machine"))]
-    hostname: Template,
+    hostname: UnconfinedTemplate,
 
     /// The MAC address that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "my-mac-address"))]
@@ -96,7 +62,7 @@ pub struct MezmoConfig {
     /// The tags that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "tag1"))]
     #[configurable(metadata(docs::examples = "tag2"))]
-    tags: Option<Vec<Template>>,
+    tags: Option<Vec<UnconfinedTemplate>>,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
@@ -145,11 +111,11 @@ fn default_env() -> String {
 }
 
 impl GenerateConfig for MezmoConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"hostname = "hostname"
-            api_key = "${LOGDNA_API_KEY}""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"hostname: hostname
+            api_key: ${LOGDNA_API_KEY}"#,
+        })
         .unwrap()
     }
 }
@@ -200,8 +166,8 @@ pub struct PartitionKey {
 }
 
 pub struct MezmoEventEncoder {
-    hostname: Template,
-    tags: Option<Vec<Template>>,
+    hostname: UnconfinedTemplate,
+    tags: Option<Vec<UnconfinedTemplate>>,
     transformer: Transformer,
     default_app: String,
     default_env: String,
@@ -431,16 +397,16 @@ mod tests {
         let mut encoder = config.build_encoder();
 
         let mut event1 = Event::Log(LogEvent::from("hello world"));
-        event1.as_mut_log().insert("app", "notvector");
-        event1.as_mut_log().insert("magic", "vector");
+        event1.as_mut_log().insert(event_path!("app"), "notvector");
+        event1.as_mut_log().insert(event_path!("magic"), "vector");
 
         let mut event2 = Event::Log(LogEvent::from("hello world"));
-        event2.as_mut_log().insert("file", "log.txt");
+        event2.as_mut_log().insert(event_path!("file"), "log.txt");
 
         let event3 = Event::Log(LogEvent::from("hello world"));
 
         let mut event4 = Event::Log(LogEvent::from("hello world"));
-        event4.as_mut_log().insert("env", "staging");
+        event4.as_mut_log().insert(event_path!("env"), "staging");
 
         let event1_out = encoder.encode_event(event1).unwrap().into_parts().0;
         let event1_out = event1_out.as_object().unwrap();
@@ -505,7 +471,7 @@ mod tests {
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.as_str()).with_batch_notifier(&batch);
             let p = i % 2;
-            event.insert("hostname", hosts[p]);
+            event.insert(event_path!("hostname"), hosts[p]);
 
             partitions[p].push(line.into());
             events.push(Event::Log(event));
@@ -524,7 +490,7 @@ mod tests {
     async fn smoke_fails() {
         let (_hosts, _partitions, mut rx) =
             smoke_start(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
-        assert!(matches!(rx.try_next(), Err(mpsc::TryRecvError { .. })));
+        assert!(rx.try_recv().is_err());
     }
 
     #[tokio::test]

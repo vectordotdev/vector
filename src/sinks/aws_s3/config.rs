@@ -12,13 +12,17 @@ use vector_lib::{
     },
     configurable::configurable_component,
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use super::sink::S3RequestOptions;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
+    },
     sinks::{
         Healthcheck,
         s3_common::{
@@ -33,7 +37,7 @@ use crate::{
             TowerRequestConfig, timezone_to_offset,
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -184,6 +188,9 @@ pub struct S3SinkConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -195,8 +202,8 @@ pub(super) fn default_filename_time_format() -> String {
 }
 
 impl GenerateConfig for S3SinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             bucket: "".to_owned(),
             key_prefix: default_key_prefix(),
             filename_time_format: default_filename_time_format(),
@@ -216,6 +223,7 @@ impl GenerateConfig for S3SinkConfig {
             timezone: Default::default(),
             force_path_style: Default::default(),
             retry_strategy: Default::default(),
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -224,11 +232,8 @@ impl GenerateConfig for S3SinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = self.create_service(&cx.proxy).await?;
-        let healthcheck = self.build_healthcheck(service.client())?;
-        let sink = self.build_processor(service, cx)?;
-        Ok((sink, healthcheck))
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -244,6 +249,59 @@ impl SinkConfig for S3SinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedAwsS3 {
+    batch_settings: BatcherSettings,
+    key_prefix: ConfinedTemplate,
+    ssekms_key_id: Option<ConfinedTemplate>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for S3SinkConfig {
+    type Validated = ValidatedAwsS3;
+
+    fn validate(&self) -> crate::Result<ValidatedAwsS3> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        let key_prefix = Template::try_from(self.key_prefix.clone())?.confine(
+            &self.confinement,
+            Self::NAME,
+            "key_prefix",
+        )?;
+
+        let ssekms_key_id = self
+            .options
+            .ssekms_key_id
+            .as_ref()
+            .cloned()
+            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .transpose()?
+            .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
+            .transpose()?;
+
+        Ok(ValidatedAwsS3 {
+            batch_settings,
+            key_prefix,
+            ssekms_key_id,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAwsS3,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let service = self.create_service(&cx.proxy).await?;
+        let healthcheck = self.build_healthcheck(service.client())?;
+        let sink = self.build_processor(service, cx, validated)?;
+        Ok((sink, healthcheck))
+    }
 }
 
 impl S3SinkConfig {
@@ -251,6 +309,7 @@ impl S3SinkConfig {
         &self,
         service: S3Service,
         cx: SinkContext,
+        validated: &ValidatedAwsS3,
     ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
@@ -268,17 +327,13 @@ impl S3SinkConfig {
             .and_then(timezone_to_offset);
 
         // Configure our partitioning/batching.
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let batch_settings = validated.batch_settings;
 
-        let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
-
-        let ssekms_key_id = self
-            .options
+        let key_prefix = validated.key_prefix.clone().with_tz_offset(offset);
+        let ssekms_key_id = validated
             .ssekms_key_id
-            .as_ref()
-            .cloned()
-            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
-            .transpose()?;
+            .clone()
+            .map(|t| t.with_tz_offset(offset));
 
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
 
@@ -370,6 +425,23 @@ impl S3SinkConfig {
 #[cfg(test)]
 mod tests {
     use super::S3SinkConfig;
+    use crate::config::ValidatedSink;
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn prepares_valid_config() {
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+        "#})
+        .unwrap();
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.key_prefix.to_string(), "date=%F");
+        assert!(validated.ssekms_key_id.is_none());
+    }
 
     #[test]
     fn generate_config() {
@@ -380,23 +452,17 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_batch_encoding_correct_toml_shape() {
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            schema_mode = "auto_infer"
-            codec = "parquet"
-
-            [batch_encoding.compression]
-            algorithm = "snappy"
-
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              schema_mode: auto_infer
+              codec: parquet
+              compression:
+                algorithm: snappy
+            "#})
         .expect("correct batch_encoding shape should parse");
 
         let batch_enc = config
@@ -447,6 +513,7 @@ mod tests {
             timezone: Default::default(),
             force_path_style: true,
             retry_strategy: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
@@ -470,24 +537,19 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_content_type_user_override_preserved() {
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-            content_type = "application/octet-stream"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "auto_infer"
-
-            [batch_encoding.compression]
-            algorithm = "gzip"
-            level = 9
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            content_type: "application/octet-stream"
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: auto_infer
+              compression:
+                algorithm: gzip
+                level: 9
+            "#})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.as_ref().unwrap();
@@ -534,20 +596,16 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_filename_extension_user_override() {
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-            filename_extension = "pq"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "auto_infer"
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            filename_extension: pq
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: auto_infer
+            "#})
         .unwrap();
 
         assert_eq!(config.filename_extension.as_deref(), Some("pq"));
@@ -559,18 +617,14 @@ mod tests {
     fn parquet_schema_mode_defaults_to_relaxed() {
         use vector_lib::codecs::encoding::format::ParquetSchemaMode;
 
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+            "#})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
@@ -583,23 +637,57 @@ mod tests {
     fn parquet_schema_mode_strict_parsed() {
         use vector_lib::codecs::encoding::format::ParquetSchemaMode;
 
-        let config: S3SinkConfig = toml::from_str(
-            r#"
-            bucket = "test-bucket"
-            compression = "none"
-
-            [encoding]
-            codec = "text"
-
-            [batch_encoding]
-            codec = "parquet"
-            schema_mode = "strict"
-            schema_file = "tmp/something.schema"
-            "#,
-        )
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: strict
+              schema_file: tmp/something.schema
+            "#})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
         assert_eq!(p.schema_mode, ParquetSchemaMode::Strict);
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_key_prefix() {
+        let template: Template = "{{ tenant }}".try_into().unwrap();
+        let err = template
+            .confine(&ConfinementConfig::default(), "aws_s3", "key_prefix")
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("no literal string prefix"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_key_prefix() {
+        let cfg = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let template: Template = "{{ tenant }}".try_into().unwrap();
+        assert!(template.confine(&cfg, "aws_s3", "key_prefix").is_ok());
+    }
+
+    #[test]
+    fn confinement_blocks_dotdot_escape_at_render() {
+        use crate::event::Event;
+        use vector_lib::event::LogEvent;
+        use vrl::event_path;
+
+        let template: Template = "safe/{{ tenant }}/".try_into().unwrap();
+        let template = template
+            .confine(&ConfinementConfig::default(), "aws_s3", "key_prefix")
+            .unwrap();
+        let mut event = Event::Log(LogEvent::from("x"));
+        event
+            .as_mut_log()
+            .insert(event_path!("tenant"), "../../escape");
+        assert!(template.render_string(&event).is_err());
     }
 }
