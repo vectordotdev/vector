@@ -389,36 +389,75 @@ fn exclusive_group<'a>(param: &'a Value, key: &str) -> Option<Vec<&'a str>> {
 
 /// Build the example object for a struct nested inside an array or map field.
 ///
-/// Nested structs carry their own exclusive groups, so those are filtered here too: emitting two
-/// members of one group would produce a config the component's validation rejects. Selection
-/// requires renderability rather than just `deep_filter`, because picking a member that yields no
-/// value would drop the rest and leave a `required_one_of` group with nothing set, which is
-/// equally invalid.
+/// Nested structs carry their own exclusive groups, so those are handled here too, and the two
+/// kinds are not symmetric. Emitting two members of either kind produces a config the component's
+/// validation rejects, but emitting *none* is only valid for `mutually_exclusive`: a nested
+/// `required_one_of` group needs its chosen member forced past `deep_filter`, exactly as
+/// `make_example_params` does at the top level. Selection requires renderability, since a member
+/// that yields no value would drop the rest and leave the group with nothing set.
+///
+/// Forcing never *creates* an object, though. The chosen member is only added to an object that is
+/// non-empty on its own account, so a nested struct whose sole content is an unfilterable group
+/// still yields an empty object and falls back to the item's own example in `get_example_value`.
 fn build_nested_object(
     options: &Map<String, Value>,
     item_kind: &str,
     deep_filter: impl Fn(&Value) -> bool,
 ) -> Option<Map<String, Value>> {
-    let excluded = excluded_group_members(options, |option| {
+    // At most one: the chosen member is subject to `deep_filter` like any other field, so a
+    // minimal example correctly emits no member of the group at all.
+    let (_, excluded) = split_exclusive_groups(options, "mutually_exclusive", |option| {
         deep_filter(option) && renders_nested_value(option, item_kind)
     });
+    // Exactly one: the chosen member is forced in, so it is picked on renderability alone.
+    let (required_one_of, _) = split_exclusive_groups(options, "required_one_of", |option| {
+        renders_nested_value(option, item_kind)
+    });
+
     let mut object = Map::new();
-    for (key, option) in options
+    for (key, option) in options.iter().filter(|(key, option)| {
+        deep_filter(option)
+            && !excluded.contains(key.as_str())
+            && (exclusive_group(option, "required_one_of").is_none()
+                || required_one_of.contains(key.as_str()))
+    }) {
+        insert_nested_value(&mut object, key, option, item_kind)?;
+    }
+
+    // Nothing else keeps the object present, so leave it empty rather than forcing a member in and
+    // materializing an object where the item's own example would be used.
+    if object.is_empty() {
+        return Some(object);
+    }
+
+    let forced: Vec<_> = options
         .iter()
-        .filter(|(key, option)| deep_filter(option) && !excluded.contains(key.as_str()))
-    {
-        for option_type in option.get("type")?.as_object()?.values() {
-            let candidate = if item_kind == "array" {
-                get_array_value(option_type)
-            } else {
-                get_value(option_type)
-            };
-            if let Some(candidate) = candidate {
-                object.insert(key.clone(), candidate);
-            }
-        }
+        .filter(|(key, _)| required_one_of.contains(key.as_str()) && !object.contains_key(*key))
+        .collect();
+    for (key, option) in forced {
+        insert_nested_value(&mut object, key, option, item_kind)?;
     }
     Some(object)
+}
+
+/// Render `option` into `object` under `key`, if any of its types yields a concrete value.
+fn insert_nested_value(
+    object: &mut Map<String, Value>,
+    key: &str,
+    option: &Value,
+    item_kind: &str,
+) -> Option<()> {
+    for option_type in option.get("type")?.as_object()?.values() {
+        let candidate = if item_kind == "array" {
+            get_array_value(option_type)
+        } else {
+            get_value(option_type)
+        };
+        if let Some(candidate) = candidate {
+            object.insert(key.to_string(), candidate);
+        }
+    }
+    Some(())
 }
 
 /// Whether any of `option`'s types yields a concrete value, mirroring how the nested-object loop
@@ -436,21 +475,6 @@ fn renders_nested_value(option: &Value, item_kind: &str) -> bool {
                 }
             })
         })
-}
-
-/// Members of any exclusive group among `params` that must be omitted so at most one member of
-/// each group appears. `usable` decides which member is preferred when several would qualify.
-///
-/// This only ever drops members, so the result is safe wherever a group cannot be forced in: a
-/// group that resolves to a member producing no value simply contributes nothing.
-fn excluded_group_members(
-    params: &Map<String, Value>,
-    usable: impl Fn(&Value) -> bool,
-) -> HashSet<&str> {
-    ["required_one_of", "mutually_exclusive"]
-        .into_iter()
-        .flat_map(|key| split_exclusive_groups(params, key, &usable).1)
-        .collect()
 }
 
 /// Partition the members of every exclusive group named by `key` into the single member that may
@@ -993,6 +1017,102 @@ mod tests {
             nested.keys().collect::<Vec<_>>(),
             ["file"],
             "expected the renderable member, got {nested:?}"
+        );
+    }
+
+    /// A nested struct holding an exclusive group of optional members, plus a sibling that a
+    /// minimal example keeps, so the nested object is emitted regardless of the group.
+    fn nested_group_params(kind: &str) -> Map<String, Value> {
+        let member = |example: &str| {
+            serde_json::json!({
+                "required": false,
+                kind: ["source", "file"],
+                "type": { "string": { "examples": [example] } }
+            })
+        };
+        Map::from_iter([(
+            "config".to_owned(),
+            serde_json::json!({
+                "required": true,
+                "type": { "object": { "items": { "type": { "object": { "options": {
+                    "name": {
+                        "required": true,
+                        "type": { "string": { "examples": ["parser"] } }
+                    },
+                    "source": member("stdin"),
+                    "file": member("/var/log/syslog"),
+                } } } } } }
+            }),
+        )])
+    }
+
+    #[test]
+    fn nested_required_one_of_forces_a_member() {
+        // No member is required or minimal, so none passes `deep_filter`. Dropping the unchosen
+        // members without forcing the chosen one in would leave the nested group with nothing set,
+        // which its exactly-one constraint rejects just as setting two would.
+        let params = nested_group_params("required_one_of");
+        let minimal = make_example_params(&params, selected_for_minimal, selected_for_minimal);
+        let nested = minimal["config"]
+            .as_object()
+            .expect("config should be an object");
+
+        assert_eq!(
+            nested.keys().collect::<Vec<_>>(),
+            ["name", "source"],
+            "expected the forced group member alongside the minimal field, got {nested:?}"
+        );
+    }
+
+    #[test]
+    fn nested_mutually_exclusive_stays_filter_dependent() {
+        // The same shape under "at most one", where emitting no member is valid. The group must
+        // not be forced in, so the minimal example keeps only the field the filter selected.
+        let params = nested_group_params("mutually_exclusive");
+        let minimal = make_example_params(&params, selected_for_minimal, selected_for_minimal);
+        let nested = minimal["config"]
+            .as_object()
+            .expect("config should be an object");
+
+        assert_eq!(
+            nested.keys().collect::<Vec<_>>(),
+            ["name"],
+            "expected no group member, got {nested:?}"
+        );
+    }
+
+    #[test]
+    fn forced_nested_member_does_not_create_an_object() {
+        // The group is the nested struct's only content, so nothing else keeps the object present.
+        // Forcing a member in here would emit an object where the item's own example is used today,
+        // shifting output for fields that are already valid.
+        let member = |example: &str| {
+            serde_json::json!({
+                "required": false,
+                "required_one_of": ["source", "file"],
+                "type": { "string": { "examples": [example] } }
+            })
+        };
+        let params = Map::from_iter([(
+            "config".to_owned(),
+            serde_json::json!({
+                "required": true,
+                "type": { "object": { "items": { "type": { "object": {
+                    "examples": [{ "source": ". = parse_json!(.message)" }],
+                    "options": {
+                        "source": member("stdin"),
+                        "file": member("/var/log/syslog"),
+                    }
+                } } } } }
+            }),
+        )]);
+
+        let minimal = make_example_params(&params, selected_for_minimal, selected_for_minimal);
+        assert_eq!(
+            minimal["config"],
+            serde_json::json!({ "source": ". = parse_json!(.message)" }),
+            "expected the item example, got {:?}",
+            minimal["config"]
         );
     }
 
