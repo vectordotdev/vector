@@ -5,3 +5,5 @@ fn main() {
     let functions = vector_vrl_functions::all();
     std::process::exit(cmd(&Opts::parse(), functions));
 }
+
+// v15 poc: benign vrl docs path touch
