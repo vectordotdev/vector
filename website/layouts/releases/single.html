@@ -131,22 +131,23 @@
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
-            <ul class="prose dark:prose-invert list-disc ml-6">
+            <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
               {{ range $changes }}
-              <li>
-                  <span class="prose dark:prose-invert">
-                    {{ .description | markdownify }}
-                  </span>
+              <li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5">
+                <div class="prose dark:prose-invert max-w-none leading-relaxed [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
+                  {{ .description | markdownify }}
+                </div>
                 {{ if gt (len .contributors) 0 }}
-                <br>
-                <span class="prose dark:prose-invert italic">
+                <div class="mt-3 overflow-x-auto border-t border-gray-200 pt-3 text-sm italic text-gray-600 dark:border-gray-700 dark:text-gray-300">
                   Thanks to
                   {{ $len := len .contributors }}
                   {{ range $i, $contributor := .contributors }}
-                    <a href="https://github.com/{{ replace $contributor "@" "" }}" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
+                    {{ $username := replace $contributor "@" "" }}
+                    {{ $profile := printf "https://github.com/%s" $username }}
+                    <a href="{{ $profile }}" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
                   {{ end }}
                   for contributing this change!
-                </span>
+                </div>
                 {{ end }}
               </li>
               {{ end }}
@@ -196,7 +197,7 @@
           {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
         </div>
 
-        <div class="mt-6 prose dark:prose-invert max-w-none">
+        <div class="mt-6 prose dark:prose-invert max-w-none [&>ul]:mb-0 [&>ul]:mt-4 [&>ul]:min-w-0 [&>ul]:list-none [&>ul]:rounded-t-lg [&>ul]:border [&>ul]:border-gray-200 [&>ul]:border-b-0 [&>ul]:bg-gray-50/50 [&>ul]:px-4 [&>ul]:py-4 [&>ul]:shadow-sm dark:[&>ul]:border-gray-700 dark:[&>ul]:bg-gray-800/40 md:[&>ul]:px-5 [&>ul>li]:m-0 [&>ul+p]:mt-0 [&>ul+p]:rounded-b-lg [&>ul+p]:border [&>ul+p]:border-gray-200 [&>ul+p]:bg-gray-50/50 [&>ul+p]:px-4 [&>ul+p]:py-3 [&>ul+p]:text-sm [&>ul+p]:italic [&>ul+p]:shadow-sm dark:[&>ul+p]:border-gray-700 dark:[&>ul+p]:bg-gray-800/40 md:[&>ul+p]:px-5 [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
           {{ . | markdownify }}
         </div>
       </div>
