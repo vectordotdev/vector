@@ -426,11 +426,13 @@ fn report_stage(
     current_metrics: &mut ReporterCurrentMetrics,
     buffer_id: &str,
 ) -> bool {
-    stage.report(current_metrics, buffer_id);
-
     // Every handle for the stage has been dropped once the reporter holds the only remaining
-    // reference, and no new handle can appear from a count of one.
-    Arc::strong_count(stage) > 1
+    // reference, and no new handle can appear from a count of one. Check this before reporting so
+    // a handle active at the start of the tick gets another tick to report any concurrent update.
+    let is_live = Arc::strong_count(stage) > 1;
+
+    stage.report(current_metrics, buffer_id);
+    is_live
 }
 
 /// Reports usage for every stage still being tracked, discarding those that have made their final
