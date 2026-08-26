@@ -13255,7 +13255,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.58.0"
+version = "0.59.0"
 dependencies = [
  "antithesis-instrumentation",
  "approx",
