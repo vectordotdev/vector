@@ -273,6 +273,14 @@ impl MemoryConfig {
             Some(TableFilter::Bloom(_)) if self.scan_interval != default_scan_interval() => {
                 return Err("`scan_interval` has no effect for bloom filter.".into());
             }
+            Some(TableFilter::Bloom(bloom)) => {
+                let filter_size = bloom.filter_size();
+                if let Some(max_byte_size) = self.max_byte_size
+                    && filter_size > max_byte_size
+                {
+                    return Err(format!("Configured bloom filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of bloom filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -472,6 +480,14 @@ mod tests {
         let config = MemoryConfig {
             filter: Some(bloom_filter()),
             scan_interval: NonZeroU64::new(60).unwrap(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // A bloom filter larger than `max_byte_size` fails validation.
+        let config = MemoryConfig {
+            filter: Some(bloom_filter()),
+            max_byte_size: Some(1),
             ..Default::default()
         };
         assert!(config.validate().is_err());
