@@ -6,6 +6,9 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
+{{ $breaking := where ($release.changelog | default slice) "breaking" true }}
+{{ $breakingTitled := where $breaking "title" "ne" nil }}
+{{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "security" "security changes" "deprecation" "deprecations" "chore" "chore"}}
 {{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
@@ -47,6 +50,24 @@
         </div>
       </div>
     </div>
+
+    {{ if and (gt (len $breakingTitled) 0) (gt (len $upgradeGuides) 0) }}
+    <div class="mt-8">
+      <div class="prose dark:prose-invert max-w-none">
+        {{ partial "heading.html" (dict "text" "Breaking changes" "level" 2) }}
+      </div>
+
+      <ul class="mt-4 space-y-2 list-disc ml-6">
+        {{ range $breakingTitled }}
+        <li class="marker:text-dark dark:marker:text-gray-300">
+          <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="text-secondary dark:text-primary hover:underline">
+            {{ .title | markdownify }}
+          </a>
+        </li>
+        {{ end }}
+      </ul>
+    </div>
+    {{ end }}
 
     {{ with $release.known_issues }}
     {{ if gt (len $release.known_issues) 0 }}

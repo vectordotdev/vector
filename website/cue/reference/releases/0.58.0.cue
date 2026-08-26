@@ -269,6 +269,8 @@ releases: "0.58.0": {
 		{
 			type:     "chore"
 			breaking: true
+			title:    "`azure_monitor_logs` sink removed"
+			anchor:   "azure-monitor-logs-sink-removed"
 			description: #"""
 				The deprecated `azure_monitor_logs` sink has been removed. Configurations using it now fail
 				validation. Microsoft ends support for the sink's underlying Data Collector API in September
@@ -279,6 +281,8 @@ releases: "0.58.0": {
 		{
 			type:     "chore"
 			breaking: true
+			title:    "Legacy buffer metrics removed"
+			anchor:   "legacy-buffer-metrics-removed"
 			description: #"""
 				The deprecated `buffer_byte_size` and `buffer_events` gauge metrics have been removed.
 				"""#
@@ -362,6 +366,8 @@ releases: "0.58.0": {
 		{
 			type:     "chore"
 			breaking: true
+			title:    "HTTP server `encoding` option removed"
+			anchor:   "http-server-encoding-removed"
 			description: #"""
 				The deprecated `encoding` option has been removed from the `http_server` source
 				and its deprecated `http` alias. Configurations using it now fail validation.
@@ -371,6 +377,8 @@ releases: "0.58.0": {
 		{
 			type:     "chore"
 			breaking: true
+			title:    "`influxdb_logs` sink `namespace` option removed"
+			anchor:   "influxdb-logs-namespace-removed"
 			description: #"""
 				The deprecated `namespace` option has been removed from the `influxdb_logs` sink. It has been
 				deprecated since v0.24.0 in favor of `measurement`. Configurations using it now fail validation.
@@ -417,6 +425,8 @@ releases: "0.58.0": {
 		{
 			type:     "chore"
 			breaking: true
+			title:    "`logdna` sink alias removed"
+			anchor:   "logdna-sink-alias-removed"
 			description: #"""
 				The deprecated `logdna` sink alias has been removed. It was renamed to `mezmo` in v0.29.0.
 				Configurations using `type: logdna` now fail validation.
@@ -501,6 +511,8 @@ releases: "0.58.0": {
 		{
 			type:     "chore"
 			breaking: true
+			title:    "URI template field references inside the authority are rejected"
+			anchor:   "uri-template-partial-authority"
 			description: #"""
 				Vector now refuses to build configs where a `{{ field }}` reference lands inside
 				the hostname (or immediately adjacent to it without a path separator). Previously,
@@ -530,6 +542,8 @@ releases: "0.58.0": {
 		{
 			type:     "chore"
 			breaking: true
+			title:    "`webhdfs` sink defaults endpoints to `https://`"
+			anchor:   "webhdfs-sink-defaults-endpoints-to-https"
 			description: #"""
 				The `webhdfs` sink's `endpoint` option now defaults a missing scheme to `https://` instead of
 				`http://`. A scheme-less endpoint (for example `endpoint: "127.0.0.1:9870"`) still loads and
