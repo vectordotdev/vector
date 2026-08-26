@@ -2211,7 +2211,7 @@ dependencies = [
  "bitflags 2.10.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "regex",
@@ -8955,7 +8955,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -8975,7 +8975,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -9009,7 +9009,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "syn 2.0.119",
@@ -9022,7 +9022,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "syn 2.0.119",
@@ -13245,7 +13245,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.58.0"
+version = "0.59.0"
 dependencies = [
  "antithesis-instrumentation",
  "approx",
@@ -13899,8 +13899,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.34.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#ca05c29ab61f5288e858b32089add9a4cb13718c"
+version = "0.35.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#ba18ec28bd1fc45836445b43ef02c622b6f7c41a"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",
@@ -13947,7 +13947,7 @@ dependencies = [
  "indoc",
  "influxdb-line-protocol",
  "ipcrypt-rs",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "jsonschema",
  "lalrpop",
  "lalrpop-util",
@@ -13993,7 +13993,7 @@ dependencies = [
  "sha2 0.11.0",
  "sha3 0.12.0",
  "simdutf8",
- "snafu 0.8.9",
+ "snafu 0.9.0",
  "snap",
  "strip-ansi-escapes",
  "strum 0.28.0",
