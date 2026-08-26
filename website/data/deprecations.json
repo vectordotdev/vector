@@ -19,6 +19,11 @@
       "what": "Environment-variable and secret placeholders in non-string positions",
       "deprecated_since": "0.57.0",
       "description": "Placeholders (`${VAR}` and `SECRET[backend.key]`) in structural positions of\na Vector configuration file are deprecated and will be removed in a future\nrelease. Current behavior is unchanged.\n\nAffected patterns:\n\n- Unquoted placeholders in non-string fields (`count = ${MY_COUNT}`).\n- Placeholders in map keys (`${KEY} = value`).\n- Placeholders in TOML table headers (`[${SECTION}]`).\n- Placeholders as inline array elements that expand to multiple values\n  (`inputs = [${VECTOR_INPUTS}]` where `VECTOR_INPUTS=a,b`).\n\nMigration guidance will accompany the removal PR. `envsubst` can be used today\nto pre-expand env-var placeholders into a fully static config as a workaround.\n\nSee [RFC: parse-first config interpolation](https://github.com/vectordotdev/vector/blob/master/rfcs/2026-06-09-parse-first-config-interpolation.md)\nfor the full rationale."
+    },
+    {
+      "what": "scheme-less `address` and `routing.endpoints` values in the `vector` sink defaulting to `http`",
+      "deprecated_since": "0.58.0",
+      "description": "A `vector` sink endpoint such as `127.0.0.1` without an explicit scheme currently defaults to `http`.\nThis behavior is deprecated and will change to `https` in a future release.\nNote that when TLS is enabled, a scheme-less address already defaults to `https`.\n\nMigrate by specifying the scheme explicitly:\n\n```yaml\nsinks:\n  my_sink:\n    type: vector\n    address: http://127.0.0.1:6000\n```"
     }
   ],
   "deprecations_enacted": [
