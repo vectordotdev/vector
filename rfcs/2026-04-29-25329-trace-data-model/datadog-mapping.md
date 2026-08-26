@@ -38,7 +38,8 @@ Trace Context, and other informational entries are defined in the
     (`priority` / `origin` / `droppedTrace` / `tags`, `spans[]`).
   - [`span.proto`](https://github.com/DataDog/datadog-agent/blob/main/pkg/proto/datadog/trace/span.proto)
     -- the per-span shape (`service`, `name`, `resource`, `traceID`, `spanID`,
-    `parentID`, `start`, `duration`, `error`, `meta`, `metrics`, `type`, `meta_struct`).
+    `parentID`, `start`, `duration`, `error`, `meta`, `metrics`, `type`, `meta_struct`,
+    `spanLinks`, `spanEvents`).
 - **Datadog Agent OTLP ingest**: the OTLP-to-Datadog conversion implemented by the
   Datadog Agent in
   [`pkg/trace/api/otlp.go`](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/otlp.go)
@@ -142,16 +143,6 @@ Rationale section below.
 - **Pre-epoch `Span.start` and `SpanEvent.time`** are clamped to epoch-zero on Datadog
   egress; a counter is incremented and a warning log identifies the affected span. See
   the "Pre-epoch `Span.start` and `SpanEvent.time` handling" subsection.
-- **Wire-empty `Span.resource` and `Span.type`** ingest as the typed-slot `None` per the
-  parent RFC's empty-string invariant and egress as the derived value (`Span.name`
-  fallback for `Span.resource`; `"custom"` from the `Unspecified` `SpanKind2Type` row
-  for `Span.type`) rather than as the empty wire value. Wire-byte non-identical;
-  backend-observable behavior is unchanged because the Datadog Agent's own normalizer
-  rewrites empty `Span.resource` to `Span.name` upstream of the agent-to-backend hop
-  Vector targets, and the Datadog backend buckets empty `Span.type` and `"custom"`
-  together. See the "`Span.resource` and `Span.type` empty-string egress consequence"
-  subsection.
-
 The Datadog-side consequences of model-level exclusions defined in the parent RFC
 (zero-ID rejection and pre-epoch timestamps via the internal proto's `fixed64` encoding)
 also apply.
@@ -254,8 +245,8 @@ The grouping rules are:
 | `Span.meta["_dd.p.tid"]` (hex u64) if present (see below)     | `Span.trace_id.high_u64`                              |
 | `Span.spanID`, `Span.parentID`                                | `Span.span_id`, `Span.parent_span_id`                 |
 | `Span.name`                                                   | `Span.name`                                           |
-| `Span.resource` (empty-string normalization, see below)       | `Span.resource_name`                                  |
-| `Span.type` (empty-string normalization, see below)           | `Span.span_type`                                      |
+| `Span.resource`                                               | `Span.resource_name`                                  |
+| `Span.type`                                                   | `Span.span_type`                                      |
 | `Span.start`, `Span.duration`                                 | `Span.start_time`, `Span.duration` (ns-exact)         |
 | `Span.error` and `Span.meta["error.message"]`                 | `Span.status` (see below)                             |
 | `Span.meta`                                                   | `Span.attributes` (`AttrValue::String`, see below)    |
@@ -290,41 +281,17 @@ implementation produces, in lockstep with the upstream reference.
 
 `TracerPayload.hostname` and `TracerPayload.env` map to typed
 `Resource.host` / `Resource.environment` directly and are not part of the deferred
-attribute set; an empty wire value normalizes to `None` per the parent RFC's
-"Empty-string invariant for optional string slots". `TracerPayload.containerDebug`
-is a Datadog-internal diagnostic with no Vector consumer and is dropped on ingest (see
-"Out of scope").
+attribute set. `TracerPayload.containerDebug` is a Datadog-internal diagnostic with no
+Vector consumer and is dropped on ingest (see "Out of scope").
 
-#### `Span.resource` and `Span.type` empty-string egress consequence
+#### Empty Datadog string fields
 
-`Span.resource` and `Span.type` follow the parent RFC's "Empty-string invariant for
-optional string slots": an empty wire value normalizes to `None` on ingress. The
-Datadog-egress derivation fallback ("When `Span.span_type` is `None` on Datadog egress…",
-below) then fires for the `None` value, including for Datadog-sourced spans whose
-producer wrote the empty string. An originally populated (non-empty) value is preserved
-verbatim.
-
-The wire bytes therefore differ from input to output for the empty-string case: empty
-`Span.resource` egresses as the value the `Span.name`-fallback rule produces (typically
-`Span.name` itself, since the OpenTelemetry semantic-convention attribute keys the
-derivation prefers are not normally present on Datadog-sourced spans), and empty
-`Span.type` egresses as `"custom"` (from the `Unspecified` row of the `SpanKind2Type`
-table -- Datadog-sourced spans always carry `Span.kind = Unspecified` per
-"Datadog egress derivation rules" below).
-
-Backend-observable behavior is unchanged on conforming Datadog Agent traffic:
-
-- The Datadog Agent's normalizer (`pkg/trace/agent/normalizer.go`) rewrites empty
-  `Span.resource` to `Span.name` before the span enters the agent-to-backend hop
-  Vector targets, so a wire-empty `Span.resource` is essentially not observed on this
-  hop in practice. The Vector derivation reaches the same `Span.name` value the Agent
-  normalizer would have produced.
-- The Datadog backend buckets empty `Span.type` and `"custom"` together in APM stats
-  and the UI, so the wire-byte change is not surfaced to operators.
-
-Empty wire input thus behaves consistently with the Datadog Agent's own handling: the
-empty value is the wire-level "derive me" signal. The wire-byte non-identity is
-declared as a Datadog-side round-trip exclusion above.
+Datadog's string scalars do not expose proto3 presence, so decode cannot distinguish an
+omitted field from one explicitly encoded as empty. The mapping nevertheless preserves
+the decoded empty value as `Some("")` for `Resource.{service,environment,host}`,
+`Span.{resource_name,span_type}`, and `ChunkContext.origin`; `None` means no source value
+was available. Datadog egress therefore reproduces the empty value, and the
+`resource_name` / `span_type` fallback applies only to `None`.
 
 #### `Span.duration` wire-domain handling
 
@@ -996,10 +963,11 @@ land first.
   single-trace chunks, non-conforming multi-trace chunks, 128-bit `SpanLink` trace
   IDs, `_dd.p.tid` consumption and emission, `_dd.meta_struct` byte preservation,
   `_dd.payload` envelope reconstruction across `vector` source/sink hops, `Span.error`
-  normalization, NaN round-trip through `Span.metrics` / `SpanEvent.attributes` /
-  `_dd.payload.{target_tps,error_tps}`, two same-`TracerPayload` chunks with identical
-  `(priority, origin, tags, trace_id)` but differing `droppedTrace` values (must egress
-  as two distinct chunks each preserving its own `droppedTrace`).
+  normalization, empty Datadog string scalars, NaN round-trip through `Span.metrics` /
+  `SpanEvent.attributes` / `_dd.payload.{target_tps,error_tps}`, two
+  same-`TracerPayload` chunks with identical `(priority, origin, tags, trace_id)` but
+  differing `droppedTrace` values (must egress as two distinct chunks each preserving
+  its own `droppedTrace`).
 - [ ] Cross-format conformance tests for `OTLP -> Vector -> datadog_traces`,
   comparing the wire output against the Datadog Agent's OTLP receiver on representative
   OTLP inputs. The reference outputs are captured from a Datadog Agent and committed

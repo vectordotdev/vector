@@ -65,10 +65,10 @@ The effective-equivalence guarantee for `OTLP -> Vector -> OTLP` does not cover 
 input shapes. Each is justified by a paragraph in the Implementation or Rationale section
 below.
 
-- **Deprecated `deployment.environment` key** is rewritten to `deployment.environment.name`
-  on OTLP egress. If both keys are present on ingress with different values, the deprecated
-  value is dropped (the stable key wins). See the deprecated-environment paragraph under
-  Implementation.
+- **Promoted deprecated `deployment.environment` key** is rewritten to
+  `deployment.environment.name` on OTLP egress. If both keys are present on ingress, the
+  deprecated value is dropped (the stable key wins). See the deprecated-environment
+  paragraph under Implementation.
 - **Reserved cross-format OTLP span-attribute keys** (`datadog.chunk.priority`,
   `datadog.chunk.origin`, `datadog.chunk.dropped`, `datadog.chunk.tags`,
   `datadog.span.resource`, `datadog.span.type`): lifted from `Span.attributes` into
@@ -77,12 +77,6 @@ below.
   egress, overwriting any existing attribute at the same key. The Datadog sub-RFC
   specifies the contents these keys carry; this sub-RFC reserves the keys.
 - **OTLP fields at `Development` or `Alpha` stability tier** are dropped on OTLP ingress.
-- **Empty `string_value` on a promoted resource attribute** (`service.name`,
-  `deployment.environment.name`, the deprecated `deployment.environment`, or
-  `host.name`): consumed from `Resource.attributes` on ingress and normalized to typed
-  slot `None` per the parent RFC's "Empty-string invariant for optional string
-  slots". Egress emits the typed `None` as field-absent rather than as the original
-  empty-string attribute.
 - **`Span.end_time_unix_nano < start_time_unix_nano`** is clamped to zero duration on
   ingress; the source increments a counter and emits a warning log
   identifying the affected span. The egress reconstruction emits `end_time_unix_nano = start_time_unix_nano`,
@@ -180,33 +174,24 @@ Promotion to a typed `Resource` field is conditional on the attribute value bein
 `string_value`. When the value is a non-empty string (the normal case), promotion is
 move-not-copy: the key is removed from `Resource.attributes` and the typed slot is the
 sole post-ingress owner of the value. This matches the move-not-copy pattern used for
-`_dd.p.tid` consumption on Datadog ingest and for the reserved cross-format keys. A
-`string_value` whose contents are empty is consumed identically -- the key is stripped
-from `Resource.attributes` -- but the typed slot stays `None` per the parent RFC's
-"Empty-string invariant for optional string slots"; this is the OTLP-side
-application of the invariant and is one of the OTLP-side zero-loss exclusions listed
-above. If the `AnyValue` for any of these three keys is a non-string variant (e.g.
-`int_value`, `bytes_value`, `bool_value`, `array_value`, `kvlist_value`, or an unset
-oneof), the key is not promoted and remains in `Resource.attributes` under its original
-key, so OTLP egress emits it unchanged. A non-string `service.name`,
-`deployment.environment.name`, or `host.name` therefore round-trips exactly; the typed
-`Resource` slot is left empty (`None`). Producers that violate the semantic-convention
-string typing for these keys are uncommon but produce valid OTLP wire data, and this
-rule ensures they are not silently truncated.
+`_dd.p.tid` consumption on Datadog ingest and for the reserved cross-format keys. An
+empty `string_value` or a non-string variant is not promoted: the typed slot remains
+`None` and the attribute remains under its original key, preserving the producer's
+value and its presence on OTLP egress.
 
 VRL transforms that want to change the service, environment, or host should write to the
 typed slots (`.resource.service`, `.resource.environment`, `.resource.host`) rather than
 to the corresponding attribute-map keys. Because promotion strips the source attribute on
 ingress, the duplicate-key case arises only when (i) a transform writes to both the typed
-slot and the matching attribute key, or (ii) the source attribute was a non-string
-variant that the promotion rule above left in place.
+slot and the matching attribute key, or (ii) the source attribute was empty or non-string
+and the promotion rule above left it in place.
 
 On OTLP egress specifically, the typed slot wins for the three pairs above: the canonical key is
 emitted once with the typed value and any duplicate at the same key in `Resource.attributes` is
 dropped; a counter is incremented and a warning log is emitted for visibility. This is required for
 spec conformance: OTLP `Resource.attributes` mandates that "attribute keys MUST be unique." If the
 typed slot is `None` and the attribute key is present, the attribute value is emitted unchanged (the
-non-string-promotion rule above applies). The other typed slot/attribute-map pairs from the parent
+non-promotion rule above applies). The other typed slot/attribute-map pairs from the parent
 RFC do not apply on OTLP egress: `Span.trace_id` is a single 16-byte wire field (no `_dd.p.tid`
 duplication), `Span.status` egresses through OTLP's `Status.message` field with any `error.message`
 attribute left in place as a regular attribute, and the chunk-state pair is the cross-format
@@ -221,12 +206,11 @@ the attribute as `deployment.environment.name` in semantic conventions
 ([PR #3584](https://github.com/open-telemetry/semantic-conventions/pull/3584)), with
 `deployment.environment` listed as "Replaced by `deployment.environment.name`."
 
-The OTLP source promotes whichever of the two keys is present; if both are present,
-`deployment.environment.name` wins and the duplicate value at `deployment.environment` is
-dropped. On OTLP egress, `Resource.environment` is emitted only as
-`deployment.environment.name`. The relay-path consequences (key rewrite from deprecated to
-stable, and divergent-value drop when both keys are present) are the two declared
-OTLP-side partial-exclusion cases above.
+The stable key wins when both are present and the deprecated value is dropped. The
+selected key is then subject to the promotion rule above: a non-empty string promotes,
+while an empty or non-string value remains under its original key. On OTLP egress, a
+promoted `Resource.environment` uses `deployment.environment.name`; an unpromoted
+attribute retains its original key and value.
 
 The Rationale for accepting both keys is in the Rationale section.
 
@@ -293,10 +277,10 @@ bytes differ:
   isn't set, it is equivalent with an empty instrumentation scope name (unknown)") -- absent
   on the wire is spec-equivalent to a default-valued message. The model carries
   `TraceEvent.resource` and `TraceEvent.scope` as values rather than `Option`, and egress
-  emits the field unconditionally. Within `Scope`, `name` and `version` are
-  `Option<String>`: an absent or empty-string wire value normalizes to `None` on
-  ingress (OTLP treats empty and absent as equivalent); on egress `None` is emitted as an
-  absent (zero-length proto3 string), which is spec-equivalent to the original.
+  emits the field unconditionally. `Scope.{name,version}` and both `schema_url` fields
+  are non-optional proto3 strings, so decoding cannot distinguish absent from empty;
+  they map empty to `None` and egress as the proto3 default. OTLP additionally defines
+  an empty scope name as unknown.
 - `Span.status` (proto comment: "Semantically when Status isn't set, it means span's
   status code is unset, i.e. assume STATUS_CODE_UNSET (code = 0)") -- the model represents
   this as `SpanStatus::Unset` and egress emits the corresponding zero-coded `Status`. A
@@ -431,7 +415,7 @@ proto extension) are owned by the parent RFC's Plan of Attack and must land firs
   mapping table, the typed-slot-precedence rule, the `AttrValue` -> `AnyValue` mapping,
   the reserved-key emission for Datadog state, and the empty-`ScopeSpans` rule.
 - [ ] Property-based round-trip unit tests for `OTLP -> Vector -> OTLP` asserting
-  effective equivalence per Scope: typed-slot promotion (both string and non-string
+  effective equivalence per Scope: typed-slot promotion (non-empty, empty, and non-string
   cases), `deployment.environment` legacy-key handling, reversed-timestamp clamping,
   oversized duration clamping, default-valued / absent equivalence for `Resource` /
   `Scope` / `Status`, and unknown enum-number forward compatibility for `SpanKind` and

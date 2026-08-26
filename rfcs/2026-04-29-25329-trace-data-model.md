@@ -345,8 +345,10 @@ warning log identifies the drop.
 Drop granularity is structural and uniform across sources: a zero `SpanLink.span_id` or
 `SpanLink.trace_id` drops only the affected link (`Span.dropped_links_count` is incremented, a
 counter is incremented, and a warning log identifies the drop); a zero `Span.trace_id` or
-`Span.span_id` drops the enclosing span; a candidate `TraceEvent` whose every span was rejected is
-dropped as a whole with an additional counter increment and warning log.
+`Span.span_id` drops the enclosing span. Every rejected span is data loss: it increments
+`component_discarded_spans_total` and emits a warning identifying the drop. If every span in a
+candidate `TraceEvent` is rejected, the event is dropped with an additional event-drop counter and
+warning.
 
 Any future relay-side drop of a `SpanEvent` or attribute follows the same convention: the
 corresponding `dropped_events_count` / `dropped_attributes_count` field on the enclosing item is
@@ -453,16 +455,13 @@ variants are exhaustive for the known-value space.
   only `Error` carries a description); writing `message` to the empty string is a no-op
   for `Unset` / `Ok`. Writing `code` to `"unset"` or `"ok"` clears any existing message.
 
-#### Empty-string invariant for optional string slots
+#### Empty strings in optional string slots
 
-Every `Option<String>` typed slot in the data model -- `Resource.service` /
-`environment` / `host` / `schema_url`, `Scope.name` / `version` / `schema_url`,
-`Span.resource_name` / `span_type`, and `ChunkContext.origin` -- carries `None` for the
-absent / unset case and a non-empty string otherwise. `Some("")` is unrepresentable in a
-well-formed `TraceEvent`, so consumers do not need to discriminate between `None` and a
-present-but-empty value at the typed surface. Every construction site normalizes an
-empty input to `None`; the per-format applications are specified in the corresponding
-sub-RFC.
+`Option<String>` typed slots preserve `Some("")` when the source mapping supplies an
+empty value; `None` means absent or unset. There is no model-wide empty-string
+normalization. A mapping may collapse empty to `None` only where its wire format makes
+the values indistinguishable or defines them as equivalent; each such case is specified
+in the corresponding sub-RFC.
 
 #### `TraceFlags` and `TraceState`
 
@@ -629,30 +628,19 @@ resolves to:
 - **`Option`-wrapped typed slot** (`Span.parent_span_id`, `Resource.service` /
   `environment` / `host` / `schema_url`, `Scope.name` / `version` / `schema_url`,
   `Span.resource_name`, `Span.span_type`, `ChunkContext.priority` / `origin`): `del()`
-  clears the slot to `None`. For each `Option<String>` slot in this list, writing the
-  empty string `""` is equivalent to `del()` -- a consequence of the empty-string
-  invariant above; the analogous rule for `Span.parent_span_id` is documented under
-  "VRL surface for `TraceId` and `SpanId`".
+  clears the slot to `None`. Writing `""` to an `Option<String>` slot sets `Some("")`;
+  it is distinct from `del()`. The analogous rule for `Span.parent_span_id` is
+  documented under "VRL surface for `TraceId` and `SpanId`".
 - **`Attributes` map entry** (e.g. `.spans[i].attributes."foo"`,
   `.resource.attributes."bar"`, `.scope.attributes.*`, `.chunk.tags.*`,
   `.spans[i].events[j].attributes.*`, `.spans[i].links[j].attributes.*`): `del()` removes
   the entry from its map.
 - **`Vec` element** (`.spans[i]`, `.spans[i].events[j]`, `.spans[i].links[j]`): `del()`
   removes the i-th / j-th element; the vector shrinks and subsequent indices renumber.
-- **Required typed sub-field with a representable default value**: `del()` is
-  equivalent to writing the sub-field's default value. Examples:
-  `del(.spans[i].status.code)` sets `code` to `"unset"` (which per the `SpanStatus`
-  write rules above also clears any existing message); `del(.spans[i].status.message)`
-  sets the message to the empty string (a no-op for `Unset` / `Ok`, clearing the inner
-  string for `Error` / `Other`); `del(.chunk.tags)` sets the map to `{}`;
-  `del(.spans[i].duration)` sets the duration to `0`;
-  `del(.spans[i].events[j].attributes)` sets the map to `{}`.
-- **Required typed field without a representable default value, or a top-level required
-  container** (the `NonZero` IDs `.spans[i].trace_id`, `.spans[i].span_id`,
-  `.spans[i].links[j].trace_id`, `.spans[i].links[j].span_id`; plus the top-level
-  `.resource`, `.scope`, `.chunk`, and `.spans` containers): `del()` raises a VRL
-  runtime error. Replace `NonZero` IDs by writing a non-zero value; replace a top-level
-  container by writing the desired value (e.g. `.spans = []` to clear the spans vector).
+- **Required typed field or container**: `del()` raises a VRL runtime error, whether or
+  not the field has a representable default. Write the replacement explicitly (for
+  example, `.spans[i].duration = 0`, `.spans[i].status.code = "unset"`,
+  `.chunk.tags = {}`, or `.spans = []`).
 - **Root path (`del(.)`)**: raises a VRL runtime error.
 
 Reading through the same paths is the inverse: `Option`-wrapped slots that are `None`
@@ -828,8 +816,8 @@ message Resource {
 }
 
 message Scope {
-  optional string name = 1;     // absent or empty on wire -> None in Rust
-  optional string version = 2;  // absent or empty on wire -> None in Rust
+  optional string name = 1;
+  optional string version = 2;
   Attributes attributes = 3;
   optional string schema_url = 4;
   uint32 dropped_attributes_count = 5;
@@ -1426,8 +1414,9 @@ The format-agnostic PRs owned by this RFC are:
   "Migration: coexistence of `LogEvent` and typed representations". Every component
   continues to produce and consume `Legacy`; no functional change.
 - [ ] Extend Vector's internal event proto with the typed wire shape, per "Wire
-  serialization". Hard prerequisite for any source-flip step: without it, disk buffers
-  and the `vector` source/sink panic on the first `Typed` event.
+  serialization", including round-trip tests distinguishing `None` from `Some("")` in
+  optional string slots. Hard prerequisite for any source-flip step: without it, disk
+  buffers and the `vector` source/sink panic on the first `Typed` event.
 - [ ] Migration guide for users (consolidated across all three RFCs):
   - field-by-key VRL programs against the old `TraceEvent` (must move to typed paths;
     legacy paths break against `Typed` events);
