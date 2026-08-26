@@ -137,34 +137,6 @@ make check-generated-docs     # Check generated documentation
 make check-changelog-fragments  # Verify changelog
 ```
 
-### Website/Docs Development (Separate Process)
-
-If you're working on vector.dev website or documentation content:
-
-**Prerequisites:**
-
-- Hugo static site generator
-- CUE CLI tool
-- Node.js and Yarn
-- htmltest
-
-**Run the site locally:**
-
-```bash
-make generate-docs
-cd website && make serve
-# Navigate to http://localhost:1313
-```
-
-**Build website:**
-
-```bash
-cd website
-make cue-build
-```
-
-**Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
-
 ## Configuration Format
 
 Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.

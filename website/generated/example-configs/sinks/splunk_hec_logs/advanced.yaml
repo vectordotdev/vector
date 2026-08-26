@@ -11,9 +11,9 @@ sinks:
       codec: json
     endpoint: https://http-inputs-hec.splunkcloud.com
     endpoint_target: event
-    index: "{{ host }}"
+    index: index-{{ host }}
     indexed_fields:
       - field1
-    source: "{{ file }}"
-    sourcetype: "{{ sourcetype }}"
+    source: source-{{ file }}
+    sourcetype: sourcetype-{{ sourcetype }}
     timestamp_key: timestamp

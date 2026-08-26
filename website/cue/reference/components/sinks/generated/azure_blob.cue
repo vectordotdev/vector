@@ -7,8 +7,12 @@ generated: components: sinks: azure_blob: configuration: {
 
 			If provided, this will be used instead of the `connection_string`.
 			This is useful for authenticating with an Azure credential.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
 			"""
 		required: false
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
 		type: string: examples: ["mylogstorage"]
 	}
 	acknowledgements: {
@@ -207,8 +211,12 @@ generated: components: sinks: azure_blob: configuration: {
 
 			If provided, this will be used instead of the `connection_string`.
 			This is useful for authenticating with an Azure credential.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
 			"""
 		required: false
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
 		type: string: examples: ["https://mylogstorage.blob.core.windows.net/"]
 	}
 	blob_prefix: {
@@ -306,9 +314,13 @@ generated: components: sinks: azure_blob: configuration: {
 			`Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
 			the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
 			uploads fail with an authorization error even when the health check still passes.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
 			"""
 		required: false
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
 		warnings: ["Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep connection strings secure and not expose them in logs, error messages, or version control systems."]
 	}
 	container_name: {
