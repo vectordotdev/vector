@@ -6,6 +6,9 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
+{{ $breaking := where ($release.changelog | default slice) "breaking" true }}
+{{ $breakingTitled := where $breaking "title" "ne" nil }}
+{{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "security" "security changes" "deprecation" "deprecations" "chore" "chore"}}
 {{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
@@ -88,13 +91,32 @@
       </div>
       {{ end }}
 
-      {{ partial "releases/deprecations.html" (dict "version" $version) }}
-
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
         </div>
+
+        {{ if and (gt (len $breakingTitled) 0) (gt (len $upgradeGuides) 0) }}
+        <div class="mt-6">
+          <div class="prose dark:prose-invert max-w-none">
+            {{ $numBreaking := len $breakingTitled }}
+            {{ $breakingWord := cond (eq $numBreaking 1) "breaking change" "breaking changes" }}
+            {{ $breakingHeading := printf "%d %s" $numBreaking $breakingWord }}
+            {{ partial "heading.html" (dict "text" $breakingHeading "level" 3 "icon" false) }}
+          </div>
+
+          <ul class="prose dark:prose-invert list-disc ml-6">
+            {{ range $breakingTitled }}
+            <li>
+              <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="text-primary-dark dark:text-primary hover:underline">
+                {{ .title | markdownify }}
+              </a>
+            </li>
+            {{ end }}
+          </ul>
+        </div>
+        {{ end }}
 
         <div class="mt-6 flex flex-col space-y-8">
           {{ range $orderedGroups }}
@@ -217,6 +239,7 @@
         </div>
       </div>
     </div>
+    {{ partial "releases/deprecations.html" (dict "version" $version) }}
   </main>
 
   <div class="hidden lg:block xl:col-span-1">
