@@ -40,7 +40,7 @@ releases: "0.58.0": {
 		{
 			type: "fix"
 			description: #"""
-				The `redis` source configured with `data_type = "channel"` now automatically reconnects and re-subscribes after the Redis connection drops (for example on a Redis restart or a transient network blip), instead of silently stopping until Vector is restarted. Reconnect attempts use exponential backoff (capped at 30s) and emit `component_errors_total` on failures and `connection_established_total` on recovery.
+				The `redis` source configured with `data_type = "channel"` now automatically reconnects and re-subscribes after the Redis connection drops (for example, on a Redis restart or a transient network blip), instead of silently stopping until Vector is restarted. Reconnect attempts use exponential backoff (capped at 30s) and emit `component_errors_total` on failures and `connection_established_total` on recovery.
 				"""#
 			contributors: ["gibranbadrul"]
 		},
@@ -48,7 +48,7 @@ releases: "0.58.0": {
 			type: "enhancement"
 			description: #"""
 				The `prometheus_exporter` sink's `flush_period_secs` option now accepts `0` to disable metric
-				expiration entirely. Previously, metrics with sparse or bursty updates (for example, high
+				expiration. Previously, metrics with sparse or bursty updates (for example, high
 				cardinality counters produced by `log_to_metric`) could be expired and re-added as a "new"
 				series, causing gaps and apparent counter resets in downstream Prometheus queries even with a
 				large `flush_period_secs` configured. Setting `flush_period_secs: 0` keeps all previously seen
@@ -96,14 +96,14 @@ releases: "0.58.0": {
 		{
 			type: "feat"
 			description: #"""
-				Added cuckoo filter support for `memory` enrichment table, to provide an efficient way to store and check presence of keys with a low memory footprint at the cost of false positives.
+				Added cuckoo filter support for the `memory` enrichment table to provide an efficient way to store and check for the presence of keys with a low memory footprint, at the cost of false positives.
 				"""#
 			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "feat"
 			description: #"""
-				Added bloom filter support for `memory` enrichment table, similar to cuckoo filter, providing as imple and efficient way to store and check presence of keys with a low memory footprint at the cost of false positives, but with less features that cuckoo filter.
+				Added bloom filter support for `memory` enrichment table, similar to cuckoo filter, providing a simple and efficient way to store and check the presence of keys with a low memory footprint at the cost of false positives, but with fewer features than cuckoo filter.
 				"""#
 			contributors: ["esensar", "Quad9DNS"]
 		},
@@ -172,7 +172,7 @@ releases: "0.58.0": {
 				      codec: json
 				```
 				
-				previously passed `vector validate --no-environment` and only failed with a full `vector validate` or when running the config. It now fails validation with a confinement error due to `topic` having no confinement base.
+				This configuration previously passed `vector validate --no-environment` and only failed with a full `vector validate` or when running the config. It now fails validation with a confinement error due to `topic` having no confinement base.
 				
 				```yaml
 				sinks:
@@ -190,7 +190,7 @@ releases: "0.58.0": {
 		{
 			type: "fix"
 			description: #"""
-				Allows hyphens in the `<backend name>` portion of the `SECRET[<backend name>.<secret name>]` collector regex. Before, a backend name containing a hyphen (e.g. `my-backend`) would fail to match, leaving the literal `SECRET[...]` string in the resolved config instead of the secret value.
+				Allows hyphens in the `<backend name>` portion of the `SECRET[<backend name>.<secret name>]` collector regex. Before, a backend name containing a hyphen (e.g., `my-backend`) would fail to match, leaving the literal `SECRET[...]` string in the resolved config instead of the secret value.
 				"""#
 			contributors: ["maklean"]
 		},
@@ -228,7 +228,7 @@ releases: "0.58.0": {
 		{
 			type: "fix"
 			description: #"""
-				The `sematext_logs` sink no longer panics when the `token` cannot be parsed as a template (for example `{{ }}`); it now fails configuration validation with a clear error instead of crashing at startup.
+				The `sematext_logs` sink no longer panics when the `token` cannot be parsed as a template (e.g., `{{ }}`). It now fails configuration validation with a clear error instead of crashing at startup.
 				"""#
 			contributors: ["thomasqueirozb"]
 		},
@@ -291,22 +291,21 @@ releases: "0.58.0": {
 		{
 			type: "fix"
 			description: #"""
-				Fixed two problems with the `chunked_gelf` framing decoder's limits. `pending_messages_limit` was applied to every chunk rather than only to new messages, so once the limit was reached even chunks of messages already pending were rejected and those messages could never complete. Separately, dropping a message for exceeding `max_length` left its timeout task running, so the number of live tasks was not bounded by `pending_messages_limit` the way the pending message count was.
+				Fixed two problems with the `chunked_gelf` framing decoder's limits. `pending_messages_limit` was applied to every chunk rather than only to new messages, so once the limit was reached even chunks of messages already pending were rejected and those messages could never complete. Separately, dropping a message for exceeding `max_length` left its timeout task running, so `pending_messages_limit` bounded the pending message count but not the number of live tasks.
 				"""#
 			contributors: ["pront"]
 		},
 		{
 			type: "fix"
 			description: #"""
-				Fixed a panic in the `chunked_gelf` framing decoder when a one-byte message arrived and trace-level logging was enabled for it, which took down the source. Such a message is now passed on for the decoder to reject, as any other malformed payload would be.
+				Fixed a panic in the `chunked_gelf` framing decoder when a one-byte message arrived with trace-level logging enabled, which caused the source to fail. Such a message is now passed on for the decoder to reject, as it would any other malformed payload.
 				"""#
 			contributors: ["pront"]
 		},
 		{
 			type: "fix"
 			description: #"""
-				Improve configuration error messages by including the affected field path. For example, this
-				invalid configuration:
+				Improve configuration error messages by including the affected field path. For example, consider the following invalid configuration:
 				
 				```yaml
 				sources:
@@ -315,7 +314,7 @@ releases: "0.58.0": {
 				    interval: not-a-number
 				```
 				
-				now reports `sources.broken: invalid type: string "not-a-number", expected f64`.
+				This configuration now reports `sources.broken: invalid type: string "not-a-number", expected f64`.
 				"""#
 			contributors: ["pront"]
 		},
