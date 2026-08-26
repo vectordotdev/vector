@@ -121,14 +121,14 @@ fn redact_endpoint(_endpoint: &str) -> String {
     "<redacted endpoint>".to_owned()
 }
 
-/// Validates the PostgreSQL connection string syntax without touching the
-/// network or filesystem.
+/// Validates the PostgreSQL connection string without touching the network or
+/// filesystem.
 ///
-/// `PgConnectOptions::from_str` may read `$PGPASSFILE` or `~/.pgpass` to
-/// resolve a missing password, so it is not invoked here; the options are
-/// constructed in `build` instead.
+/// SQLx applies `.pgpass` when a connection string has no password. An empty
+/// password is appended to the validation-only URL so SQLx validates every
+/// option without reading `$PGPASSFILE` or `~/.pgpass`.
 fn validate_pg_endpoint(endpoint: &str) -> crate::Result<()> {
-    let url = url::Url::parse(endpoint).map_err(|e| {
+    let mut url = url::Url::parse(endpoint).map_err(|e| {
         format!(
             "invalid PostgreSQL connection string `{}`: {e}",
             redact_endpoint(endpoint)
@@ -143,7 +143,8 @@ fn validate_pg_endpoint(endpoint: &str) -> crate::Result<()> {
         )
         .into());
     }
-    Ok(())
+    url.query_pairs_mut().append_pair("password", "");
+    pg_connect_options(url.as_str()).map(|_| ())
 }
 
 /// Parses the PostgreSQL connection string into SQLx connect options.
@@ -168,7 +169,6 @@ impl ValidatedSink for PostgresConfig {
         let batch_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.into_settings();
         let endpoint_uri: UriSerde = self.endpoint.parse()?;
-        // Pure syntax check only; see `validate_pg_endpoint`.
         validate_pg_endpoint(&self.endpoint)?;
 
         Ok(ValidatedPostgres {
@@ -263,6 +263,21 @@ mod tests {
         "#})
         .unwrap();
         cfg.validate().expect("valid postgres DSN should validate");
+    }
+
+    #[test]
+    fn validate_rejects_invalid_sqlx_dsn_option() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default?sslmode=bogus"
+            table: "mytable"
+        "#})
+        .unwrap();
+        assert!(
+            cfg.validate().is_err(),
+            "invalid SQLx DSN option should not validate"
+        );
     }
 
     #[test]
