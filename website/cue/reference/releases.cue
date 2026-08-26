@@ -23,6 +23,8 @@ releases: {
 		type: #SemanticType
 		scopes: [string, ...string] | *[]
 		breaking:    bool | *false
+		title?:      string
+		anchor?:     string
 		description: string
 		pr_numbers: [uint, ...uint] | *[]
 		contributors: [string, ...string] | *[]

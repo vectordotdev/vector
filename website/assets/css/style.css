@@ -155,6 +155,21 @@
   margin: 0;
 }
 
+/* VRL release entries end with linked PR and author attribution. */
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) {
+  @apply mb-0 mt-4 min-w-0 list-none rounded-t-lg border border-b-0 border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm md:px-5;
+}
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) > li {
+  @apply m-0;
+}
+.vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) {
+  @apply mt-0 rounded-b-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm italic shadow-sm md:px-5;
+}
+.dark .vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]),
+.dark .vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) {
+  @apply border-gray-700 bg-gray-800/40;
+}
+
 /* Dark mode prose overrides */
 .dark .prose table th,
 .dark .prose table td {
