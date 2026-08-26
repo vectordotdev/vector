@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt, fmt::Debug, sync::Arc};
 
 use http::Uri;
 use tower::ServiceBuilder;
@@ -8,7 +8,11 @@ use super::{
     NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink, NewRelicSinkError,
     healthcheck, service::NewRelicApiRequest,
 };
-use crate::{http::HttpClient, sinks::prelude::*};
+use crate::{
+    config::{DynValidatedSink, ValidatedSink},
+    http::HttpClient,
+    sinks::{prelude::*, util::service::TowerRequestSettings},
+};
 
 /// New Relic region.
 #[configurable_component]
@@ -126,47 +130,90 @@ impl NewRelicConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let batcher_settings = self
-            .batch
-            .validate()?
-            .limit_max_events(self.batch.max_events.unwrap_or(100))?
-            .into_batcher_settings()?;
-
-        let request_limits = self.request.into_settings();
-        let tls_settings = TlsSettings::from_options(None)?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
-        let credentials = Arc::from(NewRelicCredentials::from(self));
-
-        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(&credentials))?;
-
-        let service = ServiceBuilder::new()
-            .settings(request_limits, NewRelicApiRetry)
-            .service(NewRelicApiService { client });
-
-        let sink = NewRelicSink {
-            service,
-            encoder: NewRelicEncoder {
-                transformer: self.encoding.clone(),
-                credentials: Arc::clone(&credentials),
-            },
-            credentials,
-            compression: self.compression,
-            batcher_settings,
-        };
-
-        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Metric)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone)]
+pub struct ValidatedNewRelic {
+    batcher_settings: BatcherSettings,
+    request_limits: TowerRequestSettings,
+    credentials: Arc<NewRelicCredentials>,
+}
+
+impl fmt::Debug for ValidatedNewRelic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // The credentials contain the license key and account ID, so they are
+        // intentionally omitted from diagnostics.
+        f.debug_struct("ValidatedNewRelic")
+            .field("batcher_settings", &self.batcher_settings)
+            .field("request_limits", &self.request_limits)
+            .finish_non_exhaustive()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for NewRelicConfig {
+    type Validated = ValidatedNewRelic;
+
+    fn validate(&self) -> crate::Result<ValidatedNewRelic> {
+        let batcher_settings = self
+            .batch
+            .validate()?
+            .limit_max_events(self.batch.max_events.unwrap_or(100))?
+            .into_batcher_settings()?;
+        let request_limits = self.request.into_settings();
+        let credentials = Arc::from(NewRelicCredentials::from(self));
+        credentials.try_get_uri()?;
+
+        Ok(ValidatedNewRelic {
+            batcher_settings,
+            request_limits,
+            credentials,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedNewRelic,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let ValidatedNewRelic {
+            batcher_settings,
+            request_limits,
+            credentials,
+        } = validated;
+
+        let tls_settings = TlsSettings::from_options(None)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
+        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(credentials))?;
+
+        let service = ServiceBuilder::new()
+            .settings(request_limits.clone(), NewRelicApiRetry)
+            .service(NewRelicApiService { client });
+
+        let sink = NewRelicSink {
+            service,
+            encoder: NewRelicEncoder {
+                transformer: self.encoding.clone(),
+                credentials: Arc::clone(credentials),
+            },
+            credentials: Arc::clone(credentials),
+            compression: self.compression,
+            batcher_settings: *batcher_settings,
+        };
+
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -181,34 +228,40 @@ pub struct NewRelicCredentials {
 
 impl NewRelicCredentials {
     pub fn get_uri(&self) -> Uri {
+        self.try_get_uri().expect("URI should be valid")
+    }
+
+    pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
-            return override_uri.clone();
+            return Ok(override_uri.clone());
         }
 
         match self.api {
             NewRelicApi::Events => match self.region {
-                NewRelicRegion::Us => format!(
+                NewRelicRegion::Us => Ok(format!(
                     "https://insights-collector.newrelic.com/v1/accounts/{}/events",
                     self.account_id
                 )
-                .parse::<Uri>()
-                .unwrap(),
-                NewRelicRegion::Eu => format!(
+                .parse::<Uri>()?),
+                NewRelicRegion::Eu => Ok(format!(
                     "https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events",
                     self.account_id
                 )
-                .parse::<Uri>()
-                .unwrap(),
+                .parse::<Uri>()?),
             },
             NewRelicApi::Metrics => match self.region {
-                NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
-                NewRelicRegion::Eu => {
-                    Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1")
-                }
+                NewRelicRegion::Us => Ok(Uri::from_static(
+                    "https://metric-api.newrelic.com/metric/v1",
+                )),
+                NewRelicRegion::Eu => Ok(Uri::from_static(
+                    "https://metric-api.eu.newrelic.com/metric/v1",
+                )),
             },
             NewRelicApi::Logs => match self.region {
-                NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
-                NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
+                NewRelicRegion::Us => Ok(Uri::from_static("https://log-api.newrelic.com/log/v1")),
+                NewRelicRegion::Eu => {
+                    Ok(Uri::from_static("https://log-api.eu.newrelic.com/log/v1"))
+                }
             },
         }
     }
@@ -223,5 +276,50 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
             region: config.region.unwrap_or(NewRelicRegion::Us),
             override_uri: config.override_uri.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.credentials.api, NewRelicApi::Events);
+        assert_eq!(validated.credentials.region, NewRelicRegion::Us);
+        assert!(
+            validated
+                .credentials
+                .get_uri()
+                .to_string()
+                .starts_with("https://insights-collector.newrelic.com/v1/accounts/")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_uri_invalid_account_id() {
+        let mut config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+        config.account_id = SensitiveString::from("bad id".to_string());
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn debug_omits_credentials() {
+        let mut config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+        config.license_key = SensitiveString::from("super-secret-license-key".to_string());
+        config.account_id = SensitiveString::from("super-secret-account-id".to_string());
+
+        let validated = config.validate().expect("validation should succeed");
+        let debug = format!("{:?}", validated);
+
+        assert!(!debug.contains("super-secret-license-key"));
+        assert!(!debug.contains("super-secret-account-id"));
     }
 }
