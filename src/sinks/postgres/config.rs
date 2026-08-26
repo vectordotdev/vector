@@ -166,6 +166,10 @@ impl ValidatedSink for PostgresConfig {
     type Validated = ValidatedPostgres;
 
     fn validate(&self) -> crate::Result<ValidatedPostgres> {
+        if self.pool_size == 0 {
+            return Err("`pool_size` must be greater than zero".into());
+        }
+
         let batch_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.into_settings();
         let endpoint_uri: UriSerde = self.endpoint.parse()?;
@@ -263,6 +267,22 @@ mod tests {
         "#})
         .unwrap();
         cfg.validate().expect("valid postgres DSN should validate");
+    }
+
+    #[test]
+    fn validate_rejects_zero_pool_size() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+            pool_size: 0
+        "#})
+        .unwrap();
+        assert!(
+            cfg.validate().is_err(),
+            "zero connection pool size should not validate"
+        );
     }
 
     #[test]
