@@ -18,10 +18,7 @@ use warp::http::HeaderMap;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
-    config::{
-        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
-    },
+    config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
@@ -31,38 +28,6 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
-
-/// Configuration for the `http` source.
-#[configurable_component(source("http", "Host an HTTP endpoint to receive logs."))]
-#[configurable(metadata(deprecated))]
-#[derive(Clone, Debug)]
-pub struct HttpConfig(SimpleHttpConfig);
-
-impl GenerateConfig for HttpConfig {
-    fn generate_config() -> serde_json::Value {
-        <SimpleHttpConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "http")]
-impl SourceConfig for HttpConfig {
-    async fn build(&self, cx: SourceContext) -> vector_lib::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.0.resources()
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        self.0.can_acknowledge()
-    }
-}
 
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
