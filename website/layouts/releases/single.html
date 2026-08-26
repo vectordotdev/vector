@@ -60,7 +60,7 @@
       <ul class="mt-4 space-y-2 list-disc ml-6">
         {{ range $breakingTitled }}
         <li class="marker:text-dark dark:marker:text-gray-300">
-          <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="text-secondary dark:text-primary hover:underline">
+          <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="text-primary-dark dark:text-primary hover:underline">
             {{ .title | markdownify }}
           </a>
         </li>
