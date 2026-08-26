@@ -77,20 +77,6 @@ encoding:
 {"name": "status", "type": {"type": "enum", "name": "Status", "symbols": ["A", "B", "C"]}}
 ```
 
-#### Record (nested)
-
-##### Old
-
-```yaml
-{"name": "inner", "type": "record", "name": "Inner", "fields": [...]}
-```
-
-##### New
-
-```yaml
-{"name": "inner", "type": {"type": "record", "name": "Inner", "fields": [...]}}
-```
-
 #### Fixed
 
 ##### Old
