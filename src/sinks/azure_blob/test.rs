@@ -3,8 +3,8 @@ use chrono::Utc;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        JsonSerializerConfig, NativeSerializerConfig, NewlineDelimitedEncoder,
-        NewlineDelimitedEncoderConfig, TextSerializerConfig,
+        GelfSerializerConfig, JsonSerializerConfig, NativeSerializerConfig,
+        NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, TextSerializerConfig,
         encoding::{
             CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
         },
@@ -899,6 +899,61 @@ fn azure_blob_block_blob_allows_non_terminating_framing() {
         .build_encoder()
         .expect("block blobs must accept any framing");
     assert!(matches!(encoder.framer(), Framer::CharacterDelimited(_)));
+}
+
+/// `gelf` defaults to NUL-*separated* records, so appended batches would fuse at the seam. Append
+/// mode rejects that default instead of writing an unparseable blob; block mode is unaffected, and
+/// an explicit `framing` is still honored.
+#[test]
+fn azure_blob_append_blob_rejects_unterminated_default_framing() {
+    let append_default = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        ..default_config(
+            (
+                None::<FramingConfig>,
+                GelfSerializerConfig::new(Default::default()),
+            )
+                .into(),
+        )
+    };
+    let err = append_default
+        .build_encoder()
+        .expect_err("append mode must reject a separating default framing")
+        .to_string();
+    assert!(
+        err.contains("framing"),
+        "error must point at `framing`, got: {err}"
+    );
+
+    let append_explicit = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        ..default_config(
+            (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                GelfSerializerConfig::new(Default::default()),
+            )
+                .into(),
+        )
+    };
+    assert!(
+        append_explicit.build_encoder().is_ok(),
+        "an explicit terminating framing must be accepted"
+    );
+
+    let block = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Block,
+        ..default_config(
+            (
+                None::<FramingConfig>,
+                GelfSerializerConfig::new(Default::default()),
+            )
+                .into(),
+        )
+    };
+    assert!(
+        block.build_encoder().is_ok(),
+        "block blobs hold one batch, so the separating default stays valid there"
+    );
 }
 
 /// Only the JSON default is `blob_type`-aware: codecs that already default to a stream-safe framing

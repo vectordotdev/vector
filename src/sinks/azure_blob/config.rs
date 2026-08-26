@@ -93,7 +93,12 @@ pub enum AzureBlobType {
     /// Explicitly configured `framing` is always used as given. Azure concatenates the appended
     /// payloads with nothing in between, so framing that separates records without terminating them
     /// — `character_delimited`, for example — leaves a batch's last record joined to the next
-    /// batch's first record.
+    /// batch's first record. A codec whose own default framing separates rather than terminates
+    /// records, such as `gelf`, is rejected at startup unless `framing` is set explicitly.
+    ///
+    /// Changing `encoding` while a blob is still being appended mixes formats within that blob,
+    /// whose `Content-Type` is set when the blob is created. Change `blob_prefix` or
+    /// `blob_time_format`, or wait for the next time window, to start a new blob instead.
     Append,
 }
 
@@ -642,6 +647,22 @@ impl AzureBlobSinkConfig {
         };
 
         let (framer, serializer) = self.encoding.build(sink_type)?;
+
+        // Checked next to the resolution it depends on, so the two cannot drift: some codecs carry
+        // a default framing that separates records without terminating them (`gelf` resolves to
+        // NUL-separated), which fuses a batch's last record with the next batch's first once Azure
+        // concatenates the payloads. An explicit `framing` remains the user's call.
+        if self.blob_type == AzureBlobType::Append
+            && self.encoding.config().0.is_none()
+            && matches!(framer, Framer::Bytes(_) | Framer::CharacterDelimited(_))
+        {
+            return Err(
+                "the default `framing` for this codec separates records without \
+                 terminating them, which `blob_type` = `append` cannot use: appended batches would \
+                 fuse at every seam. Set `framing` explicitly, for example `newline_delimited`."
+                    .into(),
+            );
+        }
 
         Ok(Encoder::<Framer>::new(framer, serializer))
     }

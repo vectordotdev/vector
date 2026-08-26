@@ -318,7 +318,12 @@ generated: components: sinks: azure_blob: configuration: {
 					Explicitly configured `framing` is always used as given. Azure concatenates the appended
 					payloads with nothing in between, so framing that separates records without terminating them
 					— `character_delimited`, for example — leaves a batch's last record joined to the next
-					batch's first record.
+					batch's first record. A codec whose own default framing separates rather than terminates
+					records, such as `gelf`, is rejected at startup unless `framing` is set explicitly.
+
+					Changing `encoding` while a blob is still being appended mixes formats within that blob,
+					whose `Content-Type` is set when the blob is created. Change `blob_prefix` or
+					`blob_time_format`, or wait for the next time window, to start a new blob instead.
 					"""
 				block: """
 					Stores data as block blobs.
