@@ -38,12 +38,13 @@ pub struct UrlOrRegion {
     /// If a path is provided, the URL is used as-is.
     /// If no path (or only `/`) is provided, `/v1/datasets/{dataset}/ingest` is appended for backwards compatibility.
     /// This takes precedence over `region` if both are set (but both should not be set).
-    //
-    // No examples are rendered for this field: `url` and `region` are mutually
-    // exclusive but neither is required, and the example-config generator emits
-    // every field that has examples, which would produce an invalid config with
-    // both set.
+    #[configurable(mutually_exclusive = "endpoint")]
     #[configurable(validation(format = "uri"))]
+    // The concrete URL comes first: the example-config generator emits the first example, and
+    // `vector validate --no-environment` does not interpolate `${AXIOM_URL}`, which would then
+    // fail this field's `uri` format validation.
+    #[configurable(metadata(docs::examples = "https://api.eu.axiom.co"))]
+    #[configurable(metadata(docs::examples = "${AXIOM_URL}"))]
     pub url: Option<String>,
 
     /// The Axiom regional edge domain to use for ingestion.
@@ -51,6 +52,7 @@ pub struct UrlOrRegion {
     /// Specify the domain name only (no scheme, no path).
     /// When set, data is sent to `https://{region}/v1/ingest/{dataset}`.
     /// Cannot be used together with `url`.
+    #[configurable(mutually_exclusive = "endpoint")]
     #[configurable(metadata(docs::examples = "mumbai.axiom.co"))]
     #[configurable(metadata(docs::examples = "${AXIOM_REGION}"))]
     #[configurable(metadata(docs::examples = "eu-central-1.aws.edge.axiom.co"))]
