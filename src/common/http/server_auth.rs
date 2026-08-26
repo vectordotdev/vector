@@ -178,11 +178,11 @@ impl HttpServerAuthConfig {
         }
     }
 
-    /// Validates the auth configuration without a runtime context, compiling any
-    /// custom VRL program with empty registries so `vector validate --no-environment`
-    /// catches syntax/result-type errors.
-    pub fn validate(&self) -> crate::Result<()> {
-        self.build(&TableRegistry::default(), &MetricsStorage::default())
+    /// Validates the auth configuration against the given enrichment tables,
+    /// compiling any custom VRL program so `vector validate --no-environment`
+    /// catches syntax/type errors while resolving enrichment table names.
+    pub fn validate(&self, enrichment_tables: &TableRegistry) -> crate::Result<()> {
+        self.build(enrichment_tables, &MetricsStorage::default())
             .map(|_| ())
     }
 }

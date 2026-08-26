@@ -170,10 +170,16 @@ impl ValidatedSink for WebSocketListenerSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketListenerSink> {
         let transformer = self.encoding.transformer();
-        if let Some(auth) = &self.auth {
-            auth.validate()?;
-        }
+        // Custom-auth VRL compilation is deferred to `validate_with_context`, which
+        // has the enrichment tables needed to resolve `get_enrichment_table_record!`.
         Ok(ValidatedWebSocketListenerSink { transformer })
+    }
+
+    fn validate_with_context(&self, cx: &SinkContext) -> crate::Result<()> {
+        if let Some(auth) = &self.auth {
+            auth.validate(&cx.enrichment_tables)?;
+        }
+        Ok(())
     }
 
     async fn build(
@@ -203,6 +209,19 @@ mod test {
 
     use crate::config::ValidatedSink;
 
+    fn sink_context_with_allowed_users() -> SinkContext {
+        let cx = SinkContext::default();
+        let mut stubs: HashMap<String, Box<dyn vector_lib::enrichment::Table + Send + Sync>> =
+            HashMap::new();
+        stubs.insert(
+            "allowed_users".to_string(),
+            Box::new(crate::validate::StubEnrichmentTable)
+                as Box<dyn vector_lib::enrichment::Table + Send + Sync>,
+        );
+        cx.enrichment_tables.load(stubs);
+        cx
+    }
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<WebSocketListenerSinkConfig>();
@@ -228,12 +247,14 @@ mod test {
         let config = WebSocketListenerSinkConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             auth: Some(HttpServerAuthConfig::Custom {
-                source: "invalid VRL source".to_string(),
+                source: "\"unterminated".to_string(),
             }),
             ..Default::default()
         };
         assert!(
-            config.validate().is_err(),
+            config
+                .validate_with_context(&SinkContext::default())
+                .is_err(),
             "an invalid custom auth VRL source must fail validation"
         );
     }
@@ -251,8 +272,33 @@ mod test {
             ..Default::default()
         };
         assert!(
-            config.validate().is_ok(),
+            config
+                .validate_with_context(&SinkContext::default())
+                .is_ok(),
             "a valid custom auth VRL source must pass validation"
+        );
+    }
+
+    #[test]
+    fn validate_succeeds_on_custom_auth_with_enrichment() {
+        // Custom-auth VRL is compiled against the configured enrichment tables
+        // (stubbed during validation); a program referencing a configured table
+        // must pass without loading actual data.
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            auth: Some(HttpServerAuthConfig::Custom {
+                source: indoc! {r#"
+                    get_enrichment_table_record!("allowed_users", { "user": .headers.authorization }) != null
+                    "#}
+                .to_string(),
+            }),
+            ..Default::default()
+        };
+        assert!(
+            config
+                .validate_with_context(&sink_context_with_allowed_users())
+                .is_ok(),
+            "custom auth using enrichment tables must pass validation"
         );
     }
 }
