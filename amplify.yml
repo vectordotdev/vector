@@ -36,7 +36,7 @@ applications:
       artifacts:
         baseDirectory: public
         files:
-          - '**/*'
+          - "**/*"
       cache:
         paths: []
   - appRoot: rust-doc
@@ -54,6 +54,6 @@ applications:
       artifacts:
         baseDirectory: public/doc
         files:
-          - '**/*'
+          - "**/*"
       cache:
         paths: []
