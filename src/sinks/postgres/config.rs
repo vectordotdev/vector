@@ -1,10 +1,16 @@
+use std::str::FromStr;
+
 use futures::FutureExt;
-use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
+use sqlx::{
+    Pool, Postgres,
+    postgres::{PgConnectOptions, PgPoolOptions},
+};
 use tower::ServiceBuilder;
 use vector_lib::{
     config::AcknowledgementsConfig,
     configurable::{component::GenerateConfig, configurable_component},
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use super::{
@@ -12,12 +18,12 @@ use super::{
     sink::PostgresSink,
 };
 use crate::{
-    config::{Input, SinkConfig, SinkContext},
+    config::{DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         util::{
             BatchConfig, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, UriSerde,
+            TowerRequestConfig, TowerRequestSettings, UriSerde,
         },
     },
 };
@@ -88,17 +94,117 @@ impl GenerateConfig for PostgresConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "postgres")]
 impl SinkConfig for PostgresConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedPostgres {
+    batch_settings: BatcherSettings,
+    request_settings: TowerRequestSettings,
+    endpoint_uri: UriSerde,
+}
+
+/// Redacts credentials from a PostgreSQL connection string for error messages.
+///
+/// SQLx accepts credentials embedded in the DSN (`postgres://user:secret@host/db`),
+/// and these must not be echoed back into validation output or CI logs.
+fn redact_endpoint(endpoint: &str) -> String {
+    if endpoint.contains('@') {
+        "<redacted endpoint>".to_owned()
+    } else {
+        endpoint.to_owned()
+    }
+}
+
+/// Validates the PostgreSQL connection string syntax without touching the
+/// network or filesystem.
+///
+/// `PgConnectOptions::from_str` may read `$PGPASSFILE` or `~/.pgpass` to
+/// resolve a missing password, so it is not invoked here; the options are
+/// constructed in `build` instead.
+fn validate_pg_endpoint(endpoint: &str) -> crate::Result<()> {
+    let url = url::Url::parse(endpoint).map_err(|e| {
+        format!(
+            "invalid PostgreSQL connection string `{}`: {e}",
+            redact_endpoint(endpoint)
+        )
+    })?;
+    if !matches!(url.scheme(), "postgres" | "postgresql") {
+        return Err(format!(
+            "invalid PostgreSQL connection string `{}`: expected a \
+             `postgres://` or `postgresql://` URL, got scheme `{}`",
+            redact_endpoint(endpoint),
+            url.scheme()
+        )
+        .into());
+    }
+    Ok(())
+}
+
+/// Parses the PostgreSQL connection string into SQLx connect options.
+///
+/// Unlike [`validate_pg_endpoint`], this may read `$PGPASSFILE` or `~/.pgpass`
+/// to resolve a missing password, so it is only invoked at build time.
+fn pg_connect_options(endpoint: &str) -> crate::Result<PgConnectOptions> {
+    PgConnectOptions::from_str(endpoint).map_err(|e| {
+        format!(
+            "invalid PostgreSQL connection string `{}`: {e}",
+            redact_endpoint(endpoint)
+        )
+        .into()
+    })
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PostgresConfig {
+    type Validated = ValidatedPostgres;
+
+    fn validate(&self) -> crate::Result<ValidatedPostgres> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let request_settings = self.request.into_settings();
+        let endpoint_uri: UriSerde = self.endpoint.parse()?;
+        // Pure syntax check only; see `validate_pg_endpoint`.
+        validate_pg_endpoint(&self.endpoint)?;
+
+        Ok(ValidatedPostgres {
+            batch_settings,
+            request_settings,
+            endpoint_uri,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedPostgres,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedPostgres {
+            batch_settings,
+            request_settings,
+            endpoint_uri,
+        } = validated.clone();
+
+        // `PgConnectOptions::from_str` may read `$PGPASSFILE` or `~/.pgpass`
+        // to resolve a missing password, so it runs here rather than in
+        // `validate`.
+        let pg_connect_options = pg_connect_options(&self.endpoint)?;
+
         let connection_pool = PgPoolOptions::new()
             .max_connections(self.pool_size)
-            .connect_lazy(&self.endpoint)?;
+            .connect_lazy_with(pg_connect_options);
 
         let healthcheck = healthcheck(connection_pool.clone()).boxed();
 
-        let batch_settings = self.batch.into_batcher_settings()?;
-        let request_settings = self.request.into_settings();
-
-        let endpoint_uri: UriSerde = self.endpoint.parse()?;
         let service = PostgresService::new(
             connection_pool,
             self.table.clone(),
@@ -111,14 +217,6 @@ impl SinkConfig for PostgresConfig {
         let sink = PostgresSink::new(service, batch_settings);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -145,5 +243,92 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.endpoint, "postgres://user:password@localhost/default");
         assert_eq!(cfg.table, "mytable");
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let validated = cfg.validate().expect("validation should succeed");
+        // The parsed endpoint URI redacts the password in its Display output.
+        assert_eq!(validated.endpoint_uri.uri.host(), Some("localhost"));
+        assert_eq!(validated.endpoint_uri.uri.path(), "/default");
+    }
+
+    #[test]
+    fn validate_accepts_valid_postgres_dsn() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+        "#})
+        .unwrap();
+        cfg.validate().expect("valid postgres DSN should validate");
+    }
+
+    #[test]
+    fn validate_rejects_non_postgres_uri() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "https://example.com"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let err = cfg
+            .validate()
+            .expect_err("generic URI should not validate as a postgres DSN");
+        assert!(
+            err.to_string()
+                .contains("invalid PostgreSQL connection string"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_postgres_dsn() {
+        use crate::config::ValidatedSink;
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost:notaport/default"
+            table: "mytable"
+        "#})
+        .unwrap();
+        assert!(
+            cfg.validate().is_err(),
+            "malformed postgres DSN should not validate"
+        );
+    }
+
+    #[test]
+    fn validate_redacts_credentials_from_errors() {
+        use crate::config::ValidatedSink;
+
+        // A valid URI with credentials but a non-`postgres` scheme parses as a
+        // `UriSerde` and reaches `parse_pg_connect_options`, whose error must
+        // not echo the credentials back into validation output.
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "https://user:secret@example.com/db"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let err = cfg
+            .validate()
+            .expect_err("non-postgres URI should not validate as a postgres DSN");
+        let message = err.to_string();
+        assert!(
+            !message.contains("secret"),
+            "credentials must not leak into validation errors: {message}"
+        );
+        assert!(
+            message.contains("<redacted endpoint>"),
+            "unexpected error: {message}"
+        );
     }
 }
