@@ -324,7 +324,8 @@ pub struct BulkConfig {
     pub template_fallback_index: Option<String>,
 
     /// Version field value.
-    #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "{{ obj_version }}"))]
+    #[configurable(metadata(docs::examples = "%s"))]
     #[configurable(metadata(docs::examples = "123"))]
     pub version: Option<UnconfinedTemplate>,
 

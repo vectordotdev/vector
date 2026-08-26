@@ -300,7 +300,7 @@ generated: components: sinks: elasticsearch: configuration: {
 				description: "Version field value."
 				required:    false
 				type: string: {
-					examples: ["{{ obj_version }}-%Y-%m-%d", "123"]
+					examples: ["{{ obj_version }}", "%s", "123"]
 					syntax: "template"
 				}
 			}
