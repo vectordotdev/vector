@@ -324,10 +324,26 @@ impl HttpEndpoint {
     /// preserved. Endpoints that still lack a host after defaulting (for
     /// example `/path`) are rejected.
     pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
-        // Default a missing scheme to https. `http::Uri` cannot parse
-        // `host:port/path` without a scheme (it reads `host` as a scheme), so
-        // the scheme is added up front rather than relying on the parser to
-        // accept authority-form input.
+        Self::parse_with_default_scheme(endpoint, "https")
+    }
+
+    /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
+    ///
+    /// A missing scheme is defaulted to `http` (unlike [`Self::parse`], which
+    /// defaults to `https`). An explicit `http`/`https` scheme is preserved.
+    /// Endpoints that still lack a host after defaulting are rejected.
+    pub fn parse_default_http(endpoint: &str) -> Result<Self, HttpEndpointError> {
+        Self::parse_with_default_scheme(endpoint, "http")
+    }
+
+    fn parse_with_default_scheme(
+        endpoint: &str,
+        default_scheme: &str,
+    ) -> Result<Self, HttpEndpointError> {
+        // Default a missing scheme to `default_scheme`. `http::Uri` cannot
+        // parse `host:port/path` without a scheme (it reads `host` as a
+        // scheme), so the scheme is added up front rather than relying on
+        // the parser to accept authority-form input.
         let parse = |value: &str| {
             value
                 .parse::<Uri>()
@@ -339,7 +355,7 @@ impl HttpEndpoint {
         let uri = if has_scheme(endpoint) {
             parse(endpoint)?
         } else {
-            parse(&format!("https://{endpoint}"))?
+            parse(&format!("{default_scheme}://{endpoint}"))?
         };
         Self::new(uri)
     }
@@ -691,6 +707,34 @@ mod tests {
                 .as_uri()
                 .scheme_str(),
             Some("http")
+        );
+    }
+
+    #[test]
+    fn http_endpoint_defaults_missing_scheme_to_http() {
+        for endpoint in [
+            "example.com",
+            "example.com:8080",
+            "localhost:8080/path",
+            "[::1]:8080",
+        ] {
+            let endpoint = HttpEndpoint::parse_default_http(endpoint)
+                .expect("should default a missing scheme to http");
+            assert_eq!(endpoint.as_uri().scheme_str(), Some("http"));
+            assert!(
+                endpoint
+                    .as_uri()
+                    .host()
+                    .is_some_and(|host| !host.is_empty())
+            );
+        }
+        // An explicit scheme is preserved.
+        assert_eq!(
+            HttpEndpoint::parse_default_http("https://example.com")
+                .unwrap()
+                .as_uri()
+                .scheme_str(),
+            Some("https")
         );
     }
 

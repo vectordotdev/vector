@@ -35,7 +35,7 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
         util::{
-            BatchConfig, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
+            BatchConfig, HttpEndpoint, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
             retries::RetryLogic,
             service::{HealthConfig, HealthLogic, ServiceBuilderExt, TowerRequestSettings},
         },
@@ -718,17 +718,18 @@ impl VectorConfig {
                 Err("`routing.endpoints` must contain at least one endpoint.".into())
             }
             (Some(address), None) => {
-                // Parse the endpoint with the same pure parser used at build
-                // time. The `tls` flag only selects the default scheme and
-                // cannot change whether the parse succeeds, so the `Uri` is
-                // discarded.
-                let uri = with_default_scheme(address, false)?;
-                validate_endpoint_scheme(&uri)
+                // Validate the endpoint with the same parser used at build
+                // time. `parse_default_http` requires an absolute http(s) URL
+                // with an authority, so a hostless endpoint is rejected here
+                // instead of failing at request time. The `tls` flag only
+                // selects the default scheme and cannot change whether the
+                // parse succeeds, so the parsed endpoint is discarded.
+                HttpEndpoint::parse_default_http(address)?;
+                Ok(())
             }
             (None, Some(routing)) => {
                 for endpoint in &routing.endpoints {
-                    let uri = with_default_scheme(endpoint, false)?;
-                    validate_endpoint_scheme(&uri)?;
+                    HttpEndpoint::parse_default_http(endpoint)?;
                 }
                 Ok(())
             }
@@ -876,13 +877,6 @@ pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
     }
 }
 
-fn validate_endpoint_scheme(uri: &Uri) -> crate::Result<()> {
-    if !matches!(uri.scheme_str(), Some("http" | "https")) {
-        return Err(format!("Invalid endpoint `{uri}`: scheme must be http or https").into());
-    }
-    Ok(())
-}
-
 fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
@@ -957,7 +951,7 @@ impl HealthLogic for VectorGrpcHealthLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::UriSerde;
+    use crate::sinks::util::{HttpEndpointError, UriSerde};
 
     #[test]
     fn failover_request_settings_force_serial_concurrency() {
@@ -1532,8 +1526,8 @@ mod tests {
 
         let err = config.validate().unwrap_err();
         assert!(
-            err.downcast_ref::<http::uri::InvalidUri>().is_some(),
-            "expected a URI parse error, got: {err}"
+            err.downcast_ref::<HttpEndpointError>().is_some(),
+            "expected an endpoint parse error, got: {err}"
         );
     }
 
@@ -1553,8 +1547,8 @@ mod tests {
 
         let err = config.validate().unwrap_err();
         assert!(
-            err.downcast_ref::<http::uri::InvalidUri>().is_some(),
-            "expected a URI parse error, got: {err}"
+            err.downcast_ref::<HttpEndpointError>().is_some(),
+            "expected an endpoint parse error, got: {err}"
         );
     }
 
@@ -1567,7 +1561,7 @@ mod tests {
 
         let err = config.validate().unwrap_err().to_string();
         assert!(
-            err.contains("scheme must be http or https"),
+            err.contains("absolute http(s) URL"),
             "unexpected error: {err}"
         );
     }
@@ -1588,7 +1582,7 @@ mod tests {
 
         let err = config.validate().unwrap_err().to_string();
         assert!(
-            err.contains("scheme must be http or https"),
+            err.contains("absolute http(s) URL"),
             "unexpected error: {err}"
         );
     }
@@ -1618,5 +1612,42 @@ mod tests {
         };
 
         config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validate_rejects_hostless_address() {
+        // `HttpEndpoint` requires an authority, so a hostless address is
+        // rejected during validation instead of being accepted and failing at
+        // request time.
+        for address in ["/collector", "http:/collector"] {
+            let config = VectorConfig {
+                address: Some(address.to_owned()),
+                ..default_config("127.0.0.1:6000")
+            };
+
+            let err = config.validate().unwrap_err();
+            assert!(
+                err.downcast_ref::<HttpEndpointError>().is_some(),
+                "expected an endpoint parse error for {address:?}, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_rejects_hostless_routing_endpoint() {
+        let config = VectorConfig {
+            address: None,
+            routing: Some(RoutingConfig {
+                endpoints: vec!["/collector".to_owned()],
+                ..Default::default()
+            }),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.downcast_ref::<HttpEndpointError>().is_some(),
+            "expected an endpoint parse error, got: {err}"
+        );
     }
 }
