@@ -285,12 +285,13 @@ pub(crate) fn redact_unparsed_endpoint(endpoint: &str) -> String {
 }
 
 /// Returns `true` if the query portion of `endpoint` contains a `password`
-/// parameter (for example `postgres://host/db?password=secret`).
+/// parameter (for example `postgres://host/db?password=secret`). Query keys
+/// are percent-decoded, matching how SQLx parses them.
 fn has_password_query_param(endpoint: &str) -> bool {
     endpoint.split_once('?').is_some_and(|(_, query)| {
         query.split('&').any(|pair| {
             pair.split_once('=')
-                .is_some_and(|(key, _)| key == "password")
+                .is_some_and(|(key, _)| percent_decode_str(key).decode_utf8_lossy() == "password")
         })
     })
 }
@@ -833,9 +834,9 @@ mod tests {
             redact_unparsed_endpoint("postgres://user:secret@host/db"),
             "<redacted endpoint>"
         );
-        // A `password` query parameter, as accepted by PostgreSQL DSNs.
+        // A percent-encoded `password` query key, which SQLx decodes.
         assert_eq!(
-            redact_unparsed_endpoint("postgres://host/db?password=secret"),
+            redact_unparsed_endpoint("postgres://host/db?pass%77ord=secret"),
             "<redacted endpoint>"
         );
         // Both forms together.

@@ -23,7 +23,7 @@ use crate::{
         Healthcheck,
         util::{
             BatchConfig, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, TowerRequestSettings, UriSerde, uri::redact_unparsed_endpoint,
+            TowerRequestConfig, TowerRequestSettings, UriSerde, uri::protocol_endpoint,
         },
     },
 };
@@ -114,6 +114,13 @@ pub struct ValidatedPostgres {
     endpoint_uri: UriSerde,
 }
 
+/// PostgreSQL endpoints may carry credentials as userinfo or as a `password`
+/// query parameter (SQLx percent-decodes query keys), so they are always
+/// redacted from error messages.
+fn redact_endpoint(_endpoint: &str) -> String {
+    "<redacted endpoint>".to_owned()
+}
+
 /// Validates the PostgreSQL connection string syntax without touching the
 /// network or filesystem.
 ///
@@ -124,14 +131,14 @@ fn validate_pg_endpoint(endpoint: &str) -> crate::Result<()> {
     let url = url::Url::parse(endpoint).map_err(|e| {
         format!(
             "invalid PostgreSQL connection string `{}`: {e}",
-            redact_unparsed_endpoint(endpoint)
+            redact_endpoint(endpoint)
         )
     })?;
     if !matches!(url.scheme(), "postgres" | "postgresql") {
         return Err(format!(
             "invalid PostgreSQL connection string `{}`: expected a \
              `postgres://` or `postgresql://` URL, got scheme `{}`",
-            redact_unparsed_endpoint(endpoint),
+            redact_endpoint(endpoint),
             url.scheme()
         )
         .into());
@@ -147,7 +154,7 @@ fn pg_connect_options(endpoint: &str) -> crate::Result<PgConnectOptions> {
     PgConnectOptions::from_str(endpoint).map_err(|e| {
         format!(
             "invalid PostgreSQL connection string `{}`: {e}",
-            redact_unparsed_endpoint(endpoint)
+            redact_endpoint(endpoint)
         )
         .into()
     })
@@ -193,11 +200,9 @@ impl ValidatedSink for PostgresConfig {
 
         let healthcheck = healthcheck(connection_pool.clone()).boxed();
 
-        let service = PostgresService::new(
-            connection_pool,
-            self.table.clone(),
-            endpoint_uri.to_string(),
-        );
+        // The endpoint label must not carry credentials or query parameters.
+        let endpoint = protocol_endpoint(endpoint_uri.uri.clone()).1;
+        let service = PostgresService::new(connection_pool, self.table.clone(), endpoint);
         let service = ServiceBuilder::new()
             .settings(request_settings, PostgresRetryLogic)
             .service(service);
