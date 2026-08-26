@@ -19,7 +19,7 @@ administration: interfaces: homebrew: {
 
 	role_implementations: [Name=string]: {
 		commands: {
-			install:   "brew tap vectordotdev/brew && brew install vector"
+			install:   "brew trust vectordotdev/brew && brew tap vectordotdev/brew && brew install vector"
 			logs:      "tail -f /usr/local/var/log/vector.log"
 			reload:    "killall -s SIGHUP vector"
 			restart:   "brew services restart vector"

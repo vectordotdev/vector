@@ -267,6 +267,7 @@ impl RedisSink {
         config: &RedisSinkConfig,
         conn: RedisConnection,
         key: ConfinedTemplate,
+        batcher_settings: BatcherSettings,
     ) -> crate::Result<Self> {
         let list_method = config.list_option.map(|option| option.method);
         let (sorted_set_method, score) = if let Some(option) = &config.sorted_set_option {
@@ -283,7 +284,6 @@ impl RedisSink {
             }
         };
 
-        let batcher_settings = config.batch.validate()?.into_batcher_settings()?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);

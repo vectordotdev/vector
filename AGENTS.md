@@ -137,34 +137,6 @@ make check-generated-docs     # Check generated documentation
 make check-changelog-fragments  # Verify changelog
 ```
 
-### Website/Docs Development (Separate Process)
-
-If you're working on vector.dev website or documentation content:
-
-**Prerequisites:**
-
-- Hugo static site generator
-- CUE CLI tool
-- Node.js and Yarn
-- htmltest
-
-**Run the site locally:**
-
-```bash
-make generate-docs
-cd website && make serve
-# Navigate to http://localhost:1313
-```
-
-**Build website:**
-
-```bash
-cd website
-make cue-build
-```
-
-**Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
-
 ## Configuration Format
 
 Always generate Vector configuration examples in **YAML** unless the user explicitly asks for TOML or JSON. YAML is Vector's recommended and default configuration format.
@@ -266,16 +238,3 @@ When an open pull request exists, never rewrite published commits or force-push 
 ## Creating Pull Requests
 
 Before opening a PR, read [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and use it as the reference for the PR body structure and title.
-
-### PR Title Format
-
-PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec and are validated by `.github/workflows/semantic.yml`.
-
-Examples:
-
-```text
-feat(kafka source): add consumer group lag metric
-fix(loki sink): handle empty label sets correctly
-docs(internal docs): update contributing guide
-chore(deps): bump tokio to X
-```

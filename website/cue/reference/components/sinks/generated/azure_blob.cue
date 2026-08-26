@@ -7,8 +7,12 @@ generated: components: sinks: azure_blob: configuration: {
 
 			If provided, this will be used instead of the `connection_string`.
 			This is useful for authenticating with an Azure credential.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
 			"""
 		required: false
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
 		type: string: examples: ["mylogstorage"]
 	}
 	acknowledgements: {
@@ -209,8 +213,12 @@ generated: components: sinks: azure_blob: configuration: {
 
 			If provided, this will be used instead of the `connection_string`.
 			This is useful for authenticating with an Azure credential.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
 			"""
 		required: false
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
 		type: string: examples: ["https://mylogstorage.blob.core.windows.net/"]
 	}
 	blob_prefix: {
@@ -383,9 +391,13 @@ generated: components: sinks: azure_blob: configuration: {
 			When `blob_type` is `append`, the SAS token additionally needs the `Add` (or `Write`)
 			permission. `Read & Create` is sufficient to pass the health check and create the blob,
 			but every `Append Block` call fails with `403 Forbidden` without `Add`/`Write`.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
 			"""
 		required: false
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
 		warnings: ["Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep connection strings secure and not expose them in logs, error messages, or version control systems."]
 	}
 	container_name: {
@@ -471,7 +483,7 @@ generated: components: sinks: azure_blob: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
