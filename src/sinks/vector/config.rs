@@ -38,6 +38,7 @@ use crate::{
             BatchConfig, HttpEndpoint, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
             retries::RetryLogic,
             service::{HealthConfig, HealthLogic, ServiceBuilderExt, TowerRequestSettings},
+            uri::has_scheme,
         },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -245,6 +246,51 @@ impl SinkConfig for VectorConfig {
 pub struct ValidatedVector {
     request_settings: TowerRequestSettings,
     batch_settings: BatcherSettings,
+    endpoints: Vec<ValidatedEndpoint>,
+}
+
+/// An endpoint parsed during validation, ready for `build` to apply the
+/// TLS-dependent default scheme.
+#[derive(Clone, Debug)]
+struct ValidatedEndpoint {
+    /// The endpoint parsed with a default `http` scheme. Always an absolute
+    /// `http`/`https` URL with a host and usable port.
+    endpoint: HttpEndpoint,
+    /// Whether the original endpoint string had no scheme. Scheme-less
+    /// endpoints default to `http`, or `https` when TLS is enabled.
+    scheme_defaulted: bool,
+}
+
+impl ValidatedEndpoint {
+    /// Parses `endpoint` with a default `http` scheme, the same parser used to
+    /// construct the sink. `parse_default_http` prepends the scheme before
+    /// parsing, so a scheme-less `host:port[/path]` endpoint is parsed
+    /// correctly, whereas `http::Uri` would read the host as a scheme.
+    fn parse(endpoint: &str) -> crate::Result<Self> {
+        let scheme_defaulted = !has_scheme(endpoint);
+        let endpoint = HttpEndpoint::parse_default_http(endpoint)?;
+        Ok(Self {
+            endpoint,
+            scheme_defaulted,
+        })
+    }
+
+    /// Returns the final `Uri` for this endpoint. A scheme-less endpoint
+    /// defaults to `http`, or `https` when TLS is enabled; an explicit scheme
+    /// is preserved.
+    fn with_scheme(&self, tls: bool) -> crate::Result<Uri> {
+        let mut uri = self.endpoint.as_uri().clone();
+        if tls && self.scheme_defaulted {
+            let mut parts = uri.into_parts();
+            parts.scheme = Some(
+                "https"
+                    .parse()
+                    .unwrap_or_else(|_| unreachable!("https should be valid")),
+            );
+            uri = Uri::from_parts(parts)?;
+        }
+        Ok(uri)
+    }
 }
 
 #[async_trait::async_trait]
@@ -252,18 +298,19 @@ impl ValidatedSink for VectorConfig {
     type Validated = ValidatedVector;
 
     fn validate(&self) -> crate::Result<ValidatedVector> {
-        // Endpoint options and endpoint syntax are validated here (a pure
-        // structural check using the same parser as `build`). The URI list
-        // itself is still computed in `build` because the default scheme
-        // depends on the TLS settings, which require reading certificate
-        // files from disk.
-        self.validate_endpoint_options()?;
+        // Endpoint options and endpoint syntax are validated here, and the
+        // parsed endpoints are retained so `build` does not re-parse the
+        // original strings. Re-parsing is unsafe: `http::Uri` reads the host
+        // of a scheme-less `host:port[/path]` endpoint as a scheme, producing
+        // a URI that validation accepted but the sink cannot use.
+        let endpoints = self.validate_endpoint_options()?;
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         Ok(ValidatedVector {
             request_settings,
             batch_settings,
+            endpoints,
         })
     }
 
@@ -275,9 +322,13 @@ impl ValidatedSink for VectorConfig {
         let ValidatedVector {
             request_settings,
             batch_settings,
+            endpoints,
         } = validated.clone();
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let uris = self.uris(tls.is_tls())?;
+        let uris = endpoints
+            .iter()
+            .map(|endpoint| endpoint.with_scheme(tls.is_tls()))
+            .collect::<crate::Result<Vec<_>>>()?;
         let endpoint_strategy = self
             .routing
             .as_ref()
@@ -705,7 +756,7 @@ fn is_retriable_vector_error(error: &crate::Error) -> bool {
 }
 
 impl VectorConfig {
-    fn validate_endpoint_options(&self) -> crate::Result<()> {
+    fn validate_endpoint_options(&self) -> crate::Result<Vec<ValidatedEndpoint>> {
         match (self.address.as_ref(), self.routing.as_ref()) {
             (Some(_), Some(_)) => Err(
                 "`address` and `routing` options are mutually exclusive. Please use `routing.endpoints` for multiple Vector endpoints."
@@ -717,38 +768,12 @@ impl VectorConfig {
             (None, Some(routing)) if routing.endpoints.is_empty() => {
                 Err("`routing.endpoints` must contain at least one endpoint.".into())
             }
-            (Some(address), None) => {
-                // Validate the endpoint with the same parser used at build
-                // time. `parse_default_http` requires an absolute http(s) URL
-                // with an authority, so a hostless endpoint is rejected here
-                // instead of failing at request time. The `tls` flag only
-                // selects the default scheme and cannot change whether the
-                // parse succeeds, so the parsed endpoint is discarded.
-                HttpEndpoint::parse_default_http(address)?;
-                Ok(())
-            }
-            (None, Some(routing)) => {
-                for endpoint in &routing.endpoints {
-                    HttpEndpoint::parse_default_http(endpoint)?;
-                }
-                Ok(())
-            }
-        }
-    }
-
-    fn uris(&self, tls: bool) -> crate::Result<Vec<Uri>> {
-        // Endpoint option validation is performed in `ValidatedSink::validate`,
-        // which always runs before `build` in the validated lifecycle.
-        if let Some(address) = self.address.as_ref() {
-            Ok(vec![with_default_scheme(address, tls)?])
-        } else {
-            self.routing
-                .as_ref()
-                .expect("routing must be present after validation")
+            (Some(address), None) => Ok(vec![ValidatedEndpoint::parse(address)?]),
+            (None, Some(routing)) => routing
                 .endpoints
                 .iter()
-                .map(|endpoint| with_default_scheme(endpoint, tls))
-                .collect()
+                .map(|endpoint| ValidatedEndpoint::parse(endpoint))
+                .collect(),
         }
     }
 }
@@ -840,40 +865,6 @@ const fn default_endpoint_health_config() -> HealthConfig {
     HealthConfig {
         retry_initial_backoff_secs: 1,
         retry_max_duration_secs: Duration::from_secs(60 * 60),
-    }
-}
-
-/// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
-/// specified in the address.
-pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
-    let uri: Uri = address.parse()?;
-    if uri.scheme().is_none() {
-        // Default the scheme to http or https.
-        let mut parts = uri.into_parts();
-
-        parts.scheme = if tls {
-            Some(
-                "https"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("https should be valid")),
-            )
-        } else {
-            Some(
-                "http"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("http should be valid")),
-            )
-        };
-
-        if parts.path_and_query.is_none() {
-            parts.path_and_query = Some(
-                "/".parse()
-                    .unwrap_or_else(|_| unreachable!("root should be valid")),
-            );
-        }
-        Ok(Uri::from_parts(parts)?)
-    } else {
-        Ok(uri)
     }
 }
 
@@ -1612,6 +1603,51 @@ mod tests {
         };
 
         config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validated_endpoint_parses_scheme_less_hostname_with_path() {
+        // Regression test: `http::Uri` reads the host of a scheme-less
+        // `host:port/path` endpoint as a scheme, so the endpoint must be
+        // parsed with a prepended default scheme and retained for `build`.
+        let endpoint =
+            ValidatedEndpoint::parse("localhost:6000/collector").expect("endpoint should parse");
+        assert_eq!(
+            endpoint.with_scheme(false).unwrap().to_string(),
+            "http://localhost:6000/collector"
+        );
+        assert_eq!(
+            endpoint.with_scheme(true).unwrap().to_string(),
+            "https://localhost:6000/collector"
+        );
+    }
+
+    #[test]
+    fn validated_endpoint_preserves_explicit_sche() {
+        // An explicit scheme is never rewritten, even when TLS is enabled.
+        let endpoint =
+            ValidatedEndpoint::parse("http://localhost:6000").expect("endpoint should parse");
+        assert_eq!(
+            endpoint.with_scheme(true).unwrap().to_string(),
+            "http://localhost:6000/"
+        );
+    }
+
+    #[test]
+    fn validate_retains_scheme_less_endpoint_with_path() {
+        let config = VectorConfig {
+            address: Some("localhost:6000/collector".to_owned()),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoints[0]
+                .with_scheme(false)
+                .unwrap()
+                .to_string(),
+            "http://localhost:6000/collector"
+        );
     }
 
     #[test]

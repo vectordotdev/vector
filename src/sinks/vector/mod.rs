@@ -68,7 +68,7 @@ mod tests {
         event::{BatchNotifier, BatchStatus},
     };
 
-    use super::{config::with_default_scheme, *};
+    use super::*;
     use crate::{
         config::{SinkConfig as _, SinkContext},
         event::Event,
@@ -906,18 +906,6 @@ mod tests {
 
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
-    }
-
-    #[test]
-    fn test_with_default_scheme() {
-        assert_eq!(
-            with_default_scheme("0.0.0.0", false).unwrap().to_string(),
-            "http://0.0.0.0/"
-        );
-        assert_eq!(
-            with_default_scheme("0.0.0.0", true).unwrap().to_string(),
-            "https://0.0.0.0/"
-        );
     }
 
     async fn get_received(

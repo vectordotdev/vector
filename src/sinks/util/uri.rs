@@ -502,7 +502,7 @@ fn authority_has_invalid_port(uri: &Uri) -> bool {
 /// The scheme must be at the very start: a `://` later in the path or query
 /// (for example `localhost:8080/write?target=http://upstream`) is not a scheme
 /// marker, so the endpoint is still defaulted to `https`.
-fn has_scheme(endpoint: &str) -> bool {
+pub(crate) fn has_scheme(endpoint: &str) -> bool {
     let Some(scheme_end) = endpoint.find("://") else {
         return false;
     };
