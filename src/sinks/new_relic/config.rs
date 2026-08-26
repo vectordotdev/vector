@@ -1,5 +1,11 @@
-use std::{fmt, fmt::Debug, sync::Arc};
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
+)]
 
+use std::sync::Arc;
+
+use derivative::Derivative;
 use http::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
@@ -143,22 +149,15 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct ValidatedNewRelic {
     batcher_settings: BatcherSettings,
     request_limits: TowerRequestSettings,
+    // The credentials contain the license key and account ID, so they are
+    // intentionally omitted from diagnostics.
+    #[derivative(Debug = "ignore")]
     credentials: Arc<NewRelicCredentials>,
-}
-
-impl fmt::Debug for ValidatedNewRelic {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // The credentials contain the license key and account ID, so they are
-        // intentionally omitted from diagnostics.
-        f.debug_struct("ValidatedNewRelic")
-            .field("batcher_settings", &self.batcher_settings)
-            .field("request_limits", &self.request_limits)
-            .finish_non_exhaustive()
-    }
 }
 
 #[async_trait::async_trait]
