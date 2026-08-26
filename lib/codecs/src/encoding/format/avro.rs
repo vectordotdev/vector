@@ -72,8 +72,8 @@ impl Encoder<Event> for AvroSerializer {
         let log = event.into_log();
         let value = apache_avro::to_value(log)?;
         let value = value.resolve(&self.schema)?;
-        let writer = apache_avro::writer::datum::GenericDatumWriter::builder(&self.schema)
-            .build()?;
+        let writer =
+            apache_avro::writer::datum::GenericDatumWriter::builder(&self.schema).build()?;
         let bytes = writer.write_value_to_vec(value)?;
         buffer.put_slice(&bytes);
         Ok(())
