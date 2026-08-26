@@ -450,7 +450,7 @@ releases: "0.56.0": {
 
 		    now reports both `push(.x, 1)` (unhandled error) and `.b = push(.y, 2)` (unhandled fallible assignment) in one go. Previously you'd only see the second one, fix it, recompile, and only then discover the first.
 
-		[PR #1759](https://github.com/vectordotdev/vrl/pull/1759) by [@yjagdale](https://github.com/yjagdale)
+		[PR #1760](https://github.com/vectordotdev/vrl/pull/1760) by [@pront](https://github.com/pront)
 		- Fixed a confusing compile error where a fallible call earlier in a block could cause a later, unrelated assignment to be reported as the problem. For example:
 
 		    ```coffee

@@ -110,10 +110,10 @@
             {{ range $breakingTitled }}
             <li class="m-0 min-w-0 max-w-full">
               <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="group block overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm transition hover:border-gray-300 hover:bg-gray-100/70 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800/40 dark:hover:border-gray-600 dark:hover:bg-gray-800/70 md:px-5">
-                <div class="prose dark:prose-invert max-w-none font-semibold text-dark group-hover:text-primary-dark dark:text-gray-100 dark:group-hover:text-primary [&>p]:m-0 [&_code]:break-all [&_code]:whitespace-normal">
+                <div class="prose dark:prose-invert max-w-none font-semibold text-dark group-hover:text-primary-dark dark:text-gray-100 dark:group-hover:text-primary [&>p]:m-0 [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
                   {{ .title | markdownify }}
                 </div>
-                <div class="mt-2 prose dark:prose-invert max-w-none leading-relaxed text-gray-600 dark:text-gray-300 [&>p]:m-0 [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
+                <div class="mt-2 prose dark:prose-invert max-w-none leading-relaxed text-gray-600 dark:text-gray-300 [&>p]:m-0 [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
                   {{ .description | markdownify }}
                 </div>
               </a>
@@ -139,7 +139,7 @@
             <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
               {{ range $changes }}
               <li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5">
-                <div class="prose dark:prose-invert max-w-none leading-relaxed [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
+                <div class="prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
                   {{ .description | markdownify }}
                 </div>
                 {{ if gt (len .contributors) 0 }}
@@ -202,7 +202,7 @@
           {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
         </div>
 
-        <div class="vrl-changelog mt-6 prose dark:prose-invert max-w-none [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
+        <div class="vrl-changelog mt-6 prose dark:prose-invert max-w-none [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
           {{ . | markdownify }}
         </div>
       </div>
