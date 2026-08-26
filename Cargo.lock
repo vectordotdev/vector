@@ -2403,29 +2403,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 
 [[package]]
-name = "borsh"
-version = "1.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad8646f98db542e39fc66e68a20b2144f6a732636df7c2354e74645faaa433ce"
-dependencies = [
- "borsh-derive",
- "cfg_aliases",
-]
-
-[[package]]
-name = "borsh-derive"
-version = "1.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdd1d3c0c2f5833f22386f252fe8ed005c7f59fdcddeef025c01b4c3b9fd9ac3"
-dependencies = [
- "once_cell",
- "proc-macro-crate 3.2.0",
- "proc-macro2 1.0.106",
- "quote 1.0.45",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "brotli"
 version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2867,11 +2844,9 @@ dependencies = [
  "async-trait",
  "bytes",
  "chrono",
- "chrono-tz",
  "criterion",
  "csv-core",
  "derivative",
- "derive_more",
  "dyn-clone",
  "flate2",
  "futures",
@@ -2888,9 +2863,7 @@ dependencies = [
  "rand 0.10.1",
  "regex",
  "rstest",
- "rust_decimal",
  "serde",
- "serde-aux",
  "serde_json",
  "serde_with",
  "similar-asserts 2.0.0",
@@ -4020,7 +3993,6 @@ dependencies = [
  "snafu 0.9.0",
  "tracing 0.1.44",
  "vector-common",
- "vector-config",
  "vector-core",
  "vector-lookup",
  "vrl",
@@ -4501,13 +4473,11 @@ dependencies = [
  "futures-util",
  "glob",
  "indexmap 2.12.0",
- "libc",
  "quickcheck",
  "tempfile",
  "tokio",
  "tracing 0.1.44",
  "vector-common",
- "winapi",
 ]
 
 [[package]]
@@ -4520,7 +4490,6 @@ dependencies = [
  "chrono",
  "crc",
  "dashmap",
- "glob",
  "libc",
  "quickcheck",
  "serde",
@@ -8134,7 +8103,6 @@ dependencies = [
  "tonic-build 0.11.0",
  "vector-common",
  "vector-core",
- "vector-lookup",
  "vrl",
 ]
 
@@ -10235,13 +10203,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61f703d19852dbf87cbc513643fa81428361eb6940f1ac14fd58155d295a3eb0"
 dependencies = [
  "arrayvec",
- "borsh",
- "bytes",
  "num-traits",
- "rand 0.8.6",
- "rkyv",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -10666,18 +10628,6 @@ checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
  "serde_derive",
-]
-
-[[package]]
-name = "serde-aux"
-version = "4.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "207f67b28fe90fb596503a9bf0bf1ea5e831e21307658e177c5dfcdfc3ab8a0a"
-dependencies = [
- "chrono",
- "serde",
- "serde-value",
- "serde_json",
 ]
 
 [[package]]
@@ -12719,18 +12669,6 @@ dependencies = [
 
 [[package]]
 name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "futures",
- "futures-task",
- "pin-project",
- "tracing 0.1.44",
-]
-
-[[package]]
-name = "tracing-futures"
 version = "0.3.0"
 source = "git+https://github.com/tokio-rs/tracing?rev=e0642d949891546a3bb7e47080365ee7274f05cd#e0642d949891546a3bb7e47080365ee7274f05cd"
 dependencies = [
@@ -12822,7 +12760,7 @@ dependencies = [
  "futures",
  "tower-service",
  "tracing 0.2.0",
- "tracing-futures 0.3.0",
+ "tracing-futures",
 ]
 
 [[package]]
@@ -13252,7 +13190,6 @@ dependencies = [
  "arc-swap",
  "arr_macro",
  "arrow 59.2.0",
- "arrow-schema 59.2.0",
  "assert_cmd",
  "async-compression",
  "async-nats",
@@ -13287,7 +13224,6 @@ dependencies = [
  "base64 0.23.0",
  "bloomy",
  "bollard",
- "byteorder",
  "bytes",
  "bytesize",
  "cfg-if",
@@ -13327,7 +13263,6 @@ dependencies = [
  "headers 0.3.9",
  "heim",
  "hex",
- "hickory-proto",
  "hostname 0.4.2",
  "http 0.2.12",
  "http 1.3.1",
@@ -13335,7 +13270,6 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "http-serde",
- "humantime",
  "hyper 0.14.32",
  "hyper 1.7.0",
  "hyper-openssl 0.10.2",
@@ -13371,7 +13305,6 @@ dependencies = [
  "openssl-src",
  "ordered-float 5.3.0",
  "parquet",
- "pastey",
  "percent-encoding",
  "pin-project",
  "postgres-openssl",
@@ -13398,7 +13331,6 @@ dependencies = [
  "roaring",
  "rstest",
  "rumqttc",
- "rust_decimal",
  "seahash",
  "semver",
  "serde",
@@ -13441,7 +13373,6 @@ dependencies = [
  "tower-test",
  "tracing 0.1.44",
  "tracing-core 0.1.36",
- "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-subscriber",
  "tracing-tower",
@@ -13468,7 +13399,6 @@ dependencies = [
 name = "vector-api-client"
 version = "0.2.0"
 dependencies = [
- "futures",
  "http 0.2.12",
  "prost 0.12.6",
  "prost-build 0.12.6",
@@ -13496,7 +13426,6 @@ dependencies = [
  "criterion",
  "crossbeam-queue",
  "crossbeam-utils",
- "dashmap",
  "derivative",
  "fslock",
  "futures",
@@ -13506,8 +13435,6 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "num-traits",
- "ordered-float 5.3.0",
- "pastey",
  "proptest",
  "quickcheck",
  "rand 0.10.1",
@@ -13686,7 +13613,6 @@ dependencies = [
  "toml",
  "tonic 0.11.0",
  "tracing 0.1.44",
- "tracing-subscriber",
  "url",
  "urlencoding",
  "uuid",
@@ -13783,22 +13709,17 @@ name = "vector-top"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "clap",
  "crossterm",
- "exitcode",
  "futures",
- "futures-util",
  "glob",
  "http 0.2.12",
  "humantime",
- "indoc",
  "num-format",
  "ratatui",
  "regex",
  "tokio",
  "tokio-stream",
  "unit-prefix",
- "url",
  "vector-api-client",
  "vector-common",
 ]
@@ -13879,7 +13800,6 @@ name = "vector-vrl-web-playground"
 version = "0.1.0"
 dependencies = [
  "cargo-lock",
- "enrichment",
  "getrandom 0.2.15",
  "getrandom 0.4.2",
  "gloo-utils",
