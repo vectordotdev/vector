@@ -106,11 +106,16 @@
             {{ partial "heading.html" (dict "text" $breakingHeading "level" 3 "icon" false) }}
           </div>
 
-          <ul class="prose dark:prose-invert list-disc ml-6">
+          <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
             {{ range $breakingTitled }}
-            <li>
-              <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="text-primary-dark dark:text-primary hover:underline">
-                {{ .title | markdownify }}
+            <li class="m-0 min-w-0 max-w-full">
+              <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="group block overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm transition hover:border-gray-300 hover:bg-gray-100/70 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800/40 dark:hover:border-gray-600 dark:hover:bg-gray-800/70 md:px-5">
+                <div class="prose dark:prose-invert max-w-none font-semibold text-dark group-hover:text-primary-dark dark:text-gray-100 dark:group-hover:text-primary [&>p]:m-0 [&_code]:break-all [&_code]:whitespace-normal">
+                  {{ .title | markdownify }}
+                </div>
+                <div class="mt-2 prose dark:prose-invert max-w-none leading-relaxed text-gray-600 dark:text-gray-300 [&>p]:m-0 [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
+                  {{ .description | markdownify }}
+                </div>
               </a>
             </li>
             {{ end }}
