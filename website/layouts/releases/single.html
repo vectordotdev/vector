@@ -202,7 +202,7 @@
           {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
         </div>
 
-        <div class="mt-6 prose dark:prose-invert max-w-none [&>ul]:mb-0 [&>ul]:mt-4 [&>ul]:min-w-0 [&>ul]:list-none [&>ul]:rounded-t-lg [&>ul]:border [&>ul]:border-gray-200 [&>ul]:border-b-0 [&>ul]:bg-gray-50/50 [&>ul]:px-4 [&>ul]:py-4 [&>ul]:shadow-sm dark:[&>ul]:border-gray-700 dark:[&>ul]:bg-gray-800/40 md:[&>ul]:px-5 [&>ul>li]:m-0 [&>ul+p]:mt-0 [&>ul+p]:rounded-b-lg [&>ul+p]:border [&>ul+p]:border-gray-200 [&>ul+p]:bg-gray-50/50 [&>ul+p]:px-4 [&>ul+p]:py-3 [&>ul+p]:text-sm [&>ul+p]:italic [&>ul+p]:shadow-sm dark:[&>ul+p]:border-gray-700 dark:[&>ul+p]:bg-gray-800/40 md:[&>ul+p]:px-5 [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
+        <div class="vrl-changelog mt-6 prose dark:prose-invert max-w-none [&_code]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
           {{ . | markdownify }}
         </div>
       </div>
