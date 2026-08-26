@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "allOf": [
+    {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "_metadata": {
+            "docs::human_name": "Name"
+          }
+        }
+      }
+    },
+    {
+      "anyOf": [
+        {
+          "not": {
+            "required": [
+              "type"
+            ]
+          }
+        },
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "type",
+                "value"
+              ],
+              "properties": {
+                "type": {
+                  "const": "Foo",
+                  "_metadata": {
+                    "docs::human_name": "Type"
+                  }
+                },
+                "value": {
+                  "type": "string",
+                  "_metadata": {
+                    "docs::human_name": "Value"
+                  }
+                }
+              },
+              "_metadata": {
+                "logical_name": "Foo",
+                "docs::human_name": "Foo"
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "extra"
+              ],
+              "properties": {
+                "extra": {
+                  "type": "string",
+                  "_metadata": {
+                    "docs::human_name": "Extra"
+                  }
+                }
+              },
+              "_metadata": {
+                "logical_name": "Extra",
+                "docs::human_name": "Extra"
+              }
+            }
+          ],
+          "_metadata": {
+            "docs::enum_tagging": "internal",
+            "docs::enum_tag_field": "type"
+          }
+        }
+      ],
+      "_metadata": {
+        "docs::optional": true
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}

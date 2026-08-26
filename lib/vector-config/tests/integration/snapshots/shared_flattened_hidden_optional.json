@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "allOf": [
+    {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "extra": {
+          "$ref": "#/definitions/core::option::Option<integration::schema_snapshots::InternallyTaggedMode>",
+          "_metadata": {
+            "docs::human_name": "Extra"
+          }
+        },
+        "name": {
+          "type": "string",
+          "_metadata": {
+            "docs::human_name": "Name"
+          }
+        }
+      }
+    },
+    {
+      "anyOf": [
+        {
+          "not": {
+            "required": [
+              "type"
+            ]
+          }
+        },
+        {
+          "$ref": "#/definitions/integration::schema_snapshots::InternallyTaggedMode"
+        }
+      ],
+      "_metadata": {
+        "docs::hidden": true,
+        "docs::optional": true
+      }
+    }
+  ],
+  "unevaluatedProperties": false,
+  "definitions": {
+    "core::option::Option<integration::schema_snapshots::InternallyTaggedMode>": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/definitions/integration::schema_snapshots::InternallyTaggedMode"
+        }
+      ],
+      "unevaluatedProperties": false,
+      "_metadata": {
+        "docs::optional": true
+      }
+    },
+    "integration::schema_snapshots::InternallyTaggedMode": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "value"
+          ],
+          "properties": {
+            "type": {
+              "const": "Foo",
+              "_metadata": {
+                "docs::human_name": "Type"
+              }
+            },
+            "value": {
+              "type": "string",
+              "_metadata": {
+                "docs::human_name": "Value"
+              }
+            }
+          },
+          "_metadata": {
+            "logical_name": "Foo",
+            "docs::human_name": "Foo"
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "count",
+            "type"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "maximum": 4294967295.0,
+              "minimum": 0.0,
+              "_metadata": {
+                "docs::numeric_type": "uint",
+                "docs::human_name": "Count"
+              }
+            },
+            "type": {
+              "const": "Bar",
+              "_metadata": {
+                "docs::human_name": "Type"
+              }
+            }
+          },
+          "_metadata": {
+            "logical_name": "Bar",
+            "docs::human_name": "Bar"
+          }
+        }
+      ],
+      "_metadata": {
+        "docs::enum_tagging": "internal",
+        "docs::enum_tag_field": "type"
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "type": "object",
+  "required": [
+    "float",
+    "small",
+    "unsigned"
+  ],
+  "properties": {
+    "float": {
+      "type": "number",
+      "maximum": 9007199254740991.0,
+      "minimum": -9007199254740991.0,
+      "_metadata": {
+        "docs::numeric_type": "float",
+        "docs::human_name": "Float"
+      }
+    },
+    "small": {
+      "type": "integer",
+      "maximum": 32767.0,
+      "minimum": -32768.0,
+      "_metadata": {
+        "docs::numeric_type": "int",
+        "docs::human_name": "Small"
+      }
+    },
+    "unsigned": {
+      "type": "integer",
+      "maximum": 9007199254740991.0,
+      "minimum": 0.0,
+      "_metadata": {
+        "docs::numeric_type": "uint",
+        "docs::human_name": "Unsigned"
+      }
+    }
+  },
+  "unevaluatedProperties": false
+}

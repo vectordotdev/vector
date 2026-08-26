@@ -10,7 +10,7 @@ use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
 
 use super::visitors::{
     DisallowUnevaluatedPropertiesVisitor, GenerateHumanFriendlyNameVisitor,
-    InlineSingleUseReferencesVisitor,
+    InlineSingleUseReferencesVisitor, RewriteFlattenedOptionalVisitor,
 };
 use crate::{
     Configurable, ConfigurableRef, GenerateError, Metadata, ToValue, num::ConfigurableNumber,
@@ -172,6 +172,10 @@ pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: V
     let all_of_schemas = subschemas.into_iter().map(Schema::Object).collect();
 
     // Now update the primary schema to use `allOf` to bring everything together.
+    //
+    // Flattened `Option<T>` still carries a JSON `null` alternative at this point. That branch is
+    // rewritten after inlining by `RewriteFlattenedOptionalVisitor`, because the optional schema is
+    // often only a `$ref` here and must not be mutated in the shared definition.
     primary.subschemas = Some(Box::new(SubschemaValidation {
         all_of: Some(all_of_schemas),
         ..Default::default()
@@ -500,6 +504,7 @@ pub fn generate_internal_tagged_variant_schema(
 pub fn default_schema_settings() -> SchemaSettings {
     SchemaSettings::new()
         .with_visitor(InlineSingleUseReferencesVisitor::from_settings)
+        .with_visitor(RewriteFlattenedOptionalVisitor::from_settings)
         .with_visitor(DisallowUnevaluatedPropertiesVisitor::from_settings)
         .with_visitor(GenerateHumanFriendlyNameVisitor::from_settings)
 }
