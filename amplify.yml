@@ -45,8 +45,10 @@ applications:
         preBuild:
           commands:
             - mkdir -p ./public
+            - bash ../scripts/environment/prepare.sh --modules=rustup,protoc
         build:
           commands:
+            - export PATH="$HOME/.local/bin:$PATH"
             - make ci-docs-build
             - echo "<meta charset=\"UTF-8\" >" > ../target/doc/index.html
             - mv ../target/doc ./public
