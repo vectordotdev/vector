@@ -23,3 +23,37 @@ applications:
       cache:
         paths:
           - node_modules/**/*
+  - appRoot: lib/vector-vrl/web-playground
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - mv ../../../scripts/ensure-wasm-target-installed.sh ./
+            - chmod +x ./ensure-wasm-target-installed.sh
+        build:
+          commands:
+            - ./ensure-wasm-target-installed.sh && wasm-pack build --target web --out-dir public/pkg
+      artifacts:
+        baseDirectory: public
+        files:
+          - '**/*'
+      cache:
+        paths: []
+  - appRoot: rust-doc
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - mkdir -p ./public
+        build:
+          commands:
+            - make ci-docs-build
+            - echo "<meta charset=\"UTF-8\" >" > ../target/doc/index.html
+            - mv ../target/doc ./public
+            - rm -rf ../target
+      artifacts:
+        baseDirectory: public/doc
+        files:
+          - '**/*'
+      cache:
+        paths: []
