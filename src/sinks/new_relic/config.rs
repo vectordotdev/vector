@@ -11,7 +11,7 @@ use super::{
 use crate::{
     config::{DynValidatedSink, ValidatedSink},
     http::HttpClient,
-    sinks::{prelude::*, util::service::TowerRequestSettings},
+    sinks::{prelude::*, util::HttpEndpoint, util::service::TowerRequestSettings},
 };
 
 /// New Relic region.
@@ -112,7 +112,7 @@ pub struct NewRelicConfig {
     acknowledgements: AcknowledgementsConfig,
 
     #[serde(skip)]
-    pub override_uri: Option<Uri>,
+    pub override_uri: Option<HttpEndpoint>,
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
@@ -223,7 +223,7 @@ pub struct NewRelicCredentials {
     pub account_id: String,
     pub api: NewRelicApi,
     pub region: NewRelicRegion,
-    pub override_uri: Option<Uri>,
+    pub override_uri: Option<HttpEndpoint>,
 }
 
 impl NewRelicCredentials {
@@ -233,12 +233,7 @@ impl NewRelicCredentials {
 
     pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
-            if !matches!(override_uri.scheme_str(), Some("http" | "https"))
-                || override_uri.authority().is_none()
-            {
-                return Err("New Relic `override_uri` must be an absolute http(s) URL".into());
-            }
-            return Ok(override_uri.clone());
+            return Ok(override_uri.as_uri().clone());
         }
 
         match self.api {
@@ -326,21 +321,18 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_override_uri_not_absolute_http() {
+    fn validate_accepts_override_uri() {
         let mut config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
             .expect("config should be valid");
+        config.override_uri = Some(
+            HttpEndpoint::new("https://newrelic.example.com/collector".parse().unwrap()).unwrap(),
+        );
 
-        // A non-http(s) scheme is rejected.
-        config.override_uri = Some("ftp://newrelic.example.com".parse().unwrap());
-        assert!(config.validate().is_err());
-
-        // A host-less URI is rejected.
-        config.override_uri = Some("/collector".parse().unwrap());
-        assert!(config.validate().is_err());
-
-        // An absolute http(s) URL passes validation.
-        config.override_uri = Some("https://newrelic.example.com/collector".parse().unwrap());
-        assert!(config.validate().is_ok());
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.credentials.get_uri().to_string(),
+            "https://newrelic.example.com/collector"
+        );
     }
 
     #[test]
