@@ -1,6 +1,6 @@
 use std::{fmt, fmt::Debug, sync::Arc};
 
-use http::Uri;
+use http::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -172,7 +172,7 @@ impl ValidatedSink for NewRelicConfig {
             .limit_max_events(self.batch.max_events.unwrap_or(100))?
             .into_batcher_settings()?;
         let request_limits = self.request.into_settings();
-        let credentials = Arc::from(NewRelicCredentials::from(self));
+        let credentials = Arc::from(NewRelicCredentials::try_from_config(self)?);
         credentials.try_get_uri()?;
 
         Ok(ValidatedNewRelic {
@@ -219,7 +219,7 @@ impl ValidatedSink for NewRelicConfig {
 
 #[derive(Debug, Clone)]
 pub struct NewRelicCredentials {
-    pub license_key: String,
+    pub license_key: HeaderValue,
     pub account_id: String,
     pub api: NewRelicApi,
     pub region: NewRelicRegion,
@@ -233,6 +233,11 @@ impl NewRelicCredentials {
 
     pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
+            if !matches!(override_uri.scheme_str(), Some("http" | "https"))
+                || override_uri.authority().is_none()
+            {
+                return Err("New Relic `override_uri` must be an absolute http(s) URL".into());
+            }
             return Ok(override_uri.clone());
         }
 
@@ -267,15 +272,17 @@ impl NewRelicCredentials {
     }
 }
 
-impl From<&NewRelicConfig> for NewRelicCredentials {
-    fn from(config: &NewRelicConfig) -> Self {
-        Self {
-            license_key: config.license_key.inner().to_string(),
+impl NewRelicCredentials {
+    pub fn try_from_config(config: &NewRelicConfig) -> crate::Result<Self> {
+        let license_key = HeaderValue::from_str(config.license_key.inner())
+            .map_err(|_| "New Relic `license_key` must be a valid HTTP header value".to_string())?;
+        Ok(Self {
+            license_key,
             account_id: config.account_id.inner().to_string(),
             api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
             override_uri: config.override_uri.clone(),
-        }
+        })
     }
 }
 
@@ -307,6 +314,33 @@ mod tests {
         config.account_id = SensitiveString::from("bad id".to_string());
 
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_license_key_invalid_header_value() {
+        let mut config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+        config.license_key = SensitiveString::from("bad\nkey".to_string());
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_override_uri_not_absolute_http() {
+        let mut config: NewRelicConfig = serde_json::from_value(NewRelicConfig::generate_config())
+            .expect("config should be valid");
+
+        // A non-http(s) scheme is rejected.
+        config.override_uri = Some("ftp://newrelic.example.com".parse().unwrap());
+        assert!(config.validate().is_err());
+
+        // A host-less URI is rejected.
+        config.override_uri = Some("/collector".parse().unwrap());
+        assert!(config.validate().is_err());
+
+        // An absolute http(s) URL passes validation.
+        config.override_uri = Some("https://newrelic.example.com/collector".parse().unwrap());
+        assert!(config.validate().is_ok());
     }
 
     #[test]
