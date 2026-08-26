@@ -70,6 +70,8 @@ pub mod honeycomb;
 pub mod http;
 #[cfg(feature = "sinks-humio")]
 pub mod humio;
+#[cfg(feature = "sinks-iggy")]
+pub mod iggy;
 #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
 pub mod influxdb;
 #[cfg(feature = "sinks-kafka")]
