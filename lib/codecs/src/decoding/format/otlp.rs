@@ -11,7 +11,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::{protobuf::parse::Options, value::Kind};
+use vrl::{event_path, protobuf::parse::Options, value::Kind};
 
 use super::{Deserializer, ProtobufDeserializer};
 
@@ -165,7 +165,7 @@ impl Deserializer for OtlpDeserializer {
                 OtlpSignalType::Logs => {
                     if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
                         && let Some(Event::Log(log)) = events.first()
-                        && log.get(RESOURCE_LOGS_JSON_FIELD).is_some()
+                        && log.get(event_path!(RESOURCE_LOGS_JSON_FIELD)).is_some()
                     {
                         return Ok(events);
                     }
@@ -175,17 +175,20 @@ impl Deserializer for OtlpDeserializer {
                         .metrics_deserializer
                         .parse(bytes.clone(), log_namespace)
                         && let Some(Event::Log(log)) = events.first()
-                        && log.get(RESOURCE_METRICS_JSON_FIELD).is_some()
+                        && log.get(event_path!(RESOURCE_METRICS_JSON_FIELD)).is_some()
                     {
                         return Ok(events);
                     }
                 }
                 OtlpSignalType::Traces => {
-                    // TODO: <https://github.com/vectordotdev/vector/issues/25045>
-                    if let Ok(mut events) =
-                        self.traces_deserializer.parse(bytes.clone(), log_namespace)
+                    // Always use LogNamespace::Vector for traces to avoid spurious timestamp injection.
+                    // The log_namespace concept is logs-specific and doesn't apply to trace events.
+                    // See: https://github.com/vectordotdev/vector/issues/25045
+                    if let Ok(mut events) = self
+                        .traces_deserializer
+                        .parse(bytes.clone(), LogNamespace::Vector)
                         && let Some(Event::Log(log)) = events.first()
-                        && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
+                        && log.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some()
                     {
                         // Convert the log event to a trace event by taking ownership
                         if let Some(Event::Log(log)) = events.pop() {
@@ -214,6 +217,7 @@ mod tests {
         trace::v1::{ResourceSpans, ScopeSpans, Span},
     };
     use prost::Message;
+    use vrl::path;
 
     use super::*;
 
@@ -317,7 +321,7 @@ mod tests {
     fn validate_trace_ids(trace: &vrl::value::Value) {
         // Navigate to the span and check traceId and spanId
         let resource_spans = trace
-            .get("resourceSpans")
+            .get(path!("resourceSpans"))
             .and_then(|v| v.as_array())
             .expect("resourceSpans should be an array");
 
@@ -326,7 +330,7 @@ mod tests {
             .expect("should have at least one resource span");
 
         let scope_spans = first_rs
-            .get("scopeSpans")
+            .get(path!("scopeSpans"))
             .and_then(|v| v.as_array())
             .expect("scopeSpans should be an array");
 
@@ -335,7 +339,7 @@ mod tests {
             .expect("should have at least one scope span");
 
         let spans = first_ss
-            .get("spans")
+            .get(path!("spans"))
             .and_then(|v| v.as_array())
             .expect("spans should be an array");
 
@@ -343,7 +347,7 @@ mod tests {
 
         // Verify traceId - should be raw bytes (16 bytes for trace_id)
         let trace_id = span
-            .get("traceId")
+            .get(path!("traceId"))
             .and_then(|v| v.as_bytes())
             .expect("traceId should exist and be bytes");
 
@@ -355,7 +359,7 @@ mod tests {
 
         // Verify spanId - should be raw bytes (8 bytes for span_id)
         let span_id = span
-            .get("spanId")
+            .get(path!("spanId"))
             .and_then(|v| v.as_bytes())
             .expect("spanId should exist and be bytes");
 
@@ -374,10 +378,10 @@ mod tests {
         if is_trace {
             assert!(matches!(events[0], Event::Trace(_)));
             let trace = events[0].as_trace();
-            assert!(trace.get(field).is_some());
+            assert!(trace.get(event_path!(field)).is_some());
             validate_trace_ids(trace.value());
         } else {
-            assert!(events[0].as_log().get(field).is_some());
+            assert!(events[0].as_log().get(event_path!(field)).is_some());
         }
     }
 
@@ -435,5 +439,40 @@ mod tests {
         let log_bytes = create_logs_request_bytes();
         let result = deserializer.parse(log_bytes, LogNamespace::Legacy);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn deserialize_traces_with_legacy_namespace_should_not_inject_timestamp() {
+        use vector_core::config::log_schema;
+
+        // This test verifies the fix for issue #25045
+        // When log_namespace is Legacy, the ProtobufDeserializer injects a timestamp
+        // into log events, but this behavior should NOT apply to trace events.
+        let deserializer = OtlpDeserializer::default();
+        let trace_bytes = create_traces_request_bytes();
+
+        // Parse with Legacy namespace
+        let events = deserializer
+            .parse(trace_bytes, LogNamespace::Legacy)
+            .unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0], Event::Trace(_)));
+
+        let trace = events[0].as_trace();
+
+        // Verify that no spurious timestamp was injected
+        // The timestamp field should not exist at the root level
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+            assert!(
+                trace.get(timestamp_key).is_none(),
+                "Trace event should not have spurious timestamp field '{}' injected when using LogNamespace::Legacy",
+                timestamp_key
+            );
+        }
+
+        // The trace should still have the OTLP trace data
+        assert!(trace.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some());
+        validate_trace_ids(trace.value());
     }
 }

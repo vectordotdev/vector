@@ -90,6 +90,7 @@ pub enum CounterName {
     K8sEventNodeAnnotationFailuresTotal,
     K8sFormatPickerEdgeCasesTotal,
     K8sDockerFormatParseFailuresTotal,
+    K8sMergedLineTruncatedTotal,
     SqsS3EventRecordIgnoredTotal,
     ComponentAllocatedBytesTotal,
     ComponentDeallocatedBytesTotal,
@@ -98,7 +99,10 @@ pub enum CounterName {
     MemoryEnrichmentTableFlushesTotal,
     MemoryEnrichmentTableInsertionsTotal,
     MemoryEnrichmentTableReadsTotal,
+    MemoryEnrichmentTableRemovedTotal,
     MemoryEnrichmentTableTtlExpirations,
+    ComponentCpuUsageNsTotal,
+    DatadogLogsReservedAttributeConflictsTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -127,6 +131,8 @@ pub enum HistogramName {
     HttpClientRttSeconds,
     HttpClientResponseRttSeconds,
     HttpClientErrorRttSeconds,
+    SourceBufferUtilization,
+    TransformBufferUtilization,
 }
 
 impl HistogramName {
@@ -160,6 +166,8 @@ impl HistogramName {
             Self::HttpClientRttSeconds => "http_client_rtt_seconds",
             Self::HttpClientResponseRttSeconds => "http_client_response_rtt_seconds",
             Self::HttpClientErrorRttSeconds => "http_client_error_rtt_seconds",
+            Self::SourceBufferUtilization => "source_buffer_utilization",
+            Self::TransformBufferUtilization => "transform_buffer_utilization",
         }
     }
 }
@@ -168,14 +176,24 @@ impl HistogramName {
 #[strum(serialize_all = "snake_case")]
 pub enum GaugeName {
     ComponentLatencyMeanSeconds,
+    SourceBufferMaxSizeEvents,
+    SourceBufferMaxSizeBytes,
+    SourceBufferMaxEventSize,
+    SourceBufferMaxByteSize,
+    SourceBufferUtilizationLevel,
+    SourceBufferUtilizationMean,
+    TransformBufferMaxSizeEvents,
+    TransformBufferMaxSizeBytes,
+    TransformBufferMaxEventSize,
+    TransformBufferMaxByteSize,
+    TransformBufferUtilizationLevel,
+    TransformBufferUtilizationMean,
     BufferMaxSizeEvents,
     BufferMaxEventSize,
     BufferMaxSizeBytes,
     BufferMaxByteSize,
-    BufferEvents,
     BufferSizeEvents,
     BufferSizeBytes,
-    BufferByteSize,
     Utilization,
     ComponentAllocatedBytes,
     OpenFiles,
@@ -192,6 +210,7 @@ pub enum GaugeName {
     MemoryEnrichmentTableObjectsCount,
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
+    SecurityConfinementDisabled,
 }
 
 impl GaugeName {
@@ -199,14 +218,24 @@ impl GaugeName {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ComponentLatencyMeanSeconds => "component_latency_mean_seconds",
+            Self::SourceBufferMaxSizeEvents => "source_buffer_max_size_events",
+            Self::SourceBufferMaxSizeBytes => "source_buffer_max_size_bytes",
+            Self::SourceBufferMaxEventSize => "source_buffer_max_event_size",
+            Self::SourceBufferMaxByteSize => "source_buffer_max_byte_size",
+            Self::SourceBufferUtilizationLevel => "source_buffer_utilization_level",
+            Self::SourceBufferUtilizationMean => "source_buffer_utilization_mean",
+            Self::TransformBufferMaxSizeEvents => "transform_buffer_max_size_events",
+            Self::TransformBufferMaxSizeBytes => "transform_buffer_max_size_bytes",
+            Self::TransformBufferMaxEventSize => "transform_buffer_max_event_size",
+            Self::TransformBufferMaxByteSize => "transform_buffer_max_byte_size",
+            Self::TransformBufferUtilizationLevel => "transform_buffer_utilization_level",
+            Self::TransformBufferUtilizationMean => "transform_buffer_utilization_mean",
             Self::BufferMaxSizeEvents => "buffer_max_size_events",
             Self::BufferMaxEventSize => "buffer_max_event_size",
             Self::BufferMaxSizeBytes => "buffer_max_size_bytes",
             Self::BufferMaxByteSize => "buffer_max_byte_size",
-            Self::BufferEvents => "buffer_events",
             Self::BufferSizeEvents => "buffer_size_events",
             Self::BufferSizeBytes => "buffer_size_bytes",
-            Self::BufferByteSize => "buffer_byte_size",
             Self::Utilization => "utilization",
             Self::ComponentAllocatedBytes => "component_allocated_bytes",
             Self::OpenFiles => "open_files",
@@ -223,6 +252,7 @@ impl GaugeName {
             Self::MemoryEnrichmentTableObjectsCount => "memory_enrichment_table_objects_count",
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
+            Self::SecurityConfinementDisabled => "security_confinement_disabled",
         }
     }
 }
@@ -323,6 +353,7 @@ impl CounterName {
             Self::K8sEventNodeAnnotationFailuresTotal => "k8s_event_node_annotation_failures_total",
             Self::K8sFormatPickerEdgeCasesTotal => "k8s_format_picker_edge_cases_total",
             Self::K8sDockerFormatParseFailuresTotal => "k8s_docker_format_parse_failures_total",
+            Self::K8sMergedLineTruncatedTotal => "k8s_merged_line_truncated_total",
             Self::SqsS3EventRecordIgnoredTotal => "sqs_s3_event_record_ignored_total",
             Self::ComponentAllocatedBytesTotal => "component_allocated_bytes_total",
             Self::ComponentDeallocatedBytesTotal => "component_deallocated_bytes_total",
@@ -335,7 +366,12 @@ impl CounterName {
                 "memory_enrichment_table_insertions_total"
             }
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
+            Self::MemoryEnrichmentTableRemovedTotal => "memory_enrichment_table_removed_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
+            Self::DatadogLogsReservedAttributeConflictsTotal => {
+                "datadog_logs_reserved_attribute_conflicts_total"
+            }
         }
     }
 }

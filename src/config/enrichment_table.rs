@@ -1,3 +1,8 @@
+#![allow(clippy::let_underscore_must_use)]
+
+use std::{any::Any, sync::Arc};
+
+use derivative::Derivative;
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use vector_lib::{
@@ -11,7 +16,8 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct EnrichmentTableOuter<T>
 where
     T: Configurable + Serialize + 'static + ToValue + Clone,
@@ -27,6 +33,15 @@ where
         skip_serializing_if = "Inputs::is_empty"
     )]
     pub inputs: Inputs<T>,
+
+    /// Validated sink state, filled in during config compilation.
+    ///
+    /// Mirrors `SinkOuter::validated` for enrichment tables that double as sinks. It is
+    /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
+    /// the derived `SinkOuter` without cloning the underlying value.
+    #[serde(skip)]
+    #[derivative(Debug = "ignore")]
+    pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> EnrichmentTableOuter<T>
@@ -42,6 +57,7 @@ where
             inner: inner.into(),
             graph: Default::default(),
             inputs: Inputs::from_iter(inputs),
+            validated: None,
         }
     }
 
@@ -69,6 +85,7 @@ where
                     buffer: Default::default(),
                     proxy: Default::default(),
                     inner: sink,
+                    validated: self.validated.clone(),
                 },
             )
         })
@@ -105,6 +122,7 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             graph: self.graph,
+            validated: self.validated,
         }
     }
 }
@@ -112,7 +130,7 @@ where
 /// Generalized interface for describing and building enrichment table components.
 #[enum_dispatch]
 pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync {
-    /// Builds the enrichment table with the given globals.
+    /// Builds the enrichment table with the given globals and previous table state.
     ///
     /// If the enrichment table is built successfully, `Ok(...)` is returned containing the
     /// enrichment table.
@@ -124,7 +142,13 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
     async fn build(
         &self,
         globals: &GlobalOptions,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
+
+    /// Checks whether this table wants previous state, to try and restore it.
+    fn wants_previous_state(&self) -> bool {
+        false
+    }
 
     fn sink_config(
         &self,

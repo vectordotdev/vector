@@ -11,7 +11,6 @@ components: transforms: trace_to_log: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      false

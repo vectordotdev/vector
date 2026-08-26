@@ -4,8 +4,7 @@ components: sources: http_client: {
 	title: "HTTP Client"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon", "sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "batch"
@@ -83,7 +82,6 @@ components: sources: http_client: {
 				description: "An individual line from an `application/json` request"
 				fields: {
 					"*": {
-						common:        false
 						description:   "Any field contained in your JSON payload"
 						relevant_when: "encoding == \"json\""
 						required:      false

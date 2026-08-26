@@ -57,7 +57,7 @@ impl StreamSink<EventArray> for BlackholeSink {
 
         if self.config.print_interval_secs.as_secs() > 0 {
             let interval_dur = self.config.print_interval_secs;
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 let mut print_interval = interval(interval_dur);
                 loop {
                     select! {
