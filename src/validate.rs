@@ -11,7 +11,8 @@ use vrl::value::ObjectMap;
 
 use crate::{
     config::{
-        self, Config, ConfigDiff, SinkContext, TransformContext, loading::ConfigBuilderLoader,
+        self, Config, ConfigDiff, DynValidatedSink, SinkContext, TransformContext,
+        loading::ConfigBuilderLoader,
     },
     schema::Definition,
     topology::{
@@ -319,9 +320,8 @@ fn validate_sinks_with_context(config: &Config, fmt: &mut Formatter) -> bool {
     let mut errors = Vec::new();
 
     for (key, sink) in config.sinks() {
-        if let Some(dyn_sink) = sink.inner.as_dyn_validated()
-            && let Err(error) = dyn_sink.validate_with_context_dyn(&cx)
-        {
+        let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+        if let Err(error) = dyn_sink.validate_with_context_dyn(&cx) {
             errors.push(format!("Sink \"{key}\": {error}"));
         }
     }

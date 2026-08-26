@@ -17,8 +17,8 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        TransformContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformContext,
+        ValidatedSink,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -174,10 +174,6 @@ impl SinkConfig for HumioMetricsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

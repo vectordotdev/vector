@@ -8,7 +8,7 @@ use super::{
     sink::{LokiSink, confine_template_keys},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{
@@ -238,10 +238,6 @@ impl SinkConfig for LokiConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -15,8 +15,8 @@ use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     codecs::{Encoder, EncodingConfig},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -225,10 +225,6 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

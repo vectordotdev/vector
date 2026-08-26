@@ -18,7 +18,7 @@ use super::{
     sink::PostgresSink,
 };
 use crate::{
-    config::{DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink},
+    config::{Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         util::{
@@ -100,10 +100,6 @@ impl SinkConfig for PostgresConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

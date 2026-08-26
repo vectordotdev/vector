@@ -12,7 +12,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -85,7 +85,32 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        self.confinement.as_ref()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for BasicSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
         // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
         // started running, so that tests can request the topology be healthy before proceeding.
@@ -106,18 +131,6 @@ impl SinkConfig for BasicSinkConfig {
         let healthcheck = async move { rx.await.unwrap() };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        self.confinement.as_ref()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
     }
 }
 

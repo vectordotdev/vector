@@ -15,7 +15,7 @@ use super::{
     healthcheck, service::NewRelicApiRequest,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{prelude::*, util::HttpEndpoint, util::service::TowerRequestSettings},
 };
@@ -142,10 +142,6 @@ impl SinkConfig for NewRelicConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -27,8 +27,8 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext, SinkHealthcheckOptions, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        SinkHealthcheckOptions, ValidatedSink,
     },
     http::build_proxy_connector,
     proto::vector as proto,
@@ -238,10 +238,6 @@ impl SinkConfig for VectorConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

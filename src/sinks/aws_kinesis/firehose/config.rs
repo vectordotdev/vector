@@ -15,8 +15,8 @@ use super::{
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -128,10 +128,6 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.base.acknowledgements()
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

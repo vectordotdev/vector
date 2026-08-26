@@ -34,8 +34,8 @@ use super::request_builder::AzureBlobRequestOptions;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     event::{EventFinalizers, EventStatus, Finalizable},
     sinks::{
@@ -369,10 +369,6 @@ impl SinkConfig for AzureBlobSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -20,8 +20,8 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     sinks::{
         Healthcheck,
@@ -248,10 +248,6 @@ impl SinkConfig for S3SinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
