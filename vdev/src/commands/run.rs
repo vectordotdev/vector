@@ -10,11 +10,11 @@ use crate::{app::CommandExt as _, utils::features};
 #[command()]
 pub struct Cli {
     /// Build and run `vector` in debug mode (default)
-    #[arg(long, default_value_t = true)]
+    #[arg(long, conflicts_with = "release")]
     debug: bool,
 
     /// Build and run `vector` in release mode
-    #[arg(long)]
+    #[arg(long, conflicts_with = "debug")]
     release: bool,
 
     /// Name an additional feature to add to the build
@@ -38,7 +38,14 @@ impl Cli {
         features.extend(self.feature);
         let features = features.join(",");
         let mut command = Command::new("cargo");
-        command.args(["run", "--no-default-features", "--features", &features]);
+        command.args([
+            "run",
+            "--package",
+            "vector",
+            "--no-default-features",
+            "--features",
+            &features,
+        ]);
         if self.release {
             command.arg("--release");
         }

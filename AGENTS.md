@@ -63,7 +63,7 @@ After the task is complete run the following `make` commands to check for errors
 targets.
 
 1. Run `make fmt` to format your code.
-2. Run `make test SCOPE="<scope>"` to run tests. `<scope>` is a test filter passed to `cargo nextest`.
+2. Run the narrowest relevant tests using the minimum feature set as described below.
 
 ## Code change workflows and validation
 
@@ -71,26 +71,51 @@ targets.
 
 If you're working on Vector's Rust codebase:
 
-#### Running tests
+When building and running Vector with a configuration file, use `cargo vdev run <config>`. It
+automatically selects the minimum set of features required by the configuration, reducing compile
+times.
+
+Automatic feature selection does not support configuration providers, feature selectors, or VRL
+programs supplied through an environment variable or a `SECRET[...]` reference. It also does not
+apply YAML merge keys (`<<`). Use vanilla Cargo instead:
 
 ```bash
-# Run all tests
-make test
+# Environment variable interpolation
+cargo run -- --config path/to/config.yaml --dangerously-allow-env-var-interpolation
 
-# Target a single test
-make test SCOPE="test_some_function"
+# Secret substitution
+cargo run -- --config path/to/config.yaml
 
-# Filter to a specific package
-make test SCOPE="-p vector"
+# Configuration provider
+cargo run -- --config path/to/provider-config.yaml
 
+# YAML merge keys
+cargo run -- --config path/to/config-with-merge-keys.yaml
+```
+
+#### Running tests
+
+Start with the minimum feature set required by the configuration:
+
+```bash
+# Derive the required features and run the relevant tests
+cargo vdev test --config path/to/config.yaml test_some_function
+```
+
+If there is no configuration file, specify the relevant component feature directly:
+
+```bash
+make test FEATURES="sources-file" SCOPE="truncate"
+```
+
+Other testing methods, from targeted to broad:
+
+```bash
 # Use a nextest filter expression (note the quoting)
 make test SCOPE="-E 'test(foo) and not test(bar)'"
 
-# Run tests for a specific feature only
-make test FEATURES="sources-file"
-
-# Run tests matching a substring for a specific feature only
-make test FEATURES="sources-file" SCOPE="truncate"
+# Run all tests
+make test
 ```
 
 #### Running integration tests
