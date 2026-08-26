@@ -23,7 +23,7 @@ use crate::{
         Healthcheck,
         util::{
             BatchConfig, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, TowerRequestSettings, UriSerde,
+            TowerRequestConfig, TowerRequestSettings, UriSerde, uri::redact_unparsed_endpoint,
         },
     },
 };
@@ -114,18 +114,6 @@ pub struct ValidatedPostgres {
     endpoint_uri: UriSerde,
 }
 
-/// Redacts credentials from a PostgreSQL connection string for error messages.
-///
-/// SQLx accepts credentials embedded in the DSN (`postgres://user:secret@host/db`),
-/// and these must not be echoed back into validation output or CI logs.
-fn redact_endpoint(endpoint: &str) -> String {
-    if endpoint.contains('@') {
-        "<redacted endpoint>".to_owned()
-    } else {
-        endpoint.to_owned()
-    }
-}
-
 /// Validates the PostgreSQL connection string syntax without touching the
 /// network or filesystem.
 ///
@@ -136,14 +124,14 @@ fn validate_pg_endpoint(endpoint: &str) -> crate::Result<()> {
     let url = url::Url::parse(endpoint).map_err(|e| {
         format!(
             "invalid PostgreSQL connection string `{}`: {e}",
-            redact_endpoint(endpoint)
+            redact_unparsed_endpoint(endpoint)
         )
     })?;
     if !matches!(url.scheme(), "postgres" | "postgresql") {
         return Err(format!(
             "invalid PostgreSQL connection string `{}`: expected a \
              `postgres://` or `postgresql://` URL, got scheme `{}`",
-            redact_endpoint(endpoint),
+            redact_unparsed_endpoint(endpoint),
             url.scheme()
         )
         .into());
@@ -159,7 +147,7 @@ fn pg_connect_options(endpoint: &str) -> crate::Result<PgConnectOptions> {
     PgConnectOptions::from_str(endpoint).map_err(|e| {
         format!(
             "invalid PostgreSQL connection string `{}`: {e}",
-            redact_endpoint(endpoint)
+            redact_unparsed_endpoint(endpoint)
         )
         .into()
     })
@@ -315,6 +303,31 @@ mod tests {
         // not echo the credentials back into validation output.
         let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
             endpoint: "https://user:secret@example.com/db"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let err = cfg
+            .validate()
+            .expect_err("non-postgres URI should not validate as a postgres DSN");
+        let message = err.to_string();
+        assert!(
+            !message.contains("secret"),
+            "credentials must not leak into validation errors: {message}"
+        );
+        assert!(
+            message.contains("<redacted endpoint>"),
+            "unexpected error: {message}"
+        );
+    }
+
+    #[test]
+    fn validate_redacts_password_query_param_from_errors() {
+        use crate::config::ValidatedSink;
+
+        // SQLx also accepts the password as a `password` query parameter; a
+        // DSN carrying one must not echo it into validation errors.
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "https://example.com/db?password=secret"
             table: "mytable"
         "#})
         .unwrap();
