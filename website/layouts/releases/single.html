@@ -6,6 +6,9 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
+{{ $breaking := where ($release.changelog | default slice) "breaking" true }}
+{{ $breakingTitled := where $breaking "title" "ne" nil }}
+{{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "security" "security changes" "deprecation" "deprecations" "chore" "chore"}}
 {{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
@@ -27,9 +30,9 @@
     </div>
     {{ end }}
 
-    <div class="mt-6 admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-blue-400">
+    <div class="mt-6 admonition dark:prose-invert prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-blue-400">
       <div class="flex items-center">
-        <div class="flex-shrink-0">
+        <div class="shrink-0">
           <svg class="h-6 w-6 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
           </svg>
@@ -50,9 +53,9 @@
 
     {{ with $release.known_issues }}
     {{ if gt (len $release.known_issues) 0 }}
-    <div class="mt-4 admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
+    <div class="mt-4 admonition dark:prose-invert prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
       <div class="flex items-center">
-        <div class="flex-shrink-0">
+        <div class="shrink-0">
           <svg class="h-6 w-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
           </svg>
@@ -83,18 +86,42 @@
       {{ end }}
 
       {{ with $release.description }}
-      <div class="mt-8 prose dark:prose-dark max-w-none">
+      <div class="mt-8 prose dark:prose-invert max-w-none">
         {{ . | markdownify }}
       </div>
       {{ end }}
 
-      {{ partial "releases/deprecations.html" (dict "version" $version) }}
-
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
         </div>
+
+        {{ if and (gt (len $breakingTitled) 0) (gt (len $upgradeGuides) 0) }}
+        <div class="mt-6">
+          <div class="prose dark:prose-invert max-w-none">
+            {{ $numBreaking := len $breakingTitled }}
+            {{ $breakingWord := cond (eq $numBreaking 1) "breaking change" "breaking changes" }}
+            {{ $breakingHeading := printf "%d %s" $numBreaking $breakingWord }}
+            {{ partial "heading.html" (dict "text" $breakingHeading "level" 3 "icon" false) }}
+          </div>
+
+          <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
+            {{ range $breakingTitled }}
+            <li class="m-0 min-w-0 max-w-full">
+              <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="group block overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm transition hover:border-gray-300 hover:bg-gray-100/70 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800/40 dark:hover:border-gray-600 dark:hover:bg-gray-800/70 md:px-5">
+                <div class="prose dark:prose-invert max-w-none font-semibold text-dark group-hover:text-primary-dark dark:text-gray-100 dark:group-hover:text-primary [&>p]:m-0 [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+                  {{ .title | markdownify }}
+                </div>
+                <div class="mt-2 prose dark:prose-invert max-w-none leading-relaxed text-gray-600 dark:text-gray-300 [&>p]:m-0 [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+                  {{ .description | markdownify }}
+                </div>
+              </a>
+            </li>
+            {{ end }}
+          </ul>
+        </div>
+        {{ end }}
 
         <div class="mt-6 flex flex-col space-y-8">
           {{ range $orderedGroups }}
@@ -105,26 +132,27 @@
           {{ $numChanges := len $changes }}
           {{ $heading := printf "%d %s" $numChanges $value }}
           <div>
-            <div class="prose dark:prose-dark max-w-none">
+            <div class="prose dark:prose-invert max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
-            <ul class="prose dark:prose-dark list-disc ml-6">
+            <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
               {{ range $changes }}
-              <li>
-                  <span class="prose dark:prose-dark">
-                    {{ .description | markdownify }}
-                  </span>
+              <li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5">
+                <div class="prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+                  {{ .description | markdownify }}
+                </div>
                 {{ if gt (len .contributors) 0 }}
-                <br>
-                <span class="prose dark:prose-dark italic">
+                <div class="mt-3 overflow-x-auto border-t border-gray-200 pt-3 text-sm italic text-gray-600 dark:border-gray-700 dark:text-gray-300">
                   Thanks to
                   {{ $len := len .contributors }}
                   {{ range $i, $contributor := .contributors }}
-                    <a href="https://github.com/{{ replace $contributor "@" "" }}" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
+                    {{ $username := replace $contributor "@" "" }}
+                    {{ $profile := printf "https://github.com/%s" $username }}
+                    <a href="{{ $profile }}" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
                   {{ end }}
                   for contributing this change!
-                </span>
+                </div>
                 {{ end }}
               </li>
               {{ end }}
@@ -137,7 +165,7 @@
       {{ else }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
         </div>
 
@@ -150,7 +178,7 @@
           {{ $numCommits := len $commits }}
           {{ $heading := printf "%d %s" $numCommits $value }}
           <div class="ml-6">
-            <div class="prose dark:prose-dark max-w-none">
+            <div class="prose dark:prose-invert max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
@@ -170,11 +198,11 @@
       {{ with $release.vrl_changelog }}
       {{ if ne . "" }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
         </div>
 
-        <div class="mt-6 prose dark:prose-dark max-w-none">
+        <div class="vrl-changelog mt-6 prose dark:prose-invert max-w-none [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
           {{ . | markdownify }}
         </div>
       </div>
@@ -183,7 +211,7 @@
 
       {{ with $release.whats_next }}
       <div class="mt-8">
-        <span class="prose dark:prose-dark max-w-none">
+        <span class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
         </span>
 
@@ -194,7 +222,7 @@
               {{ .title }}
             </span>
 
-            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+            <div class="mt-2.5 prose dark:prose-invert max-w-none">
               {{ .description | markdownify }}
             </div>
           </div>
@@ -217,6 +245,7 @@
         </div>
       </div>
     </div>
+    {{ partial "releases/deprecations.html" (dict "version" $version) }}
   </main>
 
   <div class="hidden lg:block xl:col-span-1">
@@ -234,7 +263,7 @@
 <span class="flex items-center justify-between space-x-3">
   <span class="flex items-center space-x-3">
     {{/* Description */}}
-    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+    <span class="prose dark:prose-invert leading-snug shrink prose-sm">
       {{ .description | markdownify }}
     </span>
   </span>
@@ -252,7 +281,7 @@
     </span>
 
     {{/* Description */}}
-    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+    <span class="prose dark:prose-invert leading-snug shrink prose-sm">
       {{ .description | markdownify }}
     </span>
   </span>

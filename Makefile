@@ -283,7 +283,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch test-integration-opensearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
@@ -449,8 +449,9 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ve
 	$(VDEV) check events
 
 .PHONY: check-generated-docs
-check-generated-docs: generate-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+check-generated-docs: generate-docs ## Checks that machine-generated component docs and examples are up-to-date.
 	$(VDEV) check generated-docs
+	$(VDEV) check component-examples
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -539,8 +540,12 @@ generate-vector-vrl-docs: ## Generate VRL function documentation from Rust sourc
 generate-vrl-docs: ## Generate combined VRL function documentation for the website.
 	$(MAKE) -C website generate-vrl-docs
 
+.PHONY: generate-example-configs
+generate-example-configs: generate-component-docs ## Generate committed component configuration examples.
+	$(MAKE) -C website config-examples
+
 .PHONY: generate-docs
-generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs
+generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs generate-example-configs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

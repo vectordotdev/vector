@@ -1,3 +1,10 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with format_with expands to a must_use let binding"
+)]
+
+use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
@@ -11,6 +18,7 @@ use azure_core::{
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
 
 use bytes::Bytes;
+use derivative::Derivative;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -19,14 +27,16 @@ use vector_lib::{
     configurable::configurable_component,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     sensitive_string::SensitiveString,
-    stream::DriverResponse,
+    stream::{BatcherSettings, DriverResponse},
 };
 
 use super::request_builder::AzureBlobRequestOptions;
 use crate::{
-    Result,
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
+        SinkContext, ValidatedSink,
+    },
     event::{EventFinalizers, EventStatus, Finalizable},
     sinks::{
         Healthcheck, VectorSink,
@@ -43,7 +53,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -79,18 +89,24 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
+    ///
+    /// If you also configure the `tags` option, the SAS must include the
+    /// `Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
+    /// the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
+    /// uploads fail with an authorization error even when the health check still passes.
     #[configurable(metadata(
         docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
         resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
         connection strings secure and not expose them in logs, error messages, or version control systems."
     ))]
     #[configurable(metadata(
-        docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
+        docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net"
     ))]
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
     #[configurable(metadata(docs::examples = "AccountName=mylogstorage"))]
+    #[configurable(required_one_of = "azure_blob_credentials")]
     pub connection_string: Option<SensitiveString>,
 
     /// The Azure Blob Storage Account name.
@@ -98,6 +114,7 @@ pub struct AzureBlobSinkConfig {
     /// If provided, this will be used instead of the `connection_string`.
     /// This is useful for authenticating with an Azure credential.
     #[configurable(metadata(docs::examples = "mylogstorage"))]
+    #[configurable(required_one_of = "azure_blob_credentials")]
     pub(super) account_name: Option<String>,
 
     /// The Azure Blob Storage endpoint.
@@ -105,6 +122,7 @@ pub struct AzureBlobSinkConfig {
     /// If provided, this will be used instead of the `connection_string`.
     /// This is useful for authenticating with an Azure credential.
     #[configurable(metadata(docs::examples = "https://mylogstorage.blob.core.windows.net/"))]
+    #[configurable(required_one_of = "azure_blob_credentials")]
     pub(super) blob_endpoint: Option<String>,
 
     /// The Azure Blob Storage Account container name.
@@ -167,6 +185,43 @@ pub struct AzureBlobSinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
+    /// The set of [blob index tags][blob_index_tags] to apply to created blobs.
+    ///
+    /// Each entry becomes a tag in the `x-ms-tags` header. Azure limits blobs to 10 tags,
+    /// with restricted character sets for keys and values; the service rejects invalid
+    /// configurations.
+    ///
+    /// When authenticating with a shared access signature (SAS), the token must include the
+    /// `Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
+    /// authorization requirement to the `Put Blob` request that carries these tags, so without
+    /// it tagged uploads fail with an authorization error even when the health check still passes.
+    ///
+    /// When authenticating with an Azure credential (managed identity, workload identity, and so
+    /// on), the identity needs the
+    /// `Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write` RBAC action.
+    /// The least-privileged built-in role that grants it is *Storage Blob Data Owner*; the
+    /// *Storage Blob Data Contributor* role commonly sufficient for uploads does not include it.
+    ///
+    /// [blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
+    #[configurable(metadata(docs::additional_props_description = "A single tag."))]
+    #[configurable(metadata(docs::examples = "example_tags()"))]
+    #[serde(default)]
+    pub tags: Option<BTreeMap<String, String>>,
+
+    /// The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
+    ///
+    /// Each entry becomes an `x-ms-meta-{key}` header. Azure limits the total size of all
+    /// metadata and restricts key names to ASCII alphanumeric characters and underscores,
+    /// starting with a letter. Non-ASCII values must be Base64-encoded before being set.
+    /// The service rejects invalid configurations. See the [Azure documentation][blob_metadata]
+    /// for current limits.
+    ///
+    /// [blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
+    #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    pub metadata: Option<HashMap<String, String>>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
@@ -199,7 +254,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             auth: None,
-            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;").into()),
             account_name: None,
             blob_endpoint: None,
             container_name: String::from("logs"),
@@ -208,6 +263,8 @@ impl GenerateConfig for AzureBlobSinkConfig {
             blob_append_uuid: Some(true),
             encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::default()).into(),
             compression: Compression::gzip_default(),
+            tags: None,
+            metadata: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
@@ -218,10 +275,73 @@ impl GenerateConfig for AzureBlobSinkConfig {
     }
 }
 
+fn example_tags() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([
+        ("Project".to_string(), "Blue".to_string()),
+        ("Classification".to_string(), "confidential".to_string()),
+        ("PHI".to_string(), "True".to_string()),
+    ])
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
-    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct ValidatedAzureBlob {
+    // The connection string contains credentials (AccountKey / SAS token),
+    // so it is intentionally omitted from diagnostics.
+    #[derivative(Debug = "ignore")]
+    parsed_connection_string: ParsedConnectionString,
+    // The container URL may embed a SAS token as its query string, so it is
+    // rendered without the query.
+    #[derivative(Debug(format_with = "fmt_container_url"))]
+    container_url: Url,
+    batcher_settings: BatcherSettings,
+    blob_time_format: String,
+    blob_append_uuid: bool,
+    #[derivative(Debug(format_with = "fmt_confined_blob_prefix"))]
+    confined_blob_prefix: ConfinedTemplate,
+}
+
+/// Formats a container URL without its query string, so a SAS token embedded
+/// as a query parameter is not leaked into diagnostics.
+fn fmt_container_url(url: &Url, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let mut url = url.clone();
+    url.set_query(None);
+    fmt::Debug::fmt(&url, f)
+}
+
+/// Formats a confined template as its rendered string.
+fn fmt_confined_blob_prefix(
+    template: &ConfinedTemplate,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    fmt::Debug::fmt(&template.to_string(), f)
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AzureBlobSinkConfig {
+    type Validated = ValidatedAzureBlob;
+
+    fn validate(&self) -> crate::Result<ValidatedAzureBlob> {
         let connection_string: String = match (
             &self.connection_string,
             &self.account_name,
@@ -264,45 +384,35 @@ impl SinkConfig for AzureBlobSinkConfig {
             }
         };
 
-        let client = build_client(
-            self.auth.clone(),
-            connection_string.clone(),
-            self.container_name.clone(),
-            cx.proxy(),
-            self.tls.clone(),
-        )
-        .await?;
+        // Parse the resolved connection string and container URL up front.
+        // Token credential construction remains in `build`; the shared key
+        // policy is constructed here purely to validate the account key base64.
+        let parsed_connection_string = ParsedConnectionString::parse(&connection_string)
+            .map_err(|e| format!("Invalid connection string: {e}"))?;
+        // Reject the deterministic conflict between credentials implied by the
+        // connection string (SAS or Shared Key) and an explicit `auth`.
+        validate_auth_conflict(&parsed_connection_string.auth(), &self.auth)?;
+        // Force the base64 decode of a Shared Key account key during validation so
+        // malformed keys are rejected up front rather than at build time.
+        if let Auth::SharedKey {
+            account_name,
+            account_key,
+        } = parsed_connection_string.auth()
+        {
+            SharedKeyAuthorizationPolicy::new(
+                account_name,
+                account_key,
+                // Use an Azurite-supported storage service version
+                String::from("2025-11-05"),
+            )
+            .map_err(|e| format!("Failed to create SharedKey policy: {e}"))?;
+        }
+        let container_url = parsed_connection_string
+            .container_url(&self.container_name)
+            .map_err(|e| format!("Failed to build container URL: {e}"))?;
+        let container_url =
+            Url::parse(&container_url).map_err(|e| format!("Invalid container URL: {e}"))?;
 
-        let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
-        let sink = self.build_processor(client)?;
-        Ok((sink, healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type() & DataType::Log)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
-    }
-}
-
-const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
-const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
-const DEFAULT_FILENAME_APPEND_UUID: bool = true;
-
-impl AzureBlobSinkConfig {
-    pub fn build_processor(&self, client: Arc<BlobContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self.request.into_settings();
-        let service = ServiceBuilder::new()
-            .settings(request_limits, AzureBlobRetryLogic)
-            .service(AzureBlobService::new(client));
-
-        // Configure our partitioning/batching.
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         let blob_time_format = self
@@ -314,41 +424,123 @@ impl AzureBlobSinkConfig {
             .blob_append_uuid
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
-        let transformer = self.encoding.transformer();
+        let confined_blob_prefix = self.confined_blob_prefix()?;
+
+        Ok(ValidatedAzureBlob {
+            parsed_connection_string,
+            container_url,
+            batcher_settings,
+            blob_time_format,
+            blob_append_uuid,
+            confined_blob_prefix,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAzureBlob,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = build_client(
+            self.auth.clone(),
+            validated.parsed_connection_string.clone(),
+            validated.container_url.clone(),
+            cx.proxy(),
+            self.tls.clone(),
+        )
+        .await?;
+
+        let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
+        let sink = self.build_processor(client, validated)?;
+        Ok((sink, healthcheck))
+    }
+}
+
+const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
+const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
+const DEFAULT_FILENAME_APPEND_UUID: bool = true;
+
+impl AzureBlobSinkConfig {
+    pub fn build_processor(
+        &self,
+        client: Arc<BlobContainerClient>,
+        validated: &ValidatedAzureBlob,
+    ) -> crate::Result<VectorSink> {
+        let request_limits = self.request.into_settings();
+        let service = ServiceBuilder::new()
+            .settings(request_limits, AzureBlobRetryLogic)
+            .service(AzureBlobService::new(client));
+
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let request_options = AzureBlobRequestOptions {
             container_name: self.container_name.clone(),
-            blob_time_format,
-            blob_append_uuid,
-            encoder: (transformer, encoder),
+            blob_time_format: validated.blob_time_format.clone(),
+            blob_append_uuid: validated.blob_append_uuid,
+            encoder: (self.encoding.transformer(), encoder),
             compression: self.compression,
+            tags: self.tags.clone(),
+            metadata: self.metadata.clone(),
         };
 
         let sink = AzureBlobSink::new(
             service,
             request_options,
-            self.key_partitioner()?,
-            batcher_settings,
+            KeyPartitioner::new(validated.confined_blob_prefix.clone(), None),
+            validated.batcher_settings,
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        let tpl = self
-            .blob_prefix
-            .clone()
-            .confine(&self.confinement, Self::NAME, "blob_prefix")?;
+        let tpl = self.confined_blob_prefix()?;
         Ok(KeyPartitioner::new(tpl, None))
+    }
+
+    fn confined_blob_prefix(&self) -> crate::Result<ConfinedTemplate> {
+        self.blob_prefix
+            .clone()
+            .confine(&self.confinement, Self::NAME, "blob_prefix")
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::template::ConfinementConfig;
+    use crate::{
+        sinks::azure_common::config::SpecificAzureCredential, template::ConfinementConfig,
+    };
+
+    fn test_config(
+        connection_string: Option<&str>,
+        auth: Option<AzureAuthentication>,
+    ) -> AzureBlobSinkConfig {
+        AzureBlobSinkConfig {
+            auth,
+            connection_string: connection_string.map(|s| s.to_string().into()),
+            tags: None,
+            metadata: None,
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "my-logs".to_string(),
+            blob_prefix: "blob".try_into().unwrap(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+            compression: Compression::gzip_default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+            tls: None,
+            confinement: ConfinementConfig::default(),
+        }
+    }
 
     #[test]
     fn generate_config() {
@@ -392,6 +584,189 @@ mod tests {
             .insert(event_path!("tenant"), "../../escape");
         assert!(template.render_string(&event).is_err());
     }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        let config = AzureBlobSinkConfig {
+            auth: None,
+            connection_string: Some("AccountName=mylogstorage".to_string().into()),
+            tags: None,
+            metadata: None,
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "my-logs".to_string(),
+            blob_prefix: "blob".try_into().unwrap(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+            compression: Compression::gzip_default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+            tls: None,
+            confinement: ConfinementConfig::default(),
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.blob_time_format, "%s");
+        assert!(validated.blob_append_uuid);
+        assert_eq!(validated.confined_blob_prefix.to_string(), "blob");
+    }
+
+    #[test]
+    fn validated_debug_redacts_connection_string() {
+        let account_key = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+        let config = test_config(
+            Some(&format!(
+                "AccountName=mylogstorage;AccountKey={account_key}"
+            )),
+            None,
+        );
+        let validated = config.validate().expect("validation should succeed");
+        let debug = format!("{validated:?}");
+        assert!(
+            !debug.contains(account_key),
+            "Debug output must not leak the connection string: {debug}"
+        );
+    }
+
+    #[test]
+    fn validated_debug_redacts_sas_token() {
+        let sas_sig = "supersecretsignature";
+        let config = test_config(
+            Some(&format!(
+                "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=b&srt=sco&sp=rcw&se=2099-01-01T00:00:00Z&sig={sas_sig}"
+            )),
+            None,
+        );
+        let validated = config.validate().expect("validation should succeed");
+        let debug = format!("{validated:?}");
+        assert!(
+            !debug.contains(sas_sig),
+            "Debug output must not leak the SAS token: {debug}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_connection_string() {
+        let config = AzureBlobSinkConfig {
+            auth: None,
+            connection_string: Some("not-a-valid-connection-string".to_string().into()),
+            tags: None,
+            metadata: None,
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "my-logs".to_string(),
+            blob_prefix: "blob".try_into().unwrap(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::default(),
+            )
+                .into(),
+            compression: Compression::gzip_default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+            tls: None,
+            confinement: ConfinementConfig::default(),
+        };
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_connection_string_sas_with_auth() {
+        let config = test_config(
+            Some(
+                "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=b&srt=sco&sp=rcw&se=2099-01-01T00:00:00Z&sig=...",
+            ),
+            Some(AzureAuthentication::Specific(
+                SpecificAzureCredential::ManagedIdentity {
+                    user_assigned_managed_identity_id: None,
+                    user_assigned_managed_identity_id_type: None,
+                },
+            )),
+        );
+
+        let err = config.validate().expect_err("validation should fail");
+        assert!(
+            err.to_string()
+                .contains("Cannot use both SAS token and another Azure Authentication method"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_connection_string_shared_key_with_auth() {
+        let config = test_config(
+            Some(
+                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=base64key==;EndpointSuffix=core.windows.net",
+            ),
+            Some(AzureAuthentication::Specific(
+                SpecificAzureCredential::ManagedIdentity {
+                    user_assigned_managed_identity_id: None,
+                    user_assigned_managed_identity_id_type: None,
+                },
+            )),
+        );
+
+        let err = config.validate().expect_err("validation should fail");
+        assert!(
+            err.to_string()
+                .contains("Cannot use both Shared Key and another Azure Authentication method"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_connection_string_without_creds_with_auth() {
+        let config = test_config(
+            Some("AccountName=mylogstorage"),
+            Some(AzureAuthentication::Specific(
+                SpecificAzureCredential::ManagedIdentity {
+                    user_assigned_managed_identity_id: None,
+                    user_assigned_managed_identity_id_type: None,
+                },
+            )),
+        );
+
+        config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validate_accepts_connection_string_with_creds_without_auth() {
+        let config = test_config(
+            Some(
+                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=;EndpointSuffix=core.windows.net",
+            ),
+            None,
+        );
+
+        config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validate_rejects_invalid_base64_account_key() {
+        let config = test_config(
+            Some(
+                "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=base64key==;EndpointSuffix=core.windows.net",
+            ),
+            None,
+        );
+
+        let err = config.validate().expect_err("validation should fail");
+        assert!(
+            err.to_string()
+                .contains("Failed to create SharedKey policy"),
+            "unexpected error: {err}"
+        );
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -401,6 +776,10 @@ pub struct AzureBlobRequest {
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
     pub request_metadata: RequestMetadata,
+    /// Pre-encoded `x-ms-tags` header value (`k=v&k=v`), or `None` to omit the header.
+    pub tags: Option<String>,
+    /// Custom blob metadata. Each entry becomes an `x-ms-meta-{key}` header.
+    pub blob_metadata: Option<std::collections::HashMap<String, String>>,
 }
 
 impl Finalizable for AzureBlobRequest {
@@ -497,23 +876,44 @@ pub fn build_healthcheck(
     Ok(healthcheck.boxed())
 }
 
+/// Reject the deterministic conflict between credentials implied by the
+/// connection string (SAS or Shared Key) and an explicit `auth` configuration.
+///
+/// Pure structural check: no credential construction, no I/O, no async. Shared
+/// by `validate` and `build_client`.
+fn validate_auth_conflict(
+    parsed_auth: &Auth,
+    auth: &Option<AzureAuthentication>,
+) -> crate::Result<()> {
+    match (parsed_auth, auth) {
+        (Auth::Sas { .. }, Some(_)) => Err(
+            "Cannot use both SAS token and another Azure Authentication method at the same time"
+                .into(),
+        ),
+        (Auth::SharedKey { .. }, Some(_)) => Err(
+            "Cannot use both Shared Key and another Azure Authentication method at the same time"
+                .into(),
+        ),
+        _ => Ok(()),
+    }
+}
+
 pub async fn build_client(
     auth: Option<AzureAuthentication>,
-    connection_string: String,
-    container_name: String,
+    parsed: ParsedConnectionString,
+    url: Url,
     proxy: &crate::config::ProxyConfig,
     tls: Option<AzureBlobTlsConfig>,
 ) -> crate::Result<Arc<BlobContainerClient>> {
-    // Parse connection string without legacy SDK
-    let parsed = ParsedConnectionString::parse(&connection_string)
-        .map_err(|e| format!("Invalid connection string: {e}"))?;
-    // Compose container URL (SAS appended if present)
-    let container_url = parsed
-        .container_url(&container_name)
-        .map_err(|e| format!("Failed to build container URL: {e}"))?;
-    let url = Url::parse(&container_url).map_err(|e| format!("Invalid container URL: {e}"))?;
-
+    // The connection string and container URL were parsed and validated during
+    // `validate`; only credential construction remains here.
     let mut credential: Option<Arc<dyn TokenCredential>> = None;
+
+    // The deterministic conflict between connection-string-implied credentials
+    // and an explicit `auth` was already rejected during `validate`; re-check
+    // here so `build_client` stays safe when called directly (e.g. integration
+    // tests).
+    validate_auth_conflict(&parsed.auth(), &auth)?;
 
     // Prepare options; attach Shared Key policy if needed
     let mut options = BlobContainerClientOptions::default();
@@ -557,16 +957,10 @@ pub async fn build_client(
             credential = Some(credential_result);
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::Specific(..))) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both SAS token and another Azure Authentication method at the same time",
-            )));
+            unreachable!("connection string SAS + explicit auth rejected in validate")
         }
         (Auth::SharedKey { .. }, Some(AzureAuthentication::Specific(..))) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both Shared Key and another Azure Authentication method at the same time",
-            )));
+            unreachable!("connection string Shared Key + explicit auth rejected in validate")
         }
         #[cfg(test)]
         (Auth::None, Some(AzureAuthentication::MockCredential)) => {
@@ -575,10 +969,7 @@ pub async fn build_client(
         }
         #[cfg(test)]
         (_, Some(AzureAuthentication::MockCredential)) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both connection string auth and mock credential at the same time",
-            )));
+            unreachable!("connection string auth + mock credential rejected in validate")
         }
     }
 

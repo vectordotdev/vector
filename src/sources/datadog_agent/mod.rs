@@ -3,6 +3,7 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub mod llmobs;
 pub mod logs;
 pub mod metrics;
 pub mod traces;
@@ -74,6 +75,7 @@ use crate::{
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
+pub const LLMOBS: &str = "llmobs";
 
 /// Configuration for the `datadog_agent` source.
 #[configurable_component(source(
@@ -92,24 +94,25 @@ pub struct DatadogAgentConfig {
 
     /// If this is set to `true`, when incoming events contain a Datadog API key, it is
     /// stored in the event metadata and used if the event is sent to a Datadog sink.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
 
     /// If this is set to `true`, logs are not accepted by the component.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
     /// If this is set to `true`, metrics (beta) are not accepted by the component.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
     /// If this is set to `true`, traces (alpha) are not accepted by the component.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
+
+    /// If this is set to `true`, LLM Observability events are not accepted by the component.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_false")]
+    disable_llmobs: bool,
 
     /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
     ///
@@ -117,13 +120,11 @@ pub struct DatadogAgentConfig {
     /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
     /// If this is set to `true`, when log events contain the field `ddtags`, the string value that
     /// contains a list of key:value pairs set by the Agent is parsed and expanded into an array.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     parse_ddtags: bool,
 
@@ -131,7 +132,6 @@ pub struct DatadogAgentConfig {
     /// For example, `system.cpu.usage` would be split into namespace `system` and name `cpu.usage`.
     /// If `false`, the full metric name is used without splitting. This may be useful if you are using a
     /// default namespace for metrics in sinks connected to this source.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_true")]
     split_metric_namespace: bool,
 
@@ -184,6 +184,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
             multiple_outputs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
@@ -326,6 +327,50 @@ impl SourceConfig for DatadogAgentConfig {
             )
             .with_standard_vector_source_metadata();
 
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let llmobs_definition = schema::Definition::new_with_default_metadata(
+            Kind::object(
+                Collection::empty()
+                    .with_known("span_id", Kind::bytes())
+                    .with_known("trace_id", Kind::bytes())
+                    .with_known("parent_id", Kind::bytes().or_undefined())
+                    .with_known("name", Kind::bytes().or_undefined())
+                    .with_known("session_id", Kind::bytes().or_undefined())
+                    .with_known("service", Kind::bytes().or_undefined())
+                    .with_known("start_ns", Kind::integer().or_undefined())
+                    .with_known("duration", Kind::integer().or_undefined())
+                    .with_known("status", Kind::bytes().or_undefined())
+                    .with_known("status_message", Kind::bytes().or_undefined())
+                    .with_known("ml_app", Kind::bytes().or_undefined())
+                    .with_known("meta", Kind::object(Collection::any()).or_undefined())
+                    .with_known("metrics", Kind::object(Collection::any()).or_undefined())
+                    .with_known(
+                        "tags",
+                        Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    )
+                    .with_known("span_links", Kind::any().or_undefined())
+                    .with_known("config", Kind::any().or_undefined())
+                    .with_known("collection_errors", Kind::any().or_undefined())
+                    .with_known(
+                        "_dd",
+                        Kind::object(
+                            Collection::empty()
+                                .with_known("tracer_version", Kind::bytes().or_undefined()),
+                        )
+                        .or_undefined(),
+                    ),
+            ),
+            [log_namespace],
+        )
+        .with_source_metadata(
+            Self::NAME,
+            Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
+            &owned_value_path!("timestamp"),
+            Kind::timestamp(),
+            Some(meaning::TIMESTAMP),
+        )
+        .with_standard_vector_source_metadata();
+
         let mut output = Vec::with_capacity(1);
 
         if self.multiple_outputs {
@@ -337,6 +382,12 @@ impl SourceConfig for DatadogAgentConfig {
             }
             if !self.disable_traces {
                 output.push(SourceOutput::new_traces().with_port(TRACES))
+            }
+            if !self.disable_llmobs {
+                output.push(
+                    SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
+                        .with_port(LLMOBS),
+                )
             }
         } else {
             output.push(SourceOutput::new_maybe_logs(
@@ -464,10 +515,17 @@ impl DatadogAgentSource {
         }
 
         if !config.disable_metrics {
-            let metrics_filter = metrics::build_warp_filter(handler, self.clone());
+            let metrics_filter = metrics::build_warp_filter(handler.clone(), self.clone());
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
+        }
+
+        if !config.disable_llmobs {
+            let llmobs_filter = llmobs::build_warp_filter(handler.clone(), self.clone());
+            filters = filters
+                .map(|f| f.or(llmobs_filter.clone()).unify().boxed())
+                .or(Some(llmobs_filter));
         }
 
         filters.ok_or_else(|| "At least one of the supported data type shall be enabled".into())

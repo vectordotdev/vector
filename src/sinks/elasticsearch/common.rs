@@ -3,11 +3,10 @@ use http::{Response, StatusCode, Uri};
 use http_body::Body as _;
 use hyper::Body;
 use serde::Deserialize;
-use snafu::ResultExt;
 use vector_lib::config::{LogNamespace, proxy::ProxyConfig};
 
 use super::{
-    ElasticsearchApiVersion, ElasticsearchEncoder, InvalidHostSnafu, Request, VersionType,
+    ElasticsearchApiVersion, ElasticsearchEncoder, Request, VersionType,
     request_builder::ElasticsearchRequestBuilder,
 };
 use crate::{
@@ -18,7 +17,7 @@ use crate::{
             ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig,
             OpenSearchServiceType, ParseError,
         },
-        util::{UriSerde, auth::Auth, http::RequestConfig},
+        util::{HttpEndpoint, UriSerde, auth::Auth, http::RequestConfig},
     },
     tls::TlsSettings,
     transforms::metric_to_log::MetricToLog,
@@ -41,14 +40,11 @@ pub struct ElasticsearchCommon {
 impl ElasticsearchCommon {
     pub async fn parse_config(
         config: &ElasticsearchConfig,
-        endpoint: &str,
+        endpoint: &HttpEndpoint,
         proxy_config: &ProxyConfig,
         version: &mut Option<usize>,
     ) -> crate::Result<Self> {
-        // Test the configured host
-        Self::check_endpoint(endpoint)?;
-
-        let uri = endpoint.parse::<UriSerde>()?;
+        let uri = UriSerde::try_from(endpoint.as_uri().clone())?;
 
         // get auth from config or uri
         let auth = Self::extract_auth(config, proxy_config, &uri).await?;
@@ -224,20 +220,6 @@ impl ElasticsearchCommon {
             tls_settings,
             metric_to_log,
         })
-    }
-
-    fn check_endpoint(endpoint: &str) -> crate::Result<()> {
-        let uri = format!("{endpoint}/_test");
-        let uri = uri
-            .parse::<Uri>()
-            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
-        if uri.host().is_none() {
-            return Err(ParseError::HostMustIncludeHostname {
-                host: endpoint.to_string(),
-            }
-            .into());
-        }
-        Ok(())
     }
 
     // extract the authentication from config or endpoint

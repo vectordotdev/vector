@@ -1,0 +1,12 @@
+sources:
+  my_source_id:
+    type: prometheus_scrape
+    endpoints:
+      - http://localhost:9090/metrics
+    honor_labels: false
+    query:
+      match[]:
+        - '{job="somejob"}'
+        - '{__name__=~"job:.*"}'
+    scrape_interval_secs: 15
+    scrape_timeout_secs: 5.0

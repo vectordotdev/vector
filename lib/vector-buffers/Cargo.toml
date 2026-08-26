@@ -23,7 +23,6 @@ futures.workspace = true
 memmap2 = { version = "0.9.10", default-features = false }
 metrics.workspace = true
 num-traits = { version = "0.2.19", default-features = false }
-pastey.workspace = true
 rkyv = { version = "0.7.46", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde.workspace = true
 snafu.workspace = true
@@ -32,8 +31,6 @@ tokio = { workspace = true, features = ["rt", "macros", "rt-multi-thread", "sync
 tracing = { workspace = true, features = ["attributes"] }
 vector-config = { path = "../vector-config", default-features = false }
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
-dashmap.workspace = true
-ordered-float.workspace = true
 antithesis_sdk = { workspace = true, optional = true, features = ["full"] }
 serde_json = { workspace = true, optional = true }
 
@@ -53,7 +50,7 @@ quickcheck.workspace = true
 rand.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-temp-dir = "0.1.16"
+temp-dir = "0.2.0"
 tokio-test.workspace = true
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }

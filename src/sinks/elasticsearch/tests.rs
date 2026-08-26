@@ -14,7 +14,7 @@ use crate::{
             ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
             VersionType, sink::process_log,
         },
-        util::{auth::Auth, encoding::Encoder},
+        util::{HttpEndpoint, auth::Auth, encoding::Encoder},
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
@@ -43,7 +43,7 @@ async fn sets_create_action_when_configured() {
             version: None,
             version_type: VersionType::Internal,
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -86,7 +86,7 @@ async fn encoding_with_external_versioning_without_version_set_does_not_include_
             version_type: VersionType::External,
         },
         id_key: Some("my_id".into()),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -109,7 +109,7 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
             version_type: VersionType::External,
         },
         id_key: Some("my_id".into()),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -159,7 +159,7 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
             version_type: VersionType::ExternalGte,
         },
         id_key: Some("my_id".into()),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -242,7 +242,7 @@ async fn encode_datastream_mode() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
@@ -293,7 +293,7 @@ async fn encode_datastream_mode_no_routing() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             auto_routing: false,
@@ -345,7 +345,7 @@ async fn handle_metrics() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
     };
@@ -390,7 +390,7 @@ async fn decode_bulk_action_error() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
@@ -408,7 +408,7 @@ async fn decode_bulk_action_error() {
 #[tokio::test]
 async fn default_bulk_settings() {
     let config = ElasticsearchConfig {
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
@@ -423,7 +423,7 @@ async fn decode_bulk_action() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V7,
         ..Default::default()
     };
@@ -445,7 +445,7 @@ async fn encode_datastream_mode_no_sync() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             namespace: Template::try_from("something").unwrap(),
@@ -500,7 +500,7 @@ async fn allows_using_except_fields() {
         },
         encoding: Transformer::new(None, Some(vec!["idx".into(), "timestamp".into()]), None)
             .unwrap(),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
         // exercise field encoding rather than confinement.
@@ -538,7 +538,7 @@ async fn allows_using_only_fields() {
             ..Default::default()
         },
         encoding: Transformer::new(Some(vec!["foo".into()]), None, None).unwrap(),
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         api_version: ElasticsearchApiVersion::V6,
         // The `{{ idx }}` index has no literal prefix to confine to; opt out so the test can
         // exercise field encoding rather than confinement.
@@ -583,7 +583,7 @@ async fn datastream_index_name() {
             index: parse_template("vector"),
             ..Default::default()
         },
-        endpoints: vec![String::from("https://example.com")],
+        endpoints: vec![HttpEndpoint::parse("https://example.com").unwrap()],
         mode: ElasticsearchMode::DataStream,
         api_version: ElasticsearchApiVersion::V6,
         ..Default::default()
@@ -690,19 +690,14 @@ async fn datastream_index_name() {
 #[tokio::test]
 async fn test_parse_config_with_uri_auth() {
     let config = ElasticsearchConfig {
-        endpoints: vec!["http://user:pass@localhost:9200".to_string()],
+        endpoints: vec![HttpEndpoint::parse("http://user:pass@localhost:9200").unwrap()],
         ..Default::default()
     };
     let proxy = ProxyConfig::default();
     let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://user:pass@localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(
-        &config,
-        "http://user:pass@localhost:9200",
-        &proxy,
-        &mut version,
-    )
-    .await;
+    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
     assert!(result.is_ok());
     let common = result.unwrap();
 
@@ -735,15 +730,14 @@ async fn test_parse_config_with_config_auth() {
             user: "config_user".to_string(),
             password: SensitiveString::from("config_pass".to_string()),
         }),
-        endpoints: vec!["http://localhost:9200".to_string()],
+        endpoints: vec![HttpEndpoint::parse("http://localhost:9200").unwrap()],
         ..Default::default()
     };
     let proxy = ProxyConfig::default();
     let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://localhost:9200").unwrap();
 
-    let result =
-        ElasticsearchCommon::parse_config(&config, "http://localhost:9200", &proxy, &mut version)
-            .await;
+    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
     assert!(result.is_ok());
     let common = result.unwrap();
 
@@ -771,19 +765,14 @@ async fn test_parse_config_with_conflicting_auth() {
             user: "config_user".to_string(),
             password: SensitiveString::from("config_pass".to_string()),
         }),
-        endpoints: vec!["http://uri_user:uri_pass@localhost:9200".to_string()],
+        endpoints: vec![HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap()],
         ..Default::default()
     };
     let proxy = ProxyConfig::default();
     let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(
-        &config,
-        "http://uri_user:uri_pass@localhost:9200",
-        &proxy,
-        &mut version,
-    )
-    .await;
+    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
 
     // Should fail due to auth being specified in both places
     assert!(result.is_err());

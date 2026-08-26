@@ -40,7 +40,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
         DecoderFramedRead, StreamDecodingError,
-        decoding::{DeserializerConfig, FramingConfig},
+        decoding::{DecompressionConfig, Decompressor, DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
@@ -58,8 +58,8 @@ use crate::{
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
-        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
-        StreamClosedError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError,
+        KafkaPayloadDecompressionError, KafkaReadError, StreamClosedError,
     },
     kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -127,7 +127,6 @@ pub struct KafkaSourceConfig {
     /// The Kafka session timeout.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_session_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Session Timeout"))]
     session_timeout_ms: Duration,
@@ -143,14 +142,12 @@ pub struct KafkaSourceConfig {
     /// Default value is half of `session_timeout_ms`.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[configurable(metadata(docs::examples = 2500, docs::examples = 5000))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::human_name = "Drain Timeout"))]
     drain_timeout_ms: Option<u64>,
 
     /// Timeout for network requests.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 30000, docs::examples = 60000))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_socket_timeout_ms")]
     #[configurable(metadata(docs::human_name = "Socket Timeout"))]
     socket_timeout_ms: Duration,
@@ -158,7 +155,6 @@ pub struct KafkaSourceConfig {
     /// Maximum time the broker may wait to fill the response.
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::examples = 50, docs::examples = 100))]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_fetch_wait_max_ms")]
     #[configurable(metadata(docs::human_name = "Max Fetch Wait Time"))]
     fetch_wait_max_ms: Duration,
@@ -219,7 +215,6 @@ pub struct KafkaSourceConfig {
     ///
     /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     #[configurable(metadata(docs::examples = "example_librdkafka_options()"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::additional_props_description = "A librdkafka configuration option."
     ))]
@@ -228,8 +223,19 @@ pub struct KafkaSourceConfig {
     #[serde(flatten)]
     auth: kafka::KafkaAuthConfig,
 
+    /// Configuration for decompressing message payloads that were compressed by the producer.
+    ///
+    /// This applies to application-level compression, where the producer compressed each message
+    /// payload before sending it. Compression negotiated at the Kafka protocol level is handled
+    /// transparently by the underlying client library and does not require this option.
+    ///
+    /// Payloads are decompressed before `framing` and `decoding` are applied.
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    decompression: Option<DecompressionConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
@@ -330,6 +336,11 @@ impl SourceConfig for KafkaSourceConfig {
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
+        let decompressor = self
+            .decompression
+            .as_ref()
+            .map(DecompressionConfig::build)
+            .transpose()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         if let Some(d) = self.drain_timeout_ms {
@@ -349,6 +360,7 @@ impl SourceConfig for KafkaSourceConfig {
             consumer,
             callback_rx,
             decoder,
+            decompressor,
             cx.out,
             cx.shutdown,
             false,
@@ -424,6 +436,7 @@ async fn kafka_source(
     consumer: StreamConsumer<KafkaSourceContext>,
     callback_rx: UnboundedReceiver<KafkaCallback>,
     decoder: Decoder,
+    decompressor: Option<Decompressor>,
     out: SourceSender,
     shutdown: ShutdownSignal,
     eof: bool,
@@ -453,8 +466,14 @@ async fn kafka_source(
         let drain_timeout_ms = config
             .drain_timeout_ms
             .map_or(config.session_timeout_ms / 2, Duration::from_millis);
-        let consumer_state =
-            ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace, span);
+        let consumer_state = ConsumerStateInner::<Consuming>::new(
+            config,
+            decoder,
+            decompressor,
+            out,
+            log_namespace,
+            span,
+        );
         crate::spawn_in_current_span(async move {
             coordinate_kafka_callbacks(
                 consumer,
@@ -501,6 +520,7 @@ async fn kafka_source(
 struct ConsumerStateInner<S> {
     config: KafkaSourceConfig,
     decoder: Decoder,
+    decompressor: Option<Decompressor>,
     out: SourceSender,
     log_namespace: LogNamespace,
     consumer_state: S,
@@ -562,6 +582,7 @@ impl ConsumerStateInner<Consuming> {
     const fn new(
         config: KafkaSourceConfig,
         decoder: Decoder,
+        decompressor: Option<Decompressor>,
         out: SourceSender,
         log_namespace: LogNamespace,
         span: Span,
@@ -569,6 +590,7 @@ impl ConsumerStateInner<Consuming> {
         Self {
             config,
             decoder,
+            decompressor,
             out,
             log_namespace,
             consumer_state: Consuming { span },
@@ -590,6 +612,7 @@ impl ConsumerStateInner<Consuming> {
     ) -> (oneshot::Sender<()>, tokio::task::AbortHandle) {
         let keys = self.config.keys();
         let decoder = self.decoder.clone();
+        let decompressor = self.decompressor.clone();
         let log_namespace = self.log_namespace;
         let mut out = self.out.clone();
 
@@ -651,7 +674,7 @@ impl ConsumerStateInner<Consuming> {
                                 topic: msg.topic(),
                                 partition: msg.partition(),
                             });
-                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
+                            parse_message(msg, decoder.clone(), decompressor.as_ref(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
                         }
                     },
                 )
@@ -674,6 +697,7 @@ impl ConsumerStateInner<Consuming> {
         let draining = ConsumerStateInner {
             config: self.config,
             decoder: self.decoder,
+            decompressor: self.decompressor,
             out: self.out,
             log_namespace: self.log_namespace,
             consumer_state: Draining::new(sig, shutdown, self.consumer_state.span),
@@ -724,6 +748,7 @@ impl ConsumerStateInner<Draining> {
                 ConsumerState::Consuming(ConsumerStateInner {
                     config: self.config,
                     decoder: self.decoder,
+                    decompressor: self.decompressor,
                     out: self.out,
                     log_namespace: self.log_namespace,
                     consumer_state: Consuming {
@@ -948,16 +973,18 @@ fn drive_kafka_consumer(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn parse_message(
     msg: BorrowedMessage<'_>,
     decoder: Decoder,
+    decompressor: Option<&Decompressor>,
     keys: &'_ Keys,
     out: &mut SourceSender,
     acknowledgements: bool,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     log_namespace: LogNamespace,
 ) {
-    if let Some((count, stream)) = parse_stream(&msg, decoder, keys, log_namespace) {
+    if let Some((count, stream)) = parse_stream(&msg, decoder, decompressor, keys, log_namespace) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
         let mut stream = stream.map(|event| {
             // All acknowledgements flow through the normal Finalizer stream so
@@ -989,6 +1016,7 @@ async fn parse_message(
 fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
     decoder: Decoder,
+    decompressor: Option<&Decompressor>,
     keys: &'a Keys,
     log_namespace: LogNamespace,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a + use<'a>)> {
@@ -996,9 +1024,28 @@ fn parse_stream<'a>(
 
     let rmsg = ReceivedMessage::from(msg);
 
-    let payload = Cursor::new(Bytes::copy_from_slice(payload));
+    let payload = match decompressor {
+        Some(decompressor) => match decompressor.decompress(payload) {
+            Ok(decompressed) => Bytes::from(decompressed),
+            Err(error) => {
+                emit!(KafkaPayloadDecompressionError {
+                    error: &error,
+                    topic: msg.topic(),
+                    partition: msg.partition(),
+                    offset: msg.offset(),
+                });
+                // Skip messages that cannot be decompressed, but still return an (empty) stream to commit the offset.
+                // Decompression failures are generally deterministic, so redelivery doesn't help.
+                return Some((0, futures::stream::empty().boxed()));
+            }
+        },
+        None => Bytes::copy_from_slice(payload),
+    };
 
-    let mut stream = DecoderFramedRead::with_capacity(payload, decoder, msg.payload_len());
+    let payload_len = payload.len();
+    let payload = Cursor::new(payload);
+
+    let mut stream = DecoderFramedRead::with_capacity(payload, decoder, payload_len);
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
@@ -1409,6 +1456,45 @@ mod test {
         crate::test_util::test_generate_config::<KafkaSourceConfig>();
     }
 
+    #[test]
+    fn parses_decompression_config() {
+        let config: KafkaSourceConfig = toml::from_str(
+            r#"
+            bootstrap_servers = "localhost:9092"
+            topics = ["topic"]
+            group_id = "group"
+
+            [decompression]
+            algorithm = "zstd"
+            dictionary_path = "/etc/vector/compression.dict"
+            "#,
+        )
+        .unwrap();
+
+        let decompression = config.decompression.expect("decompression should be set");
+        assert_eq!(
+            decompression.algorithm,
+            vector_lib::codecs::DecompressionAlgorithm::Zstd
+        );
+        assert_eq!(
+            decompression.dictionary_path,
+            Some(std::path::PathBuf::from("/etc/vector/compression.dict"))
+        );
+    }
+
+    #[test]
+    fn decompression_config_is_optional() {
+        let config: KafkaSourceConfig = toml::from_str(
+            r#"
+            bootstrap_servers = "localhost:9092"
+            topics = ["topic"]
+            group_id = "group"
+            "#,
+        )
+        .unwrap();
+        assert!(config.decompression.is_none());
+    }
+
     pub(super) fn make_config(
         topic: &str,
         group: &str,
@@ -1701,6 +1787,140 @@ mod integration_test {
         send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
     }
 
+    fn train_test_dictionary() -> Vec<u8> {
+        let samples: Vec<Vec<u8>> = (0..100)
+            .map(|i| format!("{TEXT} sample {i:04}").into_bytes())
+            .collect();
+        zstd::dict::from_samples(&samples, 4 * 1024).expect("failed to train dictionary")
+    }
+
+    fn write_test_dictionary(dictionary: &[u8]) -> tempfile::NamedTempFile {
+        let file = tempfile::NamedTempFile::new().expect("failed to create dictionary file");
+        std::fs::write(file.path(), dictionary).expect("failed to write dictionary");
+        file
+    }
+
+    /// Produces `count` messages whose payloads are compressed with `dictionary`, except for the
+    /// message at `corrupt_index`, whose payload is not valid zstd data.
+    async fn send_dictionary_compressed_events(
+        topic: &str,
+        dictionary: &[u8],
+        count: usize,
+        corrupt_index: usize,
+    ) {
+        create_topic(topic, 1).await;
+
+        let mut compressor = zstd::bulk::Compressor::with_dictionary(3, dictionary)
+            .expect("failed to create compressor");
+        let producer: &FutureProducer = &client_config(None);
+        for i in 0..count {
+            let text = format!("{TEXT} {i:03}");
+            let payload = if i == corrupt_index {
+                b"definitely not zstd".to_vec()
+            } else {
+                compressor
+                    .compress(text.as_bytes())
+                    .expect("failed to compress payload")
+            };
+            let key = format!("{KEY} {i}");
+            let record = FutureRecord::to(topic).payload(&payload).key(&key);
+            if let Err(error) = producer.send(record, Timeout::Never).await {
+                panic!("Cannot send event to Kafka: {error:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn consumes_zstd_dictionary_compressed_payloads() {
+        const SEND_COUNT: usize = 5;
+        const CORRUPT_INDEX: usize = 2;
+
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+
+        let dictionary = train_test_dictionary();
+        let dictionary_file = write_test_dictionary(&dictionary);
+
+        let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
+        config.decompression = Some(DecompressionConfig {
+            algorithm: vector_lib::codecs::DecompressionAlgorithm::Zstd,
+            dictionary_path: Some(dictionary_file.path().to_path_buf()),
+        });
+
+        // Produce messages whose payloads are compressed with the dictionary, plus one corrupt
+        // payload that must be skipped without stalling the partition.
+        send_dictionary_compressed_events(&topic, &dictionary, SEND_COUNT, CORRUPT_INDEX).await;
+
+        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, false, false, LogNamespace::Legacy);
+            let events = collect_n(rx, SEND_COUNT - 1).await;
+            tokio::task::yield_now().await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        })
+        .await;
+
+        assert_eq!(events.len(), SEND_COUNT - 1);
+        let messages: HashSet<String> = events
+            .iter()
+            .map(|event| {
+                event.as_log()[log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        let expected: HashSet<String> = (0..SEND_COUNT)
+            .filter(|i| *i != CORRUPT_INDEX)
+            .map(|i| format!("{TEXT} {i:03}"))
+            .collect();
+        assert_eq!(messages, expected);
+    }
+
+    #[tokio::test]
+    async fn advances_offset_past_poison_messages() {
+        const SEND_COUNT: usize = 5;
+
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+
+        let dictionary = train_test_dictionary();
+        let dictionary_file = write_test_dictionary(&dictionary);
+
+        let mut opts = HashMap::new();
+        opts.insert("enable.partition.eof".into(), "true".into());
+        let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts));
+        config.decompression = Some(DecompressionConfig {
+            algorithm: vector_lib::codecs::DecompressionAlgorithm::Zstd,
+            dictionary_path: Some(dictionary_file.path().to_path_buf()),
+        });
+
+        // Corrupt message is last on the partition to ensure a later good message doesn't commit past it.
+        send_dictionary_compressed_events(&topic, &dictionary, SEND_COUNT, SEND_COUNT - 1).await;
+
+        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
+            let (tx, rx) = SourceSender::new_test_errors(|_| false);
+            let (trigger_shutdown, shutdown_done) =
+                spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
+            // With `eof` enabled the source exits by itself once the partition is fully consumed.
+            let events = rx.collect::<Vec<Event>>().await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        })
+        .await;
+
+        assert_eq!(events.len(), SEND_COUNT - 1);
+        assert_eq!(
+            fetch_tpl_offset(&group_id, &topic, 0),
+            Offset::from_raw(SEND_COUNT as i64)
+        );
+    }
+
     async fn send_receive(
         acknowledgements: bool,
         error_at: impl Fn(usize) -> bool,
@@ -1845,6 +2065,13 @@ mod integration_test {
         .build()
         .unwrap();
 
+        let decompressor = config
+            .decompression
+            .as_ref()
+            .map(DecompressionConfig::build)
+            .transpose()
+            .unwrap();
+
         let (consumer, callback_rx) = create_consumer(&config, acknowledgements).unwrap();
 
         tokio::spawn(kafka_source(
@@ -1852,6 +2079,7 @@ mod integration_test {
             consumer,
             callback_rx,
             decoder,
+            decompressor,
             out,
             shutdown,
             eof,

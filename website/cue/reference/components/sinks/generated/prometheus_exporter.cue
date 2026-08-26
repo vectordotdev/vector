@@ -272,6 +272,10 @@ generated: components: sinks: prometheus_exporter: configuration: {
 			considered expired and is removed.
 
 			Be sure to configure this value higher than your client’s scrape interval.
+
+			Set to `0` to disable expiration entirely. Metrics will then accumulate for as long as the
+			sink runs, which can result in unbounded memory growth if metric series cardinality is
+			unbounded.
 			"""
 		required: false
 		type: uint: {

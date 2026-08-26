@@ -381,7 +381,7 @@ generated: components: sinks: doris: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -767,11 +767,8 @@ generated: components: sinks: doris: configuration: {
 			The endpoint must contain an HTTP scheme, and may specify a
 			hostname or IP address and port.
 			"""
-		required: false
-		type: array: {
-			default: []
-			items: type: string: examples: ["http://127.0.0.1:8030"]
-		}
+		required: true
+		type: array: items: type: string: examples: ["http://127.0.0.1:8030"]
 	}
 	framing: {
 		description: "Framing configuration."
@@ -870,7 +867,7 @@ generated: components: sinks: doris: configuration: {
 		type: string: {
 			default: "vector"
 			examples: [
-				"vector",
+				"vector"
 			]
 		}
 	}
