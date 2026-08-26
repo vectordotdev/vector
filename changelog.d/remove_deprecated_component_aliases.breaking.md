@@ -1,4 +1,4 @@
-# Remove deprecated component aliases {#remove-deprecated-component-aliases}
+# Remove `http` source and `greptimedb` sink deprecated component aliases {#remove-deprecated-component-aliases}
 
 ## Summary
 
