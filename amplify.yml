@@ -45,7 +45,7 @@ applications:
         preBuild:
           commands:
             - mkdir -p ./public
-            - bash ../scripts/environment/install-protoc.sh "$HOME/.local/bin"
+            - bash ../scripts/environment/prepare.sh --modules=rustup,protoc
         build:
           commands:
             - export PATH="$HOME/.local/bin:$PATH"
