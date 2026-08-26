@@ -11,6 +11,7 @@ use serde::{
 use vector_config::configurable_component;
 use vector_lib::{
     TimeZone, compile_vrl,
+    enrichment::TableRegistry,
     event::{Event, LogEvent, MetricTagMode, VrlTarget},
     lookup::OwnedTargetPath,
     sensitive_string::SensitiveString,
@@ -175,6 +176,14 @@ impl HttpServerAuthConfig {
                 Ok(HttpServerAuthMatcher::Vrl { program })
             }
         }
+    }
+
+    /// Validates the auth configuration without a runtime context, compiling any
+    /// custom VRL program with empty registries so `vector validate --no-environment`
+    /// catches syntax/result-type errors.
+    pub fn validate(&self) -> crate::Result<()> {
+        self.build(&TableRegistry::default(), &MetricsStorage::default())
+            .map(|_| ())
     }
 }
 
