@@ -24,6 +24,7 @@ use crate::{
     sinks::prelude::*,
     sinks::util::{
         BatchConfig, Compression,
+        buffer::compression::CompressionLevel,
         encoding::Encoder as _,
         request_builder::{EncodeResult, RequestBuilder},
     },
@@ -1212,6 +1213,89 @@ fn azure_blob_append_blob_stable_name_without_uuid_and_time() {
         "append blob without UUID and time format must produce a stable key"
     );
     assert_eq!(key1, "logs/app.log");
+}
+
+/// An append blob holds one independently compressed stream per flush, so payloads produced with
+/// different algorithms must never land in the same blob — the blob's `Content-Encoding` is set once,
+/// at creation. The compression extension is part of the blob name, so a `compression` change rotates
+/// the name instead of mixing formats. Only a level change inside one algorithm keeps the name, and
+/// those streams concatenate (multi-member gzip, multi-frame zstd).
+#[test]
+fn azure_blob_append_blob_compression_change_rotates_blob_name() {
+    let container_name = String::from("logs");
+    let sink_config = AzureBlobSinkConfig {
+        blob_prefix: "logs/app".try_into().unwrap(),
+        container_name: container_name.clone(),
+        ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+    };
+
+    // The naming that makes the hazard possible at all: one stable blob per partition.
+    let make_key = |compression: Compression| {
+        let log = Event::Log(LogEvent::from("test message"));
+        let key = sink_config
+            .key_partitioner()
+            .unwrap()
+            .partition(&log)
+            .expect("key wasn't provided");
+
+        let request_options = AzureBlobRequestOptions {
+            container_name: container_name.clone(),
+            blob_time_format: "".to_string(),
+            blob_append_uuid: false,
+            blob_type: AzureBlobType::Append,
+            encoder: (
+                Default::default(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoder::default().into(),
+                    TextSerializerConfig::default().build().into(),
+                ),
+            ),
+            compression,
+            tags: None,
+            metadata: None,
+        };
+
+        let mut byte_size = GroupedCountByteSize::new_untagged();
+        byte_size.add_event(&log, log.estimated_json_encoded_size_of());
+
+        let (metadata, request_metadata_builder, _events) =
+            request_options.split_input((key, vec![log]));
+        let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
+        let request_metadata = request_metadata_builder.build(&payload);
+        request_options
+            .build_request(metadata, request_metadata, payload)
+            .metadata
+            .partition_key
+    };
+
+    let keys = [
+        Compression::None,
+        Compression::gzip_default(),
+        Compression::zlib_default(),
+        Compression::zstd_default(),
+        Compression::Snappy,
+    ]
+    .map(make_key);
+
+    assert_eq!(
+        keys,
+        [
+            "logs/app.log",
+            "logs/app.log.gz",
+            "logs/app.log.zz",
+            "logs/app.log.zst",
+            "logs/app.log.snappy",
+        ]
+        .map(String::from),
+        "every compression algorithm must target its own blob, so switching algorithms cannot \
+         append a format the existing blob's Content-Encoding does not describe"
+    );
+
+    assert_eq!(
+        make_key(Compression::Gzip(CompressionLevel::Fast)),
+        make_key(Compression::Gzip(CompressionLevel::Best)),
+        "a level change stays in the same blob, which is safe: gzip members concatenate"
+    );
 }
 
 #[test]
