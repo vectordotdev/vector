@@ -1,4 +1,9 @@
-use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
+use std::fmt;
+
+use async_nats::jetstream::{
+    consumer::pull::Stream as PullConsumerStream,
+    message::{AckKind, Acker},
+};
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::ResultExt;
@@ -6,6 +11,8 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
     config::{LegacyKey, LogNamespace},
+    finalization::BatchStatus,
+    finalizer::UnorderedFinalizer,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, EventsReceived, EventsReceivedHandle,
         InternalEventHandle as _, Protocol,
@@ -16,11 +23,19 @@ use vector_lib::{
 use crate::{
     SourceSender,
     codecs::Decoder,
-    event::Event,
+    event::{BatchNotifier, Event},
     internal_events::StreamClosedError,
     shutdown::ShutdownSignal,
     sources::nats::config::{BuildError, NatsSourceConfig, SubscribeSnafu},
 };
+
+struct FinalizerEntry(Acker);
+
+impl fmt::Debug for FinalizerEntry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("FinalizerEntry").finish()
+    }
+}
 
 /// The outcome of processing a single NATS message.
 pub enum ProcessingStatus {
@@ -42,6 +57,7 @@ pub async fn process_message(
     log_namespace: LogNamespace,
     out: &mut SourceSender,
     events_received: &EventsReceivedHandle,
+    batch: &Option<BatchNotifier>,
 ) -> ProcessingStatus {
     let mut framed = DecoderFramedRead::new(msg.payload.as_ref(), decoder.clone());
     let mut success = true;
@@ -77,7 +93,7 @@ pub async fn process_message(
                             msg.subject.as_str(),
                         );
                     }
-                    event
+                    event.with_batch_notifier_option(batch)
                 });
 
                 if out.send_batch(events).await.is_err() {
@@ -103,6 +119,7 @@ pub async fn process_message(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_nats_jetstream(
     config: NatsSourceConfig,
     _connection: async_nats::Client,
@@ -111,41 +128,81 @@ pub async fn run_nats_jetstream(
     log_namespace: LogNamespace,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
+    acknowledgements: bool,
 ) -> Result<(), ()> {
+    let (finalizer, mut ack_stream) =
+        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     let mut message_stream = stream.take_until(shutdown);
 
-    while let Some(Ok(msg)) = message_stream.next().await {
-        bytes_received.emit(ByteSize(msg.payload.len()));
-
-        let status = process_message(
-            &msg,
-            &config,
-            &decoder,
-            log_namespace,
-            &mut out,
-            &events_received,
-        )
-        .await;
-
-        match status {
-            ProcessingStatus::Success => {
-                // Message processed successfully, acknowledge it.
-                if let Err(err) = msg.ack().await {
-                    error!(message = "Failed to acknowledge JetStream message.", %err);
+    loop {
+        tokio::select! {
+            entry = ack_stream.next() => {
+                if let Some((status, entry)) = entry {
+                    handle_ack(status, entry).await;
                 }
-            }
-            ProcessingStatus::Failed => {
-                // Do not acknowledge on failure; the message will be redelivered.
-            }
-            ProcessingStatus::ChannelClosed => {
-                // Downstream channel is closed, shut down the source.
-                return Err(());
-            }
+            },
+            message = message_stream.next() => match message {
+                Some(Ok(msg)) => {
+                    bytes_received.emit(ByteSize(msg.payload.len()));
+                    let (batch, receiver) =
+                        BatchNotifier::maybe_new_with_receiver(acknowledgements);
+
+                    let status = process_message(
+                        &msg,
+                        &config,
+                        &decoder,
+                        log_namespace,
+                        &mut out,
+                        &events_received,
+                        &batch,
+                    )
+                    .await;
+
+                    match status {
+                        ProcessingStatus::Success => match receiver {
+                            Some(receiver) => {
+                                let (_, acker) = msg.split();
+                                finalizer
+                                    .as_ref()
+                                    .expect("Finalizer must exist when acknowledgements are enabled")
+                                    .add(FinalizerEntry(acker), receiver);
+                            }
+                            None => {
+                                if let Err(error) = msg.ack().await {
+                                    error!(message = "Failed to acknowledge JetStream message.", %error);
+                                }
+                            }
+                        },
+                        ProcessingStatus::Failed => {
+                            // Do not acknowledge on failure; the message will be redelivered.
+                        }
+                        ProcessingStatus::ChannelClosed => {
+                            // Downstream channel is closed, shut down the source.
+                            return Err(());
+                        }
+                    }
+                }
+                Some(Err(error)) => {
+                    error!(message = "Failed to read JetStream message.", %error);
+                }
+                None => break,
+            },
         }
     }
     Ok(())
+}
+
+async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
+    let result = match status {
+        BatchStatus::Delivered => entry.0.ack().await,
+        BatchStatus::Errored | BatchStatus::Rejected => entry.0.ack_with(AckKind::Nak(None)).await,
+    };
+
+    if let Err(error) = result {
+        error!(message = "Failed to acknowledge JetStream message.", %error);
+    }
 }
 
 pub async fn run_nats_core(
@@ -182,6 +239,7 @@ pub async fn run_nats_core(
                             log_namespace,
                             &mut out,
                             &events_received,
+                            &None,
                         )
                         .await;
 
