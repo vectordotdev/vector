@@ -1,1 +1,1 @@
-{"type":"record","name":"test","fields":[{"name":"timestamp_micros_field","type":"long","logicalType":"timestamp-micros"}]}
+{"type":"record","name":"test","fields":[{"name":"timestamp_micros_field","type":{"type":"long","logicalType":"timestamp-micros"}}]}

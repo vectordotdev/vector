@@ -287,7 +287,7 @@ fn generate_avro_test_case_date() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "date_field", "type": "int", "logicalType": "date"}
+            {"name": "date_field", "type": {"type": "int", "logicalType": "date"}}
         ]
     }
     "#;
@@ -306,7 +306,7 @@ fn generate_avro_test_case_decimal_var() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "decimal_var_field", "type": "bytes", "logicalType": "decimal","precision": 10,"scale": 3}
+            {"name": "decimal_var_field", "type": {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 3}}
         ]
     }
     "#;
@@ -327,7 +327,7 @@ fn generate_avro_test_case_time_millis() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "time_millis_field", "type": "int", "logicalType": "time-millis"}
+            {"name": "time_millis_field", "type": {"type": "int", "logicalType": "time-millis"}}
         ]
     }
     "#;
@@ -347,7 +347,7 @@ fn generate_avro_test_case_time_micros() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "time_micros_field", "type": "long", "logicalType": "time-micros"}
+            {"name": "time_micros_field", "type": {"type": "long", "logicalType": "time-micros"}}
         ]
     }
     "#;
@@ -367,7 +367,7 @@ fn generate_avro_test_case_timestamp_millis() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "timestamp_millis_field", "type": "long", "logicalType": "timestamp-millis"}
+            {"name": "timestamp_millis_field", "type": {"type": "long", "logicalType": "timestamp-millis"}}
         ]
     }
     "#;
@@ -387,7 +387,7 @@ fn generate_avro_test_case_timestamp_micros() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "timestamp_micros_field", "type": "long", "logicalType": "timestamp-micros"}
+            {"name": "timestamp_micros_field", "type": {"type": "long", "logicalType": "timestamp-micros"}}
         ]
     }
     "#;
@@ -407,7 +407,7 @@ fn generate_avro_test_case_local_timestamp_millis() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "local_timestamp_millis_field", "type": "long", "logicalType": "local-timestamp-millis"}
+            {"name": "local_timestamp_millis_field", "type": {"type": "long", "logicalType": "local-timestamp-millis"}}
         ]
     }
     "#;
@@ -427,7 +427,7 @@ fn generate_avro_test_case_local_timestamp_micros() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "local_timestamp_micros_field", "type": "long", "logicalType": "local-timestamp-micros"}
+            {"name": "local_timestamp_micros_field", "type": {"type": "long", "logicalType": "local-timestamp-micros"}}
         ]
     }
     "#;
@@ -447,9 +447,7 @@ fn generate_avro_test_case_uuid() -> Result<()> {
         "type": "record",
         "name": "test",
         "fields": [
-            {"name": "uuid_field", "type": "string",
-              "logicalType": "uuid"
-            }
+            {"name": "uuid_field", "type": {"type": "string", "logicalType": "uuid"}}
         ]
     }
     "#;
