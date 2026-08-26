@@ -5,11 +5,9 @@ use std::{
     fs,
     path::Path,
     process::Command,
-    sync::LazyLock,
 };
 
 use anyhow::{Context, Result, bail};
-use regex::Regex;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -62,16 +60,14 @@ const ALWAYS_COMPILED_FEATURES: &[&str] = &[
     "secrets-file",
     "secrets-test",
 ];
-const VRL_FUNCTION_FEATURES: &[&str] = &[
+const VRL_FEATURES: &[&str] = &[
+    "sources-dnstap",
     "vrl-functions-crypto",
     "vrl-functions-env",
     "vrl-functions-network",
     "vrl-functions-system",
 ];
-const DYNAMIC_SELECTOR_KEYS: &[&str] = &["type", "codec", "sasl.mechanism", "sasl.mechanisms"];
 const VRL_DISCRIMINATORS: &[(&str, &str)] = &[("type", "vrl"), ("codec", "vrl")];
-const VRL_PROGRAM_KEYS: &[&str] = &["source", "value"];
-const TRANSFORM_PROGRAM_KEYS: &[&str] = &["source", "condition"];
 const KAFKA_OPTIONS_KEY: &str = "librdkafka_options";
 const KAFKA_GSSAPI_KEYS: &[&str] = &["sasl.mechanism", "sasl.mechanisms"];
 const KAFKA_GSSAPI_VALUE: &str = "GSSAPI";
@@ -82,20 +78,9 @@ const STRATEGY_KEY: &str = "strategy";
 const CUSTOM_STRATEGY: &str = "custom";
 const CONDITION_KEY: &str = "condition";
 const SOURCE_KEY: &str = "source";
-const DNSTAP_FUNCTION: &str = "parse_dnstap";
-const DNSTAP_FEATURE: &str = "sources-dnstap";
 const CARGO_CONFIG_FILENAMES: &[&str] = &["config.toml", "config"];
 
-const UNSUPPORTED_INTERPOLATION: &str = "cargo vdev feature selection does not support environment or secret interpolation in feature selectors or VRL programs; use `cargo run` instead";
 const UNSUPPORTED_PROVIDER: &str = "cargo vdev feature selection does not support configuration providers; use `cargo run` instead";
-static ENV_INTERPOLATION: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\$\$|\$([[:word:].]+)|\$\{([[:word:].]+)(?:(:?-|:?\?)([^}]*))?\}")
-        .expect("environment interpolation regex must compile")
-});
-static SECRET_INTERPOLATION: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]")
-        .expect("secret interpolation regex must compile")
-});
 
 /// Partial configuration used to discover the features needed to compile Vector.
 ///
@@ -158,8 +143,6 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
     if config.provider.is_some() {
         bail!(UNSUPPORTED_PROVIDER);
     }
-    validate_feature_selectors(config)?;
-
     let mut features = FeatureSet::default();
     add_option(&mut features, "api", config.api.as_ref());
 
@@ -199,11 +182,7 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
     }
 
     if uses_vrl {
-        features.extend(
-            VRL_FUNCTION_FEATURES
-                .iter()
-                .map(|feature| (*feature).into()),
-        );
+        features.extend(VRL_FEATURES.iter().map(|feature| (*feature).into()));
     }
 
     for feature in ALWAYS_COMPILED_FEATURES {
@@ -211,89 +190,6 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
     }
 
     Ok(features.into_iter().collect())
-}
-
-fn validate_feature_selectors(config: &FeatureConfig) -> Result<()> {
-    for (section, contains_transforms) in [
-        (&config.enrichment_tables, false),
-        (&config.secret, false),
-        (&config.sources, false),
-        (&config.transforms, true),
-        (&config.sinks, false),
-    ] {
-        for component in section.values() {
-            if is_dynamic(&component.r#type)
-                || component.options.iter().any(|(key, value)| {
-                    (contains_transforms
-                        && TRANSFORM_PROGRAM_KEYS.contains(&key.as_str())
-                        && contains_dynamic_value(value))
-                        || has_dynamic_feature_input(Some(key.as_str()), value)
-                })
-            {
-                bail!(UNSUPPORTED_INTERPOLATION);
-            }
-        }
-    }
-    if config
-        .other
-        .iter()
-        .any(|(key, value)| has_dynamic_feature_input(Some(key.as_str()), value))
-    {
-        bail!(UNSUPPORTED_INTERPOLATION);
-    }
-    Ok(())
-}
-
-fn has_dynamic_feature_input(parent_key: Option<&str>, value: &Value) -> bool {
-    match value {
-        Value::Array(values) => values
-            .iter()
-            .any(|value| has_dynamic_feature_input(parent_key, value)),
-        Value::Object(object) => {
-            DYNAMIC_SELECTOR_KEYS
-                .iter()
-                .filter_map(|key| object.get(*key).and_then(Value::as_str))
-                .any(is_dynamic)
-                || (parent_key == Some(AUTH_KEY)
-                    && object
-                        .get(STRATEGY_KEY)
-                        .and_then(Value::as_str)
-                        .is_some_and(is_dynamic))
-                || object
-                    .get(CONDITION_KEY)
-                    .is_some_and(contains_dynamic_value)
-                || (VRL_DISCRIMINATORS
-                    .iter()
-                    .any(|(key, value)| object.get(*key).and_then(Value::as_str) == Some(*value))
-                    && VRL_PROGRAM_KEYS
-                        .iter()
-                        .filter_map(|key| object.get(*key))
-                        .any(contains_dynamic_value))
-                || (parent_key == Some(AUTH_KEY)
-                    && object.get(STRATEGY_KEY).and_then(Value::as_str) == Some(CUSTOM_STRATEGY)
-                    && object.get(SOURCE_KEY).is_some_and(contains_dynamic_value))
-                || object
-                    .iter()
-                    .any(|(key, value)| has_dynamic_feature_input(Some(key.as_str()), value))
-        }
-        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => false,
-    }
-}
-
-fn contains_dynamic_value(value: &Value) -> bool {
-    match value {
-        Value::Array(values) => values.iter().any(contains_dynamic_value),
-        Value::Object(object) => object.values().any(contains_dynamic_value),
-        Value::String(value) => is_dynamic(value),
-        Value::Null | Value::Bool(_) | Value::Number(_) => false,
-    }
-}
-
-fn is_dynamic(value: &str) -> bool {
-    ENV_INTERPOLATION
-        .captures_iter(value)
-        .any(|captures| captures.get(1).is_some() || captures.get(2).is_some())
-        || SECRET_INTERPOLATION.is_match(value)
 }
 
 fn add_option<T>(features: &mut FeatureSet, name: &str, field: Option<&T>) {
@@ -378,35 +274,8 @@ fn get_nested_features(
                 get_nested_features(features, uses_vrl, Some(key.as_str()), value);
             }
         }
-        Value::String(value) => {
-            if uses_dnstap(value) {
-                features.insert(DNSTAP_FEATURE.into());
-            }
-        }
-        Value::Null | Value::Bool(_) | Value::Number(_) => {}
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
     }
-}
-
-fn uses_dnstap(mut value: &str) -> bool {
-    while let Some(index) = value.find(DNSTAP_FUNCTION) {
-        let (prefix, matched) = value.split_at(index);
-        let suffix = matched
-            .strip_prefix(DNSTAP_FUNCTION)
-            .expect("find returned the start of the function name");
-        let has_identifier_prefix = prefix
-            .chars()
-            .next_back()
-            .is_some_and(|character| character.is_alphanumeric() || character == '_');
-        let call = suffix.trim_start();
-
-        if !has_identifier_prefix && (call.starts_with('(') || call.starts_with("!(")) {
-            return true;
-        }
-
-        value = suffix;
-    }
-
-    false
 }
 
 fn kafka_gssapi_feature() -> &'static str {
@@ -563,6 +432,7 @@ sinks:
                 "sinks-sematext",
                 "sinks-splunk_hec",
                 "sinks-websocket_server",
+                "sources-dnstap",
                 "sources-gcp_pubsub",
                 "sources-prometheus_scrape",
                 "transforms-exclusive_route",
@@ -606,6 +476,7 @@ secret:
         assert_eq!(
             features("transforms:\n  metrics:\n    type: log_to_metric\n"),
             [
+                "sources-dnstap",
                 "transforms-log_to_metric",
                 "vrl-functions-crypto",
                 "vrl-functions-env",
@@ -635,6 +506,7 @@ sinks:
             [
                 "codecs-parquet",
                 "sinks-aws_s3",
+                "sources-dnstap",
                 "transforms-remap",
                 "vrl-functions-crypto",
                 "vrl-functions-env",
@@ -642,23 +514,6 @@ sinks:
                 "vrl-functions-system",
             ]
         );
-    }
-
-    #[test]
-    fn enables_dnstap_for_both_vrl_call_variants() {
-        for call in ["parse_dnstap(.message)", "parse_dnstap!(.message)"] {
-            let config = format!(
-                r"
-transforms:
-  remap:
-    type: remap
-    source: |
-      .dns = {call}
-"
-            );
-
-            assert!(features(&config).contains(&"sources-dnstap".into()));
-        }
     }
 
     #[test]
@@ -722,6 +577,7 @@ sources:
         let features = features(config);
 
         for feature in [
+            "sources-dnstap",
             "vrl-functions-crypto",
             "vrl-functions-env",
             "vrl-functions-network",
@@ -745,6 +601,7 @@ sources:
             let features = features(config);
 
             for feature in [
+                "sources-dnstap",
                 "vrl-functions-crypto",
                 "vrl-functions-env",
                 "vrl-functions-network",
@@ -768,56 +625,6 @@ sources:
             from_config(&config, &DECLARED_FEATURES).expect_err("configuration provider must fail");
 
         assert!(error.to_string().contains("use `cargo run` instead"));
-    }
-
-    #[test]
-    fn rejects_interpolated_feature_selectors() {
-        for config in [
-            "sources:\n  input:\n    type: ${SOURCE_TYPE}\n",
-            "sources:\n  input:\n    type: SECRET[features.source_type]\n",
-            "sinks:\n  output:\n    type: aws_s3\n    encoding:\n      codec: ${CODEC}\n",
-            "sinks:\n  output:\n    type: http\n    auth:\n      strategy: ${AUTH_STRATEGY}\n",
-            "sources:\n  input:\n    type: kafka\n    librdkafka_options:\n      sasl.mechanism: ${SASL_MECHANISM}\n",
-            "sources:\n  input:\n    type: kafka\n    librdkafka_options:\n      sasl.mechanisms: ${SASL_MECHANISMS}\n",
-            "sources:\n  input:\n    type: http_client\n    query:\n      host:\n        type: ${QUERY_TYPE}\n        value: get_hostname!()\n",
-        ] {
-            let config = serde_yaml::from_str::<FeatureConfig>(config).expect("config must parse");
-            let error = from_config(&config, &DECLARED_FEATURES)
-                .expect_err("interpolated selector must fail");
-            assert!(error.to_string().contains("use `cargo run` instead"));
-        }
-
-        assert_eq!(
-            features(
-                "sources:\n  input:\n    type: file\n    include: [app.log]\n    fingerprint:\n      strategy: ${FINGERPRINT_STRATEGY}\n",
-            ),
-            ["sources-file"]
-        );
-    }
-
-    #[test]
-    fn rejects_dynamic_vrl_programs() {
-        for config in [
-            "transforms:\n  remap:\n    type: remap\n    source: ${VRL_SOURCE}\n",
-            "sources:\n  input:\n    type: http_client\n    query:\n      host:\n        type: vrl\n        value: SECRET[programs.query]\n",
-            "transforms:\n  route:\n    type: route\n    route:\n      dynamic:\n        type: vrl\n        source: ${ROUTE_CONDITION}\n",
-            "tests:\n  - condition: ${TEST_CONDITION}\n",
-        ] {
-            let config = serde_yaml::from_str::<FeatureConfig>(config).expect("config must parse");
-            let error = from_config(&config, &DECLARED_FEATURES)
-                .expect_err("dynamic VRL program must fail");
-            assert!(error.to_string().contains("use `cargo run` instead"));
-        }
-    }
-
-    #[test]
-    fn allows_non_interpolation_syntax_in_vrl_programs() {
-        for source in [r#".currency = "$""#, r#".message = "SECRET[missing_dot]""#] {
-            let config =
-                format!("transforms:\n  remap:\n    type: remap\n    source: '{source}'\n");
-
-            assert!(features(&config).contains(&"transforms-remap".into()));
-        }
     }
 
     #[test]
